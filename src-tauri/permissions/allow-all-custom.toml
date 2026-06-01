@@ -1,0 +1,25 @@
+[[permission]]
+identifier = "allow-all-custom"
+description = "Allow all custom Whisper Manager command invokes"
+
+[permission.commands]
+allow = [
+  "get_system_stats",
+  "load_settings",
+  "save_settings",
+  "apply_preset",
+  "check_build",
+  "start_git_operations",
+  "start_compilation_task",
+  "probe_media_file",
+  "convert_media_file",
+  "start_transcription_task",
+  "cancel_transcription",
+  "copy_to_clipboard",
+  "get_logs",
+  "clear_logs",
+  "scan_models",
+  "select_file",
+  "select_files",
+  "select_directory"
+]

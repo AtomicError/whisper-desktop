@@ -1,0 +1,1229 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="styles.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Whisper Manager Desktop</title>
+    <script type="module" src="main.js" defer></script>
+  </head>
+
+  <body style="display:flex; flex-direction:column; height:100vh; overflow:hidden;">
+    <!-- Premium GNOME-Style CSD Headerbar -->
+    <div data-tauri-drag-region class="titlebar">
+      <div class="titlebar-brand" data-tauri-drag-region>
+        <svg class="titlebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+          <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
+          <line x1="12" x2="12" y1="19" y2="22"/>
+        </svg>
+        <span class="titlebar-text" data-tauri-drag-region>Whisper Desktop</span>
+      </div>
+      
+      <div class="titlebar-buttons">
+        <button id="titlebar-minimize" title="Minimize">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+        </button>
+        <button id="titlebar-maximize" title="Maximize">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+          </svg>
+        </button>
+        <button id="titlebar-close" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div id="app-container">
+      
+      <!-- Left Sidebar Navigation -->
+      <sidebar>
+        <div class="brand">
+          <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+            <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
+            <line x1="12" x2="12" y1="19" y2="22"/>
+          </svg>
+          <div class="brand-name">Whisper Desktop</div>
+        </div>
+        
+        <div class="nav-links">
+          <div class="nav-item active" onclick="switchView('intro')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="7" height="7"/>
+              <rect x="14" y="3" width="7" height="7"/>
+              <rect x="14" y="14" width="7" height="7"/>
+              <rect x="3" y="14" width="7" height="7"/>
+            </svg>
+            Dashboard
+          </div>
+          
+          <div class="nav-item" onclick="switchView('build')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+              <line x1="12" y1="22.08" x2="12" y2="12"/>
+            </svg>
+            System Build
+          </div>
+          
+          <div class="nav-item" onclick="switchView('settings')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+            Configuration
+          </div>
+          
+          <div class="nav-item" onclick="switchView('transcribe')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 20h9"/>
+              <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+            </svg>
+            Transcribe File
+          </div>
+          
+          <div class="nav-item" onclick="switchView('logs')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
+              <polyline points="13 2 13 9 20 9"/>
+            </svg>
+            Activity Logs
+          </div>
+        </div>
+        
+        <div class="developer-credit">
+          Developed by <span>TheMrAhmad</span>
+        </div>
+      </sidebar>
+
+      <!-- Right Workspace -->
+      <div class="workspace">
+        
+        <!-- Top HUD for Live System Performance -->
+        <header>
+          <div class="view-title" id="current-view-title">Dashboard</div>
+          <div class="system-stats-hud">
+            <div class="hud-item">
+              <span class="stat-label">CPU:</span>
+              <span class="stat-value active" id="stat-cpu">0.0%</span>
+            </div>
+            <div class="hud-item">
+              <span class="stat-label">RAM:</span>
+              <span class="stat-value active" id="stat-ram">0.0GB / 0.0GB</span>
+            </div>
+            <div class="hud-item">
+              <span class="stat-label">GPU:</span>
+              <span class="stat-value active" id="stat-gpu">N/A</span>
+            </div>
+          </div>
+        </header>
+
+        <!-- View Panels -->
+        <main style="flex-grow: 1; overflow: hidden; position: relative;">
+          
+          <!-- 1. INTRO PANEL -->
+          <div class="view-panel active" id="panel-intro">
+            <div class="intro-grid">
+              <div class="glass-card intro-welcome">
+                <h2>Welcome to Whisper.cpp Desktop</h2>
+                <p>
+                  This is a modern, high-performance desktop application designed exclusively for Linux to orchestrate and execute Whisper.cpp audio-to-text models.
+                </p>
+                <p>
+                  Use this manager to download models, verify hardware acceleration dependencies, optimize custom computation settings, convert audio streams, and output multiple subtitle formats in real time.
+                </p>
+                <div class="features-list">
+                  <div class="feature-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 15h3M1 9h3M1 15h3"/></svg>
+                    <div>
+                      <div class="feature-title">Multi-Backend Compilation</div>
+                      <div class="feature-desc">Easily build Standard CPU, Vulkan, OpenVINO, and CUDA acceleration backends in one click.</div>
+                    </div>
+                  </div>
+                  <div class="feature-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                    <div>
+                      <div class="feature-title">Sequential Batch Queue</div>
+                      <div class="feature-desc">Orchestrate multi-file transcription with dynamic queue controls, precise duration tracking, individual item removal, and real-time progress.</div>
+                    </div>
+                  </div>
+                  <div class="feature-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                    <div>
+                      <div class="feature-title">Premium Cyber-Neon CSD HUD</div>
+                      <div class="feature-desc">Enjoy a custom obsidian glassmorphic UI featuring GTK-style client-side decorations (CSD), fluid window dragging, and ambient neon telemetry.</div>
+                    </div>
+                  </div>
+                  <div class="feature-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                    <div>
+                      <div class="feature-title">Pristine Live Logging Viewport</div>
+                      <div class="feature-desc">Monitor execution events with spaced monospace category grids and clipboard synchronization with automated ANSI formatting sequence stripping.</div>
+                    </div>
+                  </div>
+                  <div class="feature-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    <div>
+                      <div class="feature-title">Complete Whisper Management</div>
+                      <div class="feature-desc">Experience simplified settings control. Switch presets, tune Silero VAD, auto-probe media specifications, and export TXT, SRT, VTT, LRC, CSV, JSON, and karaoke subtitles.</div>
+                    </div>
+                  </div>
+                  <div class="feature-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="8 11 11 14 16 9"/></svg>
+                    <div>
+                      <div class="feature-title">Self-Healing Diagnostics HUD</div>
+                      <div class="feature-desc">Prevent GPU crashes with safe-clamped decoders, scan local directory for missing files, and rely on regex-based stderr duration fallbacks.</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="glass-card quick-start-card">
+                <h3>Quick Actions</h3>
+                <div class="shortcut-btn-card">
+                  <div class="shortcut-main-row" onclick="switchView('build')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+                    </svg>
+                    <div style="flex-grow:1; text-align:left;">
+                      <div style="font-weight:600">Compile & Switch Backends</div>
+                      <div style="font-size:0.75rem; color:var(--color-text-muted)" id="shortcut-backend-status">Active Backend: CPU</div>
+                    </div>
+                  </div>
+                  <div class="backend-tiles-row">
+                    <div class="backend-tile" id="tile-Standard" onclick="dashboardSelectBackend('Standard', event)">CPU</div>
+                    <div class="backend-tile" id="tile-Vulkan" onclick="dashboardSelectBackend('Vulkan', event)">Vulkan</div>
+                    <div class="backend-tile" id="tile-OpenVINO" onclick="dashboardSelectBackend('OpenVINO', event)">OpenVINO</div>
+                    <div class="backend-tile" id="tile-CUDA" onclick="dashboardSelectBackend('CUDA', event)">CUDA</div>
+                  </div>
+                </div>
+                
+                <div class="shortcut-btn-card" onclick="switchView('settings')" style="cursor:pointer;">
+                  <div class="shortcut-main-row" style="margin-bottom:0; display:flex; align-items:center; gap:12px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                    </svg>
+                    <div style="flex-grow:1; text-align:left;">
+                      <div style="font-weight:600">Model Configuration</div>
+                      <div style="font-size:0.75rem; color:var(--color-text-muted)">Tune VAD and decoding thresholds</div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="shortcut-btn-card drag-drop-dashboard-zone" id="dashboard-drag-zone" onclick="switchView('transcribe')" style="cursor:pointer;">
+                  <div class="shortcut-main-row" style="margin-bottom:0; flex-direction:column; align-items:flex-start; gap:8px; width:100%;">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+                      </svg>
+                      <div style="font-weight:600">Transcribe File</div>
+                    </div>
+                    <div style="font-size:0.75rem; color:var(--color-cyan); border:1px dashed rgba(6,182,212,0.3); border-radius:6px; padding:10px; width:100%; text-align:center; background:rgba(6,182,212,0.02); transition: all 0.25s ease;" id="dashboard-drag-status-text">
+                      Drag & Drop Audio/Video files here to transcribe instantly!
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. SYSTEM BUILD PANEL -->
+          <div class="view-panel" id="panel-build">
+            <div class="glass-card" style="margin-bottom: 24px;">
+              <h3 style="margin-bottom:16px;">Source Repository Configuration</h3>
+              <div class="build-setup-row">
+                <input class="text-input" type="text" id="build-clone-dir" placeholder="/home/user/whisper.cpp" />
+                <button class="btn-secondary" onclick="browseCloneDirectory()">Browse</button>
+                <button class="btn-primary" id="btn-git-op" onclick="runGitOperations()">Clone / Update Repo</button>
+              </div>
+            </div>
+
+            <h3 style="margin-bottom:16px;">Select Compilation Backend</h3>
+            <div class="backends-grid">
+              <div class="glass-card backend-card active" id="backend-Standard" onclick="selectBackend('Standard')">
+                <div class="backend-card-header">
+                  <span class="backend-name">Standard CPU</span>
+                  <svg class="backend-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="15" x2="23" y2="15"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="15" x2="4" y2="15"/></svg>
+                </div>
+                <div class="backend-status-badge missing" id="badge-Standard">Checking...</div>
+              </div>
+
+              <div class="glass-card backend-card" id="backend-Vulkan" onclick="selectBackend('Vulkan')">
+                <div class="backend-card-header">
+                  <span class="backend-name">Vulkan GPU</span>
+                  <svg class="backend-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                </div>
+                <div class="backend-status-badge missing" id="badge-Vulkan">Checking...</div>
+              </div>
+
+              <div class="glass-card backend-card" id="backend-OpenVINO" onclick="selectBackend('OpenVINO')">
+                <div class="backend-card-header">
+                  <span class="backend-name">OpenVINO Intel</span>
+                  <svg class="backend-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3z"/><path d="M6 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3z"/></svg>
+                </div>
+                <div class="backend-status-badge missing" id="badge-OpenVINO">Checking...</div>
+              </div>
+
+              <div class="glass-card backend-card" id="backend-CUDA" onclick="selectBackend('CUDA')">
+                <div class="backend-card-header">
+                  <span class="backend-name">NVIDIA CUDA</span>
+                  <svg class="backend-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                </div>
+                <div class="backend-status-badge missing" id="badge-CUDA">Checking...</div>
+              </div>
+            </div>
+
+            <div class="glass-card compilation-panel">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                  <h4 id="compilation-title" style="font-size:1.1rem; margin-bottom:4px;">Standard CPU Compilation</h4>
+                  <p style="font-size:0.85rem; color:var(--color-text-muted);">Triggers a clean CMake build. Previous compiled binaries for this backend will be replaced.</p>
+                </div>
+                <button class="btn-primary" id="btn-run-build" onclick="runBackendBuild()">Run Full Compiler</button>
+              </div>
+
+              <!-- Compile progress -->
+              <div class="build-progress-wrapper" id="build-progress-block" style="display:none;">
+                <div class="progress-info">
+                  <div class="progress-header">
+                    <span class="progress-label" id="build-progress-msg">Compiling binaries...</span>
+                    <span class="progress-pct" id="build-progress-pct">0%</span>
+                  </div>
+                  <div class="progress-bar-container">
+                    <div class="progress-bar-fill" id="build-progress-bar"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. SETTINGS CONFIGURATION PANEL -->
+          <div class="view-panel" id="panel-settings">
+            <div class="presets-container">
+              <div>
+                <h3 style="font-size:1.2rem; margin-bottom:4px;">Whisper Engine Configuration</h3>
+                <p style="font-size:0.8rem; color:var(--color-text-muted);">Adjust decoding thresholds and performance variables</p>
+              </div>
+              <div class="preset-selector-row">
+                <span style="font-size:0.85rem; color:var(--color-text-muted); align-self:center; margin-right:8px; font-weight:500;">PRESETS:</span>
+                <button class="preset-btn active" id="preset-safe" onclick="switchPreset('safe')">Safe Defaults</button>
+                <button class="preset-btn" id="preset-professional" onclick="switchPreset('professional')">Professional (VAD)</button>
+              </div>
+            </div>
+
+            <div class="settings-layout">
+              <div class="settings-categories">
+                <div class="settings-cat-btn active" id="cat-btn-general" onclick="switchSettingsCategory('general')">General Setup</div>
+                <div class="settings-cat-btn" id="cat-btn-computation" onclick="switchSettingsCategory('computation')">Computation</div>
+                <div class="settings-cat-btn" id="cat-btn-search" onclick="switchSettingsCategory('search')">Decoding Search</div>
+                <div class="settings-cat-btn" id="cat-btn-outputs" onclick="switchSettingsCategory('outputs')">Outputs</div>
+                <div class="settings-cat-btn" id="cat-btn-gpu" onclick="switchSettingsCategory('gpu')">GPU Execution</div>
+                <div class="settings-cat-btn" id="cat-btn-vad" onclick="switchSettingsCategory('vad')">Silero VAD</div>
+              </div>
+
+              <div class="settings-scroll-container">
+                <!-- Settings Groups -->
+                <div class="settings-group active" id="group-general">
+                  <!-- General cards -->
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Model Selection</span>
+                        <span class="setting-flag">-m</span>
+                      </div>
+                      <div class="setting-desc">The GGML model file to use for transcription (searched inside the <code>models/</code> folder). <strong style="color:var(--color-gold); display:block; margin-top:4px;">Note: You must download GGML models manually and place them in the models folder; this application does not download models automatically.</strong></div>
+                    </div>
+                    <div class="setting-control">
+                      <select class="select-control" id="opt-modelPath"></select>
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Language Spoken</span>
+                        <span class="setting-flag">-l</span>
+                      </div>
+                      <div class="setting-desc">Spoken language in the audio. Set "auto" to automatically detect language.</div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" type="text" id="opt-language" />
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Initial Prompt</span>
+                        <span class="setting-flag">--prompt</span>
+                      </div>
+                      <div class="setting-desc">Initial prompt text to guide the model's vocabulary and spelling style.</div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" type="text" id="opt-prompt" />
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Carry Initial Prompt</span>
+                        <span class="setting-flag">--carry-initial-prompt</span>
+                      </div>
+                      <div class="setting-desc">Always prepend the initial prompt to all contexts.</div>
+                    </div>
+                    <div class="setting-control">
+                      <label class="switch">
+                        <input type="checkbox" id="opt-carryPrompt" />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Detect Language Only</span>
+                        <span class="setting-flag">-dl</span>
+                      </div>
+                      <div class="setting-desc">Automatically detect the language and exit immediately without full transcription.</div>
+                    </div>
+                    <div class="setting-control">
+                      <label class="switch">
+                        <input type="checkbox" id="opt-detectLanguage" />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="settings-group" id="group-computation">
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Threads Count</span>
+                        <span class="setting-flag">-t</span>
+                      </div>
+                      <div class="setting-desc">Number of processor threads to allocate for standard decoding.</div>
+                    </div>
+                    <div class="setting-control">
+                      <div class="number-input-control">
+                        <button onclick="decrementNumber('opt-threads', 1)">-</button>
+                        <input type="text" id="opt-threads" value="4" readonly />
+                        <button onclick="incrementNumber('opt-threads', 1)">+</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Processors Count</span>
+                        <span class="setting-flag">-p</span>
+                      </div>
+                      <div class="setting-desc">Number of parallel processors to use (useful for multi-stream transcription).</div>
+                    </div>
+                    <div class="setting-control">
+                      <div class="number-input-control">
+                        <button onclick="decrementNumber('opt-processors', 1)">-</button>
+                        <input type="text" id="opt-processors" value="1" readonly />
+                        <button onclick="incrementNumber('opt-processors', 1)">+</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Max Token Context</span>
+                        <span class="setting-flag">-mc</span>
+                      </div>
+                      <div class="setting-desc">Maximum context size in tokens. Set -1 to auto-manage contexts.</div>
+                    </div>
+                    <div class="setting-control">
+                      <div class="number-input-control">
+                        <button onclick="decrementNumber('opt-maxContext', 1)">-</button>
+                        <input type="text" id="opt-maxContext" value="-1" readonly />
+                        <button onclick="incrementNumber('opt-maxContext', 1)">+</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Max Segment Length</span>
+                        <span class="setting-flag">-ml</span>
+                      </div>
+                      <div class="setting-desc">Maximum segment length in characters (0 for unlimited).</div>
+                    </div>
+                    <div class="setting-control">
+                      <div class="number-input-control">
+                        <button onclick="decrementNumber('opt-maxLen', 5)">-</button>
+                        <input type="text" id="opt-maxLen" value="0" readonly />
+                        <button onclick="incrementNumber('opt-maxLen', 5)">+</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Time Offset (ms)</span>
+                        <span class="setting-flag">-ot</span>
+                      </div>
+                      <div class="setting-desc">Process audio from this timestamp offset in milliseconds.</div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" style="width:100px; text-align:center;" type="number" id="opt-offsetT" />
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Segment Index Offset</span>
+                        <span class="setting-flag">-on</span>
+                      </div>
+                      <div class="setting-desc">Starting offset index for written subtitles.</div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" style="width:100px; text-align:center;" type="number" id="opt-offsetN" />
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Process Duration (ms)</span>
+                        <span class="setting-flag">-d</span>
+                      </div>
+                      <div class="setting-desc">Limit audio duration to process in milliseconds (0 for entire file).</div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" style="width:100px; text-align:center;" type="number" id="opt-duration" />
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Split on Word</span>
+                        <span class="setting-flag">-sow</span>
+                      </div>
+                      <div class="setting-desc">Force split segments strictly on word boundaries rather than token bounds.</div>
+                    </div>
+                    <div class="setting-control">
+                      <label class="switch">
+                        <input type="checkbox" id="opt-splitWord" />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="settings-group" id="group-search">
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Best Candidates Count</span>
+                        <span class="setting-flag">-bo</span>
+                      </div>
+                      <div class="setting-desc">Number of best candidates to maintain during standard greedy sampling.</div>
+                    </div>
+                    <div class="setting-control">
+                      <div class="number-input-control">
+                        <button onclick="decrementNumber('opt-bestOf', 1)">-</button>
+                        <input type="text" id="opt-bestOf" value="5" readonly />
+                        <button onclick="incrementNumber('opt-bestOf', 1)">+</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Beam Search Size</span>
+                        <span class="setting-flag">-bs</span>
+                      </div>
+                      <div class="setting-desc">Beam size used for Beam Search decoding (increases accuracy at speed cost).</div>
+                    </div>
+                    <div class="setting-control">
+                      <div class="number-input-control">
+                        <button onclick="decrementNumber('opt-beamSize', 1)">-</button>
+                        <input type="text" id="opt-beamSize" value="5" readonly />
+                        <button onclick="incrementNumber('opt-beamSize', 1)">+</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Audio Context Size</span>
+                        <span class="setting-flag">-ac</span>
+                      </div>
+                      <div class="setting-desc">Override audio context size (0 to use defaults).</div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" style="width:100px; text-align:center;" type="number" id="opt-audioCtx" />
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Word Timestamp Threshold</span>
+                        <span class="setting-flag">-wt</span>
+                      </div>
+                      <div class="setting-desc">Word timestamp probability threshold.</div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" style="width:100px; text-align:center;" type="number" step="0.01" id="opt-wordThold" />
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Entropy Threshold</span>
+                        <span class="setting-flag">-et</span>
+                      </div>
+                      <div class="setting-desc">Entropy threshold for automatic temperature fallback.</div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" style="width:100px; text-align:center;" type="number" step="0.1" id="opt-entropyThold" />
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Log Probability Threshold</span>
+                        <span class="setting-flag">-lpt</span>
+                      </div>
+                      <div class="setting-desc">Average log probability threshold for fallback logic.</div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" style="width:100px; text-align:center;" type="number" step="0.1" id="opt-logprobThold" />
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">No Speech Threshold</span>
+                        <span class="setting-flag">-nth</span>
+                      </div>
+                      <div class="setting-desc">Threshold to identify and ignore silent chunks automatically.</div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" style="width:100px; text-align:center;" type="number" step="0.05" id="opt-noSpeechThold" />
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Sampling Temperature</span>
+                        <span class="setting-flag">-tp</span>
+                      </div>
+                      <div class="setting-desc">Initial decoding temperature (lower values are highly deterministic).</div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" style="width:100px; text-align:center;" type="number" step="0.05" id="opt-temperature" />
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Temperature Increment</span>
+                        <span class="setting-flag">-tpi</span>
+                      </div>
+                      <div class="setting-desc">Temperature increment step value on fallback runs.</div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" style="width:100px; text-align:center;" type="number" step="0.05" id="opt-temperatureInc" />
+                    </div>
+                  </div>
+                </div>
+
+                <div class="settings-group" id="group-outputs">
+                  <!-- Output checklist -->
+                  <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+                    <div class="setting-card">
+                      <div class="setting-info">
+                        <span class="setting-title">Text Transcript (.txt)</span>
+                        <span class="setting-flag">-otxt</span>
+                      </div>
+                      <div class="setting-control">
+                        <label class="switch">
+                          <input type="checkbox" id="opt-outputTxt" />
+                          <span class="slider"></span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="setting-card">
+                      <div class="setting-info">
+                        <span class="setting-title">SRT Subtitles (.srt)</span>
+                        <span class="setting-flag">-osrt</span>
+                      </div>
+                      <div class="setting-control">
+                        <label class="switch">
+                          <input type="checkbox" id="opt-outputSrt" />
+                          <span class="slider"></span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="setting-card">
+                      <div class="setting-info">
+                        <span class="setting-title">WebVTT Subtitles (.vtt)</span>
+                        <span class="setting-flag">-ovtt</span>
+                      </div>
+                      <div class="setting-control">
+                        <label class="switch">
+                          <input type="checkbox" id="opt-outputVtt" />
+                          <span class="slider"></span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="setting-card">
+                      <div class="setting-info">
+                        <span class="setting-title">LRC Lyrics (.lrc)</span>
+                        <span class="setting-flag">-olrc</span>
+                      </div>
+                      <div class="setting-control">
+                        <label class="switch">
+                          <input type="checkbox" id="opt-outputLrc" />
+                          <span class="slider"></span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="setting-card">
+                      <div class="setting-info">
+                        <span class="setting-title">CSV Dataset (.csv)</span>
+                        <span class="setting-flag">-ocsv</span>
+                      </div>
+                      <div class="setting-control">
+                        <label class="switch">
+                          <input type="checkbox" id="opt-outputCsv" />
+                          <span class="slider"></span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="setting-card">
+                      <div class="setting-info">
+                        <span class="setting-title">JSON Formatted (.json)</span>
+                        <span class="setting-flag">-oj</span>
+                      </div>
+                      <div class="setting-control">
+                        <label class="switch">
+                          <input type="checkbox" id="opt-outputJson" />
+                          <span class="slider"></span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="setting-card">
+                      <div class="setting-info">
+                        <span class="setting-title">Full Detailed JSON</span>
+                        <span class="setting-flag">-ojf</span>
+                      </div>
+                      <div class="setting-desc">Inject metadata details into JSON.</div>
+                      <div class="setting-control">
+                        <label class="switch">
+                          <input type="checkbox" id="opt-outputJsonFull" />
+                          <span class="slider"></span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="setting-card">
+                      <div class="setting-info">
+                        <span class="setting-title">Karaoke script (.wts.sh)</span>
+                        <span class="setting-flag">-owts</span>
+                      </div>
+                      <div class="setting-desc">Generate karaoke video scripts.</div>
+                      <div class="setting-control">
+                        <label class="switch">
+                          <input type="checkbox" id="opt-outputWords" />
+                          <span class="slider"></span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="setting-card" style="margin-top:12px;">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Karaoke Font Path</span>
+                        <span class="setting-flag">-fp</span>
+                      </div>
+                      <div class="setting-desc">System absolute path to TTF/OTF font used for rendering video subtitle layers.</div>
+                    </div>
+                    <div class="setting-control" style="width:300px; display:flex; gap:8px;">
+                      <input class="text-input" type="text" id="opt-fontPath" placeholder="/usr/share/fonts/..." />
+                      <button class="btn-secondary" style="padding: 10px 14px; font-size:0.8rem;" onclick="browseFontFile()">Browse</button>
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Ignore Timestamps</span>
+                        <span class="setting-flag">-nt</span>
+                      </div>
+                      <div class="setting-desc">Do not print timestamps next to output lines.</div>
+                    </div>
+                    <div class="setting-control">
+                      <label class="switch">
+                        <input type="checkbox" id="opt-noTimestamps" />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Print Special Tokens</span>
+                        <span class="setting-flag">-ps</span>
+                      </div>
+                      <div class="setting-desc">Output special tags (EOT, SOT, timestamps) in the console log stream.</div>
+                    </div>
+                    <div class="setting-control">
+                      <label class="switch">
+                        <input type="checkbox" id="opt-printSpecial" />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="settings-group" id="group-gpu">
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Disable GPU Acceleration</span>
+                        <span class="setting-flag">-ng</span>
+                      </div>
+                      <div class="setting-desc">Force CPU-only computations, even if Vulkan or CUDA is configured.</div>
+                    </div>
+                    <div class="setting-control">
+                      <label class="switch">
+                        <input type="checkbox" id="opt-noGPU" />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">GPU Device Index</span>
+                        <span class="setting-flag">-dev</span>
+                      </div>
+                      <div class="setting-desc">Hardware ID of the graphics card to run calculations on (e.g. 0).</div>
+                    </div>
+                    <div class="setting-control">
+                      <div class="number-input-control">
+                        <button onclick="decrementNumber('opt-deviceId', 1)">-</button>
+                        <input type="text" id="opt-deviceId" value="0" readonly />
+                        <button onclick="incrementNumber('opt-deviceId', 1)">+</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">OpenVINO Hardware Device</span>
+                        <span class="setting-flag">-oved</span>
+                      </div>
+                      <div class="setting-desc">Intel OpenVINO target execution hardware device. CPU or GPU.</div>
+                    </div>
+                    <div class="setting-control">
+                      <select class="select-control" style="width:100px;" id="opt-ovDevice">
+                        <option value="CPU">CPU</option>
+                        <option value="GPU">GPU</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="settings-group" id="group-vad">
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Enable Voice Activity Detection</span>
+                        <span class="setting-flag">--vad</span>
+                      </div>
+                      <div class="setting-desc">Filters silences to optimize speed and mitigate repetition loops.</div>
+                    </div>
+                    <div class="setting-control">
+                      <label class="switch">
+                        <input type="checkbox" id="opt-vad" />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">VAD Model</span>
+                        <span class="setting-flag">-vm</span>
+                      </div>
+                      <div class="setting-desc">The Silero VAD bin model file. Loaded inside models/.</div>
+                    </div>
+                    <div class="setting-control">
+                      <select class="select-control" id="opt-vadModel"></select>
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">VAD Threshold</span>
+                        <span class="setting-flag">-vt</span>
+                      </div>
+                      <div class="setting-desc">VAD probability threshold for speech detection (0.0 to 1.0).</div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" style="width:100px; text-align:center;" type="number" step="0.05" id="opt-vadThold" />
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">VAD Min Speech (ms)</span>
+                        <span class="setting-flag">-vspd</span>
+                      </div>
+                      <div class="setting-desc">Minimum duration of speech in milliseconds to trigger transcription.</div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" style="width:100px; text-align:center;" type="number" id="opt-vadMinSpeech" />
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">VAD Min Silence (ms)</span>
+                        <span class="setting-flag">-vsd</span>
+                      </div>
+                      <div class="setting-desc">Silence duration threshold in milliseconds to finalize speech segment.</div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" style="width:100px; text-align:center;" type="number" id="opt-vadMinSil" />
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">VAD Max Speech (ms)</span>
+                        <span class="setting-flag">-vmsd</span>
+                      </div>
+                      <div class="setting-desc">Max duration of a speech segment in milliseconds to process at once.</div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" style="width:100px; text-align:center;" type="number" id="opt-vadMaxSpeech" />
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">VAD Speech Padding (ms)</span>
+                        <span class="setting-flag">-vp</span>
+                      </div>
+                      <div class="setting-desc">Extra padding in milliseconds attached to start and end of detected speech.</div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" style="width:100px; text-align:center;" type="number" id="opt-vadSpeechPad" />
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">VAD Segment Overlap</span>
+                        <span class="setting-flag">-vo</span>
+                      </div>
+                      <div class="setting-desc">Ratio of segment overlap to ensure contextual continuity (e.g. 0.10).</div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" style="width:100px; text-align:center;" type="number" step="0.05" id="opt-vadOverlap" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. TRANSCRIBE FILE PANEL -->
+          <div class="view-panel" id="panel-transcribe">
+            <div class="transcribe-layout">
+              
+              <div class="transcribe-left-panel">
+                <!-- STEP 1: SELECT FILE -->
+                <div class="wizard-step active" id="wizard-step-1">
+                  <div class="wizard-step-header" onclick="toggleWizardAccordion(1)">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                      <div class="wizard-step-icon" id="wizard-icon-1">1</div>
+                      <div class="wizard-step-title">Select Media Resource</div>
+                    </div>
+                    <span class="wizard-chevron" id="wizard-chevron-1">▼</span>
+                  </div>
+                  <div class="wizard-step-body" id="wizard-body-1">
+                    <div class="media-drop-zone" id="transcribe-drop-zone">
+                      <svg class="media-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
+                        <line x1="7" y1="2" x2="7" y2="22"/>
+                        <line x1="17" y1="2" x2="17" y2="22"/>
+                        <line x1="2" y1="12" x2="22" y2="12"/>
+                        <line x1="2" y1="7" x2="7" y2="7"/>
+                        <line x1="2" y1="17" x2="7" y2="17"/>
+                        <line x1="17" y1="17" x2="22" y2="17"/>
+                        <line x1="17" y1="7" x2="22" y2="7"/>
+                      </svg>
+                      <div>
+                        <p style="font-weight:600; margin-bottom:4px;" id="lbl-file-name">No Media File Loaded</p>
+                        <p style="font-size:0.8rem; color:var(--color-text-muted);" id="lbl-file-path">Select audio or video file</p>
+                      </div>
+                      <button class="btn-secondary" onclick="browseMediaFile()">Browse System</button>
+                    </div>
+                    <!-- Batch Queue Table Container (hidden by default) -->
+                    <div id="batch-queue-container" style="display:none; width:100%; margin-top:16px;">
+                      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <span style="font-size:0.85rem; color:var(--color-cyan); font-weight:600;">Queue Files</span>
+                        <button class="btn-secondary" id="btn-clear-batch" style="padding:4px 10px; font-size:0.75rem; border-color:var(--color-red); color:var(--color-red); margin:0;" onclick="clearBatchQueue()">Clear Queue</button>
+                      </div>
+                      <div class="batch-table-wrapper">
+                        <table class="batch-table">
+                          <thead>
+                            <tr>
+                              <th>File Name</th>
+                              <th>Duration</th>
+                              <th>Status</th>
+                              <th style="width: 50px; text-align: center;">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody id="batch-queue-body">
+                            <!-- Dynamic rows injected here -->
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- STEP 2: METADATA & SPECS -->
+                <div class="wizard-step" id="wizard-step-2">
+                  <div class="wizard-step-header" onclick="toggleWizardAccordion(2)">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                      <div class="wizard-step-icon" id="wizard-icon-2">2</div>
+                      <div class="wizard-step-title">Media Specifications</div>
+                    </div>
+                    <span class="wizard-chevron" id="wizard-chevron-2">▼</span>
+                  </div>
+                  <div class="wizard-step-body" id="wizard-body-2">
+                    <div class="media-metadata-box" id="media-meta-box">
+                      <div class="meta-item">
+                        <div class="meta-label">File Type</div>
+                        <div class="meta-value" id="meta-type">-</div>
+                      </div>
+                      <div class="meta-item">
+                        <div class="meta-label">File Size</div>
+                        <div class="meta-value" id="meta-size">-</div>
+                      </div>
+                      <div class="meta-item">
+                        <div class="meta-label">Duration</div>
+                        <div class="meta-value" id="meta-duration" style="color:var(--color-gold);">-</div>
+                      </div>
+                      <div class="meta-item">
+                        <div class="meta-label">Target Format</div>
+                        <div class="meta-value" style="color:var(--color-cyan);">16kHz Mono Target</div>
+                      </div>
+                      <div class="meta-item" style="grid-column: span 2;">
+                        <div class="meta-label">Active Extraction Engine</div>
+                        <div class="meta-value" id="meta-recommendation" style="font-size:0.8rem; line-height:1.4; color:var(--color-purple);">-</div>
+                      </div>
+                    </div>
+                    <!-- Batch Spec Card (hidden by default) -->
+                    <div class="glass-card batch-specs-box" id="batch-specs-box" style="display:none; padding:16px; margin-bottom:16px; border:1px solid var(--border-glass);">
+                      <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px;color:var(--color-cyan);"><path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2" ry="2"/></svg>
+                        <span style="font-weight:600; font-size:0.9rem; color:var(--color-cyan);">Batch Extraction Mode Active</span>
+                      </div>
+                      <div style="font-size:0.85rem; color:var(--color-text-muted); line-height:1.6;">
+                        <p style="margin-bottom:6px;"><strong style="color:#fff;" id="batch-files-count">0</strong> media files are loaded in the queue.</p>
+                        <p style="margin-bottom:12px;">Total Duration: <strong style="color:var(--color-gold);" id="batch-total-duration">--:--:--</strong></p>
+                        <p>Global configurations selected in the settings panel will be applied **globally** to all files in the batch. Processing runs sequentially to ensure stability.</p>
+                      </div>
+                    </div>
+                    <button class="btn-primary wizard-next-btn" id="btn-next-step-2" onclick="openWizardStep(3)">
+                      Continue to Conversion
+                    </button>
+                  </div>
+                </div>
+
+                <!-- STEP 3: WAV AUDIO CONVERSION -->
+                <div class="wizard-step" id="wizard-step-3">
+                  <div class="wizard-step-header" onclick="toggleWizardAccordion(3)">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                      <div class="wizard-step-icon" id="wizard-icon-3">3</div>
+                      <div class="wizard-step-title">WAV Audio Conversion</div>
+                    </div>
+                    <span class="wizard-chevron" id="wizard-chevron-3">▼</span>
+                  </div>
+                  <div class="wizard-step-body" id="wizard-body-3">
+                    <div class="step-details-row" style="margin-bottom: 16px;">
+                      <span>AR: 16000Hz</span> | <span>Mono Channel</span> | <span>PCM S16LE Codec</span>
+                    </div>
+                    <button class="btn-primary" id="btn-run-ffmpeg" onclick="runFFmpegConversion()">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:18px;height:18px;margin-right:8px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                      Run FFmpeg Conversion
+                    </button>
+                    <button class="btn-primary wizard-next-btn" id="btn-next-to-transcribe" style="display:none;" onclick="openWizardStep(4)">
+                      Continue to AI Transcription
+                    </button>
+                    <!-- Batch Control Panel (hidden by default) -->
+                    <div id="batch-controls-box" style="display:none; width:100%;">
+                      <div class="step-details-row" style="margin-bottom: 16px;">
+                        <span>Automated Pipeline</span> | <span>FFmpeg Convert & Whisper Extraction Sequentially</span>
+                      </div>
+                      <div style="display:flex; gap:12px;">
+                        <button class="btn-primary" id="btn-run-batch" style="flex:2;" onclick="runBatchExtraction()">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:18px;height:18px;margin-right:8px;"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+                          Start Batch AI Extraction
+                        </button>
+                        <button class="btn-secondary" id="btn-cancel-batch" style="display:none; flex:1; border-color:var(--color-red); color:var(--color-red); font-weight:600;" onclick="abortBatchExtraction()">
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- STEP 4: EXECUTE TRANSCRIPTION -->
+                <div class="wizard-step" id="wizard-step-4">
+                  <div class="wizard-step-header" onclick="toggleWizardAccordion(4)">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                      <div class="wizard-step-icon" id="wizard-icon-4">4</div>
+                      <div class="wizard-step-title">Execute Whisper Transcription</div>
+                    </div>
+                    <span class="wizard-chevron" id="wizard-chevron-4">▼</span>
+                  </div>
+                  <div class="wizard-step-body" id="wizard-body-4">
+                    <div class="step-details-row" style="margin-bottom: 16px;">
+                      Backend: <span id="trans-cfg-backend" style="color:var(--color-cyan); font-weight:600;">Standard</span> | Model: <span id="trans-cfg-model" style="color:var(--color-purple); font-weight:600;">Base</span> | VAD: <span id="trans-cfg-vad" style="color:var(--color-gold); font-weight:600;">OFF</span>
+                    </div>
+                    <div style="display:flex; gap:12px;">
+                      <button class="btn-primary" id="btn-run-transcribe" style="flex:2;" onclick="runWhisperTranscription()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:18px;height:18px;margin-right:8px;"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+                        Start AI Extraction
+                      </button>
+                      <button class="btn-secondary" id="btn-cancel-transcribe" style="display:none; flex:1; border-color:var(--color-red); color:var(--color-red); font-weight:600;" onclick="abortTranscription()">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Cyber-Neon Progress & Telemetry HUD (Right Panel) -->
+              <div class="glass-card radial-progress-card telemetry-hud">
+                <h3 style="font-weight:600; text-align:center; font-size:1.1rem; margin-bottom:16px; border-bottom:1px solid var(--border-glass); padding-bottom:12px;">Live Extraction Status</h3>
+                
+                <div class="progress-linear-wrapper">
+                  <div class="hud-stats-row">
+                    <span class="hud-stat-label">COMPLETION</span>
+                    <span class="radial-pct" id="lbl-radial-pct">0%</span>
+                  </div>
+                  
+                  <div class="progress-linear-track">
+                    <div class="progress-linear-fill" id="progress-linear-fill" style="width: 0%;">
+                      <div class="progress-linear-glow"></div>
+                      <div class="progress-linear-scanner"></div>
+                    </div>
+                  </div>
+                  
+                  <div class="hud-status-subtitle">
+                    <div class="hud-pulse-dot" id="hud-pulse-dot"></div>
+                    <span class="radial-msg" id="lbl-radial-msg">Standing By</span>
+                  </div>
+                </div>
+                
+                <!-- Results Analytics details -->
+                <div class="analytics-box" id="analytics-box" style="display:none; width:100%; margin-top: 16px;">
+                  <h4 style="border-bottom: 1px solid var(--border-glass); padding-bottom:8px; margin-bottom:8px; font-weight:600;">Transcription Completed</h4>
+                  <div class="analytic-row">
+                    <span class="analytic-label">Processing Time:</span>
+                    <span class="analytic-val" id="analytic-time">0s</span>
+                  </div>
+                  <div class="analytic-row">
+                    <span class="analytic-label">Speed Factor:</span>
+                    <span class="analytic-val" style="color:var(--color-green);" id="analytic-speed">0.0x Real-time</span>
+                  </div>
+                  <div class="analytic-row" style="flex-direction:column; gap:4px; margin-top:4px;">
+                    <span class="analytic-label">Generated Files:</span>
+                    <div class="outputs-row" id="badge-outputs-row"></div>
+                  </div>
+                  <button class="btn-primary" style="margin-top:12px; font-size:0.85rem; padding:10px;" onclick="copyTranscriptToClipboard()">
+                    Copy Main Transcript
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 5. ACTIVITY LOG PANEL -->
+          <div class="view-panel" id="panel-logs">
+            <div class="logs-layout">
+              <div class="logs-controls">
+                <div class="log-filters">
+                  <button class="filter-btn active" id="log-filter-All" onclick="filterLogs('All')">All</button>
+                  <button class="filter-btn" id="log-filter-Build" onclick="filterLogs('Build')">Build</button>
+                  <button class="filter-btn" id="log-filter-FFmpeg" onclick="filterLogs('FFmpeg')">FFmpeg</button>
+                  <button class="filter-btn" id="log-filter-Whisper" onclick="filterLogs('Whisper')">Whisper</button>
+                </div>
+                
+                <div class="log-search-container">
+                  <input class="log-search-input" type="text" id="log-search" placeholder="Search logs..." oninput="handleLogSearch()" />
+                </div>
+                
+                <div class="logs-actions">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="log-autoscroll" checked />
+                    Auto Scroll
+                  </label>
+                  <button class="btn-secondary" style="padding:6px 12px; font-size:0.8rem;" onclick="copyAllLogs()">Copy All</button>
+                  <button class="btn-secondary" style="padding:6px 12px; font-size:0.8rem; border-color:var(--color-red); color:var(--color-red);" onclick="clearLogsHistory()">Clear</button>
+                </div>
+              </div>
+
+              <!-- Monospace Log Viewport -->
+              <div class="log-viewport" id="log-viewport"></div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

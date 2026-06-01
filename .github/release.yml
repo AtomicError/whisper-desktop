@@ -1,0 +1,26 @@
+changelog:
+  exclude:
+    labels:
+      - duplicate
+      - question
+      - invalid
+      - wontfix
+  categories:
+    - title: '🚀 Features & Enhancements'
+      labels:
+        - feature
+        - enhancement
+        - feat
+    - title: '🐛 Bug Fixes'
+      labels:
+        - bug
+        - fix
+    - title: '📖 Documentation'
+      labels:
+        - documentation
+        - docs
+    - title: '⚙️ Build System & Core'
+      labels:
+        - build
+        - ci
+        - chore

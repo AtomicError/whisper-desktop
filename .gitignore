@@ -1,0 +1,56 @@
+# ==========================================
+#          Whisper Desktop Gitignore
+# ==========================================
+
+# --- Node & Frontend ---
+node_modules/
+dist/
+dist-ssr/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# --- Environment Secrets ---
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+
+# --- Rust & Cargo ---
+**/target/
+**/*.rs.bk
+Cargo.lock.log
+
+# --- Tauri v2 Specifics ---
+src-tauri/gen/
+src-tauri/build.log
+
+# --- Arch Linux Packaging Artifacts ---
+pkg/
+*.pkg.tar.zst
+*.pkg.tar.xz
+
+# --- OS Specific ---
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*~
+*.swp
+*.swo
+
+# --- IDEs & Editors ---
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
