@@ -37,10 +37,12 @@ jobs:
           workspaces: './src-tauri -> target'
 
       - name: Install Linux system dependencies
-        if: matrix.platform == 'ubuntu-latest'
+        if: startsWith(matrix.platform, 'ubuntu')
         run: |
           sudo apt-get update
           sudo apt-get install -y \
+            libglib2.0-dev \
+            pkg-config \
             libgtk-3-dev \
             libwebkit2gtk-4.1-dev \
             build-essential \
