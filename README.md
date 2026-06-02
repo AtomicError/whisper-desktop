@@ -72,21 +72,21 @@ paru -S whisper-desktop-bin
 ### 🐧 Debian / Ubuntu (`.deb`)
 Download the latest `.deb` file from the [GitHub Releases](https://github.com/AtomicError/whisper-desktop/releases) page and install it:
 ```bash
-sudo dpkg -i whisper-desktop_*_amd64.deb
+sudo dpkg -i Whisper.Desktop_*_amd64.deb
 sudo apt-get install -f # Install dependencies if missing
 ```
 
 ### 🎩 RedHat / Fedora (`.rpm`)
 Download the `.rpm` package and install via `dnf`:
 ```bash
-sudo dnf install whisper-desktop-*.rpm
+sudo dnf install Whisper.Desktop-*.rpm
 ```
 
 ### 🐳 AppImage
 For any other Linux distribution, simply download the portable `AppImage`, make it executable, and run it:
 ```bash
-chmod +x whisper-desktop-*.AppImage
-./whisper-desktop-*.AppImage
+chmod +x Whisper.Desktop_*.AppImage
+./Whisper.Desktop_*.AppImage
 ```
 
 ---
