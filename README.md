@@ -64,7 +64,7 @@ graph TD
 ## 🚀 Installation & Packaging
 
 ### 🐧 Debian / Ubuntu (`.deb`)
-Download the latest `.deb` file from the [GitHub Releases]() page and install it:
+Download the latest `.deb` file from the [GitHub Releases](https://github.com/AtomicError/whisper-desktop/releases) page and install it:
 ```bash
 sudo dpkg -i whisper-desktop_*_amd64.deb
 sudo apt-get install -f # Install dependencies if missing
