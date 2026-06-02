@@ -1,0 +1,10 @@
+[Desktop Entry]
+Categories=Utility;AudioVideo;
+{{#if comment}}
+Comment={{comment}}
+{{/if}}
+Exec={{exec}}
+Icon={{icon}}
+Name={{name}}
+Terminal=false
+Type=Application
