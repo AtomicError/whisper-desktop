@@ -34,11 +34,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "deb": {
-      "desktopTemplate": "./desktop.desktop"
-    },
-    "rpm": {
-      "desktopTemplate": "./desktop.desktop"
+    "linux": {
+      "deb": {
+        "desktopTemplate": "./desktop.desktop"
+      },
+      "rpm": {
+        "desktopTemplate": "./desktop.desktop"
+      }
     }
   }
 }
