@@ -79,8 +79,8 @@ jobs:
           echo "Found AppImage at: $APPIMAGE_PATH"
 
           # 4. Extract the app's AppImage
-          chmod +x $APPIMAGE_PATH
-          ./$APPIMAGE_PATH --appimage-extract
+          chmod +x "$APPIMAGE_PATH"
+          "$APPIMAGE_PATH" --appimage-extract
           
           # 5. Remove the conflicting graphics libraries from the extracted squashfs-root
           echo "Removing conflicting graphics libraries..."
@@ -97,12 +97,12 @@ jobs:
           rm -f squashfs-root/usr/lib/x86_64-linux-gnu/libwayland-client.so*
 
           # 6. Remove the old AppImage file
-          rm -f $APPIMAGE_PATH
+          rm -f "$APPIMAGE_PATH"
 
           # 7. Re-package the AppImage using the extracted appimagetool
           echo "Re-packaging AppImage..."
           export ARCH=x86_64
-          ./appimagetool-temp/AppRun squashfs-root $APPIMAGE_PATH
+          ./appimagetool-temp/AppRun squashfs-root "$APPIMAGE_PATH"
 
       - name: Create Release and Upload Assets
         uses: softprops/action-gh-release@v2
