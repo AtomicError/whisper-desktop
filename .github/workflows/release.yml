@@ -72,6 +72,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_BUNDLER_NEW_APPIMAGE_FORMAT: true
           NO_STRIP: true
+          EXTRA_LD_LIBRARY_PATH: "/usr/lib/x86_64-linux-gnu"
         with:
           tauriScript: cargo tauri
           tagName: v__VERSION__
