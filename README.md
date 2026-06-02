@@ -63,6 +63,12 @@ graph TD
 
 ## 🚀 Installation & Packaging
 
+### 📦 Arch Linux (AUR)
+Whisper Desktop is available in the Arch User Repository (AUR) as a precompiled binary package (recommended for Arch users):
+```bash
+paru -S whisper-desktop-bin
+```
+
 ### 🐧 Debian / Ubuntu (`.deb`)
 Download the latest `.deb` file from the [GitHub Releases](https://github.com/AtomicError/whisper-desktop/releases) page and install it:
 ```bash
