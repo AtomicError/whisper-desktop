@@ -305,10 +305,11 @@ fn main() {
         
         if let Ok(appdir) = std::env::var("APPDIR") {
             let shared_lib_path = format!("{}/shared/lib", appdir);
+            let usr_lib_path = format!("{}/usr/lib/x86_64-linux-gnu", appdir);
             if let Ok(existing_paths) = std::env::var("LD_LIBRARY_PATH") {
-                std::env::set_var("LD_LIBRARY_PATH", format!("{}:{}", shared_lib_path, existing_paths));
+                std::env::set_var("LD_LIBRARY_PATH", format!("{}:{}:{}", shared_lib_path, usr_lib_path, existing_paths));
             } else {
-                std::env::set_var("LD_LIBRARY_PATH", shared_lib_path);
+                std::env::set_var("LD_LIBRARY_PATH", format!("{}:{}", shared_lib_path, usr_lib_path));
             }
         }
     }

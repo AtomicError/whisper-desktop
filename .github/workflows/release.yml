@@ -36,15 +36,6 @@ jobs:
         with:
           workspaces: './src-tauri -> target'
 
-      - name: Install Experimental Truly Portable Tauri CLI
-        shell: bash
-        run: |
-          cargo install tauri-cli \
-            --git https://github.com/tauri-apps/tauri \
-            --branch feat/truly-portable-appimage \
-            --locked \
-            --force
-
       - name: Install Linux system dependencies
         if: startsWith(matrix.platform, 'ubuntu')
         run: |
@@ -66,17 +57,57 @@ jobs:
       - name: Install frontend dependencies
         run: npm install
 
-      - name: Build and upload Tauri bundles
-        uses: tauri-apps/tauri-action@v0
+      - name: Build Tauri Application
+        run: npm run tauri build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_BUNDLER_NEW_APPIMAGE_FORMAT: true
           NO_STRIP: true
-          EXTRA_LD_LIBRARY_PATH: "/usr/lib/x86_64-linux-gnu"
+
+      - name: Fix AppImage Graphics Libraries
+        shell: bash
+        run: |
+          # 1. Download appimagetool and make it executable
+          wget -q -O appimagetool https://github.com/AppImage/AppImageKit/releases/download/13/appimagetool-x86_64.AppImage
+          chmod +x appimagetool
+
+          # 2. Find the generated AppImage
+          APPIMAGE_PATH=$(find src-tauri/target/release/bundle/appimage/ -name "*.AppImage" | head -n 1)
+          echo "Found AppImage at: $APPIMAGE_PATH"
+
+          # 3. Extract the AppImage
+          ./appimagetool --appimage-extract-and-run $APPIMAGE_PATH --appimage-extract
+          
+          # 4. Remove the conflicting graphics libraries from the extracted squashfs-root
+          echo "Removing conflicting graphics libraries..."
+          rm -f squashfs-root/usr/lib/libEGL.so*
+          rm -f squashfs-root/usr/lib/libGL.so*
+          rm -f squashfs-root/usr/lib/libgbm.so*
+          rm -f squashfs-root/usr/lib/libglapi.so*
+          rm -f squashfs-root/usr/lib/libwayland-client.so*
+          
+          rm -f squashfs-root/usr/lib/x86_64-linux-gnu/libEGL.so*
+          rm -f squashfs-root/usr/lib/x86_64-linux-gnu/libGL.so*
+          rm -f squashfs-root/usr/lib/x86_64-linux-gnu/libgbm.so*
+          rm -f squashfs-root/usr/lib/x86_64-linux-gnu/libglapi.so*
+          rm -f squashfs-root/usr/lib/x86_64-linux-gnu/libwayland-client.so*
+
+          # 5. Remove the old AppImage file
+          rm -f $APPIMAGE_PATH
+
+          # 6. Re-package the AppImage using appimagetool (without FUSE check)
+          echo "Re-packaging AppImage..."
+          export ARCH=x86_64
+          ./appimagetool --appimage-extract-and-run squashfs-root $APPIMAGE_PATH
+
+      - name: Create Release and Upload Assets
+        uses: softprops/action-gh-release@v2
         with:
-          tauriScript: cargo tauri
-          tagName: v__VERSION__
-          releaseName: 'Whisper Desktop v__VERSION__'
-          releaseBody: 'To download Whisper Desktop for your platform, please see the assets below. Enjoy local, private speech-to-text transcription!'
-          releaseDraft: true
+          tag_name: ${{ github.ref_name }}
+          name: 'Whisper Desktop ${{ github.ref_name }}'
+          body: 'To download Whisper Desktop for your platform, please see the assets below. Enjoy local, private speech-to-text transcription!'
+          draft: true
           prerelease: false
+          files: |
+            src-tauri/target/release/bundle/appimage/*.AppImage
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/rpm/*.rpm
