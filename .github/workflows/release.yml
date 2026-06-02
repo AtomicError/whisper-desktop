@@ -36,6 +36,15 @@ jobs:
         with:
           workspaces: './src-tauri -> target'
 
+      - name: Install Experimental Truly Portable Tauri CLI
+        shell: bash
+        run: |
+          cargo install tauri-cli \
+            --git https://github.com/tauri-apps/tauri \
+            --branch feat/truly-portable-appimage \
+            --locked \
+            --force
+
       - name: Install Linux system dependencies
         if: startsWith(matrix.platform, 'ubuntu')
         run: |
@@ -61,7 +70,10 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_BUNDLER_NEW_APPIMAGE_FORMAT: true
+          NO_STRIP: true
         with:
+          tauriScript: cargo tauri
           tagName: v__VERSION__
           releaseName: 'Whisper Desktop v__VERSION__'
           releaseBody: 'To download Whisper Desktop for your platform, please see the assets below. Enjoy local, private speech-to-text transcription!'

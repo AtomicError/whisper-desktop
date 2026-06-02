@@ -42,14 +42,7 @@
         "desktopTemplate": "./desktop.desktop"
       },
       "appimage": {
-        "bundleMediaFramework": false,
-        "excludedLibs": [
-          "libEGL*",
-          "libGL*",
-          "libgbm*",
-          "libglapi*",
-          "libwayland*"
-        ]
+        "bundleMediaFramework": false
       }
     }
   }
