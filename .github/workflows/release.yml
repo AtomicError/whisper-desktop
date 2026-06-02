@@ -61,6 +61,7 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FILTER_LIBS: "libEGL.so.1:libGL.so.1:libgbm.so.1:libglapi.so.0:libwayland-client.so.0"
         with:
           tagName: v__VERSION__
           releaseName: 'Whisper Desktop v__VERSION__'
