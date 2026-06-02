@@ -299,9 +299,18 @@ fn select_directory() -> Option<String> {
 }
 
 fn main() {
-    // Disable WebKit sandbox if running inside AppImage to avoid dynamic loading errors of ICU libraries.
+    // Resolve WebKit subprocess ICU dependency loading crashes inside the AppImage environment.
     if std::env::var("APPIMAGE").is_ok() {
         std::env::set_var("WEBKIT_DISABLE_SANDBOX", "1");
+        
+        if let Ok(appdir) = std::env::var("APPDIR") {
+            let shared_lib_path = format!("{}/shared/lib", appdir);
+            if let Ok(existing_paths) = std::env::var("LD_LIBRARY_PATH") {
+                std::env::set_var("LD_LIBRARY_PATH", format!("{}:{}", shared_lib_path, existing_paths));
+            } else {
+                std::env::set_var("LD_LIBRARY_PATH", shared_lib_path);
+            }
+        }
     }
 
     let hardware_monitor = Arc::new(Mutex::new(HardwareMonitor::new()));
