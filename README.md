@@ -10,16 +10,16 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License MIT">
-  <img src="https://img.shields.io/badge/Platform-Linux-orange.svg" alt="Platform Linux">
-  <img src="https://img.shields.io/badge/Built%20With-Rust%20%26%20Tauri-red.svg" alt="Built With Rust & Tauri">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square&color=2d7fff" alt="License MIT"></a>
+  <img src="https://img.shields.io/badge/Platform-Linux-orange?style=flat-square&logo=linux&logoColor=white&color=0057d9" alt="Platform Linux">
+  <img src="https://img.shields.io/badge/Built%20With-Rust%20%26%20Tauri-red?style=flat-square&logo=tauri&logoColor=white&color=8b5cf6" alt="Built With Rust & Tauri">
 </p>
 
 ---
 
 ## 📸 Screenshots & Visual Walkthrough
 
-Here is a preview of the premium cyber-neon glassmorphic interface:
+Here is a preview of the premium obsidian glassmorphic interface:
 
 | 🎛️ Dashboard Home | 🏗️ Build Screen |
 | :---: | :---: |
@@ -35,13 +35,15 @@ Here is a preview of the premium cyber-neon glassmorphic interface:
 
 Whisper Desktop is designed to feel like a next-generation utility, combining the blistering performance of Rust/C++ with a highly aesthetic, responsive, and modern glassmorphic web dashboard.
 
-*   **⚡ Multiple Acceleration Backends:** Choose between **CPU**, **Vulkan**, **OpenVINO**, or **CUDA** directly from the UI to match your hardware capabilities.
-*   **📂 Batch Processing Queue:** Import multiple files, view their duration, remove individual files, clear the queue, and transcribe them sequentially.
-*   **🎤 Live Audio Recording:** Record audio directly from your microphone with real-time waveform animation and transcribe it instantly.
-*   **🎞️ Integrated Media Converter:** Automatically extract audio from video files using integrated utilities.
-*   **🎨 Cyber-Neon Glassmorphic Design:** A premium dark-mode interface with elegant micro-animations, harmonized gradient glowing borders, and intuitive layout transitions.
+*   **⚡ Multiple Acceleration Backends:** Choose between **CPU**, **Vulkan**, **OpenVINO**, or **CUDA** directly from the UI. *Note: Compiling the OpenVINO backend requires the OpenVINO package/SDK to be installed on your operating system.*
+*   **📥 Integrated Model Downloader:** Easily browse and download GGML models directly from the UI with real-time download speed, progress indicators, and remaining time (ETA) tracking.
+*   **📂 Batch Processing Queue:** Import multiple files, view their duration, remove individual files, clear the queue, and transcribe them sequentially with detailed progress.
+*   **🎞️ Integrated Media Converter:** Automatically extract audio from video files and convert them to the target 16kHz mono WAV format using integrated FFmpeg utilities.
+*   **🎨 Premium Glassmorphic Design:** A modern dark-mode interface featuring elegant micro-animations, royal-blue gradient glowing accents, and fluid layout transitions.
 *   **📦 Easy Drag & Drop HUD:** Drag audio or video files anywhere into the application to instantly load them into your queue.
+*   **📊 Live Telemetry HUD:** Real-time hardware performance monitoring tracking CPU usage, RAM utilization, and active GPU metrics during transcription.
 *   **⚙️ Full Transcription Settings:** Adjust transcription parameters such as GGML model selection, thread count, target language, translation to English, and output formats (TXT, SRT, VTT).
+*   **★ Spec-Guided Recommendations:** Automatically recommends optimal model sizes and quantization formats (e.g. 5-bit/8-bit) based on detected system hardware and GPU acceleration.
 
 ---
 
@@ -96,7 +98,7 @@ chmod +x Whisper.Desktop_*.AppImage
 To build Whisper Desktop locally, ensure you have the following prerequisites installed on your system:
 *   **Node.js** (v18 or higher) & **npm**
 *   **Rust** toolchain (Cargo, rustc)
-*   **System Libraries:** `gtk3`, `webkit2gtk-4.1`, `ffmpeg`
+*   **System Libraries:** `gtk3`, `webkit2gtk-4.1`, `ffmpeg` (Note: OpenVINO must be installed on your system if compiling the OpenVINO backend)
 
 ### 1. Clone the Repository
 ```bash
@@ -129,17 +131,19 @@ Production packages will be generated inside `src-tauri/target/release/bundle/`.
 ```
 whisper-desktop/
 ├── src/                      # Glassmorphic Frontend Core
-│   ├── assets/               # Neon SVGs, custom icons, and visual elements
-│   ├── index.html            # Main dashboard layout (6 premium feature panels)
-│   ├── index.css             # Glassmorphism, animations, and color design system
-│   └── main.js               # IPC binding, queue state, and audio recorders
+│   ├── assets/               # Custom SVGs, icons, and visual elements
+│   ├── index.html            # Main dashboard layout (6 feature panels)
+│   ├── styles.css            # Glassmorphism, animations, and color design system
+│   └── main.js               # IPC binding, queue state, and UI logic
 ├── src-tauri/                # Tauri backend (Rust)
-│   ├── src/                  # Tauri Rust entry point and command routers
-│   ├── icons/                # Beautiful high-resolution custom cyber-neon app icons
+│   ├── src/                  # Tauri Rust backend source
+│   │   ├── main.rs           # Tauri command bindings, state, and entry point
+│   │   ├── builder.rs        # Compilation coordinator for whisper.cpp backends
+│   │   └── specs.rs          # Hardware specification detection
+│   ├── icons/                # Beautiful high-resolution custom app icons
 │   ├── permissions/          # Tauri v2 security policies and capability schemas
 │   ├── Cargo.toml            # Rust manifest
 │   └── tauri.conf.json       # Build target configs (deb, rpm, appimage)
-├── PKGBUILD                  # Arch Linux packaging script
 └── README.md                 # Project documentation
 ```
 
