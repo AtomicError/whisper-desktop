@@ -574,7 +574,39 @@ window.dashboardSelectBackend = function(backend) {
     return;
   }
   
-  selectBackend(backend, true);
+  if (settingsState) {
+    settingsState.selectedBackend = backend;
+    saveCurrentSettings();
+    scanAndPopulateModels();
+  }
+  
+  // Update the System Build selection to match
+  selectedBackendsForBuild = [backend];
+  const backends = ['Standard', 'Vulkan', 'OpenVINO', 'CUDA'];
+  backends.forEach(b => {
+    const card = document.getElementById(`backend-${b}`);
+    if (card) {
+      if (b === backend) card.classList.add('active');
+      else card.classList.remove('active');
+    }
+    const chk = document.getElementById(`chk-${b}`);
+    if (chk) {
+      chk.checked = (b === backend);
+    }
+  });
+  
+  const labelMap = {
+    'Standard': 'Standard CPU',
+    'Vulkan': 'Vulkan GPU',
+    'OpenVINO': 'OpenVINO Intel',
+    'CUDA': 'NVIDIA CUDA'
+  };
+  const selectedLabels = selectedBackendsForBuild.map(b => labelMap[b] || b);
+  const compTitle = document.getElementById('compilation-title');
+  if (compTitle) {
+    compTitle.textContent = `${selectedLabels.join(', ')} Compilation`;
+  }
+  
   updateDashboardBackendTiles();
   showNotification(`Active backend switched to ${backend === 'Standard' ? 'CPU' : backend} successfully!`, "success");
 };
