@@ -837,6 +837,12 @@ header {
   align-items: center;
 }
 
+.outputs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
 /* Switch UI */
 .switch {
   position: relative;
@@ -1907,6 +1913,11 @@ select.select-control {
   .settings-layout {
     grid-template-columns: 1fr !important;
     gap: 20px !important;
+  }
+
+  /* Outputs checklist: Stack cards vertically on narrow screens */
+  .outputs-grid {
+    grid-template-columns: 1fr !important;
   }
 
   /* Transcribe layout: Stack accordion and output/telemetry panels vertically */

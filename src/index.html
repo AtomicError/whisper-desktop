@@ -683,7 +683,7 @@
 
                 <div class="settings-group" id="group-outputs">
                   <!-- Output checklist -->
-                  <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+                  <div class="outputs-grid">
                     <div class="setting-card">
                       <div class="setting-info">
                         <span class="setting-title">Text Transcript (.txt)</span>
@@ -767,7 +767,6 @@
                         <span class="setting-title">Full Detailed JSON</span>
                         <span class="setting-flag">-ojf</span>
                       </div>
-                      <div class="setting-desc">Inject metadata details into JSON.</div>
                       <div class="setting-control">
                         <label class="switch">
                           <input type="checkbox" id="opt-outputJsonFull" />
@@ -781,7 +780,6 @@
                         <span class="setting-title">Karaoke script (.wts.sh)</span>
                         <span class="setting-flag">-owts</span>
                       </div>
-                      <div class="setting-desc">Generate karaoke video scripts.</div>
                       <div class="setting-control">
                         <label class="switch">
                           <input type="checkbox" id="opt-outputWords" />
