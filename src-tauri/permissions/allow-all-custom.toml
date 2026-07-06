@@ -11,6 +11,7 @@ allow = [
   "check_build",
   "start_git_operations",
   "start_compilation_task",
+  "start_multi_compilations",
   "probe_media_file",
   "convert_media_file",
   "start_transcription_task",
@@ -21,5 +22,12 @@ allow = [
   "scan_models",
   "select_file",
   "select_files",
-  "select_directory"
+  "select_directory",
+  "read_text_file_content",
+  "start_download_model_task",
+  "get_model_download_progress",
+  "get_all_models_status",
+  "pause_download_model",
+  "delete_model_file",
+  "get_system_specs"
 ]

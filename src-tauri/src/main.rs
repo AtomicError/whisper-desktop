@@ -1,11 +1,9 @@
-// Prevents additional console window on Windows in release, though this is a Linux-only app
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-
 mod settings;
 mod hardware;
 mod logger;
 mod builder;
 mod transcribe;
+mod downloader;
 
 use std::sync::{Arc, Mutex};
 use std::path::Path;
@@ -15,7 +13,8 @@ use settings::{WhisperSettings, load_settings_file, save_settings_file, load_app
 use hardware::{HardwareMonitor, SystemStats};
 use logger::AppLogs;
 use builder::{check_build_exists, run_git_clone_or_update, run_compilation};
-use transcribe::{probe_file_metadata, convert_to_wav, run_transcription, FileMetadata, TranscriptionResult};
+use transcribe::{probe_file_metadata, convert_to_wav, run_transcription, FileMetadata, TranscriptionResult, read_text_file};
+use downloader::{DownloadSession, DownloadState, run_model_download, get_expected_model_size, get_all_models_status, pause_download_model, delete_model_file};
 
 // Tauri Managed States
 struct HardwareState(Arc<Mutex<HardwareMonitor>>);
@@ -91,8 +90,48 @@ async fn start_compilation_task(
 }
 
 #[tauri::command]
+async fn start_multi_compilations(
+    app: AppHandle,
+    state: State<'_, LogState>,
+    clone_dir: String,
+    backends: Vec<String>,
+) -> Result<(), String> {
+    let logs = state.0.clone();
+    tokio::spawn(async move {
+        for b in backends {
+            let res = run_compilation(app.clone(), logs.clone(), clone_dir.clone(), b).await;
+            if res.is_err() {
+                break;
+            }
+        }
+    });
+    Ok(())
+}
+
+#[tauri::command]
 fn probe_media_file(file_path: String) -> FileMetadata {
     probe_file_metadata(&file_path)
+}
+
+#[derive(serde::Serialize)]
+pub struct SystemSpecs {
+    pub total_ram_gb: f64,
+    pub cpu_cores: usize,
+}
+
+#[tauri::command]
+fn get_system_specs() -> SystemSpecs {
+    use sysinfo::System;
+    let mut sys = System::new_all();
+    sys.refresh_all();
+    
+    let total_ram_gb = sys.total_memory() as f64 / 1024.0 / 1024.0 / 1024.0;
+    let cpu_cores = sys.cpus().len();
+    
+    SystemSpecs {
+        total_ram_gb,
+        cpu_cores,
+    }
 }
 
 #[tauri::command]
@@ -298,6 +337,59 @@ fn select_directory() -> Option<String> {
         .map(|p| p.to_string_lossy().to_string())
 }
 
+
+#[tauri::command]
+fn read_text_file_content(file_path: String) -> Result<String, String> {
+    read_text_file(file_path)
+}
+
+#[tauri::command]
+async fn start_download_model_task(
+    app: AppHandle,
+    download_state: State<'_, DownloadState>,
+    clone_dir: String,
+    model_name: String,
+) -> Result<(), String> {
+    let state = download_state.0.clone();
+    tokio::spawn(async move {
+        let _ = run_model_download(app, state, clone_dir, model_name).await;
+    });
+    Ok(())
+}
+
+#[tauri::command]
+fn get_model_download_progress(clone_dir: String, model_name: String) -> Result<f64, String> {
+    let clean_name = model_name
+        .strip_prefix("ggml-")
+        .unwrap_or(&model_name)
+        .strip_suffix(".bin")
+        .unwrap_or(&model_name)
+        .to_string();
+
+    let models_dir = Path::new(&clone_dir).join("models");
+    let target_path = models_dir.join(format!("ggml-{}.bin", clean_name));
+    let tmp_path = models_dir.join(format!("ggml-{}.bin.tmp", clean_name));
+
+    if target_path.exists() {
+        return Ok(1.0);
+    }
+
+    if !tmp_path.exists() {
+        return Ok(0.0);
+    }
+
+    if let Ok(meta) = std::fs::metadata(&tmp_path) {
+        let current_size = meta.len();
+        let expected_size = get_expected_model_size(&clean_name);
+        if expected_size > 0 {
+            let progress = current_size as f64 / expected_size as f64;
+            return Ok(progress.min(0.99)); // Cap at 99% until renamed to .bin
+        }
+    }
+
+    Ok(0.0)
+}
+
 fn main() {
     // Resolve WebKit subprocess ICU dependency loading crashes inside the AppImage environment.
     if std::env::var("APPIMAGE").is_ok() {
@@ -317,12 +409,31 @@ fn main() {
     let hardware_monitor = Arc::new(Mutex::new(HardwareMonitor::new()));
     let app_logs = Arc::new(AppLogs::new());
     let transcription_session = Arc::new(Mutex::new(TranscriptionSession { child_pid: None }));
+    let download_session = Arc::new(Mutex::new(DownloadSession::new()));
     
     tauri::Builder::default()
+        .setup(|app| {
+            #[cfg(target_os = "linux")]
+            {
+                use tauri::Manager;
+                use webkit2gtk::{WebViewExt, PermissionRequestExt};
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.with_webview(|webview| {
+                        let webview = webview.inner();
+                        webview.connect_permission_request(|_webview, req| {
+                            req.allow();
+                            true
+                        });
+                    });
+                }
+            }
+            Ok(())
+        })
         .plugin(tauri_plugin_opener::init())
         .manage(HardwareState(hardware_monitor))
         .manage(LogState(app_logs))
         .manage(TranscriptionState(transcription_session))
+        .manage(DownloadState(download_session))
         .invoke_handler(tauri::generate_handler![
             get_system_stats,
             load_settings,
@@ -331,6 +442,7 @@ fn main() {
             check_build,
             start_git_operations,
             start_compilation_task,
+            start_multi_compilations,
             probe_media_file,
             convert_media_file,
             start_transcription_task,
@@ -341,7 +453,14 @@ fn main() {
             scan_models,
             select_file,
             select_files,
-            select_directory
+            select_directory,
+            read_text_file_content,
+            start_download_model_task,
+            get_model_download_progress,
+            get_all_models_status,
+            pause_download_model,
+            delete_model_file,
+            get_system_specs
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

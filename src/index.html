@@ -81,6 +81,15 @@
             Configuration
           </div>
           
+          <div class="nav-item" onclick="switchView('models')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Model Manager
+          </div>
+          
           <div class="nav-item" onclick="switchView('transcribe')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 20h9"/>
@@ -248,32 +257,36 @@
             <h3 style="margin-bottom:16px;">Select Compilation Backend</h3>
             <div class="backends-grid">
               <div class="glass-card backend-card active" id="backend-Standard" onclick="selectBackend('Standard')">
-                <div class="backend-card-header">
-                  <span class="backend-name">Standard CPU</span>
+                <div class="backend-card-header" style="display: flex; align-items: center; gap: 12px; width: 100%;">
+                  <input type="checkbox" class="backend-checkbox" id="chk-Standard" checked style="pointer-events: none;" />
+                  <span class="backend-name" style="flex-grow: 1;">Standard CPU</span>
                   <svg class="backend-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="15" x2="23" y2="15"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="15" x2="4" y2="15"/></svg>
                 </div>
                 <div class="backend-status-badge missing" id="badge-Standard">Checking...</div>
               </div>
 
               <div class="glass-card backend-card" id="backend-Vulkan" onclick="selectBackend('Vulkan')">
-                <div class="backend-card-header">
-                  <span class="backend-name">Vulkan GPU</span>
+                <div class="backend-card-header" style="display: flex; align-items: center; gap: 12px; width: 100%;">
+                  <input type="checkbox" class="backend-checkbox" id="chk-Vulkan" style="pointer-events: none;" />
+                  <span class="backend-name" style="flex-grow: 1;">Vulkan GPU</span>
                   <svg class="backend-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                 </div>
                 <div class="backend-status-badge missing" id="badge-Vulkan">Checking...</div>
               </div>
 
               <div class="glass-card backend-card" id="backend-OpenVINO" onclick="selectBackend('OpenVINO')">
-                <div class="backend-card-header">
-                  <span class="backend-name">OpenVINO Intel</span>
+                <div class="backend-card-header" style="display: flex; align-items: center; gap: 12px; width: 100%;">
+                  <input type="checkbox" class="backend-checkbox" id="chk-OpenVINO" style="pointer-events: none;" />
+                  <span class="backend-name" style="flex-grow: 1;">OpenVINO Intel</span>
                   <svg class="backend-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3z"/><path d="M6 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3z"/></svg>
                 </div>
                 <div class="backend-status-badge missing" id="badge-OpenVINO">Checking...</div>
               </div>
 
               <div class="glass-card backend-card" id="backend-CUDA" onclick="selectBackend('CUDA')">
-                <div class="backend-card-header">
-                  <span class="backend-name">NVIDIA CUDA</span>
+                <div class="backend-card-header" style="display: flex; align-items: center; gap: 12px; width: 100%;">
+                  <input type="checkbox" class="backend-checkbox" id="chk-CUDA" style="pointer-events: none;" />
+                  <span class="backend-name" style="flex-grow: 1;">NVIDIA CUDA</span>
                   <svg class="backend-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
                 </div>
                 <div class="backend-status-badge missing" id="badge-CUDA">Checking...</div>
@@ -332,7 +345,7 @@
                 <!-- Settings Groups -->
                 <div class="settings-group active" id="group-general">
                   <!-- General cards -->
-                  <div class="setting-card">
+                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title">Model Selection</span>
@@ -976,6 +989,60 @@
             </div>
           </div>
 
+          <!-- 3.5. MODEL MANAGER PANEL -->
+          <div class="view-panel" id="panel-models">
+            <div class="glass-card" style="margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+              <div>
+                <h3 style="font-size: 1.25rem; margin-bottom: 4px;">GGML Model Registry Console</h3>
+                <p id="model-specs-subtitle" style="font-size: 0.85rem; color: var(--color-text-muted);">Download, configure, and manage GGML models inside the models directory.</p>
+              </div>
+              <div>
+                <input class="text-input" type="text" id="model-search" placeholder="Search models..." oninput="loadModelStatusesGrid()" style="margin: 0; padding: 8px 16px; font-size: 0.85rem; width: 250px;" />
+              </div>
+            </div>
+
+            <div class="settings-layout">
+              <div class="settings-categories" id="model-categories-sidebar">
+                <div class="settings-cat-btn active" id="model-cat-recommended" onclick="switchModelCategory('recommended')">
+                  <svg class="settings-cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; margin-right:8px;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                  Recommended
+                </div>
+                <div class="settings-cat-btn" id="model-cat-local" onclick="switchModelCategory('local')">
+                  <svg class="settings-cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; margin-right:8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  Downloaded Models
+                </div>
+                <div class="settings-cat-btn" id="model-cat-tiny" onclick="switchModelCategory('tiny')">
+                  <svg class="settings-cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; margin-right:8px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                  Tiny Family (75M)
+                </div>
+                <div class="settings-cat-btn" id="model-cat-base" onclick="switchModelCategory('base')">
+                  <svg class="settings-cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; margin-right:8px;"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="15" x2="23" y2="15"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="15" x2="4" y2="15"/></svg>
+                  Base Family (145M)
+                </div>
+                <div class="settings-cat-btn" id="model-cat-small" onclick="switchModelCategory('small')">
+                  <svg class="settings-cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; margin-right:8px;"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                  Small Family (468M)
+                </div>
+                <div class="settings-cat-btn" id="model-cat-medium" onclick="switchModelCategory('medium')">
+                  <svg class="settings-cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; margin-right:8px;"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.44 2.5 2.5 0 0 1 0-3.12 3 3 0 0 1 0-3.88 2.5 2.5 0 0 1 0-3.12A2.5 2.5 0 0 1 9.5 2zM14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.44 2.5 2.5 0 0 0 0-3.12 3 3 0 0 0 0-3.88 2.5 2.5 0 0 0 0-3.12A2.5 2.5 0 0 0 14.5 2z"/></svg>
+                  Medium Family (769M)
+                </div>
+                <div class="settings-cat-btn" id="model-cat-large" onclick="switchModelCategory('large')">
+                  <svg class="settings-cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; margin-right:8px;"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.45 1-1 1H4v2h16v-2h-5c-.55 0-1-.45-1-1v-2.34M12 2a4 4 0 0 0-4 4v6h8V6a4 4 0 0 0-4-4z"/></svg>
+                  Large Family (1550M)
+                </div>
+                <div class="settings-cat-btn" id="model-cat-all" onclick="switchModelCategory('all')">
+                  <svg class="settings-cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; margin-right:8px;"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                  All Models
+                </div>
+              </div>
+
+              <div class="settings-scroll-container" id="models-list-scroll" style="display: flex; flex-direction: column; gap: 16px; flex-grow: 1; overflow-y: auto;">
+                <!-- Dynamically populated model rows -->
+              </div>
+            </div>
+          </div>
+
           <!-- 4. TRANSCRIBE FILE PANEL -->
           <div class="view-panel" id="panel-transcribe">
             <div class="transcribe-layout">
@@ -1147,47 +1214,68 @@
                 </div>
               </div>
 
-              <!-- Cyber-Neon Progress & Telemetry HUD (Right Panel) -->
-              <div class="glass-card radial-progress-card telemetry-hud">
-                <h3 style="font-weight:600; text-align:center; font-size:1.1rem; margin-bottom:16px; border-bottom:1px solid var(--border-glass); padding-bottom:12px;">Live Extraction Status</h3>
-                
-                <div class="progress-linear-wrapper">
-                  <div class="hud-stats-row">
-                    <span class="hud-stat-label">COMPLETION</span>
-                    <span class="radial-pct" id="lbl-radial-pct">0%</span>
-                  </div>
+              <!-- Cyber-Neon Progress & Telemetry HUD (Right Panel wrapper) -->
+              <div class="transcribe-right-panel" style="display: flex; flex-direction: column; gap: 20px;">
+                <div class="glass-card radial-progress-card telemetry-hud" style="margin-bottom: 0;">
+                  <h3 style="font-weight:600; text-align:center; font-size:1.1rem; margin-bottom:16px; border-bottom:1px solid var(--border-glass); padding-bottom:12px;">Live Extraction Status</h3>
                   
-                  <div class="progress-linear-track">
-                    <div class="progress-linear-fill" id="progress-linear-fill" style="width: 0%;">
-                      <div class="progress-linear-glow"></div>
-                      <div class="progress-linear-scanner"></div>
+                  <div class="progress-linear-wrapper">
+                    <div class="hud-stats-row">
+                      <span class="hud-stat-label">COMPLETION</span>
+                      <span class="radial-pct" id="lbl-radial-pct">0%</span>
+                    </div>
+                    
+                    <div class="progress-linear-track">
+                      <div class="progress-linear-fill" id="progress-linear-fill" style="width: 0%;">
+                        <div class="progress-linear-glow"></div>
+                        <div class="progress-linear-scanner"></div>
+                      </div>
+                    </div>
+                    
+                    <div class="hud-status-subtitle">
+                      <div class="hud-pulse-dot" id="hud-pulse-dot"></div>
+                      <span class="radial-msg" id="lbl-radial-msg">Standing By</span>
                     </div>
                   </div>
                   
-                  <div class="hud-status-subtitle">
-                    <div class="hud-pulse-dot" id="hud-pulse-dot"></div>
-                    <span class="radial-msg" id="lbl-radial-msg">Standing By</span>
+                  <!-- Results Analytics details -->
+                  <div class="analytics-box" id="analytics-box" style="display:none; width:100%; margin-top: 16px;">
+                    <h4 style="border-bottom: 1px solid var(--border-glass); padding-bottom:8px; margin-bottom:8px; font-weight:600;">Transcription Completed</h4>
+                    <div class="analytic-row">
+                      <span class="analytic-label">Processing Time:</span>
+                      <span class="analytic-val" id="analytic-time">0s</span>
+                    </div>
+                    <div class="analytic-row">
+                      <span class="analytic-label">Speed Factor:</span>
+                      <span class="analytic-val" style="color:var(--color-green);" id="analytic-speed">0.0x Real-time</span>
+                    </div>
+                    <div class="analytic-row" style="flex-direction:column; gap:4px; margin-top:4px;">
+                      <span class="analytic-label">Generated Files:</span>
+                      <div class="outputs-row" id="badge-outputs-row"></div>
+                    </div>
+                    <button class="btn-primary" style="margin-top:12px; font-size:0.85rem; padding:10px;" onclick="copyTranscriptToClipboard()">
+                      Copy Main Transcript
+                    </button>
                   </div>
                 </div>
-                
-                <!-- Results Analytics details -->
-                <div class="analytics-box" id="analytics-box" style="display:none; width:100%; margin-top: 16px;">
-                  <h4 style="border-bottom: 1px solid var(--border-glass); padding-bottom:8px; margin-bottom:8px; font-weight:600;">Transcription Completed</h4>
-                  <div class="analytic-row">
-                    <span class="analytic-label">Processing Time:</span>
-                    <span class="analytic-val" id="analytic-time">0s</span>
+
+                <!-- Live Transcript Viewer -->
+                <div class="glass-card transcript-viewer-card" style="display: flex; flex-direction: column; flex-grow: 1; min-height: 350px; padding: 20px; gap: 12px; overflow: hidden;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: 10px;">
+                    <h3 style="font-weight: 600; font-size: 1rem; margin: 0;">Live Transcript Viewer</h3>
+                    <button class="btn-secondary" id="btn-copy-transcript" onclick="copyTranscriptToClipboard()" style="padding: 4px 10px; font-size: 0.75rem; margin: 0;">Copy</button>
                   </div>
-                  <div class="analytic-row">
-                    <span class="analytic-label">Speed Factor:</span>
-                    <span class="analytic-val" style="color:var(--color-green);" id="analytic-speed">0.0x Real-time</span>
+                  
+                  <div class="transcript-search-box" style="display: flex; gap: 8px; width: 100%;">
+                    <input class="text-input" type="text" id="transcript-search" placeholder="Search transcript..." oninput="filterTranscriptLines()" style="padding: 6px 12px; font-size: 0.8rem; margin: 0; width: 100%;" />
                   </div>
-                  <div class="analytic-row" style="flex-direction:column; gap:4px; margin-top:4px;">
-                    <span class="analytic-label">Generated Files:</span>
-                    <div class="outputs-row" id="badge-outputs-row"></div>
+                  
+                  <!-- Real-time transcript display box -->
+                  <div class="transcript-viewport" id="transcript-viewport" style="flex-grow: 1; overflow-y: auto; font-family: var(--font-sans); font-size: 0.85rem; line-height: 1.6; padding: 12px; border-radius: 8px; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255,255,255,0.03); min-height: 200px; max-height: 400px; user-select: text;">
+                    <div style="color: var(--color-text-dim); text-align: center; margin-top: 40px;" id="transcript-placeholder">
+                      Start transcription to stream live text preview.
+                    </div>
                   </div>
-                  <button class="btn-primary" style="margin-top:12px; font-size:0.85rem; padding:10px;" onclick="copyTranscriptToClipboard()">
-                    Copy Main Transcript
-                  </button>
                 </div>
               </div>
             </div>

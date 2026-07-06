@@ -184,7 +184,7 @@ let logSearchQuery = '';
 let settingsState = null;
 let compiledBackends = {};
 let allLogsArray = []; // Store raw log payloads
-let activeBackendForBuild = 'Standard';
+
 let selectedMediaFile = null;
 let probedMetadata = null;
 let wavPathForTranscription = null;
@@ -299,10 +299,15 @@ window.switchView = function(viewName) {
     'intro': 'Dashboard',
     'build': 'System Build',
     'settings': 'Configuration Grid',
+    'models': 'Model Manager',
     'transcribe': 'Transcribe File',
     'logs': 'Central Logging Center'
   };
   document.getElementById('current-view-title').textContent = titleMap[viewName] || 'Whisper Manager';
+
+  if (viewName === 'models') {
+    loadModelStatusesGrid();
+  }
 };
 
 // ----------------- HUD Statistics Poll -----------------
@@ -345,15 +350,28 @@ function setupTauriListeners() {
       fillEl.style.width = `${pct}%`;
       labelEl.textContent = payload.message;
       pctEl.textContent = `${pct}%`;
+      fillEl.style.backgroundColor = 'var(--color-cyan)';
     } else {
-      // Completed or finished
-      fillEl.style.width = '100%';
-      labelEl.textContent = payload.message;
-      pctEl.textContent = '100%';
+      if (payload.error) {
+        fillEl.style.width = '100%';
+        fillEl.style.backgroundColor = 'var(--color-red)';
+        labelEl.textContent = payload.message;
+        pctEl.textContent = 'Failed';
+        // Alert the user with package installation instructions
+        alert(`Compilation Error:\n\n${payload.error}`);
+      } else {
+        fillEl.style.width = '100%';
+        fillEl.style.backgroundColor = 'var(--color-green)';
+        labelEl.textContent = payload.message;
+        pctEl.textContent = '100%';
+        showNotification("Build completed successfully!", "success");
+      }
       setTimeout(async () => {
         progressBlock.style.display = 'none';
+        // Reset color to cyan for next build
+        fillEl.style.backgroundColor = 'var(--color-cyan)';
         await refreshBuildStatuses();
-      }, 5000);
+      }, 7000);
     }
   });
 
@@ -381,6 +399,23 @@ function setupTauriListeners() {
     }
   });
 
+  // Model download progress
+  listen('model-download-status', (event) => {
+    const payload = event.payload;
+    
+    // Reload model statuses grid to show the progress update in real-time
+    loadModelStatusesGrid(true);
+    
+    if (!payload.active) {
+      if (payload.error) {
+        showNotification(`Model download failed: ${payload.error}`, "error");
+      } else {
+        showNotification(`Finished downloading ggml-${payload.model_name}.bin successfully!`, "success");
+        scanAndPopulateModels();
+      }
+    }
+  });
+
   // Central logs listener
   listen('log-message', (event) => {
     const payload = event.payload;
@@ -390,6 +425,16 @@ function setupTauriListeners() {
     payload.timestamp = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
     allLogsArray.push(payload);
     appendLogToViewport(payload);
+
+    // Intercept Whisper lines containing timestamp ranges
+    if (payload.category === 'Whisper') {
+      const match = payload.message.match(/\[(\d{2}):(\d{2}):(\d{2})\.(\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2})\.(\d{3})\]\s*(.*)/);
+      if (match) {
+        const timeRange = `[${match[1]}:${match[2]}:${match[3]} --> ${match[5]}:${match[6]}:${match[7]}]`;
+        const text = match[9] || '';
+        appendTranscriptLine(timeRange, text);
+      }
+    }
   });
 }
 
@@ -509,28 +554,60 @@ async function refreshBuildStatuses() {
   updateDashboardBackendTiles();
 }
 
-window.selectBackend = function(backend) {
-  activeBackendForBuild = backend;
-  
-  // Toggle UI cards
-  const cards = document.querySelectorAll('.backend-card');
-  cards.forEach(card => {
-    card.classList.remove('active');
-  });
-  
-  const activeCard = document.getElementById(`backend-${backend}`);
-  if (activeCard) {
-    activeCard.classList.add('active');
+let selectedBackendsForBuild = ['Standard'];
+
+window.selectBackend = function(backend, isInitialSelection = false) {
+  if (isInitialSelection) {
+    selectedBackendsForBuild = [backend];
+    
+    const backends = ['Standard', 'Vulkan', 'OpenVINO', 'CUDA'];
+    backends.forEach(b => {
+      const card = document.getElementById(`backend-${b}`);
+      if (card) {
+        if (b === backend) card.classList.add('active');
+        else card.classList.remove('active');
+      }
+      const chk = document.getElementById(`chk-${b}`);
+      if (chk) {
+        chk.checked = (b === backend);
+      }
+    });
+  } else {
+    if (selectedBackendsForBuild.includes(backend)) {
+      if (selectedBackendsForBuild.length === 1) {
+        showNotification("You must select at least one backend to compile.", "info");
+        return;
+      }
+      selectedBackendsForBuild = selectedBackendsForBuild.filter(b => b !== backend);
+      const card = document.getElementById(`backend-${backend}`);
+      if (card) card.classList.remove('active');
+      const chk = document.getElementById(`chk-${backend}`);
+      if (chk) chk.checked = false;
+    } else {
+      selectedBackendsForBuild.push(backend);
+      const card = document.getElementById(`backend-${backend}`);
+      if (card) card.classList.add('active');
+      const chk = document.getElementById(`chk-${backend}`);
+      if (chk) chk.checked = true;
+    }
   }
+
+  // Update compile title with list of selected backends
+  const labelMap = {
+    'Standard': 'Standard CPU',
+    'Vulkan': 'Vulkan GPU',
+    'OpenVINO': 'OpenVINO Intel',
+    'CUDA': 'NVIDIA CUDA'
+  };
+  const selectedLabels = selectedBackendsForBuild.map(b => labelMap[b] || b);
+  document.getElementById('compilation-title').textContent = `${selectedLabels.join(', ')} Compilation`;
   
-  // Update compile title
-  document.getElementById('compilation-title').textContent = `${backend} Compilation`;
-  
-  // Populate trans model dropdown for OpenVINO since OpenVINO requires specific encoders
   if (settingsState) {
-    settingsState.selectedBackend = backend;
-    saveCurrentSettings();
-    scanAndPopulateModels();
+    if (selectedBackendsForBuild.includes(backend)) {
+      settingsState.selectedBackend = backend;
+      saveCurrentSettings();
+      scanAndPopulateModels();
+    }
   }
   
   updateDashboardBackendTiles();
@@ -583,8 +660,8 @@ window.runBackendBuild = async function() {
   btn.disabled = true;
   
   try {
-    await invoke('start_compilation_task', { cloneDir, backend: activeBackendForBuild });
-    showNotification(`Compilation launched successfully for ${activeBackendForBuild}! Check the progress logs.`, "success");
+    await invoke('start_multi_compilations', { cloneDir, backends: selectedBackendsForBuild });
+    showNotification(`Compilation launched successfully for: ${selectedBackendsForBuild.join(', ')}! Check the progress logs.`, "success");
     switchView('logs');
   } catch (e) {
     showNotification("Error spawning compile commands: " + e, "error");
@@ -685,7 +762,7 @@ function bindSettingsToDOM() {
   });
   
   // Update build selection card highlight based on settings backend
-  selectBackend(settingsState.selectedBackend);
+  selectBackend(settingsState.selectedBackend, true);
 }
 
 async function saveCurrentSettings() {
@@ -1071,6 +1148,13 @@ window.runWhisperTranscription = async function() {
   if (cancelBtn) cancelBtn.style.display = 'inline-flex';
   
   document.getElementById('analytics-box').style.display = 'none';
+
+  // Clear transcript preview
+  transcriptLines = [];
+  const viewport = document.getElementById('transcript-viewport');
+  if (viewport) {
+    viewport.innerHTML = '<div style="color: var(--color-cyan); text-align: center; margin-top: 40px; font-weight: 500;">AI model is initializing...</div>';
+  }
   
   try {
     const result = await invoke('start_transcription_task', {
@@ -1078,6 +1162,15 @@ window.runWhisperTranscription = async function() {
       wavPath: wavPathForTranscription,
       durationSec: probedMetadata.durationSec
     });
+
+    // Load final transcript from the text file
+    if (result.generatedFiles && result.generatedFiles.length > 0) {
+      const parentDir = settingsState.inputFile.substring(0, settingsState.inputFile.lastIndexOf('/'));
+      const txtFile = result.generatedFiles.find(f => f.endsWith('.txt'));
+      if (txtFile) {
+        await loadTranscriptFromFile(`${parentDir}/${txtFile}`);
+      }
+    }
     
     document.getElementById('analytics-box').style.display = 'flex';
     document.getElementById('analytic-time').textContent = `${(result.durationMs / 1000).toFixed(1)}s`;
@@ -1448,12 +1541,28 @@ window.runBatchExtraction = async function() {
       // Override settingsState inputFile to point to this item's path so outputs are generated next to the original file
       const originalInputFile = settingsState.inputFile;
       settingsState.inputFile = item.path;
+
+      // Clear transcript preview for this file
+      transcriptLines = [];
+      const viewport = document.getElementById('transcript-viewport');
+      if (viewport) {
+        viewport.innerHTML = '<div style="color: var(--color-cyan); text-align: center; margin-top: 40px; font-weight: 500;">AI model is initializing...</div>';
+      }
       
       const result = await invoke('start_transcription_task', {
         settings: settingsState,
         wavPath: currentWavPath,
         durationSec: item.durationSec || 60.0
       });
+
+      // Load final transcript from the text file
+      if (result.generatedFiles && result.generatedFiles.length > 0) {
+        const parentDir = settingsState.inputFile.substring(0, settingsState.inputFile.lastIndexOf('/'));
+        const txtFile = result.generatedFiles.find(f => f.endsWith('.txt'));
+        if (txtFile) {
+          await loadTranscriptFromFile(`${parentDir}/${txtFile}`);
+        }
+      }
       
       // Restore original setting
       settingsState.inputFile = originalInputFile;
@@ -1713,3 +1822,392 @@ async function handleDashboardDroppedFiles(files) {
   switchView('transcribe');
   showNotification(`Successfully loaded ${files.length} file(s) via Drag & Drop!`, "success");
 }
+
+
+// ----------------- Model Manager Logic -----------------
+let modelStatusPollInterval = null;
+let prevDownloadedBytesMap = new Map();
+let prevTimestampMap = new Map();
+let lastKnownSpeedMap = new Map();
+let currentCategoryFilter = 'recommended';
+let systemSpecs = null;
+
+function formatRemainingTime(seconds) {
+  if (seconds <= 0 || !isFinite(seconds)) return "Unknown";
+  if (seconds < 60) return `${seconds}s`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}m ${s}s`;
+}
+
+function startModelStatusPolling() {
+  if (modelStatusPollInterval) return;
+  modelStatusPollInterval = setInterval(async () => {
+    if (activeView === 'models') {
+      await loadModelStatusesGrid(true);
+    } else {
+      clearInterval(modelStatusPollInterval);
+      modelStatusPollInterval = null;
+    }
+  }, 1000);
+}
+
+window.switchModelCategory = function(category) {
+  currentCategoryFilter = category;
+  
+  const buttons = document.querySelectorAll('#model-categories-sidebar .settings-cat-btn');
+  buttons.forEach(btn => {
+    btn.classList.remove('active');
+  });
+  
+  const activeBtn = document.getElementById(`model-cat-${category}`);
+  if (activeBtn) {
+    activeBtn.classList.add('active');
+  }
+  
+  loadModelStatusesGrid();
+};
+
+window.loadModelStatusesGrid = async function(isSilent = false) {
+  if (!settingsState) return;
+  
+  // 1. Fetch system specifications if not already loaded
+  if (!systemSpecs) {
+    try {
+      systemSpecs = await invoke('get_system_specs');
+    } catch (e) {
+      console.error("Failed to load system specs:", e);
+      systemSpecs = { total_ram_gb: 8.0, cpu_cores: 4 };
+    }
+  }
+
+  // Update specs subtitle UI helper
+  const specsSubtitle = document.getElementById('model-specs-subtitle');
+  if (specsSubtitle && systemSpecs) {
+    specsSubtitle.innerHTML = `
+      System detected: <strong style="color: var(--color-cyan);">${systemSpecs.total_ram_gb.toFixed(1)} GB RAM</strong>, 
+      <strong style="color: var(--color-cyan);">${systemSpecs.cpu_cores} CPU Cores</strong>. 
+      Recommended models optimized for your hardware are highlighted below.
+    `;
+  }
+  
+  try {
+    const statuses = await invoke('get_all_models_status', { cloneDir: settingsState.cloneDir });
+    const grid = document.getElementById('models-list-scroll');
+    if (!grid) return;
+    
+    const query = document.getElementById('model-search').value.toLowerCase();
+    
+    grid.innerHTML = '';
+    
+    // Determine dynamic list of recommended models based on specs
+    let recList = ["tiny", "tiny.en", "base", "base.en"];
+    if (systemSpecs.total_ram_gb >= 16.0 && systemSpecs.cpu_cores >= 8) {
+      recList = ["base", "base.en", "small", "small.en", "medium", "medium.en", "large-v3-turbo", "small-q8_0"];
+    } else if (systemSpecs.total_ram_gb >= 8.0) {
+      recList = ["tiny", "tiny.en", "base", "base.en", "small", "small.en", "base-q8_0", "small-q8_0"];
+    }
+    
+    statuses.forEach(m => {
+      if (query && !m.name.toLowerCase().includes(query)) {
+        return;
+      }
+
+      // EXCLUSIVE SEPARATION:
+      // Downloaded models should only show in the "local" tab, and not anywhere else!
+      if (currentCategoryFilter === 'local') {
+        if (m.status !== 'Downloaded') return;
+      } else {
+        if (m.status === 'Downloaded') return;
+        
+        // Filter catalog tabs by size families or recommended status
+        if (currentCategoryFilter === 'recommended') {
+          if (!recList.includes(m.name)) return;
+        } else if (currentCategoryFilter === 'tiny') {
+          if (!m.name.startsWith("tiny")) return;
+        } else if (currentCategoryFilter === 'base') {
+          if (!m.name.startsWith("base")) return;
+        } else if (currentCategoryFilter === 'small') {
+          if (!m.name.startsWith("small")) return;
+        } else if (currentCategoryFilter === 'medium') {
+          if (!m.name.startsWith("medium")) return;
+        } else if (currentCategoryFilter === 'large') {
+          if (!m.name.startsWith("large")) return;
+        }
+      }
+      
+      const card = document.createElement('div');
+      card.className = 'setting-card';
+      card.dataset.name = m.name;
+      
+      let badgeHtml = '';
+      if (m.status === 'Downloading') {
+        badgeHtml = `<span class="model-badge badge-downloading">${m.status}</span>`;
+      } else if (m.status === 'Paused') {
+        badgeHtml = `<span class="model-badge badge-paused">${m.status}</span>`;
+      }
+      
+      let isRecommended = recList.includes(m.name);
+      const sizeMB = (m.sizeBytes / 1024 / 1024).toFixed(0);
+      const dlMB = (m.downloadedBytes / 1024 / 1024).toFixed(0);
+
+      let speedText = '';
+      let remainingText = '';
+      
+      if (m.status === 'Downloading') {
+        const now = Date.now();
+        const prevBytes = prevDownloadedBytesMap.get(m.name) || 0;
+        const prevTime = prevTimestampMap.get(m.name) || now;
+        
+        const deltaBytes = m.downloadedBytes - prevBytes;
+        const deltaTime = (now - prevTime) / 1000;
+        
+        prevDownloadedBytesMap.set(m.name, m.downloadedBytes);
+        prevTimestampMap.set(m.name, now);
+        
+        if (deltaBytes > 0 && deltaTime > 0) {
+          const speedBytesPerSec = deltaBytes / deltaTime;
+          const speedMBPerSec = (speedBytesPerSec / 1024 / 1024).toFixed(1);
+          speedText = `${speedMBPerSec} MB/s`;
+          lastKnownSpeedMap.set(m.name, speedText);
+          
+          const remainingBytes = m.sizeBytes - m.downloadedBytes;
+          const remainingSeconds = Math.round(remainingBytes / speedBytesPerSec);
+          remainingText = ` • ETA: ${formatRemainingTime(remainingSeconds)}`;
+        } else {
+          if (m.downloadedBytes === 0) {
+            speedText = 'Starting...';
+          } else {
+            speedText = lastKnownSpeedMap.get(m.name) || '0.0 MB/s';
+          }
+        }
+      } else {
+        prevDownloadedBytesMap.delete(m.name);
+        prevTimestampMap.delete(m.name);
+        lastKnownSpeedMap.delete(m.name);
+      }
+      
+      let actionButtons = '';
+      if (m.status === 'Downloaded') {
+        actionButtons = `
+          <button class="btn-secondary" style="border-color: var(--color-red); color: var(--color-red); margin: 0; padding: 6px 14px; font-size: 0.8rem;" onclick="deleteModelClick('${m.name}')">Delete</button>
+        `;
+      } else if (m.status === 'Downloading') {
+        actionButtons = `
+          <button class="btn-secondary" style="border-color: var(--color-gold); color: var(--color-gold); margin: 0; padding: 6px 14px; font-size: 0.8rem;" onclick="pauseModelClick('${m.name}')">Pause</button>
+        `;
+      } else if (m.status === 'Paused') {
+        actionButtons = `
+          <button class="btn-primary" style="margin: 0; padding: 6px 14px; font-size: 0.8rem;" onclick="downloadModelClick('${m.name}')">Resume</button>
+          <button class="btn-secondary" style="border-color: var(--color-red); color: var(--color-red); margin: 0; padding: 6px 14px; font-size: 0.8rem;" onclick="deleteModelClick('${m.name}')">Discard</button>
+        `;
+      } else {
+        actionButtons = `
+          <button class="btn-primary" style="margin: 0; padding: 6px 14px; font-size: 0.8rem; min-width: 100px;" onclick="downloadModelClick('${m.name}')">Download</button>
+        `;
+      }
+      
+      const pct = (m.progress * 100).toFixed(0);
+      const showProgressBlock = m.status === 'Downloading' || m.status === 'Paused' ? 'block' : 'none';
+      const isQuant = m.name.includes("-q");
+      
+      let recommendedBadge = '';
+      if (isRecommended) {
+        recommendedBadge = `<span class="model-badge" style="background: rgba(139, 92, 246, 0.1); color: var(--color-purple); border: 1px solid rgba(139, 92, 246, 0.3); margin-right: 6px;">Recommended</span>`;
+      }
+      
+      card.innerHTML = `
+        <div class="setting-info" style="flex-grow: 1; padding-right: 20px;">
+          <div class="setting-label-row" style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+            <span class="setting-title" style="font-size: 1.05rem; font-weight: 600; color: #fff;">ggml-${m.name}.bin</span>
+            ${recommendedBadge}
+          </div>
+          <div class="setting-desc" style="font-size: 0.82rem; color: var(--color-text-muted); line-height: 1.4; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            ${badgeHtml}
+            ${badgeHtml ? '<span style="color: rgba(255,255,255,0.1);">|</span>' : ''}
+            <span>Expected Size: ${sizeMB} MB</span>
+            <span style="color: rgba(255,255,255,0.1);">|</span>
+            <span style="color: ${isQuant ? 'var(--color-cyan)' : 'var(--color-purple)'}; font-weight: 500;">
+              ${isQuant ? 'Quantized Optimized (5-bit/8-bit)' : 'Full Precision (16-bit)'}
+            </span>
+            ${m.status === 'Downloading' ? `
+              <span style="color: rgba(255,255,255,0.1);">|</span>
+              <span style="color: var(--color-cyan);">${dlMB} MB (${pct}%) • Speed: ${speedText}${remainingText}</span>
+            ` : ''}
+            ${m.status === 'Paused' ? `
+              <span style="color: rgba(255,255,255,0.1);">|</span>
+              <span style="color: var(--color-gold);">${dlMB} MB (${pct}%) • Paused</span>
+            ` : ''}
+          </div>
+          <div class="progress-bar-container" style="display: ${showProgressBlock}; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.05); overflow: hidden; margin-top: 10px; border: 1px solid rgba(255,255,255,0.02); max-width: 500px;">
+            <div class="progress-bar-fill" style="width: ${pct}%; height: 100%; background: ${m.status === 'Downloading' ? 'var(--color-cyan)' : 'var(--color-gold)'}; box-shadow: ${m.status === 'Downloading' ? 'var(--shadow-neon-cyan)' : 'var(--shadow-neon-gold)'}; transition: width 0.3s ease;"></div>
+          </div>
+        </div>
+        <div class="setting-control" style="display: flex; gap: 8px; align-items: center; justify-content: flex-end; flex-shrink: 0; min-width: 160px;">
+          ${actionButtons}
+        </div>
+      `;
+      grid.appendChild(card);
+    });
+    
+    const hasActiveDownloads = statuses.some(m => m.status === 'Downloading');
+    if (hasActiveDownloads) {
+      startModelStatusPolling();
+    }
+  } catch (err) {
+    console.error("Failed to load model statuses:", err);
+  }
+};
+
+window.filterModelsGrid = function() {
+  loadModelStatusesGrid();
+};
+
+window.downloadModelClick = async function(name) {
+  if (!settingsState) return;
+  
+  try {
+    showNotification(`Downloading ggml-${name}.bin...`, "info");
+    
+    await invoke('start_download_model_task', {
+      cloneDir: settingsState.cloneDir,
+      modelName: name
+    });
+    
+    // Refresh UI and start active polling
+    await loadModelStatusesGrid();
+    startModelStatusPolling();
+  } catch (err) {
+    showNotification("Failed to start download: " + err, "error");
+  }
+};
+
+window.pauseModelClick = async function(name) {
+  try {
+    await invoke('pause_download_model', { modelName: name });
+    showNotification(`Paused ggml-${name}.bin download`, "info");
+    await loadModelStatusesGrid();
+  } catch (err) {
+    showNotification("Failed to pause download: " + err, "error");
+  }
+};
+
+window.deleteModelClick = async function(name) {
+  const confirm = window.confirm(`Are you sure you want to delete / discard the model ggml-${name}.bin?`);
+  if (!confirm) return;
+  
+  try {
+    await invoke('delete_model_file', {
+      cloneDir: settingsState.cloneDir,
+      modelName: name
+    });
+    showNotification(`Deleted ggml-${name}.bin`, "success");
+    await loadModelStatusesGrid();
+    // Scan configuration dropdown to sync options
+    await scanAndPopulateModels();
+  } catch (err) {
+    showNotification("Failed to delete model: " + err, "error");
+  }
+};
+
+// ----------------- Live Transcript Viewer Helper Functions -----------------
+let transcriptLines = [];
+
+function appendTranscriptLine(timeRange, text) {
+  const placeholder = document.getElementById('transcript-placeholder');
+  if (placeholder) placeholder.remove();
+  
+  const viewport = document.getElementById('transcript-viewport');
+  
+  // Clean text
+  const cleanText = text.trim();
+  
+  const lineObj = { timeRange, text: cleanText, id: transcriptLines.length };
+  transcriptLines.push(lineObj);
+  
+  const lineEl = document.createElement('div');
+  lineEl.className = 'transcript-line';
+  lineEl.dataset.id = lineObj.id;
+  lineEl.innerHTML = `
+    <span class="transcript-time">${timeRange}</span>
+    <div class="transcript-text">
+      <input type="text" class="transcript-text-input" value="${escapeHTML(cleanText)}" onchange="updateTranscriptLineText(${lineObj.id}, this.value)" />
+    </div>
+  `;
+  viewport.appendChild(lineEl);
+  viewport.scrollTop = viewport.scrollHeight;
+}
+
+window.updateTranscriptLineText = function(id, value) {
+  const line = transcriptLines.find(l => l.id === id);
+  if (line) {
+    line.text = value;
+  }
+};
+
+window.filterTranscriptLines = function() {
+  const query = document.getElementById('transcript-search').value.toLowerCase();
+  const lines = document.querySelectorAll('.transcript-line');
+  lines.forEach(lineEl => {
+    const textInput = lineEl.querySelector('.transcript-text-input');
+    if (textInput) {
+      const match = textInput.value.toLowerCase().includes(query);
+      lineEl.style.display = match ? 'flex' : 'none';
+    }
+  });
+};
+
+window.loadTranscriptFromFile = async function(fullPath) {
+  try {
+    const text = await invoke('read_text_file_content', { filePath: fullPath });
+    
+    // Clear transcript lines
+    transcriptLines = [];
+    const viewport = document.getElementById('transcript-viewport');
+    viewport.innerHTML = '';
+    
+    // Split text by newlines and add to viewer
+    const lines = text.split('\n');
+    lines.forEach((lineText, idx) => {
+      if (!lineText.trim()) return;
+      
+      const lineObj = { timeRange: `Line ${idx + 1}`, text: lineText.trim(), id: idx };
+      transcriptLines.push(lineObj);
+      
+      const lineEl = document.createElement('div');
+      lineEl.className = 'transcript-line';
+      lineEl.dataset.id = lineObj.id;
+      lineEl.innerHTML = `
+        <span class="transcript-time" style="color: var(--color-text-muted); font-family: inherit; font-size: 0.75rem;">[L${idx + 1}]</span>
+        <div class="transcript-text">
+          <input type="text" class="transcript-text-input" value="${escapeHTML(lineText.trim())}" onchange="updateTranscriptLineText(${lineObj.id}, this.value)" />
+        </div>
+      `;
+      viewport.appendChild(lineEl);
+    });
+    
+    if (transcriptLines.length === 0) {
+      viewport.innerHTML = `<div style="color: var(--color-text-dim); text-align: center; margin-top: 40px;">Transcript is empty.</div>`;
+    }
+  } catch (err) {
+    console.error("Failed to load transcript file:", err);
+  }
+};
+
+window.copyTranscriptToClipboard = async function() {
+  if (transcriptLines.length === 0) {
+    showNotification("No transcript text to copy.", "info");
+    return;
+  }
+  
+  const textToCopy = transcriptLines
+    .map(l => l.text)
+    .join('\n');
+    
+  try {
+    await invoke('copy_to_clipboard', { text: textToCopy });
+    showNotification("Transcript copied to clipboard!", "success");
+  } catch (err) {
+    showNotification("Failed to copy transcript: " + err, "error");
+  }
+};
