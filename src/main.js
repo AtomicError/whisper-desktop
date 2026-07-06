@@ -574,7 +574,7 @@ window.dashboardSelectBackend = function(backend) {
     return;
   }
   
-  selectBackend(backend);
+  selectBackend(backend, true);
   updateDashboardBackendTiles();
   showNotification(`Active backend switched to ${backend === 'Standard' ? 'CPU' : backend} successfully!`, "success");
 };
