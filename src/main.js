@@ -62,6 +62,41 @@ window.showNotification = function(message, type = 'info') {
   }, 3200);
 };
 
+// Centered Premium Glassmorphic Modal overlay API
+window.showAppModal = function(title, message, details = '') {
+  const overlay = document.getElementById('app-modal-overlay');
+  const titleEl = document.getElementById('app-modal-title');
+  const msgEl = document.getElementById('app-modal-message');
+  const detailsEl = document.getElementById('app-modal-details');
+  
+  if (overlay && titleEl && msgEl && detailsEl) {
+    titleEl.textContent = title;
+    msgEl.textContent = message;
+    
+    if (details) {
+      detailsEl.textContent = details;
+      detailsEl.style.display = 'block';
+    } else {
+      detailsEl.style.display = 'none';
+    }
+    
+    overlay.style.display = 'flex';
+    // Trigger reflow to run CSS animation
+    void overlay.offsetWidth;
+    overlay.classList.add('show');
+  }
+};
+
+window.closeAppModal = function() {
+  const overlay = document.getElementById('app-modal-overlay');
+  if (overlay) {
+    overlay.classList.remove('show');
+    setTimeout(() => {
+      overlay.style.display = 'none';
+    }, 300);
+  }
+};
+
 // Safe Tauri API extraction
 let originalInvoke = null;
 let originalListen = null;
@@ -417,7 +452,7 @@ function setupTauriListeners() {
         labelEl.textContent = payload.message;
         pctEl.textContent = 'Failed';
         // Alert the user with package installation instructions
-        alert(`Compilation Error:\n\n${payload.error}`);
+        showAppModal("Compilation Error", payload.message || "An error occurred during compilation.", payload.error);
       } else {
         fillEl.style.width = '100%';
         fillEl.style.backgroundColor = 'var(--color-green)';
