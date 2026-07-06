@@ -284,6 +284,14 @@ function recommendCompilationBackend() {
 async function initApp() {
   console.log("Whisper Manager Desktop UI Initialized!");
   
+  // Disable default webview context menu globally to make it feel like a native desktop app
+  document.addEventListener('contextmenu', e => {
+    // Allow right-click default context menu ONLY on inputs and textareas (for copy/cut/paste)
+    if (!e.target.closest('input, textarea')) {
+      e.preventDefault();
+    }
+  });
+  
   // Setup custom CSD titlebar controls
   setupTitlebar();
   
