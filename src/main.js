@@ -1073,6 +1073,11 @@ function setWizardStepCompleted(stepNum, isCompleted) {
 }
 
 window.browseMediaFile = async function() {
+  const startBtn = document.getElementById('btn-run-batch');
+  if (startBtn && startBtn.disabled) {
+    showNotification("Cannot select files while batch extraction is active.", "info");
+    return;
+  }
   const files = await invoke('select_files');
   if (files && files.length > 0) {
     selectedMediaFiles = files;
@@ -1521,6 +1526,73 @@ window.clearBatchQueue = function() {
   showNotification("Batch queue cleared.", "info");
 };
 
+window.moveBatchItemUp = function(index) {
+  if (index <= 0 || index >= batchItems.length) return;
+  // Swap in batchItems
+  const tempItem = batchItems[index];
+  batchItems[index] = batchItems[index - 1];
+  batchItems[index - 1] = tempItem;
+
+  // Swap in selectedMediaFiles
+  const tempFile = selectedMediaFiles[index];
+  selectedMediaFiles[index] = selectedMediaFiles[index - 1];
+  selectedMediaFiles[index - 1] = tempFile;
+
+  renderBatchQueueTable();
+};
+
+window.moveBatchItemDown = function(index) {
+  if (index < 0 || index >= batchItems.length - 1) return;
+  // Swap in batchItems
+  const tempItem = batchItems[index];
+  batchItems[index] = batchItems[index + 1];
+  batchItems[index + 1] = tempItem;
+
+  // Swap in selectedMediaFiles
+  const tempFile = selectedMediaFiles[index];
+  selectedMediaFiles[index] = selectedMediaFiles[index + 1];
+  selectedMediaFiles[index + 1] = tempFile;
+
+  renderBatchQueueTable();
+};
+
+window.sortBatchQueue = function(criteria) {
+  if (batchItems.length <= 1) return;
+  
+  const zipped = batchItems.map((item, index) => ({
+    item,
+    filePath: selectedMediaFiles[index]
+  }));
+
+  if (criteria === 'name-asc') {
+    zipped.sort((a, b) => a.item.name.localeCompare(b.item.name));
+  } else if (criteria === 'name-desc') {
+    zipped.sort((a, b) => b.item.name.localeCompare(a.item.name));
+  } else if (criteria === 'duration-asc') {
+    zipped.sort((a, b) => {
+      const da = a.item.durationSec || 0;
+      const db = b.item.durationSec || 0;
+      return da - db;
+    });
+  } else if (criteria === 'duration-desc') {
+    zipped.sort((a, b) => {
+      const da = a.item.durationSec || 0;
+      const db = b.item.durationSec || 0;
+      return db - da;
+    });
+  }
+
+  batchItems = zipped.map(z => z.item);
+  selectedMediaFiles = zipped.map(z => z.filePath);
+
+  // Reset dropdown value
+  const sortSelect = document.getElementById('batch-sort-select');
+  if (sortSelect) sortSelect.value = '';
+
+  renderBatchQueueTable();
+  showNotification("Queue sorted successfully!", "success");
+};
+
 function renderBatchQueueTable() {
   const tbody = document.getElementById('batch-queue-body');
   if (!tbody) return;
@@ -1570,33 +1642,88 @@ function renderBatchQueueTable() {
     
     // Action column
     const actionTd = document.createElement('td');
-    actionTd.style.textAlign = 'center';
+    actionTd.style.display = 'flex';
+    actionTd.style.alignItems = 'center';
+    actionTd.style.justifyContent = 'center';
+    actionTd.style.gap = '8px';
     
+    const startBtn = document.getElementById('btn-run-batch');
+    const isRunning = startBtn && startBtn.disabled;
+    
+    // Up button
+    const upBtn = document.createElement('button');
+    upBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px;"><path d="m18 15-6-6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    upBtn.style.background = 'transparent';
+    upBtn.style.border = 'none';
+    upBtn.style.color = 'var(--color-cyan)';
+    upBtn.style.padding = '4px';
+    upBtn.style.display = 'inline-flex';
+    upBtn.style.alignItems = 'center';
+    upBtn.style.justifyContent = 'center';
+    upBtn.title = 'Move up';
+    
+    if (isRunning || index === 0) {
+      upBtn.disabled = true;
+      upBtn.style.opacity = '0.3';
+      upBtn.style.cursor = 'not-allowed';
+    } else {
+      upBtn.style.cursor = 'pointer';
+      upBtn.onclick = (e) => {
+        e.stopPropagation();
+        moveBatchItemUp(index);
+      };
+    }
+    
+    // Down button
+    const downBtn = document.createElement('button');
+    downBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px;"><path d="m6 9 6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    downBtn.style.background = 'transparent';
+    downBtn.style.border = 'none';
+    downBtn.style.color = 'var(--color-cyan)';
+    downBtn.style.padding = '4px';
+    downBtn.style.display = 'inline-flex';
+    downBtn.style.alignItems = 'center';
+    downBtn.style.justifyContent = 'center';
+    downBtn.title = 'Move down';
+    
+    if (isRunning || index === batchItems.length - 1) {
+      downBtn.disabled = true;
+      downBtn.style.opacity = '0.3';
+      downBtn.style.cursor = 'not-allowed';
+    } else {
+      downBtn.style.cursor = 'pointer';
+      downBtn.onclick = (e) => {
+        e.stopPropagation();
+        moveBatchItemDown(index);
+      };
+    }
+    
+    // Delete button
     const deleteBtn = document.createElement('button');
     deleteBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px;"><path d="M18 6 6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
     deleteBtn.style.background = 'transparent';
     deleteBtn.style.border = 'none';
     deleteBtn.style.color = 'var(--color-red)';
-    deleteBtn.style.cursor = 'pointer';
     deleteBtn.style.padding = '4px';
     deleteBtn.style.display = 'inline-flex';
     deleteBtn.style.alignItems = 'center';
     deleteBtn.style.justifyContent = 'center';
     deleteBtn.title = 'Remove from queue';
     
-    // Disable delete if batch is running
-    const startBtn = document.getElementById('btn-run-batch');
-    if (startBtn && startBtn.disabled) {
+    if (isRunning) {
       deleteBtn.disabled = true;
-      deleteBtn.style.opacity = '0.4';
+      deleteBtn.style.opacity = '0.3';
       deleteBtn.style.cursor = 'not-allowed';
     } else {
+      deleteBtn.style.cursor = 'pointer';
       deleteBtn.onclick = (e) => {
         e.stopPropagation();
         removeFileFromBatch(index);
       };
     }
     
+    actionTd.appendChild(upBtn);
+    actionTd.appendChild(downBtn);
     actionTd.appendChild(deleteBtn);
     tr.appendChild(actionTd);
     
@@ -1609,9 +1736,14 @@ window.runBatchExtraction = async function() {
   
   const startBtn = document.getElementById('btn-run-batch');
   const cancelBtn = document.getElementById('btn-cancel-batch');
+  const sortSelect = document.getElementById('batch-sort-select');
+  const clearBtn = document.getElementById('btn-clear-batch');
   
   startBtn.disabled = true;
   startBtn.textContent = 'Batch Running...';
+  if (sortSelect) sortSelect.disabled = true;
+  if (clearBtn) clearBtn.disabled = true;
+  
   if (cancelBtn) {
     cancelBtn.style.display = 'inline-flex';
     cancelBtn.disabled = false;
@@ -1722,6 +1854,10 @@ window.runBatchExtraction = async function() {
   startBtn.disabled = false;
   startBtn.textContent = 'Start Batch AI Extraction';
   if (cancelBtn) cancelBtn.style.display = 'none';
+  if (sortSelect) sortSelect.disabled = false;
+  if (clearBtn) clearBtn.disabled = false;
+  
+  renderBatchQueueTable();
   
   setWizardStepCompleted(3, true);
 };
@@ -1866,6 +2002,11 @@ function setupDashboardDragAndDrop() {
 }
 
 async function handleDashboardDroppedFiles(files) {
+  const startBtn = document.getElementById('btn-run-batch');
+  if (startBtn && startBtn.disabled) {
+    showNotification("Cannot load dropped files while batch extraction is active.", "info");
+    return;
+  }
   selectedMediaFiles = files;
   
   if (files.length === 1) {

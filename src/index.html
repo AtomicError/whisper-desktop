@@ -1091,7 +1091,16 @@
                     <div id="batch-queue-container" style="display:none; width:100%; margin-top:16px;">
                       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                         <span style="font-size:0.85rem; color:var(--color-cyan); font-weight:600;">Queue Files</span>
-                        <button class="btn-secondary" id="btn-clear-batch" style="padding:4px 10px; font-size:0.75rem; border-color:var(--color-red); color:var(--color-red); margin:0;" onclick="clearBatchQueue()">Clear Queue</button>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                          <select id="batch-sort-select" class="select-control" style="padding: 2px 8px; font-size: 0.75rem; height: 26px; width: auto; margin: 0; background: rgba(255,255,255,0.03); border: 1px solid var(--border-glass);" onchange="sortBatchQueue(this.value)">
+                            <option value="" disabled selected>Sort Queue...</option>
+                            <option value="name-asc">Alphabetical (A-Z)</option>
+                            <option value="name-desc">Alphabetical (Z-A)</option>
+                            <option value="duration-asc">Duration (Shortest first)</option>
+                            <option value="duration-desc">Duration (Longest first)</option>
+                          </select>
+                          <button class="btn-secondary" id="btn-clear-batch" style="padding:4px 10px; font-size:0.75rem; border-color:var(--color-red); color:var(--color-red); margin:0; height: 26px; display: inline-flex; align-items: center;" onclick="clearBatchQueue()">Clear Queue</button>
+                        </div>
                       </div>
                       <div class="batch-table-wrapper">
                         <table class="batch-table">
@@ -1100,7 +1109,7 @@
                               <th>File Name</th>
                               <th>Duration</th>
                               <th>Status</th>
-                              <th style="width: 50px; text-align: center;">Action</th>
+                              <th style="width: 100px; text-align: center;">Action</th>
                             </tr>
                           </thead>
                           <tbody id="batch-queue-body">
