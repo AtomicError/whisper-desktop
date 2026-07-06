@@ -476,3 +476,14 @@ pub async fn run_transcription(
         generated_files,
     })
 }
+
+
+pub fn read_text_file(file_path: String) -> Result<String, String> {
+    let path = Path::new(&file_path);
+    if !path.exists() {
+        return Err("File does not exist".to_string());
+    }
+    fs::read_to_string(path)
+        .map_err(|e| format!("Failed to read file: {}", e))
+}
+
