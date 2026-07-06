@@ -306,12 +306,12 @@
             </div>
 
             <div class="glass-card compilation-panel">
-              <div style="display:flex; justify-content:space-between; align-items:center;">
-                <div>
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:24px; flex-wrap:wrap;">
+                <div style="flex:1; min-width:250px;">
                   <h4 id="compilation-title" style="font-size:1.1rem; margin-bottom:4px;">Standard CPU Compilation</h4>
-                  <p style="font-size:0.85rem; color:var(--color-text-muted);">Triggers a clean CMake build. Previous compiled binaries for this backend will be replaced.</p>
+                  <p style="font-size:0.85rem; color:var(--color-text-muted); margin:0;">Triggers a clean CMake build. Previous compiled binaries for this backend will be replaced.</p>
                 </div>
-                <button class="btn-primary" id="btn-run-build" onclick="runBackendBuild()">Run Full Compiler</button>
+                <button class="btn-primary" id="btn-run-build" onclick="runBackendBuild()" style="flex-shrink:0;">Run Full Compiler</button>
               </div>
 
               <!-- Compile progress -->

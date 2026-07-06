@@ -559,21 +559,9 @@ header {
 }
 
 .backend-card.active {
-  border-color: var(--color-cyan);
-  box-shadow: 0 0 0 1px var(--color-cyan), 0 0 18px rgba(6, 182, 212, 0.25);
-  background: rgba(6, 182, 212, 0.03);
-}
-
-.backend-card.active::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 5px;
-  height: 100%;
-  background: var(--color-cyan);
-  box-shadow: 0 0 10px var(--color-cyan);
-  border-radius: 0 4px 4px 0;
+  border-color: rgba(139, 92, 246, 0.4);
+  box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.4), 0 0 20px rgba(139, 92, 246, 0.15);
+  background: rgba(139, 92, 246, 0.02);
 }
 
 .backend-card-header {
@@ -1855,14 +1843,14 @@ select.select-control {
 }
 
 .backend-card.active .backend-checkbox {
-  border-color: var(--color-cyan);
-  box-shadow: 0 0 8px rgba(6, 182, 212, 0.3);
+  border-color: var(--color-purple);
+  box-shadow: 0 0 8px rgba(139, 92, 246, 0.3);
 }
 
 .backend-checkbox:checked {
-  background: var(--color-cyan) !important;
-  border-color: var(--color-cyan) !important;
-  box-shadow: 0 0 10px rgba(6, 182, 212, 0.6) !important;
+  background: var(--color-purple) !important;
+  border-color: var(--color-purple) !important;
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.6) !important;
 }
 
 .backend-checkbox:checked::after {
