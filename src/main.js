@@ -238,6 +238,46 @@ function setupTitlebar() {
   }
 }
 
+function recommendCompilationBackend() {
+  if (!systemSpecs) return;
+  
+  // Hide all recommendation pills first
+  const pills = document.querySelectorAll('.recommendation-pill');
+  pills.forEach(p => p.style.display = 'none');
+  
+  // Determine recommended backends based on GPU
+  let recBackends = ['Standard'];
+  if (systemSpecs.gpu_type === 'nvidia') {
+    recBackends = ['CUDA'];
+  } else if (systemSpecs.gpu_type === 'amd') {
+    recBackends = ['Vulkan'];
+  } else if (systemSpecs.gpu_type === 'intel') {
+    recBackends = ['OpenVINO', 'Vulkan'];
+  }
+  
+  recBackends.forEach(backend => {
+    const recPill = document.getElementById(`rec-${backend}`);
+    if (recPill) {
+      recPill.style.display = 'inline-block';
+    }
+  });
+  
+  // Auto-select the first non-Standard backend initially if any
+  const firstNonCpu = recBackends.find(b => b !== 'Standard');
+  if (firstNonCpu) {
+    selectBackend(firstNonCpu, true);
+    
+    // Auto-select additional recommended backends as well
+    recBackends.forEach(b => {
+      if (b !== 'Standard' && b !== firstNonCpu) {
+        if (!selectedBackendsForBuild.includes(b)) {
+          selectBackend(b);
+        }
+      }
+    });
+  }
+}
+
 // Initialize App
 async function initApp() {
   console.log("Whisper Manager Desktop UI Initialized!");
@@ -251,9 +291,18 @@ async function initApp() {
   // Setup Tauri Listeners
   setupTauriListeners();
   
+  // Load system specs early to guide recommendation engine
+  try {
+    systemSpecs = await invoke('get_system_specs');
+  } catch (e) {
+    console.error("Failed to load system specs on startup:", e);
+    systemSpecs = { total_ram_gb: 8.0, cpu_cores: 4, gpu_type: 'unknown' };
+  }
+  
   // Initial load
   await refreshSettings();
   await refreshBuildStatuses();
+  recommendCompilationBackend();
   
   // Setup Dashboard drag & drop
   setupDashboardDragAndDrop();
@@ -1877,16 +1926,24 @@ window.loadModelStatusesGrid = async function(isSilent = false) {
       systemSpecs = await invoke('get_system_specs');
     } catch (e) {
       console.error("Failed to load system specs:", e);
-      systemSpecs = { total_ram_gb: 8.0, cpu_cores: 4 };
+      systemSpecs = { total_ram_gb: 8.0, cpu_cores: 4, gpu_type: 'unknown' };
     }
   }
 
   // Update specs subtitle UI helper
   const specsSubtitle = document.getElementById('model-specs-subtitle');
   if (specsSubtitle && systemSpecs) {
+    const gpuLabelMap = {
+      'nvidia': 'NVIDIA Dedicated GPU (CUDA Supported)',
+      'amd': 'AMD GPU (Vulkan Supported)',
+      'intel': 'Intel GPU (OpenVINO/Vulkan Supported)',
+      'unknown': 'CPU Only / Undetected GPU'
+    };
+    const gpuName = gpuLabelMap[systemSpecs.gpu_type] || systemSpecs.gpu_type || 'Unknown GPU';
     specsSubtitle.innerHTML = `
       System detected: <strong style="color: var(--color-cyan);">${systemSpecs.total_ram_gb.toFixed(1)} GB RAM</strong>, 
-      <strong style="color: var(--color-cyan);">${systemSpecs.cpu_cores} CPU Cores</strong>. 
+      <strong style="color: var(--color-cyan);">${systemSpecs.cpu_cores} CPU Cores</strong>, 
+      <strong style="color: var(--color-cyan);">${gpuName}</strong>. 
       Recommended models optimized for your hardware are highlighted below.
     `;
   }
@@ -1900,12 +1957,24 @@ window.loadModelStatusesGrid = async function(isSilent = false) {
     
     grid.innerHTML = '';
     
-    // Determine dynamic list of recommended models based on specs
+    // Determine dynamic list of recommended models based on specs and GPU
     let recList = ["tiny", "tiny.en", "base", "base.en"];
-    if (systemSpecs.total_ram_gb >= 16.0 && systemSpecs.cpu_cores >= 8) {
-      recList = ["base", "base.en", "small", "small.en", "medium", "medium.en", "large-v3-turbo", "small-q8_0"];
-    } else if (systemSpecs.total_ram_gb >= 8.0) {
-      recList = ["tiny", "tiny.en", "base", "base.en", "small", "small.en", "base-q8_0", "small-q8_0"];
+    const hasGpuAcceleration = systemSpecs.gpu_type === 'nvidia' || systemSpecs.gpu_type === 'amd' || systemSpecs.gpu_type === 'intel';
+    
+    if (hasGpuAcceleration) {
+      if (systemSpecs.total_ram_gb >= 16.0) {
+        recList = ["base", "base.en", "small", "small.en", "medium", "medium.en", "large-v3-turbo", "small-q8_0"];
+      } else if (systemSpecs.total_ram_gb >= 8.0) {
+        recList = ["tiny", "tiny.en", "base", "base.en", "small", "small.en", "large-v3-turbo", "small-q8_0"];
+      } else {
+        recList = ["tiny", "tiny.en", "base", "base.en", "base-q8_0"];
+      }
+    } else {
+      if (systemSpecs.total_ram_gb >= 16.0) {
+        recList = ["base", "base.en", "small", "small.en", "base-q8_0", "small-q8_0"];
+      } else if (systemSpecs.total_ram_gb >= 8.0) {
+        recList = ["tiny", "tiny.en", "base", "base.en", "base-q8_0", "small-q8_0"];
+      }
     }
     
     statuses.forEach(m => {
@@ -2013,7 +2082,15 @@ window.loadModelStatusesGrid = async function(isSilent = false) {
       
       let recommendedBadge = '';
       if (isRecommended) {
-        recommendedBadge = `<span class="model-badge" style="background: rgba(139, 92, 246, 0.1); color: var(--color-purple); border: 1px solid rgba(139, 92, 246, 0.3); margin-right: 6px;">Recommended</span>`;
+        let reason = "Recommended";
+        if (hasGpuAcceleration && (m.name.includes("small") || m.name.includes("medium") || m.name.includes("turbo"))) {
+          reason = `${systemSpecs.gpu_type.toUpperCase()} GPU Recommended`;
+        } else if (m.name.includes("-q")) {
+          reason = "Fast CPU Quantized";
+        } else if (m.name.startsWith("tiny") || m.name.startsWith("base")) {
+          reason = "Lightweight & Fast";
+        }
+        recommendedBadge = `<span class="model-badge" style="background: rgba(6, 182, 212, 0.08); color: var(--color-cyan); border: 1px solid rgba(6, 182, 212, 0.25); margin-right: 6px;" title="${reason}">★ ${reason}</span>`;
       }
       
       card.innerHTML = `
