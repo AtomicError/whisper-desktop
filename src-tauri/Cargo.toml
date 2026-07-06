@@ -29,6 +29,7 @@ tokio = { version = "1", features = ["full"] }
 regex = "1"
 rfd = "0.14"
 chrono = { version = "0.4", features = ["serde"] }
+webkit2gtk = { version = "2.0.2" }
 
 
 
