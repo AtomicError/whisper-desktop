@@ -531,7 +531,7 @@ header {
 
 .backends-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
   margin-bottom: 32px;
 }
@@ -559,8 +559,8 @@ header {
 }
 
 .backend-card.active {
-  border: 2px solid var(--color-cyan);
-  box-shadow: 0 0 18px rgba(6, 182, 212, 0.25);
+  border-color: var(--color-cyan);
+  box-shadow: 0 0 0 1px var(--color-cyan), 0 0 18px rgba(6, 182, 212, 0.25);
   background: rgba(6, 182, 212, 0.03);
 }
 
