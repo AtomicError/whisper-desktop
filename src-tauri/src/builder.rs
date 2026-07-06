@@ -1,11 +1,11 @@
 use std::path::Path;
 use std::process::Stdio;
-use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
+use tokio::io::{AsyncBufReadExt, BufReader};
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter};
-use regex::Regex;
 use std::fs;
+use regex::Regex;
+use tauri::{AppHandle, Emitter};
 
 use crate::logger::AppLogs;
 
@@ -14,6 +14,7 @@ pub struct BuildProgress {
     pub progress: f64, // 0.0 to 1.0
     pub message: String,
     pub active: bool,
+    pub error: Option<String>,
 }
 
 pub fn check_build_exists(clone_dir: &str, backend: &str) -> bool {
@@ -59,23 +60,69 @@ pub async fn run_git_clone_or_update(
         stream_command_output(app.clone(), logs.clone(), &mut child, "Build").await?;
         logs.log(&app, "Build", "Cloning completed successfully!");
     } else {
-        logs.log(&app, "Build", "whisper.cpp repository already exists. Running git pull...");
-        let mut child = Command::new("git")
-            .args(["pull"])
+        logs.log(&app, "Build", "whisper.cpp repository already exists. Checking for local changes...");
+        
+        let status_output = std::process::Command::new("git")
+            .args(["status", "--porcelain"])
             .current_dir(path)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| format!("Failed to start git pull: {}", e))?;
-            
-        stream_command_output(app.clone(), logs.clone(), &mut child, "Build").await?;
+            .output();
+
+        let has_changes = match status_output {
+            Ok(out) => !out.stdout.is_empty(),
+            Err(_) => false,
+        };
+
+        if has_changes {
+            logs.log(&app, "Build", "Local changes/downloads detected in the repository. Stashing unstaged files...");
+            let mut stash_child = Command::new("git")
+                .args(["stash"])
+                .current_dir(path)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .map_err(|e| format!("Failed to start git stash: {}", e))?;
+            let _ = stream_command_output(app.clone(), logs.clone(), &mut stash_child, "Build").await;
+
+            logs.log(&app, "Build", "Running git pull...");
+            let mut pull_child = Command::new("git")
+                .args(["pull"])
+                .current_dir(path)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .map_err(|e| format!("Failed to start git pull: {}", e))?;
+            let pull_result = stream_command_output(app.clone(), logs.clone(), &mut pull_child, "Build").await;
+
+            logs.log(&app, "Build", "Restoring local changes/downloads...");
+            let mut pop_child = Command::new("git")
+                .args(["stash", "pop"])
+                .current_dir(path)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .map_err(|e| format!("Failed to start git stash pop: {}", e))?;
+            let _ = stream_command_output(app.clone(), logs.clone(), &mut pop_child, "Build").await;
+
+            pull_result?;
+        } else {
+            logs.log(&app, "Build", "Running git pull...");
+            let mut child = Command::new("git")
+                .args(["pull"])
+                .current_dir(path)
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .map_err(|e| format!("Failed to start git pull: {}", e))?;
+            stream_command_output(app.clone(), logs.clone(), &mut child, "Build").await?;
+        }
+        
         logs.log(&app, "Build", "Repository updated successfully!");
     }
     
     Ok(())
 }
 
-pub async fn run_compilation(
+async fn run_compilation_inner(
     app: AppHandle,
     logs: Arc<AppLogs>,
     clone_dir: String,
@@ -115,6 +162,7 @@ pub async fn run_compilation(
         progress: 0.0,
         message: "Configuring build (CMake)...".to_string(),
         active: true,
+        error: None,
     }).unwrap();
     
     let mut child = Command::new("cmake")
@@ -133,6 +181,7 @@ pub async fn run_compilation(
         progress: 0.05,
         message: "Compiling code...".to_string(),
         active: true,
+        error: None,
     }).unwrap();
     
     let build_args = [
@@ -153,11 +202,43 @@ pub async fn run_compilation(
         
     stream_compilation_progress(app.clone(), logs.clone(), &mut child).await?;
     
+    Ok(())
+}
+
+pub async fn run_compilation(
+    app: AppHandle,
+    logs: Arc<AppLogs>,
+    clone_dir: String,
+    backend: String,
+) -> Result<(), String> {
+    let res = run_compilation_inner(app.clone(), logs.clone(), clone_dir.clone(), backend.clone()).await;
+    if let Err(e) = res {
+        let mut err_msg = e.clone();
+        if backend == "Vulkan" {
+            err_msg = format!(
+                "{} (Vulkan SDK/Headers might be missing. Please install dependencies:\n\
+                - Ubuntu/Debian: sudo apt update && sudo apt install libvulkan-dev vulkan-tools\n\
+                - Arch Linux: sudo pacman -Syu vulkan-devel vulkan-tools\n\
+                - Fedora: sudo dnf install vulkan-loader-devel vulkan-tools)",
+                e
+            );
+        }
+        logs.log(&app, "Build", &format!("Build failed: {}", err_msg));
+        let _ = app.emit("build-status", BuildProgress {
+            progress: 0.0,
+            message: format!("Build failed! Check logs for details."),
+            active: false,
+            error: Some(err_msg.clone()),
+        });
+        return Err(err_msg);
+    }
+    
     logs.log(&app, "Build", &format!("Success! {} build completed.", backend));
     app.emit("build-status", BuildProgress {
         progress: 1.0,
         message: format!("Build finished! ready to use."),
         active: false,
+        error: None,
     }).unwrap();
     
     Ok(())
@@ -195,7 +276,7 @@ async fn stream_command_output(
     
     let status = child.wait().await.map_err(|e| format!("Wait failed: {}", e))?;
     if !status.success() {
-        return Err(format!("Command failed with exit code: {:?}", status.code()));
+        return Err(format!("Command failed with exit status code: {:?}", status.code()));
     }
     
     Ok(())
@@ -231,6 +312,7 @@ async fn stream_compilation_progress(
                                         progress,
                                         message: format!("Compiling: {:.0}%", pct_val),
                                         active: true,
+                                        error: None,
                                     });
                                 }
                             }
@@ -246,6 +328,7 @@ async fn stream_compilation_progress(
                                             progress,
                                             message: format!("Compiling files: {}/{}", curr, total),
                                             active: true,
+                                            error: None,
                                         });
                                     }
                                 }
@@ -267,7 +350,7 @@ async fn stream_compilation_progress(
     
     let status = child.wait().await.map_err(|e| format!("Wait failed: {}", e))?;
     if !status.success() {
-        return Err(format!("Compilation failed with exit code: {:?}", status.code()));
+        return Err(format!("Compilation failed with exit status code: {:?}", status.code()));
     }
     
     Ok(())

@@ -1,6 +1,7 @@
 use sysinfo::System;
 use std::process::Command;
 use std::fs;
+use std::path::Path;
 
 #[derive(serde::Serialize, Clone, Debug)]
 pub struct SystemStats {
@@ -12,6 +13,8 @@ pub struct SystemStats {
 pub struct HardwareMonitor {
     sys: System,
     gpu_type: String,
+    last_intel_time: Option<std::time::Instant>,
+    last_intel_residency: Option<u64>,
 }
 
 impl HardwareMonitor {
@@ -21,7 +24,12 @@ impl HardwareMonitor {
         
         let gpu_type = detect_gpu_type();
         
-        HardwareMonitor { sys, gpu_type }
+        HardwareMonitor {
+            sys,
+            gpu_type,
+            last_intel_time: None,
+            last_intel_residency: None,
+        }
     }
 
     pub fn get_stats(&mut self) -> SystemStats {
@@ -46,7 +54,7 @@ impl HardwareMonitor {
         }
     }
 
-    fn get_gpu_stats(&self) -> String {
+    fn get_gpu_stats(&mut self) -> String {
         match self.gpu_type.as_str() {
             "nvidia" => {
                 if let Ok(output) = Command::new("nvidia-smi")
@@ -55,24 +63,126 @@ impl HardwareMonitor {
                 {
                     let out_str = String::from_utf8_lossy(&output.stdout);
                     if let Some(line) = out_str.lines().next() {
-                        return format!("{}%", line.trim());
+                        return format!("NVIDIA: {}%", line.trim());
                     }
                 }
-                "N/A (Nvidia)".to_string()
+                "NVIDIA: N/A".to_string()
             }
             "amd" => {
-                if let Ok(data) = fs::read_to_string("/sys/class/drm/card0/device/gpu_busy_percent") {
-                    return format!("{}%", data.trim());
+                for card in ["card0", "card1", "card2"] {
+                    let path = format!("/sys/class/drm/{}/device/gpu_busy_percent", card);
+                    if let Ok(data) = fs::read_to_string(&path) {
+                        return format!("AMD: {}%", data.trim());
+                    }
                 }
-                "N/A (AMD)".to_string()
+                "AMD: N/A".to_string()
             }
             "intel" => {
-                let freq = get_intel_freq();
-                let status = if freq > 600 { "🔥 ACTIVE" } else { "💤 IDLE" };
-                format!("{}MHz ({})", freq, status)
+                self.get_intel_gpu_stats()
             }
-            _ => "N/A".to_string()
+            _ => {
+                // Fallback: check AMD sysfs
+                for card in ["card0", "card1", "card2"] {
+                    let path = format!("/sys/class/drm/{}/device/gpu_busy_percent", card);
+                    if let Ok(data) = fs::read_to_string(&path) {
+                        return format!("AMD: {}%", data.trim());
+                    }
+                }
+                // Fallback: check Intel sysfs
+                let intel_stats = self.get_intel_gpu_stats();
+                if intel_stats != "Intel: N/A" {
+                    return intel_stats;
+                }
+                "GPU: N/A".to_string()
+            }
         }
+    }
+
+    fn get_intel_gpu_stats(&mut self) -> String {
+        for card in ["card0", "card1", "card2"] {
+            let residency_path_1 = format!("/sys/class/drm/{}/device/gt/gt0/rc6_residency_ms", card);
+            let residency_path_2 = format!("/sys/class/drm/{}/gt/gt0/rc6_residency_ms", card);
+            
+            let has_residency = Path::new(&residency_path_1).exists() || Path::new(&residency_path_2).exists();
+            if has_residency {
+                let current_residency = if Path::new(&residency_path_2).exists() {
+                    get_file_as_u64(&residency_path_2)
+                } else {
+                    get_file_as_u64(&residency_path_1)
+                };
+                
+                let now = std::time::Instant::now();
+                
+                if let (Some(last_time), Some(last_res)) = (self.last_intel_time, self.last_intel_residency) {
+                    let elapsed_ms = now.duration_since(last_time).as_millis() as f64;
+                    let residency_delta = (current_residency.saturating_sub(last_res)) as f64;
+                    
+                    self.last_intel_time = Some(now);
+                    self.last_intel_residency = Some(current_residency);
+                    
+                    if elapsed_ms > 0.0 {
+                        let idle_ratio = residency_delta / elapsed_ms;
+                        let usage_pct = (100.0 - (idle_ratio * 100.0)).round() as i32;
+                        let usage_pct = usage_pct.clamp(0, 100);
+                        
+                        let cur_path_1 = format!("/sys/class/drm/{}/gt_cur_freq_mhz", card);
+                        let cur_path_2 = format!("/sys/class/drm/{}/gt/gt0/rps_act_freq_mhz", card);
+                        let mut cur_freq = get_file_as_int(&cur_path_2);
+                        if cur_freq == 0 {
+                            cur_freq = get_file_as_int(&cur_path_1);
+                        }
+                        
+                        if cur_freq > 0 {
+                            return format!("Intel: {}% ({}MHz)", usage_pct, cur_freq);
+                        } else {
+                            return format!("Intel: {}%", usage_pct);
+                        }
+                    }
+                } else {
+                    self.last_intel_time = Some(now);
+                    self.last_intel_residency = Some(current_residency);
+                    
+                    let cur_path_1 = format!("/sys/class/drm/{}/gt_cur_freq_mhz", card);
+                    let cur_path_2 = format!("/sys/class/drm/{}/gt/gt0/rps_act_freq_mhz", card);
+                    let mut cur_freq = get_file_as_int(&cur_path_2);
+                    if cur_freq == 0 {
+                        cur_freq = get_file_as_int(&cur_path_1);
+                    }
+                    if cur_freq > 0 {
+                        return format!("Intel: 0% ({}MHz)", cur_freq);
+                    }
+                    return "Intel: 0%".to_string();
+                }
+            }
+        }
+        
+        // Fallback: frequency ratio if residency is not exposed
+        for card in ["card0", "card1", "card2"] {
+            let cur_path_1 = format!("/sys/class/drm/{}/gt_cur_freq_mhz", card);
+            let cur_path_2 = format!("/sys/class/drm/{}/gt/gt0/rps_act_freq_mhz", card);
+            
+            let mut cur_freq = get_file_as_int(&cur_path_2);
+            if cur_freq == 0 {
+                cur_freq = get_file_as_int(&cur_path_1);
+            }
+            
+            if cur_freq > 0 {
+                let max_path_1 = format!("/sys/class/drm/{}/gt_max_freq_mhz", card);
+                let max_path_2 = format!("/sys/class/drm/{}/gt/gt0/rps_max_freq_mhz", card);
+                
+                let mut max_freq = get_file_as_int(&max_path_2);
+                if max_freq == 0 {
+                    max_freq = get_file_as_int(&max_path_1);
+                }
+                
+                if max_freq > 0 {
+                    let pct = (cur_freq as f64 / max_freq as f64 * 100.0).round() as i32;
+                    return format!("Intel: {}% ({}MHz)", pct, cur_freq);
+                }
+                return format!("Intel: {}MHz", cur_freq);
+            }
+        }
+        "Intel: N/A".to_string()
     }
 }
 
@@ -82,23 +192,33 @@ fn detect_gpu_type() -> String {
         return "nvidia".to_string();
     }
     
-    // 2. Check for AMD gpu sysfs path
-    if Path::new("/sys/class/drm/card0/device/gpu_busy_percent").exists() {
-        return "amd".to_string();
+    // 2. Check for AMD gpu sysfs path in cards 0-2
+    for card in ["card0", "card1", "card2"] {
+        let path = format!("/sys/class/drm/{}/device/gpu_busy_percent", card);
+        if Path::new(&path).exists() {
+            return "amd".to_string();
+        }
     }
     
-    // 3. Check lpcspci for Intel Graphics
+    // 3. Check for Intel gpu sysfs path in cards 0-2
+    for card in ["card0", "card1", "card2"] {
+        let path1 = format!("/sys/class/drm/{}/gt_cur_freq_mhz", card);
+        let path2 = format!("/sys/class/drm/{}/gt/gt0/rps_act_freq_mhz", card);
+        if Path::new(&path1).exists() || Path::new(&path2).exists() {
+            return "intel".to_string();
+        }
+    }
+    
+    // 4. Fallback: check lspci for Intel Graphics
     if let Ok(output) = Command::new("lspci").output() {
         let lspci_str = String::from_utf8_lossy(&output.stdout).to_lowercase();
-        if lspci_str.contains("intel") && lspci_str.contains("graphics") {
+        if lspci_str.contains("intel") && (lspci_str.contains("graphics") || lspci_str.contains("gpu") || lspci_str.contains("vga")) {
             return "intel".to_string();
         }
     }
     
     "unknown".to_string()
 }
-
-use std::path::Path;
 
 fn get_file_as_int<P: AsRef<Path>>(path: P) -> i32 {
     if let Ok(content) = fs::read_to_string(path) {
@@ -109,23 +229,11 @@ fn get_file_as_int<P: AsRef<Path>>(path: P) -> i32 {
     0
 }
 
-fn get_intel_freq() -> i32 {
-    let freq_path_1 = "/sys/class/drm/card0/gt_cur_freq_mhz";
-    let freq_path_2 = "/sys/class/drm/card0/gt/gt0/rps_act_freq_mhz";
-    
-    let mut freq = get_file_as_int(freq_path_2);
-    if freq == 0 {
-        freq = get_file_as_int(freq_path_1);
-    }
-    
-    if freq == 0 {
-        let freq_path_1_alt = "/sys/class/drm/card1/gt_cur_freq_mhz";
-        let freq_path_2_alt = "/sys/class/drm/card1/gt/gt0/rps_act_freq_mhz";
-        freq = get_file_as_int(freq_path_2_alt);
-        if freq == 0 {
-            freq = get_file_as_int(freq_path_1_alt);
+fn get_file_as_u64<P: AsRef<Path>>(path: P) -> u64 {
+    if let Ok(content) = fs::read_to_string(path) {
+        if let Ok(val) = content.trim().parse::<u64>() {
+            return val;
         }
     }
-    
-    freq
+    0
 }
