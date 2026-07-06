@@ -789,7 +789,7 @@ header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 32px;
+  gap: 20px;
   padding: 16px 20px;
   background: rgba(255, 255, 255, 0.01);
   border: 1px solid var(--border-glass);
@@ -803,6 +803,7 @@ header {
 .setting-label-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 4px;
 }
@@ -1890,6 +1891,45 @@ select.select-control {
   background: #0b0e1b;
   border-radius: 50%;
   display: block;
+}
+
+/* ----------------- Responsive Mobile & Tiling Window Managers Layouts ----------------- */
+@media (max-width: 960px) {
+  /* Dashboard layout: Stack cards vertically */
+  .intro-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
+  /* Model Manager and Configuration layouts: Stack sidebar and list content vertically */
+  .settings-layout {
+    grid-template-columns: 1fr !important;
+    gap: 20px !important;
+  }
+
+  /* Transcribe layout: Stack accordion and output/telemetry panels vertically */
+  .transcribe-layout {
+    grid-template-columns: 1fr !important;
+    gap: 20px !important;
+  }
+
+  /* Convert sidebar lists into a horizontal tab-bar flow */
+  .settings-categories {
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    border-right: none !important;
+    border-bottom: 1px solid var(--border-glass) !important;
+    padding-right: 0 !important;
+    padding-bottom: 12px !important;
+    gap: 8px !important;
+    margin-bottom: 16px !important;
+  }
+
+  /* Adjust model manager category buttons in tab format */
+  .settings-cat-btn {
+    padding: 8px 12px !important;
+    font-size: 0.85rem !important;
+  }
 }
 
 
