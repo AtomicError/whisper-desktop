@@ -475,6 +475,7 @@ header {
   font-family: var(--font-sans);
   font-size: 0.95rem;
   transition: var(--transition-smooth);
+  color-scheme: dark; /* Force native browser controls (spin buttons) to render in dark mode */
 }
 
 .text-input:focus {
@@ -941,6 +942,7 @@ input:checked + .slider:before {
   -webkit-appearance: none !important;
   -moz-appearance: none !important;
   transition: var(--transition-smooth);
+  color-scheme: dark;
 }
 
 select.select-control {
