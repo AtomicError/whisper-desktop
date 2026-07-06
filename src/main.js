@@ -184,6 +184,8 @@ let logSearchQuery = '';
 let settingsState = null;
 let compiledBackends = {};
 let allLogsArray = []; // Store raw log payloads
+let systemSpecs = null;
+let selectedBackendsForBuild = ['Standard'];
 
 let selectedMediaFile = null;
 let probedMetadata = null;
@@ -603,7 +605,6 @@ async function refreshBuildStatuses() {
   updateDashboardBackendTiles();
 }
 
-let selectedBackendsForBuild = ['Standard'];
 
 window.selectBackend = function(backend, isInitialSelection = false) {
   if (isInitialSelection) {
@@ -1879,7 +1880,6 @@ let prevDownloadedBytesMap = new Map();
 let prevTimestampMap = new Map();
 let lastKnownSpeedMap = new Map();
 let currentCategoryFilter = 'recommended';
-let systemSpecs = null;
 
 function formatRemainingTime(seconds) {
   if (seconds <= 0 || !isFinite(seconds)) return "Unknown";
