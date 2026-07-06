@@ -12,7 +12,7 @@ pub struct SystemStats {
 
 pub struct HardwareMonitor {
     sys: System,
-    gpu_type: String,
+    pub gpu_type: String,
     last_intel_time: Option<std::time::Instant>,
     last_intel_residency: Option<u64>,
 }

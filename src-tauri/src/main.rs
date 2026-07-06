@@ -117,10 +117,11 @@ fn probe_media_file(file_path: String) -> FileMetadata {
 pub struct SystemSpecs {
     pub total_ram_gb: f64,
     pub cpu_cores: usize,
+    pub gpu_type: String,
 }
 
 #[tauri::command]
-fn get_system_specs() -> SystemSpecs {
+fn get_system_specs(hardware_state: State<'_, HardwareState>) -> SystemSpecs {
     use sysinfo::System;
     let mut sys = System::new_all();
     sys.refresh_all();
@@ -128,9 +129,16 @@ fn get_system_specs() -> SystemSpecs {
     let total_ram_gb = sys.total_memory() as f64 / 1024.0 / 1024.0 / 1024.0;
     let cpu_cores = sys.cpus().len();
     
+    let gpu_type = if let Ok(monitor) = hardware_state.0.lock() {
+        monitor.gpu_type.clone()
+    } else {
+        "unknown".to_string()
+    };
+    
     SystemSpecs {
         total_ram_gb,
         cpu_cores,
+        gpu_type,
     }
 }
 
