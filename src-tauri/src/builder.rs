@@ -145,6 +145,7 @@ async fn run_compilation_inner(
         "-B".to_string(),
         build_dir.to_str().ok_or("Invalid build path")?.to_string(),
         "-DCMAKE_BUILD_TYPE=Release".to_string(),
+        "-DGGML_OPENMP=ON".to_string(),
     ];
     
     match backend.as_str() {
