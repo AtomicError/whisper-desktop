@@ -2839,7 +2839,10 @@ window.onProviderChanged = function(keepCurrentTab = false, skipTableRender = fa
     const bannerVal = document.getElementById('active-model-banner-value');
     if (bannerEl && bannerVal) {
       if (settingsState.translateAiModel) {
-        bannerVal.textContent = `${settingsState.translateAiModel} (${providerName})`;
+        bannerVal.innerHTML = `
+          <span class="active-model-chip">${escapeHTML(settingsState.translateAiModel)}</span>
+          <span class="active-provider-badge">${escapeHTML(providerName)}</span>
+        `;
         bannerEl.style.display = 'flex';
       } else {
         bannerEl.style.display = 'none';
@@ -3311,7 +3314,10 @@ window.saveActiveProviderModels = async function(keepCurrentTab = false, skipTab
   const bannerVal = document.getElementById('active-model-banner-value');
   if (bannerEl && bannerVal) {
     if (activeModelId) {
-      bannerVal.textContent = `${activeModelId} (${providerName})`;
+      bannerVal.innerHTML = `
+        <span class="active-model-chip">${escapeHTML(activeModelId)}</span>
+        <span class="active-provider-badge">${escapeHTML(providerName)}</span>
+      `;
       bannerEl.style.display = 'flex';
     } else {
       bannerEl.style.display = 'none';

@@ -2866,14 +2866,35 @@ select.select-control {
 }
 
 .active-model-banner-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.active-model-chip {
   color: #ffffff;
   font-family: var(--font-mono);
-  font-weight: 600;
-  background: rgba(255, 255, 255, 0.05);
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 0.8rem;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  font-weight: 700;
+  background: rgba(45, 127, 255, 0.12);
+  border: 1px solid rgba(45, 127, 255, 0.25);
+  box-shadow: 0 0 10px rgba(45, 127, 255, 0.1);
+  padding: 4px 10px;
+  border-radius: 6px;
+  letter-spacing: 0.02em;
+  font-size: 0.82rem;
+}
+
+.active-provider-badge {
+  color: var(--color-text-muted);
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: 0.75rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 3px 8px;
+  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
 }
 
 /* Eye Icon Sizes */
