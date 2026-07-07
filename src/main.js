@@ -2941,21 +2941,29 @@ window.switchProviderTab = function(tab) {
   if (divGen) divGen.style.display = 'none';
   if (divMod) divMod.style.display = 'none';
   
+  let activeDiv = null;
   if (tab === 'providers') {
     if (btnProv) btnProv.classList.add('active');
-    if (divProv) divProv.style.display = 'block';
+    if (divProv) { divProv.style.display = 'block'; activeDiv = divProv; }
   } else if (tab === 'general') {
     if (btnGen) btnGen.classList.add('active');
-    if (divGen) divGen.style.display = 'block';
+    if (divGen) { divGen.style.display = 'block'; activeDiv = divGen; }
   } else {
     if (btnMod) btnMod.classList.add('active');
-    if (divMod) divMod.style.display = 'block';
+    if (divMod) { divMod.style.display = 'block'; activeDiv = divMod; }
     
     const search = document.getElementById('mgr-models-search');
     if (search) search.value = '';
     if (typeof filterModelsStatus === 'function') {
       filterModelsStatus('all');
     }
+  }
+  
+  // Force restart CSS scale-fade-blur transition animation on the active tab content
+  if (activeDiv) {
+    activeDiv.style.animation = 'none';
+    void activeDiv.offsetWidth; // force synchronous layout reflow
+    activeDiv.style.animation = '';
   }
 };
 
