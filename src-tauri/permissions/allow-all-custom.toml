@@ -29,5 +29,11 @@ allow = [
   "get_all_models_status",
   "pause_download_model",
   "delete_model_file",
-  "get_system_specs"
+  "get_system_specs",
+  "fetch_provider_models",
+  "translate_transcription_files",
+  "preview_translate_first_lines",
+  "store_keyring_credential",
+  "get_keyring_credential",
+  "delete_keyring_credential"
 ]

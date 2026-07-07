@@ -346,6 +346,9 @@ async function initApp() {
   
   // Initial load
   await refreshSettings();
+  if (typeof setupTranslationEventListeners === 'function') {
+    setupTranslationEventListeners();
+  }
   await refreshBuildStatuses();
   recommendCompilationBackend();
   
@@ -839,6 +842,15 @@ async function refreshSettings() {
 
 function bindSettingsToDOM() {
   if (!settingsState) return;
+
+  // Initialize AI translation elements
+  if (typeof populateProvidersDropdown === 'function') {
+    populateProvidersDropdown();
+    onProviderChanged();
+    if (typeof toggleTranslationSubSettingsVisibility === 'function') {
+      toggleTranslationSubSettingsVisibility();
+    }
+  }
   
   // Update Presets UI
   document.getElementById('preset-safe').classList.remove('active');
@@ -858,6 +870,9 @@ function bindSettingsToDOM() {
         el.onchange = () => {
           settingsState[key] = el.checked;
           saveCurrentSettings();
+          if (key === 'translateAiEnabled' && typeof toggleTranslationSubSettingsVisibility === 'function') {
+            toggleTranslationSubSettingsVisibility();
+          }
         };
       } else if (el.tagName === 'SELECT' || el.type === 'text' || el.type === 'number') {
         el.value = settingsState[key];
@@ -880,6 +895,11 @@ function bindSettingsToDOM() {
           
           if (key === 'selectedBackend') {
             refreshBuildStatuses();
+          }
+          if (key === 'translateAiProvider') {
+            if (typeof onProviderChanged === 'function') {
+              onProviderChanged();
+            }
           }
         };
       }
@@ -1219,6 +1239,17 @@ function updateTranscribeUIConfigs() {
   
   const vad = settingsState.vad ? 'ON' : 'OFF';
   document.getElementById('trans-cfg-vad').textContent = vad;
+  
+  const transCfgTranslation = document.getElementById('trans-cfg-translation');
+  if (transCfgTranslation) {
+    const translationEnabled = settingsState.translateAiEnabled === true;
+    let translationText = 'OFF';
+    if (translationEnabled) {
+      translationText = settingsState.translateAiModel ? `ON (${settingsState.translateAiModel})` : 'ON';
+    }
+    transCfgTranslation.textContent = translationText;
+    transCfgTranslation.style.color = translationEnabled ? 'var(--color-green)' : 'var(--color-text-muted)';
+  }
 }
 
 window.runFFmpegConversion = async function() {
@@ -1314,6 +1345,34 @@ window.runWhisperTranscription = async function() {
       badge.textContent = f;
       badgesRow.appendChild(badge);
     });
+    
+    // Run AI Translation if enabled
+    if (settingsState.translateAiEnabled && result.generatedFiles && result.generatedFiles.length > 0) {
+      try {
+        const parentDir = settingsState.inputFile.substring(0, settingsState.inputFile.lastIndexOf('/'));
+        btn.textContent = 'AI Translating...';
+        showNotification("Starting AI translation of generated files...", "info");
+        
+        const translatedFiles = await invoke('translate_transcription_files', {
+          settings: settingsState,
+          generatedFiles: result.generatedFiles,
+          parentDir: parentDir
+        });
+        
+        translatedFiles.forEach(f => {
+          const badge = document.createElement('span');
+          badge.className = 'output-badge';
+          badge.style.borderColor = 'var(--color-green)';
+          badge.style.color = 'var(--color-green)';
+          badge.textContent = f;
+          badgesRow.appendChild(badge);
+        });
+        
+        showNotification("AI translation completed successfully!", "success");
+      } catch (err) {
+        showNotification("AI translation failed: " + err, "error");
+      }
+    }
     
     setWizardStepCompleted(4, true);
     showNotification("Transcription completed successfully!", "success");
@@ -1626,6 +1685,9 @@ function renderBatchQueueTable() {
     } else if (item.status === 'transcribing') {
       badge.className = 'batch-status-badge badge-processing';
       badge.textContent = 'Extracting...';
+    } else if (item.status === 'translating') {
+      badge.className = 'batch-status-badge badge-processing';
+      badge.textContent = 'Translating...';
     } else if (item.status === 'completed') {
       badge.className = 'batch-status-badge badge-completed';
       badge.textContent = 'Completed';
@@ -1821,13 +1883,53 @@ window.runBatchExtraction = async function() {
         }
       }
       
+      // Run AI Translation if enabled
+      let translationSuccess = false;
+      item.outputs = result.generatedFiles;
+      
+      while (!translationSuccess && settingsState.translateAiEnabled && result.generatedFiles && result.generatedFiles.length > 0) {
+        if (batchCancelActive) break;
+        
+        try {
+          item.status = 'translating';
+          renderBatchQueueTable();
+          if (msgEl) msgEl.textContent = `[${i + 1}/${totalCount}] Translating: '${item.name}'...`;
+          
+          const parentDir = item.path.substring(0, item.path.lastIndexOf('/'));
+          const translatedFiles = await invoke('translate_transcription_files', {
+            settings: settingsState,
+            generatedFiles: result.generatedFiles,
+            parentDir: parentDir
+          });
+          
+          item.outputs = [...result.generatedFiles, ...translatedFiles];
+          translationSuccess = true;
+        } catch (transErr) {
+          console.error("Batch translation error:", transErr);
+          const choice = await showBatchErrorDialog(item.name, transErr);
+          if (choice === 'retry') {
+            // continues the while loop to retry
+          } else if (choice === 'skip') {
+            translationSuccess = true; // exit loop, proceed with transcription outputs only
+          } else { // abort
+            batchCancelActive = true;
+            item.status = 'aborted';
+            renderBatchQueueTable();
+            break;
+          }
+        }
+      }
+      
       // Restore original setting
       settingsState.inputFile = originalInputFile;
+      
+      if (batchCancelActive) {
+        continue;
+      }
       
       item.status = 'completed';
       item.timeSec = result.durationMs / 1000;
       item.speedFactor = result.speedFactor;
-      item.outputs = result.generatedFiles;
       successCount++;
       
       renderBatchQueueTable();
@@ -2503,4 +2605,938 @@ window.copyTranscriptToClipboard = async function() {
   } catch (err) {
     showNotification("Failed to copy transcript: " + err, "error");
   }
+};
+
+// ----------------- AI Translation Configuration & Providers Handling -----------------
+window.populateProvidersDropdown = function() {
+  const select = document.getElementById('opt-translateAiProvider');
+  if (!select) return;
+  select.innerHTML = '';
+  
+  let providers = [];
+  try {
+    providers = JSON.parse(settingsState.translateAiProviders || '[]');
+  } catch (e) {
+    console.error(e);
+  }
+  
+  providers.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.name;
+    opt.textContent = p.name;
+    select.appendChild(opt);
+  });
+  
+  if (providers.length > 0 && !settingsState.translateAiProvider) {
+    settingsState.translateAiProvider = providers[0].name;
+  }
+  
+  select.value = settingsState.translateAiProvider || '';
+  
+  // Render the tiles grid
+  renderProvidersGrid(providers);
+};
+
+window.renderProvidersGrid = function(providers = null) {
+  const grid = document.getElementById('providers-tiles-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  
+  if (providers === null) {
+    try {
+      providers = JSON.parse(settingsState.translateAiProviders || '[]');
+    } catch (e) {
+      console.error(e);
+      providers = [];
+    }
+  }
+  
+  const activeName = settingsState.translateAiProvider || '';
+  
+  providers.forEach(p => {
+    const tile = document.createElement('div');
+    const isActive = p.name === activeName;
+    tile.className = `provider-tile${isActive ? ' active' : ''}`;
+    
+    const formatStr = p.apiFormat || p.api_format || 'Chat completions';
+    let iconSvg = '';
+    let brandClass = '';
+    
+    if (formatStr === 'Chat completions') {
+      brandClass = 'format-openai';
+      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 20px; height: 20px; color: #10b981;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`;
+    } else if (formatStr === 'Anthropic messages') {
+      brandClass = 'format-anthropic';
+      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 20px; height: 20px; color: #8b5cf6;"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>`;
+    } else if (formatStr === 'Responses') {
+      brandClass = 'format-gemini';
+      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 20px; height: 20px; color: #06b6d4;"><path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6l2.1 2.1M5.6 18.4l2.1-2.1m8.6-8.6l2.1-2.1M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/></svg>`;
+    } else {
+      brandClass = 'format-custom';
+      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 20px; height: 20px; color: #f59e0b;"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5M3 12c0 1.66 4 3 9 3s9-1.34 9-3"></path></svg>`;
+    }
+    
+    tile.innerHTML = `
+      <div class="provider-tile-header">
+        <div class="provider-tile-icon-wrapper ${brandClass}">
+          ${iconSvg}
+        </div>
+        <div class="provider-tile-meta">
+          <div class="provider-tile-name" title="${escapeHTML(p.name)}">${escapeHTML(p.name)}</div>
+          <div class="provider-tile-format" title="${escapeHTML(formatStr)}">${escapeHTML(formatStr)}</div>
+        </div>
+      </div>
+      <div class="provider-tile-footer">
+        <span class="provider-tile-badge ${isActive ? 'active' : ''}">
+          ${isActive ? '<span class="pulse-dot"></span>ACTIVE' : 'INACTIVE'}
+        </span>
+        <button class="provider-tile-delete" title="Delete Provider">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            <line x1="10" y1="11" x2="10" y2="17"></line>
+            <line x1="14" y1="11" x2="14" y2="17"></line>
+          </svg>
+        </button>
+      </div>
+    `;
+    
+    tile.onclick = (e) => {
+      if (e.target.closest('.provider-tile-delete')) return;
+      
+      const select = document.getElementById('opt-translateAiProvider');
+      if (select) {
+        select.value = p.name;
+        onProviderChanged(true); // Keep current tab (which is 'providers')
+      }
+    };
+    
+    const delBtn = tile.querySelector('.provider-tile-delete');
+    delBtn.onclick = (e) => {
+      e.stopPropagation();
+      deleteProviderByName(p.name);
+    };
+    
+    grid.appendChild(tile);
+  });
+  
+  // Add "+ Add Provider" tile
+  const addTile = document.createElement('div');
+  addTile.className = 'provider-tile-add';
+  addTile.innerHTML = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <line x1="12" y1="5" x2="12" y2="19"/>
+      <line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+    <span style="font-size: 0.88rem; font-weight: 500;">Add Provider</span>
+  `;
+  addTile.onclick = () => openAddProviderModal();
+  grid.appendChild(addTile);
+};
+
+window.onProviderChanged = function(keepCurrentTab = false, skipTableRender = false) {
+  const providerSelect = document.getElementById('opt-translateAiProvider');
+  const modelSelect = document.getElementById('opt-translateAiModel');
+  const mgrCard = document.getElementById('provider-manager-card');
+  if (!providerSelect || !modelSelect || !mgrCard) return;
+  
+  const providerName = providerSelect.value;
+  settingsState.translateAiProvider = providerName;
+  
+  // Re-render the grid to highlight the active tile
+  renderProvidersGrid();
+  
+  let providers = [];
+  try {
+    providers = JSON.parse(settingsState.translateAiProviders || '[]');
+  } catch (e) {
+    console.error(e);
+  }
+  
+  const provider = providers.find(p => p.name === providerName);
+  
+  const genPlaceholder = document.getElementById('general-placeholder-overlay');
+  const genFields = document.getElementById('general-config-fields');
+  const modelsPlaceholder = document.getElementById('models-placeholder-overlay');
+  const modelsFields = document.getElementById('models-catalog-fields');
+  
+  if (provider) {
+    if (genPlaceholder) genPlaceholder.style.display = 'none';
+    if (genFields) genFields.style.display = 'block';
+    
+    if (modelsPlaceholder) modelsPlaceholder.style.display = 'none';
+    if (modelsFields) modelsFields.style.display = 'block';
+    
+    if (!keepCurrentTab) {
+      switchProviderTab('providers');
+    }
+    
+    // Load General configuration fields
+    document.getElementById('mgr-provider-url').value = provider.baseUrl || provider.base_url || '';
+    document.getElementById('mgr-provider-format').value = provider.apiFormat || provider.api_format || 'Chat completions';
+    document.getElementById('mgr-provider-prompt').value = provider.customPrompt || provider.custom_prompt || '';
+    
+    // Set API Key field. If stored in Keyring, we show a generic placeholder value and mark it for lazy retrieval.
+    const keyVal = provider.apiKey || provider.api_key || '';
+    const keyInput = document.getElementById('mgr-provider-key');
+    keyInput.type = 'password';
+    
+    // Reset any custom active color on eye button
+    const eyeBtn = keyInput.nextElementSibling;
+    if (eyeBtn) eyeBtn.style.color = 'var(--color-text-muted)';
+    
+    if (keyVal === '__KEYRING__') {
+      keyInput.value = '••••••••••••••••'; // Temporary placeholder length
+      keyInput.dataset.isKeyring = 'true';
+      
+      // Load real password length asynchronously in background to avoid freezing UI
+      (async () => {
+        try {
+          const realKey = await invoke('get_keyring_credential', { providerName });
+          const currentSelect = document.getElementById('opt-translateAiProvider');
+          if (currentSelect && currentSelect.value === providerName) {
+            keyInput.value = realKey;
+            keyInput.dataset.isKeyring = 'false';
+          }
+        } catch (e) {
+          console.error("Background keyring credential fetch failed:", e);
+          const currentSelect = document.getElementById('opt-translateAiProvider');
+          if (currentSelect && currentSelect.value === providerName) {
+            keyInput.value = '';
+            keyInput.placeholder = 'sk-...';
+            keyInput.dataset.isKeyring = 'false';
+          }
+        }
+      })();
+    } else {
+      keyInput.value = keyVal;
+      keyInput.dataset.isKeyring = 'false';
+    }
+    
+    // Load models dropdown (ONLY enabled ones)
+    modelSelect.innerHTML = '';
+    const enabledModels = (provider.models || []).filter(m => m.enabled !== false);
+    
+    enabledModels.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.id;
+      opt.textContent = `${m.id} (${(m.contextWindow || m.context_window || 200000).toLocaleString()} tokens)`;
+      modelSelect.appendChild(opt);
+    });
+    
+    // Auto-select first model if not set or not in enabled list
+    const hasModel = enabledModels.some(m => m.id === settingsState.translateAiModel);
+    if (!hasModel && enabledModels.length > 0) {
+      settingsState.translateAiModel = enabledModels[0].id;
+    } else if (enabledModels.length === 0) {
+      settingsState.translateAiModel = '';
+    }
+    modelSelect.value = settingsState.translateAiModel || '';
+    
+    // Update active model top status banner
+    const bannerEl = document.getElementById('active-model-banner');
+    const bannerVal = document.getElementById('active-model-banner-value');
+    if (bannerEl && bannerVal) {
+      if (settingsState.translateAiModel) {
+        bannerVal.textContent = `${settingsState.translateAiModel} (${providerName})`;
+        bannerEl.style.display = 'flex';
+      } else {
+        bannerEl.style.display = 'none';
+      }
+    }
+    
+    // Render models registry
+    if (!skipTableRender) {
+      renderModelsRegistryTable(provider);
+    }
+  } else {
+    if (genPlaceholder) genPlaceholder.style.display = 'flex';
+    if (genFields) genFields.style.display = 'none';
+    
+    if (modelsPlaceholder) modelsPlaceholder.style.display = 'flex';
+    if (modelsFields) modelsFields.style.display = 'none';
+    
+    if (!keepCurrentTab) {
+      switchProviderTab('providers');
+    }
+    
+    modelSelect.innerHTML = '';
+    settingsState.translateAiModel = '';
+    modelSelect.value = '';
+    
+    const bannerEl = document.getElementById('active-model-banner');
+    if (bannerEl) {
+      bannerEl.style.display = 'none';
+    }
+    
+    document.getElementById('mgr-provider-url').value = '';
+    document.getElementById('mgr-provider-format').value = 'Chat completions';
+    document.getElementById('mgr-provider-prompt').value = '';
+    document.getElementById('mgr-provider-key').value = '';
+    document.getElementById('provider-models-count').textContent = '0';
+    
+    const tbody = document.getElementById('mgr-models-tbody');
+    if (tbody) tbody.innerHTML = '';
+  }
+  
+  saveCurrentSettings();
+  updateTranscribeUIConfigs();
+};
+
+window.togglePasswordVisibility = async function(inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const svg = btn.querySelector('svg');
+  const providerSelect = document.getElementById('opt-translateAiProvider');
+  
+  if (input.type === 'password') {
+    // If key is saved in keyring, load it lazily only on-demand when user wants to view it
+    if (input.dataset.isKeyring === 'true' && providerSelect && providerSelect.value) {
+      btn.disabled = true;
+      try {
+        const realKey = await invoke('get_keyring_credential', { providerName: providerSelect.value });
+        input.value = realKey;
+        input.dataset.isKeyring = 'false'; // Loaded
+      } catch (e) {
+        showNotification("Failed to load secure API key: " + e, "error");
+      } finally {
+        btn.disabled = false;
+      }
+    }
+    
+    input.type = 'text';
+    btn.style.color = 'var(--color-cyan)';
+    svg.innerHTML = `
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+      <line x1="1" y1="1" x2="23" y2="23"/>
+    `;
+  } else {
+    input.type = 'password';
+    btn.style.color = 'var(--color-text-muted)';
+    svg.innerHTML = `
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+      <circle cx="12" cy="12" r="3"/>
+    `;
+  }
+};
+
+window.switchProviderTab = function(tab) {
+  const btnProv = document.getElementById('tab-btn-providers');
+  const btnGen = document.getElementById('tab-btn-general');
+  const btnMod = document.getElementById('tab-btn-models');
+  
+  const divProv = document.getElementById('provider-tab-providers');
+  const divGen = document.getElementById('provider-tab-general');
+  const divMod = document.getElementById('provider-tab-models');
+  
+  if (btnProv) btnProv.classList.remove('active');
+  if (btnGen) btnGen.classList.remove('active');
+  if (btnMod) btnMod.classList.remove('active');
+  
+  if (divProv) divProv.style.display = 'none';
+  if (divGen) divGen.style.display = 'none';
+  if (divMod) divMod.style.display = 'none';
+  
+  if (tab === 'providers') {
+    if (btnProv) btnProv.classList.add('active');
+    if (divProv) divProv.style.display = 'block';
+  } else if (tab === 'general') {
+    if (btnGen) btnGen.classList.add('active');
+    if (divGen) divGen.style.display = 'block';
+  } else {
+    if (btnMod) btnMod.classList.add('active');
+    if (divMod) divMod.style.display = 'block';
+    
+    const search = document.getElementById('mgr-models-search');
+    if (search) search.value = '';
+    if (typeof filterModelsStatus === 'function') {
+      filterModelsStatus('all');
+    }
+  }
+};
+
+window.saveActiveProviderGeneral = async function(silent = false) {
+  const providerSelect = document.getElementById('opt-translateAiProvider');
+  if (!providerSelect) return;
+  const providerName = providerSelect.value;
+  if (!providerName) return;
+  
+  let providers = [];
+  try {
+    providers = JSON.parse(settingsState.translateAiProviders || '[]');
+  } catch (e) {
+    console.error(e);
+  }
+  
+  const providerIdx = providers.findIndex(p => p.name === providerName);
+  if (providerIdx === -1) return;
+  
+  const provider = providers[providerIdx];
+  const baseUrl = document.getElementById('mgr-provider-url').value.trim();
+  const apiFormat = document.getElementById('mgr-provider-format').value;
+  const key = document.getElementById('mgr-provider-key').value.trim();
+  const customPrompt = document.getElementById('mgr-provider-prompt').value.trim();
+  
+  if (!baseUrl) {
+    if (!silent) showNotification("Base URL is required.", "info");
+    return;
+  }
+  
+  let keyToSave = provider.apiKey || provider.api_key || '';
+  let useKeyring = provider.useKeyring !== false;
+  
+  // If the user modified the key
+  if (key && key !== '••••••••••••••••') {
+    try {
+      await invoke('store_keyring_credential', { providerName, key });
+      keyToSave = '__KEYRING__';
+      useKeyring = true;
+    } catch (e) {
+      console.warn("Failed to store API Key in system keyring, saving in file:", e);
+      keyToSave = key;
+      useKeyring = false;
+    }
+  }
+  
+  provider.baseUrl = baseUrl;
+  provider.apiFormat = apiFormat;
+  provider.apiKey = keyToSave;
+  provider.useKeyring = useKeyring;
+  provider.customPrompt = customPrompt;
+  
+  // Clean old keys if they exist
+  delete provider.base_url;
+  delete provider.api_format;
+  delete provider.api_key;
+  delete provider.use_keyring;
+  delete provider.custom_prompt;
+  
+  providers[providerIdx] = provider;
+  settingsState.translateAiProviders = JSON.stringify(providers);
+  
+  await saveCurrentSettings();
+  
+  const select = document.getElementById('opt-translateAiProvider');
+  if (select) select.value = providerName;
+  
+  if (!silent) {
+    showNotification("Provider settings saved successfully!", "success");
+  }
+};
+
+window.deleteProviderByName = async function(providerName) {
+  if (!providerName) return;
+  
+  const confirmDel = confirm(`Are you sure you want to delete the provider '${providerName}'?`);
+  if (!confirmDel) return;
+  
+  let providers = [];
+  try {
+    providers = JSON.parse(settingsState.translateAiProviders || '[]');
+  } catch (e) {
+    console.error(e);
+  }
+  
+  const providerIdx = providers.findIndex(p => p.name === providerName);
+  if (providerIdx === -1) return;
+  
+  const provider = providers[providerIdx];
+  if (provider.useKeyring || provider.use_keyring || provider.apiKey === '__KEYRING__' || provider.api_key === '__KEYRING__') {
+    try {
+      await invoke('delete_keyring_credential', { providerName });
+    } catch(e) {}
+  }
+  
+  providers.splice(providerIdx, 1);
+  settingsState.translateAiProviders = JSON.stringify(providers);
+  
+  if (settingsState.translateAiProvider === providerName) {
+    settingsState.translateAiProvider = providers.length > 0 ? providers[0].name : '';
+  }
+  
+  await saveCurrentSettings();
+  populateProvidersDropdown();
+  onProviderChanged(true);
+  
+  showNotification("Provider deleted.", "info");
+};
+
+window.deleteActiveProvider = async function() {
+  const providerSelect = document.getElementById('opt-translateAiProvider');
+  if (!providerSelect) return;
+  const providerName = providerSelect.value;
+  if (!providerName) return;
+  
+  await deleteProviderByName(providerName);
+};
+
+window.toEnglishDigits = function(str) {
+  const persianMap = { '۰':'0', '۱':'1', '۲':'2', '۳':'3', '۴':'4', '۵':'5', '۶':'6', '۷':'7', '۸':'8', '^\u06F9$':'9', '۹':'9' };
+  const arabicMap = { '٠':'0', '١':'1', '٢':'2', '٣':'3', '٤':'4', '٥':'5', '٦':'6', '٧':'7', '٨':'8', '٩':'9' };
+  if (typeof str !== 'string') return str;
+  return str.replace(/[۰-۹]/g, d => persianMap[d] || d).replace(/[٠-٩]/g, d => arabicMap[d] || d);
+};
+
+window.renderModelsRegistryTable = function(provider) {
+  const tbody = document.getElementById('mgr-models-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  
+  const models = provider.models || [];
+  document.getElementById('provider-models-count').textContent = models.length;
+  
+  // Sort: active model first, then the rest
+  const activeModelId = settingsState.translateAiModel;
+  const sortedModels = [...models].sort((a, b) => {
+    if (a.id === activeModelId) return -1;
+    if (b.id === activeModelId) return 1;
+    return 0;
+  });
+  
+  sortedModels.forEach(m => {
+    const isModelActive = m.id === activeModelId;
+    addManualModelRow(
+      m.id || '',
+      m.contextWindow || m.context_window || 200000,
+      m.reasoning || 'None',
+      isModelActive
+    );
+  });
+};
+
+window.addManualModelRow = function(modelId = "", contextWindow = 200000, reasoning = "None", isActive = false) {
+  const tbody = document.getElementById('mgr-models-tbody');
+  if (!tbody) return;
+  
+  const tr = document.createElement('tr');
+  tr.style.borderBottom = '1px solid rgba(255, 255, 255, 0.04)';
+  if (isActive) {
+    tr.classList.add('active-model-row');
+  }
+  
+  tr.innerHTML = `
+    <td style="width: 15%; text-align: center; padding: 8px;">
+      <label class="radio-container">
+        <input type="radio" name="mgr-active-model" class="model-active-radio" ${isActive ? 'checked' : ''} />
+        <span class="custom-radio"></span>
+      </label>
+    </td>
+    <td style="width: 40%; padding: 8px;"><input type="text" class="model-row-input model-id-input" value="${escapeHTML(modelId)}" placeholder="e.g. gpt-4o-mini" /></td>
+    <td style="width: 20%; padding: 8px;"><input type="text" inputmode="numeric" class="model-row-input model-ctx-input" value="${contextWindow}" /></td>
+    <td style="width: 15%; padding: 8px;">
+      <select class="select-control model-reasoning-select">
+        <option value="None" ${reasoning === 'None' ? 'selected' : ''}>None</option>
+        <option value="Low" ${reasoning === 'Low' ? 'selected' : ''}>Low</option>
+        <option value="Medium" ${reasoning === 'Medium' ? 'selected' : ''}>Medium</option>
+        <option value="High" ${reasoning === 'High' ? 'selected' : ''}>High</option>
+      </select>
+    </td>
+    <td style="width: 10%; text-align: center; padding: 8px;">
+      <button class="btn-trash" title="Remove Model Row">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </td>
+  `;
+  tbody.appendChild(tr);
+
+  const idInput = tr.querySelector('.model-id-input');
+  const ctxInput = tr.querySelector('.model-ctx-input');
+  const reasoningSelect = tr.querySelector('.model-reasoning-select');
+  const activeRadio = tr.querySelector('.model-active-radio');
+  const trashBtn = tr.querySelector('.btn-trash');
+  
+  const triggerAutoSave = () => {
+    saveActiveProviderModels(true, true);
+  };
+  
+  idInput.addEventListener('change', triggerAutoSave);
+  
+  ctxInput.addEventListener('input', () => {
+    let cleanVal = toEnglishDigits(ctxInput.value).replace(/[^0-9]/g, '');
+    ctxInput.value = cleanVal;
+  });
+  ctxInput.addEventListener('change', triggerAutoSave);
+  
+  reasoningSelect.addEventListener('change', triggerAutoSave);
+  
+  activeRadio.addEventListener('change', () => {
+    const siblingRows = tbody.querySelectorAll('tr');
+    siblingRows.forEach(r => r.classList.remove('active-model-row'));
+    tr.classList.add('active-model-row');
+    triggerAutoSave();
+  });
+  
+  trashBtn.addEventListener('click', () => {
+    if (activeRadio.checked) {
+      showNotification("The active model row cannot be deleted. Please set another model as active first.", "info");
+      return;
+    }
+    tr.remove();
+    triggerAutoSave();
+  });
+};
+
+window.fetchActiveProviderModels = async function() {
+  const providerSelect = document.getElementById('opt-translateAiProvider');
+  if (!providerSelect) return;
+  const providerName = providerSelect.value;
+  
+  let providers = [];
+  try {
+    providers = JSON.parse(settingsState.translateAiProviders || '[]');
+  } catch (e) {
+    console.error(e);
+  }
+  
+  const provider = providers.find(p => p.name === providerName);
+  if (!provider) return;
+  
+  const baseUrl = document.getElementById('mgr-provider-url').value.trim();
+  const apiFormat = document.getElementById('mgr-provider-format').value;
+  let apiKey = document.getElementById('mgr-provider-key').value.trim();
+  
+  if (!baseUrl) {
+    showNotification("Please provide a Base URL to fetch models.", "info");
+    return;
+  }
+  
+  const btn = document.getElementById('mgr-btn-fetch-models');
+  btn.disabled = true;
+  btn.textContent = 'Fetching...';
+  
+  if (!apiKey && (provider.apiKey === '__KEYRING__' || provider.api_key === '__KEYRING__')) {
+    try {
+      apiKey = await invoke('get_keyring_credential', { providerName });
+    } catch(e) {}
+  }
+  
+  try {
+    const modelsList = await invoke('fetch_provider_models', { baseUrl, apiKey, apiFormat });
+    const tbody = document.getElementById('mgr-models-tbody');
+    tbody.innerHTML = '';
+    
+    const currentActive = settingsState.translateAiModel;
+    
+    modelsList.forEach((m, idx) => {
+      const idLower = m.toLowerCase();
+      let reasoning = (idLower.includes('reasoning') || idLower.includes('o1') || idLower.includes('o3') || idLower.includes('deepseek-r1')) ? 'High' : 'None';
+      const makeActive = !currentActive && idx === 0;
+      addManualModelRow(m, 200000, reasoning, makeActive);
+    });
+    
+    await saveActiveProviderModels(true, false);
+    showNotification(`Successfully fetched ${modelsList.length} models!`, "success");
+  } catch (e) {
+    showNotification("Failed to fetch models: " + e, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Fetch Models';
+  }
+};
+
+window.saveActiveProviderModels = async function(keepCurrentTab = false, skipTableRender = false) {
+  const providerSelect = document.getElementById('opt-translateAiProvider');
+  if (!providerSelect) return;
+  const providerName = providerSelect.value;
+  
+  let providers = [];
+  try {
+    providers = JSON.parse(settingsState.translateAiProviders || '[]');
+  } catch (e) {
+    console.error(e);
+  }
+  
+  const providerIdx = providers.findIndex(p => p.name === providerName);
+  if (providerIdx === -1) return;
+  
+  const provider = providers[providerIdx];
+  const models = [];
+  const rows = document.querySelectorAll('#mgr-models-tbody tr');
+  let activeModelId = '';
+  
+  rows.forEach(row => {
+    const idInput = row.querySelector('.model-id-input');
+    const ctxInput = row.querySelector('.model-ctx-input');
+    const reasoningSelect = row.querySelector('.model-reasoning-select');
+    const activeRadio = row.querySelector('.model-active-radio');
+    if (!idInput) return;
+    
+    const modelId = idInput.value.trim();
+    const contextWindow = parseInt(ctxInput.value) || 200000;
+    const reasoning = reasoningSelect.value;
+    
+    if (modelId) {
+      models.push({ id: modelId, contextWindow, reasoning, enabled: true });
+      if (activeRadio && activeRadio.checked) {
+        activeModelId = modelId;
+      }
+    }
+  });
+  
+  if (!activeModelId && models.length > 0) activeModelId = models[0].id;
+  
+  settingsState.translateAiModel = activeModelId;
+  provider.models = models;
+  providers[providerIdx] = provider;
+  settingsState.translateAiProviders = JSON.stringify(providers);
+  
+  const selectDOM = document.getElementById('opt-translateAiModel');
+  if (selectDOM) {
+    selectDOM.innerHTML = '';
+    models.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.id;
+      opt.textContent = m.id;
+      selectDOM.appendChild(opt);
+    });
+    selectDOM.value = activeModelId;
+  }
+  
+  const bannerEl = document.getElementById('active-model-banner');
+  const bannerVal = document.getElementById('active-model-banner-value');
+  if (bannerEl && bannerVal) {
+    if (activeModelId) {
+      bannerVal.textContent = `${activeModelId} (${providerName})`;
+      bannerEl.style.display = 'flex';
+    } else {
+      bannerEl.style.display = 'none';
+    }
+  }
+  
+  await saveCurrentSettings();
+  updateTranscribeUIConfigs();
+};
+
+let currentModelStatusFilter = 'all';
+let filterTimeout;
+
+window.filterModelsTable = function() {
+  clearTimeout(filterTimeout);
+  filterTimeout = setTimeout(() => {
+    const query = document.getElementById('mgr-models-search').value.toLowerCase();
+    const rows = document.querySelectorAll('#mgr-models-tbody tr');
+    
+    rows.forEach(row => {
+      const idInput = row.querySelector('.model-id-input');
+      if (!idInput) return;
+      
+      const modelId = idInput.value.toLowerCase();
+      const isFree = modelId.includes('free');
+      
+      const matchQuery = modelId.includes(query);
+      let matchStatus = true;
+      
+      if (currentModelStatusFilter === 'free') {
+        matchStatus = isFree;
+      }
+      
+      if (matchQuery && matchStatus) {
+        row.style.display = '';
+      } else {
+        row.style.display = 'none';
+      }
+    });
+  }, 150);
+};
+
+window.filterModelsStatus = function(status) {
+  currentModelStatusFilter = status;
+  
+  const filters = ['all', 'free'];
+  filters.forEach(f => {
+    const btn = document.getElementById(`filter-models-${f}`);
+    if (btn) {
+      if (f === status) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    }
+  });
+  
+  const container = document.querySelector('#provider-tab-models .providers-table-wrapper');
+  if (container) {
+    container.scrollTop = 0;
+  }
+  
+  filterModelsTable();
+};
+
+window.openAddProviderModal = function() {
+  document.getElementById('provider-name').value = '';
+  document.getElementById('provider-url').value = '';
+  document.getElementById('provider-key').value = '';
+  
+  const modal = document.getElementById('translation-provider-modal');
+  modal.style.display = 'flex';
+  setTimeout(() => modal.classList.add('show'), 10);
+};
+
+window.closeProviderModal = function() {
+  const modal = document.getElementById('translation-provider-modal');
+  modal.classList.remove('show');
+  setTimeout(() => modal.style.display = 'none', 300);
+};
+
+window.saveProviderConfig = async function() {
+  const name = document.getElementById('provider-name').value.trim();
+  const baseUrl = document.getElementById('provider-url').value.trim();
+  const apiFormat = document.getElementById('provider-format').value;
+  const key = document.getElementById('provider-key').value.trim();
+  
+  if (!name || !baseUrl) {
+    showNotification("Name and Base URL are required.", "info");
+    return;
+  }
+  
+  let keyToSave = key;
+  let useKeyring = false;
+  
+  if (key) {
+    try {
+      await invoke('store_keyring_credential', { providerName: name, key });
+      keyToSave = '__KEYRING__';
+      useKeyring = true;
+    } catch (e) {
+      console.warn("Failed to store API Key in system keyring:", e);
+      keyToSave = key;
+      useKeyring = false;
+    }
+  }
+  
+  let providers = [];
+  try {
+    providers = JSON.parse(settingsState.translateAiProviders || '[]');
+  } catch (e) {
+    console.error(e);
+  }
+  
+  if (providers.some(p => p.name === name)) {
+    showNotification(`A provider named '${name}' already exists.`, "error");
+    return;
+  }
+  
+  const providerData = {
+    name,
+    baseUrl: baseUrl,
+    apiKey: keyToSave,
+    apiFormat: apiFormat,
+    useKeyring: useKeyring,
+    models: [],
+    customPrompt: ""
+  };
+  
+  providers.push(providerData);
+  settingsState.translateAiProviders = JSON.stringify(providers);
+  settingsState.translateAiProvider = name;
+  
+  await saveCurrentSettings();
+  populateProvidersDropdown();
+  onProviderChanged(false); // Load general tab for newly created provider
+  closeProviderModal();
+  
+  showNotification("Provider added successfully! Configure its models below.", "success");
+};
+
+window.showBatchErrorDialog = function(fileName, errorMsg) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('batch-error-modal');
+    document.getElementById('batch-error-message').textContent = `Failed to translate '${fileName}': ${errorMsg}`;
+    
+    modal.style.display = 'flex';
+    setTimeout(() => modal.classList.add('show'), 10);
+    
+    window.resolveBatchError = function(choice) {
+      modal.classList.remove('show');
+      setTimeout(() => modal.style.display = 'none', 300);
+      resolve(choice);
+    };
+  });
+};
+
+window.setupTranslationEventListeners = function() {
+  const urlInput = document.getElementById('mgr-provider-url');
+  const formatSelect = document.getElementById('mgr-provider-format');
+  const keyInput = document.getElementById('mgr-provider-key');
+  const promptTextarea = document.getElementById('mgr-provider-prompt');
+  
+  const triggerAutoSave = () => {
+    saveActiveProviderGeneral(true); // Save silently
+  };
+  
+  if (urlInput) urlInput.addEventListener('change', triggerAutoSave);
+  if (formatSelect) formatSelect.addEventListener('change', triggerAutoSave);
+  if (keyInput) keyInput.addEventListener('change', triggerAutoSave);
+  if (promptTextarea) promptTextarea.addEventListener('change', triggerAutoSave);
+};
+
+window.closeTestModal = function() {
+  const modal = document.getElementById('translation-test-modal');
+  modal.classList.remove('show');
+  setTimeout(() => modal.style.display = 'none', 300);
+};
+
+window.testTranslationConnection = async function() {
+  const providerSelect = document.getElementById('opt-translateAiProvider');
+  if (!providerSelect) return;
+  const providerName = providerSelect.value;
+  if (!providerName) {
+    showNotification("No active provider selected to test.", "info");
+    return;
+  }
+  
+  const testBtn = document.getElementById('mgr-btn-test-connection');
+  const originalText = testBtn.textContent;
+  testBtn.disabled = true;
+  testBtn.textContent = 'Testing...';
+  
+  // Make sure general settings are saved silently first
+  await saveActiveProviderGeneral(true);
+  
+  const testSrt = `1\n00:00:01,000 --> 00:00:05,000\nHello, this is a test of the AI translation system connection.`;
+  
+  const testModal = document.getElementById('translation-test-modal');
+  const statusEl = document.getElementById('test-modal-status');
+  const resultEl = document.getElementById('test-modal-result');
+  
+  statusEl.textContent = 'Testing connection...';
+  statusEl.style.color = 'var(--color-cyan)';
+  resultEl.textContent = 'Waiting for response from translation API...';
+  
+  testModal.style.display = 'flex';
+  setTimeout(() => testModal.classList.add('show'), 10);
+  
+  try {
+    const response = await invoke('preview_translate_first_lines', {
+      settings: settingsState,
+      fileContent: testSrt
+    });
+    
+    statusEl.textContent = 'Connection Successful!';
+    statusEl.style.color = 'var(--color-green)';
+    resultEl.textContent = response;
+  } catch (err) {
+    statusEl.textContent = 'Connection Failed!';
+    statusEl.style.color = 'var(--color-red)';
+    resultEl.textContent = err;
+  } finally {
+    testBtn.disabled = false;
+    testBtn.textContent = originalText;
+  }
+};
+
+window.toggleTranslationSubSettingsVisibility = function() {
+  const enabled = settingsState.translateAiEnabled === true;
+  const group = document.getElementById('group-translation');
+  if (!group) return;
+  
+  const cards = group.querySelectorAll('.setting-card, .provider-manager-card');
+  cards.forEach(c => {
+    const checkbox = c.querySelector('#opt-translateAiEnabled');
+    if (checkbox) return;
+    c.style.display = enabled ? '' : 'none';
+  });
 };

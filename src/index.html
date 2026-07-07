@@ -351,6 +351,7 @@
                 <div class="settings-cat-btn" id="cat-btn-outputs" onclick="switchSettingsCategory('outputs')">Outputs</div>
                 <div class="settings-cat-btn" id="cat-btn-gpu" onclick="switchSettingsCategory('gpu')">GPU Execution</div>
                 <div class="settings-cat-btn" id="cat-btn-vad" onclick="switchSettingsCategory('vad')">Silero VAD</div>
+                <div class="settings-cat-btn" id="cat-btn-translation" onclick="switchSettingsCategory('translation')">AI Translation</div>
               </div>
 
               <div class="settings-scroll-container">
@@ -995,7 +996,206 @@
                     </div>
                   </div>
                 </div>
+                
+                <!-- AI Translation Settings Group -->
+                <div class="settings-group" id="group-translation">
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Enable AI Translation</span>
+                      </div>
+                      <div class="setting-desc">Translates your transcription output files using external AI APIs.</div>
+                    </div>
+                    <div class="setting-control">
+                      <label class="switch">
+                        <input type="checkbox" id="opt-translateAiEnabled" />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Target Language</span>
+                      </div>
+                      <div class="setting-desc">The language to translate the subtitles/text into.</div>
+                    </div>
+                    <div class="setting-control">
+                      <select class="select-control" id="opt-translateAiTargetLang" onchange="saveCurrentSettings()">
+                        <option value="Persian">Persian (Farsi)</option>
+                        <option value="Spanish">Spanish</option>
+                        <option value="French">French</option>
+                        <option value="German">German</option>
+                        <option value="Italian">Italian</option>
+                        <option value="Russian">Russian</option>
+                        <option value="Chinese">Chinese</option>
+                        <option value="Arabic">Arabic</option>
+                        <option value="Turkish">Turkish</option>
+                        <option value="Portuguese">Portuguese</option>
+                        <option value="Japanese">Japanese</option>
+                        <option value="Korean">Korean</option>
+                        <option value="English">English</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Enable Polish Pass</span>
+                      </div>
+                      <div class="setting-desc">Instructs the AI to rewrite translation for natural flow as subtitles.</div>
+                    </div>
+                    <div class="setting-control">
+                      <label class="switch">
+                        <input type="checkbox" id="opt-translateAiPolish" onchange="saveCurrentSettings()" />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <!-- Tabbed Provider Manager Card -->
+                  <div class="provider-manager-card" id="provider-manager-card" style="display: none;">
+                    <!-- Active Model Banner -->
+                    <div class="active-model-banner" id="active-model-banner" style="display: none;">
+                      <div class="active-model-banner-info">
+                        <span class="active-model-banner-dot"></span>
+                        <span class="active-model-banner-label">Active Translation Model:</span>
+                        <strong class="active-model-banner-value" id="active-model-banner-value">None</strong>
+                      </div>
+                    </div>
+                    <!-- Tab buttons -->
+                    <div class="provider-tabs">
+                      <button class="provider-tab-btn active" onclick="switchProviderTab('providers')" id="tab-btn-providers">API Providers</button>
+                      <button class="provider-tab-btn" onclick="switchProviderTab('general')" id="tab-btn-general">General Configuration</button>
+                      <button class="provider-tab-btn" onclick="switchProviderTab('models')" id="tab-btn-models">Models Catalog (<span id="provider-models-count">0</span>)</button>
+                    </div>
+
+                    <!-- Tab 0 Content: Providers Card Grid -->
+                    <div class="provider-tab-content" id="provider-tab-providers">
+                      <!-- Hidden select boxes for bindSettingsToDOM mapping -->
+                      <select class="select-control" id="opt-translateAiProvider" style="display: none;"></select>
+                      <select class="select-control" id="opt-translateAiModel" style="display: none;"></select>
+                      <div class="provider-grid" id="providers-tiles-grid">
+                        <!-- Populated dynamically in Javascript -->
+                      </div>
+                    </div>
+
+                    <!-- Tab 1 Content: General Setup -->
+                    <div class="provider-tab-content" id="provider-tab-general" style="display: none;">
+                      <!-- Placeholder Empty State -->
+                      <div class="provider-placeholder-overlay" id="general-placeholder-overlay">
+                        <svg class="provider-placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <circle cx="12" cy="12" r="10"/>
+                          <line x1="12" y1="8" x2="12" y2="16"/>
+                          <line x1="8" y1="12" x2="16" y2="12"/>
+                        </svg>
+                        <div class="provider-placeholder-text">Please add or select an API Provider in the <strong>API Providers</strong> tab to configure its settings.</div>
+                      </div>
+
+                      <div id="general-config-fields" style="display: none;">
+                        <div class="provider-grid-two">
+                          <div class="provider-field">
+                            <label>Base URL</label>
+                            <input class="text-input" id="mgr-provider-url" type="text" placeholder="https://..." />
+                          </div>
+                          <div class="provider-field">
+                            <label>API Format</label>
+                            <select class="select-control" id="mgr-provider-format">
+                              <option value="Chat completions">Chat completions (/chat/completions)</option>
+                              <option value="Anthropic messages">Anthropic messages (/v1/messages)</option>
+                              <option value="Responses">Responses (Gemini)</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div class="provider-field" style="margin-bottom: 20px;">
+                          <label>API Key (Update)</label>
+                          <div class="password-input-wrapper">
+                            <input class="text-input" id="mgr-provider-key" type="password" placeholder="••••••••••••••••" />
+                            <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('mgr-provider-key', this)">
+                              <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                <circle cx="12" cy="12" r="3"/>
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+
+                        <div class="provider-field" style="margin-bottom: 16px;">
+                          <label>Provider Custom System Prompt</label>
+                          <span>Instructs the AI for translation style overrides (e.g. vocab, tone). Leave blank for system defaults.</span>
+                          <textarea class="textarea-control" id="mgr-provider-prompt" rows="3" placeholder="You are a professional translator..."></textarea>
+                        </div>
+
+                        <div class="provider-actions">
+                          <button class="btn-secondary btn-delete" onclick="deleteActiveProvider()">Delete Provider</button>
+                          <button class="btn-primary" id="mgr-btn-test-connection" onclick="testTranslationConnection()">Test Connection</button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Tab 2 Content: Models Catalog -->
+                    <div class="provider-tab-content" id="provider-tab-models" style="display: none;">
+                      <!-- Placeholder Empty State -->
+                      <div class="provider-placeholder-overlay" id="models-placeholder-overlay">
+                        <svg class="provider-placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <circle cx="12" cy="12" r="10"/>
+                          <line x1="12" y1="8" x2="12" y2="16"/>
+                          <line x1="8" y1="12" x2="16" y2="12"/>
+                        </svg>
+                        <div class="provider-placeholder-text">Please add or select an API Provider in the <strong>API Providers</strong> tab to configure its models catalog.</div>
+                      </div>
+
+                      <div id="models-catalog-fields" style="display: none;">
+                        <!-- Search and Action header -->
+                        <div class="provider-grid-two-search">
+                          <input class="text-input" id="mgr-models-search" type="text" placeholder="Search models by ID..." oninput="filterModelsTable()" />
+                          <div class="provider-actions-row">
+                            <button class="btn-secondary" id="mgr-btn-fetch-models" onclick="fetchActiveProviderModels()">Fetch Models</button>
+                            <button class="btn-secondary" onclick="addManualModelRow()">+ Add Custom Model</button>
+                          </div>
+                        </div>
+
+                        <!-- Filters Quick Actions bar -->
+                        <div class="provider-filter-bar">
+                          <div class="models-filter-bar">
+                            <button class="btn-filter active" onclick="filterModelsStatus('all')" id="filter-models-all">All</button>
+                            <button class="btn-filter" onclick="filterModelsStatus('free')" id="filter-models-free">Free Only</button>
+                          </div>
+                        </div>
+
+                        <!-- Models Table Header (Fixed) -->
+                        <div class="providers-table-header-container">
+                          <table class="providers-table" style="margin-bottom: 0;">
+                            <thead>
+                              <tr>
+                                <th style="width: 15%; text-align: center;">Active</th>
+                                <th style="width: 40%;">Model ID</th>
+                                <th style="width: 20%;">Context Window</th>
+                                <th style="width: 15%;">Reasoning</th>
+                                <th style="width: 10%; text-align: center;">Action</th>
+                              </tr>
+                            </thead>
+                          </table>
+                        </div>
+                        <!-- Models Table Body (Scrollable) -->
+                        <div class="providers-table-body-container">
+                          <table class="providers-table" style="margin-top: 0;">
+                            <tbody id="mgr-models-tbody">
+                              <!-- Populated dynamically -->
+                            </tbody>
+                          </table>
+                        </div>
+                        
+                        <!-- Auto-saves dynamically -->
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
               </div>
+
             </div>
           </div>
 
@@ -1218,7 +1418,7 @@
                   </div>
                   <div class="wizard-step-body" id="wizard-body-4">
                     <div class="step-details-row" style="margin-bottom: 16px;">
-                      Backend: <span id="trans-cfg-backend" style="color:var(--color-cyan); font-weight:600;">Standard</span> | Model: <span id="trans-cfg-model" style="color:var(--color-purple); font-weight:600;">Base</span> | VAD: <span id="trans-cfg-vad" style="color:var(--color-gold); font-weight:600;">OFF</span>
+                      Backend: <span id="trans-cfg-backend" style="color:var(--color-cyan); font-weight:600;">Standard</span> | Model: <span id="trans-cfg-model" style="color:var(--color-purple); font-weight:600;">Base</span> | VAD: <span id="trans-cfg-vad" style="color:var(--color-gold); font-weight:600;">OFF</span> | Translation: <span id="trans-cfg-translation" style="color:var(--color-green); font-weight:600;">OFF</span>
                     </div>
                     <div style="display:flex; gap:12px;">
                       <button class="btn-primary" id="btn-run-transcribe" style="flex:2;" onclick="runWhisperTranscription()">
@@ -1316,9 +1516,10 @@
                 </div>
                 
                 <div class="logs-actions">
-                  <label class="checkbox-label">
+                  <label class="checkbox-container">
                     <input type="checkbox" id="log-autoscroll" checked />
-                    Auto Scroll
+                    <span class="custom-checkmark"></span>
+                    <span>Auto Scroll</span>
                   </label>
                   <button class="btn-secondary" style="padding:6px 12px; font-size:0.8rem;" onclick="copyAllLogs()">Copy All</button>
                   <button class="btn-secondary" style="padding:6px 12px; font-size:0.8rem; border-color:var(--color-red); color:var(--color-red);" onclick="clearLogsHistory()">Clear</button>
@@ -1355,4 +1556,111 @@
       </div>
     </div>
   </div>
+
+  <!-- Translation Provider Configuration Modal -->
+  <div class="modal-overlay" id="translation-provider-modal" style="display: none;">
+    <div class="glass-card modal-card" style="max-width: 480px;">
+      <div class="modal-header">
+        <div class="modal-title-row">
+          <svg class="modal-icon" viewBox="0 0 24 24" fill="none" stroke="var(--color-cyan)" stroke-width="2" style="width: 24px; height: 24px;">
+            <path d="M12 2a10 10 0 0 1 10 10c0 5.523-4.477 10-10 10S2 17.523 2 12s4.477-10 10-10zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16z"/>
+            <path d="M7 12h10M12 7l5 5-5 5"/>
+          </svg>
+          <h3 id="provider-modal-title" style="color: var(--color-cyan);">Add API Provider</h3>
+        </div>
+      </div>
+      <div class="modal-body" style="max-height: 480px; overflow-y: auto; padding-right: 8px;">
+        <div style="display: flex; flex-direction: column; gap: 14px; margin-bottom: 16px;">
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <label style="font-size: 0.85rem; color: var(--color-text-muted);">Provider Name</label>
+            <input class="text-input" id="provider-name" type="text" placeholder="e.g. OpenRouter" style="width: 100%;" />
+          </div>
+          
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <label style="font-size: 0.85rem; color: var(--color-text-muted);">API Format</label>
+            <select class="select-control" id="provider-format" style="width: 100%;">
+              <option value="Chat completions">Chat completions (/chat/completions)</option>
+              <option value="Anthropic messages">Anthropic messages (/v1/messages)</option>
+              <option value="Responses">Responses (Gemini)</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px;">
+          <label style="font-size: 0.85rem; color: var(--color-text-muted);">Base URL</label>
+          <input class="text-input" id="provider-url" type="text" placeholder="https://openrouter.ai/api/v1" style="width: 100%;" />
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px;">
+          <label style="font-size: 0.85rem; color: var(--color-text-muted);">API Key</label>
+          <input class="text-input" id="provider-key" type="password" placeholder="sk-..." style="width: 100%;" />
+        </div>
+        
+        <div style="margin-bottom: 16px; padding-left: 8px;">
+          <label class="checkbox-container">
+            <input type="checkbox" id="provider-use-keyring" checked />
+            <span class="custom-checkmark"></span>
+            <span>Store API Key securely in system keyring</span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 16px;">
+        <button class="btn-secondary" onclick="closeProviderModal()" style="padding: 10px 20px; font-size: 0.9rem;">Cancel</button>
+        <button class="btn-primary" onclick="saveProviderConfig()" style="padding: 10px 20px; font-size: 0.9rem;">Save Provider</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Batch Translation Error Dialog -->
+  <div class="modal-overlay" id="batch-error-modal" style="display: none;">
+    <div class="glass-card modal-card" style="max-width: 500px;">
+      <div class="modal-header">
+        <div class="modal-title-row">
+          <svg class="modal-icon error-icon" viewBox="0 0 24 24" fill="none" stroke="var(--color-red)" stroke-width="2" style="width: 24px; height: 24px;">
+            <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <h3 id="batch-error-title" style="color: var(--color-red);">Translation Error</h3>
+        </div>
+      </div>
+      <div class="modal-body">
+        <p id="batch-error-message" style="font-size: 0.95rem; margin-bottom: 12px; line-height: 1.4;"></p>
+        <p style="font-size: 0.85rem; color: var(--color-text-muted);">An error occurred during translation of this batch item. Select how you would like to proceed:</p>
+      </div>
+      <div class="modal-footer" style="display: flex; gap: 8px; flex-direction: column; width: 100%; margin-top: 16px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%;">
+          <button class="btn-primary" onclick="resolveBatchError('retry')" style="justify-content: center; font-size: 0.9rem;">Retry Translation</button>
+          <button class="btn-secondary" onclick="resolveBatchError('skip')" style="justify-content: center; font-size: 0.9rem;">Skip Item</button>
+        </div>
+        <button class="btn-secondary" onclick="resolveBatchError('abort')" style="width: 100%; justify-content: center; border-color: var(--color-red); color: var(--color-red); font-size: 0.9rem;">Abort Batch Job</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Test Connection Modal -->
+  <div class="modal-overlay" id="translation-test-modal" style="display: none;">
+    <div class="glass-card modal-card" style="max-width: 480px;">
+      <div class="modal-header">
+        <div class="modal-title-row">
+          <svg class="modal-icon" viewBox="0 0 24 24" fill="none" stroke="var(--color-cyan)" stroke-width="2" style="width: 24px; height: 24px;">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+          <h3 style="color: var(--color-cyan);">Connection Test Results</h3>
+        </div>
+      </div>
+      <div class="modal-body" style="padding-top: 10px;">
+        <div id="test-modal-status" style="font-weight: 600; margin-bottom: 12px; font-size: 1rem;">Testing...</div>
+        <div class="textarea-control" id="test-modal-result" style="width: 100%; height: 160px; overflow-y: auto; white-space: pre-wrap; font-family: monospace; font-size: 0.85rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 10px; box-sizing: border-box; color: var(--color-text); width: 100%;">
+          Waiting for response...
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 16px;">
+        <button class="btn-primary" onclick="closeTestModal()" style="padding: 10px 20px; font-size: 0.9rem;">Close</button>
+      </div>
+    </div>
+  </div>
 </html>
+
