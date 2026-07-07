@@ -23,10 +23,10 @@ html {
   --bg-card-hover: rgba(22, 29, 54, 0.75);
   --bg-input: rgba(10, 13, 28, 0.8);
   --border-glass: rgba(255, 255, 255, 0.06);
-  --border-glass-active: rgba(139, 92, 246, 0.4);
+  --border-glass-active: rgba(45, 127, 255, 0.4);
   
   --color-cyan: #06b6d4;
-  --color-purple: #8b5cf6;
+  --color-purple: #2d7fff;
   --color-gold: #f59e0b;
   --color-green: #10b981;
   --color-red: #ef4444;
@@ -35,7 +35,7 @@ html {
   --color-text-dim: #6b7280;
   
   --shadow-neon-cyan: 0 0 15px rgba(6, 182, 212, 0.15);
-  --shadow-neon-purple: 0 0 20px rgba(139, 92, 246, 0.25);
+  --shadow-neon-purple: 0 0 20px rgba(45, 127, 255, 0.25);
   --shadow-neon-gold: 0 0 15px rgba(245, 158, 11, 0.15);
   --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
   
@@ -80,7 +80,7 @@ body {
   color: var(--color-text);
   user-select: none;
   background-image: 
-    radial-gradient(at 10% 20%, rgba(139, 92, 246, 0.08) 0px, transparent 50%),
+    radial-gradient(at 10% 20%, rgba(45, 127, 255, 0.08) 0px, transparent 50%),
     radial-gradient(at 90% 80%, rgba(6, 182, 212, 0.06) 0px, transparent 50%);
   display: flex;
   flex-direction: column;
@@ -188,14 +188,14 @@ sidebar {
   width: 32px;
   height: 32px;
   color: var(--color-purple);
-  filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.5));
+  filter: drop-shadow(0 0 8px rgba(45, 127, 255, 0.5));
 }
 
 .brand-name {
   font-size: 1.25rem;
   font-weight: 700;
   letter-spacing: 0.5px;
-  background: linear-gradient(135deg, #fff 30%, #a78bfa 100%);
+  background: linear-gradient(135deg, #fff 30%, #85b1ff 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -234,15 +234,17 @@ sidebar {
 }
 
 .nav-item.active {
-  background: rgba(139, 92, 246, 0.12);
-  border-color: var(--border-glass-active);
+  background: linear-gradient(135deg, rgba(45, 127, 255, 0.18) 0%, rgba(0, 87, 217, 0.04) 100%);
+  border-color: rgba(45, 127, 255, 0.35);
   color: #fff;
-  box-shadow: var(--shadow-neon-purple);
+  box-shadow: 
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.1),
+    var(--shadow-neon-purple);
 }
 
 .nav-item.active svg {
   color: var(--color-purple);
-  filter: drop-shadow(0 0 4px rgba(139, 92, 246, 0.5));
+  filter: drop-shadow(0 0 4px rgba(45, 127, 255, 0.5));
 }
 
 .developer-credit {
@@ -362,8 +364,8 @@ header {
 .intro-welcome:hover,
 .quick-start-card:hover {
   background: var(--bg-card) !important;
-  border-color: rgba(139, 92, 246, 0.15) !important;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.65), 0 0 20px rgba(139, 92, 246, 0.06) !important;
+  border-color: rgba(45, 127, 255, 0.15) !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.65), 0 0 20px rgba(45, 127, 255, 0.06) !important;
   transform: translateY(-2px) !important;
 }
 
@@ -459,7 +461,7 @@ header {
 }
 
 .shortcut-btn:hover {
-  background: rgba(139, 92, 246, 0.08);
+  background: rgba(45, 127, 255, 0.08);
   border-color: var(--border-glass-active);
   transform: translateX(4px);
 }
@@ -481,7 +483,7 @@ header {
 .text-input:focus {
   outline: none;
   border-color: var(--color-purple);
-  box-shadow: 0 0 10px rgba(139, 92, 246, 0.15);
+  box-shadow: 0 0 10px rgba(45, 127, 255, 0.15);
 }
 
 .btn-primary {
@@ -589,9 +591,12 @@ header {
 }
 
 .backend-card.active {
-  border-color: rgba(139, 92, 246, 0.4);
-  box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.4), 0 0 20px rgba(139, 92, 246, 0.15);
-  background: rgba(139, 92, 246, 0.02);
+  border-color: rgba(45, 127, 255, 0.45);
+  box-shadow: 
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
+    0 0 0 1px rgba(45, 127, 255, 0.2), 
+    0 0 24px rgba(45, 127, 255, 0.18);
+  background: linear-gradient(135deg, rgba(45, 127, 255, 0.08) 0%, rgba(0, 87, 217, 0.02) 100%);
 }
 
 .backend-card-header {
@@ -764,10 +769,12 @@ header {
 }
 
 .preset-btn.active {
-  background: rgba(139, 92, 246, 0.1);
+  background: linear-gradient(135deg, rgba(45, 127, 255, 0.15) 0%, rgba(0, 87, 217, 0.03) 100%);
   border-color: var(--color-purple);
   color: #fff;
-  box-shadow: var(--shadow-neon-purple);
+  box-shadow: 
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.12),
+    var(--shadow-neon-purple);
 }
 
 .settings-scroll-container {
@@ -818,7 +825,7 @@ header {
   font-family: var(--font-mono);
   font-size: 0.75rem;
   color: var(--color-purple);
-  background: rgba(139, 92, 246, 0.08);
+  background: rgba(45, 127, 255, 0.08);
   padding: 2px 6px;
   border-radius: 4px;
 }
@@ -965,7 +972,7 @@ select.select-control {
 .select-control:focus {
   outline: none;
   border-color: var(--color-purple) !important;
-  box-shadow: 0 0 8px rgba(139, 92, 246, 0.25) !important;
+  box-shadow: 0 0 8px rgba(45, 127, 255, 0.25) !important;
 }
 
 /* 4. Transcribe File View */
@@ -998,8 +1005,11 @@ select.select-control {
 }
 
 .wizard-step.active {
-  border-color: var(--border-glass-active);
-  box-shadow: 0 4px 20px rgba(139, 92, 246, 0.05);
+  border-color: rgba(45, 127, 255, 0.45);
+  box-shadow: 
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
+    0 8px 24px rgba(0, 0, 0, 0.35),
+    0 0 15px rgba(45, 127, 255, 0.1);
 }
 
 .wizard-step-header {
@@ -1033,10 +1043,10 @@ select.select-control {
 }
 
 .wizard-step.active .wizard-step-icon {
-  background: rgba(139, 92, 246, 0.15);
-  border-color: var(--border-glass-active);
-  color: var(--color-purple);
-  box-shadow: 0 0 10px rgba(139, 92, 246, 0.2);
+  background: linear-gradient(135deg, rgba(45, 127, 255, 0.25) 0%, rgba(0, 87, 217, 0.1) 100%);
+  border-color: rgba(45, 127, 255, 0.45);
+  color: #fff;
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.15), 0 0 10px rgba(45, 127, 255, 0.25);
 }
 
 .wizard-step.completed .wizard-step-icon {
@@ -1107,7 +1117,7 @@ select.select-control {
 
 .media-drop-zone:hover {
   border-color: var(--color-purple);
-  background: rgba(139, 92, 246, 0.01);
+  background: rgba(45, 127, 255, 0.01);
 }
 
 .media-drop-zone.drag-over {
@@ -1206,7 +1216,7 @@ select.select-control {
   font-size: 1.5rem;
   font-weight: 700;
   color: #fff;
-  text-shadow: 0 0 10px rgba(139, 92, 246, 0.5);
+  text-shadow: 0 0 10px rgba(45, 127, 255, 0.5);
   transition: var(--transition-smooth);
 }
 
@@ -1461,7 +1471,7 @@ select.select-control {
   width: 100px;
 }
 
-.log-line .log-cat.build { background: rgba(139, 92, 246, 0.1); color: var(--color-purple); }
+.log-line .log-cat.build { background: rgba(45, 127, 255, 0.1); color: var(--color-purple); }
 .log-line .log-cat.ffmpeg { background: rgba(6, 182, 212, 0.1); color: var(--color-cyan); }
 .log-line .log-cat.whisper { background: rgba(245, 158, 11, 0.1); color: var(--color-gold); }
 
@@ -1520,7 +1530,7 @@ select.select-control {
   width: 22px;
   height: 22px;
   color: var(--color-purple);
-  filter: drop-shadow(0 0 4px rgba(139, 92, 246, 0.5));
+  filter: drop-shadow(0 0 4px rgba(45, 127, 255, 0.5));
   flex-shrink: 0;
 }
 
@@ -1545,13 +1555,13 @@ select.select-control {
 }
 
 .toast-info {
-  border-color: rgba(139, 92, 246, 0.3);
-  box-shadow: 0 0 20px rgba(139, 92, 246, 0.15), 0 10px 32px rgba(0, 0, 0, 0.6);
+  border-color: rgba(45, 127, 255, 0.3);
+  box-shadow: 0 0 20px rgba(45, 127, 255, 0.15), 0 10px 32px rgba(0, 0, 0, 0.6);
 }
 
 .toast-info .toast-icon {
   color: var(--color-purple);
-  filter: drop-shadow(0 0 4px rgba(139, 92, 246, 0.5));
+  filter: drop-shadow(0 0 4px rgba(45, 127, 255, 0.5));
 }
 
 /* Premium Batch Queue Table Styling */
@@ -1573,7 +1583,7 @@ select.select-control {
 
 .batch-table th {
   padding: 10px 12px;
-  background: rgba(139, 92, 246, 0.1);
+  background: rgba(45, 127, 255, 0.1);
   color: var(--color-text-muted);
   font-weight: 600;
   border-bottom: 1px solid var(--border-glass);
@@ -1614,10 +1624,10 @@ select.select-control {
 }
 
 .badge-processing {
-  background: rgba(139, 92, 246, 0.15);
+  background: rgba(45, 127, 255, 0.15);
   color: #c084fc;
-  border: 1px solid rgba(139, 92, 246, 0.3);
-  box-shadow: 0 0 10px rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(45, 127, 255, 0.3);
+  box-shadow: 0 0 10px rgba(45, 127, 255, 0.15);
   animation: pulse-badge 1.8s infinite ease-in-out;
 }
 
@@ -1634,8 +1644,8 @@ select.select-control {
 }
 
 @keyframes pulse-badge {
-  0%, 100% { opacity: 0.8; box-shadow: 0 0 8px rgba(139, 92, 246, 0.15); }
-  50% { opacity: 1; box-shadow: 0 0 15px rgba(139, 92, 246, 0.35); }
+  0%, 100% { opacity: 0.8; box-shadow: 0 0 8px rgba(45, 127, 255, 0.15); }
+  50% { opacity: 1; box-shadow: 0 0 15px rgba(45, 127, 255, 0.35); }
 }
 
 /* Dashboard Quick Action Backend Tiles */
@@ -1700,8 +1710,8 @@ select.select-control {
 
 .shortcut-btn-card:hover {
   background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(139, 92, 246, 0.3);
-  box-shadow: 0 4px 15px rgba(139, 92, 246, 0.05);
+  border-color: rgba(45, 127, 255, 0.3);
+  box-shadow: 0 4px 15px rgba(45, 127, 255, 0.05);
 }
 
 .shortcut-main-row {
@@ -1728,10 +1738,12 @@ select.select-control {
 
 /* Custom additions for switcher buttons, waveform visualizer, and transcript viewer */
 .switcher-btn.active-switcher {
-  background: rgba(139, 92, 246, 0.15) !important;
+  background: linear-gradient(135deg, rgba(45, 127, 255, 0.2) 0%, rgba(0, 87, 217, 0.05) 100%) !important;
   border-color: var(--border-glass-active) !important;
   color: #fff !important;
-  box-shadow: var(--shadow-neon-purple);
+  box-shadow: 
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.12),
+    var(--shadow-neon-purple);
 }
 
 .transcript-line {
@@ -1883,13 +1895,13 @@ select.select-control {
 
 .backend-card.active .backend-checkbox {
   border-color: var(--color-purple);
-  box-shadow: 0 0 8px rgba(139, 92, 246, 0.3);
+  box-shadow: 0 0 8px rgba(45, 127, 255, 0.3);
 }
 
 .backend-checkbox:checked {
   background: var(--color-purple) !important;
   border-color: var(--color-purple) !important;
-  box-shadow: 0 0 10px rgba(139, 92, 246, 0.6) !important;
+  box-shadow: 0 0 10px rgba(45, 127, 255, 0.6) !important;
 }
 
 .backend-checkbox:checked::after {
