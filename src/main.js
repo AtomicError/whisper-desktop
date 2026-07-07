@@ -3348,11 +3348,16 @@ window.filterModelsTable = function() {
       const modelId = idInput.value.toLowerCase();
       const isFree = modelId.includes('free');
       
+      const reasoningSelect = row.querySelector('.model-reasoning-select');
+      const hasReasoning = reasoningSelect && reasoningSelect.value !== 'None';
+      
       const matchQuery = modelId.includes(query);
       let matchStatus = true;
       
       if (currentModelStatusFilter === 'free') {
         matchStatus = isFree;
+      } else if (currentModelStatusFilter === 'reasoning') {
+        matchStatus = hasReasoning;
       }
       
       if (matchQuery && matchStatus) {
@@ -3367,7 +3372,7 @@ window.filterModelsTable = function() {
 window.filterModelsStatus = function(status) {
   currentModelStatusFilter = status;
   
-  const filters = ['all', 'free'];
+  const filters = ['all', 'free', 'reasoning'];
   filters.forEach(f => {
     const btn = document.getElementById(`filter-models-${f}`);
     if (btn) {
