@@ -847,9 +847,10 @@ function bindSettingsToDOM() {
   if (typeof populateProvidersDropdown === 'function') {
     populateProvidersDropdown();
     onProviderChanged();
-    if (typeof toggleTranslationSubSettingsVisibility === 'function') {
-      toggleTranslationSubSettingsVisibility();
-    }
+  }
+  
+  if (typeof toggleTranslationSubSettingsVisibility === 'function') {
+    toggleTranslationSubSettingsVisibility();
   }
   
   // Update Presets UI
@@ -2985,8 +2986,15 @@ window.saveActiveProviderGeneral = async function(silent = false) {
   let keyToSave = provider.apiKey || provider.api_key || '';
   let useKeyring = provider.useKeyring !== false;
   
-  // If the user modified the key
-  if (key && key !== '••••••••••••••••') {
+  // If the user cleared the key, delete from keyring
+  if (key === '') {
+    try {
+      await invoke('delete_keyring_credential', { providerName });
+    } catch (e) {}
+    keyToSave = '';
+    useKeyring = false;
+  } else if (key !== '••••••••••••••••') {
+    // If the user modified the key
     try {
       await invoke('store_keyring_credential', { providerName, key });
       keyToSave = '__KEYRING__';
@@ -3071,7 +3079,7 @@ window.deleteActiveProvider = async function() {
 };
 
 window.toEnglishDigits = function(str) {
-  const persianMap = { '۰':'0', '۱':'1', '۲':'2', '۳':'3', '۴':'4', '۵':'5', '۶':'6', '۷':'7', '۸':'8', '^\u06F9$':'9', '۹':'9' };
+  const persianMap = { '۰':'0', '۱':'1', '۲':'2', '۳':'3', '۴':'4', '۵':'5', '۶':'6', '۷':'7', '۸':'8', '۹':'9' };
   const arabicMap = { '٠':'0', '١':'1', '٢':'2', '٣':'3', '٤':'4', '٥':'5', '٦':'6', '٧':'7', '٨':'8', '٩':'9' };
   if (typeof str !== 'string') return str;
   return str.replace(/[۰-۹]/g, d => persianMap[d] || d).replace(/[٠-٩]/g, d => arabicMap[d] || d);
@@ -3166,6 +3174,10 @@ window.addManualModelRow = function(modelId = "", contextWindow = 200000, reason
     const siblingRows = tbody.querySelectorAll('tr');
     siblingRows.forEach(r => r.classList.remove('active-model-row'));
     tr.classList.add('active-model-row');
+    
+    // Move this row to the very top of tbody immediately
+    tbody.insertBefore(tr, tbody.firstChild);
+    
     triggerAutoSave();
   });
   
@@ -3207,7 +3219,7 @@ window.fetchActiveProviderModels = async function() {
   btn.disabled = true;
   btn.textContent = 'Fetching...';
   
-  if (!apiKey && (provider.apiKey === '__KEYRING__' || provider.api_key === '__KEYRING__')) {
+  if ((!apiKey || apiKey === '••••••••••••••••') && (provider.useKeyring || provider.apiKey === '__KEYRING__' || provider.api_key === '__KEYRING__')) {
     try {
       apiKey = await invoke('get_keyring_credential', { providerName });
     } catch(e) {}
@@ -3308,6 +3320,10 @@ window.saveActiveProviderModels = async function(keepCurrentTab = false, skipTab
   
   await saveCurrentSettings();
   updateTranscribeUIConfigs();
+  
+  if (!skipTableRender) {
+    renderModelsRegistryTable(provider);
+  }
 };
 
 let currentModelStatusFilter = 'all';
@@ -3320,6 +3336,12 @@ window.filterModelsTable = function() {
     const rows = document.querySelectorAll('#mgr-models-tbody tr');
     
     rows.forEach(row => {
+      // Active model row is ALWAYS shown, regardless of query or status filter!
+      if (row.classList.contains('active-model-row')) {
+        row.style.display = '';
+        return;
+      }
+      
       const idInput = row.querySelector('.model-id-input');
       if (!idInput) return;
       

@@ -2127,8 +2127,6 @@ select.select-control {
 }
 
 .providers-table-wrapper {
-  max-height: 320px;
-  overflow-y: auto;
   border-radius: 8px;
   border: 1px solid var(--border-glass);
   background: rgba(9, 11, 23, 0.4);
@@ -2354,7 +2352,7 @@ select.select-control {
   border-radius: 6px;
   width: 30px;
   height: 30px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
@@ -2885,58 +2883,22 @@ select.select-control {
   display: block;
 }
 
-/* Tab Switching Slide & Fade Animations */
+/* Tab Switching Scale-Fade-Blur Animations */
 .provider-tab-content {
-  animation: tabFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: tabFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes tabFadeIn {
-  from {
+  0% {
     opacity: 0;
-    transform: translateY(6px);
+    transform: scale(0.97) translateY(8px);
+    filter: blur(3px);
   }
-  to {
+  100% {
     opacity: 1;
-    transform: translateY(0);
+    transform: scale(1) translateY(0);
+    filter: blur(0);
   }
-}
-
-/* Split Table Header & Body Container Layouts */
-.providers-table-header-container {
-  background: #0e111f;
-  border: 1px solid var(--border-glass);
-  border-bottom: none;
-  border-top-left-radius: 8px;
-  border-top-right-radius: 8px;
-  overflow: hidden;
-  box-sizing: border-box;
-}
-
-.providers-table-body-container {
-  max-height: 280px;
-  overflow-y: auto;
-  border: 1px solid var(--border-glass);
-  border-bottom-left-radius: 8px;
-  border-bottom-right-radius: 8px;
-  background: rgba(9, 11, 23, 0.4);
-  box-sizing: border-box;
-}
-
-.providers-table-body-container::-webkit-scrollbar {
-  width: 6px;
-}
-
-.providers-table-body-container::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.providers-table-body-container::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 3px;
-}
-
-.providers-table-body-container::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.15);
 }
 
 /* Unify Input Heights, Paddings, and Roundness in General Config Card */

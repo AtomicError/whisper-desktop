@@ -22,7 +22,11 @@ pub async fn fetch_provider_models(
         // Gemini: GET https://generativelanguage.googleapis.com/v1beta/models?key={api_key}
         if !url.contains("/models") {
             let clean_base = url.trim_end_matches('/');
-            url = format!("{}/v1beta/models", clean_base);
+            if clean_base.ends_with("/v1beta") {
+                url = format!("{}/models", clean_base);
+            } else {
+                url = format!("{}/v1beta/models", clean_base);
+            }
         }
         if !api_key.is_empty() {
             url = format!("{}?key={}", url, api_key);

@@ -59,17 +59,28 @@ fn parse_response_content(api_format: &str, response_val: &Value) -> Result<Stri
 fn parse_translated_lines(response_text: &str) -> HashMap<usize, String> {
     let mut map = HashMap::new();
     let re = regex::Regex::new(r"^(\d+)[\s:：.-]+(.*)$").unwrap();
+    let mut current_idx = None;
     
     for line in response_text.lines() {
         let trimmed = line.trim();
-        if trimmed.is_empty() || trimmed.starts_with("```") {
+        if trimmed.is_empty() {
+            current_idx = None;
+            continue;
+        }
+        if trimmed.starts_with("```") {
             continue;
         }
         if let Some(caps) = re.captures(trimmed) {
             if let (Some(num_cap), Some(val_cap)) = (caps.get(1), caps.get(2)) {
                 if let Ok(idx) = num_cap.as_str().parse::<usize>() {
                     map.insert(idx, val_cap.as_str().trim().to_string());
+                    current_idx = Some(idx);
                 }
+            }
+        } else if let Some(idx) = current_idx {
+            if let Some(existing) = map.get_mut(&idx) {
+                existing.push('\n');
+                existing.push_str(trimmed);
             }
         }
     }
@@ -175,12 +186,6 @@ pub async fn translate_files(
         let output_file_name = format!("{}.{}.{}", base_stem, lang_code, ext);
         let output_path = Path::new(&parent_dir).join(&output_file_name);
 
-        // Resume feature: skip if file already exists
-        if output_path.exists() {
-            successfully_translated.push(output_file_name);
-            continue;
-        }
-
         let content = fs::read_to_string(&input_path)
             .map_err(|e| format!("Failed to read source file '{}': {}", file_name, e))?;
 
@@ -229,17 +234,22 @@ pub async fn translate_files(
             match provider.api_format.as_str() {
                 "Anthropic messages" => {
                     if !request_url.contains("/messages") {
-                        if request_url.ends_with('/') {
-                            request_url.push_str("v1/messages");
+                        let clean_base = request_url.trim_end_matches('/');
+                        if clean_base.ends_with("/v1") {
+                            request_url = format!("{}/messages", clean_base);
                         } else {
-                            request_url.push_str("/v1/messages");
+                            request_url = format!("{}/v1/messages", clean_base);
                         }
                     }
                 }
                 "Responses" => {
                     if !request_url.contains("/models/") {
                         let clean_base = request_url.trim_end_matches('/');
-                        request_url = format!("{}/v1beta/models/{}:generateContent", clean_base, settings.translate_ai_model);
+                        if clean_base.ends_with("/v1beta") {
+                            request_url = format!("{}/models/{}:generateContent", clean_base, settings.translate_ai_model);
+                        } else {
+                            request_url = format!("{}/v1beta/models/{}:generateContent", clean_base, settings.translate_ai_model);
+                        }
                     }
                     if !api_key.is_empty() {
                         request_url = format!("{}?key={}", request_url, api_key);
@@ -247,11 +257,8 @@ pub async fn translate_files(
                 }
                 _ => {
                     if !request_url.contains("/chat/completions") {
-                        if request_url.ends_with('/') {
-                            request_url.push_str("chat/completions");
-                        } else {
-                            request_url.push_str("/chat/completions");
-                        }
+                        let clean_base = request_url.trim_end_matches('/');
+                        request_url = format!("{}/chat/completions", clean_base);
                     }
                 }
             }
@@ -361,17 +368,22 @@ pub async fn preview_translate(
     match provider.api_format.as_str() {
         "Anthropic messages" => {
             if !request_url.contains("/messages") {
-                if request_url.ends_with('/') {
-                    request_url.push_str("v1/messages");
+                let clean_base = request_url.trim_end_matches('/');
+                if clean_base.ends_with("/v1") {
+                    request_url = format!("{}/messages", clean_base);
                 } else {
-                    request_url.push_str("/v1/messages");
+                    request_url = format!("{}/v1/messages", clean_base);
                 }
             }
         }
         "Responses" => {
             if !request_url.contains("/models/") {
                 let clean_base = request_url.trim_end_matches('/');
-                request_url = format!("{}/v1beta/models/{}:generateContent", clean_base, settings.translate_ai_model);
+                if clean_base.ends_with("/v1beta") {
+                    request_url = format!("{}/models/{}:generateContent", clean_base, settings.translate_ai_model);
+                } else {
+                    request_url = format!("{}/v1beta/models/{}:generateContent", clean_base, settings.translate_ai_model);
+                }
             }
             if !api_key.is_empty() {
                 request_url = format!("{}?key={}", request_url, api_key);
@@ -379,11 +391,8 @@ pub async fn preview_translate(
         }
         _ => {
             if !request_url.contains("/chat/completions") {
-                if request_url.ends_with('/') {
-                    request_url.push_str("chat/completions");
-                } else {
-                    request_url.push_str("/chat/completions");
-                }
+                let clean_base = request_url.trim_end_matches('/');
+                request_url = format!("{}/chat/completions", clean_base);
             }
         }
     }

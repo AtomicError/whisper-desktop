@@ -18,11 +18,14 @@ pub fn chunk_dialogues(
         context_limit
     };
 
+    // Limit the maximum number of items in a single chunk to avoid output token limit exhaustion
+    let max_items = 100;
+
     for entry in entries {
         // Estimate entry length: the line index digits + separator + text length
         let entry_len = entry.1.len() + 15; 
         
-        if !current_chunk.is_empty() && current_len + entry_len > safety_limit {
+        if !current_chunk.is_empty() && (current_len + entry_len > safety_limit || current_chunk.len() >= max_items) {
             chunks.push(current_chunk);
             current_chunk = Vec::new();
             current_len = 0;
