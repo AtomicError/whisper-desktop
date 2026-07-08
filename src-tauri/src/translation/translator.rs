@@ -204,12 +204,18 @@ pub async fn translate_files(
             continue;
         }
 
-        // Chunker
-        let chunks = chunk_dialogues(&original_entries, context_window);
         let mut translations_map = HashMap::new();
+        let mut remaining_entries = original_entries.clone();
+        let mut context_window = context_window;
 
-        // Perform requests chunk by chunk
-        for chunk in chunks {
+        while !remaining_entries.is_empty() {
+            let mut chunks = chunk_dialogues(&remaining_entries, context_window);
+            if chunks.is_empty() {
+                break;
+            }
+            
+            let chunk = chunks.remove(0);
+
             let system_prompt = build_system_prompt(
                 &provider.custom_prompt,
                 &settings.translate_ai_target_lang,
@@ -286,6 +292,25 @@ pub async fn translate_files(
             if !res.status().is_success() {
                 let status = res.status();
                 let err_text = res.text().await.unwrap_or_default();
+                
+                // Reactive context limit recovery
+                if let Some(new_limit) = parse_context_limit_from_error(&err_text) {
+                    if new_limit < context_window {
+                        context_window = new_limit;
+                        let _ = update_model_context_window(&settings.translate_ai_provider, &settings.translate_ai_model, new_limit);
+                        continue;
+                    }
+                }
+
+                if is_context_length_error(&err_text) {
+                    let new_limit = context_window / 2;
+                    if new_limit >= 1024 {
+                        context_window = new_limit;
+                        let _ = update_model_context_window(&settings.translate_ai_provider, &settings.translate_ai_model, new_limit);
+                        continue;
+                    }
+                }
+
                 return Err(format!("API returned error status ({}): {}", status, err_text));
             }
 
@@ -296,6 +321,8 @@ pub async fn translate_files(
             let chunk_translations = align_translations(&chunk, &response_text);
             
             translations_map.extend(chunk_translations);
+            
+            remaining_entries.retain(|(idx, _)| !translations_map.contains_key(idx));
         }
 
         // Reconstruct and save
@@ -433,4 +460,62 @@ pub async fn preview_translate(
     }
 
     Ok(preview_lines.join("\n\n"))
+}
+
+fn parse_context_limit_from_error(error_msg: &str) -> Option<usize> {
+    let error_lower = error_msg.to_lowercase();
+    let patterns = [
+        r"max_model_len\s*(?:is\s*)?[:=(]?\s*(\d{4,})",
+        r"maximum model length\s*(?:is\s*)?[:=(]?\s*(\d{4,})",
+        r"(?:max(?:imum)?|limit)\s*(?:context\s*)?(?:length|size|window)?\s*(?:is|of|:)?\s*(\d{4,})",
+        r"context\s*(?:length|size|window)\s*(?:is|of|:)?\s*(\d{4,})",
+        r"(\d{4,})\s*(?:token)?\s*(?:context|limit)",
+        r">\s*(\d{4,})\s*(?:max|limit|token)",
+        r"(\d{4,})\s*(?:max(?:imum)?)\b",
+    ];
+
+    for pattern in &patterns {
+        if let Ok(re) = regex::Regex::new(pattern) {
+            if let Some(caps) = re.captures(&error_lower) {
+                if let Some(num_match) = caps.get(1) {
+                    if let Ok(limit) = num_match.as_str().parse::<usize>() {
+                        if limit >= 1024 && limit <= 10_000_000 {
+                            return Some(limit);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+fn is_context_length_error(error_msg: &str) -> bool {
+    let error_lower = error_msg.to_lowercase();
+    error_lower.contains("context") && (
+        error_lower.contains("exceed") ||
+        error_lower.contains("too long") ||
+        error_lower.contains("too large") ||
+        error_lower.contains("overflow") ||
+        error_lower.contains("limit")
+    )
+}
+
+fn update_model_context_window(provider_name: &str, model_id: &str, new_limit: usize) -> Result<(), String> {
+    use crate::settings::{load_settings_file, save_settings_file};
+    use crate::translation::provider::AiProvider;
+
+    let mut settings = load_settings_file();
+    let mut providers: Vec<AiProvider> = serde_json::from_str(&settings.translate_ai_providers)
+        .map_err(|e| format!("Failed to parse translation providers: {}", e))?;
+
+    if let Some(provider) = providers.iter_mut().find(|p| p.name == provider_name) {
+        if let Some(model) = provider.models.iter_mut().find(|m| m.id == model_id) {
+            model.context_window = new_limit;
+            settings.translate_ai_providers = serde_json::to_string(&providers)
+                .map_err(|e| format!("Failed to serialize providers: {}", e))?;
+            save_settings_file(&settings)?;
+        }
+    }
+    Ok(())
 }

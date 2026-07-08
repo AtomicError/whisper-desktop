@@ -3244,10 +3244,12 @@ window.fetchActiveProviderModels = async function() {
     const currentActive = settingsState.translateAiModel;
     
     modelsList.forEach((m, idx) => {
-      const idLower = m.toLowerCase();
+      const modelId = (m && typeof m === 'object') ? m.id : m;
+      const modelCtx = (m && typeof m === 'object') ? (m.contextWindow || 200000) : 200000;
+      const idLower = modelId.toLowerCase();
       let reasoning = (idLower.includes('reasoning') || idLower.includes('o1') || idLower.includes('o3') || idLower.includes('deepseek-r1')) ? 'High' : 'None';
       const makeActive = !currentActive && idx === 0;
-      addManualModelRow(m, 200000, reasoning, makeActive);
+      addManualModelRow(modelId, modelCtx, reasoning, makeActive);
     });
     
     await saveActiveProviderModels(true, false);

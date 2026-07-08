@@ -7,12 +7,19 @@ pub mod translator;
 use crate::settings::WhisperSettings;
 use serde_json::Value;
 
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct FetchedModel {
+    pub id: String,
+    pub context_window: Option<usize>,
+}
+
 #[tauri::command]
 pub async fn fetch_provider_models(
     base_url: String,
     api_key: String,
     api_format: String,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<FetchedModel>, String> {
     let client = reqwest::Client::new();
     
     // Construct models endpoint URL based on base_url and format
@@ -74,14 +81,24 @@ pub async fn fetch_provider_models(
         // OpenAI format: { "data": [ { "id": "gpt-4o" }, ... ] }
         for item in arr {
             if let Some(id) = item.get("id").and_then(|v| v.as_str()) {
-                models.push(id.to_string());
+                let context_window = item.get("max_model_len")
+                    .or_else(|| item.get("context_length"))
+                    .or_else(|| item.get("max_tokens"))
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize);
+                models.push(FetchedModel { id: id.to_string(), context_window });
             }
         }
     } else if let Some(arr) = json.as_array() {
         // Direct array response
         for item in arr {
             if let Some(id) = item.get("id").and_then(|v| v.as_str()) {
-                models.push(id.to_string());
+                let context_window = item.get("max_model_len")
+                    .or_else(|| item.get("context_length"))
+                    .or_else(|| item.get("max_tokens"))
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize);
+                models.push(FetchedModel { id: id.to_string(), context_window });
             }
         }
     } else if let Some(arr) = json.get("models").and_then(|v| v.as_array()) {
@@ -90,7 +107,22 @@ pub async fn fetch_provider_models(
             if let Some(name) = item.get("name").and_then(|v| v.as_str()) {
                 // Strip models/ prefix if present
                 let clean_name = name.strip_prefix("models/").unwrap_or(name);
-                models.push(clean_name.to_string());
+                let context_window = item.get("max_model_len")
+                    .or_else(|| item.get("context_length"))
+                    .or_else(|| item.get("max_tokens"))
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize)
+                    .or_else(|| {
+                        let n_lower = clean_name.to_lowercase();
+                        if n_lower.contains("gemini-1.5") || n_lower.contains("gemini-2.0") {
+                            Some(1_000_000)
+                        } else if n_lower.contains("gemini-1.0") {
+                            Some(32_768)
+                        } else {
+                            None
+                        }
+                    });
+                models.push(FetchedModel { id: clean_name.to_string(), context_window });
             }
         }
     }
@@ -98,15 +130,15 @@ pub async fn fetch_provider_models(
     if models.is_empty() {
         // Anthropic fallback since it doesn't support public listing in some configurations
         if api_format == "Anthropic messages" {
-            models.push("claude-3-5-sonnet-latest".to_string());
-            models.push("claude-3-5-haiku-latest".to_string());
-            models.push("claude-3-opus-latest".to_string());
+            models.push(FetchedModel { id: "claude-3-5-sonnet-latest".to_string(), context_window: Some(200_000) });
+            models.push(FetchedModel { id: "claude-3-5-haiku-latest".to_string(), context_window: Some(200_000) });
+            models.push(FetchedModel { id: "claude-3-opus-latest".to_string(), context_window: Some(200_000) });
         } else {
             return Err("No models found in the API response.".to_string());
         }
     }
     
-    models.sort();
+    models.sort_by(|a, b| a.id.cmp(&b.id));
     Ok(models)
 }
 
