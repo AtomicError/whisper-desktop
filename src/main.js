@@ -2840,8 +2840,10 @@ window.onProviderChanged = function(keepCurrentTab = false, skipTableRender = fa
     if (bannerEl && bannerVal) {
       if (settingsState.translateAiModel) {
         bannerVal.innerHTML = `
-          <span class="active-model-chip">${escapeHTML(settingsState.translateAiModel)}</span>
-          <span class="active-provider-badge">${escapeHTML(providerName)}</span>
+          <div class="active-model-chip-group">
+            <span class="active-model-chip-provider">${escapeHTML(providerName)}</span>
+            <span class="active-model-chip-model">${escapeHTML(settingsState.translateAiModel)}</span>
+          </div>
         `;
         bannerEl.style.display = 'flex';
       } else {
@@ -2955,7 +2957,7 @@ window.switchProviderTab = function(tab) {
     const search = document.getElementById('mgr-models-search');
     if (search) search.value = '';
     if (typeof filterModelsStatus === 'function') {
-      filterModelsStatus('all');
+      filterModelsStatus('all', 450);
     }
   }
   
@@ -3123,26 +3125,28 @@ window.renderModelsRegistryTable = function(provider) {
   });
 };
 
-window.addManualModelRow = function(modelId = "", contextWindow = 200000, reasoning = "None", isActive = false) {
+window.addManualModelRow = function(modelId = "", contextWindow = 200000, reasoning = "None", isActive = false, focus = false) {
   const tbody = document.getElementById('mgr-models-tbody');
   if (!tbody) return;
   
   const tr = document.createElement('tr');
   tr.style.borderBottom = '1px solid rgba(255, 255, 255, 0.04)';
+  tr.dataset.modelId = modelId.toLowerCase();
+  tr.dataset.reasoning = reasoning;
   if (isActive) {
     tr.classList.add('active-model-row');
   }
   
   tr.innerHTML = `
-    <td style="width: 15%; text-align: center; padding: 8px;">
+    <td style="width: 15%; text-align: center;">
       <label class="radio-container">
         <input type="radio" name="mgr-active-model" class="model-active-radio" ${isActive ? 'checked' : ''} />
         <span class="custom-radio"></span>
       </label>
     </td>
-    <td style="width: 40%; padding: 8px;"><input type="text" class="model-row-input model-id-input" value="${escapeHTML(modelId)}" placeholder="e.g. gpt-4o-mini" /></td>
-    <td style="width: 20%; padding: 8px;"><input type="text" inputmode="numeric" class="model-row-input model-ctx-input" value="${contextWindow}" /></td>
-    <td style="width: 15%; padding: 8px;">
+    <td style="width: 40%;"><input type="text" class="model-row-input model-id-input" value="${escapeHTML(modelId)}" placeholder="e.g. gpt-4o-mini" /></td>
+    <td style="width: 20%;"><input type="text" inputmode="numeric" class="model-row-input model-ctx-input" value="${contextWindow}" /></td>
+    <td style="width: 15%;">
       <select class="select-control model-reasoning-select">
         <option value="None" ${reasoning === 'None' ? 'selected' : ''}>None</option>
         <option value="Low" ${reasoning === 'Low' ? 'selected' : ''}>Low</option>
@@ -3150,8 +3154,8 @@ window.addManualModelRow = function(modelId = "", contextWindow = 200000, reason
         <option value="High" ${reasoning === 'High' ? 'selected' : ''}>High</option>
       </select>
     </td>
-    <td style="width: 10%; text-align: center; padding: 8px;">
-      <button class="btn-trash" title="Remove Model Row">
+    <td style="width: 10%; text-align: center;">
+      <button class="model-btn-trash" title="Remove Model Row">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
           <line x1="18" y1="6" x2="6" y2="18"/>
           <line x1="6" y1="6" x2="18" y2="18"/>
@@ -3159,19 +3163,36 @@ window.addManualModelRow = function(modelId = "", contextWindow = 200000, reason
       </button>
     </td>
   `;
-  tbody.appendChild(tr);
+  if (focus) {
+    tbody.insertBefore(tr, tbody.firstChild);
+  } else {
+    tbody.appendChild(tr);
+  }
 
   const idInput = tr.querySelector('.model-id-input');
   const ctxInput = tr.querySelector('.model-ctx-input');
   const reasoningSelect = tr.querySelector('.model-reasoning-select');
   const activeRadio = tr.querySelector('.model-active-radio');
-  const trashBtn = tr.querySelector('.btn-trash');
+  const trashBtn = tr.querySelector('.model-btn-trash');
   
   const triggerAutoSave = () => {
     saveActiveProviderModels(true, true);
   };
   
-  idInput.addEventListener('change', triggerAutoSave);
+  const updateReasoningStyle = () => {
+    if (reasoningSelect.value === 'None') {
+      reasoningSelect.classList.add('reasoning-none');
+      reasoningSelect.classList.remove('reasoning-active');
+    } else {
+      reasoningSelect.classList.remove('reasoning-none');
+      reasoningSelect.classList.add('reasoning-active');
+    }
+  };
+  
+  idInput.addEventListener('change', () => {
+    tr.dataset.modelId = idInput.value.toLowerCase();
+    triggerAutoSave();
+  });
   
   ctxInput.addEventListener('input', () => {
     let cleanVal = toEnglishDigits(ctxInput.value).replace(/[^0-9]/g, '');
@@ -3179,7 +3200,13 @@ window.addManualModelRow = function(modelId = "", contextWindow = 200000, reason
   });
   ctxInput.addEventListener('change', triggerAutoSave);
   
-  reasoningSelect.addEventListener('change', triggerAutoSave);
+  reasoningSelect.addEventListener('change', () => {
+    tr.dataset.reasoning = reasoningSelect.value;
+    updateReasoningStyle();
+    triggerAutoSave();
+  });
+  
+  updateReasoningStyle();
   
   activeRadio.addEventListener('change', () => {
     const siblingRows = tbody.querySelectorAll('tr');
@@ -3200,6 +3227,14 @@ window.addManualModelRow = function(modelId = "", contextWindow = 200000, reason
     tr.remove();
     triggerAutoSave();
   });
+
+  if (focus) {
+    setTimeout(() => {
+      if (idInput) {
+        idInput.focus({ preventScroll: true });
+      }
+    }, 50);
+  }
 };
 
 window.fetchActiveProviderModels = async function() {
@@ -3325,8 +3360,10 @@ window.saveActiveProviderModels = async function(keepCurrentTab = false, skipTab
   if (bannerEl && bannerVal) {
     if (activeModelId) {
       bannerVal.innerHTML = `
-        <span class="active-model-chip">${escapeHTML(activeModelId)}</span>
-        <span class="active-provider-badge">${escapeHTML(providerName)}</span>
+        <div class="active-model-chip-group">
+          <span class="active-model-chip-provider">${escapeHTML(providerName)}</span>
+          <span class="active-model-chip-model">${escapeHTML(activeModelId)}</span>
+        </div>
       `;
       bannerEl.style.display = 'flex';
     } else {
@@ -3345,7 +3382,7 @@ window.saveActiveProviderModels = async function(keepCurrentTab = false, skipTab
 let currentModelStatusFilter = 'all';
 let filterTimeout;
 
-window.filterModelsTable = function() {
+window.filterModelsTable = function(delay = 150) {
   clearTimeout(filterTimeout);
   filterTimeout = setTimeout(() => {
     const query = document.getElementById('mgr-models-search').value.toLowerCase();
@@ -3358,14 +3395,10 @@ window.filterModelsTable = function() {
         return;
       }
       
-      const idInput = row.querySelector('.model-id-input');
-      if (!idInput) return;
-      
-      const modelId = idInput.value.toLowerCase();
+      const modelId = row.dataset.modelId || '';
       const isFree = modelId.includes('free');
-      
-      const reasoningSelect = row.querySelector('.model-reasoning-select');
-      const hasReasoning = reasoningSelect && reasoningSelect.value !== 'None';
+      const reasoning = row.dataset.reasoning || 'None';
+      const hasReasoning = reasoning !== 'None';
       
       const matchQuery = modelId.includes(query);
       let matchStatus = true;
@@ -3382,10 +3415,10 @@ window.filterModelsTable = function() {
         row.style.display = 'none';
       }
     });
-  }, 150);
+  }, delay);
 };
 
-window.filterModelsStatus = function(status) {
+window.filterModelsStatus = function(status, delay = 150) {
   currentModelStatusFilter = status;
   
   const filters = ['all', 'free', 'reasoning'];
@@ -3405,7 +3438,7 @@ window.filterModelsStatus = function(status) {
     container.scrollTop = 0;
   }
   
-  filterModelsTable();
+  filterModelsTable(delay);
 };
 
 window.openAddProviderModal = function() {
@@ -3514,6 +3547,13 @@ window.setupTranslationEventListeners = function() {
   if (formatSelect) formatSelect.addEventListener('change', triggerAutoSave);
   if (keyInput) keyInput.addEventListener('change', triggerAutoSave);
   if (promptTextarea) promptTextarea.addEventListener('change', triggerAutoSave);
+
+  const addCustomModelBtn = document.getElementById('mgr-btn-add-custom-model');
+  if (addCustomModelBtn) {
+    addCustomModelBtn.addEventListener('click', () => {
+      window.addManualModelRow("", 200000, "None", false, true);
+    });
+  }
 };
 
 window.closeTestModal = function() {

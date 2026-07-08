@@ -340,7 +340,7 @@ header {
 
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  to { opacity: 1; transform: none; }
 }
 
 .glass-card {
@@ -2141,7 +2141,7 @@ select.select-control {
 }
 
 .providers-table th {
-  padding: 10px 12px;
+  padding: 8px 12px !important;
   background: #0e111f;
   color: var(--color-text-muted);
   font-weight: 600;
@@ -2153,14 +2153,18 @@ select.select-control {
 }
 
 .providers-table td {
-  padding: 10px 12px;
+  padding: 8px 12px !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.03);
   color: var(--color-text);
   vertical-align: middle;
 }
 
-.providers-table tr:hover {
-  background: rgba(255, 255, 255, 0.02);
+.providers-table tbody tr {
+  transition: background-color 0.2s ease;
+}
+
+.providers-table tbody tr:hover {
+  background: rgba(45, 127, 255, 0.02) !important;
 }
 
 .provider-action-btn {
@@ -2871,30 +2875,37 @@ select.select-control {
   gap: 8px;
 }
 
-.active-model-chip {
+.active-model-chip-group {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 2px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.active-model-chip-provider {
+  color: var(--color-text-muted);
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 4px 8px 4px 12px;
+  letter-spacing: 0.02em;
+}
+
+.active-model-chip-model {
   color: #ffffff;
   font-family: var(--font-mono);
   font-weight: 700;
-  background: rgba(45, 127, 255, 0.12);
-  border: 1px solid rgba(45, 127, 255, 0.25);
-  box-shadow: 0 0 10px rgba(45, 127, 255, 0.1);
-  padding: 4px 10px;
+  font-size: 0.78rem;
+  background: rgba(45, 127, 255, 0.15);
+  border: 1px solid rgba(45, 127, 255, 0.28);
+  padding: 4px 12px;
   border-radius: 6px;
+  box-shadow: 0 0 10px rgba(45, 127, 255, 0.15);
   letter-spacing: 0.02em;
-  font-size: 0.82rem;
-}
-
-.active-provider-badge {
-  color: var(--color-text-muted);
-  font-family: var(--font-sans);
-  font-weight: 500;
-  font-size: 0.75rem;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  padding: 3px 8px;
-  border-radius: 5px;
-  display: inline-flex;
-  align-items: center;
 }
 
 /* Eye Icon Sizes */
@@ -2917,8 +2928,8 @@ select.select-control {
   }
   100% {
     opacity: 1;
-    transform: scale(1) translateY(0);
-    filter: blur(0);
+    transform: none;
+    filter: none;
   }
 }
 
@@ -2938,23 +2949,102 @@ select.select-control {
   padding-right: 36px !important;
 }
 
-/* Unify Input Heights, Paddings, and Roundness in Models Catalog Rows */
-.providers-table .model-row-input,
-.providers-table .model-reasoning-select {
-  height: 32px !important;
-  padding: 5px 8px !important;
-  border-radius: 6px !important;
-  font-size: 0.82rem !important;
-  background-color: var(--bg-input) !important;
-  border: 1px solid var(--border-glass) !important;
-  color: #ffffff !important;
+/* Modern Plain Text Inputs with Inline Editing (Hover/Focus reveal border) */
+.providers-table .model-row-input {
+  height: 28px !important;
+  padding: 4px 6px !important;
+  border-radius: 4px !important;
+  font-size: 0.83rem !important;
+  background-color: transparent !important;
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
   box-sizing: border-box !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
-.providers-table select.model-reasoning-select {
-  padding-right: 28px !important;
+.providers-table .model-row-input:hover,
+.providers-table .model-row-input:focus {
+  background-color: var(--bg-input) !important;
+  border: 1px solid var(--border-glass) !important;
+  box-shadow: 0 0 8px rgba(45, 127, 255, 0.15) !important;
+}
+
+/* Typography Hierarchy (Model ID: bright/bold, Context Window: muted/mono) */
+.providers-table .model-id-input {
+  color: #ffffff !important;
+  font-weight: 500 !important;
+}
+
+.providers-table .model-ctx-input {
+  color: rgba(255, 255, 255, 0.45) !important;
+  font-family: var(--font-mono) !important;
+  font-size: 0.8rem !important;
+}
+
+/* Reasoning Dropdown: borderless, faded default, dynamic coloring */
+.providers-table .model-reasoning-select {
+  height: 28px !important;
+  padding: 4px 18px 4px 4px !important;
+  border-radius: 4px !important;
+  font-size: 0.82rem !important;
+  background-color: transparent !important;
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
+  box-sizing: border-box !important;
+  transition: all 0.2s ease !important;
+  cursor: pointer !important;
+  background-repeat: no-repeat !important;
+  background-position: right 4px center !important;
+  background-size: 10px !important;
+}
+
+.providers-table select.model-reasoning-select.reasoning-none {
+  color: rgba(255, 255, 255, 0.35) !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23ffffff' stroke-opacity='0.35' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5'/%3E%3C/svg%3E") !important;
+}
+
+.providers-table select.model-reasoning-select.reasoning-active {
+  color: var(--color-cyan) !important;
+  font-weight: 600 !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2300f0ff' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5'/%3E%3C/svg%3E") !important;
+}
+
+.providers-table .model-reasoning-select:hover,
+.providers-table .model-reasoning-select:focus {
+  background-color: var(--bg-input) !important;
+  border: 1px solid var(--border-glass) !important;
+  padding: 4px 24px 4px 8px !important;
   background-position: right 8px center !important;
-  background-size: 12px !important;
+}
+
+/* Modern Delete Actions: muted gray in resting state, bright red on row hover */
+.model-btn-trash {
+  background: transparent;
+  border: 1px solid transparent;
+  color: rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.providers-table tr:hover .model-btn-trash {
+  color: rgba(239, 68, 68, 0.5);
+}
+
+.model-btn-trash:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+
+.active-model-row {
+  background-color: rgba(45, 127, 255, 0.04) !important;
 }
 
 
