@@ -315,6 +315,171 @@ function recommendCompilationBackend() {
   }
 }
 
+// ----------------- Custom Dropdown Component -----------------
+window.customSelectsMap = new Map();
+
+class CustomSelect {
+  constructor(selectElement) {
+    this.select = selectElement;
+    this.container = null;
+    this.trigger = null;
+    this.optionsContainer = null;
+    this.isOpen = false;
+    this.init();
+  }
+
+  init() {
+    this.select.style.display = 'none';
+
+    this.container = document.createElement('div');
+    this.container.className = 'custom-select-container';
+    
+    if (this.select.className) {
+      this.container.classList.add(...this.select.className.split(' ').filter(c => c !== 'select-control'));
+    }
+    if (this.select.id) {
+      this.container.id = `custom-select-${this.select.id}`;
+    }
+    
+    this.container.style.width = this.select.style.width || '100%';
+    this.container.style.height = this.select.style.height || 'auto';
+    this.container.style.margin = this.select.style.margin || '0';
+
+    this.trigger = document.createElement('div');
+    this.trigger.className = 'custom-select-trigger';
+    this.trigger.innerHTML = `
+      <span class="custom-select-value"></span>
+      <svg class="custom-select-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 12 15 18 9"></polyline>
+      </svg>
+    `;
+    this.container.appendChild(this.trigger);
+
+    this.optionsContainer = document.createElement('div');
+    this.optionsContainer.className = 'custom-select-options';
+    this.container.appendChild(this.optionsContainer);
+
+    this.select.parentNode.insertBefore(this.container, this.select.nextSibling);
+
+    this.trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggle();
+    });
+
+    document.addEventListener('click', (e) => {
+      if (this.isOpen && !this.container.contains(e.target)) {
+        this.close();
+      }
+    });
+
+    this.updateOptions();
+
+    this.select.addEventListener('change', () => {
+      this.syncSelectedValue();
+    });
+
+    this.observer = new MutationObserver(() => {
+      this.updateOptions();
+    });
+    this.observer.observe(this.select, { childList: true, attributes: true, subtree: true });
+
+    // Register this instance globally for sync
+    window.customSelectsMap.set(this.select.id || this.select, this);
+  }
+
+  updateOptions() {
+    this.optionsContainer.innerHTML = '';
+    const options = Array.from(this.select.options);
+
+    options.forEach(opt => {
+      const optDiv = document.createElement('div');
+      optDiv.className = 'custom-select-option';
+      optDiv.textContent = opt.textContent;
+      optDiv.dataset.value = opt.value;
+
+      optDiv.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.select.value = opt.value;
+        this.select.dispatchEvent(new Event('change'));
+        this.close();
+      });
+
+      this.optionsContainer.appendChild(optDiv);
+    });
+
+    this.syncSelectedValue();
+  }
+
+  syncSelectedValue() {
+    const selectedOpt = this.select.options[this.select.selectedIndex];
+    const valText = selectedOpt ? selectedOpt.textContent : (this.select.placeholder || 'Select...');
+    this.trigger.querySelector('.custom-select-value').textContent = valText;
+
+    Array.from(this.optionsContainer.children).forEach(child => {
+      if (child.dataset.value === this.select.value) {
+        child.classList.add('selected');
+      } else {
+        child.classList.remove('selected');
+      }
+    });
+  }
+
+  toggle() {
+    if (this.isOpen) {
+      this.close();
+    } else {
+      this.open();
+    }
+  }
+
+  open() {
+    document.querySelectorAll('.custom-select-container').forEach(c => {
+      if (c !== this.container) {
+        c.classList.remove('open');
+        c.closest('.setting-card, .wizard-step')?.classList.remove('has-active-dropdown');
+      }
+    });
+
+    // Check if we should open upward
+    const rect = this.trigger.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const dropdownHeight = 250;
+    
+    if (spaceBelow < dropdownHeight && rect.top > dropdownHeight) {
+      this.container.classList.add('open-upward');
+    } else {
+      this.container.classList.remove('open-upward');
+    }
+
+    this.container.classList.add('open');
+    this.container.closest('.setting-card, .wizard-step')?.classList.add('has-active-dropdown');
+    this.isOpen = true;
+  }
+
+  close() {
+    this.container.classList.remove('open');
+    this.container.closest('.setting-card, .wizard-step')?.classList.remove('has-active-dropdown');
+    this.isOpen = false;
+  }
+}
+
+window.initializeCustomSelects = function() {
+  document.querySelectorAll('select.select-control, select#batch-sort-select').forEach(select => {
+    if (!select.dataset.customSelectInitialized) {
+      new CustomSelect(select);
+      select.dataset.customSelectInitialized = 'true';
+    }
+  });
+};
+
+window.syncCustomSelects = function() {
+  if (window.customSelectsMap) {
+    window.customSelectsMap.forEach(cs => {
+      cs.syncSelectedValue();
+    });
+  }
+};
+
 // Initialize App
 async function initApp() {
   console.log("Whisper Manager Desktop UI Initialized!");
@@ -329,6 +494,9 @@ async function initApp() {
   
   // Setup custom CSD titlebar controls
   setupTitlebar();
+  
+  // Initialize Custom Select components
+  initializeCustomSelects();
   
   // Start HUD polling
   startHudPoll();
@@ -888,6 +1056,11 @@ function bindSettingsToDOM() {
   
   // Update build selection card highlight based on settings backend
   selectBackend(settingsState.selectedBackend, true);
+  
+  // Sync custom dropdown views
+  if (window.syncCustomSelects) {
+    window.syncCustomSelects();
+  }
 }
 
 async function saveCurrentSettings() {
@@ -999,6 +1172,11 @@ async function scanAndPopulateModels() {
       settingsState.vadModel = vadSelect.value;
       saveCurrentSettings();
     };
+    
+    // Sync custom dropdown views
+    if (window.syncCustomSelects) {
+      window.syncCustomSelects();
+    }
   } catch (e) {
     console.error("Failed to scan models directory:", e);
   }
@@ -2504,3 +2682,4 @@ window.copyTranscriptToClipboard = async function() {
     showNotification("Failed to copy transcript: " + err, "error");
   }
 };
+
