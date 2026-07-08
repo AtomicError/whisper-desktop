@@ -330,7 +330,7 @@
           </div>
 
           <!-- 3. SETTINGS CONFIGURATION PANEL -->
-          <div class="view-panel" id="panel-settings">
+          <div class="view-panel fixed-layout-panel" id="panel-settings">
             <div class="presets-container">
               <div>
                 <h3 style="font-size:1.2rem; margin-bottom:4px;">Whisper Engine Configuration</h3>
@@ -1000,7 +1000,7 @@
           </div>
 
           <!-- 3.5. MODEL MANAGER PANEL -->
-          <div class="view-panel" id="panel-models">
+          <div class="view-panel fixed-layout-panel" id="panel-models">
             <div class="glass-card" style="margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
               <div>
                 <h3 style="font-size: 1.25rem; margin-bottom: 4px;">GGML Model Registry Console</h3>
@@ -1047,14 +1047,14 @@
                 </div>
               </div>
 
-              <div class="settings-scroll-container" id="models-list-scroll" style="display: flex; flex-direction: column; gap: 16px; flex-grow: 1; overflow-y: auto;">
+              <div class="settings-scroll-container" id="models-list-scroll" style="display: flex; flex-direction: column; gap: 16px; flex-grow: 1; min-height: 0; height: 100%; overflow-y: auto;">
                 <!-- Dynamically populated model rows -->
               </div>
             </div>
           </div>
 
           <!-- 4. TRANSCRIBE FILE PANEL -->
-          <div class="view-panel" id="panel-transcribe">
+          <div class="view-panel fixed-layout-panel" id="panel-transcribe">
             <div class="transcribe-layout">
               
               <div class="transcribe-left-panel">
@@ -1234,7 +1234,7 @@
               </div>
 
               <!-- Cyber-Neon Progress & Telemetry HUD (Right Panel wrapper) -->
-              <div class="transcribe-right-panel" style="display: flex; flex-direction: column; gap: 20px;">
+              <div class="transcribe-right-panel">
                 <div class="glass-card radial-progress-card telemetry-hud" style="margin-bottom: 0;">
                   <h3 style="font-weight:600; text-align:center; font-size:1.1rem; margin-bottom:16px; border-bottom:1px solid var(--border-glass); padding-bottom:12px;">Live Extraction Status</h3>
                   
@@ -1279,7 +1279,7 @@
                 </div>
 
                 <!-- Live Transcript Viewer -->
-                <div class="glass-card transcript-viewer-card" style="display: flex; flex-direction: column; flex-grow: 1; min-height: 350px; padding: 20px; gap: 12px; overflow: hidden;">
+                <div class="glass-card transcript-viewer-card" style="display: flex; flex-direction: column; flex-grow: 1; min-height: 0; padding: 20px; gap: 12px; overflow: hidden;">
                   <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: 10px;">
                     <h3 style="font-weight: 600; font-size: 1rem; margin: 0;">Live Transcript Viewer</h3>
                     <button class="btn-secondary" id="btn-copy-transcript" onclick="copyTranscriptToClipboard()" style="padding: 4px 10px; font-size: 0.75rem; margin: 0;">Copy</button>
@@ -1290,7 +1290,7 @@
                   </div>
                   
                   <!-- Real-time transcript display box -->
-                  <div class="transcript-viewport" id="transcript-viewport" style="flex-grow: 1; overflow-y: auto; font-family: var(--font-sans); font-size: 0.85rem; line-height: 1.6; padding: 12px; border-radius: 8px; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255,255,255,0.03); min-height: 200px; max-height: 400px; user-select: text;">
+                  <div class="transcript-viewport" id="transcript-viewport" style="flex-grow: 1; min-height: 0; overflow-y: auto; font-family: var(--font-sans); font-size: 0.85rem; line-height: 1.6; padding: 12px; border-radius: 8px; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255,255,255,0.03); user-select: text;">
                     <div style="color: var(--color-text-dim); text-align: center; margin-top: 40px;" id="transcript-placeholder">
                       Start transcription to stream live text preview.
                     </div>
@@ -1301,7 +1301,7 @@
           </div>
 
           <!-- 5. ACTIVITY LOG PANEL -->
-          <div class="view-panel" id="panel-logs">
+          <div class="view-panel fixed-layout-panel" id="panel-logs">
             <div class="logs-layout">
               <div class="logs-controls">
                 <div class="log-filters">

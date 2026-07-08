@@ -62,11 +62,15 @@ html {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(45, 127, 255, 0.35);
+  box-shadow: 0 0 4px rgba(45, 127, 255, 0.2);
+}
+::-webkit-scrollbar-thumb:active {
+  background: rgba(45, 127, 255, 0.55);
 }
 html, body {
   border-radius: 12px;
@@ -338,6 +342,19 @@ header {
 
 .view-panel.active {
   display: block;
+}
+
+/* Fixed Layout Panel Utility (No outer scrollbar, uses internal scrolling) */
+.view-panel.fixed-layout-panel {
+  overflow: hidden;
+  display: none;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.view-panel.fixed-layout-panel.active {
+  display: flex;
 }
 
 @keyframes fadeIn {
@@ -711,14 +728,18 @@ header {
   display: grid;
   grid-template-columns: 200px 1fr;
   gap: 32px;
+  flex-grow: 1;
+  min-height: 0;
 }
 
 .settings-categories {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  border-right: 1px solid var(--border-glass);
+  overflow-y: auto;
+  height: 100%;
   padding-right: 16px;
+  border-right: 1px solid var(--border-glass);
 }
 
 .settings-cat-btn {
@@ -778,7 +799,7 @@ header {
 }
 
 .settings-scroll-container {
-  max-height: calc(100vh - 240px);
+  height: 100%;
   overflow-y: auto;
   padding-right: 12px;
 }
@@ -980,12 +1001,25 @@ select.select-control {
   display: grid;
   grid-template-columns: 1.2fr 0.8fr; /* Balanced dual-pane layout */
   gap: 24px;
+  flex-grow: 1;
+  min-height: 0;
 }
 
 .transcribe-left-panel {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  height: 100%;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.transcribe-right-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  height: 100%;
+  overflow: hidden;
 }
 
 /* Wizard Accordion Styles */
@@ -1352,7 +1386,8 @@ select.select-control {
 .logs-layout {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 140px);
+  flex-grow: 1;
+  min-height: 0;
   gap: 16px;
 }
 
