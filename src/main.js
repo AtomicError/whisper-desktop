@@ -2320,7 +2320,7 @@ window.loadModelStatusesGrid = async function(isSilent = false) {
             ${badgeHtml ? '<span style="color: rgba(255,255,255,0.1);">|</span>' : ''}
             <span>Expected Size: ${sizeMB} MB</span>
             <span style="color: rgba(255,255,255,0.1);">|</span>
-            <span style="color: ${isQuant ? 'var(--color-cyan)' : 'var(--color-purple)'}; font-weight: 500;">
+            <span style="color: ${isQuant ? 'var(--color-cyan)' : 'var(--color-royal-blue)'}; font-weight: 500;">
               ${isQuant ? 'Quantized Optimized (5-bit/8-bit)' : 'Full Precision (16-bit)'}
             </span>
             ${m.status === 'Downloading' ? `

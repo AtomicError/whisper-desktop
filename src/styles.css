@@ -26,7 +26,7 @@ html {
   --border-glass-active: rgba(45, 127, 255, 0.4);
   
   --color-cyan: #06b6d4;
-  --color-purple: #2d7fff;
+  --color-royal-blue: #2d7fff;
   --color-gold: #f59e0b;
   --color-green: #10b981;
   --color-red: #ef4444;
@@ -35,7 +35,7 @@ html {
   --color-text-dim: #6b7280;
   
   --shadow-neon-cyan: 0 0 15px rgba(6, 182, 212, 0.15);
-  --shadow-neon-purple: 0 0 20px rgba(45, 127, 255, 0.25);
+  --shadow-neon-royal-blue: 0 0 20px rgba(45, 127, 255, 0.25);
   --shadow-neon-gold: 0 0 15px rgba(245, 158, 11, 0.15);
   --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
   
@@ -218,7 +218,7 @@ sidebar {
 .brand-icon {
   width: 32px;
   height: 32px;
-  color: var(--color-purple);
+  color: var(--color-royal-blue);
   filter: drop-shadow(0 0 8px rgba(45, 127, 255, 0.5));
 }
 
@@ -283,7 +283,7 @@ sidebar {
 }
 
 .nav-item.active svg {
-  color: var(--color-purple);
+  color: var(--color-royal-blue);
   filter: drop-shadow(0 0 4px rgba(45, 127, 255, 0.5));
 }
 
@@ -296,7 +296,7 @@ sidebar {
 }
 
 .developer-credit span {
-  color: var(--color-purple);
+  color: var(--color-royal-blue);
   font-weight: 600;
 }
 
@@ -510,7 +510,7 @@ header {
 .shortcut-btn svg {
   width: 20px;
   height: 20px;
-  color: var(--color-purple);
+  color: var(--color-royal-blue);
 }
 
 .shortcut-btn:hover {
@@ -535,7 +535,7 @@ header {
 
 .text-input:focus {
   outline: none;
-  border-color: var(--color-purple);
+  border-color: var(--color-royal-blue);
   box-shadow: 0 0 10px rgba(45, 127, 255, 0.15);
 }
 
@@ -749,7 +749,7 @@ header {
 
 .progress-pct {
   font-weight: 600;
-  color: var(--color-purple);
+  color: var(--color-royal-blue);
 }
 
 .progress-bar-container {
@@ -764,7 +764,7 @@ header {
 .progress-bar-fill {
   height: 100%;
   width: 0%;
-  background: linear-gradient(90deg, var(--color-purple), var(--color-cyan));
+  background: linear-gradient(90deg, var(--color-royal-blue), var(--color-cyan));
   border-radius: 4px;
   transition: width 0.1s linear;
 }
@@ -805,7 +805,7 @@ header {
 
 .settings-cat-btn.active {
   background: rgba(255, 255, 255, 0.04);
-  color: var(--color-purple);
+  color: var(--color-royal-blue);
   font-weight: 600;
 }
 
@@ -910,7 +910,7 @@ header {
 .setting-flag {
   font-family: var(--font-mono);
   font-size: 0.75rem;
-  color: var(--color-purple);
+  color: var(--color-royal-blue);
   background: rgba(45, 127, 255, 0.08);
   padding: 2px 6px;
   border-radius: 4px;
@@ -1057,7 +1057,7 @@ select.select-control {
 
 .select-control:focus {
   outline: none;
-  border-color: var(--color-purple) !important;
+  border-color: var(--color-royal-blue) !important;
   box-shadow: 0 0 8px rgba(45, 127, 255, 0.25) !important;
 }
 
@@ -1224,7 +1224,7 @@ select.select-control {
 }
 
 .media-drop-zone:hover {
-  border-color: var(--color-purple);
+  border-color: var(--color-royal-blue);
   background: rgba(45, 127, 255, 0.01);
 }
 
@@ -1277,7 +1277,7 @@ select.select-control {
 
 .step-details-row span {
   font-family: var(--font-mono);
-  color: var(--color-purple);
+  color: var(--color-royal-blue);
 }
 
 /* Compact Telemetry HUD (Right Panel) */
@@ -1342,7 +1342,7 @@ select.select-control {
 .progress-linear-fill {
   height: 100%;
   width: 0%;
-  background: linear-gradient(90deg, var(--color-purple) 0%, var(--color-cyan) 100%);
+  background: linear-gradient(90deg, var(--color-royal-blue) 0%, var(--color-cyan) 100%);
   border-radius: 6px;
   position: relative;
   transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1580,7 +1580,7 @@ select.select-control {
   width: 100px;
 }
 
-.log-line .log-cat.build { background: rgba(45, 127, 255, 0.1); color: var(--color-purple); }
+.log-line .log-cat.build { background: rgba(45, 127, 255, 0.1); color: var(--color-royal-blue); }
 .log-line .log-cat.ffmpeg { background: rgba(6, 182, 212, 0.1); color: var(--color-cyan); }
 .log-line .log-cat.whisper { background: rgba(245, 158, 11, 0.1); color: var(--color-gold); }
 
@@ -1611,7 +1611,7 @@ select.select-control {
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--border-glass-active);
-  box-shadow: var(--shadow-neon-purple), 0 10px 32px rgba(0, 0, 0, 0.6);
+  box-shadow: var(--shadow-neon-royal-blue), 0 10px 32px rgba(0, 0, 0, 0.6);
   border-radius: 12px;
   padding: 14px 24px;
   color: #fff;
@@ -1638,7 +1638,7 @@ select.select-control {
 .toast-icon {
   width: 22px;
   height: 22px;
-  color: var(--color-purple);
+  color: var(--color-royal-blue);
   filter: drop-shadow(0 0 4px rgba(45, 127, 255, 0.5));
   flex-shrink: 0;
 }
@@ -1669,7 +1669,7 @@ select.select-control {
 }
 
 .toast-info .toast-icon {
-  color: var(--color-purple);
+  color: var(--color-royal-blue);
   filter: drop-shadow(0 0 4px rgba(45, 127, 255, 0.5));
 }
 
@@ -2012,13 +2012,13 @@ select.select-control {
 }
 
 .backend-card.active .backend-checkbox {
-  border-color: var(--color-purple);
+  border-color: var(--color-royal-blue);
   box-shadow: 0 0 8px rgba(45, 127, 255, 0.3);
 }
 
 .backend-checkbox:checked {
-  background: var(--color-purple) !important;
-  border-color: var(--color-purple) !important;
+  background: var(--color-royal-blue) !important;
+  border-color: var(--color-royal-blue) !important;
   box-shadow: 0 0 10px rgba(45, 127, 255, 0.6) !important;
 }
 
