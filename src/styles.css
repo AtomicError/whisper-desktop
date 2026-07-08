@@ -460,6 +460,8 @@ header {
 }
 
 .glass-card {
+  position: relative;
+  overflow: hidden;
   background: var(--bg-card);
   backdrop-filter: blur(16px);
   border: 1px solid var(--border-glass);
@@ -472,8 +474,7 @@ header {
 .glass-card:hover {
   background: var(--bg-card-hover);
   border-color: rgba(255, 255, 255, 0.09);
-  transform: translateY(-2px);
-  box-shadow: 
+  box-shadow:
     inset 0 1px 0 0 rgba(255, 255, 255, 0.05),
     0 12px 40px rgba(0, 0, 0, 0.55),
     0 0 20px rgba(45, 127, 255, 0.04);
@@ -485,7 +486,7 @@ header {
   background: var(--bg-card) !important;
   border-color: rgba(45, 127, 255, 0.15) !important;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.65), 0 0 20px rgba(45, 127, 255, 0.06) !important;
-  transform: translateY(-2px) !important;
+  transform: none !important;
 }
 
 /* 1. Intro View */
@@ -704,7 +705,7 @@ header {
   border-radius: 14px;
   padding: 24px;
   box-shadow: var(--shadow-glass);
-  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1), transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: var(--transition-smooth);
   animation: fadeInSettingCard 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
@@ -716,15 +717,18 @@ header {
 .backend-card:hover {
   background: var(--bg-card-hover);
   border-color: rgba(255, 255, 255, 0.08);
-  transform: translateY(-2px);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.05),
+    0 12px 40px rgba(0, 0, 0, 0.55),
+    0 0 20px rgba(45, 127, 255, 0.04);
+  transform: none;
 }
 
 .backend-card.active {
-  border-color: rgba(45, 127, 255, 0.45);
-  box-shadow: 
+  border-color: rgba(45, 127, 255, 0.4);
+  box-shadow:
     inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
-    0 0 0 1px rgba(45, 127, 255, 0.15), 
-    -6px 0 20px rgba(45, 127, 255, 0.18),
+    0 0 0 1px rgba(45, 127, 255, 0.15),
     0 0 10px rgba(45, 127, 255, 0.08);
   background: linear-gradient(135deg, rgba(45, 127, 255, 0.08) 0%, rgba(45, 127, 255, 0.02) 100%);
 }
@@ -732,10 +736,11 @@ header {
 .backend-card.active:hover {
   background: linear-gradient(135deg, rgba(45, 127, 255, 0.14) 0%, rgba(45, 127, 255, 0.06) 100%);
   border-color: rgba(45, 127, 255, 0.7);
-  box-shadow: 
+  box-shadow:
     inset 0 1px 0 0 rgba(255, 255, 255, 0.12),
-    0 0 0 1px rgba(45, 127, 255, 0.3), 
-    0 0 28px rgba(45, 127, 255, 0.35);
+    0 0 0 1px rgba(45, 127, 255, 0.3),
+    0 0 18px rgba(45, 127, 255, 0.18);
+  transform: none;
 }
 
 .backend-card-header {
@@ -996,35 +1001,26 @@ header {
   animation: fadeInSettingCard 0.35s cubic-bezier(0.4, 0, 0.2, 1) both;
   transition: var(--transition-smooth);
   position: relative;
-  overflow: visible;
-}
-
-.setting-card::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 4px;
-  background: var(--color-royal-blue);
-  box-shadow: 0 0 10px rgba(45, 127, 255, 0.6);
-  border-radius: 10px 0 0 10px;
-  transform: translateX(-4px);
-  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
 }
 
 .setting-card:hover {
   background: var(--bg-card-hover);
   border-color: rgba(255, 255, 255, 0.08);
-  transform: translateY(-2px) scale(1.005);
   box-shadow: 
     inset 0 1px 0 0 rgba(255, 255, 255, 0.05),
-    0 8px 24px rgba(0, 0, 0, 0.35),
-    -4px 0 16px rgba(45, 127, 255, 0.1);
+    0 8px 24px rgba(0, 0, 0, 0.35);
+  transform: none;
 }
 
-.setting-card:hover::before {
-  transform: translateX(0);
+.setting-card .btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.setting-card:has(.setting-control:hover) {
+  background: rgba(255, 255, 255, 0.01);
+  border-color: var(--border-glass);
+  box-shadow: none;
 }
 
 .setting-card:nth-child(1) { animation-delay: 0.02s; }
@@ -1134,8 +1130,18 @@ header {
 }
 
 .switch:hover .slider {
-  border-color: rgba(255, 255, 255, 0.15);
-  background-color: rgba(255, 255, 255, 0.12);
+  border-color: var(--border-glass);
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.setting-control:hover .slider {
+  border-color: var(--border-glass);
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.setting-control:hover input:checked + .slider {
+  background-color: #0057d9;
+  border-color: rgba(45, 127, 255, 0.45);
 }
 
 .switch input:focus + .slider {
@@ -1179,8 +1185,13 @@ input:checked + .slider:before {
 }
 
 .number-input-control button:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: #fff;
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
+.setting-control .custom-select-trigger:hover {
+  background-color: var(--bg-deep);
+  border-color: var(--border-glass);
 }
 
 .number-input-control input {
@@ -1260,6 +1271,7 @@ select.select-control {
 
 /* Wizard Accordion Styles */
 .wizard-step {
+  position: relative;
   background: var(--bg-card);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
@@ -1272,24 +1284,25 @@ select.select-control {
 .wizard-step:hover {
   background: var(--bg-card-hover);
   border-color: rgba(255, 255, 255, 0.08);
+  transform: none;
 }
 
 .wizard-step.active {
-  border-color: rgba(45, 127, 255, 0.45);
-  box-shadow: 
+  border-color: rgba(45, 127, 255, 0.4);
+  box-shadow:
     inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
     0 8px 24px rgba(0, 0, 0, 0.35),
-    -6px 0 20px rgba(45, 127, 255, 0.15),
     0 0 10px rgba(45, 127, 255, 0.05);
-  overflow: visible !important;
+  overflow: hidden;
 }
 
 .wizard-step.active:hover {
-  border-color: rgba(45, 127, 255, 0.7);
+  border-color: rgba(45, 127, 255, 0.4);
   box-shadow: 
     inset 0 1px 0 0 rgba(255, 255, 255, 0.12),
     0 8px 28px rgba(0, 0, 0, 0.4),
-    0 0 24px rgba(45, 127, 255, 0.35);
+    0 0 18px rgba(45, 127, 255, 0.18);
+  transform: none;
 }
 
 .wizard-step-header {
@@ -1383,9 +1396,9 @@ select.select-control {
 
 /* Metadata & dropzone adjustments */
 .media-drop-zone {
-  border: 2px dashed rgba(255, 255, 255, 0.06);
+  border: 2px dashed rgba(255, 255, 255, 0.1);
   border-radius: 10px;
-  padding: 24px;
+  padding: 32px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1396,7 +1409,7 @@ select.select-control {
 }
 
 .media-drop-zone:hover {
-  border-color: var(--color-royal-blue);
+  border-color: rgba(255, 255, 255, 0.16);
   background: rgba(45, 127, 255, 0.01);
 }
 
@@ -1459,35 +1472,21 @@ select.select-control {
   align-items: stretch;
   padding: 24px !important;
   justify-content: flex-start !important;
-  background: 
-    radial-gradient(circle at 50% 50%, rgba(45, 127, 255, 0.04), transparent 80%),
-    linear-gradient(rgba(255, 255, 255, 0.003) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.003) 1px, transparent 1px),
-    var(--bg-card);
-  background-size: 100% 100%, 20px 20px, 20px 20px;
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
   border: 1px solid var(--border-glass);
   box-shadow: var(--shadow-glass);
   height: fit-content;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
+  transform: none;
 }
 
-/* Sci-fi Scanline Overlay */
-.telemetry-hud::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(
-    rgba(18, 16, 16, 0) 50%, 
-    rgba(0, 0, 0, 0.25) 50%
-  );
-  background-size: 100% 4px;
-  z-index: 1;
-  pointer-events: none;
-  opacity: 0.4;
+.telemetry-hud:hover {
+  background: var(--bg-card);
+  border-color: var(--border-glass);
+  box-shadow: var(--shadow-glass);
+  transform: none;
 }
 
 /* Premium Cyber-Neon Linear Progress HUD */
@@ -2123,6 +2122,8 @@ select.select-control {
 .model-card {
   display: flex;
   flex-direction: column;
+  position: relative;
+  overflow: hidden;
   background: var(--bg-card);
   backdrop-filter: blur(16px);
   border: 1px solid var(--border-glass);
@@ -2136,6 +2137,11 @@ select.select-control {
 .model-card:hover {
   background: var(--bg-card-hover);
   border-color: rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.05),
+    0 12px 40px rgba(0, 0, 0, 0.55),
+    0 0 20px rgba(45, 127, 255, 0.04);
+  transform: none;
 }
 
 .model-card-header {
@@ -2464,6 +2470,10 @@ select.select-control {
   z-index: 99999 !important;
 }
 
+.setting-card.has-active-dropdown {
+  overflow: visible;
+}
+
 /* Discrete Scrollbar inside dropdown */
 .custom-select-options::-webkit-scrollbar-thumb {
   background: transparent !important;
@@ -2541,6 +2551,3 @@ select.select-control {
   transform: translateY(-50%) scaleY(1);
   opacity: 1;
 }
-
-
-
