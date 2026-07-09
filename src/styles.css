@@ -414,6 +414,7 @@ header {
 .hud-item .stat-value {
   font-weight: 600;
   font-family: var(--font-mono);
+  white-space: nowrap;
 }
 
 .hud-item .stat-value.active {
@@ -628,6 +629,7 @@ header {
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  white-space: nowrap;
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -670,6 +672,7 @@ header {
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  white-space: nowrap;
 }
 
 .btn-secondary:hover:not(:disabled) {
@@ -879,6 +882,8 @@ header {
   cursor: pointer;
   transition: all 0.25s ease;
   overflow: hidden;
+  display: inline-flex;
+  align-items: center;
 }
 
 .settings-cat-btn::before {
@@ -945,6 +950,7 @@ header {
   transition: var(--transition-smooth);
   -webkit-appearance: none;
   appearance: none;
+  white-space: nowrap;
 }
 
 .preset-btn:hover:not(.active) {
@@ -1002,6 +1008,7 @@ header {
   transition: var(--transition-smooth);
   position: relative;
   overflow: hidden;
+  flex-shrink: 0 !important;
 }
 
 .setting-card:hover {
@@ -2277,19 +2284,30 @@ select.select-control {
   /* Convert sidebar lists into a horizontal tab-bar flow */
   .settings-categories {
     flex-direction: row !important;
-    flex-wrap: wrap !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
     border-right: none !important;
     border-bottom: 1px solid var(--border-glass) !important;
     padding-right: 0 !important;
-    padding-bottom: 12px !important;
+    padding-bottom: 8px !important;
     gap: 8px !important;
     margin-bottom: 16px !important;
+    -webkit-overflow-scrolling: touch;
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+
+  .settings-categories::-webkit-scrollbar {
+    display: none;
   }
 
   /* Adjust model manager category buttons in tab format */
   .settings-cat-btn {
     padding: 8px 12px !important;
     font-size: 0.85rem !important;
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
   }
 }
 
@@ -2551,3 +2569,196 @@ select.select-control {
   transform: translateY(-50%) scaleY(1);
   opacity: 1;
 }
+
+/* ==========================================================================
+   Responsive Layout & Small Window Sizing Fixes (Tauri Desktop App)
+   ========================================================================== */
+
+/* 1. Sidebar Collapse (Screens <= 800px) */
+/* 1. Sidebar Collapse (Screens <= 960px) */
+@media (max-width: 960px) {
+  sidebar {
+    width: 72px !important;
+    padding: 24px 8px !important;
+  }
+  sidebar .brand {
+    justify-content: center !important;
+    padding-left: 0 !important;
+    margin-bottom: 24px !important;
+  }
+  sidebar .brand-name {
+    display: none !important;
+  }
+  sidebar .nav-item {
+    gap: 0 !important;
+    justify-content: center !important;
+    padding: 12px !important;
+  }
+  sidebar .nav-item span {
+    display: none !important;
+  }
+  sidebar .developer-credit {
+    display: none !important;
+  }
+}
+
+/* 2. Header & Live System Stats HUD Wrap (Screens <= 750px) */
+@media (max-width: 750px) {
+  header {
+    height: auto !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+    padding: 16px 20px !important;
+  }
+  .system-stats-hud {
+    gap: 10px !important;
+    width: 100% !important;
+    justify-content: flex-start !important;
+    flex-wrap: wrap !important;
+  }
+  .hud-item {
+    padding: 4px 10px !important;
+    font-size: 0.8rem !important;
+  }
+}
+
+/* 3. Prevent Flex Shrinking of Headers & Reduce View Padding (Screens <= 960px) */
+.view-panel.fixed-layout-panel .glass-card {
+  flex-shrink: 0 !important;
+}
+.presets-container {
+  flex-shrink: 0 !important;
+}
+@media (max-width: 960px) {
+  .view-panel {
+    padding: 16px !important;
+  }
+}
+
+/* 4. Settings View & Layout (Screens <= 960px) */
+@media (max-width: 960px) {
+  .settings-layout {
+    display: flex !important;
+    flex-direction: column !important;
+    grid-template-columns: none !important;
+    gap: 20px !important;
+  }
+  .settings-categories {
+    height: auto !important;
+    margin-bottom: 0 !important;
+  }
+  .settings-scroll-container {
+    flex-grow: 1 !important;
+    min-height: 0 !important;
+    height: auto !important;
+  }
+}
+
+/* 5. Setting Cards Vertical Flow (Screens <= 600px) */
+@media (max-width: 600px) {
+  .setting-card {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+    padding: 16px !important;
+  }
+  .setting-control {
+    width: 100% !important;
+    justify-content: flex-start !important;
+  }
+  .presets-container {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+  .preset-selector-row {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+}
+
+/* 6. System Build Setup Row Stack (Screens <= 680px) */
+@media (max-width: 680px) {
+  .build-setup-row {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+  }
+  .build-setup-row button {
+    width: 100% !important;
+  }
+}
+
+/* 7. Transcribe Layout Stacking & Scroll (Screens <= 960px) */
+@media (max-width: 960px) {
+  .transcribe-layout {
+    display: flex !important;
+    flex-direction: column !important;
+    grid-template-columns: none !important;
+    gap: 20px !important;
+    overflow-y: auto !important;
+  }
+  .transcribe-left-panel,
+  .transcribe-right-panel {
+    height: auto !important;
+    overflow: visible !important;
+  }
+}
+
+/* 8. Log View controls Wrap & Stacking (Screens <= 768px) */
+@media (max-width: 768px) {
+  .logs-controls {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+    padding: 12px 16px !important;
+  }
+  .log-filters {
+    justify-content: space-between !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+  .log-search-container {
+    width: 100% !important;
+  }
+  .log-search-input {
+    font-size: 0.85rem !important;
+    padding: 8px 12px !important;
+  }
+  .logs-actions {
+    justify-content: space-between !important;
+    width: 100% !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+}
+
+/* 9. Model Registry header adjustments (Screens <= 600px) */
+@media (max-width: 600px) {
+  #panel-models .glass-card {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  #panel-models #model-search {
+    width: 100% !important;
+    margin-top: 8px !important;
+  }
+}
+
+/* 10. Compilation Backend Grid & Card Padding Adjustments (Responsive Flow) */
+@media (max-width: 1100px) and (min-width: 701px) {
+  .backends-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+@media (max-width: 700px) {
+  .backends-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+@media (max-width: 960px) {
+  .backend-card {
+    padding: 16px !important;
+  }
+}
+
