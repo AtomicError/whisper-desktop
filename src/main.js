@@ -315,7 +315,217 @@ function recommendCompilationBackend() {
   }
 }
 
+// ----------------- Custom Dropdown Component -----------------
+window.customSelectsMap = new Map();
+
+class CustomSelect {
+  constructor(selectElement) {
+    this.select = selectElement;
+    this.container = null;
+    this.trigger = null;
+    this.optionsContainer = null;
+    this.isOpen = false;
+    this.init();
+  }
+
+  init() {
+    this.select.style.display = 'none';
+
+    this.container = document.createElement('div');
+    this.container.className = 'custom-select-container';
+    
+    if (this.select.className) {
+      this.container.classList.add(...this.select.className.split(' ').filter(c => c !== 'select-control'));
+    }
+    if (this.select.id) {
+      this.container.id = `custom-select-${this.select.id}`;
+    }
+    
+    this.container.style.width = this.select.style.width || '100%';
+    this.container.style.height = this.select.style.height || 'auto';
+    this.container.style.margin = this.select.style.margin || '0';
+
+    this.trigger = document.createElement('div');
+    this.trigger.className = 'custom-select-trigger';
+    this.trigger.innerHTML = `
+      <span class="custom-select-value"></span>
+      <svg class="custom-select-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 12 15 18 9"></polyline>
+      </svg>
+    `;
+    this.container.appendChild(this.trigger);
+
+    this.optionsContainer = document.createElement('div');
+    this.optionsContainer.className = 'custom-select-options';
+    this.container.appendChild(this.optionsContainer);
+
+    this.select.parentNode.insertBefore(this.container, this.select.nextSibling);
+
+    this.trigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggle();
+    });
+
+    document.addEventListener('click', (e) => {
+      if (this.isOpen && !this.container.contains(e.target)) {
+        this.close();
+      }
+    });
+
+    this.updateOptions();
+
+    this.select.addEventListener('change', () => {
+      this.syncSelectedValue();
+    });
+
+    this.observer = new MutationObserver(() => {
+      this.updateOptions();
+    });
+    this.observer.observe(this.select, { childList: true, attributes: true, subtree: true });
+
+    // Register this instance globally for sync
+    window.customSelectsMap.set(this.select.id || this.select, this);
+  }
+
+  updateOptions() {
+    this.optionsContainer.innerHTML = '';
+    const options = Array.from(this.select.options);
+
+    options.forEach(opt => {
+      const optDiv = document.createElement('div');
+      optDiv.className = 'custom-select-option';
+      optDiv.textContent = opt.textContent;
+      optDiv.dataset.value = opt.value;
+
+      optDiv.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.select.value = opt.value;
+        this.select.dispatchEvent(new Event('change'));
+        this.close();
+      });
+
+      this.optionsContainer.appendChild(optDiv);
+    });
+
+    this.syncSelectedValue();
+  }
+
+  syncSelectedValue() {
+    const selectedOpt = this.select.options[this.select.selectedIndex];
+    const valText = selectedOpt ? selectedOpt.textContent : (this.select.placeholder || 'Select...');
+    this.trigger.querySelector('.custom-select-value').textContent = valText;
+
+    Array.from(this.optionsContainer.children).forEach(child => {
+      if (child.dataset.value === this.select.value) {
+        child.classList.add('selected');
+      } else {
+        child.classList.remove('selected');
+      }
+    });
+  }
+
+  toggle() {
+    if (this.isOpen) {
+      this.close();
+    } else {
+      this.open();
+    }
+  }
+
+  open() {
+    document.querySelectorAll('.custom-select-container').forEach(c => {
+      if (c !== this.container) {
+        c.classList.remove('open');
+        c.closest('.setting-card, .wizard-step')?.classList.remove('has-active-dropdown');
+      }
+    });
+
+    // Check if we should open upward
+    const rect = this.trigger.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const dropdownHeight = 250;
+    
+    if (spaceBelow < dropdownHeight && rect.top > dropdownHeight) {
+      this.container.classList.add('open-upward');
+    } else {
+      this.container.classList.remove('open-upward');
+    }
+
+    this.container.classList.add('open');
+    this.container.closest('.setting-card, .wizard-step')?.classList.add('has-active-dropdown');
+    this.isOpen = true;
+  }
+
+  close() {
+    this.container.classList.remove('open');
+    this.container.closest('.setting-card, .wizard-step')?.classList.remove('has-active-dropdown');
+    this.isOpen = false;
+  }
+}
+
+window.initializeCustomSelects = function() {
+  document.querySelectorAll('select.select-control, select#batch-sort-select').forEach(select => {
+    if (select.style.display === 'none') return; // leave hidden data-binder stubs unwrapped
+    if (!select.dataset.customSelectInitialized) {
+      new CustomSelect(select);
+      select.dataset.customSelectInitialized = 'true';
+    }
+  });
+};
+
+window.syncCustomSelects = function() {
+  if (window.customSelectsMap) {
+    window.customSelectsMap.forEach(cs => {
+      cs.syncSelectedValue();
+    });
+  }
+};
+
 // Initialize App
+// Replay the fade-in animation on the three menu sidebars when the window
+// grows back from the narrow (<960px) responsive layout to the wide desktop
+// layout. CSS animations only run once on appearance, so we re-trigger them
+// here by toggling the .menu-fade-in class with a small per-item stagger.
+let wasNarrowViewport = window.innerWidth < 960;
+
+function setupResponsiveMenuFadeIn() {
+  window.addEventListener('resize', () => {
+    const isNarrowNow = window.innerWidth < 960;
+
+    // Only fire when crossing from narrow -> wide (small window becomes large).
+    // No debounce: we act on the exact crossing so items appear WITH the
+    // animation instead of being visible first and animating a moment later.
+    if (wasNarrowViewport && !isNarrowNow) {
+      replayMenuFadeIn();
+    }
+
+    wasNarrowViewport = isNarrowNow;
+  });
+}
+
+function replayMenuFadeIn() {
+  // Animate each menu independently so the stagger resets per sidebar.
+  const menuGroups = [
+    document.querySelectorAll('.nav-links .nav-item'),
+    document.querySelectorAll('.settings-categories .settings-cat-btn'),
+    document.querySelectorAll('#model-categories-sidebar .settings-cat-btn'),
+  ];
+
+  menuGroups.forEach(items => {
+    items.forEach((item, index) => {
+      // Remove -> force reflow -> re-add in the same frame so the animation
+      // restarts cleanly with no visible flash and no fallback animation.
+      item.classList.remove('menu-fade-in');
+      void item.offsetWidth;
+
+      // Small staggered delay per item, capped so nothing waits too long.
+      const delay = Math.min(index * 0.04, 0.32);
+      item.style.animationDelay = `${delay.toFixed(2)}s`;
+      item.classList.add('menu-fade-in');
+    });
+  });
+}
+
 async function initApp() {
   console.log("Whisper Manager Desktop UI Initialized!");
   
@@ -329,6 +539,9 @@ async function initApp() {
   
   // Setup custom CSD titlebar controls
   setupTitlebar();
+  
+  // Initialize Custom Select components
+  initializeCustomSelects();
   
   // Start HUD polling
   startHudPoll();
@@ -354,6 +567,9 @@ async function initApp() {
   
   // Setup Dashboard drag & drop
   setupDashboardDragAndDrop();
+  
+  // Setup responsive menu fade-in on window re-expand
+  setupResponsiveMenuFadeIn();
   
   // Switch to default intro view
   switchView('intro');
@@ -820,6 +1036,26 @@ window.switchSettingsCategory = function(catName) {
   const targetGroup = document.getElementById(`group-${catName}`);
   if (targetGroup) {
     targetGroup.classList.add('active');
+
+    // Replay the staggered cascade animation for the now-visible cards.
+    // The base .setting-card animation only runs once at load (and is skipped
+    // for cards inside a display:none group at that time), so we re-trigger it
+    // per category to keep the nice intro without leaving any card stuck at
+    // opacity:0.
+    const cards = targetGroup.querySelectorAll('.setting-card');
+    cards.forEach((card, idx) => {
+      card.classList.remove('setting-card-anim');
+      // Force reflow so the animation restarts even if already applied.
+      void card.offsetWidth;
+      card.classList.add('setting-card-anim');
+      card.style.animationDelay = `${(idx * 0.03).toFixed(2)}s`;
+    });
+
+    // Re-sync any custom dropdowns living inside this group so they recompute
+    // their size/position now that the group is visible.
+    if (window.syncCustomSelects) {
+      window.syncCustomSelects();
+    }
   }
 };
 
@@ -909,6 +1145,11 @@ function bindSettingsToDOM() {
   
   // Update build selection card highlight based on settings backend
   selectBackend(settingsState.selectedBackend, true);
+  
+  // Sync custom dropdown views
+  if (window.syncCustomSelects) {
+    window.syncCustomSelects();
+  }
 }
 
 async function saveCurrentSettings() {
@@ -1020,6 +1261,11 @@ async function scanAndPopulateModels() {
       settingsState.vadModel = vadSelect.value;
       saveCurrentSettings();
     };
+    
+    // Sync custom dropdown views
+    if (window.syncCustomSelects) {
+      window.syncCustomSelects();
+    }
   } catch (e) {
     console.error("Failed to scan models directory:", e);
   }
@@ -2423,7 +2669,7 @@ window.loadModelStatusesGrid = async function(isSilent = false) {
             ${badgeHtml ? '<span style="color: rgba(255,255,255,0.1);">|</span>' : ''}
             <span>Expected Size: ${sizeMB} MB</span>
             <span style="color: rgba(255,255,255,0.1);">|</span>
-            <span style="color: ${isQuant ? 'var(--color-cyan)' : 'var(--color-purple)'}; font-weight: 500;">
+            <span style="color: ${isQuant ? 'var(--color-cyan)' : 'var(--color-royal-blue)'}; font-weight: 500;">
               ${isQuant ? 'Quantized Optimized (5-bit/8-bit)' : 'Full Precision (16-bit)'}
             </span>
             ${m.status === 'Downloading' ? `

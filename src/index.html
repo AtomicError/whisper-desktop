@@ -61,7 +61,7 @@
               <rect x="14" y="14" width="7" height="7"/>
               <rect x="3" y="14" width="7" height="7"/>
             </svg>
-            Dashboard
+            <span>Dashboard</span>
           </div>
           
           <div class="nav-item" onclick="switchView('build')">
@@ -70,7 +70,7 @@
               <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
               <line x1="12" y1="22.08" x2="12" y2="12"/>
             </svg>
-            System Build
+            <span>System Build</span>
           </div>
           
           <div class="nav-item" onclick="switchView('settings')">
@@ -78,7 +78,7 @@
               <circle cx="12" cy="12" r="3"/>
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
             </svg>
-            Configuration
+            <span>Configuration</span>
           </div>
           
           <div class="nav-item" onclick="switchView('models')">
@@ -87,7 +87,7 @@
               <polyline points="7 10 12 15 17 10"/>
               <line x1="12" y1="15" x2="12" y2="3"/>
             </svg>
-            Model Manager
+            <span>Model Manager</span>
           </div>
           
           <div class="nav-item" onclick="switchView('transcribe')">
@@ -95,7 +95,7 @@
               <path d="M12 20h9"/>
               <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
             </svg>
-            Transcribe File
+            <span>Transcribe File</span>
           </div>
           
           <div class="nav-item" onclick="switchView('logs')">
@@ -103,7 +103,7 @@
               <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
               <polyline points="13 2 13 9 20 9"/>
             </svg>
-            Activity Logs
+            <span>Activity Logs</span>
           </div>
         </div>
         
@@ -330,7 +330,7 @@
           </div>
 
           <!-- 3. SETTINGS CONFIGURATION PANEL -->
-          <div class="view-panel" id="panel-settings">
+          <div class="view-panel fixed-layout-panel" id="panel-settings">
             <div class="presets-container">
               <div>
                 <h3 style="font-size:1.2rem; margin-bottom:4px;">Whisper Engine Configuration</h3>
@@ -1196,7 +1196,7 @@
           </div>
 
           <!-- 3.5. MODEL MANAGER PANEL -->
-          <div class="view-panel" id="panel-models">
+          <div class="view-panel fixed-layout-panel" id="panel-models">
             <div class="glass-card" style="margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
               <div>
                 <h3 style="font-size: 1.25rem; margin-bottom: 4px;">GGML Model Registry Console</h3>
@@ -1243,14 +1243,14 @@
                 </div>
               </div>
 
-              <div class="settings-scroll-container" id="models-list-scroll" style="display: flex; flex-direction: column; gap: 16px; flex-grow: 1; overflow-y: auto;">
+              <div class="settings-scroll-container" id="models-list-scroll" style="display: flex; flex-direction: column; gap: 16px; flex-grow: 1; min-height: 0; height: 100%; overflow-y: auto;">
                 <!-- Dynamically populated model rows -->
               </div>
             </div>
           </div>
 
           <!-- 4. TRANSCRIBE FILE PANEL -->
-          <div class="view-panel" id="panel-transcribe">
+          <div class="view-panel fixed-layout-panel" id="panel-transcribe">
             <div class="transcribe-layout">
               
               <div class="transcribe-left-panel">
@@ -1344,7 +1344,7 @@
                       </div>
                       <div class="meta-item" style="grid-column: span 2;">
                         <div class="meta-label">Active Extraction Engine</div>
-                        <div class="meta-value" id="meta-recommendation" style="font-size:0.8rem; line-height:1.4; color:var(--color-purple);">-</div>
+                        <div class="meta-value" id="meta-recommendation" style="font-size:0.8rem; line-height:1.4; color:var(--color-royal-blue);">-</div>
                       </div>
                     </div>
                     <!-- Batch Spec Card (hidden by default) -->
@@ -1414,7 +1414,7 @@
                   </div>
                   <div class="wizard-step-body" id="wizard-body-4">
                     <div class="step-details-row" style="margin-bottom: 16px;">
-                      Backend: <span id="trans-cfg-backend" style="color:var(--color-cyan); font-weight:600;">Standard</span> | Model: <span id="trans-cfg-model" style="color:var(--color-purple); font-weight:600;">Base</span> | VAD: <span id="trans-cfg-vad" style="color:var(--color-gold); font-weight:600;">OFF</span> | Translation: <span id="trans-cfg-translation" style="color:var(--color-green); font-weight:600;">OFF</span>
+                      Backend: <span id="trans-cfg-backend" style="color:var(--color-cyan); font-weight:600;">Standard</span> | Model: <span id="trans-cfg-model" style="color:var(--color-royal-blue); font-weight:600;">Base</span> | VAD: <span id="trans-cfg-vad" style="color:var(--color-gold); font-weight:600;">OFF</span> | Translation: <span id="trans-cfg-translation" style="color:var(--color-green); font-weight:600;">OFF</span>
                     </div>
                     <div style="display:flex; gap:12px;">
                       <button class="btn-primary" id="btn-run-transcribe" style="flex:2;" onclick="runWhisperTranscription()">
@@ -1430,7 +1430,7 @@
               </div>
 
               <!-- Cyber-Neon Progress & Telemetry HUD (Right Panel wrapper) -->
-              <div class="transcribe-right-panel" style="display: flex; flex-direction: column; gap: 20px;">
+              <div class="transcribe-right-panel">
                 <div class="glass-card radial-progress-card telemetry-hud" style="margin-bottom: 0;">
                   <h3 style="font-weight:600; text-align:center; font-size:1.1rem; margin-bottom:16px; border-bottom:1px solid var(--border-glass); padding-bottom:12px;">Live Extraction Status</h3>
                   
@@ -1475,7 +1475,7 @@
                 </div>
 
                 <!-- Live Transcript Viewer -->
-                <div class="glass-card transcript-viewer-card" style="display: flex; flex-direction: column; flex-grow: 1; min-height: 350px; padding: 20px; gap: 12px; overflow: hidden;">
+                <div class="glass-card transcript-viewer-card" style="display: flex; flex-direction: column; flex-grow: 1; min-height: 0; padding: 20px; gap: 12px; overflow: hidden;">
                   <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: 10px;">
                     <h3 style="font-weight: 600; font-size: 1rem; margin: 0;">Live Transcript Viewer</h3>
                     <button class="btn-secondary" id="btn-copy-transcript" onclick="copyTranscriptToClipboard()" style="padding: 4px 10px; font-size: 0.75rem; margin: 0;">Copy</button>
@@ -1486,7 +1486,7 @@
                   </div>
                   
                   <!-- Real-time transcript display box -->
-                  <div class="transcript-viewport" id="transcript-viewport" style="flex-grow: 1; overflow-y: auto; font-family: var(--font-sans); font-size: 0.85rem; line-height: 1.6; padding: 12px; border-radius: 8px; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255,255,255,0.03); min-height: 200px; max-height: 400px; user-select: text;">
+                  <div class="transcript-viewport" id="transcript-viewport" style="flex-grow: 1; min-height: 0; overflow-y: auto; font-family: var(--font-sans); font-size: 0.85rem; line-height: 1.6; padding: 12px; border-radius: 8px; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255,255,255,0.03); user-select: text;">
                     <div style="color: var(--color-text-dim); text-align: center; margin-top: 40px;" id="transcript-placeholder">
                       Start transcription to stream live text preview.
                     </div>
@@ -1497,7 +1497,7 @@
           </div>
 
           <!-- 5. ACTIVITY LOG PANEL -->
-          <div class="view-panel" id="panel-logs">
+          <div class="view-panel fixed-layout-panel" id="panel-logs">
             <div class="logs-layout">
               <div class="logs-controls">
                 <div class="log-filters">
@@ -1654,7 +1654,7 @@
         </div>
       </div>
       <div class="modal-footer" style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 16px;">
-        <button class="btn-primary" onclick="closeTestModal()" style="padding: 10px 20px; font-size: 0.9rem;">Close</button>
+        <button class="btn-primary" onclick="closeTestModal()" style="padding: 10px 20px; font-size: 0.9rem; width: 100%; justify-content: center;">OK</button>
       </div>
     </div>
   </div>
