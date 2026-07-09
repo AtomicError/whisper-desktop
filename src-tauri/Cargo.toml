@@ -30,6 +30,8 @@ regex = "1"
 rfd = "0.14"
 chrono = { version = "0.4", features = ["serde"] }
 webkit2gtk = { version = "2.0.2" }
+reqwest = { version = "0.12", features = ["json"] }
+keyring = "2.1"
 
 
 

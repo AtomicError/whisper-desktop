@@ -65,6 +65,28 @@ pub struct WhisperSettings {
     pub vad_max_speech: f64,
     pub vad_speech_pad: i32,
     pub vad_overlap: f64,
+    #[serde(default)]
+    pub translate_ai_enabled: bool,
+    #[serde(default)]
+    pub translate_ai_provider: String,
+    #[serde(default)]
+    pub translate_ai_model: String,
+    #[serde(default = "default_target_lang")]
+    pub translate_ai_target_lang: String,
+    #[serde(default = "default_providers")]
+    pub translate_ai_providers: String,
+    #[serde(default)]
+    pub translate_ai_custom_prompt: String,
+    #[serde(default)]
+    pub translate_ai_polish: bool,
+}
+
+fn default_target_lang() -> String {
+    "Persian".to_string()
+}
+
+fn default_providers() -> String {
+    "[]".to_string()
 }
 
 impl WhisperSettings {
@@ -133,6 +155,13 @@ impl WhisperSettings {
             vad_max_speech: 30000.0,
             vad_speech_pad: 30,
             vad_overlap: 0.10,
+            translate_ai_enabled: false,
+            translate_ai_provider: "".to_string(),
+            translate_ai_model: "".to_string(),
+            translate_ai_target_lang: "Persian".to_string(),
+            translate_ai_providers: "[]".to_string(),
+            translate_ai_custom_prompt: "".to_string(),
+            translate_ai_polish: false,
         }
     }
 

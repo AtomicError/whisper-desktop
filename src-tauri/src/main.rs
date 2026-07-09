@@ -4,6 +4,7 @@ mod logger;
 mod builder;
 mod transcribe;
 mod downloader;
+mod translation;
 
 use std::sync::{Arc, Mutex};
 use std::path::Path;
@@ -15,6 +16,14 @@ use logger::AppLogs;
 use builder::{check_build_exists, run_git_clone_or_update, run_compilation};
 use transcribe::{probe_file_metadata, convert_to_wav, run_transcription, FileMetadata, TranscriptionResult, read_text_file};
 use downloader::{DownloadSession, DownloadState, run_model_download, get_expected_model_size, get_all_models_status, pause_download_model, delete_model_file};
+use translation::{
+    fetch_provider_models,
+    translate_transcription_files,
+    preview_translate_first_lines,
+    store_keyring_credential,
+    get_keyring_credential,
+    delete_keyring_credential,
+};
 
 // Tauri Managed States
 struct HardwareState(Arc<Mutex<HardwareMonitor>>);
@@ -468,7 +477,13 @@ fn main() {
             get_all_models_status,
             pause_download_model,
             delete_model_file,
-            get_system_specs
+            get_system_specs,
+            fetch_provider_models,
+            translate_transcription_files,
+            preview_translate_first_lines,
+            store_keyring_credential,
+            get_keyring_credential,
+            delete_keyring_credential
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
