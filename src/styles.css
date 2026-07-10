@@ -2196,7 +2196,7 @@ select.select-control {
   padding: 0 4px;
 }
 
-/* Model Manager Page Styles */
+/* Models Page Styles */
 .model-card {
   display: flex;
   flex-direction: column;
@@ -2335,7 +2335,7 @@ select.select-control {
     gap: 16px !important;
   }
 
-  /* Model Manager and Configuration layouts: Stack sidebar and list content vertically */
+  /* Models and Configuration layouts: Stack sidebar and list content vertically */
   .settings-layout {
     display: flex !important;
     flex-direction: column !important;
@@ -2712,18 +2712,18 @@ select.select-control {
 
 /* Hover State */
 .checkbox-container:hover .custom-checkmark {
-  border-color: rgba(6, 182, 212, 0.5);
+  border-color: rgba(45, 127, 255, 0.4);
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.08) 100%);
   transform: scale(1.06);
-  box-shadow: 0 0 10px rgba(6, 182, 212, 0.15);
+  box-shadow: 0 0 6px rgba(45, 127, 255, 0.12);
 }
 
 /* Active State (Checked) */
 .checkbox-container input:checked ~ .custom-checkmark {
-  background: linear-gradient(135deg, var(--color-cyan) 0%, #0891b2 100%);
-  border-color: #22d3ee;
+  background: linear-gradient(135deg, var(--color-royal-blue) 0%, #1a6aff 100%);
+  border-color: var(--color-royal-blue);
   transform: scale(1.1);
-  box-shadow: 0 0 14px rgba(6, 182, 212, 0.5), 0 0 24px rgba(6, 182, 212, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 8px rgba(45, 127, 255, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.3);
 }
 
 .checkbox-container input:active ~ .custom-checkmark {

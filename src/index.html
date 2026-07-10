@@ -87,7 +87,7 @@
               <polyline points="7 10 12 15 17 10"/>
               <line x1="12" y1="15" x2="12" y2="3"/>
             </svg>
-            <span>Model Manager</span>
+            <span>Models</span>
           </div>
           
           <div class="nav-item" onclick="switchView('transcribe')">
@@ -347,7 +347,7 @@
               <div class="settings-categories">
                 <div class="settings-cat-btn active" id="cat-btn-general" onclick="switchSettingsCategory('general')">General Setup</div>
                 <div class="settings-cat-btn" id="cat-btn-computation" onclick="switchSettingsCategory('computation')">Computation</div>
-                <div class="settings-cat-btn" id="cat-btn-search" onclick="switchSettingsCategory('search')">Decoding Search</div>
+                <div class="settings-cat-btn" id="cat-btn-search" onclick="switchSettingsCategory('search')">Decoding Strategy</div>
                 <div class="settings-cat-btn" id="cat-btn-outputs" onclick="switchSettingsCategory('outputs')">Outputs</div>
                 <div class="settings-cat-btn" id="cat-btn-gpu" onclick="switchSettingsCategory('gpu')">GPU Execution</div>
                 <div class="settings-cat-btn" id="cat-btn-vad" onclick="switchSettingsCategory('vad')">Silero VAD</div>
@@ -1068,7 +1068,7 @@
                     <div class="provider-tabs">
                       <button class="provider-tab-btn active" onclick="switchProviderTab('providers')" id="tab-btn-providers">API Providers</button>
                       <button class="provider-tab-btn" onclick="switchProviderTab('general')" id="tab-btn-general">General Configuration</button>
-                      <button class="provider-tab-btn" onclick="switchProviderTab('models')" id="tab-btn-models">Models Catalog (<span id="provider-models-count">0</span>)</button>
+                      <button class="provider-tab-btn" onclick="switchProviderTab('models')" id="tab-btn-models">Models (<span id="provider-models-count">0</span>)</button>
                     </div>
 
                     <!-- Tab 0 Content: Providers Card Grid -->
@@ -1135,7 +1135,7 @@
                       </div>
                     </div>
 
-                    <!-- Tab 2 Content: Models Catalog -->
+                    <!-- Tab 2 Content: Models -->
                     <div class="provider-tab-content" id="provider-tab-models" style="display: none;">
                       <!-- Placeholder Empty State -->
                       <div class="provider-placeholder-overlay" id="models-placeholder-overlay">

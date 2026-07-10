@@ -607,7 +607,7 @@ window.switchView = function(viewName) {
     'intro': 'Dashboard',
     'build': 'System Build',
     'settings': 'Configuration Grid',
-    'models': 'Model Manager',
+    'models': 'Models',
     'transcribe': 'Transcribe File',
     'logs': 'Central Logging Center'
   };
@@ -2453,7 +2453,7 @@ async function handleDashboardDroppedFiles(files) {
 }
 
 
-// ----------------- Model Manager Logic -----------------
+// ----------------- Models Logic -----------------
 let modelStatusPollInterval = null;
 let prevDownloadedBytesMap = new Map();
 let prevTimestampMap = new Map();
