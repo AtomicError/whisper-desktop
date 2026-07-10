@@ -428,6 +428,38 @@
                       </label>
                     </div>
                   </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Translate to English</span>
+                        <span class="setting-flag">-tr</span>
+                      </div>
+                      <div class="setting-desc">Translate transcribed audio from its source language to English in real-time.</div>
+                    </div>
+                    <div class="setting-control">
+                      <label class="switch">
+                        <input type="checkbox" id="opt-translate" />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">DTW Timestamps</span>
+                        <span class="setting-flag">--dtw</span>
+                      </div>
+                      <div class="setting-desc">Enable token-level timestamps via Dynamic Time Warping. Automatically matches the DTW model to your selected model. Disables Flash Attention.</div>
+                    </div>
+                    <div class="setting-control">
+                      <label class="switch">
+                        <input type="checkbox" id="opt-dtwEnabled" />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
                 </div>
 
                 <div class="settings-group" id="group-computation">
@@ -549,6 +581,38 @@
                     <div class="setting-control">
                       <label class="switch">
                         <input type="checkbox" id="opt-splitWord" />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Speaker Diarization</span>
+                        <span class="setting-flag">-di</span>
+                      </div>
+                      <div class="setting-desc">Enable speaker diarization for stereo audio — distinguish who spoke when.</div>
+                    </div>
+                    <div class="setting-control">
+                      <label class="switch">
+                        <input type="checkbox" id="opt-diarize" />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Tiny Diarization</span>
+                        <span class="setting-flag">-tdrz</span>
+                      </div>
+                      <div class="setting-desc">Lightweight on-device speaker change detection (requires a tdrz model).</div>
+                    </div>
+                    <div class="setting-control">
+                      <label class="switch">
+                        <input type="checkbox" id="opt-tinyDiarize" />
                         <span class="slider"></span>
                       </label>
                     </div>
@@ -678,6 +742,39 @@
                     </div>
                     <div class="setting-control">
                       <input class="text-input" style="width:100px; text-align:center;" type="number" step="0.05" id="opt-temperatureInc" />
+                    </div>
+                  </div>
+
+                  <!-- Advanced Decoding Flags -->
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Disable Temperature Fallback</span>
+                        <span class="setting-flag">-nf</span>
+                      </div>
+                      <div class="setting-desc">Prevent automatic temperature fallback during decoding (forces initial temperature).</div>
+                    </div>
+                    <div class="setting-control">
+                      <label class="switch">
+                        <input type="checkbox" id="opt-noFallback" />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Log Decoder Scores</span>
+                        <span class="setting-flag">-ls</span>
+                      </div>
+                      <div class="setting-desc">Log best decoder scores for each token to assist with debugging and analysis.</div>
+                    </div>
+                    <div class="setting-control">
+                      <label class="switch">
+                        <input type="checkbox" id="opt-logScore" />
+                        <span class="slider"></span>
+                      </label>
                     </div>
                   </div>
                 </div>
@@ -831,6 +928,22 @@
                     <div class="setting-control">
                       <label class="switch">
                         <input type="checkbox" id="opt-printSpecial" />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Word Confidence Scores</span>
+                        <span class="setting-flag">--print-confidence</span>
+                      </div>
+                      <div class="setting-desc">Include per-word confidence scores in JSON output for detailed quality analysis.</div>
+                    </div>
+                    <div class="setting-control">
+                      <label class="switch">
+                        <input type="checkbox" id="opt-printConfidence" />
                         <span class="slider"></span>
                       </label>
                     </div>

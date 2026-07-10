@@ -298,7 +298,6 @@ pub async fn run_transcription(
     if settings.diarize { args.push("-di".to_string()); }
     if settings.tiny_diarize { args.push("-tdrz".to_string()); }
     if settings.no_fallback { args.push("-nf".to_string()); }
-    if !settings.flash_attn { args.push("-nfa".to_string()); }
     
     if settings.no_prints { args.push("-np".to_string()); }
     if settings.print_special { args.push("-ps".to_string()); }
@@ -309,6 +308,17 @@ pub async fn run_transcription(
     if settings.detect_language { args.push("-dl".to_string()); }
     if settings.carry_prompt { args.push("--carry-initial-prompt".to_string()); }
     if settings.log_score { args.push("-ls".to_string()); }
+    
+    if settings.dtw_enabled {
+        if let Some(token) = dtw_token_for_model(&settings.model_path) {
+            args.push("--dtw".to_string());
+            args.push(token.to_string());
+        }
+        args.push("-nfa".to_string());
+    } else if !settings.flash_attn {
+        args.push("-nfa".to_string());
+    }
+    
     if settings.no_gpu { args.push("-ng".to_string()); }
     if settings.device_id != 0 { args.push("-dev".to_string()); args.push(settings.device_id.to_string()); }
     
@@ -485,5 +495,32 @@ pub fn read_text_file(file_path: String) -> Result<String, String> {
     }
     fs::read_to_string(path)
         .map_err(|e| format!("Failed to read file: {}", e))
+}
+
+fn dtw_token_for_model(model_path: &str) -> Option<&'static str> {
+    let filename = Path::new(model_path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("");
+
+    let name = filename
+        .strip_prefix("ggml-")
+        .or_else(|| filename.strip_prefix("gguf-"))
+        .unwrap_or(filename)
+        .strip_suffix(".bin")
+        .or_else(|| filename.strip_suffix(".gguf"))
+        .unwrap_or(filename);
+
+    match name {
+        "tiny" | "tiny.en" => Some("tiny"),
+        "base" | "base.en" => Some("base"),
+        "small" | "small.en" => Some("small"),
+        "medium" | "medium.en" => Some("medium"),
+        "large-v1" => Some("large.v1"),
+        "large-v2" => Some("large.v2"),
+        "large-v3" => Some("large.v3"),
+        "large-v3-turbo" => Some("large.v3.turbo"),
+        _ => None,
+    }
 }
 
