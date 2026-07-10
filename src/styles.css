@@ -247,9 +247,8 @@ sidebar {
   padding: 24px 16px;
   z-index: 10;
   flex-shrink: 0;
-  will-change: width, padding;
-  transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1),
-              padding 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: width 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+              padding 0.4s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 sidebar.sidebar-collapsed {
@@ -257,8 +256,9 @@ sidebar.sidebar-collapsed {
   padding: 24px 8px;
 }
 sidebar.sidebar-collapsed .brand {
-  justify-content: center;
-  padding-left: 0;
+  justify-content: flex-start;
+  padding-left: 6px;
+  padding-right: 6px;
   margin-bottom: 24px;
 }
 sidebar.sidebar-collapsed .brand-name {
@@ -269,8 +269,8 @@ sidebar.sidebar-collapsed .brand-name {
   white-space: nowrap;
 }
 sidebar.sidebar-collapsed .nav-item {
-  justify-content: center;
-  padding: 12px;
+  justify-content: flex-start;
+  padding: 12px 18px;
 }
 sidebar.sidebar-collapsed .nav-item span {
   max-width: 0px;

@@ -549,25 +549,39 @@ function setupResponsiveMenuFadeIn() {
     const sidebar = document.querySelector('sidebar');
     if (!sidebar) return;
 
+    // Clear any leftover inline styles from previous animation
+    document.querySelectorAll('.nav-links .nav-item').forEach(el => el.style.transitionDelay = '');
+    document.querySelectorAll('.nav-links .nav-item span').forEach(el => el.style.transitionDelay = '');
+    sidebar.style.willChange = 'auto';
+
     if (e.matches) {
-      // Narrow → collapse sidebar (CSS transitions handle everything)
+      // Narrow → collapse sidebar
+      sidebar.style.willChange = 'width, padding';
       sidebar.classList.add('sidebar-collapsed');
+      setTimeout(() => {
+        sidebar.style.willChange = 'auto';
+      }, 500);
     } else {
       // Wide → expand sidebar
-      // Set staggered transition-delay on spans BEFORE removing the class
+      sidebar.style.willChange = 'width, padding';
+
+      const items = document.querySelectorAll('.nav-links .nav-item');
       const spans = document.querySelectorAll('.nav-links .nav-item span');
+
+      items.forEach((item, index) => {
+        item.style.transitionDelay = `${Math.min(index * 0.03, 0.30).toFixed(2)}s`;
+      });
       spans.forEach((span, index) => {
-        span.style.transitionDelay = `${Math.min(index * 0.05, 0.30).toFixed(2)}s`;
+        span.style.transitionDelay = `${Math.min(index * 0.03, 0.30).toFixed(2)}s`;
       });
 
       sidebar.classList.remove('sidebar-collapsed');
 
-      // Clean up inline delays after transitions finish
       setTimeout(() => {
-        spans.forEach(span => {
-          span.style.transitionDelay = '';
-        });
-      }, 900);
+        items.forEach(item => item.style.transitionDelay = '');
+        spans.forEach(span => span.style.transitionDelay = '');
+        sidebar.style.willChange = 'auto';
+      }, 700);
     }
   };
 
