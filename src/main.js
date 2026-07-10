@@ -1245,10 +1245,15 @@ async function scanAndPopulateModels() {
     // 1. Populate Model Selection
     const transSelect = document.getElementById('opt-modelPath');
     transSelect.innerHTML = '';
+    const seenModelNames = new Set();
     res.transModels.forEach(m => {
+      const name = m.split('/').pop();
+      if (name.startsWith('for-tests')) return;
+      if (seenModelNames.has(name)) return;
+      seenModelNames.add(name);
       const opt = document.createElement('option');
       opt.value = m;
-      opt.textContent = m.split('/').pop(); // Show only filename
+      opt.textContent = name;
       if (m === settingsState.modelPath) {
         opt.selected = true;
       }
