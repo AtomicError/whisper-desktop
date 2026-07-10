@@ -482,48 +482,43 @@ window.syncCustomSelects = function() {
 };
 
 // Initialize App
-// Replay the fade-in animation on the three menu sidebars when the window
-// grows back from the narrow (<960px) responsive layout to the wide desktop
-// layout. CSS animations only run once on appearance, so we re-trigger them
-// here by toggling the .menu-fade-in class with a small per-item stagger.
-let wasNarrowViewport = window.innerWidth < 960;
+// Handle responsive sidebar collapse via matchMedia + class toggle,
+// combined with CSS transitions for smooth width/opacity animation
+// and staggered text-span reveal when expanding.
+let sidebarMql = null;
 
 function setupResponsiveMenuFadeIn() {
-  window.addEventListener('resize', () => {
-    const isNarrowNow = window.innerWidth < 960;
+  sidebarMql = window.matchMedia('(max-width: 960px)');
 
-    // Only fire when crossing from narrow -> wide (small window becomes large).
-    // No debounce: we act on the exact crossing so items appear WITH the
-    // animation instead of being visible first and animating a moment later.
-    if (wasNarrowViewport && !isNarrowNow) {
-      replayMenuFadeIn();
+  const handler = (e) => {
+    const sidebar = document.querySelector('sidebar');
+    if (!sidebar) return;
+
+    if (e.matches) {
+      // Narrow → collapse sidebar (CSS transitions handle everything)
+      sidebar.classList.add('sidebar-collapsed');
+    } else {
+      // Wide → expand sidebar
+      // Set staggered transition-delay on spans BEFORE removing the class
+      const spans = document.querySelectorAll('.nav-links .nav-item span');
+      spans.forEach((span, index) => {
+        span.style.transitionDelay = `${Math.min(index * 0.05, 0.30).toFixed(2)}s`;
+      });
+
+      sidebar.classList.remove('sidebar-collapsed');
+
+      // Clean up inline delays after transitions finish
+      setTimeout(() => {
+        spans.forEach(span => {
+          span.style.transitionDelay = '';
+        });
+      }, 900);
     }
+  };
 
-    wasNarrowViewport = isNarrowNow;
-  });
-}
-
-function replayMenuFadeIn() {
-  // Animate each menu independently so the stagger resets per sidebar.
-  const menuGroups = [
-    document.querySelectorAll('.nav-links .nav-item'),
-    document.querySelectorAll('.settings-categories .settings-cat-btn'),
-    document.querySelectorAll('#model-categories-sidebar .settings-cat-btn'),
-  ];
-
-  menuGroups.forEach(items => {
-    items.forEach((item, index) => {
-      // Remove -> force reflow -> re-add in the same frame so the animation
-      // restarts cleanly with no visible flash and no fallback animation.
-      item.classList.remove('menu-fade-in');
-      void item.offsetWidth;
-
-      // Small staggered delay per item, capped so nothing waits too long.
-      const delay = Math.min(index * 0.04, 0.32);
-      item.style.animationDelay = `${delay.toFixed(2)}s`;
-      item.classList.add('menu-fade-in');
-    });
-  });
+  sidebarMql.addEventListener('change', handler);
+  // Apply initial state
+  handler(sidebarMql);
 }
 
 async function initApp() {
@@ -621,7 +616,26 @@ window.switchView = function(viewName) {
   if (viewName === 'models') {
     loadModelStatusesGrid();
   }
+
+  // Re-trigger slide-in animation for sidebar category buttons
+  // (elements were hidden via display:none parent panel, so CSS animation never fired)
+  if (viewName === 'settings') {
+    reanimateSlideIn('.settings-categories .settings-cat-btn', 0.03);
+  }
+  if (viewName === 'models') {
+    reanimateSlideIn('#model-categories-sidebar .settings-cat-btn', 0.03);
+  }
 };
+
+function reanimateSlideIn(selector, stagger = 0.03) {
+  const items = document.querySelectorAll(selector);
+  items.forEach((item, index) => {
+    item.style.animation = 'none';
+    void item.offsetWidth;
+    item.style.animation = '';
+    item.style.animationDelay = `${(index * stagger).toFixed(2)}s`;
+  });
+}
 
 // ----------------- HUD Statistics Poll -----------------
 function startHudPoll() {

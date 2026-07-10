@@ -247,6 +247,43 @@ sidebar {
   padding: 24px 16px;
   z-index: 10;
   flex-shrink: 0;
+  will-change: width, padding;
+  transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+              padding 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+sidebar.sidebar-collapsed {
+  width: 72px;
+  padding: 24px 8px;
+}
+sidebar.sidebar-collapsed .brand {
+  justify-content: center;
+  padding-left: 0;
+  margin-bottom: 24px;
+}
+sidebar.sidebar-collapsed .brand-name {
+  opacity: 0;
+  width: 0;
+  overflow: hidden;
+  margin: 0;
+  white-space: nowrap;
+}
+sidebar.sidebar-collapsed .nav-item {
+  justify-content: center;
+  padding: 12px;
+}
+sidebar.sidebar-collapsed .nav-item span {
+  max-width: 0px;
+  opacity: 0;
+  margin-left: 0px;
+  pointer-events: none;
+}
+sidebar.sidebar-collapsed .developer-credit {
+  opacity: 0;
+  max-height: 0;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
 }
 
 .brand {
@@ -271,6 +308,7 @@ sidebar {
   background: linear-gradient(135deg, #fff 30%, #85b1ff 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  transition: opacity 0.3s ease, width 0.3s ease;
 }
 
 .nav-links {
@@ -325,9 +363,9 @@ sidebar {
   opacity: 1;
   overflow: hidden;
   white-space: nowrap;
-  transition: max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-              margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-              opacity 0.25s ease;
+  transition: max-width 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+              margin-left 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+              opacity 0.35s ease;
 }
 
 .nav-item:hover {
@@ -365,6 +403,7 @@ sidebar {
   text-align: center;
   padding-top: 16px;
   border-top: 1px solid var(--border-glass);
+  transition: opacity 0.3s ease, max-height 0.3s ease, padding 0.3s ease, margin 0.3s ease;
 }
 
 .developer-credit span {
@@ -897,7 +936,25 @@ header {
   overflow: hidden;
   display: inline-flex;
   align-items: center;
+  animation: slideInNav 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
+
+.settings-categories .settings-cat-btn:nth-child(1) { animation-delay: 0.03s; }
+.settings-categories .settings-cat-btn:nth-child(2) { animation-delay: 0.06s; }
+.settings-categories .settings-cat-btn:nth-child(3) { animation-delay: 0.09s; }
+.settings-categories .settings-cat-btn:nth-child(4) { animation-delay: 0.12s; }
+.settings-categories .settings-cat-btn:nth-child(5) { animation-delay: 0.15s; }
+.settings-categories .settings-cat-btn:nth-child(6) { animation-delay: 0.18s; }
+.settings-categories .settings-cat-btn:nth-child(7) { animation-delay: 0.21s; }
+
+#model-categories-sidebar .settings-cat-btn:nth-child(1) { animation-delay: 0.03s; }
+#model-categories-sidebar .settings-cat-btn:nth-child(2) { animation-delay: 0.06s; }
+#model-categories-sidebar .settings-cat-btn:nth-child(3) { animation-delay: 0.09s; }
+#model-categories-sidebar .settings-cat-btn:nth-child(4) { animation-delay: 0.12s; }
+#model-categories-sidebar .settings-cat-btn:nth-child(5) { animation-delay: 0.15s; }
+#model-categories-sidebar .settings-cat-btn:nth-child(6) { animation-delay: 0.18s; }
+#model-categories-sidebar .settings-cat-btn:nth-child(7) { animation-delay: 0.21s; }
+#model-categories-sidebar .settings-cat-btn:nth-child(8) { animation-delay: 0.24s; }
 
 .settings-cat-btn::before {
   content: "";
@@ -1063,22 +1120,6 @@ header {
     opacity: 1;
     transform: translateY(0);
   }
-}
-
-/* Reusable fade-in-and-slide-up for menu items on responsive re-expand */
-@keyframes menuItemFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.menu-fade-in {
-  animation: menuItemFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .setting-info {
@@ -3642,34 +3683,7 @@ select.select-control {
    Responsive Layout & Small Window Sizing Fixes (Tauri Desktop App)
    ========================================================================== */
 
-/* 1. Sidebar Collapse (Screens <= 800px) */
-/* 1. Sidebar Collapse (Screens <= 960px) */
-@media (max-width: 960px) {
-  sidebar {
-    width: 72px !important;
-    padding: 24px 8px !important;
-  }
-  sidebar .brand {
-    justify-content: center !important;
-    padding-left: 0 !important;
-    margin-bottom: 24px !important;
-  }
-  sidebar .brand-name {
-    display: none !important;
-  }
-  sidebar .nav-item {
-    justify-content: center !important;
-    padding: 12px !important;
-  }
-  sidebar .nav-item span {
-    max-width: 0 !important;
-    opacity: 0 !important;
-    margin-left: 0 !important;
-  }
-  sidebar .developer-credit {
-    display: none !important;
-  }
-}
+/* Sidebar collapse handled by .sidebar-collapsed class (toggled via JS matchMedia) */
 
 /* 2. Header & Live System Stats HUD Wrap (Screens <= 750px) */
 @media (max-width: 750px) {
