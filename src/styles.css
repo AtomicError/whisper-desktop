@@ -1660,6 +1660,16 @@ select.select-control {
   100% { transform: translateX(100%); }
 }
 
+@keyframes indeterminate-pulse {
+  0% { width: 30%; }
+  50% { width: 70%; }
+  100% { width: 30%; }
+}
+
+.progress-linear-fill.indeterminate {
+  animation: indeterminate-pulse 1.5s ease-in-out infinite;
+}
+
 .hud-status-subtitle {
   display: flex;
   align-items: center;

@@ -1473,33 +1473,36 @@
                       </div>
                     </div>
                     <button class="btn-primary wizard-next-btn" id="btn-next-step-2" onclick="openWizardStep(3)">
-                      Continue to Conversion
+                      Continue to Transcription
                     </button>
                   </div>
                 </div>
 
-                <!-- STEP 3: WAV AUDIO CONVERSION -->
+                <!-- STEP 3: EXECUTE TRANSCRIPTION -->
                 <div class="wizard-step" id="wizard-step-3">
                   <div class="wizard-step-header" onclick="toggleWizardAccordion(3)">
                     <div style="display:flex; align-items:center; gap:12px;">
                       <div class="wizard-step-icon" id="wizard-icon-3">3</div>
-                      <div class="wizard-step-title">WAV Audio Conversion</div>
+                      <div class="wizard-step-title">Execute Whisper Transcription</div>
                     </div>
                     <span class="wizard-chevron" id="wizard-chevron-3">▼</span>
                   </div>
                   <div class="wizard-step-body" id="wizard-body-3">
                     <div class="step-details-row" style="margin-bottom: 16px;">
-                      <span>AR: 16000Hz</span> | <span>Mono Channel</span> | <span>PCM S16LE Codec</span>
+                      Backend: <span id="trans-cfg-backend" style="color:var(--color-cyan); font-weight:600;">Standard</span> | Model: <span id="trans-cfg-model" style="color:var(--color-royal-blue); font-weight:600;">Base</span> | VAD: <span id="trans-cfg-vad" style="color:var(--color-gold); font-weight:600;">OFF</span> | Translation: <span id="trans-cfg-translation" style="color:var(--color-green); font-weight:600;">OFF</span>
                     </div>
-                    <button class="btn-primary" id="btn-run-ffmpeg" onclick="runFFmpegConversion()">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:18px;height:18px;margin-right:8px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                      Run FFmpeg Conversion
-                    </button>
-                    <button class="btn-primary wizard-next-btn" id="btn-next-to-transcribe" style="display:none;" onclick="openWizardStep(4)">
-                      Continue to AI Transcription
-                    </button>
+                    <!-- Single-file controls -->
+                    <div style="display:flex; gap:12px;">
+                      <button class="btn-primary" id="btn-run-transcribe" style="flex:2;" onclick="runWhisperTranscription()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:18px;height:18px;margin-right:8px;"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+                        Start AI Extraction
+                      </button>
+                      <button class="btn-secondary" id="btn-cancel-transcribe" style="display:none; flex:1; border-color:var(--color-red); color:var(--color-red); font-weight:600;" onclick="abortTranscription()">
+                        Cancel
+                      </button>
+                    </div>
                     <!-- Batch Control Panel (hidden by default) -->
-                    <div id="batch-controls-box" style="display:none; width:100%;">
+                    <div id="batch-controls-box" style="display:none; width:100%; margin-top: 16px;">
                       <div class="step-details-row" style="margin-bottom: 16px;">
                         <span>Automated Pipeline</span> | <span>FFmpeg Convert & Whisper Extraction Sequentially</span>
                       </div>
@@ -1512,31 +1515,6 @@
                           Cancel
                         </button>
                       </div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- STEP 4: EXECUTE TRANSCRIPTION -->
-                <div class="wizard-step" id="wizard-step-4">
-                  <div class="wizard-step-header" onclick="toggleWizardAccordion(4)">
-                    <div style="display:flex; align-items:center; gap:12px;">
-                      <div class="wizard-step-icon" id="wizard-icon-4">4</div>
-                      <div class="wizard-step-title">Execute Whisper Transcription</div>
-                    </div>
-                    <span class="wizard-chevron" id="wizard-chevron-4">▼</span>
-                  </div>
-                  <div class="wizard-step-body" id="wizard-body-4">
-                    <div class="step-details-row" style="margin-bottom: 16px;">
-                      Backend: <span id="trans-cfg-backend" style="color:var(--color-cyan); font-weight:600;">Standard</span> | Model: <span id="trans-cfg-model" style="color:var(--color-royal-blue); font-weight:600;">Base</span> | VAD: <span id="trans-cfg-vad" style="color:var(--color-gold); font-weight:600;">OFF</span> | Translation: <span id="trans-cfg-translation" style="color:var(--color-green); font-weight:600;">OFF</span>
-                    </div>
-                    <div style="display:flex; gap:12px;">
-                      <button class="btn-primary" id="btn-run-transcribe" style="flex:2;" onclick="runWhisperTranscription()">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:18px;height:18px;margin-right:8px;"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
-                        Start AI Extraction
-                      </button>
-                      <button class="btn-secondary" id="btn-cancel-transcribe" style="display:none; flex:1; border-color:var(--color-red); color:var(--color-red); font-weight:600;" onclick="abortTranscription()">
-                        Cancel
-                      </button>
                     </div>
                   </div>
                 </div>

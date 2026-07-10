@@ -1389,7 +1389,7 @@ window.toggleWizardAccordion = function(stepNum) {
   const isCurrentlyActive = stepEl.classList.contains('active');
   
   // Collapse all steps
-  for (let i = 1; i <= 4; i++) {
+  for (let i = 1; i <= 3; i++) {
     const s = document.getElementById(`wizard-step-${i}`);
     if (s) {
       s.classList.remove('active');
@@ -1407,7 +1407,7 @@ window.toggleWizardAccordion = function(stepNum) {
 };
 
 window.openWizardStep = function(stepNum) {
-  for (let i = 1; i <= 4; i++) {
+  for (let i = 1; i <= 3; i++) {
     const s = document.getElementById(`wizard-step-${i}`);
     if (s) {
       s.classList.remove('active');
@@ -1461,11 +1461,13 @@ window.browseMediaFile = async function() {
       
       document.getElementById('media-meta-box').style.display = 'grid';
       document.getElementById('batch-specs-box').style.display = 'none';
-      document.getElementById('btn-next-step-2').textContent = 'Continue to Conversion';
+      document.getElementById('btn-next-step-2').textContent = 'Continue to Transcription';
       
-      document.getElementById('btn-run-ffmpeg').style.display = 'inline-flex';
+      
       document.getElementById('batch-controls-box').style.display = 'none';
-      document.getElementById('wizard-step-4').style.display = 'block';
+      document.getElementById('btn-run-transcribe').style.display = 'inline-flex';
+      document.getElementById('btn-cancel-transcribe').style.display = 'none';
+      document.getElementById('wizard-step-3').style.display = 'block';
       
       if (settingsState) {
         settingsState.inputFile = selectedMediaFile;
@@ -1504,9 +1506,10 @@ window.browseMediaFile = async function() {
       document.getElementById('batch-files-count').textContent = files.length;
       document.getElementById('btn-next-step-2').textContent = 'Continue to Batch Setup';
       
-      document.getElementById('btn-run-ffmpeg').style.display = 'none';
+      
       document.getElementById('batch-controls-box').style.display = 'block';
-      document.getElementById('wizard-step-4').style.display = 'none';
+      document.getElementById('btn-run-transcribe').style.display = 'none';
+      document.getElementById('btn-cancel-transcribe').style.display = 'none';
       
       setWizardStepCompleted(1, true);
       setWizardStepCompleted(2, true);
@@ -1560,11 +1563,9 @@ async function probeSelectedFile() {
       const fillBar = document.getElementById('progress-linear-fill');
       if (fillBar) fillBar.style.width = '0%';
       document.getElementById('lbl-radial-pct').textContent = '0%';
-      document.getElementById('lbl-radial-msg').textContent = 'Ready for WAV Convert';
+      document.getElementById('lbl-radial-msg').textContent = 'Ready for Transcription';
       
       setWizardStepCompleted(3, false);
-      setWizardStepCompleted(4, false);
-      document.getElementById('btn-next-to-transcribe').style.display = 'none';
       document.getElementById('analytics-box').style.display = 'none';
     } else {
       showNotification("Selected file does not exist or cannot be probed!", "error");
@@ -1598,62 +1599,33 @@ function updateTranscribeUIConfigs() {
   }
 }
 
-window.runFFmpegConversion = async function() {
-  if (!selectedMediaFile) return;
-  
-  const btn = document.getElementById('btn-run-ffmpeg');
-  btn.disabled = true;
-  btn.textContent = 'Converting via FFmpeg...';
-  
-  try {
-    const wavPath = await invoke('convert_media_file', { filePath: selectedMediaFile });
-    wavPathForTranscription = wavPath;
-    
-    setWizardStepCompleted(3, true);
-    document.getElementById('btn-next-to-transcribe').style.display = 'inline-flex';
-    
-    document.getElementById('lbl-radial-msg').textContent = 'WAV Ready! Click Next';
-    showNotification("FFmpeg converted successfully! Audio is ready for transcription.", "success");
-    
-    setTimeout(() => {
-      openWizardStep(4);
-    }, 800);
-  } catch (e) {
-    showNotification("FFmpeg audio conversion failed: " + e, "error");
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Run FFmpeg Conversion';
-  }
-};
-
 window.runWhisperTranscription = async function() {
-  if (!wavPathForTranscription || !probedMetadata) {
-    showNotification("Please convert the media file to WAV format first in Step 3!", "info");
-    openWizardStep(3);
+  const btn = document.getElementById('btn-run-transcribe');
+  const cancelBtn = document.getElementById('btn-cancel-transcribe');
+  const fillBar = document.getElementById('progress-linear-fill');
+  const pctEl = document.getElementById('lbl-radial-pct');
+  const msgEl = document.getElementById('lbl-radial-msg');
+
+  if (!selectedMediaFile && !wavPathForTranscription) {
+    showNotification("No media file selected!", "info");
     return;
   }
-  
+
   const isCompiled = compiledBackends[settingsState.selectedBackend];
   if (!isCompiled) {
     showNotification(`The selected backend (${settingsState.selectedBackend}) is not compiled yet! Please go to the 'System Build' panel and build it first.`, "info");
     switchView('build');
     return;
   }
-  
+
   const modelExists = localScannedTransModels.includes(settingsState.modelPath);
   if (!modelExists) {
     const modelName = settingsState.modelPath.split('/').pop() || 'selected model';
     showNotification(`The selected model file '${modelName}' does not exist locally. Please select a valid model in General Configuration!`, "error");
     return;
   }
-  
-  const btn = document.getElementById('btn-run-transcribe');
-  const cancelBtn = document.getElementById('btn-cancel-transcribe');
-  
+
   btn.disabled = true;
-  btn.textContent = 'AI Transcribing...';
-  if (cancelBtn) cancelBtn.style.display = 'inline-flex';
-  
   document.getElementById('analytics-box').style.display = 'none';
 
   // Clear transcript preview
@@ -1662,12 +1634,32 @@ window.runWhisperTranscription = async function() {
   if (viewport) {
     viewport.innerHTML = '<div style="color: var(--color-cyan); text-align: center; margin-top: 40px; font-weight: 500;">AI model is initializing...</div>';
   }
-  
+
   try {
+    // Phase 1: Auto-convert to WAV if not already done
+    if (!wavPathForTranscription) {
+      btn.textContent = 'Converting to WAV...';
+      if (msgEl) msgEl.textContent = 'Converting audio to 16kHz WAV...';
+      if (fillBar) {
+        fillBar.style.width = '50%';
+        fillBar.classList.add('indeterminate');
+      }
+      if (pctEl) pctEl.textContent = 'Converting...';
+
+      wavPathForTranscription = await invoke('convert_media_file', { filePath: selectedMediaFile });
+
+      if (fillBar) fillBar.classList.remove('indeterminate');
+      if (msgEl) msgEl.textContent = 'WAV Ready! Transcribing...';
+    }
+
+    // Phase 2: Run Whisper transcription
+    if (cancelBtn) cancelBtn.style.display = 'inline-flex';
+    btn.textContent = 'AI Transcribing...';
+
     const result = await invoke('start_transcription_task', {
       settings: settingsState,
       wavPath: wavPathForTranscription,
-      durationSec: probedMetadata.durationSec
+      durationSec: probedMetadata ? probedMetadata.durationSec : 60.0
     });
 
     // Load final transcript from the text file
@@ -1678,11 +1670,11 @@ window.runWhisperTranscription = async function() {
         await loadTranscriptFromFile(`${parentDir}/${txtFile}`);
       }
     }
-    
+
     document.getElementById('analytics-box').style.display = 'flex';
     document.getElementById('analytic-time').textContent = `${(result.durationMs / 1000).toFixed(1)}s`;
     document.getElementById('analytic-speed').textContent = `${result.speedFactor.toFixed(1)}x Real-time`;
-    
+
     const badgesRow = document.getElementById('badge-outputs-row');
     badgesRow.innerHTML = '';
     result.generatedFiles.forEach(f => {
@@ -1691,20 +1683,20 @@ window.runWhisperTranscription = async function() {
       badge.textContent = f;
       badgesRow.appendChild(badge);
     });
-    
+
     // Run AI Translation if enabled
     if (settingsState.translateAiEnabled && result.generatedFiles && result.generatedFiles.length > 0) {
       try {
         const parentDir = settingsState.inputFile.substring(0, settingsState.inputFile.lastIndexOf('/'));
         btn.textContent = 'AI Translating...';
         showNotification("Starting AI translation of generated files...", "info");
-        
+
         const translatedFiles = await invoke('translate_transcription_files', {
           settings: settingsState,
           generatedFiles: result.generatedFiles,
           parentDir: parentDir
         });
-        
+
         translatedFiles.forEach(f => {
           const badge = document.createElement('span');
           badge.className = 'output-badge';
@@ -1713,32 +1705,31 @@ window.runWhisperTranscription = async function() {
           badge.textContent = f;
           badgesRow.appendChild(badge);
         });
-        
+
         showNotification("AI translation completed successfully!", "success");
       } catch (err) {
         showNotification("AI translation failed: " + err, "error");
       }
     }
-    
-    setWizardStepCompleted(4, true);
+
+    setWizardStepCompleted(3, true);
     showNotification("Transcription completed successfully!", "success");
   } catch (e) {
-    setWizardStepCompleted(4, false);
+    setWizardStepCompleted(3, false);
     if (e.includes("cancelled") || e.includes("terminated") || e.includes("aborted") || e.includes("signal")) {
       showNotification("Transcription aborted by the user.", "info");
-      document.getElementById('lbl-radial-msg').textContent = 'Aborted';
+      if (msgEl) msgEl.textContent = 'Aborted';
     } else {
-      showNotification("Transcription execution failed: " + e, "error");
-      document.getElementById('lbl-radial-msg').textContent = 'Task Failed';
+      showNotification("Task failed: " + e, "error");
+      if (msgEl) msgEl.textContent = 'Task Failed';
     }
   } finally {
     // ALWAYS clear the temporary WAV state since it has been cleaned up by the backend
     wavPathForTranscription = null;
     setWizardStepCompleted(3, false);
-    document.getElementById('btn-next-to-transcribe').style.display = 'none';
-    
     btn.disabled = false;
     btn.textContent = 'Start AI Extraction';
+    if (fillBar) fillBar.classList.remove('indeterminate');
     if (cancelBtn) {
       cancelBtn.disabled = false;
       cancelBtn.textContent = 'Cancel';
@@ -1905,17 +1896,16 @@ window.clearBatchQueue = function() {
   
   document.getElementById('media-meta-box').style.display = 'grid';
   document.getElementById('batch-specs-box').style.display = 'none';
-  document.getElementById('btn-next-step-2').textContent = 'Continue to Conversion';
+  document.getElementById('btn-next-step-2').textContent = 'Continue to Transcription';
   
-  document.getElementById('btn-run-ffmpeg').style.display = 'inline-flex';
+  
   document.getElementById('batch-controls-box').style.display = 'none';
-  document.getElementById('wizard-step-4').style.display = 'block';
+  document.getElementById('wizard-step-3').style.display = 'block';
   
-  // Set steps 1, 2, 3, 4 as incomplete
+  // Set steps 1, 2, 3 as incomplete
   setWizardStepCompleted(1, false);
   setWizardStepCompleted(2, false);
   setWizardStepCompleted(3, false);
-  setWizardStepCompleted(4, false);
   
   // Clear any meta values
   document.getElementById('meta-type').textContent = '-';
@@ -2469,10 +2459,10 @@ async function handleDashboardDroppedFiles(files) {
     
     document.getElementById('media-meta-box').style.display = 'grid';
     document.getElementById('batch-specs-box').style.display = 'none';
-    document.getElementById('btn-next-step-2').textContent = 'Continue to Conversion';
-    document.getElementById('btn-run-ffmpeg').style.display = 'inline-flex';
+    document.getElementById('btn-next-step-2').textContent = 'Continue to Transcription';
+    
     document.getElementById('batch-controls-box').style.display = 'none';
-    document.getElementById('wizard-step-4').style.display = 'block';
+    document.getElementById('wizard-step-3').style.display = 'block';
     
     if (settingsState) {
       settingsState.inputFile = selectedMediaFile;
@@ -2507,9 +2497,10 @@ async function handleDashboardDroppedFiles(files) {
     document.getElementById('batch-specs-box').style.display = 'block';
     document.getElementById('batch-files-count').textContent = files.length;
     document.getElementById('btn-next-step-2').textContent = 'Continue to Batch Setup';
-    document.getElementById('btn-run-ffmpeg').style.display = 'none';
+    
     document.getElementById('batch-controls-box').style.display = 'block';
-    document.getElementById('wizard-step-4').style.display = 'none';
+    document.getElementById('btn-run-transcribe').style.display = 'none';
+    document.getElementById('btn-cancel-transcribe').style.display = 'none';
     
     setWizardStepCompleted(1, true);
     setWizardStepCompleted(2, true);
