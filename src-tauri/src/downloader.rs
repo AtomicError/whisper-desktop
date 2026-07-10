@@ -67,6 +67,8 @@ pub fn get_expected_model_size(model_name: &str) -> u64 {
         "large-v3-turbo" => 1610612736,
         "large-v3-turbo-q5_0" => 573566976,
         "large-v3-turbo-q8_0" => 874516480,
+        "silero-v5.1.2" => 1048576,
+        "silero-v6.2.0" => 1048576,
         _ => 0,
     }
 }
@@ -96,7 +98,8 @@ pub fn get_models_list() -> Vec<&'static str> {
         "small", "small-q5_1", "small-q8_0", "small.en", "small.en-q5_1", "small.en-q8_0", "small.en-tdrz",
         "medium", "medium-q5_0", "medium-q8_0", "medium.en", "medium.en-q5_0", "medium.en-q8_0",
         "large-v1", "large-v2", "large-v2-q5_0", "large-v2-q8_0",
-        "large-v3", "large-v3-q5_0", "large-v3-turbo", "large-v3-turbo-q5_0", "large-v3-turbo-q8_0"
+        "large-v3", "large-v3-q5_0", "large-v3-turbo", "large-v3-turbo-q5_0", "large-v3-turbo-q8_0",
+        "silero-v5.1.2", "silero-v6.2.0",
     ]
 }
 
@@ -127,10 +130,17 @@ pub async fn run_model_download(
         return Err(format!("Model ggml-{}.bin already exists locally.", clean_name));
     }
 
-    let url = format!(
-        "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-{}.bin",
-        clean_name
-    );
+    let url = if clean_name.starts_with("silero-") {
+        format!(
+            "https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-{}.bin?download=true",
+            clean_name
+        )
+    } else {
+        format!(
+            "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-{}.bin",
+            clean_name
+        )
+    };
 
     // Spawning curl with range support (-C -) and auto-retry to handle network drops
     let mut child = Command::new("curl")

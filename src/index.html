@@ -87,7 +87,7 @@
               <polyline points="7 10 12 15 17 10"/>
               <line x1="12" y1="15" x2="12" y2="3"/>
             </svg>
-            <span>Models</span>
+            <span>Model Hub</span>
           </div>
           
           <div class="nav-item" onclick="switchView('transcribe')">
@@ -1312,7 +1312,7 @@
           <div class="view-panel fixed-layout-panel" id="panel-models">
             <div class="glass-card" style="margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
               <div>
-                <h3 style="font-size: 1.25rem; margin-bottom: 4px;">GGML Model Registry Console</h3>
+                <h3 style="font-size: 1.25rem; margin-bottom: 4px;">Whisper Model Hub</h3>
                 <p id="model-specs-subtitle" style="font-size: 0.85rem; color: var(--color-text-muted);">Download, configure, and manage GGML models inside the models directory.</p>
               </div>
               <div>
@@ -1660,8 +1660,12 @@
         <p id="app-modal-message">An error occurred during execution.</p>
         <pre class="modal-details-box" id="app-modal-details"></pre>
       </div>
-      <div class="modal-footer">
+      <div class="modal-footer" id="app-modal-ok-footer">
         <button class="btn-primary" id="app-modal-close-btn" onclick="closeAppModal()" style="width: 100%; justify-content: center;">OK</button>
+      </div>
+      <div class="modal-footer" id="app-modal-confirm-footer" style="display: none; gap: 12px; width: 100%; justify-content: flex-start;">
+        <button class="btn-secondary" id="app-modal-cancel-btn" onclick="resolveAppConfirm(false)" style="padding: 8px 20px; flex-shrink: 0; justify-content: center;">Cancel</button>
+        <button class="btn-primary" id="app-modal-delete-btn" onclick="resolveAppConfirm(true)" style="flex: 1; justify-content: center; background: linear-gradient(135deg, #b91c1c, #991b1b); border-color: #b91c1c; padding: 8px 20px;">Delete</button>
       </div>
     </div>
   </div>

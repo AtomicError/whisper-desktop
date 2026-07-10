@@ -68,6 +68,8 @@ window.showAppModal = function(title, message, details = '') {
   const titleEl = document.getElementById('app-modal-title');
   const msgEl = document.getElementById('app-modal-message');
   const detailsEl = document.getElementById('app-modal-details');
+  const okFooter = document.getElementById('app-modal-ok-footer');
+  const confirmFooter = document.getElementById('app-modal-confirm-footer');
   
   if (overlay && titleEl && msgEl && detailsEl) {
     titleEl.textContent = title;
@@ -79,6 +81,10 @@ window.showAppModal = function(title, message, details = '') {
     } else {
       detailsEl.style.display = 'none';
     }
+    
+    // Reset footers to default (OK visible, confirm hidden)
+    if (okFooter) okFooter.style.display = 'flex';
+    if (confirmFooter) confirmFooter.style.display = 'none';
     
     overlay.style.display = 'flex';
     // Trigger reflow to run CSS animation
@@ -93,8 +99,57 @@ window.closeAppModal = function() {
     overlay.classList.remove('show');
     setTimeout(() => {
       overlay.style.display = 'none';
+      // Reset footers to default after hidden
+      const okFooter = document.getElementById('app-modal-ok-footer');
+      const confirmFooter = document.getElementById('app-modal-confirm-footer');
+      if (okFooter) okFooter.style.display = 'flex';
+      if (confirmFooter) confirmFooter.style.display = 'none';
     }, 300);
   }
+};
+
+// Promise-based confirm dialog using the themed modal
+window._confirmModalResolve = null;
+
+window.showConfirmModal = function(title, message, confirmButtonText = 'Delete') {
+  return new Promise((resolve) => {
+    const overlay = document.getElementById('app-modal-overlay');
+    const titleEl = document.getElementById('app-modal-title');
+    const msgEl = document.getElementById('app-modal-message');
+    const detailsEl = document.getElementById('app-modal-details');
+    const okFooter = document.getElementById('app-modal-ok-footer');
+    const confirmFooter = document.getElementById('app-modal-confirm-footer');
+    const deleteBtn = document.getElementById('app-modal-delete-btn');
+    
+    if (!overlay || !titleEl || !msgEl || !detailsEl || !okFooter || !confirmFooter || !deleteBtn) {
+      resolve(false);
+      return;
+    }
+    
+    titleEl.textContent = title;
+    msgEl.textContent = message;
+    detailsEl.style.display = 'none';
+    
+    deleteBtn.textContent = confirmButtonText;
+    
+    okFooter.style.display = 'none';
+    confirmFooter.style.display = 'flex';
+    
+    window._confirmModalResolve = resolve;
+    
+    overlay.style.display = 'flex';
+    void overlay.offsetWidth;
+    overlay.classList.add('show');
+  });
+};
+
+window.resolveAppConfirm = function(value) {
+  if (window._confirmModalResolve) {
+    const resolve = window._confirmModalResolve;
+    window._confirmModalResolve = null;
+    resolve(value);
+  }
+  closeAppModal();
 };
 
 // Safe Tauri API extraction
@@ -521,6 +576,22 @@ function setupResponsiveMenuFadeIn() {
   handler(sidebarMql);
 }
 
+function setupHorizontalTabScroll() {
+  const scrollWheel = (e) => {
+    const container = e.currentTarget;
+    const maxScroll = container.scrollWidth - container.clientWidth;
+    if (maxScroll > 0) {
+      container.scrollLeft += e.deltaY;
+      e.preventDefault();
+    }
+  };
+
+  const containers = document.querySelectorAll('.settings-categories');
+  containers.forEach(el => {
+    el.addEventListener('wheel', scrollWheel, { passive: false });
+  });
+}
+
 async function initApp() {
   console.log("Whisper Manager Desktop UI Initialized!");
   
@@ -566,6 +637,9 @@ async function initApp() {
   // Setup responsive menu fade-in on window re-expand
   setupResponsiveMenuFadeIn();
   
+  // Setup horizontal scroll on tab bars for narrow windows
+  setupHorizontalTabScroll();
+  
   // Switch to default intro view
   switchView('intro');
 }
@@ -607,13 +681,19 @@ window.switchView = function(viewName) {
     'intro': 'Dashboard',
     'build': 'System Build',
     'settings': 'Configuration Grid',
-    'models': 'Models',
+    'models': 'Model Hub',
     'transcribe': 'Transcribe File',
     'logs': 'Central Logging Center'
   };
   document.getElementById('current-view-title').textContent = titleMap[viewName] || 'Whisper Manager';
 
   if (viewName === 'models') {
+    // Always reset to Recommended tab when entering the view
+    currentCategoryFilter = 'recommended';
+    const buttons = document.querySelectorAll('#model-categories-sidebar .settings-cat-btn');
+    buttons.forEach(btn => btn.classList.remove('active'));
+    const recommendedBtn = document.getElementById('model-cat-recommended');
+    if (recommendedBtn) recommendedBtn.classList.add('active');
     loadModelStatusesGrid();
   }
 
@@ -1759,12 +1839,12 @@ window.copyAllLogs = async function() {
 };
 
 window.clearLogsHistory = async function() {
-  if (confirm("Are you sure you want to clear the entire log history?")) {
-    allLogsArray = [];
-    lastAppendedCategory = null;
-    await invoke('clear_logs');
-    redrawLogsViewport();
-  }
+  const confirmed = await showConfirmModal('Clear Log History', 'Are you sure you want to clear the entire log history?', 'Clear');
+  if (!confirmed) return;
+  allLogsArray = [];
+  lastAppendedCategory = null;
+  await invoke('clear_logs');
+  redrawLogsViewport();
 };
 
 // ----------------- Batch Processing Queue Helpers & Engine -----------------
@@ -2477,6 +2557,9 @@ function startModelStatusPolling() {
   if (modelStatusPollInterval) return;
   modelStatusPollInterval = setInterval(async () => {
     if (activeView === 'models') {
+      // Skip polling refresh when user has an active search query
+      const searchInput = document.getElementById('model-search');
+      if (searchInput && searchInput.value.trim()) return;
       await loadModelStatusesGrid(true);
     } else {
       clearInterval(modelStatusPollInterval);
@@ -2562,8 +2645,12 @@ window.loadModelStatusesGrid = async function(isSilent = false) {
     }
     
     statuses.forEach(m => {
-      if (query && !m.name.toLowerCase().includes(query)) {
-        return;
+      if (query) {
+        const fullName = `ggml-${m.name}.bin`;
+        const searchTarget = `${m.name} ${fullName}`.toLowerCase();
+        if (!searchTarget.includes(query)) {
+          return;
+        }
       }
 
       // EXCLUSIVE SEPARATION:
@@ -2572,20 +2659,22 @@ window.loadModelStatusesGrid = async function(isSilent = false) {
         if (m.status !== 'Downloaded') return;
       } else {
         if (m.status === 'Downloaded') return;
-        
-        // Filter catalog tabs by size families or recommended status
-        if (currentCategoryFilter === 'recommended') {
-          if (!recList.includes(m.name)) return;
-        } else if (currentCategoryFilter === 'tiny') {
-          if (!m.name.startsWith("tiny")) return;
-        } else if (currentCategoryFilter === 'base') {
-          if (!m.name.startsWith("base")) return;
-        } else if (currentCategoryFilter === 'small') {
-          if (!m.name.startsWith("small")) return;
-        } else if (currentCategoryFilter === 'medium') {
-          if (!m.name.startsWith("medium")) return;
-        } else if (currentCategoryFilter === 'large') {
-          if (!m.name.startsWith("large")) return;
+
+        // When a search query is active, bypass category tabs and show all matches
+        if (!query) {
+          if (currentCategoryFilter === 'recommended') {
+            if (!recList.includes(m.name)) return;
+          } else if (currentCategoryFilter === 'tiny') {
+            if (!m.name.startsWith("tiny")) return;
+          } else if (currentCategoryFilter === 'base') {
+            if (!m.name.startsWith("base")) return;
+          } else if (currentCategoryFilter === 'small') {
+            if (!m.name.startsWith("small")) return;
+          } else if (currentCategoryFilter === 'medium') {
+            if (!m.name.startsWith("medium")) return;
+          } else if (currentCategoryFilter === 'large') {
+            if (!m.name.startsWith("large")) return;
+          }
         }
       }
       
@@ -2651,12 +2740,12 @@ window.loadModelStatusesGrid = async function(isSilent = false) {
         `;
       } else if (m.status === 'Paused') {
         actionButtons = `
-          <button class="btn-primary" style="margin: 0; padding: 6px 14px; font-size: 0.8rem;" onclick="downloadModelClick('${m.name}')">Resume</button>
+          <button class="btn-primary" style="margin: 0; padding: 6px 14px; font-size: 0.8rem; justify-content: center;" onclick="downloadModelClick('${m.name}')">Resume</button>
           <button class="btn-secondary" style="border-color: var(--color-red); color: var(--color-red); margin: 0; padding: 6px 14px; font-size: 0.8rem;" onclick="deleteModelClick('${m.name}')">Discard</button>
         `;
       } else {
         actionButtons = `
-          <button class="btn-primary" style="margin: 0; padding: 6px 14px; font-size: 0.8rem; min-width: 100px;" onclick="downloadModelClick('${m.name}')">Download</button>
+          <button class="btn-primary" style="margin: 0; padding: 6px 14px; font-size: 0.8rem; min-width: 100px; justify-content: center;" onclick="downloadModelClick('${m.name}')">Download</button>
         `;
       }
       
@@ -2754,8 +2843,11 @@ window.pauseModelClick = async function(name) {
 };
 
 window.deleteModelClick = async function(name) {
-  const confirm = window.confirm(`Are you sure you want to delete / discard the model ggml-${name}.bin?`);
-  if (!confirm) return;
+  const confirmed = await showConfirmModal(
+    'Delete Model',
+    `Are you sure you want to delete / discard the model ggml-${name}.bin?`
+  );
+  if (!confirmed) return;
   
   try {
     await invoke('delete_model_file', {
@@ -3313,8 +3405,8 @@ window.saveActiveProviderGeneral = async function(silent = false) {
 window.deleteProviderByName = async function(providerName) {
   if (!providerName) return;
   
-  const confirmDel = confirm(`Are you sure you want to delete the provider '${providerName}'?`);
-  if (!confirmDel) return;
+  const confirmed = await showConfirmModal('Delete Provider', `Are you sure you want to delete the provider '${providerName}'?`);
+  if (!confirmed) return;
   
   let providers = [];
   try {
