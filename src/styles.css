@@ -256,9 +256,9 @@ sidebar.sidebar-collapsed {
   padding: 24px 8px;
 }
 sidebar.sidebar-collapsed .brand {
-  justify-content: flex-start;
-  padding-left: 6px;
-  padding-right: 6px;
+  justify-content: center;
+  gap: 0;
+  padding: 0;
   margin-bottom: 24px;
 }
 sidebar.sidebar-collapsed .brand-name {
@@ -289,9 +289,9 @@ sidebar.sidebar-collapsed .developer-credit {
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   margin-bottom: 32px;
-  padding-left: 8px;
+  padding-left: 31px;
 }
 
 .brand-icon {

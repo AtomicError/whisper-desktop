@@ -160,11 +160,16 @@ try {
   if (window.__TAURI__) {
     originalInvoke = window.__TAURI__.core.invoke;
     originalListen = window.__TAURI__.event.listen;
+    window.openUrl = (url) => {
+      window.__TAURI__.opener.openUrl(url).catch(() => window.open(url, '_blank'));
+    };
   } else {
     console.warn("Tauri global namespace not detected. Web fallback active.");
+    window.openUrl = (url) => window.open(url, '_blank');
   }
 } catch (e) {
   console.error("Failed to load Tauri core APIs:", e);
+  window.openUrl = (url) => window.open(url, '_blank');
 }
 
 // Redefine invoke and listen to be safe functions with mocks if original APIs are missing
