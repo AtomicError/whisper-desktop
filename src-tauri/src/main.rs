@@ -29,8 +29,17 @@ use translation::{
 struct HardwareState(Arc<Mutex<HardwareMonitor>>);
 struct LogState(Arc<AppLogs>);
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SessionPhase {
+    Idle,
+    Transcribing,
+    Translating,
+}
+
 pub struct TranscriptionSession {
     pub child_pid: Option<u32>,
+    pub phase: SessionPhase,
+    pub cancel_requested: bool,
 }
 pub struct TranscriptionState(pub Arc<Mutex<TranscriptionSession>>);
 
@@ -177,29 +186,45 @@ async fn start_transcription_task(
 
 #[tauri::command]
 fn cancel_transcription(session_state: State<'_, TranscriptionState>) -> Result<(), String> {
-    let mut pid_to_kill = None;
-    if let Ok(lock) = session_state.0.lock() {
-        pid_to_kill = lock.child_pid;
-    }
-    
-    if let Some(pid) = pid_to_kill {
-        let status = std::process::Command::new("kill")
-            .arg("-9")
-            .arg(pid.to_string())
-            .status();
-            
-        match status {
-            Ok(s) if s.success() => {
-                if let Ok(mut lock) = session_state.0.lock() {
-                    lock.child_pid = None;
-                }
-                Ok(())
-            }
-            Ok(s) => Err(format!("Kill command returned exit code: {:?}", s.code())),
-            Err(e) => Err(format!("Failed to execute kill command: {}", e)),
+    // Signal cancellation regardless of which phase we are in. The transcription
+    // loop reacts to the killed child process; the translation loop polls this
+    // flag.
+    {
+        let mut lock = session_state.0.lock().map_err(|e| format!("Lock error: {}", e))?;
+        if lock.phase == SessionPhase::Idle {
+            return Err("No active transcription or translation session".to_string());
         }
-    } else {
-        Err("No active transcription session found to cancel.".to_string())
+        lock.cancel_requested = true;
+    }
+
+    // Snapshot the pid without holding the lock across the kill.
+    let pid_to_kill = {
+        if let Ok(lock) = session_state.0.lock() {
+            lock.child_pid
+        } else {
+            None
+        }
+    };
+
+    match pid_to_kill {
+        Some(pid) => {
+            let status = std::process::Command::new("kill")
+                .arg("-9")
+                .arg(pid.to_string())
+                .status();
+
+            match status {
+                Ok(s) if s.success() => {
+                    if let Ok(mut lock) = session_state.0.lock() {
+                        lock.child_pid = None;
+                    }
+                    Ok(())
+                }
+                Ok(s) => Err(format!("Kill command returned exit code: {:?}", s.code())),
+                Err(e) => Err(format!("Failed to execute kill command: {}", e)),
+            }
+        }
+        None => Ok(()),
     }
 }
 
@@ -425,7 +450,11 @@ fn main() {
 
     let hardware_monitor = Arc::new(Mutex::new(HardwareMonitor::new()));
     let app_logs = Arc::new(AppLogs::new());
-    let transcription_session = Arc::new(Mutex::new(TranscriptionSession { child_pid: None }));
+    let transcription_session = Arc::new(Mutex::new(TranscriptionSession {
+        child_pid: None,
+        phase: SessionPhase::Idle,
+        cancel_requested: false,
+    }));
     let download_session = Arc::new(Mutex::new(DownloadSession::new()));
     
     tauri::Builder::default()

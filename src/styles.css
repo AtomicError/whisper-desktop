@@ -1325,7 +1325,7 @@ select.select-control {
 .transcribe-layout {
   display: grid;
   grid-template-columns: 1.2fr 0.8fr; /* Balanced dual-pane layout */
-  gap: 24px;
+  gap: 16px;
   flex-grow: 1;
   min-height: 0;
 }
@@ -1344,6 +1344,7 @@ select.select-control {
   flex-direction: column;
   gap: 20px;
   height: 100%;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -3784,17 +3785,27 @@ select.select-control {
 
 /* 7. Transcribe Layout Stacking & Scroll (Screens <= 960px) */
 @media (max-width: 960px) {
+  #panel-transcribe {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
   .transcribe-layout {
     display: flex !important;
     flex-direction: column !important;
     grid-template-columns: none !important;
     gap: 20px !important;
-    overflow-y: auto !important;
-  }
-  .transcribe-left-panel,
-  .transcribe-right-panel {
-    height: auto !important;
     overflow: visible !important;
+  }
+  .transcribe-left-panel {
+    height: auto !important;
+    padding-right: 0 !important;
+    overflow: visible !important;
+  }
+  .transcribe-right-panel {
+    overflow: visible !important;
+  }
+  .transcript-viewer-card {
+    min-height: 300px !important;
   }
 }
 

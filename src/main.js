@@ -820,6 +820,26 @@ function setupTauriListeners() {
     }
   });
 
+  listen('translation-status', (event) => {
+    const payload = event.payload;
+    const fillBar = document.getElementById('progress-linear-fill');
+    const pctEl = document.getElementById('lbl-radial-pct');
+    const msgEl = document.getElementById('lbl-radial-msg');
+    const pulseDot = document.getElementById('hud-pulse-dot');
+
+    if (fillBar) fillBar.style.width = payload.active ? '0%' : '100%';
+    if (pctEl) pctEl.textContent = payload.active ? '0%' : '100%';
+    if (msgEl) msgEl.textContent = payload.message;
+
+    if (pulseDot) {
+      if (payload.active) {
+        pulseDot.classList.add('active');
+      } else {
+        pulseDot.classList.remove('active');
+      }
+    }
+  });
+
   // Model download progress
   listen('model-download-status', (event) => {
     const payload = event.payload;
@@ -1619,6 +1639,7 @@ window.runWhisperTranscription = async function() {
   const fillBar = document.getElementById('progress-linear-fill');
   const pctEl = document.getElementById('lbl-radial-pct');
   const msgEl = document.getElementById('lbl-radial-msg');
+  const pulseDot = document.getElementById('hud-pulse-dot');
 
   if (!selectedMediaFile && !wavPathForTranscription) {
     showNotification("No media file selected!", "info");
@@ -1714,27 +1735,36 @@ window.runWhisperTranscription = async function() {
         translatedFiles.forEach(f => {
           const badge = document.createElement('span');
           badge.className = 'output-badge';
-          badge.style.borderColor = 'var(--color-green)';
-          badge.style.color = 'var(--color-green)';
           badge.textContent = f;
           badgesRow.appendChild(badge);
         });
 
         showNotification("AI translation completed successfully!", "success");
       } catch (err) {
-        showNotification("AI translation failed: " + err, "error");
+        const errMsg = (typeof err === 'string') ? err : (err && err.toString ? err.toString() : '');
+        if (errMsg.toLowerCase().includes('cancelled')) {
+          // Bubble up to outer catch so it shows the proper "cancelled" message
+          // and marks the step as incomplete.
+          throw err;
+        } else {
+          showNotification("AI translation failed: " + errMsg, "error");
+        }
       }
     }
 
     setWizardStepCompleted(3, true);
     showNotification("Transcription completed successfully!", "success");
   } catch (e) {
+    const errMsg = (typeof e === 'string') ? e : (e && e.toString ? e.toString() : '');
     setWizardStepCompleted(3, false);
-    if (e.includes("cancelled") || e.includes("terminated") || e.includes("aborted") || e.includes("signal")) {
+    if (errMsg.toLowerCase().includes('cancelled')) {
+      showNotification("AI translation cancelled by the user.", "info");
+      if (msgEl) msgEl.textContent = 'Translation cancelled';
+    } else if (errMsg.toLowerCase().includes("aborted") || errMsg.toLowerCase().includes("terminated") || errMsg.toLowerCase().includes("signal")) {
       showNotification("Transcription aborted by the user.", "info");
       if (msgEl) msgEl.textContent = 'Aborted';
     } else {
-      showNotification("Task failed: " + e, "error");
+      showNotification("Task failed: " + errMsg, "error");
       if (msgEl) msgEl.textContent = 'Task Failed';
     }
   } finally {
@@ -1744,6 +1774,8 @@ window.runWhisperTranscription = async function() {
     btn.disabled = false;
     btn.textContent = 'Start AI Extraction';
     if (fillBar) fillBar.classList.remove('indeterminate');
+    // Guarantee the HUD pulse dot can never get stuck (success, error, or cancel).
+    if (pulseDot) pulseDot.classList.remove('active');
     if (cancelBtn) {
       cancelBtn.disabled = false;
       cancelBtn.textContent = 'Cancel';
@@ -1756,19 +1788,19 @@ window.abortTranscription = async function() {
   const cancelBtn = document.getElementById('btn-cancel-transcribe');
   if (cancelBtn) {
     cancelBtn.disabled = true;
-    cancelBtn.textContent = 'Aborting...';
+    cancelBtn.textContent = 'Cancelling...';
   }
   
   try {
     await invoke('cancel_transcription');
-    showNotification("Aborting AI process...", "info");
   } catch (e) {
-    showNotification("Failed to cancel process: " + e, "error");
-  } finally {
+    const errMsg = (typeof e === 'string') ? e : (e && e.toString ? e.toString() : '');
+    if (!errMsg.includes("No active transcription or translation session")) {
+      showNotification("Failed to cancel process: " + errMsg, "error");
+    }
     if (cancelBtn) {
       cancelBtn.disabled = false;
       cancelBtn.textContent = 'Cancel';
-      cancelBtn.style.display = 'none';
     }
   }
 };
@@ -2256,6 +2288,13 @@ window.runBatchExtraction = async function() {
           translationSuccess = true;
         } catch (transErr) {
           console.error("Batch translation error:", transErr);
+          const errMsg = (typeof transErr === 'string') ? transErr : (transErr && transErr.toString ? transErr.toString() : '');
+          if (errMsg.toLowerCase().includes('cancelled')) {
+            batchCancelActive = true;
+            item.status = 'aborted';
+            renderBatchQueueTable();
+            break;
+          }
           const choice = await showBatchErrorDialog(item.name, transErr);
           if (choice === 'retry') {
             // continues the while loop to retry

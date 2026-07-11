@@ -5,6 +5,7 @@ pub mod formatter;
 pub mod translator;
 
 use crate::settings::WhisperSettings;
+use tauri::AppHandle;
 use serde_json::Value;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -144,11 +145,13 @@ pub async fn fetch_provider_models(
 
 #[tauri::command]
 pub async fn translate_transcription_files(
+    app: AppHandle,
+    session_state: tauri::State<'_, crate::TranscriptionState>,
     settings: WhisperSettings,
     generated_files: Vec<String>,
     parent_dir: String,
 ) -> Result<Vec<String>, String> {
-    translator::translate_files(settings, generated_files, parent_dir).await
+    translator::translate_files(app, session_state.0.clone(), settings, generated_files, parent_dir).await
 }
 
 #[tauri::command]

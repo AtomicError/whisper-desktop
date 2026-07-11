@@ -1,10 +1,28 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
+use std::sync::{Arc, Mutex};
 use serde_json::Value;
+use tauri::{AppHandle, Emitter};
 use crate::settings::WhisperSettings;
 use crate::translation::provider::{AiProvider, get_keyring_key};
 use crate::translation::formatter::ParsedSubtitle;
+
+/// Reset the shared session state when translation ends, regardless of whether it
+/// finished, errored, or was cancelled. Mirrors `ActiveSessionGuard` on the
+/// transcription side so the session never gets stuck in `Translating`.
+struct TranslationSessionGuard {
+    session: Arc<Mutex<crate::TranscriptionSession>>,
+}
+
+impl Drop for TranslationSessionGuard {
+    fn drop(&mut self) {
+        if let Ok(mut lock) = self.session.lock() {
+            lock.phase = crate::SessionPhase::Idle;
+            lock.cancel_requested = false;
+        }
+    }
+}
 use crate::translation::chunker::chunk_dialogues;
 use crate::translation::prompts::build_system_prompt;
 
@@ -122,6 +140,8 @@ fn align_translations(
 
 /// Core function to execute translation on a file list.
 pub async fn translate_files(
+    app: AppHandle,
+    session: Arc<Mutex<crate::TranscriptionSession>>,
     settings: WhisperSettings,
     generated_files: Vec<String>,
     parent_dir: String,
@@ -162,11 +182,38 @@ pub async fn translate_files(
 
     let lang_code = get_language_code(&settings.translate_ai_target_lang);
     let mut successfully_translated = Vec::new();
-    
+
+    // Mark the session as translating and install a guard that resets the state
+    // (phase + cancel flag) no matter how this function exits.
+    {
+        if let Ok(mut lock) = session.lock() {
+            lock.phase = crate::SessionPhase::Translating;
+        }
+    }
+    let _guard = TranslationSessionGuard { session: session.clone() };
+
+    if !generated_files.is_empty() {
+        let _ = app.emit(
+            "translation-status",
+            serde_json::json!({ "progress": 0.0, "message": "Translating with AI…", "active": true }),
+        );
+    }
+
     let client = reqwest::Client::new();
 
-    for file_name in generated_files {
-        let input_path = Path::new(&parent_dir).join(&file_name);
+    for file_name in generated_files.iter() {
+        // Honour a cancel request between files. The flag is checked without
+        // holding the lock across the await points inside the loop.
+        let cancelled = session.lock().map(|l| l.cancel_requested).unwrap_or(false);
+        if cancelled {
+            let _ = app.emit(
+                "translation-status",
+                serde_json::json!({ "progress": 1.0, "message": "Translation cancelled", "active": false }),
+            );
+            return Err("Translation cancelled by user".to_string());
+        }
+
+        let input_path = Path::new(&parent_dir).join(file_name);
         if !input_path.exists() {
             continue;
         }
@@ -209,6 +256,16 @@ pub async fn translate_files(
         let mut context_window = context_window;
 
         while !remaining_entries.is_empty() {
+            // Honour a cancel request between chunks (each chunk awaits an HTTP call).
+            let cancelled = session.lock().map(|l| l.cancel_requested).unwrap_or(false);
+            if cancelled {
+                let _ = app.emit(
+                    "translation-status",
+                    serde_json::json!({ "progress": 1.0, "message": "Translation cancelled", "active": false }),
+                );
+                return Err("Translation cancelled by user".to_string());
+            }
+
             let mut chunks = chunk_dialogues(&remaining_entries, context_window);
             if chunks.is_empty() {
                 break;
@@ -286,43 +343,78 @@ pub async fn translate_files(
                 }
             }
 
-            let res = req.send().await
-                .map_err(|e| format!("HTTP request to {} failed: {}", provider.name, e))?;
-
-            if !res.status().is_success() {
-                let status = res.status();
-                let err_text = res.text().await.unwrap_or_default();
-                
-                // Reactive context limit recovery
-                if let Some(new_limit) = parse_context_limit_from_error(&err_text) {
-                    if new_limit < context_window {
-                        context_window = new_limit;
-                        let _ = update_model_context_window(&settings.translate_ai_provider, &settings.translate_ai_model, new_limit);
-                        continue;
+            // Race the in-flight HTTP request against cancellation. We poll the
+            // `cancel_requested` flag directly (it is stateful and never lost) on a
+            // short interval, so a cancel is honoured within ~100ms no matter when
+            // the button is pressed — without relying on a one-shot `Notify` that
+            // can be missed if the loop isn't currently parked on it.
+            let req_future = req.send();
+            tokio::select! {
+                biased;
+                _ = async {
+                    loop {
+                        if session.lock().map(|l| l.cancel_requested).unwrap_or(false) {
+                            break;
+                        }
+                        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
                     }
+                } => {
+                    let _ = app.emit(
+                        "translation-status",
+                        serde_json::json!({ "progress": 1.0, "message": "Translation cancelled", "active": false }),
+                    );
+                    return Err("Translation cancelled by user".to_string());
                 }
+                res = req_future => {
+                    let res = res.map_err(|e| format!("HTTP request to {} failed: {}", provider.name, e))?;
 
-                if is_context_length_error(&err_text) {
-                    let new_limit = context_window / 2;
-                    if new_limit >= 1024 {
-                        context_window = new_limit;
-                        let _ = update_model_context_window(&settings.translate_ai_provider, &settings.translate_ai_model, new_limit);
-                        continue;
+                    if !res.status().is_success() {
+                        let status = res.status();
+                        let err_text = res.text().await.unwrap_or_default();
+                        
+                        // Reactive context limit recovery
+                        if let Some(new_limit) = parse_context_limit_from_error(&err_text) {
+                            if new_limit < context_window {
+                                context_window = new_limit;
+                                let _ = update_model_context_window(&settings.translate_ai_provider, &settings.translate_ai_model, new_limit);
+                                continue;
+                            }
+                        }
+
+                        if is_context_length_error(&err_text) {
+                            let new_limit = context_window / 2;
+                            if new_limit >= 1024 {
+                                context_window = new_limit;
+                                let _ = update_model_context_window(&settings.translate_ai_provider, &settings.translate_ai_model, new_limit);
+                                continue;
+                            }
+                        }
+
+                        return Err(format!("API returned error status ({}): {}", status, err_text));
                     }
-                }
 
-                return Err(format!("API returned error status ({}): {}", status, err_text));
+                    let res_json: Value = res.json().await
+                        .map_err(|e| format!("Failed to parse response JSON: {}", e))?;
+
+                    let response_text = parse_response_content(&provider.api_format, &res_json)?;
+                    let chunk_translations = align_translations(&chunk, &response_text);
+                    
+                    translations_map.extend(chunk_translations);
+                    
+                    remaining_entries.retain(|(idx, _)| !translations_map.contains_key(idx));
+                }
             }
+        }
 
-            let res_json: Value = res.json().await
-                .map_err(|e| format!("Failed to parse response JSON: {}", e))?;
-
-            let response_text = parse_response_content(&provider.api_format, &res_json)?;
-            let chunk_translations = align_translations(&chunk, &response_text);
-            
-            translations_map.extend(chunk_translations);
-            
-            remaining_entries.retain(|(idx, _)| !translations_map.contains_key(idx));
+        // Check cancellation before writing the file to prevent completing
+        // even when the in-flight poll missed the flag (e.g. fast API response).
+        let cancelled = session.lock().map(|l| l.cancel_requested).unwrap_or(false);
+        if cancelled {
+            let _ = app.emit(
+                "translation-status",
+                serde_json::json!({ "progress": 1.0, "message": "Translation cancelled", "active": false }),
+            );
+            return Err("Translation cancelled by user".to_string());
         }
 
         // Reconstruct and save
@@ -331,6 +423,13 @@ pub async fn translate_files(
             .map_err(|e| format!("Failed to write output translated file: {}", e))?;
 
         successfully_translated.push(output_file_name);
+    }
+
+    if !successfully_translated.is_empty() {
+        let _ = app.emit(
+            "translation-status",
+            serde_json::json!({ "progress": 1.0, "message": "AI translation complete", "active": false }),
+        );
     }
 
     Ok(successfully_translated)

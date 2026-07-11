@@ -179,6 +179,8 @@ impl Drop for ActiveSessionGuard {
     fn drop(&mut self) {
         if let Ok(mut lock) = self.session.lock() {
             lock.child_pid = None;
+            lock.phase = crate::SessionPhase::Idle;
+            lock.cancel_requested = false;
         }
     }
 }
@@ -358,6 +360,7 @@ pub async fn run_transcription(
     let pid = child.id();
     if let Ok(mut lock) = session.lock() {
         lock.child_pid = pid;
+        lock.phase = crate::SessionPhase::Transcribing;
     }
     let _guard = ActiveSessionGuard { session: session.clone() };
         
@@ -424,10 +427,22 @@ pub async fn run_transcription(
     let _ = fs::remove_file(&wav_path); // Clean up converted WAV file
     
     if !status.success() {
-        let _ = std::process::Command::new("notify-send")
-            .args(["Transcription Failed or Cancelled", &format!("Whisper process terminated for {}!", file_name)])
-            .spawn();
-        return Err(format!("Whisper CLI failed or was cancelled. Exit code: {:?}", status.code()));
+        // Distinguish a genuine user cancellation from a real failure so the UI
+        // never labels an unexpected crash as "Aborted".
+        let cancelled = session.lock().map(|l| l.cancel_requested).unwrap_or(false);
+        if cancelled {
+            let _ = app.emit("transcribe-status", TranscribeProgress { progress: 0.0, message: "Aborted".to_string(), active: false });
+            let _ = std::process::Command::new("notify-send")
+                .args(["Transcription Cancelled", &format!("Whisper process cancelled for {}!", file_name)])
+                .spawn();
+            return Err("Whisper process was cancelled by the user.".to_string());
+        } else {
+            let _ = app.emit("transcribe-status", TranscribeProgress { progress: 0.0, message: "Task Failed".to_string(), active: false });
+            let _ = std::process::Command::new("notify-send")
+                .args(["Transcription Failed", &format!("Whisper process terminated for {}!", file_name)])
+                .spawn();
+            return Err(format!("Whisper CLI process failed with exit code: {:?}", status.code()));
+        }
     }
     
     let elapsed = start_time.elapsed().as_millis() as u64;
