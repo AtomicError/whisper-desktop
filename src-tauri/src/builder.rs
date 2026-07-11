@@ -159,12 +159,12 @@ async fn run_compilation_inner(
     
     // 1. CMake Configure
     logs.log(&app, "Build", &format!("Configuring build: cmake {}", config_args.join(" ")));
-    app.emit("build-status", BuildProgress {
+    let _ = app.emit("build-status", BuildProgress {
         progress: 0.0,
         message: "Configuring build (CMake)...".to_string(),
         active: true,
         error: None,
-    }).unwrap();
+    });
     
     let mut child = Command::new("cmake")
         .args(&config_args)
@@ -178,12 +178,12 @@ async fn run_compilation_inner(
     
     // 2. CMake Build
     logs.log(&app, "Build", "Starting compilation...");
-    app.emit("build-status", BuildProgress {
+    let _ = app.emit("build-status", BuildProgress {
         progress: 0.05,
         message: "Compiling code...".to_string(),
         active: true,
         error: None,
-    }).unwrap();
+    });
     
     let build_args = [
         "--build",
@@ -235,12 +235,12 @@ pub async fn run_compilation(
     }
     
     logs.log(&app, "Build", &format!("Success! {} build completed.", backend));
-    app.emit("build-status", BuildProgress {
+    let _ = app.emit("build-status", BuildProgress {
         progress: 1.0,
         message: format!("Build finished! ready to use."),
         active: false,
         error: None,
-    }).unwrap();
+    });
     
     Ok(())
 }
@@ -269,7 +269,8 @@ async fn stream_command_output(
             line = stderr_reader.next_line() => {
                 match line {
                     Ok(Some(l)) => logs.log(&app, category, &l),
-                    _ => {}
+                    Ok(None) => break,
+                    Err(_) => {}
                 }
             }
         }
@@ -294,8 +295,8 @@ async fn stream_compilation_progress(
     let mut stdout_reader = BufReader::new(stdout).lines();
     let mut stderr_reader = BufReader::new(stderr).lines();
     
-    let pct_regex = Regex::new(r"\[\s*(\d+)%\]").unwrap();
-    let ninja_regex = Regex::new(r"\[\s*(\d+)/(\d+)\]").unwrap();
+    let pct_regex = Regex::new(r"\[\s*(\d+)%\]").expect("static regex");
+    let ninja_regex = Regex::new(r"\[\s*(\d+)/(\d+)\]").expect("static regex");
     
     loop {
         tokio::select! {
@@ -343,7 +344,8 @@ async fn stream_compilation_progress(
             line = stderr_reader.next_line() => {
                 match line {
                     Ok(Some(l)) => logs.log(&app, "Build", &l),
-                    _ => {}
+                    Ok(None) => break,
+                    Err(_) => {}
                 }
             }
         }

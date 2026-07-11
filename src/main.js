@@ -39,10 +39,8 @@ window.showNotification = function(message, type = 'info') {
     iconSvg = `<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`;
   }
   
-  toast.innerHTML = `
-    ${iconSvg}
-    <div class="toast-message">${message}</div>
-  `;
+  toast.innerHTML = `${iconSvg}<div class="toast-message"></div>`;
+  toast.querySelector('.toast-message').textContent = message;
   
   container.appendChild(toast);
   
@@ -94,6 +92,13 @@ window.showAppModal = function(title, message, details = '') {
 };
 
 window.closeAppModal = function() {
+  // If a confirm modal is open, resolve as cancelled so the caller doesn't hang.
+  // Inlined (not resolveAppConfirm) to avoid recursive closeAppModal calls.
+  if (window._confirmModalResolve) {
+    const resolve = window._confirmModalResolve;
+    window._confirmModalResolve = null;
+    resolve(false);
+  }
   const overlay = document.getElementById('app-modal-overlay');
   if (overlay) {
     overlay.classList.remove('show');
@@ -112,6 +117,7 @@ window.closeAppModal = function() {
 window._confirmModalResolve = null;
 
 window.showConfirmModal = function(title, message, confirmButtonText = 'Delete') {
+  if (window._confirmModalResolve) return Promise.resolve(false);
   return new Promise((resolve) => {
     const overlay = document.getElementById('app-modal-overlay');
     const titleEl = document.getElementById('app-modal-title');
@@ -184,7 +190,7 @@ const invoke = async function(cmd, args = {}) {
     return {
       cpu: Math.random() * 8.0 + 2.0, // Mock realistic idle load
       ram: "4.8GB / 16.0GB",
-      gpu: "Intel Iris Xe Graphics (💤 IDLE)"
+      gpu: "Intel Iris Xe Graphics (idle)"
     };
   }
   if (cmd === 'load_settings') {
@@ -220,7 +226,7 @@ const invoke = async function(cmd, args = {}) {
       outputSrt: true,
       outputLrc: false,
       outputWords: false,
-      fontPath: "".to_string || "",
+      fontPath: "",
       outputCsv: false,
       outputJson: false,
       outputJsonFull: false,
@@ -293,6 +299,9 @@ let selectedMediaFiles = [];
 let batchItems = [];
 let isBatchMode = false;
 let batchCancelActive = false;
+let _hudInterval = null;
+let _unlistenFns = [];
+let _modelActionsInProgress = new Set();
 
 // Premium GNOME-Style Titlebar Window Controls Binding
 function setupTitlebar() {
@@ -426,11 +435,12 @@ class CustomSelect {
       this.toggle();
     });
 
-    document.addEventListener('click', (e) => {
+    this._documentClickHandler = (e) => {
       if (this.isOpen && !this.container.contains(e.target)) {
         this.close();
       }
-    });
+    };
+    document.addEventListener('click', this._documentClickHandler);
 
     this.updateOptions();
 
@@ -520,6 +530,12 @@ class CustomSelect {
     this.container.classList.remove('open');
     this.container.closest('.setting-card, .wizard-step')?.classList.remove('has-active-dropdown');
     this.isOpen = false;
+  }
+
+  destroy() {
+    document.removeEventListener('click', this._documentClickHandler);
+    this.observer.disconnect();
+    window.customSelectsMap.delete(this.select.id || this.select);
   }
 }
 
@@ -644,6 +660,29 @@ async function initApp() {
   
   // Initial load
   await refreshSettings();
+  // Load existing logs
+  try {
+    const logs = await invoke('get_logs');
+    if (logs) {
+      const lines = logs.trim().split('\n');
+      for (const line of lines) {
+        if (line.trim()) {
+          // Parse log format: [HH:MM:SS] [Category] message
+          const match = line.match(/^\[(\d{2}:\d{2}:\d{2})\] \[([^\]]+)\] (.*)$/);
+          if (match) {
+            allLogsArray.push({
+              timestamp: match[1],
+              category: match[2],
+              message: match[3]
+            });
+          }
+        }
+      }
+      redrawLogsViewport();
+    }
+  } catch (e) {
+    console.error("Failed to load initial logs:", e);
+  }
   if (typeof setupTranslationEventListeners === 'function') {
     setupTranslationEventListeners();
   }
@@ -737,8 +776,10 @@ function reanimateSlideIn(selector, stagger = 0.03) {
 }
 
 // ----------------- HUD Statistics Poll -----------------
+
 function startHudPoll() {
-  setInterval(async () => {
+  if (_hudInterval) return;
+  _hudInterval = setInterval(async () => {
     try {
       const stats = await invoke('get_system_stats');
       
@@ -761,9 +802,21 @@ function startHudPoll() {
 }
 
 // ----------------- Real-Time Listeners -----------------
+
+function cleanupTauriListeners() {
+  _unlistenFns.forEach(fn => { try { fn(); } catch(e) {} });
+  _unlistenFns = [];
+}
+
 function setupTauriListeners() {
+  cleanupTauriListeners();
+
+  const on = (event, handler) => {
+    listen(event, handler).then(fn => _unlistenFns.push(fn)).catch(() => {});
+  };
+
   // Build compilation logs & progress
-  listen('build-status', (event) => {
+  on('build-status', (event) => {
     const payload = event.payload;
     const progressBlock = document.getElementById('build-progress-block');
     const fillEl = document.getElementById('build-progress-bar');
@@ -802,7 +855,7 @@ function setupTauriListeners() {
   });
 
   // Transcription progress
-  listen('transcribe-status', (event) => {
+  on('transcribe-status', (event) => {
     const payload = event.payload;
     
     const fillBar = document.getElementById('progress-linear-fill');
@@ -825,7 +878,7 @@ function setupTauriListeners() {
     }
   });
 
-  listen('translation-status', (event) => {
+  on('translation-status', (event) => {
     const payload = event.payload;
     const fillBar = document.getElementById('progress-linear-fill');
     const pctEl = document.getElementById('lbl-radial-pct');
@@ -846,7 +899,7 @@ function setupTauriListeners() {
   });
 
   // Model download progress
-  listen('model-download-status', (event) => {
+  on('model-download-status', (event) => {
     const payload = event.payload;
     
     // Reload model statuses grid to show the progress update in real-time
@@ -863,13 +916,14 @@ function setupTauriListeners() {
   });
 
   // Central logs listener
-  listen('log-message', (event) => {
+  on('log-message', (event) => {
     const payload = event.payload;
     payload.message = stripAnsi(payload.message);
     const now = new Date();
     const pad = (num) => num.toString().padStart(2, '0');
     payload.timestamp = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
     allLogsArray.push(payload);
+    if (allLogsArray.length > 10000) allLogsArray.splice(0, allLogsArray.length - 10000);
     appendLogToViewport(payload);
 
     // Intercept Whisper lines containing timestamp ranges
@@ -918,6 +972,7 @@ function appendLogToViewport(payload) {
 }
 
 function stripAnsi(str) {
+  if (typeof str !== 'string') return '';
   const ansiRegex = /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g;
   return str.replace(ansiRegex, '');
 }
@@ -1508,6 +1563,8 @@ window.browseMediaFile = async function() {
       document.getElementById('btn-cancel-transcribe').style.display = 'none';
       document.getElementById('wizard-step-3').style.display = 'block';
       
+      wavPathForTranscription = null;
+      
       if (settingsState) {
         settingsState.inputFile = selectedMediaFile;
         saveCurrentSettings();
@@ -1553,20 +1610,22 @@ window.browseMediaFile = async function() {
       setWizardStepCompleted(1, true);
       setWizardStepCompleted(2, true);
       
-      // Probe file sizes and durations asynchronously to avoid freezing the UI thread
-      files.forEach(async (f, idx) => {
-        try {
-          const meta = await invoke('probe_media_file', { filePath: f });
-          if (meta && meta.exists) {
-            batchItems[idx].size = meta.size;
-            batchItems[idx].durationSec = meta.durationSec;
-            renderBatchQueueTable();
-            updateBatchSpecs();
+      // Probe file sizes and durations sequentially to avoid race / DOM thrash
+      (async () => {
+        for (let idx = 0; idx < files.length; idx++) {
+          try {
+            const meta = await invoke('probe_media_file', { filePath: files[idx] });
+            if (meta && meta.exists) {
+              batchItems[idx].size = meta.size;
+              batchItems[idx].durationSec = meta.durationSec;
+            }
+          } catch (err) {
+            console.error("Failed to probe file in batch:", err);
           }
-        } catch (err) {
-          console.error("Failed to probe file in batch:", err);
         }
-      });
+        renderBatchQueueTable();
+        updateBatchSpecs();
+      })();
       
       setTimeout(() => {
         openWizardStep(2);
@@ -1775,7 +1834,6 @@ window.runWhisperTranscription = async function() {
   } finally {
     // ALWAYS clear the temporary WAV state since it has been cleaned up by the backend
     wavPathForTranscription = null;
-    setWizardStepCompleted(3, false);
     btn.disabled = false;
     btn.textContent = 'Start AI Extraction';
     if (fillBar) fillBar.classList.remove('indeterminate');
@@ -1813,28 +1871,29 @@ window.abortTranscription = async function() {
 window.copyTranscriptToClipboard = async function() {
   if (!selectedMediaFile) return;
   
-  // Read base path and .txt path
-  // Since selectedMediaFile is /path/to/media.mp4, we extract its base name and check for .txt file
   const base = selectedMediaFile.substring(0, selectedMediaFile.lastIndexOf('.')) || selectedMediaFile;
   const txtFile = `${base}.txt`;
   
   try {
-    // We can run a shell copy of the written transcript file
-    const content = await invoke('get_logs'); // Fallback to raw log string
-    // In our Rust backend, we have a custom copy_to_clipboard command which reads clipboard natively.
-    // Let's copy the full logs or display a notice.
-    // Actually, we'll read the main generated files using standard commands or copy log text.
-    // Since copy_to_clipboard is bound in Rust main.rs, let's copy the activity logs for now!
-    // Or we can let users copy all logs. Let's send the central logs to the clipboard.
-    const allLogs = allLogsArray
+    const content = await invoke('read_text_file_content', { filePath: txtFile });
+    await invoke('copy_to_clipboard', { text: content });
+    showNotification("Transcription text copied to clipboard successfully!", "success");
+  } catch (e) {
+    // Fallback: copy Whisper logs
+    const fallback = allLogsArray
       .filter(l => l.category === 'Whisper')
       .map(l => l.message)
       .join('\n');
-      
-    await invoke('copy_to_clipboard', { text: allLogs });
-    showNotification("Transcription text copied to clipboard successfully!", "success");
-  } catch (e) {
-    showNotification("Failed to copy transcript: " + e, "error");
+    if (fallback) {
+      try {
+        await invoke('copy_to_clipboard', { text: fallback });
+        showNotification("Transcript file not found; copied log output instead.", "info");
+      } catch(e2) {
+        showNotification("Failed to copy transcript: " + e2, "error");
+      }
+    } else {
+      showNotification("Failed to copy transcript: " + e, "error");
+    }
   }
 };
 
@@ -2227,28 +2286,28 @@ window.runBatchExtraction = async function() {
     if (msgEl) msgEl.textContent = `[${i + 1}/${totalCount}] Converting: '${item.name}'...`;
     
     let currentWavPath = null;
-    
-    try {
-      // 1. Run FFmpeg conversion
-      currentWavPath = await invoke('convert_media_file', { filePath: item.path });
-      
-      if (batchCancelActive) {
-        item.status = 'aborted';
-        renderBatchQueueTable();
-        continue;
-      }
-      
-      // 2. Run Whisper Transcription
-      item.status = 'transcribing';
-      renderBatchQueueTable();
-      
-      if (msgEl) msgEl.textContent = `[${i + 1}/${totalCount}] Extracting: '${item.name}'...`;
-      
-      // Override settingsState inputFile to point to this item's path so outputs are generated next to the original file
-      const originalInputFile = settingsState.inputFile;
-      settingsState.inputFile = item.path;
 
-      // Clear transcript preview for this file
+        // Override settingsState inputFile to point to this item's path so outputs are generated next to the original file
+        const originalInputFile = settingsState.inputFile;
+        settingsState.inputFile = item.path;
+
+        try {
+          // 1. Run FFmpeg conversion
+          currentWavPath = await invoke('convert_media_file', { filePath: item.path });
+
+          if (batchCancelActive) {
+            item.status = 'aborted';
+            renderBatchQueueTable();
+            continue;
+          }
+
+          // 2. Run Whisper Transcription
+          item.status = 'transcribing';
+          renderBatchQueueTable();
+
+          if (msgEl) msgEl.textContent = `[${i + 1}/${totalCount}] Extracting: '${item.name}'...`;
+
+          // Clear transcript preview for this file
       transcriptLines = [];
       const viewport = document.getElementById('transcript-viewport');
       if (viewport) {
@@ -2314,9 +2373,6 @@ window.runBatchExtraction = async function() {
         }
       }
       
-      // Restore original setting
-      settingsState.inputFile = originalInputFile;
-      
       if (batchCancelActive) {
         continue;
       }
@@ -2331,6 +2387,8 @@ window.runBatchExtraction = async function() {
       item.status = 'failed';
       renderBatchQueueTable();
       showNotification(`Failed to process '${item.name}': ${err}`, "error");
+    } finally {
+      settingsState.inputFile = originalInputFile;
     }
   }
   
@@ -2563,19 +2621,21 @@ async function handleDashboardDroppedFiles(files) {
     setWizardStepCompleted(1, true);
     setWizardStepCompleted(2, true);
     
-    files.forEach(async (f, idx) => {
-      try {
-        const meta = await invoke('probe_media_file', { filePath: f });
-        if (meta && meta.exists) {
-          batchItems[idx].size = meta.size;
-          batchItems[idx].durationSec = meta.durationSec;
-          renderBatchQueueTable();
-          updateBatchSpecs();
+    (async () => {
+      for (let idx = 0; idx < files.length; idx++) {
+        try {
+          const meta = await invoke('probe_media_file', { filePath: files[idx] });
+          if (meta && meta.exists) {
+            batchItems[idx].size = meta.size;
+            batchItems[idx].durationSec = meta.durationSec;
+          }
+        } catch (err) {
+          console.error("Failed to probe file in batch:", err);
         }
-      } catch (err) {
-        console.error("Failed to probe file in batch:", err);
       }
-    });
+      renderBatchQueueTable();
+      updateBatchSpecs();
+    })();
     
     setTimeout(() => {
       openWizardStep(2);
@@ -2672,6 +2732,21 @@ window.loadModelStatusesGrid = async function(isSilent = false) {
     const query = document.getElementById('model-search').value.toLowerCase();
     
     grid.innerHTML = '';
+    if (!grid._modelDelegate) {
+      grid.addEventListener('click', function(e) {
+        const btn = e.target.closest('button[data-action]');
+        if (!btn) return;
+        const card = btn.closest('[data-model]');
+        if (!card) return;
+        const name = card.dataset.model;
+        switch (btn.dataset.action) {
+          case 'delete': deleteModelClick(name); break;
+          case 'pause':  pauseModelClick(name); break;
+          case 'download': downloadModelClick(name); break;
+        }
+      });
+      grid._modelDelegate = true;
+    }
     
     // Determine dynamic list of recommended models based on specs and GPU
     let recList = ["tiny", "tiny.en", "base", "base.en"];
@@ -2781,20 +2856,20 @@ window.loadModelStatusesGrid = async function(isSilent = false) {
       let actionButtons = '';
       if (m.status === 'Downloaded') {
         actionButtons = `
-          <button class="btn-secondary" style="border-color: var(--color-red); color: var(--color-red); margin: 0; padding: 6px 14px; font-size: 0.8rem;" onclick="deleteModelClick('${m.name}')">Delete</button>
+          <button class="btn-secondary" style="border-color: var(--color-red); color: var(--color-red); margin: 0; padding: 6px 14px; font-size: 0.8rem;" data-action="delete">Delete</button>
         `;
       } else if (m.status === 'Downloading') {
         actionButtons = `
-          <button class="btn-secondary" style="border-color: var(--color-gold); color: var(--color-gold); margin: 0; padding: 6px 14px; font-size: 0.8rem;" onclick="pauseModelClick('${m.name}')">Pause</button>
+          <button class="btn-secondary" style="border-color: var(--color-gold); color: var(--color-gold); margin: 0; padding: 6px 14px; font-size: 0.8rem;" data-action="pause">Pause</button>
         `;
       } else if (m.status === 'Paused') {
         actionButtons = `
-          <button class="btn-primary" style="margin: 0; padding: 6px 14px; font-size: 0.8rem; justify-content: center;" onclick="downloadModelClick('${m.name}')">Resume</button>
-          <button class="btn-secondary" style="border-color: var(--color-red); color: var(--color-red); margin: 0; padding: 6px 14px; font-size: 0.8rem;" onclick="deleteModelClick('${m.name}')">Discard</button>
+          <button class="btn-primary" style="margin: 0; padding: 6px 14px; font-size: 0.8rem; justify-content: center;" data-action="download">Resume</button>
+          <button class="btn-secondary" style="border-color: var(--color-red); color: var(--color-red); margin: 0; padding: 6px 14px; font-size: 0.8rem;" data-action="delete">Discard</button>
         `;
       } else {
         actionButtons = `
-          <button class="btn-primary" style="margin: 0; padding: 6px 14px; font-size: 0.8rem; min-width: 100px; justify-content: center;" onclick="downloadModelClick('${m.name}')">Download</button>
+          <button class="btn-primary" style="margin: 0; padding: 6px 14px; font-size: 0.8rem; min-width: 100px; justify-content: center;" data-action="download">Download</button>
         `;
       }
       
@@ -2815,10 +2890,12 @@ window.loadModelStatusesGrid = async function(isSilent = false) {
         recommendedBadge = `<span class="model-badge" style="background: rgba(6, 182, 212, 0.08); color: var(--color-cyan); border: 1px solid rgba(6, 182, 212, 0.25); margin-right: 6px;" title="${reason}">★ ${reason}</span>`;
       }
       
+      card.setAttribute('data-model', m.name);
+      const safeName = escapeHTML(m.name);
       card.innerHTML = `
         <div class="setting-info" style="flex-grow: 1; padding-right: 20px;">
           <div class="setting-label-row" style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-            <span class="setting-title" style="font-size: 1.05rem; font-weight: 600; color: #fff;">ggml-${m.name}.bin</span>
+            <span class="setting-title" style="font-size: 1.05rem; font-weight: 600; color: #fff;">ggml-${safeName}.bin</span>
             ${recommendedBadge}
           </div>
           <div class="setting-desc" style="font-size: 0.82rem; color: var(--color-text-muted); line-height: 1.4; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
@@ -2863,8 +2940,8 @@ window.filterModelsGrid = function() {
 };
 
 window.downloadModelClick = async function(name) {
-  if (!settingsState) return;
-  
+  if (!settingsState || _modelActionsInProgress.has(name)) return;
+  _modelActionsInProgress.add(name);
   try {
     showNotification(`Downloading ggml-${name}.bin...`, "info");
     
@@ -2878,26 +2955,33 @@ window.downloadModelClick = async function(name) {
     startModelStatusPolling();
   } catch (err) {
     showNotification("Failed to start download: " + err, "error");
+  } finally {
+    _modelActionsInProgress.delete(name);
   }
 };
 
 window.pauseModelClick = async function(name) {
+  if (_modelActionsInProgress.has(name)) return;
+  _modelActionsInProgress.add(name);
   try {
     await invoke('pause_download_model', { modelName: name });
     showNotification(`Paused ggml-${name}.bin download`, "info");
     await loadModelStatusesGrid();
   } catch (err) {
     showNotification("Failed to pause download: " + err, "error");
+  } finally {
+    _modelActionsInProgress.delete(name);
   }
 };
 
 window.deleteModelClick = async function(name) {
+  if (_modelActionsInProgress.has(name)) return;
   const confirmed = await showConfirmModal(
     'Delete Model',
     `Are you sure you want to delete / discard the model ggml-${name}.bin?`
   );
   if (!confirmed) return;
-  
+  _modelActionsInProgress.add(name);
   try {
     await invoke('delete_model_file', {
       cloneDir: settingsState.cloneDir,
@@ -2909,6 +2993,8 @@ window.deleteModelClick = async function(name) {
     await scanAndPopulateModels();
   } catch (err) {
     showNotification("Failed to delete model: " + err, "error");
+  } finally {
+    _modelActionsInProgress.delete(name);
   }
 };
 
@@ -2930,12 +3016,22 @@ function appendTranscriptLine(timeRange, text) {
   const lineEl = document.createElement('div');
   lineEl.className = 'transcript-line';
   lineEl.dataset.id = lineObj.id;
-  lineEl.innerHTML = `
-    <span class="transcript-time">${timeRange}</span>
-    <div class="transcript-text">
-      <input type="text" class="transcript-text-input" value="${escapeHTML(cleanText)}" onchange="updateTranscriptLineText(${lineObj.id}, this.value)" />
-    </div>
-  `;
+
+  const timeSpan = document.createElement('span');
+  timeSpan.className = 'transcript-time';
+  timeSpan.textContent = timeRange;
+
+  const textDiv = document.createElement('div');
+  textDiv.className = 'transcript-text';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'transcript-text-input';
+  input.value = cleanText;
+  input.onchange = function() { updateTranscriptLineText(lineObj.id, this.value); };
+  textDiv.appendChild(input);
+
+  lineEl.appendChild(timeSpan);
+  lineEl.appendChild(textDiv);
   viewport.appendChild(lineEl);
   viewport.scrollTop = viewport.scrollHeight;
 }

@@ -1,6 +1,7 @@
 use serde::{Serialize, Deserialize};
 use std::fs;
 use std::path::PathBuf;
+use crate::translation::provider::AiProvider;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -299,7 +300,25 @@ pub fn load_app_settings() -> AppSettings {
     app_settings
 }
 
+/// Strip api_key from providers that use keyring before persisting to disk
+fn sanitize_providers(providers_json: &str) -> String {
+    if let Ok(mut providers) = serde_json::from_str::<Vec<AiProvider>>(providers_json) {
+        for p in &mut providers {
+            if p.use_keyring {
+                p.api_key = "__KEYRING__".to_string();
+            }
+        }
+        serde_json::to_string(&providers).unwrap_or_else(|_| providers_json.to_string())
+    } else {
+        providers_json.to_string()
+    }
+}
+
 pub fn save_app_settings(app_settings: &AppSettings) -> Result<(), String> {
+    let mut sanitized = app_settings.clone();
+    sanitized.safe.translate_ai_providers = sanitize_providers(&sanitized.safe.translate_ai_providers);
+    sanitized.professional.translate_ai_providers = sanitize_providers(&sanitized.professional.translate_ai_providers);
+
     let path = get_settings_path();
     if let Some(parent) = path.parent() {
         if !parent.exists() {
@@ -307,7 +326,7 @@ pub fn save_app_settings(app_settings: &AppSettings) -> Result<(), String> {
         }
     }
     
-    let data = serde_json::to_string_pretty(app_settings)
+    let data = serde_json::to_string_pretty(&sanitized)
         .map_err(|e| format!("Failed to serialize settings: {}", e))?;
     
     fs::write(&path, data)

@@ -23,7 +23,6 @@ impl AppLogs {
             }
         }
         
-        // Emit log line to the frontend in real-time
         let payload = LogPayload {
             timestamp,
             category: category.to_string(),

@@ -2034,7 +2034,7 @@ select.select-control {
 
 .badge-processing {
   background: rgba(45, 127, 255, 0.15);
-  color: #c084fc;
+  color: var(--color-royal-blue);
   border: 1px solid rgba(45, 127, 255, 0.3);
   box-shadow: 0 0 10px rgba(45, 127, 255, 0.15);
   animation: pulse-badge 1.8s infinite ease-in-out;

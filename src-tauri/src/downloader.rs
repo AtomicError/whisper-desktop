@@ -23,13 +23,12 @@ pub struct DownloadState(pub Arc<Mutex<DownloadSession>>);
 
 // Helper to get expected sizes of the models in bytes
 pub fn get_expected_model_size(model_name: &str) -> u64 {
-    let name = model_name
-        .trim()
-        .to_lowercase()
+    let lowered = model_name.trim().to_lowercase();
+    let name = lowered
         .strip_prefix("ggml-")
-        .unwrap_or(model_name)
+        .unwrap_or(&lowered)
         .strip_suffix(".bin")
-        .unwrap_or(model_name)
+        .unwrap_or(&lowered)
         .to_string();
 
     match name.as_str() {

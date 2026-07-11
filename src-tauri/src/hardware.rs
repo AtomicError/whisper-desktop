@@ -36,7 +36,9 @@ impl HardwareMonitor {
         self.sys.refresh_cpu();
         self.sys.refresh_memory();
         
-        // CPU utilization
+        // CPU utilization - need two refreshes for delta calculation
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        self.sys.refresh_cpu();
         let cpu_usage = self.sys.global_cpu_info().cpu_usage() as f64;
         
         // RAM used vs total

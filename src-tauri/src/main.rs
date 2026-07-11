@@ -88,7 +88,9 @@ async fn start_git_operations(
     let logs = state.0.clone();
     // Spawn task to prevent blocking the Tauri thread
     tokio::spawn(async move {
-        let _ = run_git_clone_or_update(app, logs, clone_dir).await;
+        if let Err(e) = run_git_clone_or_update(app, logs, clone_dir).await {
+            eprintln!("[git] clone/update failed: {}", e);
+        }
     });
     Ok(())
 }
@@ -102,7 +104,9 @@ async fn start_compilation_task(
 ) -> Result<(), String> {
     let logs = state.0.clone();
     tokio::spawn(async move {
-        let _ = run_compilation(app, logs, clone_dir, backend).await;
+        if let Err(e) = run_compilation(app, logs, clone_dir, backend).await {
+            eprintln!("[build] compilation failed: {}", e);
+        }
     });
     Ok(())
 }
@@ -116,9 +120,9 @@ async fn start_multi_compilations(
 ) -> Result<(), String> {
     let logs = state.0.clone();
     tokio::spawn(async move {
-        for b in backends {
-            let res = run_compilation(app.clone(), logs.clone(), clone_dir.clone(), b).await;
-            if res.is_err() {
+        for b in &backends {
+            if let Err(e) = run_compilation(app.clone(), logs.clone(), clone_dir.clone(), b.clone()).await {
+                eprintln!("[build] multi-compilation failed for {}: {}", b, e);
                 break;
             }
         }
@@ -186,24 +190,13 @@ async fn start_transcription_task(
 
 #[tauri::command]
 fn cancel_transcription(session_state: State<'_, TranscriptionState>) -> Result<(), String> {
-    // Signal cancellation regardless of which phase we are in. The transcription
-    // loop reacts to the killed child process; the translation loop polls this
-    // flag.
-    {
+    let pid_to_kill = {
         let mut lock = session_state.0.lock().map_err(|e| format!("Lock error: {}", e))?;
         if lock.phase == SessionPhase::Idle {
             return Err("No active transcription or translation session".to_string());
         }
         lock.cancel_requested = true;
-    }
-
-    // Snapshot the pid without holding the lock across the kill.
-    let pid_to_kill = {
-        if let Ok(lock) = session_state.0.lock() {
-            lock.child_pid
-        } else {
-            None
-        }
+        lock.child_pid.take()
     };
 
     match pid_to_kill {
@@ -214,12 +207,7 @@ fn cancel_transcription(session_state: State<'_, TranscriptionState>) -> Result<
                 .status();
 
             match status {
-                Ok(s) if s.success() => {
-                    if let Ok(mut lock) = session_state.0.lock() {
-                        lock.child_pid = None;
-                    }
-                    Ok(())
-                }
+                Ok(s) if s.success() => Ok(()),
                 Ok(s) => Err(format!("Kill command returned exit code: {:?}", s.code())),
                 Err(e) => Err(format!("Failed to execute kill command: {}", e)),
             }
@@ -230,45 +218,30 @@ fn cancel_transcription(session_state: State<'_, TranscriptionState>) -> Result<
 
 #[tauri::command]
 fn copy_to_clipboard(text: String) -> Result<(), String> {
-    // 1. Try wl-copy first (Wayland native)
-    if let Ok(mut child) = std::process::Command::new("wl-copy")
-        .stdin(std::process::Stdio::piped())
-        .spawn()
-    {
-        use std::io::Write;
-        if let Some(mut stdin) = child.stdin.take() {
-            let _ = stdin.write_all(text.as_bytes());
-        }
-        let _ = child.wait();
-        return Ok(());
-    }
+    use std::io::Write;
 
-    // 2. Try xclip (X11)
-    if let Ok(mut child) = std::process::Command::new("xclip")
-        .args(["-selection", "clipboard"])
-        .stdin(std::process::Stdio::piped())
-        .spawn()
-    {
-        use std::io::Write;
+    let try_copy = |cmd: &str, args: &[&str]| -> Result<(), String> {
+        let mut child = std::process::Command::new(cmd)
+            .args(args)
+            .stdin(std::process::Stdio::piped())
+            .spawn()
+            .map_err(|e| format!("spawn {} failed: {}", cmd, e))?;
         if let Some(mut stdin) = child.stdin.take() {
-            let _ = stdin.write_all(text.as_bytes());
+            stdin.write_all(text.as_bytes())
+                .map_err(|e| format!("write to {} stdin failed: {}", cmd, e))?;
         }
-        let _ = child.wait();
-        return Ok(());
-    }
+        let status = child.wait()
+            .map_err(|e| format!("wait for {} failed: {}", cmd, e))?;
+        if !status.success() {
+            return Err(format!("{} exited with {:?}", cmd, status.code()));
+        }
+        Ok(())
+    };
 
-    // 3. Try xsel (X11)
-    if let Ok(mut child) = std::process::Command::new("xsel")
-        .args(["--clipboard", "--input"])
-        .stdin(std::process::Stdio::piped())
-        .spawn()
-    {
-        use std::io::Write;
-        if let Some(mut stdin) = child.stdin.take() {
-            let _ = stdin.write_all(text.as_bytes());
+    for (cmd, args) in [("wl-copy", &[] as &[&str]), ("xclip", &["-selection", "clipboard"]), ("xsel", &["--clipboard", "--input"])] {
+        if try_copy(cmd, args).is_ok() {
+            return Ok(());
         }
-        let _ = child.wait();
-        return Ok(());
     }
 
     Err("All clipboard tools (wl-copy, xclip, xsel) failed or are not installed.".to_string())
@@ -382,7 +355,14 @@ fn select_directory() -> Option<String> {
 
 #[tauri::command]
 fn read_text_file_content(file_path: String) -> Result<String, String> {
-    read_text_file(file_path)
+    let path = std::path::Path::new(&file_path);
+    let allowed_exts = ["txt", "srt", "vtt", "lrc"];
+    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+    if !allowed_exts.contains(&ext) {
+        return Err("File type not allowed".into());
+    }
+    let canonical = path.canonicalize().map_err(|_| "Invalid file path".to_string())?;
+    read_text_file(canonical.to_string_lossy().to_string())
 }
 
 #[tauri::command]
@@ -394,18 +374,21 @@ async fn start_download_model_task(
 ) -> Result<(), String> {
     let state = download_state.0.clone();
     tokio::spawn(async move {
-        let _ = run_model_download(app, state, clone_dir, model_name).await;
+        if let Err(e) = run_model_download(app, state, clone_dir, model_name).await {
+            eprintln!("[download] model download failed: {}", e);
+        }
     });
     Ok(())
 }
 
 #[tauri::command]
 fn get_model_download_progress(clone_dir: String, model_name: String) -> Result<f64, String> {
-    let clean_name = model_name
+    let lowered = model_name.to_lowercase();
+    let clean_name = lowered
         .strip_prefix("ggml-")
-        .unwrap_or(&model_name)
+        .unwrap_or(&lowered)
         .strip_suffix(".bin")
-        .unwrap_or(&model_name)
+        .unwrap_or(&lowered)
         .to_string();
 
     let models_dir = Path::new(&clone_dir).join("models");

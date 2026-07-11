@@ -88,7 +88,7 @@ impl ParsedSubtitle {
             }
         } else if format_lower == "lrc" {
             // LRC parser: matching timestamps like [00:12.34] or [00:12:34]
-            let lrc_re = Regex::new(r"^(\s*\[\d{2,3}:\d{2}(?:[.:]\d{2,3})?\])(.*)$").unwrap();
+            let lrc_re = Regex::new(r"^(\s*\[\d{2,3}:\d{2}(?:[.:]\d{2,3})?\])(.*)$").expect("static regex");
             for line in lines {
                 if let Some(caps) = lrc_re.captures(&line) {
                     let timeline = caps.get(1).unwrap().as_str().to_string();

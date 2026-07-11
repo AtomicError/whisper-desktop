@@ -11,6 +11,14 @@ use std::time::Instant;
 use crate::logger::AppLogs;
 use crate::settings::WhisperSettings;
 
+/// Drop guard that removes a file when the guard goes out of scope (including on panic).
+struct FileGuard(std::path::PathBuf);
+impl Drop for FileGuard {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.0);
+    }
+}
+
 #[derive(serde::Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct FileMetadata {
@@ -75,15 +83,20 @@ pub fn probe_file_metadata(file_path: &str) -> FileMetadata {
     }
     
     // ffprobe for duration
+    let probe_path = if file_path.starts_with('-') {
+        format!("./{}", file_path)
+    } else {
+        file_path.to_string()
+    };
     let output = std::process::Command::new("ffprobe")
         .args([
             "-v", "error",
             "-show_entries", "format=duration",
             "-of", "default=noprint_wrappers=1:nokey=1",
-            file_path,
+            &probe_path,
         ])
         .output();
-        
+    
     if let Ok(out) = output {
         let out_str = String::from_utf8_lossy(&out.stdout).trim().to_string();
         if let Ok(secs) = out_str.parse::<f64>() {
@@ -111,16 +124,21 @@ pub async fn convert_to_wav(
     let tmp_wav = tmp_dir.join(format!("whisper_tmp_{}.wav", timestamp));
     let tmp_wav_str = tmp_wav.to_str().ok_or("Invalid temp wav path")?.to_string();
     
-    app.emit("transcribe-status", TranscribeProgress {
+    let _ = app.emit("transcribe-status", TranscribeProgress {
         progress: 0.0,
         message: "Converting to 16kHz WAV...".to_string(),
         active: true,
-    }).unwrap();
+    });
     
+    let safe_input = if file_path.starts_with('-') {
+        format!("./{}", file_path)
+    } else {
+        file_path.clone()
+    };
     let mut child = Command::new("ffmpeg")
         .args([
             "-y",
-            "-i", &file_path,
+            "-i", &safe_input,
             "-ar", "16000",
             "-ac", "1",
             "-c:a", "pcm_s16le",
@@ -149,7 +167,8 @@ pub async fn convert_to_wav(
             line = stderr_reader.next_line() => {
                 match line {
                     Ok(Some(l)) => logs.log(&app, "FFmpeg", &l),
-                    _ => {}
+                    Ok(None) => break,
+                    Err(_) => {}
                 }
             }
         }
@@ -162,11 +181,11 @@ pub async fn convert_to_wav(
     }
     
     logs.log(&app, "FFmpeg", "WAV conversion finished successfully! Format: PCM 16-bit, 16kHz, Mono.");
-    app.emit("transcribe-status", TranscribeProgress {
+    let _ = app.emit("transcribe-status", TranscribeProgress {
         progress: 1.0,
         message: "Conversion complete! Ready to transcribe.".to_string(),
         active: false,
-    }).unwrap();
+    });
     
     Ok(tmp_wav_str)
 }
@@ -193,6 +212,7 @@ pub async fn run_transcription(
     wav_path: String,
     mut duration_sec: f64,
 ) -> Result<TranscriptionResult, String> {
+    let _wav_guard = FileGuard(std::path::PathBuf::from(&wav_path));
     let start_time = Instant::now();
     let file_name = Path::new(&settings.input_file)
         .file_name()
@@ -222,8 +242,18 @@ pub async fn run_transcription(
     let input_path = Path::new(&settings.input_file);
     let base_name = input_path.file_stem().unwrap_or_default().to_string_lossy();
     let parent_dir = input_path.parent().unwrap_or_else(|| Path::new("."));
-    
-    let mut out_name = parent_dir.join(base_name.to_string());
+
+    // If the input is outside the user's home directory, redirect output to a safe default
+    let user_home = std::env::var("HOME").unwrap_or_default();
+    let out_dir = if !user_home.is_empty() && !parent_dir.starts_with(&user_home) {
+        let safe = Path::new(&user_home).join("Documents/WhisperOutputs");
+        let _ = std::fs::create_dir_all(&safe);
+        safe
+    } else {
+        parent_dir.to_path_buf()
+    };
+
+    let mut out_name = out_dir.join(base_name.to_string());
     let mut counter = 1;
     while {
         let name_str = out_name.file_name()
@@ -344,11 +374,11 @@ pub async fn run_transcription(
     }
     
     logs.log(&app, "Whisper", &format!("Spawning Whisper CLI: {} {}", bin_path.display(), args.join(" ")));
-    app.emit("transcribe-status", TranscribeProgress {
+    let _ = app.emit("transcribe-status", TranscribeProgress {
         progress: 0.0,
         message: "Running Whisper AI model...".to_string(),
         active: true,
-    }).unwrap();
+    });
     
     let mut child = Command::new(&bin_path)
         .args(&args)
@@ -371,9 +401,9 @@ pub async fn run_transcription(
     let mut stderr_reader = BufReader::new(stderr).lines();
     
     // Regex to match timestamps like: [00:01:23.000 --> 00:01:30.000]
-    let timestamp_regex = Regex::new(r"\[(\d{2}):(\d{2}):(\d{2})\.(\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2})\.(\d{3})\]").unwrap();
+    let timestamp_regex = Regex::new(r"\[(\d{2}):(\d{2}):(\d{2})\.(\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2})\.(\d{3})\]").expect("static regex");
     // Regex to match duration in Whisper startup logs: e.g. "samples, 50.0 sec)"
-    let whisper_duration_regex = Regex::new(r"samples,\s*([\d.]+)\s*sec\)").unwrap();
+    let whisper_duration_regex = Regex::new(r"samples,\s*([\d.]+)\s*sec\)").expect("static regex");
     
     loop {
         tokio::select! {
@@ -417,7 +447,8 @@ pub async fn run_transcription(
                             }
                         }
                     }
-                    _ => {}
+                    Ok(None) => break,
+                    Err(_) => {}
                 }
             }
         }
@@ -489,11 +520,11 @@ pub async fn run_transcription(
         .args(["Transcription Complete", &format!("Successfully processed {}!", file_name)])
         .spawn();
         
-    app.emit("transcribe-status", TranscribeProgress {
+    let _ = app.emit("transcribe-status", TranscribeProgress {
         progress: 1.0,
         message: "Transcription successfully completed!".to_string(),
         active: false,
-    }).unwrap();
+    });
     
     Ok(TranscriptionResult {
         duration_ms: elapsed,

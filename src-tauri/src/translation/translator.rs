@@ -49,26 +49,30 @@ pub fn get_language_code(lang: &str) -> String {
 
 /// Parses the response JSON based on format schema
 fn parse_response_content(api_format: &str, response_val: &Value) -> Result<String, String> {
+    let trunc = |v: &Value| {
+        let s = format!("{:?}", v);
+        if s.len() > 500 { format!("{}... (truncated)", &s[..500]) } else { s }
+    };
     match api_format {
         "Anthropic messages" => {
             response_val["content"][0]["text"]
                 .as_str()
                 .map(|s| s.to_string())
-                .ok_or_else(|| format!("Invalid Anthropic response format: {:?}", response_val))
+                .ok_or_else(|| format!("Invalid Anthropic response format: {}", trunc(response_val)))
         }
         "Responses" => {
             // Gemini
             response_val["candidates"][0]["content"]["parts"][0]["text"]
                 .as_str()
                 .map(|s| s.to_string())
-                .ok_or_else(|| format!("Invalid Gemini response format: {:?}", response_val))
+                .ok_or_else(|| format!("Invalid Gemini response format: {}", trunc(response_val)))
         }
         _ => {
             // OpenAI compatible
             response_val["choices"][0]["message"]["content"]
                 .as_str()
                 .map(|s| s.to_string())
-                .ok_or_else(|| format!("Invalid OpenAI response format: {:?}", response_val))
+                .ok_or_else(|| format!("Invalid OpenAI response format: {}", trunc(response_val)))
         }
     }
 }
@@ -76,7 +80,7 @@ fn parse_response_content(api_format: &str, response_val: &Value) -> Result<Stri
 /// Parses numbered lines from response (e.g. "1: Translated text")
 fn parse_translated_lines(response_text: &str) -> HashMap<usize, String> {
     let mut map = HashMap::new();
-    let re = regex::Regex::new(r"^(\d+)[\s:：.-]+(.*)$").unwrap();
+    let re = regex::Regex::new(r"^(\d+)[\s:：.-]+(.*)$").expect("static regex");
     let mut current_idx = None;
     
     for line in response_text.lines() {
@@ -561,26 +565,30 @@ pub async fn preview_translate(
     Ok(preview_lines.join("\n\n"))
 }
 
+fn context_limit_patterns() -> &'static [regex::Regex] {
+    use std::sync::OnceLock;
+    static PATTERNS: OnceLock<Vec<regex::Regex>> = OnceLock::new();
+    PATTERNS.get_or_init(|| {
+        vec![
+            regex::Regex::new(r"max_model_len\s*(?:is\s*)?[:=(]?\s*(\d{4,})").expect("static regex"),
+            regex::Regex::new(r"maximum model length\s*(?:is\s*)?[:=(]?\s*(\d{4,})").expect("static regex"),
+            regex::Regex::new(r"(?:max(?:imum)?|limit)\s*(?:context\s*)?(?:length|size|window)?\s*(?:is|of|:)?\s*(\d{4,})").expect("static regex"),
+            regex::Regex::new(r"context\s*(?:length|size|window)\s*(?:is|of|:)?\s*(\d{4,})").expect("static regex"),
+            regex::Regex::new(r"(\d{4,})\s*(?:token)?\s*(?:context|limit)").expect("static regex"),
+            regex::Regex::new(r">\s*(\d{4,})\s*(?:max|limit|token)").expect("static regex"),
+            regex::Regex::new(r"(\d{4,})\s*(?:max(?:imum)?)\b").expect("static regex"),
+        ]
+    })
+}
+
 fn parse_context_limit_from_error(error_msg: &str) -> Option<usize> {
     let error_lower = error_msg.to_lowercase();
-    let patterns = [
-        r"max_model_len\s*(?:is\s*)?[:=(]?\s*(\d{4,})",
-        r"maximum model length\s*(?:is\s*)?[:=(]?\s*(\d{4,})",
-        r"(?:max(?:imum)?|limit)\s*(?:context\s*)?(?:length|size|window)?\s*(?:is|of|:)?\s*(\d{4,})",
-        r"context\s*(?:length|size|window)\s*(?:is|of|:)?\s*(\d{4,})",
-        r"(\d{4,})\s*(?:token)?\s*(?:context|limit)",
-        r">\s*(\d{4,})\s*(?:max|limit|token)",
-        r"(\d{4,})\s*(?:max(?:imum)?)\b",
-    ];
-
-    for pattern in &patterns {
-        if let Ok(re) = regex::Regex::new(pattern) {
-            if let Some(caps) = re.captures(&error_lower) {
-                if let Some(num_match) = caps.get(1) {
-                    if let Ok(limit) = num_match.as_str().parse::<usize>() {
-                        if limit >= 1024 && limit <= 10_000_000 {
-                            return Some(limit);
-                        }
+    for re in context_limit_patterns() {
+        if let Some(caps) = re.captures(&error_lower) {
+            if let Some(num_match) = caps.get(1) {
+                if let Ok(limit) = num_match.as_str().parse::<usize>() {
+                    if limit >= 1024 && limit <= 10_000_000 {
+                        return Some(limit);
                     }
                 }
             }
