@@ -290,7 +290,7 @@ fn walk_models_dir(
                         if backend == "OpenVINO" {
                             let base_name = filename.strip_suffix(".bin").unwrap_or(&filename);
                             let ov_encoder_name = format!("{}-encoder-openvino.bin", base_name);
-                            let ov_encoder_path = path.parent().unwrap().join(ov_encoder_name);
+                            let ov_encoder_path = path.parent().expect("file path has parent").join(ov_encoder_name);
                             if ov_encoder_path.exists() {
                                 trans_models.push(rel_path);
                             }

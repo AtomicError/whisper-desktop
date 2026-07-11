@@ -91,8 +91,8 @@ impl ParsedSubtitle {
             let lrc_re = Regex::new(r"^(\s*\[\d{2,3}:\d{2}(?:[.:]\d{2,3})?\])(.*)$").expect("static regex");
             for line in lines {
                 if let Some(caps) = lrc_re.captures(&line) {
-                    let timeline = caps.get(1).unwrap().as_str().to_string();
-                    let text = caps.get(2).unwrap().as_str().to_string();
+                    let timeline = caps.get(1).expect("lrc regex group 1").as_str().to_string();
+                    let text = caps.get(2).expect("lrc regex group 2").as_str().to_string();
                     
                     let cue_index = timed_cues.len();
                     timed_cues.push(TimedCue {

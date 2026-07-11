@@ -1260,7 +1260,7 @@ async function refreshSettings() {
     // Scan models path
     await scanAndPopulateModels();
   } catch (e) {
-    console.error("Failed to load settings:", e);
+    showNotification("Failed to load settings. Starting with default configuration.", "error");
   }
 }
 
@@ -1346,7 +1346,7 @@ async function saveCurrentSettings() {
     await invoke('save_settings', { settings: settingsState });
     updateTranscribeUIConfigs();
   } catch (e) {
-    console.error("Failed to save settings:", e);
+    showNotification("Failed to save settings. Check disk space and file permissions.", "error");
   }
 }
 
@@ -1828,7 +1828,7 @@ window.runWhisperTranscription = async function() {
       showNotification("Transcription aborted by the user.", "info");
       if (msgEl) msgEl.textContent = 'Aborted';
     } else {
-      showNotification("Task failed: " + errMsg, "error");
+      showNotification("Transcription failed: " + errMsg, "error");
       if (msgEl) msgEl.textContent = 'Task Failed';
     }
   } finally {
@@ -3674,6 +3674,7 @@ window.addManualModelRow = function(modelId = "", contextWindow = 200000, reason
   const idInput = tr.querySelector('.model-id-input');
   const ctxInput = tr.querySelector('.model-ctx-input');
   const reasoningSelect = tr.querySelector('.model-reasoning-select');
+  new CustomSelect(reasoningSelect);
   const activeRadio = tr.querySelector('.model-active-radio');
   const trashBtn = tr.querySelector('.model-btn-trash');
   
@@ -3682,12 +3683,13 @@ window.addManualModelRow = function(modelId = "", contextWindow = 200000, reason
   };
   
   const updateReasoningStyle = () => {
+    const el = reasoningSelect.closest('.custom-select-container') || reasoningSelect;
     if (reasoningSelect.value === 'None') {
-      reasoningSelect.classList.add('reasoning-none');
-      reasoningSelect.classList.remove('reasoning-active');
+      el.classList.add('reasoning-none');
+      el.classList.remove('reasoning-active');
     } else {
-      reasoningSelect.classList.remove('reasoning-none');
-      reasoningSelect.classList.add('reasoning-active');
+      el.classList.remove('reasoning-none');
+      el.classList.add('reasoning-active');
     }
   };
   
