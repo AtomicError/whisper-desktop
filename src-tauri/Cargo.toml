@@ -1,6 +1,6 @@
 [package]
 name = "whisper-desktop"
-version = "1.0.1"
+version = "2.0.0"
 description = "A premium, state-of-the-art, and gorgeous native Rust & Tauri GUI designed for whisper.cpp"
 authors = ["TheMrAhmad"]
 homepage = "https://github.com/AtomicError/whisper-desktop"
