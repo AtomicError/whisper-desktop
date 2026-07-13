@@ -955,19 +955,23 @@ function appendLogToViewport(payload) {
   logLine.className = 'log-line';
   
   const catClass = payload.category.toLowerCase();
+  logLine.dataset.category = payload.category;
   if (payload.category === lastAppendedCategory) {
-    logLine.innerHTML = `<span class="log-time-spacer"></span><span class="log-cat-spacer"></span><span class="log-msg">${escapeHTML(payload.message)}</span>`;
+    logLine.innerHTML = '<span class="log-time-spacer"></span><span class="log-cat-spacer"></span><span class="log-msg">' + escapeHTML(payload.message) + '</span>';
   } else {
-    logLine.innerHTML = `<span class="log-time">${payload.timestamp}</span><span class="log-cat ${catClass}">${payload.category.toUpperCase()}</span><span class="log-msg">${escapeHTML(payload.message)}</span>`;
+    logLine.innerHTML = '<span class="log-time">' + payload.timestamp + '</span><span class="log-cat ' + catClass + '">' + payload.category.toUpperCase() + '</span><span class="log-msg">' + escapeHTML(payload.message) + '</span>';
     lastAppendedCategory = payload.category;
   }
   
   viewport.appendChild(logLine);
   
-  // Handle Auto Scroll
+  // Handle Auto Scroll — debounced to avoid forced layout on every line
   const autoScroll = document.getElementById('log-autoscroll').checked;
   if (autoScroll) {
-    viewport.scrollTop = viewport.scrollHeight;
+    clearTimeout(viewport._scrollDebounce);
+    viewport._scrollDebounce = setTimeout(() => {
+      viewport.scrollTop = viewport.scrollHeight;
+    }, 80);
   }
 }
 
@@ -978,8 +982,7 @@ function stripAnsi(str) {
 }
 
 function escapeHTML(str) {
-  const cleanStr = stripAnsi(str);
-  return cleanStr.replace(/[&<>'"]/g, 
+  return str.replace(/[&<>'"]/g, 
     tag => ({
       '&': '&amp;',
       '<': '&lt;',
@@ -1910,13 +1913,34 @@ window.filterLogs = function(category) {
     }
   });
   
-  // Redraw viewport
-  redrawLogsViewport();
+  // Toggle visibility instead of rebuilding DOM
+  const logLines = document.querySelectorAll('#log-viewport .log-line');
+  logLines.forEach(el => {
+    if (activeLogCategory === 'All' || (el.dataset.category && el.dataset.category === activeLogCategory)) {
+      el.style.display = '';
+    } else {
+      el.style.display = 'none';
+    }
+  });
 };
 
 window.handleLogSearch = function() {
-  logSearchQuery = document.getElementById('log-search').value;
-  redrawLogsViewport();
+  logSearchQuery = document.getElementById('log-search').value.toLowerCase();
+  
+  // Toggle visibility instead of rebuilding DOM
+  const logLines = document.querySelectorAll('#log-viewport .log-line');
+  logLines.forEach(el => {
+    const msgEl = el.querySelector('.log-msg');
+    if (activeLogCategory !== 'All' && el.dataset.category !== activeLogCategory) {
+      el.style.display = 'none';
+      return;
+    }
+    if (logSearchQuery === '' || (msgEl && msgEl.textContent.toLowerCase().includes(logSearchQuery))) {
+      el.style.display = '';
+    } else {
+      el.style.display = 'none';
+    }
+  });
 };
 
 function redrawLogsViewport() {
@@ -2648,7 +2672,6 @@ async function handleDashboardDroppedFiles(files) {
 
 
 // ----------------- Models Logic -----------------
-let modelStatusPollInterval = null;
 let prevDownloadedBytesMap = new Map();
 let prevTimestampMap = new Map();
 let lastKnownSpeedMap = new Map();
@@ -2660,21 +2683,6 @@ function formatRemainingTime(seconds) {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return `${m}m ${s}s`;
-}
-
-function startModelStatusPolling() {
-  if (modelStatusPollInterval) return;
-  modelStatusPollInterval = setInterval(async () => {
-    if (activeView === 'models') {
-      // Skip polling refresh when user has an active search query
-      const searchInput = document.getElementById('model-search');
-      if (searchInput && searchInput.value.trim()) return;
-      await loadModelStatusesGrid(true);
-    } else {
-      clearInterval(modelStatusPollInterval);
-      modelStatusPollInterval = null;
-    }
-  }, 1000);
 }
 
 window.switchModelCategory = function(category) {
@@ -2926,10 +2934,6 @@ window.loadModelStatusesGrid = async function(isSilent = false) {
       grid.appendChild(card);
     });
     
-    const hasActiveDownloads = statuses.some(m => m.status === 'Downloading');
-    if (hasActiveDownloads) {
-      startModelStatusPolling();
-    }
   } catch (err) {
     console.error("Failed to load model statuses:", err);
   }
@@ -2950,9 +2954,8 @@ window.downloadModelClick = async function(name) {
       modelName: name
     });
     
-    // Refresh UI and start active polling
+    // Refresh UI
     await loadModelStatusesGrid();
-    startModelStatusPolling();
   } catch (err) {
     showNotification("Failed to start download: " + err, "error");
   } finally {
@@ -3033,7 +3036,10 @@ function appendTranscriptLine(timeRange, text) {
   lineEl.appendChild(timeSpan);
   lineEl.appendChild(textDiv);
   viewport.appendChild(lineEl);
-  viewport.scrollTop = viewport.scrollHeight;
+  clearTimeout(viewport._scrollDebounce);
+  viewport._scrollDebounce = setTimeout(() => {
+    viewport.scrollTop = viewport.scrollHeight;
+  }, 80);
 }
 
 window.updateTranscriptLineText = function(id, value) {
