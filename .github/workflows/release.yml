@@ -52,10 +52,60 @@ jobs:
             libssl-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev \
-            ffmpeg
+            ffmpeg \
+            libvulkan-dev
+
+      - name: Install CUDA Toolkit
+        uses: Jimver/cuda-toolkit@v0.2.35
+        id: cuda-toolkit
+        with:
+          cuda: '12.5.0'
+          method: 'network'
+
+      - name: Add Intel APT Repository for OpenVINO
+        run: |
+          wget https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
+          sudo gpg --dearmor -o /usr/share/keyrings/intel-openvino.gpg GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
+          echo "deb [signed-by=/usr/share/keyrings/intel-openvino.gpg] https://apt.repos.intel.com/openvino ubuntu24 main" | sudo tee /etc/apt/sources.list.d/intel-openvino.list
+          sudo apt update
+          sudo apt-get install -y libopenvino-dev-2024.2.0
 
       - name: Install frontend dependencies
         run: npm install
+
+      - name: Clone whisper.cpp repository
+        run: |
+          LATEST_TAG=$(git ls-remote --tags --refs https://github.com/ggml-org/whisper.cpp.git | awk -F/ '{print $3}' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)
+          echo "Detected latest release tag: $LATEST_TAG"
+          git clone --depth 1 --branch "$LATEST_TAG" https://github.com/ggml-org/whisper.cpp.git whisper.cpp-src
+
+      - name: Compile whisper.cpp acceleration backends
+        run: |
+          mkdir -p src-tauri/resources
+          
+          # 1. Standard CPU Backend
+          echo "Building Standard CPU backend..."
+          cmake -B whisper.cpp-src/build-standard -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON
+          cmake --build whisper.cpp-src/build-standard -j$(nproc) --config Release --target whisper-cli
+          cp whisper.cpp-src/build-standard/bin/whisper-cli src-tauri/resources/whisper-cli-standard
+          
+          # 2. Vulkan Backend
+          echo "Building Vulkan backend..."
+          cmake -B whisper.cpp-src/build-vulkan -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DGGML_VULKAN=ON
+          cmake --build whisper.cpp-src/build-vulkan -j$(nproc) --config Release --target whisper-cli
+          cp whisper.cpp-src/build-vulkan/bin/whisper-cli src-tauri/resources/whisper-cli-vulkan
+          
+          # 3. OpenVINO Backend
+          echo "Building OpenVINO backend..."
+          cmake -B whisper.cpp-src/build-openvino -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DWHISPER_OPENVINO=1
+          cmake --build whisper.cpp-src/build-openvino -j$(nproc) --config Release --target whisper-cli
+          cp whisper.cpp-src/build-openvino/bin/whisper-cli src-tauri/resources/whisper-cli-openvino
+          
+          # 4. CUDA Backend
+          echo "Building CUDA backend..."
+          cmake -B whisper.cpp-src/build-cuda -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DGGML_CUDA=ON
+          cmake --build whisper.cpp-src/build-cuda -j$(nproc) --config Release --target whisper-cli
+          cp whisper.cpp-src/build-cuda/bin/whisper-cli src-tauri/resources/whisper-cli-cuda
 
       - name: Build Tauri Application
         run: npm run tauri build

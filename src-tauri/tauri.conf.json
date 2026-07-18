@@ -26,6 +26,12 @@
   "bundle": {
     "active": true,
     "targets": ["deb", "rpm", "appimage"],
+    "resources": [
+      "resources/whisper-cli-standard",
+      "resources/whisper-cli-vulkan",
+      "resources/whisper-cli-openvino",
+      "resources/whisper-cli-cuda"
+    ],
     "category": "Utility",
     "icon": [
       "icons/32x32.png",

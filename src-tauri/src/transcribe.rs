@@ -225,18 +225,46 @@ pub async fn run_transcription(
         .args(["Transcription Started", &format!("Processing {}...", file_name)])
         .spawn();
         
-    let root = Path::new(&settings.clone_dir);
-    let dir_name = settings.selected_backend.to_lowercase();
-    let bin_path_1 = root.join(format!("build-{}", dir_name)).join("bin").join("whisper-cli");
-    let bin_path_2 = root.join(format!("build-{}", dir_name)).join("whisper-cli");
+    let root = Path::new(&settings.models_dir);
+    let backend_name = settings.selected_backend.to_lowercase();
+    let bin_name = format!("whisper-cli-{}", backend_name);
     
-    let bin_path = if bin_path_1.exists() {
-        bin_path_1
-    } else if bin_path_2.exists() {
-        bin_path_2
-    } else {
-        return Err(format!("Whisper CLI binary not found! Please compile the {} backend first.", settings.selected_backend));
+    use tauri::Manager;
+    let bin_path = match app.path().resolve(format!("resources/{}", bin_name), tauri::path::BaseDirectory::Resource) {
+        Ok(path) => {
+            if path.exists() {
+                path
+            } else {
+                let dev_path = std::env::current_dir()
+                    .unwrap_or_default()
+                    .join("src-tauri")
+                    .join("resources")
+                    .join(&bin_name);
+                if dev_path.exists() {
+                    dev_path
+                } else {
+                    return Err(format!(
+                        "Precompiled Whisper CLI binary not found at resource path: {:?} or dev path: {:?}. Please ensure you've placed it in the resources folder.",
+                        path, dev_path
+                    ));
+                }
+            }
+        }
+        Err(e) => return Err(format!("Failed to resolve resource path: {}", e)),
     };
+
+    // Ensure executable permissions on Unix platforms
+    #[cfg(target_os = "linux")]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Ok(meta) = std::fs::metadata(&bin_path) {
+            let mut perms = meta.permissions();
+            if perms.mode() & 0o111 == 0 {
+                perms.set_mode(perms.mode() | 0o111);
+                let _ = std::fs::set_permissions(&bin_path, perms);
+            }
+        }
+    }
     
     // Generate output file prefix (avoid overwriting existing ones by appending counters)
     let input_path = Path::new(&settings.input_file);

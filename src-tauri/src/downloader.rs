@@ -105,12 +105,12 @@ pub fn get_models_list() -> Vec<&'static str> {
 pub async fn run_model_download(
     app: AppHandle,
     download_state: Arc<Mutex<DownloadSession>>,
-    clone_dir: String,
+    models_dir: String,
     model_name: String,
 ) -> Result<(), String> {
-    let models_dir = Path::new(&clone_dir).join("models");
-    if !models_dir.exists() {
-        fs::create_dir_all(&models_dir)
+    let models_dir_path = Path::new(&models_dir).join("models");
+    if !models_dir_path.exists() {
+        fs::create_dir_all(&models_dir_path)
             .map_err(|e| format!("Failed to create models directory: {}", e))?;
     }
 
@@ -122,8 +122,8 @@ pub async fn run_model_download(
         .to_string();
 
     let target_filename = format!("ggml-{}.bin", clean_name);
-    let target_path = models_dir.join(&target_filename);
-    let tmp_path = models_dir.join(format!("{}.tmp", target_filename));
+    let target_path = models_dir_path.join(&target_filename);
+    let tmp_path = models_dir_path.join(format!("{}.tmp", target_filename));
 
     if target_path.exists() {
         return Err(format!("Model ggml-{}.bin already exists locally.", clean_name));
@@ -222,9 +222,9 @@ pub async fn run_model_download(
 #[tauri::command]
 pub fn get_all_models_status(
     download_state: State<'_, DownloadState>,
-    clone_dir: String,
+    models_dir: String,
 ) -> Result<Vec<ModelStatus>, String> {
-    let models_dir = Path::new(&clone_dir).join("models");
+    let models_dir_path = Path::new(&models_dir).join("models");
     let active_downloads = if let Ok(lock) = download_state.0.lock() {
         lock.active_downloads.clone()
     } else {
@@ -238,8 +238,8 @@ pub fn get_all_models_status(
         let bin_name = format!("ggml-{}.bin", m);
         let tmp_name = format!("{}.tmp", bin_name);
 
-        let bin_path = models_dir.join(&bin_name);
-        let tmp_path = models_dir.join(&tmp_name);
+        let bin_path = models_dir_path.join(&bin_name);
+        let tmp_path = models_dir_path.join(&tmp_name);
 
         let expected_size = get_expected_model_size(m);
         let is_active = active_downloads.contains_key(m);
@@ -319,7 +319,7 @@ pub fn pause_download_model(
 }
 
 #[tauri::command]
-pub fn delete_model_file(clone_dir: String, model_name: String) -> Result<(), String> {
+pub fn delete_model_file(models_dir: String, model_name: String) -> Result<(), String> {
     let clean_name = model_name
         .strip_prefix("ggml-")
         .unwrap_or(&model_name)
@@ -327,9 +327,9 @@ pub fn delete_model_file(clone_dir: String, model_name: String) -> Result<(), St
         .unwrap_or(&model_name)
         .to_string();
 
-    let models_dir = Path::new(&clone_dir).join("models");
-    let bin_path = models_dir.join(format!("ggml-{}.bin", clean_name));
-    let tmp_path = models_dir.join(format!("ggml-{}.bin.tmp", clean_name));
+    let models_dir_path = Path::new(&models_dir).join("models");
+    let bin_path = models_dir_path.join(format!("ggml-{}.bin", clean_name));
+    let tmp_path = models_dir_path.join(format!("ggml-{}.bin.tmp", clean_name));
 
     if bin_path.exists() {
         fs::remove_file(&bin_path)

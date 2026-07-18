@@ -8,7 +8,8 @@ use crate::translation::provider::AiProvider;
 pub struct WhisperSettings {
     pub preset: String,
     pub selected_backend: String, // "Standard", "Vulkan", "OpenVINO", "CUDA"
-    pub clone_dir: String,
+    #[serde(rename = "modelsDir", alias = "cloneDir")]
+    pub models_dir: String,
     pub threads: i32,
     pub processors: i32,
     pub offset_t: i32,
@@ -93,12 +94,12 @@ fn default_providers() -> String {
 impl WhisperSettings {
     pub fn default_settings() -> Self {
         let home = std::env::var("HOME").unwrap_or_else(|_| "/home/user".to_string());
-        let default_clone = format!("{}/whisper.cpp", home);
+        let default_models = format!("{}/whisper.cpp", home);
         
         WhisperSettings {
             preset: "safe".to_string(),
             selected_backend: "Standard".to_string(),
-            clone_dir: default_clone,
+            models_dir: default_models,
             threads: 4,
             processors: 1,
             offset_t: 0,
@@ -222,12 +223,12 @@ impl AppSettings {
     }
 
     pub fn set_active(&mut self, settings: WhisperSettings) {
-        let clone_dir = settings.clone_dir.clone();
+        let models_dir = settings.models_dir.clone();
         let backend = settings.selected_backend.clone();
         
         // Sync global values across both profiles
-        self.safe.clone_dir = clone_dir.clone();
-        self.professional.clone_dir = clone_dir;
+        self.safe.models_dir = models_dir.clone();
+        self.professional.models_dir = models_dir;
         self.safe.selected_backend = backend.clone();
         self.professional.selected_backend = backend;
         
@@ -279,8 +280,8 @@ pub fn load_app_settings() -> AppSettings {
                     app_settings.active_preset = "safe".to_string();
                     app_settings.safe = old_settings.clone();
                 }
-                app_settings.safe.clone_dir = old_settings.clone_dir.clone();
-                app_settings.professional.clone_dir = old_settings.clone_dir.clone();
+                app_settings.safe.models_dir = old_settings.models_dir.clone();
+                app_settings.professional.models_dir = old_settings.models_dir.clone();
                 app_settings.safe.selected_backend = old_settings.selected_backend.clone();
                 app_settings.professional.selected_backend = old_settings.selected_backend.clone();
                 

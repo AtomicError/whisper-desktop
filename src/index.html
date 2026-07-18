@@ -64,14 +64,7 @@
             <span>Dashboard</span>
           </div>
           
-          <div class="nav-item" onclick="switchView('build')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-              <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-              <line x1="12" y1="22.08" x2="12" y2="12"/>
-            </svg>
-            <span>System Build</span>
-          </div>
+
           
           <div class="nav-item" onclick="switchView('models')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -152,8 +145,8 @@
                   <div class="feature-item">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 15h3M1 9h3M1 15h3"/></svg>
                     <div>
-                      <div class="feature-title">Multi-Backend Compilation</div>
-                      <div class="feature-desc">Easily build Standard CPU, Vulkan, OpenVINO, and CUDA acceleration backends in one click.</div>
+                      <div class="feature-title">Multi-Backend Acceleration</div>
+                      <div class="feature-desc">Easily select between CPU, Vulkan, OpenVINO, and CUDA acceleration backends to match your hardware.</div>
                     </div>
                   </div>
                   <div class="feature-item">
@@ -197,7 +190,7 @@
               <div class="glass-card quick-start-card">
                 <h3>Quick Actions</h3>
                 <div class="shortcut-btn-card">
-                  <div class="shortcut-main-row" onclick="switchView('build')">
+                  <div class="shortcut-main-row" onclick="switchView('settings')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
                     </svg>
@@ -243,91 +236,7 @@
             </div>
           </div>
 
-          <!-- 2. SYSTEM BUILD PANEL -->
-          <div class="view-panel" id="panel-build">
-            <div class="glass-card" style="margin-bottom: 24px;">
-              <h3 style="margin-bottom:16px;">Source Repository Configuration</h3>
-              <div class="build-setup-row">
-                <input class="text-input" type="text" id="build-clone-dir" placeholder="/home/user/whisper.cpp" />
-                <button class="btn-secondary" onclick="browseCloneDirectory()">Browse</button>
-                <button class="btn-primary" id="btn-git-op" onclick="runGitOperations()">Clone / Update Repo</button>
-              </div>
-            </div>
 
-            <h3 style="margin-bottom:16px;">Select Compilation Backend</h3>
-            <div class="backends-grid">
-              <div class="glass-card backend-card active" id="backend-Standard" onclick="selectBackend('Standard')">
-                <div class="backend-card-header" style="display: flex; align-items: center; gap: 12px; width: 100%;">
-                  <input type="checkbox" class="backend-checkbox" id="chk-Standard" checked style="pointer-events: none;" />
-                  <span class="backend-name" style="flex-grow: 1;">Standard CPU</span>
-                  <svg class="backend-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="15" x2="23" y2="15"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="15" x2="4" y2="15"/></svg>
-                </div>
-                <div style="display: flex; gap: 8px; align-items: center; margin-top: 12px; flex-wrap: wrap;">
-                  <div class="backend-status-badge missing" id="badge-Standard">Checking...</div>
-                  <span class="recommendation-pill" id="rec-Standard" style="display: none; font-size: 0.68rem; font-weight: 600; padding: 4px 10px; border-radius: 12px; background: rgba(6, 182, 212, 0.08); color: var(--color-cyan); border: 1px solid rgba(6, 182, 212, 0.25); text-transform: uppercase;">★ Recommended</span>
-                </div>
-              </div>
-
-              <div class="glass-card backend-card" id="backend-Vulkan" onclick="selectBackend('Vulkan')">
-                <div class="backend-card-header" style="display: flex; align-items: center; gap: 12px; width: 100%;">
-                  <input type="checkbox" class="backend-checkbox" id="chk-Vulkan" style="pointer-events: none;" />
-                  <span class="backend-name" style="flex-grow: 1;">Vulkan GPU</span>
-                  <svg class="backend-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                </div>
-                <div style="display: flex; gap: 8px; align-items: center; margin-top: 12px; flex-wrap: wrap;">
-                  <div class="backend-status-badge missing" id="badge-Vulkan">Checking...</div>
-                  <span class="recommendation-pill" id="rec-Vulkan" style="display: none; font-size: 0.68rem; font-weight: 600; padding: 4px 10px; border-radius: 12px; background: rgba(6, 182, 212, 0.08); color: var(--color-cyan); border: 1px solid rgba(6, 182, 212, 0.25); text-transform: uppercase;">★ Recommended</span>
-                </div>
-              </div>
-
-              <div class="glass-card backend-card" id="backend-OpenVINO" onclick="selectBackend('OpenVINO')">
-                <div class="backend-card-header" style="display: flex; align-items: center; gap: 12px; width: 100%;">
-                  <input type="checkbox" class="backend-checkbox" id="chk-OpenVINO" style="pointer-events: none;" />
-                  <span class="backend-name" style="flex-grow: 1;">OpenVINO Intel</span>
-                  <svg class="backend-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3z"/><path d="M6 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3z"/></svg>
-                </div>
-                <div style="display: flex; gap: 8px; align-items: center; margin-top: 12px; flex-wrap: wrap;">
-                  <div class="backend-status-badge missing" id="badge-OpenVINO">Checking...</div>
-                  <span class="recommendation-pill" id="rec-OpenVINO" style="display: none; font-size: 0.68rem; font-weight: 600; padding: 4px 10px; border-radius: 12px; background: rgba(6, 182, 212, 0.08); color: var(--color-cyan); border: 1px solid rgba(6, 182, 212, 0.25); text-transform: uppercase;">★ Recommended</span>
-                </div>
-              </div>
-
-              <div class="glass-card backend-card" id="backend-CUDA" onclick="selectBackend('CUDA')">
-                <div class="backend-card-header" style="display: flex; align-items: center; gap: 12px; width: 100%;">
-                  <input type="checkbox" class="backend-checkbox" id="chk-CUDA" style="pointer-events: none;" />
-                  <span class="backend-name" style="flex-grow: 1;">NVIDIA CUDA</span>
-                  <svg class="backend-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
-                </div>
-                <div style="display: flex; gap: 8px; align-items: center; margin-top: 12px; flex-wrap: wrap;">
-                  <div class="backend-status-badge missing" id="badge-CUDA">Checking...</div>
-                  <span class="recommendation-pill" id="rec-CUDA" style="display: none; font-size: 0.68rem; font-weight: 600; padding: 4px 10px; border-radius: 12px; background: rgba(6, 182, 212, 0.08); color: var(--color-cyan); border: 1px solid rgba(6, 182, 212, 0.25); text-transform: uppercase;">★ Recommended</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="glass-card compilation-panel">
-              <div style="display:flex; justify-content:space-between; align-items:center; gap:24px; flex-wrap:wrap;">
-                <div style="flex:1; min-width:250px;">
-                  <h4 id="compilation-title" style="font-size:1.1rem; margin-bottom:4px;">Standard CPU Compilation</h4>
-                  <p style="font-size:0.85rem; color:var(--color-text-muted); margin:0;">Triggers a clean CMake build. Previous compiled binaries for this backend will be replaced.</p>
-                </div>
-                <button class="btn-primary" id="btn-run-build" onclick="runBackendBuild()" style="flex-shrink:0;">Run Full Compiler</button>
-              </div>
-
-              <!-- Compile progress -->
-              <div class="build-progress-wrapper" id="build-progress-block" style="display:none;">
-                <div class="progress-info">
-                  <div class="progress-header">
-                    <span class="progress-label" id="build-progress-msg">Compiling binaries...</span>
-                    <span class="progress-pct" id="build-progress-pct">0%</span>
-                  </div>
-                  <div class="progress-bar-container">
-                    <div class="progress-bar-fill" id="build-progress-bar"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
 
           <!-- 3. SETTINGS CONFIGURATION PANEL -->
           <div class="view-panel fixed-layout-panel" id="panel-settings">
@@ -358,7 +267,39 @@
                 <!-- Settings Groups -->
                 <div class="settings-group active" id="group-general">
                   <!-- General cards -->
-                   <div class="setting-card">
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Active Backend</span>
+                        <span class="setting-flag">selectedBackend</span>
+                      </div>
+                      <div class="setting-desc">Choose the computation backend (CPU or GPU acceleration).</div>
+                    </div>
+                    <div class="setting-control">
+                      <select class="select-control" id="opt-selectedBackend">
+                        <option value="Standard">Standard CPU</option>
+                        <option value="Vulkan">Vulkan GPU</option>
+                        <option value="OpenVINO">OpenVINO Intel</option>
+                        <option value="CUDA">NVIDIA CUDA</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Models Storage Directory</span>
+                        <span class="setting-flag">modelsDir</span>
+                      </div>
+                      <div class="setting-desc">The folder where GGML models are stored. Default is ~/whisper.cpp.</div>
+                    </div>
+                    <div class="setting-control" style="display: flex; gap: 8px; align-items: center; justify-content: flex-end; width: 100%; max-width: 320px;">
+                      <input class="text-input" type="text" id="opt-modelsDir" style="flex-grow: 1; min-width: 150px;" readonly />
+                      <button class="btn-secondary" onclick="browseModelsDirectory()" style="padding: 8px 16px; flex-shrink: 0; font-size: 0.85rem;">Browse</button>
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title">Model Selection</span>

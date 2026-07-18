@@ -13,7 +13,7 @@ use tauri::{AppHandle, State};
 use settings::{WhisperSettings, load_settings_file, save_settings_file, load_app_settings, save_app_settings};
 use hardware::{HardwareMonitor, SystemStats};
 use logger::AppLogs;
-use builder::{check_build_exists, run_git_clone_or_update, run_compilation};
+use builder::check_build_exists;
 use transcribe::{probe_file_metadata, convert_to_wav, run_transcription, FileMetadata, TranscriptionResult, read_text_file};
 use downloader::{DownloadSession, DownloadState, run_model_download, get_expected_model_size, get_all_models_status, pause_download_model, delete_model_file};
 use translation::{
@@ -75,59 +75,8 @@ fn apply_preset(preset: String) -> Result<WhisperSettings, String> {
 }
 
 #[tauri::command]
-fn check_build(clone_dir: String, backend: String) -> bool {
-    check_build_exists(&clone_dir, &backend)
-}
-
-#[tauri::command]
-async fn start_git_operations(
-    app: AppHandle,
-    state: State<'_, LogState>,
-    clone_dir: String,
-) -> Result<(), String> {
-    let logs = state.0.clone();
-    // Spawn task to prevent blocking the Tauri thread
-    tokio::spawn(async move {
-        if let Err(e) = run_git_clone_or_update(app, logs, clone_dir).await {
-            eprintln!("[git] clone/update failed: {}", e);
-        }
-    });
-    Ok(())
-}
-
-#[tauri::command]
-async fn start_compilation_task(
-    app: AppHandle,
-    state: State<'_, LogState>,
-    clone_dir: String,
-    backend: String,
-) -> Result<(), String> {
-    let logs = state.0.clone();
-    tokio::spawn(async move {
-        if let Err(e) = run_compilation(app, logs, clone_dir, backend).await {
-            eprintln!("[build] compilation failed: {}", e);
-        }
-    });
-    Ok(())
-}
-
-#[tauri::command]
-async fn start_multi_compilations(
-    app: AppHandle,
-    state: State<'_, LogState>,
-    clone_dir: String,
-    backends: Vec<String>,
-) -> Result<(), String> {
-    let logs = state.0.clone();
-    tokio::spawn(async move {
-        for b in &backends {
-            if let Err(e) = run_compilation(app.clone(), logs.clone(), clone_dir.clone(), b.clone()).await {
-                eprintln!("[build] multi-compilation failed for {}: {}", b, e);
-                break;
-            }
-        }
-    });
-    Ok(())
+fn check_build(app: AppHandle, backend: String) -> bool {
+    check_build_exists(&app, &backend)
 }
 
 #[tauri::command]
@@ -305,15 +254,15 @@ fn walk_models_dir(
 }
 
 #[tauri::command]
-fn scan_models(clone_dir: String, backend: String) -> ModelScanResult {
+fn scan_models(models_dir: String, backend: String) -> ModelScanResult {
     let mut trans_models = Vec::new();
     let mut vad_models = Vec::new();
     
-    let root = Path::new(&clone_dir);
-    let models_dir = root.join("models");
+    let root = Path::new(&models_dir);
+    let models_dir_path = root.join("models");
     
-    if models_dir.exists() && models_dir.is_dir() {
-        walk_models_dir(&models_dir, root, &backend, &mut trans_models, &mut vad_models);
+    if models_dir_path.exists() && models_dir_path.is_dir() {
+        walk_models_dir(&models_dir_path, root, &backend, &mut trans_models, &mut vad_models);
     }
     
     if trans_models.is_empty() {
@@ -369,12 +318,12 @@ fn read_text_file_content(file_path: String) -> Result<String, String> {
 async fn start_download_model_task(
     app: AppHandle,
     download_state: State<'_, DownloadState>,
-    clone_dir: String,
+    models_dir: String,
     model_name: String,
 ) -> Result<(), String> {
     let state = download_state.0.clone();
     tokio::spawn(async move {
-        if let Err(e) = run_model_download(app, state, clone_dir, model_name).await {
+        if let Err(e) = run_model_download(app, state, models_dir, model_name).await {
             eprintln!("[download] model download failed: {}", e);
         }
     });
@@ -382,7 +331,7 @@ async fn start_download_model_task(
 }
 
 #[tauri::command]
-fn get_model_download_progress(clone_dir: String, model_name: String) -> Result<f64, String> {
+fn get_model_download_progress(models_dir: String, model_name: String) -> Result<f64, String> {
     let lowered = model_name.to_lowercase();
     let clean_name = lowered
         .strip_prefix("ggml-")
@@ -391,9 +340,9 @@ fn get_model_download_progress(clone_dir: String, model_name: String) -> Result<
         .unwrap_or(&lowered)
         .to_string();
 
-    let models_dir = Path::new(&clone_dir).join("models");
-    let target_path = models_dir.join(format!("ggml-{}.bin", clean_name));
-    let tmp_path = models_dir.join(format!("ggml-{}.bin.tmp", clean_name));
+    let models_dir_path = Path::new(&models_dir).join("models");
+    let target_path = models_dir_path.join(format!("ggml-{}.bin", clean_name));
+    let tmp_path = models_dir_path.join(format!("ggml-{}.bin.tmp", clean_name));
 
     if target_path.exists() {
         return Ok(1.0);
@@ -469,9 +418,6 @@ fn main() {
             save_settings,
             apply_preset,
             check_build,
-            start_git_operations,
-            start_compilation_task,
-            start_multi_compilations,
             probe_media_file,
             convert_media_file,
             start_transcription_task,
