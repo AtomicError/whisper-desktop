@@ -230,7 +230,7 @@ pub async fn run_transcription(
     let bin_name = format!("whisper-cli-{}", backend_name);
     
     use tauri::Manager;
-    let bin_path = match app.path().resolve(format!("resources/{}", bin_name), tauri::path::BaseDirectory::Resource) {
+    let mut bin_path = match app.path().resolve(format!("resources/{}", bin_name), tauri::path::BaseDirectory::Resource) {
         Ok(path) => {
             if path.exists() {
                 path
@@ -253,15 +253,52 @@ pub async fn run_transcription(
         Err(e) => return Err(format!("Failed to resolve resource path: {}", e)),
     };
 
-    // Ensure executable permissions on Unix platforms
-    #[cfg(target_os = "linux")]
+    // Ensure executable permissions on Unix platforms.
+    // If the binary is inside a read-only filesystem (like an AppImage mount) or execution is restricted,
+    // we copy the binary to the user's writable cache directory first and make it executable there.
+    #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        if let Ok(meta) = std::fs::metadata(&bin_path) {
-            let mut perms = meta.permissions();
-            if perms.mode() & 0o111 == 0 {
-                perms.set_mode(perms.mode() | 0o111);
-                let _ = std::fs::set_permissions(&bin_path, perms);
+        
+        let mut needs_copy = std::env::var("APPIMAGE").is_ok() || std::env::var("APPDIR").is_ok();
+        
+        if !needs_copy {
+            if let Ok(meta) = std::fs::metadata(&bin_path) {
+                let perms = meta.permissions();
+                if perms.mode() & 0o111 == 0 {
+                    let mut new_perms = perms.clone();
+                    new_perms.set_mode(perms.mode() | 0o111);
+                    if std::fs::set_permissions(&bin_path, new_perms).is_err() {
+                        needs_copy = true;
+                    }
+                }
+            }
+        }
+        
+        if needs_copy {
+            if let Ok(cache_dir) = app.path().app_cache_dir() {
+                let cached_bin = cache_dir.join(&bin_name);
+                let _ = std::fs::create_dir_all(&cache_dir);
+                
+                let should_copy = if let (Ok(src_meta), Ok(dst_meta)) = (std::fs::metadata(&bin_path), std::fs::metadata(&cached_bin)) {
+                    src_meta.len() != dst_meta.len()
+                } else {
+                    true
+                };
+                
+                if should_copy {
+                    if std::fs::copy(&bin_path, &cached_bin).is_ok() {
+                        if let Ok(meta) = std::fs::metadata(&cached_bin) {
+                            let mut perms = meta.permissions();
+                            perms.set_mode(perms.mode() | 0o111);
+                            let _ = std::fs::set_permissions(&cached_bin, perms);
+                        }
+                    }
+                }
+                
+                if cached_bin.exists() {
+                    bin_path = cached_bin;
+                }
             }
         }
     }
