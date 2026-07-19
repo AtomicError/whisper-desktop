@@ -17,6 +17,11 @@ window.onerror = function(message, source, lineno, colno, error) {
   return false;
 };
 
+function getBasename(path) {
+  if (!path) return '';
+  return path.replace(/\\/g, '/').split('/').pop();
+}
+
 // Premium Glassmorphic Toast Notification System
 window.showNotification = function(message, type = 'info') {
   let container = document.getElementById('toast-container');
@@ -197,7 +202,7 @@ const invoke = async function(cmd, args = {}) {
     return {
       preset: 'safe',
       selectedBackend: 'Standard',
-      cloneDir: '/home/user/whisper.cpp',
+      modelsDir: '/home/user/whisper.cpp',
       threads: 4,
       processors: 1,
       offsetT: 0,
@@ -240,7 +245,7 @@ const invoke = async function(cmd, args = {}) {
       detectLanguage: false,
       prompt: "",
       carryPrompt: false,
-      modelPath: "models/ggml-base.en.bin",
+      modelPath: "ggml-base.en.bin",
       inputFile: "",
       ovDevice: "CPU",
       dtwEnabled: false,
@@ -258,12 +263,12 @@ const invoke = async function(cmd, args = {}) {
     };
   }
   if (cmd === 'check_build') {
-    return false;
+    return true;
   }
   if (cmd === 'scan_models') {
     return {
-      transModels: ['models/ggml-base.en.bin', 'models/ggml-small.bin'],
-      vadModels: ['models/ggml-silero-v6.2.0.bin']
+      transModels: ['ggml-base.en.bin', 'ggml-small.bin'],
+      vadModels: ['ggml-silero-v6.2.0.bin']
     };
   }
   return null;
@@ -286,7 +291,6 @@ let settingsState = null;
 let compiledBackends = {};
 let allLogsArray = []; // Store raw log payloads
 let systemSpecs = null;
-let selectedBackendsForBuild = ['Standard'];
 
 let selectedMediaFile = null;
 let probedMetadata = null;
@@ -344,45 +348,7 @@ function setupTitlebar() {
   }
 }
 
-function recommendCompilationBackend() {
-  if (!systemSpecs) return;
-  
-  // Hide all recommendation pills first
-  const pills = document.querySelectorAll('.recommendation-pill');
-  pills.forEach(p => p.style.display = 'none');
-  
-  // Determine recommended backends based on GPU
-  let recBackends = ['Standard'];
-  if (systemSpecs.gpu_type === 'nvidia') {
-    recBackends = ['CUDA'];
-  } else if (systemSpecs.gpu_type === 'amd') {
-    recBackends = ['Vulkan'];
-  } else if (systemSpecs.gpu_type === 'intel') {
-    recBackends = ['OpenVINO', 'Vulkan'];
-  }
-  
-  recBackends.forEach(backend => {
-    const recPill = document.getElementById(`rec-${backend}`);
-    if (recPill) {
-      recPill.style.display = 'inline-block';
-    }
-  });
-  
-  // Auto-select the first non-Standard backend initially if any
-  const firstNonCpu = recBackends.find(b => b !== 'Standard');
-  if (firstNonCpu) {
-    selectBackend(firstNonCpu, true);
-    
-    // Auto-select additional recommended backends as well
-    recBackends.forEach(b => {
-      if (b !== 'Standard' && b !== firstNonCpu) {
-        if (!selectedBackendsForBuild.includes(b)) {
-          selectBackend(b);
-        }
-      }
-    });
-  }
-}
+
 
 // ----------------- Custom Dropdown Component -----------------
 window.customSelectsMap = new Map();
@@ -561,21 +527,23 @@ window.syncCustomSelects = function() {
 // Handle responsive sidebar collapse via matchMedia + class toggle,
 // combined with CSS transitions for smooth width/opacity animation
 // and staggered text-span reveal when expanding.
-let sidebarMql = null;
+let isCurrentlyCollapsed = null;
 
 function setupResponsiveMenuFadeIn() {
-  sidebarMql = window.matchMedia('(max-width: 960px)');
+  const sidebarMql = window.matchMedia('(max-width: 960px)');
 
   const handler = (e) => {
     const sidebar = document.querySelector('sidebar');
     if (!sidebar) return;
 
-    // Clear any leftover inline styles from previous animation
-    document.querySelectorAll('.nav-links .nav-item').forEach(el => el.style.transitionDelay = '');
-    document.querySelectorAll('.nav-links .nav-item span').forEach(el => el.style.transitionDelay = '');
-    sidebar.style.willChange = 'auto';
-
     if (e.matches) {
+      if (isCurrentlyCollapsed === true) return;
+      isCurrentlyCollapsed = true;
+
+      // Clear any leftover inline styles from previous animation
+      document.querySelectorAll('.nav-links .nav-item').forEach(el => el.style.transitionDelay = '');
+      document.querySelectorAll('.nav-links .nav-item span').forEach(el => el.style.transitionDelay = '');
+      
       // Narrow → collapse sidebar
       sidebar.style.willChange = 'width, padding';
       sidebar.classList.add('sidebar-collapsed');
@@ -583,6 +551,9 @@ function setupResponsiveMenuFadeIn() {
         sidebar.style.willChange = 'auto';
       }, 500);
     } else {
+      if (isCurrentlyCollapsed === false) return;
+      isCurrentlyCollapsed = false;
+
       // Wide → expand sidebar
       sidebar.style.willChange = 'width, padding';
 
@@ -606,7 +577,18 @@ function setupResponsiveMenuFadeIn() {
     }
   };
 
-  sidebarMql.addEventListener('change', handler);
+  // Support both modern addEventListener and legacy addListener for older WebKit/GTK engines
+  if (sidebarMql.addEventListener) {
+    sidebarMql.addEventListener('change', handler);
+  } else if (sidebarMql.addListener) {
+    sidebarMql.addListener(handler);
+  }
+
+  // Backup event listener for standard window resize events
+  window.addEventListener('resize', () => {
+    handler(sidebarMql);
+  });
+
   // Apply initial state
   handler(sidebarMql);
 }
@@ -687,7 +669,6 @@ async function initApp() {
     setupTranslationEventListeners();
   }
   await refreshBuildStatuses();
-  recommendCompilationBackend();
   
   // Setup Dashboard drag & drop
   setupDashboardDragAndDrop();
@@ -737,7 +718,6 @@ window.switchView = function(viewName) {
   // Update Title
   const titleMap = {
     'intro': 'Dashboard',
-    'build': 'System Build',
     'settings': 'Configuration Grid',
     'models': 'Model Hub',
     'transcribe': 'Transcribe File',
@@ -815,44 +795,7 @@ function setupTauriListeners() {
     listen(event, handler).then(fn => _unlistenFns.push(fn)).catch(() => {});
   };
 
-  // Build compilation logs & progress
-  on('build-status', (event) => {
-    const payload = event.payload;
-    const progressBlock = document.getElementById('build-progress-block');
-    const fillEl = document.getElementById('build-progress-bar');
-    const labelEl = document.getElementById('build-progress-msg');
-    const pctEl = document.getElementById('build-progress-pct');
-    
-    if (payload.active) {
-      progressBlock.style.display = 'block';
-      const pct = (payload.progress * 100).toFixed(0);
-      fillEl.style.width = `${pct}%`;
-      labelEl.textContent = payload.message;
-      pctEl.textContent = `${pct}%`;
-      fillEl.style.backgroundColor = 'var(--color-cyan)';
-    } else {
-      if (payload.error) {
-        fillEl.style.width = '100%';
-        fillEl.style.backgroundColor = 'var(--color-red)';
-        labelEl.textContent = payload.message;
-        pctEl.textContent = 'Failed';
-        // Alert the user with package installation instructions
-        showAppModal("Compilation Error", payload.message || "An error occurred during compilation.", payload.error);
-      } else {
-        fillEl.style.width = '100%';
-        fillEl.style.backgroundColor = 'var(--color-green)';
-        labelEl.textContent = payload.message;
-        pctEl.textContent = '100%';
-        showNotification("Build completed successfully!", "success");
-      }
-      setTimeout(async () => {
-        progressBlock.style.display = 'none';
-        // Reset color to cyan for next build
-        fillEl.style.backgroundColor = 'var(--color-cyan)';
-        await refreshBuildStatuses();
-      }, 7000);
-    }
-  });
+
 
   // Transcription progress
   on('transcribe-status', (event) => {
@@ -955,19 +898,23 @@ function appendLogToViewport(payload) {
   logLine.className = 'log-line';
   
   const catClass = payload.category.toLowerCase();
+  logLine.dataset.category = payload.category;
   if (payload.category === lastAppendedCategory) {
-    logLine.innerHTML = `<span class="log-time-spacer"></span><span class="log-cat-spacer"></span><span class="log-msg">${escapeHTML(payload.message)}</span>`;
+    logLine.innerHTML = '<span class="log-time-spacer"></span><span class="log-cat-spacer"></span><span class="log-msg">' + escapeHTML(payload.message) + '</span>';
   } else {
-    logLine.innerHTML = `<span class="log-time">${payload.timestamp}</span><span class="log-cat ${catClass}">${payload.category.toUpperCase()}</span><span class="log-msg">${escapeHTML(payload.message)}</span>`;
+    logLine.innerHTML = '<span class="log-time">' + payload.timestamp + '</span><span class="log-cat ' + catClass + '">' + payload.category.toUpperCase() + '</span><span class="log-msg">' + escapeHTML(payload.message) + '</span>';
     lastAppendedCategory = payload.category;
   }
   
   viewport.appendChild(logLine);
   
-  // Handle Auto Scroll
+  // Handle Auto Scroll — debounced to avoid forced layout on every line
   const autoScroll = document.getElementById('log-autoscroll').checked;
   if (autoScroll) {
-    viewport.scrollTop = viewport.scrollHeight;
+    clearTimeout(viewport._scrollDebounce);
+    viewport._scrollDebounce = setTimeout(() => {
+      viewport.scrollTop = viewport.scrollHeight;
+    }, 80);
   }
 }
 
@@ -978,8 +925,7 @@ function stripAnsi(str) {
 }
 
 function escapeHTML(str) {
-  const cleanStr = stripAnsi(str);
-  return cleanStr.replace(/[&<>'"]/g, 
+  return str.replace(/[&<>'"]/g, 
     tag => ({
       '&': '&amp;',
       '<': '&lt;',
@@ -1020,7 +966,7 @@ function updateDashboardBackendTiles() {
 window.dashboardSelectBackend = function(backend) {
   const isCompiled = compiledBackends[backend];
   if (!isCompiled) {
-    showNotification(`The selected backend (${backend === 'Standard' ? 'CPU' : backend}) is not compiled yet! Please click above to compile it first.`, "info");
+    showNotification(`The selected backend (${backend === 'Standard' ? 'CPU' : backend}) precompiled binary was not found in resources.`, "error");
     return;
   }
   
@@ -1028,177 +974,58 @@ window.dashboardSelectBackend = function(backend) {
     settingsState.selectedBackend = backend;
     saveCurrentSettings();
     scanAndPopulateModels();
-  }
-  
-  // Update the System Build selection to match
-  selectedBackendsForBuild = [backend];
-  const backends = ['Standard', 'Vulkan', 'OpenVINO', 'CUDA'];
-  backends.forEach(b => {
-    const card = document.getElementById(`backend-${b}`);
-    if (card) {
-      if (b === backend) card.classList.add('active');
-      else card.classList.remove('active');
+    
+    // Sync dropdown in settings page
+    const dropdown = document.getElementById('opt-selectedBackend');
+    if (dropdown) {
+      dropdown.value = backend;
+      if (window.syncCustomSelects) {
+        window.syncCustomSelects();
+      }
     }
-    const chk = document.getElementById(`chk-${b}`);
-    if (chk) {
-      chk.checked = (b === backend);
-    }
-  });
-  
-  const labelMap = {
-    'Standard': 'Standard CPU',
-    'Vulkan': 'Vulkan GPU',
-    'OpenVINO': 'OpenVINO Intel',
-    'CUDA': 'NVIDIA CUDA'
-  };
-  const selectedLabels = selectedBackendsForBuild.map(b => labelMap[b] || b);
-  const compTitle = document.getElementById('compilation-title');
-  if (compTitle) {
-    compTitle.textContent = `${selectedLabels.join(', ')} Compilation`;
   }
   
   updateDashboardBackendTiles();
   showNotification(`Active backend switched to ${backend === 'Standard' ? 'CPU' : backend} successfully!`, "success");
 };
 
-// ----------------- System Build Panel -----------------
+window.selectBackend = function(backend, isInitialSelection = false) {
+  if (!isInitialSelection && settingsState) {
+    settingsState.selectedBackend = backend;
+    saveCurrentSettings();
+    scanAndPopulateModels();
+  }
+  updateDashboardBackendTiles();
+};
+
 async function refreshBuildStatuses() {
   const backends = ['Standard', 'Vulkan', 'OpenVINO', 'CUDA'];
-  const cloneDir = document.getElementById('build-clone-dir').value || '';
-  
   for (const b of backends) {
-    const isCompiled = await invoke('check_build', { cloneDir, backend: b });
-    compiledBackends[b] = isCompiled;
-    
-    const badge = document.getElementById(`badge-${b}`);
-    if (badge) {
-      if (isCompiled) {
-        badge.textContent = 'Installed';
-        badge.className = 'backend-status-badge installed';
-      } else {
-        badge.textContent = 'Not Compiled';
-        badge.className = 'backend-status-badge missing';
-      }
+    let isCompiled = false;
+    try {
+      isCompiled = await invoke('check_build', { backend: b });
+    } catch (e) {
+      console.error(`Failed to check build for ${b}:`, e);
     }
+    compiledBackends[b] = isCompiled;
   }
-  
-  // Update transcription card configs too
   updateTranscribeUIConfigs();
   updateDashboardBackendTiles();
 }
 
-
-window.selectBackend = function(backend, isInitialSelection = false) {
-  if (isInitialSelection) {
-    selectedBackendsForBuild = [backend];
-    
-    const backends = ['Standard', 'Vulkan', 'OpenVINO', 'CUDA'];
-    backends.forEach(b => {
-      const card = document.getElementById(`backend-${b}`);
-      if (card) {
-        if (b === backend) card.classList.add('active');
-        else card.classList.remove('active');
-      }
-      const chk = document.getElementById(`chk-${b}`);
-      if (chk) {
-        chk.checked = (b === backend);
-      }
-    });
-  } else {
-    if (selectedBackendsForBuild.includes(backend)) {
-      if (selectedBackendsForBuild.length === 1) {
-        showNotification("You must select at least one backend to compile.", "info");
-        return;
-      }
-      selectedBackendsForBuild = selectedBackendsForBuild.filter(b => b !== backend);
-      const card = document.getElementById(`backend-${backend}`);
-      if (card) card.classList.remove('active');
-      const chk = document.getElementById(`chk-${backend}`);
-      if (chk) chk.checked = false;
-    } else {
-      selectedBackendsForBuild.push(backend);
-      const card = document.getElementById(`backend-${backend}`);
-      if (card) card.classList.add('active');
-      const chk = document.getElementById(`chk-${backend}`);
-      if (chk) chk.checked = true;
-    }
-  }
-
-  // Update compile title with list of selected backends
-  const labelMap = {
-    'Standard': 'Standard CPU',
-    'Vulkan': 'Vulkan GPU',
-    'OpenVINO': 'OpenVINO Intel',
-    'CUDA': 'NVIDIA CUDA'
-  };
-  const selectedLabels = selectedBackendsForBuild.map(b => labelMap[b] || b);
-  document.getElementById('compilation-title').textContent = `${selectedLabels.join(', ')} Compilation`;
-  
-  if (settingsState) {
-    if (selectedBackendsForBuild.includes(backend)) {
-      settingsState.selectedBackend = backend;
-      saveCurrentSettings();
-      scanAndPopulateModels();
-    }
-  }
-  
-  updateDashboardBackendTiles();
-};
-
-window.browseCloneDirectory = async function() {
+window.browseModelsDirectory = async function() {
   const path = await invoke('select_directory');
   if (path) {
-    document.getElementById('build-clone-dir').value = path;
+    const inputEl = document.getElementById('opt-modelsDir');
+    if (inputEl) {
+      inputEl.value = path;
+    }
     if (settingsState) {
-      settingsState.cloneDir = path;
+      settingsState.modelsDir = path;
       saveCurrentSettings();
       scanAndPopulateModels();
     }
     await refreshBuildStatuses();
-  }
-};
-
-window.runGitOperations = async function() {
-  const cloneDir = document.getElementById('build-clone-dir').value;
-  if (!cloneDir) {
-    showNotification("Please select or type a repository path first!", "info");
-    return;
-  }
-  
-  const btn = document.getElementById('btn-git-op');
-  btn.disabled = true;
-  btn.textContent = 'Cloning / Updating...';
-  
-  try {
-    await invoke('start_git_operations', { cloneDir });
-    showNotification("Git task launched successfully! Follow progress in the Central Logging Center.", "success");
-    switchView('logs');
-  } catch (e) {
-    showNotification("Error spawning git commands: " + e, "error");
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Clone / Update Repo';
-  }
-};
-
-window.runBackendBuild = async function() {
-  const cloneDir = document.getElementById('build-clone-dir').value;
-  if (!cloneDir) {
-    showNotification("Please select or type a repository path first!", "info");
-    return;
-  }
-  
-  const btn = document.getElementById('btn-run-build');
-  btn.disabled = true;
-  
-  try {
-    await invoke('start_multi_compilations', { cloneDir, backends: selectedBackendsForBuild });
-    showNotification(`Compilation launched successfully for: ${selectedBackendsForBuild.join(', ')}! Check the progress logs.`, "success");
-    switchView('logs');
-  } catch (e) {
-    showNotification("Error spawning compile commands: " + e, "error");
-  } finally {
-    btn.disabled = false;
   }
 };
 
@@ -1251,8 +1078,11 @@ async function refreshSettings() {
   try {
     settingsState = await invoke('load_settings');
     
-    // Set clone dir input
-    document.getElementById('build-clone-dir').value = settingsState.cloneDir;
+    // Set models dir input
+    const inputEl = document.getElementById('opt-modelsDir');
+    if (inputEl) {
+      inputEl.value = settingsState.modelsDir;
+    }
     
     // Bind all options dynamically
     bindSettingsToDOM();
@@ -1410,7 +1240,7 @@ async function scanAndPopulateModels() {
   
   try {
     const res = await invoke('scan_models', {
-      cloneDir: settingsState.cloneDir,
+      modelsDir: settingsState.modelsDir,
       backend: settingsState.selectedBackend
     });
     
@@ -1421,7 +1251,7 @@ async function scanAndPopulateModels() {
     transSelect.innerHTML = '';
     const seenModelNames = new Set();
     res.transModels.forEach(m => {
-      const name = m.split('/').pop();
+      const name = getBasename(m);
       if (name.startsWith('for-tests')) return;
       if (seenModelNames.has(name)) return;
       seenModelNames.add(name);
@@ -1444,7 +1274,7 @@ async function scanAndPopulateModels() {
     res.vadModels.forEach(m => {
       const opt = document.createElement('option');
       opt.value = m;
-      opt.textContent = m.split('/').pop();
+      opt.textContent = getBasename(m);
       if (m === settingsState.vadModel) {
         opt.selected = true;
       }
@@ -1549,7 +1379,7 @@ window.browseMediaFile = async function() {
       // Update UI for Single-file Mode
       document.getElementById('lbl-file-name').style.display = 'block';
       document.getElementById('lbl-file-path').style.display = 'block';
-      document.getElementById('lbl-file-name').textContent = selectedMediaFile.split('/').pop();
+      document.getElementById('lbl-file-name').textContent = getBasename(selectedMediaFile);
       document.getElementById('lbl-file-path').textContent = selectedMediaFile;
       document.getElementById('batch-queue-container').style.display = 'none';
       
@@ -1584,7 +1414,7 @@ window.browseMediaFile = async function() {
       // Populate batch table state
       batchItems = files.map(filePath => ({
         path: filePath,
-        name: filePath.split('/').pop(),
+        name: getBasename(filePath),
         size: 'Pending...',
         durationSec: null,
         status: 'pending',
@@ -1679,7 +1509,7 @@ function updateTranscribeUIConfigs() {
   const backend = settingsState.selectedBackend;
   document.getElementById('trans-cfg-backend').textContent = backend;
   
-  const model = settingsState.modelPath.split('/').pop() || 'None';
+  const model = getBasename(settingsState.modelPath) || 'None';
   document.getElementById('trans-cfg-model').textContent = model;
   
   const vad = settingsState.vad ? 'ON' : 'OFF';
@@ -1712,14 +1542,14 @@ window.runWhisperTranscription = async function() {
 
   const isCompiled = compiledBackends[settingsState.selectedBackend];
   if (!isCompiled) {
-    showNotification(`The selected backend (${settingsState.selectedBackend}) is not compiled yet! Please go to the 'System Build' panel and build it first.`, "info");
-    switchView('build');
+    showNotification(`The selected backend (${settingsState.selectedBackend}) precompiled binary was not found in resources! Please choose a different backend in the configuration.`, "error");
+    switchView('settings');
     return;
   }
 
   const modelExists = localScannedTransModels.includes(settingsState.modelPath);
   if (!modelExists) {
-    const modelName = settingsState.modelPath.split('/').pop() || 'selected model';
+    const modelName = getBasename(settingsState.modelPath) || 'selected model';
     showNotification(`The selected model file '${modelName}' does not exist locally. Please select a valid model in General Configuration!`, "error");
     return;
   }
@@ -1910,13 +1740,34 @@ window.filterLogs = function(category) {
     }
   });
   
-  // Redraw viewport
-  redrawLogsViewport();
+  // Toggle visibility instead of rebuilding DOM
+  const logLines = document.querySelectorAll('#log-viewport .log-line');
+  logLines.forEach(el => {
+    if (activeLogCategory === 'All' || (el.dataset.category && el.dataset.category === activeLogCategory)) {
+      el.style.display = '';
+    } else {
+      el.style.display = 'none';
+    }
+  });
 };
 
 window.handleLogSearch = function() {
-  logSearchQuery = document.getElementById('log-search').value;
-  redrawLogsViewport();
+  logSearchQuery = document.getElementById('log-search').value.toLowerCase();
+  
+  // Toggle visibility instead of rebuilding DOM
+  const logLines = document.querySelectorAll('#log-viewport .log-line');
+  logLines.forEach(el => {
+    const msgEl = el.querySelector('.log-msg');
+    if (activeLogCategory !== 'All' && el.dataset.category !== activeLogCategory) {
+      el.style.display = 'none';
+      return;
+    }
+    if (logSearchQuery === '' || (msgEl && msgEl.textContent.toLowerCase().includes(logSearchQuery))) {
+      el.style.display = '';
+    } else {
+      el.style.display = 'none';
+    }
+  });
 };
 
 function redrawLogsViewport() {
@@ -2569,7 +2420,7 @@ async function handleDashboardDroppedFiles(files) {
     
     document.getElementById('lbl-file-name').style.display = 'block';
     document.getElementById('lbl-file-path').style.display = 'block';
-    document.getElementById('lbl-file-name').textContent = selectedMediaFile.split('/').pop();
+    document.getElementById('lbl-file-name').textContent = getBasename(selectedMediaFile);
     document.getElementById('lbl-file-path').textContent = selectedMediaFile;
     document.getElementById('batch-queue-container').style.display = 'none';
     
@@ -2597,7 +2448,7 @@ async function handleDashboardDroppedFiles(files) {
     
     batchItems = files.map(filePath => ({
       path: filePath,
-      name: filePath.split('/').pop(),
+      name: getBasename(filePath),
       size: 'Pending...',
       durationSec: null,
       status: 'pending',
@@ -2648,7 +2499,6 @@ async function handleDashboardDroppedFiles(files) {
 
 
 // ----------------- Models Logic -----------------
-let modelStatusPollInterval = null;
 let prevDownloadedBytesMap = new Map();
 let prevTimestampMap = new Map();
 let lastKnownSpeedMap = new Map();
@@ -2660,21 +2510,6 @@ function formatRemainingTime(seconds) {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return `${m}m ${s}s`;
-}
-
-function startModelStatusPolling() {
-  if (modelStatusPollInterval) return;
-  modelStatusPollInterval = setInterval(async () => {
-    if (activeView === 'models') {
-      // Skip polling refresh when user has an active search query
-      const searchInput = document.getElementById('model-search');
-      if (searchInput && searchInput.value.trim()) return;
-      await loadModelStatusesGrid(true);
-    } else {
-      clearInterval(modelStatusPollInterval);
-      modelStatusPollInterval = null;
-    }
-  }, 1000);
 }
 
 window.switchModelCategory = function(category) {
@@ -2725,7 +2560,7 @@ window.loadModelStatusesGrid = async function(isSilent = false) {
   }
   
   try {
-    const statuses = await invoke('get_all_models_status', { cloneDir: settingsState.cloneDir });
+    const statuses = await invoke('get_all_models_status', { modelsDir: settingsState.modelsDir });
     const grid = document.getElementById('models-list-scroll');
     if (!grid) return;
     
@@ -2926,10 +2761,6 @@ window.loadModelStatusesGrid = async function(isSilent = false) {
       grid.appendChild(card);
     });
     
-    const hasActiveDownloads = statuses.some(m => m.status === 'Downloading');
-    if (hasActiveDownloads) {
-      startModelStatusPolling();
-    }
   } catch (err) {
     console.error("Failed to load model statuses:", err);
   }
@@ -2946,13 +2777,12 @@ window.downloadModelClick = async function(name) {
     showNotification(`Downloading ggml-${name}.bin...`, "info");
     
     await invoke('start_download_model_task', {
-      cloneDir: settingsState.cloneDir,
+      modelsDir: settingsState.modelsDir,
       modelName: name
     });
     
-    // Refresh UI and start active polling
+    // Refresh UI
     await loadModelStatusesGrid();
-    startModelStatusPolling();
   } catch (err) {
     showNotification("Failed to start download: " + err, "error");
   } finally {
@@ -2984,7 +2814,7 @@ window.deleteModelClick = async function(name) {
   _modelActionsInProgress.add(name);
   try {
     await invoke('delete_model_file', {
-      cloneDir: settingsState.cloneDir,
+      modelsDir: settingsState.modelsDir,
       modelName: name
     });
     showNotification(`Deleted ggml-${name}.bin`, "success");
@@ -3033,7 +2863,10 @@ function appendTranscriptLine(timeRange, text) {
   lineEl.appendChild(timeSpan);
   lineEl.appendChild(textDiv);
   viewport.appendChild(lineEl);
-  viewport.scrollTop = viewport.scrollHeight;
+  clearTimeout(viewport._scrollDebounce);
+  viewport._scrollDebounce = setTimeout(() => {
+    viewport.scrollTop = viewport.scrollHeight;
+  }, 80);
 }
 
 window.updateTranscriptLineText = function(id, value) {
