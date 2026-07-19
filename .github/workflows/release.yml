@@ -54,7 +54,9 @@ jobs:
             librsvg2-dev \
             ffmpeg \
             libvulkan-dev \
-            glslc
+            glslc \
+            glslang-tools \
+            spirv-headers
 
       - name: Install CUDA Toolkit
         uses: Jimver/cuda-toolkit@v0.2.35
