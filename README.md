@@ -19,19 +19,19 @@
 
 ## 📸 Screenshots & Visual Walkthrough
 
-| 🎛️ Dashboard Home | 🏗️ Build Screen |
+| 🎛️ Dashboard Home | 🛠️ Configuration Step |
 | :---: | :---: |
-| ![Dashboard Home](assets/screenshots/dashboard.png) | ![Build Screen](assets/screenshots/build.png) |
+| ![Dashboard Home](assets/screenshots/dashboard.png) | ![Configuration Step](assets/screenshots/configuration.png) |
 
-| 🛠️ Configuration Step | 🎙️ Transcription Screen |
+| 📥 Model Hub | 🎙️ Transcription Screen |
 | :---: | :---: |
-| ![Configuration Step](assets/screenshots/configuration.png) | ![Transcription Screen](assets/screenshots/transcription.png) |
+| ![Model Hub](assets/screenshots/models.png) | ![Transcription Screen](assets/screenshots/transcription.png) |
 
 ---
 
 ## ✨ Features at a Glance
 
-*   **⚡ Multiple Acceleration Backends:** Choose between **CPU**, **Vulkan**, **OpenVINO**, or **CUDA** directly from the UI. *Note: Compiling the OpenVINO backend requires the OpenVINO package/SDK to be installed on your operating system.*
+*   **⚡ Multiple Acceleration Backends:** Choose between **CPU**, **Vulkan**, **OpenVINO**, or **CUDA** directly from the UI. *Note: Precompiled binaries for all backends are bundled directly inside the app, so no local compilation or system-level developer SDKs are required.*
 *   **📥 Integrated Model Downloader:** Browse and download GGML models from the UI with real-time speed, progress bars, and ETA tracking. Supports pause, resume, and delete.
 *   **📂 Batch Processing Queue:** Import multiple files, view duration, remove items, and transcribe them sequentially with detailed per-file progress.
 *   **🎞️ Integrated Media Converter:** Auto-extract 16kHz mono WAV from any audio/video file via FFmpeg. Output is placed next to the source file or redirected to `~/Documents/WhisperOutputs/` if the source is outside your home directory.
@@ -100,6 +100,7 @@ Prerequisites:
 *   **Rust** toolchain (latest stable)
 *   **System Libraries:** `gtk3`, `webkit2gtk-4.1`, `ffmpeg`
 *   **Optional:** `wl-copy`, `xclip`, or `xsel` for clipboard support
+*   **Precompiled Binaries:** Since the app packages precompiled whisper.cpp binaries at runtime, you need to place a compiled `whisper-cli` binary (renamed to `whisper-cli-standard`, `whisper-cli-vulkan`, etc.) inside the `src-tauri/resources/` folder before running or building.
 
 ### 1. Clone the Repository
 ```bash
