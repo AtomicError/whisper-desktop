@@ -88,25 +88,25 @@ jobs:
           
           # 1. Standard CPU Backend
           echo "Building Standard CPU backend..."
-          cmake -B whisper.cpp-src/build-standard -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON
+          cmake -B whisper.cpp-src/build-standard -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DBUILD_SHARED_LIBS=OFF
           cmake --build whisper.cpp-src/build-standard -j$(nproc) --config Release --target whisper-cli
           cp whisper.cpp-src/build-standard/bin/whisper-cli src-tauri/resources/whisper-cli-standard
           
           # 2. Vulkan Backend
           echo "Building Vulkan backend..."
-          cmake -B whisper.cpp-src/build-vulkan -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DGGML_VULKAN=ON
+          cmake -B whisper.cpp-src/build-vulkan -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DGGML_VULKAN=ON -DBUILD_SHARED_LIBS=OFF
           cmake --build whisper.cpp-src/build-vulkan -j$(nproc) --config Release --target whisper-cli
           cp whisper.cpp-src/build-vulkan/bin/whisper-cli src-tauri/resources/whisper-cli-vulkan
           
           # 3. OpenVINO Backend
           echo "Building OpenVINO backend..."
-          cmake -B whisper.cpp-src/build-openvino -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DWHISPER_OPENVINO=1
+          cmake -B whisper.cpp-src/build-openvino -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DWHISPER_OPENVINO=1 -DBUILD_SHARED_LIBS=OFF
           cmake --build whisper.cpp-src/build-openvino -j$(nproc) --config Release --target whisper-cli
           cp whisper.cpp-src/build-openvino/bin/whisper-cli src-tauri/resources/whisper-cli-openvino
           
           # 4. CUDA Backend
           echo "Building CUDA backend..."
-          cmake -B whisper.cpp-src/build-cuda -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DGGML_CUDA=ON
+          cmake -B whisper.cpp-src/build-cuda -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DGGML_CUDA=ON -DBUILD_SHARED_LIBS=OFF
           cmake --build whisper.cpp-src/build-cuda -j$(nproc) --config Release --target whisper-cli
           cp whisper.cpp-src/build-cuda/bin/whisper-cli src-tauri/resources/whisper-cli-cuda
           chmod +x src-tauri/resources/whisper-cli-*
