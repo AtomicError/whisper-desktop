@@ -53,7 +53,8 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             ffmpeg \
-            libvulkan-dev
+            libvulkan-dev \
+            glslc
 
       - name: Install CUDA Toolkit
         uses: Jimver/cuda-toolkit@v0.2.35
