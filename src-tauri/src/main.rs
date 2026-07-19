@@ -224,7 +224,11 @@ fn walk_models_dir(
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
-                walk_models_dir(&path, root, backend, trans_models, vad_models);
+                let dir_name = path.file_name().unwrap_or_default().to_string_lossy();
+                // Avoid recursing into hidden directories or huge dependency/build directories
+                if !dir_name.starts_with('.') && dir_name != "node_modules" && dir_name != "target" && dir_name != "build" {
+                    walk_models_dir(&path, root, backend, trans_models, vad_models);
+                }
             } else if path.is_file() {
                 let filename = path.file_name().unwrap_or_default().to_string_lossy();
                 if filename.ends_with(".bin") && (filename.contains("ggml-") || filename.contains("silero")) {
@@ -259,10 +263,10 @@ fn scan_models(models_dir: String, backend: String) -> ModelScanResult {
     let mut vad_models = Vec::new();
     
     let root = Path::new(&models_dir);
-    let models_dir_path = root.join("models");
+    let models_dir_path = root;
     
     if models_dir_path.exists() && models_dir_path.is_dir() {
-        walk_models_dir(&models_dir_path, root, &backend, &mut trans_models, &mut vad_models);
+        walk_models_dir(models_dir_path, root, &backend, &mut trans_models, &mut vad_models);
     }
     
     if trans_models.is_empty() {
@@ -356,7 +360,7 @@ fn get_model_download_progress(models_dir: String, model_name: String) -> Result
         .unwrap_or(&lowered)
         .to_string();
 
-    let models_dir_path = Path::new(&models_dir).join("models");
+    let models_dir_path = Path::new(&models_dir);
     let target_path = models_dir_path.join(format!("ggml-{}.bin", clean_name));
     let tmp_path = models_dir_path.join(format!("ggml-{}.bin.tmp", clean_name));
 

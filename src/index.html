@@ -271,7 +271,6 @@
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title">Active Backend</span>
-                        <span class="setting-flag">selectedBackend</span>
                       </div>
                       <div class="setting-desc">Choose the computation backend (CPU or GPU acceleration).</div>
                     </div>
@@ -289,7 +288,6 @@
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title">Models Storage Directory</span>
-                        <span class="setting-flag">modelsDir</span>
                       </div>
                       <div class="setting-desc">The folder where GGML models are stored. Default is ~/whisper.cpp.</div>
                     </div>
@@ -305,7 +303,7 @@
                         <span class="setting-title">Model Selection</span>
                         <span class="setting-flag">-m</span>
                       </div>
-                      <div class="setting-desc">The GGML model file to use for transcription (searched inside the <code>models/</code> folder).</div>
+                      <div class="setting-desc">The GGML model file to use for transcription (searched inside selected folder).</div>
                     </div>
                     <div class="setting-control">
                       <select class="select-control" id="opt-modelPath"></select>

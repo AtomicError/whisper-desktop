@@ -8,3 +8,4 @@ Icon={{icon}}
 Name={{name}}
 Terminal=false
 Type=Application
+StartupWMClass=whisper-desktop

@@ -108,9 +108,9 @@ pub async fn run_model_download(
     models_dir: String,
     model_name: String,
 ) -> Result<(), String> {
-    let models_dir_path = Path::new(&models_dir).join("models");
+    let models_dir_path = Path::new(&models_dir);
     if !models_dir_path.exists() {
-        fs::create_dir_all(&models_dir_path)
+        fs::create_dir_all(models_dir_path)
             .map_err(|e| format!("Failed to create models directory: {}", e))?;
     }
 
@@ -224,7 +224,7 @@ pub fn get_all_models_status(
     download_state: State<'_, DownloadState>,
     models_dir: String,
 ) -> Result<Vec<ModelStatus>, String> {
-    let models_dir_path = Path::new(&models_dir).join("models");
+    let models_dir_path = Path::new(&models_dir);
     let active_downloads = if let Ok(lock) = download_state.0.lock() {
         lock.active_downloads.clone()
     } else {
@@ -327,7 +327,7 @@ pub fn delete_model_file(models_dir: String, model_name: String) -> Result<(), S
         .unwrap_or(&model_name)
         .to_string();
 
-    let models_dir_path = Path::new(&models_dir).join("models");
+    let models_dir_path = Path::new(&models_dir);
     let bin_path = models_dir_path.join(format!("ggml-{}.bin", clean_name));
     let tmp_path = models_dir_path.join(format!("ggml-{}.bin.tmp", clean_name));
 

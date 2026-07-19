@@ -240,7 +240,7 @@ const invoke = async function(cmd, args = {}) {
       detectLanguage: false,
       prompt: "",
       carryPrompt: false,
-      modelPath: "models/ggml-base.en.bin",
+      modelPath: "ggml-base.en.bin",
       inputFile: "",
       ovDevice: "CPU",
       dtwEnabled: false,
@@ -262,8 +262,8 @@ const invoke = async function(cmd, args = {}) {
   }
   if (cmd === 'scan_models') {
     return {
-      transModels: ['models/ggml-base.en.bin', 'models/ggml-small.bin'],
-      vadModels: ['models/ggml-silero-v6.2.0.bin']
+      transModels: ['ggml-base.en.bin', 'ggml-small.bin'],
+      vadModels: ['ggml-silero-v6.2.0.bin']
     };
   }
   return null;
