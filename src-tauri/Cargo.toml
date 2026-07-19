@@ -27,7 +27,7 @@ serde_json = "1"
 sysinfo = "0.30"
 tokio = { version = "1", features = ["full"] }
 regex = "1"
-rfd = "0.14"
+tauri-plugin-dialog = "2"
 chrono = { version = "0.4", features = ["serde"] }
 webkit2gtk = { version = "2.0.2" }
 reqwest = { version = "0.12", features = ["json"] }

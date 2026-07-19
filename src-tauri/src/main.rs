@@ -278,28 +278,44 @@ fn scan_models(models_dir: String, backend: String) -> ModelScanResult {
     ModelScanResult { trans_models, vad_models }
 }
 
+use tauri_plugin_dialog::DialogExt;
+
 #[tauri::command]
-fn select_file() -> Option<String> {
-    rfd::FileDialog::new()
+async fn select_file(app: AppHandle) -> Option<String> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .file()
         .add_filter("Audio/Video", &["mp4", "mkv", "avi", "mov", "flv", "webm", "m4v", "mp3", "wav", "ogg", "m4a", "flac", "aac", "wma"])
-        .pick_file()
-        .map(|p| p.to_string_lossy().to_string())
+        .pick_file(move |file| {
+            let _ = tx.send(file);
+        });
+    rx.await.ok().flatten().and_then(|p| p.into_path().ok()).map(|p| p.to_string_lossy().to_string())
 }
 
 #[tauri::command]
-fn select_files() -> Option<Vec<String>> {
-    rfd::FileDialog::new()
+async fn select_files(app: AppHandle) -> Option<Vec<String>> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .file()
         .add_filter("Audio/Video", &["mp4", "mkv", "avi", "mov", "flv", "webm", "m4v", "mp3", "wav", "ogg", "m4a", "flac", "aac", "wma"])
-        .pick_files()
-        .map(|paths| paths.into_iter().map(|p| p.to_string_lossy().to_string()).collect())
+        .pick_files(move |files| {
+            let _ = tx.send(files);
+        });
+    rx.await.ok().flatten()
+        .map(|files| files.into_iter().filter_map(|p| p.into_path().ok()).map(|p| p.to_string_lossy().to_string()).collect())
 }
 
 #[tauri::command]
-fn select_directory() -> Option<String> {
-    rfd::FileDialog::new()
-        .pick_folder()
-        .map(|p| p.to_string_lossy().to_string())
+async fn select_directory(app: AppHandle) -> Option<String> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .file()
+        .pick_folder(move |dir| {
+            let _ = tx.send(dir);
+        });
+    rx.await.ok().flatten().and_then(|p| p.into_path().ok()).map(|p| p.to_string_lossy().to_string())
 }
+
 
 
 #[tauri::command]
@@ -408,6 +424,7 @@ fn main() {
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(HardwareState(hardware_monitor))
         .manage(LogState(app_logs))
         .manage(TranscriptionState(transcription_session))
