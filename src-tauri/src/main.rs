@@ -364,15 +364,34 @@ fn get_model_download_progress(models_dir: String, model_name: String) -> Result
     let target_path = models_dir_path.join(format!("ggml-{}.bin", clean_name));
     let tmp_path = models_dir_path.join(format!("ggml-{}.bin.tmp", clean_name));
 
-    if target_path.exists() {
+    let mut target_exists = target_path.exists();
+    let mut tmp_exists = tmp_path.exists();
+    let mut active_tmp = tmp_path;
+
+    if !target_exists {
+        let legacy_target = models_dir_path.join("models").join(format!("ggml-{}.bin", clean_name));
+        if legacy_target.exists() {
+            target_exists = true;
+        }
+    }
+
+    if target_exists {
         return Ok(1.0);
     }
 
-    if !tmp_path.exists() {
+    if !tmp_exists {
+        let legacy_tmp = models_dir_path.join("models").join(format!("ggml-{}.bin.tmp", clean_name));
+        if legacy_tmp.exists() {
+            tmp_exists = true;
+            active_tmp = legacy_tmp;
+        }
+    }
+
+    if !tmp_exists {
         return Ok(0.0);
     }
 
-    if let Ok(meta) = std::fs::metadata(&tmp_path) {
+    if let Ok(meta) = std::fs::metadata(&active_tmp) {
         let current_size = meta.len();
         let expected_size = get_expected_model_size(&clean_name);
         if expected_size > 0 {

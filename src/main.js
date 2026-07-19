@@ -17,6 +17,11 @@ window.onerror = function(message, source, lineno, colno, error) {
   return false;
 };
 
+function getBasename(path) {
+  if (!path) return '';
+  return path.replace(/\\/g, '/').split('/').pop();
+}
+
 // Premium Glassmorphic Toast Notification System
 window.showNotification = function(message, type = 'info') {
   let container = document.getElementById('toast-container');
@@ -1246,7 +1251,7 @@ async function scanAndPopulateModels() {
     transSelect.innerHTML = '';
     const seenModelNames = new Set();
     res.transModels.forEach(m => {
-      const name = m.split('/').pop();
+      const name = getBasename(m);
       if (name.startsWith('for-tests')) return;
       if (seenModelNames.has(name)) return;
       seenModelNames.add(name);
@@ -1269,7 +1274,7 @@ async function scanAndPopulateModels() {
     res.vadModels.forEach(m => {
       const opt = document.createElement('option');
       opt.value = m;
-      opt.textContent = m.split('/').pop();
+      opt.textContent = getBasename(m);
       if (m === settingsState.vadModel) {
         opt.selected = true;
       }
@@ -1374,7 +1379,7 @@ window.browseMediaFile = async function() {
       // Update UI for Single-file Mode
       document.getElementById('lbl-file-name').style.display = 'block';
       document.getElementById('lbl-file-path').style.display = 'block';
-      document.getElementById('lbl-file-name').textContent = selectedMediaFile.split('/').pop();
+      document.getElementById('lbl-file-name').textContent = getBasename(selectedMediaFile);
       document.getElementById('lbl-file-path').textContent = selectedMediaFile;
       document.getElementById('batch-queue-container').style.display = 'none';
       
@@ -1409,7 +1414,7 @@ window.browseMediaFile = async function() {
       // Populate batch table state
       batchItems = files.map(filePath => ({
         path: filePath,
-        name: filePath.split('/').pop(),
+        name: getBasename(filePath),
         size: 'Pending...',
         durationSec: null,
         status: 'pending',
@@ -1504,7 +1509,7 @@ function updateTranscribeUIConfigs() {
   const backend = settingsState.selectedBackend;
   document.getElementById('trans-cfg-backend').textContent = backend;
   
-  const model = settingsState.modelPath.split('/').pop() || 'None';
+  const model = getBasename(settingsState.modelPath) || 'None';
   document.getElementById('trans-cfg-model').textContent = model;
   
   const vad = settingsState.vad ? 'ON' : 'OFF';
@@ -1544,7 +1549,7 @@ window.runWhisperTranscription = async function() {
 
   const modelExists = localScannedTransModels.includes(settingsState.modelPath);
   if (!modelExists) {
-    const modelName = settingsState.modelPath.split('/').pop() || 'selected model';
+    const modelName = getBasename(settingsState.modelPath) || 'selected model';
     showNotification(`The selected model file '${modelName}' does not exist locally. Please select a valid model in General Configuration!`, "error");
     return;
   }
@@ -2415,7 +2420,7 @@ async function handleDashboardDroppedFiles(files) {
     
     document.getElementById('lbl-file-name').style.display = 'block';
     document.getElementById('lbl-file-path').style.display = 'block';
-    document.getElementById('lbl-file-name').textContent = selectedMediaFile.split('/').pop();
+    document.getElementById('lbl-file-name').textContent = getBasename(selectedMediaFile);
     document.getElementById('lbl-file-path').textContent = selectedMediaFile;
     document.getElementById('batch-queue-container').style.display = 'none';
     
@@ -2443,7 +2448,7 @@ async function handleDashboardDroppedFiles(files) {
     
     batchItems = files.map(filePath => ({
       path: filePath,
-      name: filePath.split('/').pop(),
+      name: getBasename(filePath),
       size: 'Pending...',
       durationSec: null,
       status: 'pending',

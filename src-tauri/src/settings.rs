@@ -260,19 +260,6 @@ pub fn save_settings_file(settings: &WhisperSettings) -> Result<(), String> {
     save_app_settings(&app_settings)
 }
 
-fn strip_models_prefix(path: &str) -> String {
-    if let Some(stripped) = path.strip_prefix("models/") {
-        stripped.to_string()
-    } else {
-        path.to_string()
-    }
-}
-
-fn sanitize_settings(settings: &mut WhisperSettings) {
-    settings.model_path = strip_models_prefix(&settings.model_path);
-    settings.vad_model = strip_models_prefix(&settings.vad_model);
-}
-
 pub fn load_app_settings() -> AppSettings {
     let path = get_settings_path();
     if path.exists() {
@@ -283,13 +270,9 @@ pub fn load_app_settings() -> AppSettings {
                 if app_settings.professional.beam_size > 8 { app_settings.professional.beam_size = 8; }
                 if app_settings.professional.best_of > 8 { app_settings.professional.best_of = 8; }
                 
-                sanitize_settings(&mut app_settings.safe);
-                sanitize_settings(&mut app_settings.professional);
-                
                 return app_settings;
             }
-            if let Ok(mut old_settings) = serde_json::from_str::<WhisperSettings>(&data) {
-                sanitize_settings(&mut old_settings);
+            if let Ok(old_settings) = serde_json::from_str::<WhisperSettings>(&data) {
                 let mut app_settings = AppSettings::default_app_settings();
                 if old_settings.preset.to_lowercase() == "professional" {
                     app_settings.active_preset = "professional".to_string();

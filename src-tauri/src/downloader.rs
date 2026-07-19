@@ -125,7 +125,15 @@ pub async fn run_model_download(
     let target_path = models_dir_path.join(&target_filename);
     let tmp_path = models_dir_path.join(format!("{}.tmp", target_filename));
 
-    if target_path.exists() {
+    let mut exists = target_path.exists();
+    if !exists {
+        let legacy_target = models_dir_path.join("models").join(&target_filename);
+        if legacy_target.exists() {
+            exists = true;
+        }
+    }
+
+    if exists {
         return Err(format!("Model ggml-{}.bin already exists locally.", clean_name));
     }
 
@@ -244,16 +252,34 @@ pub fn get_all_models_status(
         let expected_size = get_expected_model_size(m);
         let is_active = active_downloads.contains_key(m);
 
+        let mut bin_exists = bin_path.exists();
+        let mut tmp_exists = tmp_path.exists();
+        let mut active_tmp_path = tmp_path.clone();
+
+        if !bin_exists {
+            let legacy_bin = models_dir_path.join("models").join(&bin_name);
+            if legacy_bin.exists() {
+                bin_exists = true;
+            }
+        }
+        if !tmp_exists {
+            let legacy_tmp = models_dir_path.join("models").join(&tmp_name);
+            if legacy_tmp.exists() {
+                tmp_exists = true;
+                active_tmp_path = legacy_tmp;
+            }
+        }
+
         let mut status = "Not Downloaded".to_string();
         let mut downloaded_bytes = 0;
         let mut progress = 0.0;
 
-        if bin_path.exists() {
+        if bin_exists {
             status = "Downloaded".to_string();
             downloaded_bytes = expected_size;
             progress = 1.0;
-        } else if tmp_path.exists() {
-            if let Ok(meta) = fs::metadata(&tmp_path) {
+        } else if tmp_exists {
+            if let Ok(meta) = fs::metadata(&active_tmp_path) {
                 downloaded_bytes = meta.len();
                 if expected_size > 0 {
                     progress = downloaded_bytes as f64 / expected_size as f64;
@@ -330,14 +356,24 @@ pub fn delete_model_file(models_dir: String, model_name: String) -> Result<(), S
     let models_dir_path = Path::new(&models_dir);
     let bin_path = models_dir_path.join(format!("ggml-{}.bin", clean_name));
     let tmp_path = models_dir_path.join(format!("ggml-{}.bin.tmp", clean_name));
+    
+    let legacy_bin = models_dir_path.join("models").join(format!("ggml-{}.bin", clean_name));
+    let legacy_tmp = models_dir_path.join("models").join(format!("ggml-{}.bin.tmp", clean_name));
 
     if bin_path.exists() {
         fs::remove_file(&bin_path)
             .map_err(|e| format!("Failed to delete bin file: {}", e))?;
+    } else if legacy_bin.exists() {
+        fs::remove_file(&legacy_bin)
+            .map_err(|e| format!("Failed to delete legacy bin file: {}", e))?;
     }
+
     if tmp_path.exists() {
         fs::remove_file(&tmp_path)
             .map_err(|e| format!("Failed to delete tmp file: {}", e))?;
+    } else if legacy_tmp.exists() {
+        fs::remove_file(&legacy_tmp)
+            .map_err(|e| format!("Failed to delete legacy tmp file: {}", e))?;
     }
 
     Ok(())
