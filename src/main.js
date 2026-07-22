@@ -1597,24 +1597,41 @@ async function probeSelectedFile() {
 function updateTranscribeUIConfigs() {
   if (!settingsState) return;
   
-  const backend = settingsState.selectedBackend;
-  document.getElementById('trans-cfg-backend').textContent = backend;
+  const backend = settingsState.selectedBackend || 'Standard';
+  const backendEl = document.getElementById('trans-cfg-backend');
+  if (backendEl) {
+    backendEl.textContent = backend;
+    backendEl.title = backend;
+  }
   
   const model = getBasename(settingsState.modelPath) || 'None';
-  document.getElementById('trans-cfg-model').textContent = model;
+  const modelEl = document.getElementById('trans-cfg-model');
+  if (modelEl) {
+    modelEl.textContent = model;
+    modelEl.title = model;
+  }
   
   const vad = settingsState.vad ? 'ON' : 'OFF';
-  document.getElementById('trans-cfg-vad').textContent = vad;
+  const vadEl = document.getElementById('trans-cfg-vad');
+  if (vadEl) {
+    vadEl.textContent = vad;
+    vadEl.className = settingsState.vad ? 'trans-cfg-val val-gold' : 'trans-cfg-val val-muted';
+    vadEl.title = settingsState.vad ? `VAD Active (${settingsState.vadModel || 'Default'})` : 'VAD Disabled';
+  }
   
   const transCfgTranslation = document.getElementById('trans-cfg-translation');
   if (transCfgTranslation) {
     const translationEnabled = settingsState.translateAiEnabled === true;
     let translationText = 'OFF';
+    let fullTitle = 'Translation Disabled';
     if (translationEnabled) {
-      translationText = settingsState.translateAiModel ? `ON (${settingsState.translateAiModel})` : 'ON';
+      const aiModel = settingsState.translateAiModel || '';
+      translationText = aiModel ? `ON (${aiModel})` : 'ON';
+      fullTitle = aiModel ? `Translation Active: ${aiModel}` : 'Translation Active';
     }
     transCfgTranslation.textContent = translationText;
-    transCfgTranslation.style.color = translationEnabled ? 'var(--color-green)' : 'var(--color-text-muted)';
+    transCfgTranslation.title = fullTitle;
+    transCfgTranslation.className = translationEnabled ? 'trans-cfg-val val-green' : 'trans-cfg-val val-muted';
   }
 }
 

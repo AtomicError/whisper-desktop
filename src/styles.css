@@ -1517,6 +1517,80 @@ select.select-control {
   color: var(--color-royal-blue);
 }
 
+/* Premium Glassmorphic Configuration Bar in Step 3 */
+.trans-cfg-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  background: rgba(11, 14, 27, 0.5);
+  border: 1px solid var(--border-glass);
+  border-radius: 10px;
+  padding: 8px 12px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.trans-cfg-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 0.82rem;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.trans-cfg-chip-translation {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.trans-cfg-label {
+  color: var(--color-text-muted);
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.trans-cfg-val {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.trans-cfg-chip-translation .trans-cfg-val {
+  max-width: 320px;
+}
+
+.val-cyan {
+  color: var(--color-cyan) !important;
+}
+
+.val-blue {
+  color: var(--color-royal-blue) !important;
+}
+
+.val-gold {
+  color: var(--color-gold) !important;
+}
+
+.val-green {
+  color: var(--color-green) !important;
+}
+
+.val-muted {
+  color: var(--color-text-muted) !important;
+}
+
 /* Compact Telemetry HUD (Right Panel) */
 .telemetry-hud {
   display: flex;

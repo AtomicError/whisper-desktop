@@ -1427,8 +1427,23 @@
                     <span class="wizard-chevron" id="wizard-chevron-3">▼</span>
                   </div>
                   <div class="wizard-step-body" id="wizard-body-3">
-                    <div class="step-details-row" style="margin-bottom: 16px;">
-                      Backend: <span id="trans-cfg-backend" style="color:var(--color-cyan); font-weight:600;">Standard</span> | Model: <span id="trans-cfg-model" style="color:var(--color-royal-blue); font-weight:600;">Base</span> | VAD: <span id="trans-cfg-vad" style="color:var(--color-gold); font-weight:600;">OFF</span> | Translation: <span id="trans-cfg-translation" style="color:var(--color-green); font-weight:600;">OFF</span>
+                    <div class="trans-cfg-bar" style="margin-bottom: 16px;">
+                      <div class="trans-cfg-chip">
+                        <span class="trans-cfg-label">Backend:</span>
+                        <span class="trans-cfg-val val-cyan" id="trans-cfg-backend">Standard</span>
+                      </div>
+                      <div class="trans-cfg-chip">
+                        <span class="trans-cfg-label">Model:</span>
+                        <span class="trans-cfg-val val-blue" id="trans-cfg-model">Base</span>
+                      </div>
+                      <div class="trans-cfg-chip">
+                        <span class="trans-cfg-label">VAD:</span>
+                        <span class="trans-cfg-val val-gold" id="trans-cfg-vad">OFF</span>
+                      </div>
+                      <div class="trans-cfg-chip trans-cfg-chip-translation">
+                        <span class="trans-cfg-label">Translation:</span>
+                        <span class="trans-cfg-val val-green" id="trans-cfg-translation">OFF</span>
+                      </div>
                     </div>
                     <!-- Single-file controls -->
                     <div style="display:flex; gap:12px;">
