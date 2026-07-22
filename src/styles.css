@@ -1873,7 +1873,7 @@ select.select-control {
   border: 1px solid var(--border-glass-active);
   box-shadow: var(--shadow-neon-royal-blue), 0 10px 32px rgba(0, 0, 0, 0.6);
   border-radius: 12px;
-  padding: 14px 24px;
+  padding: 14px 20px;
   color: #fff;
   font-weight: 500;
   font-size: 0.95rem;
@@ -1883,6 +1883,61 @@ select.select-control {
   transform: translateY(30px) scale(0.95);
   opacity: 0;
   transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.toast-message {
+  flex: 1;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+.toast-close-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: color 0.2s, background 0.2s;
+  flex-shrink: 0;
+}
+
+.toast-close-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.toast-close-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.toast-progress-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  width: 100%;
+  background: var(--color-royal-blue);
+  opacity: 0.75;
+  border-radius: 0 0 12px 12px;
+}
+
+.toast-success .toast-progress-bar {
+  background: var(--color-green);
+}
+
+.toast-error .toast-progress-bar {
+  background: var(--color-red);
+}
+
+.toast-info .toast-progress-bar {
+  background: var(--color-royal-blue);
 }
 
 .toast-notification.show {

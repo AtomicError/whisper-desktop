@@ -23,7 +23,7 @@ function getBasename(path) {
 }
 
 // Premium Glassmorphic Toast Notification System
-window.showNotification = function(message, type = 'info') {
+window.showNotification = function(message, type = 'info', customDuration = null) {
   let container = document.getElementById('toast-container');
   if (!container) {
     container = document.createElement('div');
@@ -44,16 +44,39 @@ window.showNotification = function(message, type = 'info') {
     iconSvg = `<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`;
   }
   
-  toast.innerHTML = `${iconSvg}<div class="toast-message"></div>`;
+  const closeSvg = `<svg class="toast-close-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+
+  // Extended durations: 10s for errors, 6s for info/success
+  let defaultDuration = 6000;
+  if (type === 'error') {
+    defaultDuration = 10000;
+  }
+  const duration = (customDuration !== null) ? customDuration : defaultDuration;
+
+  toast.innerHTML = `
+    ${iconSvg}
+    <div class="toast-message"></div>
+    <button class="toast-close-btn" title="Close">${closeSvg}</button>
+    <div class="toast-progress-bar"></div>
+  `;
   toast.querySelector('.toast-message').textContent = message;
+  
+  const progressBar = toast.querySelector('.toast-progress-bar');
+  if (duration > 0 && duration !== Infinity) {
+    progressBar.style.transition = `width ${duration}ms linear`;
+  } else {
+    progressBar.style.display = 'none';
+  }
   
   container.appendChild(toast);
   
-  // Animate Entry
-  setTimeout(() => toast.classList.add('show'), 20);
+  let timerId = null;
+  let startTime = Date.now();
+  let remainingTime = duration;
+  let isPaused = false;
   
-  // Auto Pruning
-  setTimeout(() => {
+  const closeToast = () => {
+    if (toast.classList.contains('hide')) return;
     toast.classList.remove('show');
     toast.classList.add('hide');
     setTimeout(() => {
@@ -62,7 +85,55 @@ window.showNotification = function(message, type = 'info') {
         container.remove();
       }
     }, 400);
-  }, 3200);
+  };
+  
+  const startTimer = () => {
+    if (duration <= 0 || duration === Infinity) return;
+    startTime = Date.now();
+    progressBar.style.width = '0%';
+    timerId = setTimeout(closeToast, remainingTime);
+  };
+  
+  const pauseTimer = () => {
+    if (duration <= 0 || duration === Infinity || isPaused) return;
+    isPaused = true;
+    clearTimeout(timerId);
+    remainingTime -= (Date.now() - startTime);
+    if (remainingTime < 0) remainingTime = 0;
+    const computedWidth = getComputedStyle(progressBar).width;
+    progressBar.style.transition = 'none';
+    progressBar.style.width = computedWidth;
+  };
+
+  const resumeTimer = () => {
+    if (duration <= 0 || duration === Infinity || !isPaused) return;
+    isPaused = false;
+    if (remainingTime > 0) {
+      startTime = Date.now();
+      progressBar.style.transition = `width ${remainingTime}ms linear`;
+      progressBar.style.width = '0%';
+      timerId = setTimeout(closeToast, remainingTime);
+    } else {
+      closeToast();
+    }
+  };
+
+  toast.addEventListener('mouseenter', pauseTimer);
+  toast.addEventListener('mouseleave', resumeTimer);
+  
+  const closeBtn = toast.querySelector('.toast-close-btn');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeToast();
+    });
+  }
+  
+  // Animate Entry
+  setTimeout(() => {
+    toast.classList.add('show');
+    startTimer();
+  }, 20);
 };
 
 // Centered Premium Glassmorphic Modal overlay API
