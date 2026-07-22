@@ -454,10 +454,20 @@ pub async fn run_transcription(
     
     if settings.vad {
         args.push("--vad".to_string());
-        if !settings.vad_model.is_empty() {
-            args.push("-vm".to_string());
-            args.push(root.join(&settings.vad_model).to_string_lossy().to_string());
+        let vad_model_name = if !settings.vad_model.is_empty() {
+            settings.vad_model.clone()
+        } else {
+            "ggml-silero-v6.2.0.bin".to_string()
+        };
+        let vad_full_path = root.join(&vad_model_name);
+        if !vad_full_path.exists() {
+            return Err(format!(
+                "VAD is enabled, but VAD model file not found: '{}'. Please ensure the Silero VAD model is downloaded from Model Hub.",
+                vad_full_path.display()
+            ));
         }
+        args.push("-vm".to_string());
+        args.push(vad_full_path.to_string_lossy().to_string());
         args.push("-vt".to_string()); args.push(format!("{:.2}", settings.vad_thold));
         args.push("-vspd".to_string()); args.push(settings.vad_min_speech.to_string());
         args.push("-vsd".to_string()); args.push(settings.vad_min_sil.to_string());

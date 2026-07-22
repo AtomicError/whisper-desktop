@@ -1250,9 +1250,10 @@ async function scanAndPopulateModels() {
     const transSelect = document.getElementById('opt-modelPath');
     transSelect.innerHTML = '';
     const seenModelNames = new Set();
+    let modelMatched = false;
     res.transModels.forEach(m => {
       const name = getBasename(m);
-      if (name.startsWith('for-tests')) return;
+      if (name.startsWith('for-tests') || name.startsWith('No trans')) return;
       if (seenModelNames.has(name)) return;
       seenModelNames.add(name);
       const opt = document.createElement('option');
@@ -1260,9 +1261,14 @@ async function scanAndPopulateModels() {
       opt.textContent = name;
       if (m === settingsState.modelPath) {
         opt.selected = true;
+        modelMatched = true;
       }
       transSelect.appendChild(opt);
     });
+    if (!modelMatched && transSelect.options.length > 0) {
+      transSelect.selectedIndex = 0;
+      settingsState.modelPath = transSelect.value;
+    }
     transSelect.onchange = () => {
       settingsState.modelPath = transSelect.value;
       saveCurrentSettings();
@@ -1271,19 +1277,33 @@ async function scanAndPopulateModels() {
     // 2. Populate VAD Selection
     const vadSelect = document.getElementById('opt-vadModel');
     vadSelect.innerHTML = '';
-    res.vadModels.forEach(m => {
+    const validVadModels = (res.vadModels || []).filter(m => m !== 'No VAD models found');
+    let vadMatched = false;
+    validVadModels.forEach(m => {
       const opt = document.createElement('option');
       opt.value = m;
       opt.textContent = getBasename(m);
       if (m === settingsState.vadModel) {
         opt.selected = true;
+        vadMatched = true;
       }
       vadSelect.appendChild(opt);
     });
+    if (!vadMatched && validVadModels.length > 0) {
+      vadSelect.selectedIndex = 0;
+      settingsState.vadModel = vadSelect.value;
+    } else if (validVadModels.length === 0) {
+      settingsState.vadModel = '';
+    }
     vadSelect.onchange = () => {
       settingsState.vadModel = vadSelect.value;
       saveCurrentSettings();
     };
+
+    // Save state if auto-selected
+    if ((!modelMatched && transSelect.options.length > 0) || (!vadMatched && validVadModels.length > 0)) {
+      await saveCurrentSettings();
+    }
     
     // Sync custom dropdown views
     if (window.syncCustomSelects) {

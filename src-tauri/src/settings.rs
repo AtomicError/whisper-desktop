@@ -150,7 +150,7 @@ impl WhisperSettings {
             no_gpu: false,
             device_id: 0,
             vad: false,
-            vad_model: "".to_string(),
+            vad_model: "ggml-silero-v6.2.0.bin".to_string(),
             vad_thold: 0.50,
             vad_min_speech: 250,
             vad_min_sil: 100,
@@ -180,6 +180,9 @@ impl WhisperSettings {
             self.logprob_thold = -1.00;
         } else if preset_name == "professional" {
             self.vad = true;
+            if self.vad_model.is_empty() {
+                self.vad_model = "ggml-silero-v6.2.0.bin".to_string();
+            }
             self.best_of = 8;
             self.beam_size = 8;
             self.max_len = 0;
