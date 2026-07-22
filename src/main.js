@@ -1762,12 +1762,9 @@ window.runWhisperTranscription = async function() {
   } catch (e) {
     const errMsg = (typeof e === 'string') ? e : (e && e.toString ? e.toString() : '');
     setWizardStepCompleted(3, false);
-    if (errMsg.toLowerCase().includes('cancelled')) {
-      showNotification("AI translation cancelled by the user.", "info");
-      if (msgEl) msgEl.textContent = 'Translation cancelled';
-    } else if (errMsg.toLowerCase().includes("aborted") || errMsg.toLowerCase().includes("terminated") || errMsg.toLowerCase().includes("signal")) {
-      showNotification("Transcription aborted by the user.", "info");
-      if (msgEl) msgEl.textContent = 'Aborted';
+    if (errMsg.toLowerCase().includes('cancelled by the user') || errMsg.toLowerCase().includes('was cancelled by the user')) {
+      showNotification("Transcription cancelled by the user.", "info");
+      if (msgEl) msgEl.textContent = 'Cancelled';
     } else {
       showNotification("Transcription failed: " + errMsg, "error");
       if (msgEl) msgEl.textContent = 'Task Failed';

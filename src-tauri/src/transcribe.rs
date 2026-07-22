@@ -155,20 +155,21 @@ pub async fn convert_to_wav(
     let mut stdout_reader = BufReader::new(stdout).lines();
     let mut stderr_reader = BufReader::new(stderr).lines();
     
-    loop {
+    let mut stdout_done = false;
+    let mut stderr_done = false;
+    
+    while !stdout_done || !stderr_done {
         tokio::select! {
-            line = stdout_reader.next_line() => {
-                match line {
-                    Ok(Some(l)) => logs.log(&app, "FFmpeg", &l),
-                    Ok(None) => break,
-                    Err(_) => {}
+            res = stdout_reader.next_line(), if !stdout_done => {
+                match res {
+                    Ok(Some(l)) => { logs.log(&app, "FFmpeg", &l); }
+                    _ => stdout_done = true,
                 }
             }
-            line = stderr_reader.next_line() => {
-                match line {
-                    Ok(Some(l)) => logs.log(&app, "FFmpeg", &l),
-                    Ok(None) => break,
-                    Err(_) => {}
+            res = stderr_reader.next_line(), if !stderr_done => {
+                match res {
+                    Ok(Some(l)) => { logs.log(&app, "FFmpeg", &l); }
+                    _ => stderr_done = true,
                 }
             }
         }
@@ -444,7 +445,7 @@ pub async fn run_transcription(
         args.push("-nfa".to_string());
     }
     
-    if settings.no_gpu { args.push("-ng".to_string()); }
+    if settings.no_gpu || settings.selected_backend == "Standard" { args.push("-ng".to_string()); }
     if settings.device_id != 0 { args.push("-dev".to_string()); args.push(settings.device_id.to_string()); }
     
     if settings.selected_backend == "OpenVINO" && !settings.ov_device.is_empty() {
@@ -518,10 +519,13 @@ pub async fn run_transcription(
     // Regex to match duration in Whisper startup logs: e.g. "samples, 50.0 sec)"
     let whisper_duration_regex = Regex::new(r"samples,\s*([\d.]+)\s*sec\)").expect("static regex");
     
-    loop {
+    let mut stdout_done = false;
+    let mut stderr_done = false;
+
+    while !stdout_done || !stderr_done {
         tokio::select! {
-            line = stdout_reader.next_line() => {
-                match line {
+            res = stdout_reader.next_line(), if !stdout_done => {
+                match res {
                     Ok(Some(l)) => {
                         logs.log(&app, "Whisper", &l);
                         
@@ -544,12 +548,11 @@ pub async fn run_transcription(
                             }
                         }
                     }
-                    Ok(None) => break,
-                    Err(_) => {}
+                    _ => stdout_done = true,
                 }
             }
-            line = stderr_reader.next_line() => {
-                match line {
+            res = stderr_reader.next_line(), if !stderr_done => {
+                match res {
                     Ok(Some(l)) => {
                         logs.log(&app, "Whisper", &l);
                         if let Some(caps) = whisper_duration_regex.captures(&l) {
@@ -560,8 +563,7 @@ pub async fn run_transcription(
                             }
                         }
                     }
-                    Ok(None) => break,
-                    Err(_) => {}
+                    _ => stderr_done = true,
                 }
             }
         }
