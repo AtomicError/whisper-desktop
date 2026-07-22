@@ -244,14 +244,24 @@ pub async fn run_transcription(
                     dev_path
                 } else {
                     return Err(format!(
-                        "Precompiled Whisper CLI binary not found at resource path: {:?} or dev path: {:?}. Please ensure you've placed it in the resources folder.",
-                        path, dev_path
+                        "Whisper CLI binary ('{}') not found. Please place the compiled binary into 'src-tauri/resources/'.",
+                        bin_name
                     ));
                 }
             }
         }
-        Err(e) => return Err(format!("Failed to resolve resource path: {}", e)),
+        Err(e) => return Err(format!("Failed to resolve resource path for Whisper binary: {}", e)),
     };
+
+    // Check if the binary is a placeholder text file instead of a real compiled binary
+    if let Ok(meta) = fs::metadata(&bin_path) {
+        if meta.len() < 100_000 {
+            return Err(format!(
+                "Whisper binary for backend '{}' ({}) is a placeholder file (size: {} bytes). Please place a real compiled binary executable in src-tauri/resources/.",
+                settings.selected_backend, bin_name, meta.len()
+            ));
+        }
+    }
 
     // Ensure executable permissions on Unix platforms.
     // If the binary is inside a read-only filesystem (like an AppImage mount) or execution is restricted,
@@ -334,10 +344,28 @@ pub async fn run_transcription(
     
     let out_name_str = out_name.to_str().ok_or("Invalid output name path")?.to_string();
     
+    let model_full_path = root.join(&settings.model_path);
+    if !model_full_path.exists() {
+        return Err(format!(
+            "Model file not found: '{}'. Please download this model first from the Model Hub.",
+            settings.model_path
+        ));
+    }
+
+    if settings.vad && !settings.vad_model.is_empty() {
+        let vad_full_path = root.join(&settings.vad_model);
+        if !vad_full_path.exists() {
+            return Err(format!(
+                "VAD model file not found: '{}'. Please ensure the VAD model is downloaded.",
+                settings.vad_model
+            ));
+        }
+    }
+
     // Build arguments
     let mut args = vec![
         "-m".to_string(),
-        root.join(&settings.model_path).to_string_lossy().to_string(),
+        model_full_path.to_string_lossy().to_string(),
         "-f".to_string(),
         wav_path.clone(),
         "-t".to_string(),
@@ -450,7 +478,17 @@ pub async fn run_transcription(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| format!("Failed to spawn Whisper process: {}", e))?;
+        .map_err(|e| {
+            let err_str = e.to_string();
+            if err_str.contains("Exec format error") || e.raw_os_error() == Some(8) {
+                format!(
+                    "Failed to spawn Whisper process: Exec format error (OS error 8). The binary '{}' is a placeholder or corrupted file, not a valid executable. Please place a compiled whisper-cli binary in src-tauri/resources/.",
+                    bin_name
+                )
+            } else {
+                format!("Failed to spawn Whisper process ({}): {}", bin_name, e)
+            }
+        })?;
         
     let pid = child.id();
     if let Ok(mut lock) = session.lock() {
@@ -537,7 +575,18 @@ pub async fn run_transcription(
             let _ = std::process::Command::new("notify-send")
                 .args(["Transcription Failed", &format!("Whisper process terminated for {}!", file_name)])
                 .spawn();
-            return Err(format!("Whisper CLI process failed with exit code: {:?}", status.code()));
+
+            let detailed_err = match status.code() {
+                Some(10) => {
+                    format!(
+                        "Whisper process failed with exit code 10 (Model or GPU initialization error). Check if the model file '{}' is corrupt or if your GPU/Vulkan/CUDA driver is working properly.",
+                        settings.model_path
+                    )
+                }
+                Some(code) => format!("Whisper CLI process failed with exit code: {}", code),
+                None => "Whisper CLI process was terminated unexpectedly by system signal.".to_string(),
+            };
+            return Err(detailed_err);
         }
     }
     
