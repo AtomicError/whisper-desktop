@@ -80,7 +80,7 @@ fn parse_response_content(api_format: &str, response_val: &Value) -> Result<Stri
 /// Parses numbered lines from response (e.g. "1: Translated text")
 fn parse_translated_lines(response_text: &str) -> HashMap<usize, String> {
     let mut map = HashMap::new();
-    let re = regex::Regex::new(r"^(\d+)[\s:：.-]+(.*)$").expect("static regex");
+    let re = regex::Regex::new(r"^(\d+)\s*[:：.]\s*(.*)$").expect("static regex");
     let mut current_idx = None;
     
     for line in response_text.lines() {
@@ -132,10 +132,23 @@ fn align_translations(
         }
     }
     
-    // Fill missing entries with original text
+    // Fill missing entries with original text & enforce speaker prefix preservation (- / —)
     for entry in original_entries {
-        if !map.contains_key(&entry.0) {
-            map.insert(entry.0, entry.1.clone());
+        let (idx, orig_text) = entry;
+        
+        if let Some(translated_text) = map.get_mut(idx) {
+            let orig_trimmed = orig_text.trim_start();
+            let trans_trimmed = translated_text.trim_start();
+            
+            if orig_trimmed.starts_with("- ") && !trans_trimmed.starts_with('-') && !trans_trimmed.starts_with('—') {
+                *translated_text = format!("- {}", translated_text);
+            } else if orig_trimmed.starts_with("— ") && !trans_trimmed.starts_with('-') && !trans_trimmed.starts_with('—') {
+                *translated_text = format!("— {}", translated_text);
+            } else if orig_trimmed.starts_with('-') && !trans_trimmed.starts_with('-') && !trans_trimmed.starts_with('—') {
+                *translated_text = format!("- {}", translated_text);
+            }
+        } else {
+            map.insert(*idx, orig_text.clone());
         }
     }
     

@@ -34,7 +34,8 @@ pub fn build_system_prompt(custom_prompt: &str, target_lang: &str, polish: bool)
         2. Output one translation per line.\n\
         3. Do NOT skip any numbers, do NOT merge lines, and do NOT alter the sequence numbers.\n\
         4. If a line contains only punctuation, formatting tags, or is untranslatable, preserve it as-is.\n\
-        5. Return ONLY the translated numbered list. Do NOT include any introductory or concluding text, explanations, or notes."
+        5. Return ONLY the translated numbered list. Do NOT include any introductory or concluding text, explanations, or notes.\n\
+        6. Preserve speaker dashes (such as '- ') at the beginning of dialogue lines if present in the original text."
     );
 
     prompt
