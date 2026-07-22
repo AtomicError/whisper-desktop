@@ -297,12 +297,34 @@ pub async fn translate_files(
                 settings.translate_ai_polish,
             );
 
-            // Format dialogue lines as "index: text"
-            let user_content = chunk
-                .iter()
-                .map(|(idx, text)| format!("{}: {}", idx, text))
-                .collect::<Vec<String>>()
-                .join("\n");
+            // Extract previous context (up to 3 preceding lines) if available for narrative continuity
+            let first_chunk_idx = chunk.first().map(|(idx, _)| *idx).unwrap_or(1);
+            let context_lines: Vec<String> = if first_chunk_idx > 1 {
+                original_entries
+                    .iter()
+                    .filter(|(idx, _)| *idx < first_chunk_idx && *idx >= first_chunk_idx.saturating_sub(3))
+                    .map(|(idx, orig_text)| {
+                        let trans_text = translations_map.get(idx).cloned().unwrap_or_else(|| orig_text.clone());
+                        format!("{}: {} -> {}", idx, orig_text, trans_text)
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            };
+
+            let mut user_content = String::new();
+            if !context_lines.is_empty() {
+                user_content.push_str("[Previous Context for Continuity - DO NOT translate or output these lines]:\n");
+                user_content.push_str(&context_lines.join("\n"));
+                user_content.push_str("\n\n[Lines to Translate]:\n");
+            }
+            user_content.push_str(
+                &chunk
+                    .iter()
+                    .map(|(idx, text)| format!("{}: {}", idx, text))
+                    .collect::<Vec<String>>()
+                    .join("\n")
+            );
 
             let request_body = provider.format_request_body(
                 &settings.translate_ai_model,
