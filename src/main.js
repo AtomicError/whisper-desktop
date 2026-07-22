@@ -669,12 +669,12 @@ function setupHorizontalTabScroll() {
     const container = e.currentTarget;
     const maxScroll = container.scrollWidth - container.clientWidth;
     if (maxScroll > 0) {
-      container.scrollLeft += e.deltaY;
+      container.scrollLeft += (e.deltaY || e.deltaX);
       e.preventDefault();
     }
   };
 
-  const containers = document.querySelectorAll('.settings-categories');
+  const containers = document.querySelectorAll('.settings-categories, .trans-cfg-status-bar');
   containers.forEach(el => {
     el.addEventListener('wheel', scrollWheel, { passive: false });
   });
@@ -1615,7 +1615,7 @@ function updateTranscribeUIConfigs() {
   const vadEl = document.getElementById('trans-cfg-vad');
   if (vadEl) {
     vadEl.textContent = vad;
-    vadEl.className = settingsState.vad ? 'trans-cfg-val val-gold' : 'trans-cfg-val val-muted';
+    vadEl.className = settingsState.vad ? 'val-gold' : 'val-muted';
     vadEl.title = settingsState.vad ? `VAD Active (${settingsState.vadModel || 'Default'})` : 'VAD Disabled';
   }
   
@@ -1631,7 +1631,7 @@ function updateTranscribeUIConfigs() {
     }
     transCfgTranslation.textContent = translationText;
     transCfgTranslation.title = fullTitle;
-    transCfgTranslation.className = translationEnabled ? 'trans-cfg-val val-green' : 'trans-cfg-val val-muted';
+    transCfgTranslation.className = translationEnabled ? 'val-green' : 'val-muted';
   }
 }
 
