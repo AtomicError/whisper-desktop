@@ -5,8 +5,7 @@
 <h1 align="center">Whisper Desktop</h1>
 
 <p align="center">
-  <strong>A premium, state-of-the-art, and gorgeous native Rust & Tauri GUI designed for whisper.cpp.</strong><br>
-  Run high-performance local speech-to-text models with ease, beauty, and complete privacy.
+  <strong>A premium, high-performance native desktop GUI for local speech-to-text powered by OpenAI Whisper and Rust.</strong>
 </p>
 
 <p align="center">
@@ -17,52 +16,92 @@
 
 ---
 
+## 💡 What is Whisper Desktop?
+
+**Whisper Desktop** is a modern, lightweight, and privacy-focused desktop application designed to bring the incredible power of OpenAI's **Whisper** speech recognition model directly to your personal computer.
+
+Running AI models locally often requires navigating command-line interfaces, installing complex Python environments, or exposing sensitive audio files to paid cloud services. **Whisper Desktop** eliminates all of that by pairing a blazing-fast **Rust & Tauri** backend with native `whisper.cpp` binaries and a gorgeous glassmorphic GUI.
+
+### 🎯 Core Goals & Key Highlights
+
+* **🔒 100% Local & Private:** Speech recognition and audio conversion run entirely on your local machine. No data is sent to external servers.
+* **⚡ Multi-Backend Acceleration:** Switch seamlessly between **CPU**, **Vulkan**, **CUDA**, or **OpenVINO** directly from the interface for near-instant transcription.
+* **🎞️ Direct Smart Media Import:** Drop any video or audio file directly into the app—no manual audio conversion or pre-extraction required.
+* **🎙️ Voice Activity Detection (VAD):** Integrated Silero VAD automatically strips silence, boosting speed and accuracy.
+* **🤖 Multi-Provider AI Translation:** Post-process and translate subtitles into Persian or any target language using OpenAI, Anthropic, Gemini, or local LLMs (LM Studio/Ollama) with secure system keyring storage.
+* **✨ Glassmorphic UI & Real-Time Telemetry:** Dark-mode interface featuring dynamic hardware metrics (CPU/RAM/GPU), drag-and-drop file queue, and live transcript highlighting.
+
+---
+
 ## 📸 Screenshots & Visual Walkthrough
 
-| 🎛️ Dashboard Home | 🛠️ Configuration Step |
-| :---: | :---: |
-| ![Dashboard Home](assets/screenshots/dashboard.png) | ![Configuration Step](assets/screenshots/configuration.png) |
-
-| 📥 Model Hub | 🎙️ Transcription Screen |
-| :---: | :---: |
-| ![Model Hub](assets/screenshots/models.png) | ![Transcription Screen](assets/screenshots/transcription.png) |
-
----
-
-## ✨ Features at a Glance
-
-*   **⚡ Multiple Acceleration Backends:** Choose between **CPU**, **Vulkan**, **OpenVINO**, or **CUDA** directly from the UI. *Note: Precompiled binaries for all backends are bundled directly inside the app, so no local compilation or system-level developer SDKs are required.*
-*   **📥 Integrated Model Downloader:** Browse and download GGML models from the UI with real-time speed, progress bars, and ETA tracking. Supports pause, resume, and delete.
-*   **📂 Batch Processing Queue:** Import multiple files, view duration, remove items, and transcribe them sequentially with detailed per-file progress.
-*   **🎞️ Integrated Media Converter:** Auto-extract 16kHz mono WAV from any audio/video file via FFmpeg. Output is placed next to the source file or redirected to `~/Documents/WhisperOutputs/` if the source is outside your home directory.
-*   **🤖 AI Translation — Provider Manager:** Add, edit, and remove AI providers supporting OpenAI-compatible, Anthropic, and Gemini API formats. API keys can be stored securely in the system keyring rather than plaintext config files. Each provider's model list is fetched automatically and filtered by the selected API format.
-*   **🤖 AI Translation — Model Configuration:** Per-provider model management with reasoning levels (None/Low/Medium/High), active model selection via radio buttons, and context window auto-detection. The system automatically recovers from token-limit errors by reducing chunk sizes.
-*   **🤖 AI Translation — Pipeline:** Preserves original subtitle formatting (SRT, VTT, LRC, TXT) through token-aware text chunking with configurable overlap. Preview translation of selected lines before committing. Full cancel support via session state machine with immediate HTTP request abort.
-*   **🗣️ Voice Activity Detection (VAD):** Built-in Silero VAD model support — automatically detects speech segments and reduces processing time on silent sections. Configurable threshold, speech tolerance, and min segment duration.
-*   **🎨 Premium Glassmorphic Design:** Dark-mode interface with micro-animations, royal-blue gradient accents, and fluid layout transitions. Custom-styled dropdowns, toggles, radio buttons, and scrollbars throughout.
-*   **📦 Drag & Drop:** Drag audio/video files onto the dashboard to instantly load them into the queue.
-*   **📊 Live Telemetry HUD:** Real-time CPU usage, RAM utilization, and GPU metrics displayed during transcription.
-*   **⚙️ Full Transcription Settings:** Adjust threads, language, output formats (TXT, SRT, VTT, LRC, CSV, JSON), temperature, beam size, best-of, word-level timestamps (DTW), VAD parameters, and more.
-*   **★ Spec-Guided Recommendations:** Recommends optimal model sizes and quantization formats based on detected hardware and GPU type.
-*   **📝 Live Transcript Viewer:** Editable transcript lines with inline search/filter. Logged timestamps and real-time word highlighting.
-*   **🗂️ Activity Logs:** Central logging panel with per-category filtering (FFmpeg, Whisper, Build, System). Real-time log streaming and full history.
+<table width="100%">
+  <tr>
+    <td width="50%" align="center" valign="top">
+      <h4>🎛️ Dashboard Home</h4>
+      <img src="assets/screenshots/dashboard.png" alt="Dashboard Home" width="100%">
+    </td>
+    <td width="50%" align="center" valign="top">
+      <h4>🛠️ Configuration Step</h4>
+      <img src="assets/screenshots/configuration.png" alt="Configuration Step" width="100%">
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center" valign="top">
+      <h4>📥 Model Hub</h4>
+      <img src="assets/screenshots/models.png" alt="Model Hub" width="100%">
+    </td>
+    <td width="50%" align="center" valign="top">
+      <h4>🎙️ Transcription Screen</h4>
+      <img src="assets/screenshots/transcription.png" alt="Transcription Screen" width="100%">
+    </td>
+  </tr>
+</table>
 
 ---
 
-## 🛠️ Interactive Architecture
+## ✨ Features Breakdown
 
-Whisper Desktop orchestrates native `whisper.cpp` binaries using Tauri's Rust IPC bridge.
+### 🎙️ Speech-to-Text Engine & Audio Pipeline
+* **⚡ Multi-Acceleration Backends:** Choose between **CPU**, **Vulkan**, **OpenVINO**, or **CUDA** directly from the UI. Precompiled binaries are bundled so no local SDK setup is required.
+* **🎞️ Direct Smart Media Processing:** Drop any video or audio format (MP4, MKV, AVI, MOV, FLV, WEBM, MP3, WAV, FLAC, M4A, etc.) directly into the app—zero manual pre-conversion or audio extraction needed. The built-in FFmpeg pipeline transparently converts media into an optimized 16kHz mono WAV stream on the fly. Smart path redirection automatically routes outputs to `~/Documents/WhisperOutputs/` when working outside your home folder.
+* **📥 Integrated Model Downloader:** Browse, download, pause, resume, and manage GGML models (Tiny, Base, Small, Medium, Large, Q4/Q5/Q8) with live speed, progress, and ETA tracking.
+* **📂 Batch Processing Queue:** Import multiple audio/video files via **Drag & Drop**, reorder queue items, inspect metadata/duration, and transcribe sequentially.
+* **⚙️ Complete Decoding Controls:** Adjust threads, processors, temperature, beam size, best-of, initial prompts, carry-over prompts, diarization, and word-level timestamps (DTW).
+* **📄 Flexible Export Formats:** Export transcripts as **SRT, VTT, LRC, TXT, CSV, JSON**, and full word-level timestamp files.
+* **★ Hardware-Guided Recommendations:** Recommends optimal model sizes and quantization formats based on detected RAM, CPU cores, and GPU type.
+
+### 🗣️ Voice Activity Detection (VAD)
+* **Silero VAD Integration:** Detects speech segments and automatically bypasses silent sections to dramatically improve transcription speed.
+* **Granular Controls:** Configurable VAD threshold, minimum speech duration, minimum silence duration, speech padding, and segment overlap.
+
+### 🤖 AI Subtitle Translation Pipeline
+* **Multi-Provider API Manager:** Add and manage API configurations for **OpenAI**, **Anthropic (Claude)**, **Google Gemini**, or **OpenAI-Compatible** endpoints (e.g., LM Studio, Ollama).
+* **🔐 Secure System Keyring:** Stores API keys safely in your native OS keychain (`secret-service` / `kwallet` / `keyring`) instead of plain text files.
+* **Formatting Preservation:** Uses token-aware chunking with overlap to keep SRT/VTT/LRC subtitle timestamps and index numbers perfectly aligned during translation.
+* **Model & Reasoning Control:** Supports model selection, reasoning intensity levels (None/Low/Medium/High), custom translation prompts, and live line-by-line preview.
+* **Auto-Recovery:** Automatic token-limit error handling dynamically reduces chunk size and retries without failing the entire file.
+
+### 📊 User Experience, Telemetry & Logs
+* **📝 Live Transcript Viewer:** Real-time line streaming with active word highlighting, search/filter capabilities, and inline editing.
+* **📊 Live Telemetry HUD:** Real-time monitoring of CPU usage, RAM utilization, and active GPU metrics during transcription.
+* **🗂️ Unified Activity Logs:** Centralized log panel with category filtering (FFmpeg, Whisper, AI Translation, Build, System) and export options.
+* **🔔 Native OS Notifications:** Receive system desktop notifications (`notify-send`) when background transcription jobs complete or fail.
+
+---
+
+## 🛠️ System Architecture
 
 ```mermaid
 graph TD
-    A[Glassmorphic UI - HTML/CSS/JS] -->|Tauri IPC Command| B(Tauri Core - Rust)
-    B -->|Spawn Process| C[whisper.cpp C++ Engine]
-    B -->|Spawn Process| G[ffmpeg Audio Extraction]
-    C -->|GPU Acceleration| E[Vulkan / CUDA / OpenVINO]
+    A[Glassmorphic UI - HTML/CSS/JS] -->|Tauri IPC Bridge| B(Tauri Core - Rust)
+    B -->|Spawn Process| C[whisper.cpp Native Engine]
+    B -->|Spawn Process| G[FFmpeg Audio Converter]
+    C -->|Hardware Acceleration| E[Vulkan / CUDA / OpenVINO]
     C -->|Thread Allocation| D[CPU Execution]
     F[(Local GGML Models)] -.->|Loads Model| C
-    H[(System Keyring)] -.->|API Keys| B
-    I[OpenAI / Anthropic / Gemini API] -.->|Translation| B
+    H[(System Keyring)] -.->|Secure Keys| B
+    I[OpenAI / Anthropic / Gemini API] -.->|AI Translation| B
 ```
 
 ---
@@ -93,36 +132,34 @@ chmod +x Whisper.Desktop_*.AppImage
 
 ---
 
-## 💻 Development & Building from Source
+## 💻 Building from Source
 
-Prerequisites:
-*   **Node.js** (v18+) & **npm**
-*   **Rust** toolchain (latest stable)
-*   **System Libraries:** `gtk3`, `webkit2gtk-4.1`, `ffmpeg`
-*   **Optional:** `wl-copy`, `xclip`, or `xsel` for clipboard support
-*   **Precompiled Binaries:** Since the app packages precompiled whisper.cpp binaries at runtime, you need to place a compiled `whisper-cli` binary (renamed to `whisper-cli-standard`, `whisper-cli-vulkan`, etc.) inside the `src-tauri/resources/` folder before running or building.
+### Prerequisites
+* **Node.js** (v18+) & **npm**
+* **Rust** toolchain (latest stable)
+* **System Libraries:** `gtk3`, `webkit2gtk-4.1`, `ffmpeg`
 
-### 1. Clone the Repository
+### 1. Clone Repository
 ```bash
 git clone https://github.com/AtomicError/whisper-desktop.git
 cd whisper-desktop
 ```
 
-### 2. Install Frontend Dependencies
+### 2. Install Dependencies
 ```bash
 npm install
 ```
 
-### 3. Run in Development Mode
+### 3. Run Development Mode
 ```bash
 npm run tauri dev
 ```
 
-### 4. Build Production Packages
+### 4. Build Production Bundle
 ```bash
 npm run tauri build
 ```
-Production packages are generated in `src-tauri/target/release/bundle/`.
+Production packages will be generated in `src-tauri/target/release/bundle/`.
 
 ---
 
@@ -130,43 +167,29 @@ Production packages are generated in `src-tauri/target/release/bundle/`.
 
 ```
 whisper-desktop/
-├── src/                          # Frontend (vanilla JS/CSS)
-│   ├── index.html                # Main layout (6 view panels)
-│   ├── styles.css                # Glassmorphic design system (~3870 lines)
-│   └── main.js                   # IPC, state, and all UI logic (~4130 lines)
-├── src-tauri/                    # Tauri / Rust backend
+├── src/                          # Frontend (Vanilla JS & Modern Glassmorphic CSS)
+│   ├── index.html                # Main UI layout & view panels
+│   ├── styles.css                # Glassmorphic design system
+│   └── main.js                   # State management & IPC bridge logic
+├── src-tauri/                    # Tauri / Rust Backend
 │   ├── src/
-│   │   ├── main.rs               # Tauri command bindings, managed state
-│   │   ├── lib.rs                # Entry point, plugin registration
-│   │   ├── settings.rs           # WhisperSettings + AppSettings (JSON load/save)
-│   │   ├── transcribe.rs         # ffmpeg conversion, whisper-cli orchestration
-│   │   ├── builder.rs            # git clone/pull, cmake build coordination
-│   │   ├── downloader.rs         # curl model download with resume
-│   │   ├── hardware.rs           # CPU/RAM/GPU polling
-│   │   ├── logger.rs             # Ring-buffer log + real-time IPC emit
-│   │   └── translation/          # AI translation module
-│   │       ├── mod.rs            # Public API (translate, preview, model fetch)
-│   │       ├── translator.rs     # Core translation loop with chunking + retry
-│   │       ├── provider.rs       # API request formatting + keyring storage
-│   │       ├── formatter.rs      # SRT/VTT/LRC/TXT parse + reconstruct
-│   │       ├── chunker.rs        # Token-aware text chunking
-│   │       └── prompts.rs        # Translation system prompts
-│   ├── permissions/
-│   │   └── allow-all-custom.toml # Command allow-list for Tauri v2
-│   ├── capabilities/
-│   │   └── default.json          # Window capability bindings
-│   ├── icons/                    # App icons (all required formats)
-│   └── tauri.conf.json           # Tauri configuration
-├── .github/workflows/
-│   └── release.yml               # CI/CD build pipeline
+│   │   ├── main.rs               # Entry point & Tauri command handlers
+│   │   ├── settings.rs           # Profile & setting management
+│   │   ├── transcribe.rs         # FFmpeg & whisper-cli process orchestration
+│   │   ├── downloader.rs         # Model downloading with resume support
+│   │   ├── hardware.rs           # System stats & hardware polling
+│   │   ├── logger.rs             # Application logging ring-buffer
+│   │   └── translation/          # AI Translation pipeline
+│   ├── resources/                # Precompiled binaries (whisper-cli)
+│   └── tauri.conf.json           # Tauri app configuration
 └── README.md
 ```
 
 ---
 
-## 🔒 Privacy & Local Processing
+## 🔒 Privacy Guarantee
 
-All audio transcription and processing run **100% locally** on your computer. The optional AI Translation feature sends text to your chosen API provider (OpenAI, Anthropic, Gemini, or any OpenAI-compatible endpoint) — API keys can be stored in your system keyring rather than in plaintext config files.
+All speech transcription, audio conversion, and model execution run **100% locally** on your computer. Your audio files and transcripts never leave your machine unless you explicitly enable the optional AI Translation feature to communicate with your chosen API provider.
 
 ---
 
