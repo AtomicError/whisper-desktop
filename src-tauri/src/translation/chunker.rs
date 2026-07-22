@@ -18,7 +18,7 @@ pub fn chunk_dialogues(
         context_limit
     };
 
-    // Limit the maximum number of items in a single chunk to avoid output token limit exhaustion
+   // Limit the maximum number of items in a single chunk to avoid output token limit exhaustion
     let max_items = 100;
 
     for entry in entries {

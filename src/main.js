@@ -1724,6 +1724,10 @@ window.runWhisperTranscription = async function() {
       badgesRow.appendChild(badge);
     });
 
+    // Mark Step 3 as completed and notify user immediately when transcription succeeds
+    setWizardStepCompleted(3, true);
+    showNotification("Transcription completed successfully!", "success");
+
     // Run AI Translation if enabled
     if (settingsState.translateAiEnabled && result.generatedFiles && result.generatedFiles.length > 0) {
       try {
@@ -1756,9 +1760,6 @@ window.runWhisperTranscription = async function() {
         }
       }
     }
-
-    setWizardStepCompleted(3, true);
-    showNotification("Transcription completed successfully!", "success");
   } catch (e) {
     const errMsg = (typeof e === 'string') ? e : (e && e.toString ? e.toString() : '');
     setWizardStepCompleted(3, false);
