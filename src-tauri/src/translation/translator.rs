@@ -205,7 +205,7 @@ pub async fn translate_files(
 
     let client = reqwest::Client::new();
 
-    for file_name in generated_files.iter() {
+    for (file_idx, file_name) in generated_files.iter().enumerate() {
         // Honour a cancel request between files. The flag is checked without
         // holding the lock across the await points inside the loop.
         let cancelled = session.lock().map(|l| l.cancel_requested).unwrap_or(false);
@@ -255,6 +255,7 @@ pub async fn translate_files(
             continue;
         }
 
+        let total_lines = original_entries.len();
         let mut translations_map = HashMap::new();
         let mut remaining_entries = original_entries.clone();
         let mut context_window = context_window;
@@ -406,6 +407,36 @@ pub async fn translate_files(
                     translations_map.extend(chunk_translations);
                     
                     remaining_entries.retain(|(idx, _)| !translations_map.contains_key(idx));
+
+                    // Emit real-time progress event for completed chunk
+                    let current_translated_lines = translations_map.len();
+                    let file_progress = if total_lines > 0 {
+                        (current_translated_lines as f64) / (total_lines as f64)
+                    } else {
+                        1.0
+                    };
+                    let total_files = generated_files.len();
+                    let file_weight = 1.0 / (total_files as f64);
+                    let global_progress = (file_idx as f64 * file_weight) + (file_progress * file_weight);
+
+                    let msg = if total_files > 1 {
+                        format!("Translating AI [{}/{}]: {}/{} lines ({})", file_idx + 1, total_files, current_translated_lines, total_lines, file_name)
+                    } else {
+                        format!("Translating AI: {}/{} lines ({})", current_translated_lines, total_lines, file_name)
+                    };
+
+                    let _ = app.emit(
+                        "translation-status",
+                        serde_json::json!({
+                            "progress": global_progress,
+                            "message": msg,
+                            "active": true,
+                            "currentLine": current_translated_lines,
+                            "totalLines": total_lines,
+                            "fileIndex": file_idx + 1,
+                            "totalFiles": total_files
+                        }),
+                    );
                 }
             }
         }

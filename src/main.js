@@ -899,9 +899,12 @@ function setupTauriListeners() {
     const msgEl = document.getElementById('lbl-radial-msg');
     const pulseDot = document.getElementById('hud-pulse-dot');
 
-    if (fillBar) fillBar.style.width = payload.active ? '0%' : '100%';
-    if (pctEl) pctEl.textContent = payload.active ? '0%' : '100%';
-    if (msgEl) msgEl.textContent = payload.message;
+    const progressVal = (payload && typeof payload.progress === 'number') ? payload.progress : 0;
+    const pct = Math.min(100, Math.max(0, Math.round(progressVal * 100)));
+
+    if (fillBar) fillBar.style.width = payload.active ? `${pct}%` : (progressVal >= 1 ? '100%' : '0%');
+    if (pctEl) pctEl.textContent = payload.active ? `${pct}%` : (progressVal >= 1 ? '100%' : '0%');
+    if (msgEl && payload.message) msgEl.textContent = payload.message;
 
     if (pulseDot) {
       if (payload.active) {
