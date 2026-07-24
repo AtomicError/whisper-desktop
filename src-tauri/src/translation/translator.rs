@@ -273,6 +273,29 @@ pub async fn translate_files(
         let mut remaining_entries = original_entries.clone();
         let mut context_window = context_window;
 
+        let total_files = generated_files.len();
+        let file_weight = 1.0 / (total_files as f64);
+        let initial_progress = file_idx as f64 * file_weight;
+
+        let initial_msg = if total_files > 1 {
+            format!("Translating AI [{}/{}]: 0/{} lines ({})", file_idx + 1, total_files, total_lines, file_name)
+        } else {
+            format!("Translating AI: 0/{} lines ({})", total_lines, file_name)
+        };
+
+        let _ = app.emit(
+            "translation-status",
+            serde_json::json!({
+                "progress": initial_progress,
+                "message": initial_msg,
+                "active": true,
+                "currentLine": 0,
+                "totalLines": total_lines,
+                "fileIndex": file_idx + 1,
+                "totalFiles": total_files
+            }),
+        );
+
         while !remaining_entries.is_empty() {
             // Honour a cancel request between chunks (each chunk awaits an HTTP call).
             let cancelled = session.lock().map(|l| l.cancel_requested).unwrap_or(false);
@@ -290,6 +313,34 @@ pub async fn translate_files(
             }
             
             let chunk = chunks.remove(0);
+
+            // Emit current in-flight chunk status
+            let current_translated_lines = translations_map.len();
+            let file_progress = if total_lines > 0 {
+                (current_translated_lines as f64) / (total_lines as f64)
+            } else {
+                0.0
+            };
+            let global_progress = (file_idx as f64 * file_weight) + (file_progress * file_weight);
+
+            let msg = if total_files > 1 {
+                format!("Translating AI [{}/{}]: {}/{} lines ({})", file_idx + 1, total_files, current_translated_lines, total_lines, file_name)
+            } else {
+                format!("Translating AI: {}/{} lines ({})", current_translated_lines, total_lines, file_name)
+            };
+
+            let _ = app.emit(
+                "translation-status",
+                serde_json::json!({
+                    "progress": global_progress,
+                    "message": msg,
+                    "active": true,
+                    "currentLine": current_translated_lines,
+                    "totalLines": total_lines,
+                    "fileIndex": file_idx + 1,
+                    "totalFiles": total_files
+                }),
+            );
 
             let system_prompt = build_system_prompt(
                 &provider.custom_prompt,

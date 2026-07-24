@@ -18,8 +18,8 @@ pub fn chunk_dialogues(
         context_limit
     };
 
-   // Limit the maximum number of items in a single chunk to avoid output token limit exhaustion
-    let max_items = 100;
+    // Limit the maximum number of items in a single chunk to 30 for fast real-time progress updates and optimal LLM output accuracy
+    let max_items = 30;
 
     for entry in entries {
         // Estimate entry length: the line index digits + separator + text length
