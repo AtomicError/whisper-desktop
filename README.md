@@ -5,7 +5,7 @@
 <h1 align="center">Whisper Desktop</h1>
 
 <p align="center">
-  <strong>A premium, high-performance native desktop GUI for local speech-to-text powered by OpenAI Whisper and Rust.</strong>
+  <strong>A premium, high-performance native desktop GUI for local speech-to-text powered by Whisper.cpp and Rust.</strong>
 </p>
 
 <p align="center">
