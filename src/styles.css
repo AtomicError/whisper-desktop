@@ -634,6 +634,80 @@ header {
   box-shadow: 0 0 10px rgba(45, 127, 255, 0.15);
 }
 
+/* Read-only Path Field for Directory Selector Settings */
+.setting-control-path {
+  width: auto !important;
+  max-width: 400px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.readonly-path-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-input, rgba(0, 0, 0, 0.3));
+  border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.12));
+  border-radius: 10px;
+  padding: 9px 14px;
+  min-height: 40px;
+  flex: 1;
+  min-width: 180px;
+  max-width: 300px;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: var(--transition-smooth);
+}
+
+.readonly-path-field:hover {
+  border-color: rgba(45, 127, 255, 0.4);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.path-folder-icon {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  stroke: var(--color-royal-blue, #2d7fff);
+  stroke-width: 2;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.9;
+}
+
+.readonly-path-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #e2e8f0;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 0.88rem;
+  cursor: pointer;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  user-select: all;
+  padding: 0;
+}
+
+.path-browse-btn {
+  flex-shrink: 0;
+  padding: 9px 18px !important;
+  font-size: 0.88rem !important;
+  min-height: 40px;
+  border-radius: 10px !important;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .btn-primary {
   padding: 12px 24px;
   background: linear-gradient(135deg, #2d7fff, #0057d9);

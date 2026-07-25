@@ -291,9 +291,14 @@
                       </div>
                       <div class="setting-desc">The folder where GGML models are stored. Default is ~/whisper.cpp.</div>
                     </div>
-                    <div class="setting-control" style="display: flex; gap: 8px; align-items: center; justify-content: flex-end; width: 100%; max-width: 320px;">
-                      <input class="text-input" type="text" id="opt-modelsDir" style="flex-grow: 1; min-width: 150px;" readonly />
-                      <button class="btn-secondary" onclick="browseModelsDirectory()" style="padding: 8px 16px; flex-shrink: 0; font-size: 0.85rem;">Browse</button>
+                    <div class="setting-control setting-control-path">
+                      <div class="readonly-path-field" onclick="browseModelsDirectory()" title="Click to browse models directory">
+                        <svg class="path-folder-icon" viewBox="0 0 24 24" width="16" height="16">
+                          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        <input class="readonly-path-input" type="text" id="opt-modelsDir" readonly tabindex="-1" />
+                      </div>
+                      <button class="btn-secondary path-browse-btn" onclick="browseModelsDirectory()" type="button">Browse</button>
                     </div>
                   </div>
 
