@@ -463,7 +463,7 @@ class CustomSelect {
 
     this.optionsContainer = document.createElement('div');
     this.optionsContainer.className = 'custom-select-options';
-    this.container.appendChild(this.optionsContainer);
+    document.body.appendChild(this.optionsContainer);
 
     this.select.parentNode.insertBefore(this.container, this.select.nextSibling);
 
@@ -473,11 +473,19 @@ class CustomSelect {
     });
 
     this._documentClickHandler = (e) => {
-      if (this.isOpen && !this.container.contains(e.target)) {
+      if (this.isOpen && !this.container.contains(e.target) && !this.optionsContainer.contains(e.target)) {
         this.close();
       }
     };
     document.addEventListener('click', this._documentClickHandler);
+
+    this._scrollResizeHandler = () => {
+      if (this.isOpen) {
+        this.updatePosition();
+      }
+    };
+    window.addEventListener('scroll', this._scrollResizeHandler, true);
+    window.addEventListener('resize', this._scrollResizeHandler);
 
     this.updateOptions();
 
@@ -531,6 +539,29 @@ class CustomSelect {
     });
   }
 
+  updatePosition() {
+    if (!this.isOpen || !this.trigger || !this.optionsContainer) return;
+    const rect = this.trigger.getBoundingClientRect();
+    const dropdownHeight = Math.min(this.optionsContainer.scrollHeight || 220, 240);
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+
+    this.optionsContainer.style.position = 'fixed';
+    this.optionsContainer.style.width = `${rect.width}px`;
+    this.optionsContainer.style.left = `${rect.left}px`;
+    this.optionsContainer.style.zIndex = '999999';
+
+    if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
+      // Space below insufficient -> open upward
+      this.optionsContainer.style.top = 'auto';
+      this.optionsContainer.style.bottom = `${window.innerHeight - rect.top + 4}px`;
+    } else {
+      // Space available -> open downward
+      this.optionsContainer.style.bottom = 'auto';
+      this.optionsContainer.style.top = `${rect.bottom + 4}px`;
+    }
+  }
+
   toggle() {
     if (this.isOpen) {
       this.close();
@@ -541,36 +572,31 @@ class CustomSelect {
 
   open() {
     document.querySelectorAll('.custom-select-container').forEach(c => {
-      if (c !== this.container) {
-        c.classList.remove('open');
-        c.closest('.setting-card, .wizard-step')?.classList.remove('has-active-dropdown');
-      }
+      if (c !== this.container) c.classList.remove('open');
+    });
+    document.querySelectorAll('.custom-select-options').forEach(opt => {
+      if (opt !== this.optionsContainer) opt.classList.remove('open');
     });
 
-    // Check if we should open upward
-    const rect = this.trigger.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const dropdownHeight = 250;
-    
-    if (spaceBelow < dropdownHeight && rect.top > dropdownHeight) {
-      this.container.classList.add('open-upward');
-    } else {
-      this.container.classList.remove('open-upward');
-    }
-
     this.container.classList.add('open');
-    this.container.closest('.setting-card, .wizard-step')?.classList.add('has-active-dropdown');
+    this.optionsContainer.classList.add('open');
     this.isOpen = true;
+    this.updatePosition();
   }
 
   close() {
     this.container.classList.remove('open');
-    this.container.closest('.setting-card, .wizard-step')?.classList.remove('has-active-dropdown');
+    this.optionsContainer.classList.remove('open');
     this.isOpen = false;
   }
 
   destroy() {
     document.removeEventListener('click', this._documentClickHandler);
+    window.removeEventListener('scroll', this._scrollResizeHandler, true);
+    window.removeEventListener('resize', this._scrollResizeHandler);
+    if (this.optionsContainer && this.optionsContainer.parentNode) {
+      this.optionsContainer.parentNode.removeChild(this.optionsContainer);
+    }
     this.observer.disconnect();
     window.customSelectsMap.delete(this.select.id || this.select);
   }
@@ -2062,6 +2088,9 @@ function renderBatchQueueTable() {
   const tbody = document.getElementById('batch-queue-body');
   if (!tbody) return;
   
+  const countChip = document.getElementById('lbl-batch-count');
+  if (countChip) countChip.textContent = batchItems.length;
+
   tbody.innerHTML = '';
   batchItems.forEach((item, index) => {
     const tr = document.createElement('tr');
@@ -2110,10 +2139,10 @@ function renderBatchQueueTable() {
     
     // Action column
     const actionTd = document.createElement('td');
-    actionTd.style.display = 'flex';
-    actionTd.style.alignItems = 'center';
-    actionTd.style.justifyContent = 'center';
-    actionTd.style.gap = '8px';
+    actionTd.className = 'batch-action-cell';
+    
+    const actionGroup = document.createElement('div');
+    actionGroup.className = 'batch-action-group';
     
     const startBtn = document.getElementById('btn-run-batch');
     const isRunning = startBtn && startBtn.disabled;
@@ -2190,9 +2219,10 @@ function renderBatchQueueTable() {
       };
     }
     
-    actionTd.appendChild(upBtn);
-    actionTd.appendChild(downBtn);
-    actionTd.appendChild(deleteBtn);
+    actionGroup.appendChild(upBtn);
+    actionGroup.appendChild(downBtn);
+    actionGroup.appendChild(deleteBtn);
+    actionTd.appendChild(actionGroup);
     tr.appendChild(actionTd);
     
     tbody.appendChild(tr);

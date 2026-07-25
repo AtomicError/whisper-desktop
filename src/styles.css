@@ -198,13 +198,13 @@ body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .titlebar-buttons button svg {
   width: 10px;
   height: 10px;
-  transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .titlebar-buttons button:hover {
@@ -1226,7 +1226,7 @@ header {
   left: 3px;
   bottom: 3px;
   background-color: var(--color-text-muted);
-  transition: transform 0.3s cubic-bezier(0.68, -0.6, 0.34, 1.6), background-color 0.3s ease, width 0.2s ease;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.25s ease, width 0.2s ease;
   border-radius: 50%;
 }
 
@@ -1268,41 +1268,47 @@ input:checked + .slider:before {
 .number-input-control {
   display: flex;
   align-items: center;
-  background: var(--bg-input);
-  border: 1px solid var(--border-glass);
-  border-radius: 8px;
+  background: var(--bg-input, rgba(0, 0, 0, 0.3));
+  border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.1));
+  border-radius: 10px;
   overflow: hidden;
-}
-
-.number-input-control button {
-  width: 32px;
-  height: 32px;
-  background: transparent;
-  border: none;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  font-weight: bold;
+  box-sizing: border-box;
   transition: var(--transition-smooth);
 }
 
-.number-input-control button:hover {
-  background: transparent;
-  color: var(--color-text-muted);
+.number-input-control:hover {
+  border-color: rgba(45, 127, 255, 0.3);
 }
 
-.setting-control .custom-select-trigger:hover {
-  background-color: var(--bg-deep);
-  border-color: var(--border-glass);
+.number-input-control button {
+  width: 34px;
+  height: 34px;
+  background: rgba(255, 255, 255, 0.02);
+  border: none;
+  color: var(--color-text-muted, #94a3b8);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: var(--transition-smooth);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.number-input-control button:hover {
+  background: rgba(45, 127, 255, 0.12);
+  color: #ffffff;
 }
 
 .number-input-control input {
-  width: 50px;
+  width: 52px;
   text-align: center;
   background: transparent;
   border: none;
-  color: #fff;
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
+  color: #f8fafc;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.88rem;
+  font-weight: 600;
 }
 
 .number-input-control input:focus {
@@ -2089,44 +2095,171 @@ select.select-control {
   filter: drop-shadow(0 0 4px rgba(45, 127, 255, 0.5));
 }
 
-/* Premium Batch Queue Table Styling */
-.batch-table-wrapper {
-  max-height: 200px;
-  overflow-y: auto;
-  border-radius: 8px;
+/* Premium Unified Batch Queue Panel Styling */
+.batch-queue-panel {
+  width: 100%;
+  margin-top: 16px;
+  background: rgba(11, 15, 30, 0.65);
   border: 1px solid var(--border-glass);
-  background: rgba(9, 11, 23, 0.4);
+  border-radius: 12px;
+  overflow: visible;
+  position: relative;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  transition: var(--transition-smooth);
+}
+
+.batch-queue-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-glass);
+  background: rgba(255, 255, 255, 0.02);
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+  position: relative;
+  z-index: 10;
+}
+
+.batch-queue-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-cyan);
+}
+
+.batch-count-chip {
+  background: rgba(6, 182, 212, 0.15);
+  color: var(--color-cyan);
+  border: 1px solid rgba(6, 182, 212, 0.3);
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.batch-queue-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+  z-index: 20;
+}
+
+#custom-select-batch-sort-select {
+  min-width: 160px !important;
+  width: 160px !important;
+  height: 32px !important;
+  margin: 0 !important;
+}
+
+#custom-select-batch-sort-select .custom-select-trigger {
+  height: 32px !important;
+  padding: 0 10px !important;
+  font-size: 0.78rem !important;
+  border-radius: 8px !important;
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid var(--border-glass) !important;
+}
+
+.batch-queue-actions .custom-select-options {
+  right: 0 !important;
+  left: auto !important;
+  min-width: 190px !important;
+}
+
+.batch-action-cell {
+  text-align: center !important;
+  vertical-align: middle !important;
+  padding: 6px 16px !important;
+}
+
+.batch-action-group {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  vertical-align: middle !important;
+}
+
+.btn-clear-queue {
+  padding: 0 12px !important;
+  font-size: 0.78rem !important;
+  height: 32px !important;
+  border-color: rgba(239, 68, 68, 0.35) !important;
+  color: #ef4444 !important;
+  background: rgba(239, 68, 68, 0.06) !important;
+  margin: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  border-radius: 8px !important;
+}
+
+.btn-clear-queue:hover {
+  background: rgba(239, 68, 68, 0.15) !important;
+  border-color: #ef4444 !important;
+  color: #ffffff !important;
+}
+
+.batch-table-wrapper {
+  max-height: 220px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border: none;
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+  background: transparent;
 }
 
 .batch-table {
   width: 100%;
   border-collapse: collapse;
   font-family: var(--font-sans);
-  font-size: 0.82rem;
+  font-size: 0.84rem;
   text-align: left;
 }
 
 .batch-table th {
-  padding: 10px 12px;
-  background: rgba(45, 127, 255, 0.1);
+  padding: 10px 16px;
+  background: rgba(45, 127, 255, 0.07);
   color: var(--color-text-muted);
   font-weight: 600;
   border-bottom: 1px solid var(--border-glass);
   letter-spacing: 0.02em;
 }
 
+.batch-table th:first-child {
+  padding-left: 18px;
+}
+
+.batch-table th:last-child {
+  padding-right: 18px;
+}
+
 .batch-table td {
-  padding: 10px 12px;
+  padding: 10px 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.03);
   color: #f3f4f6;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 180px;
+  max-width: 200px;
+}
+
+.batch-table td:first-child {
+  padding-left: 18px;
+}
+
+.batch-table td:last-child {
+  padding-right: 18px;
 }
 
 .batch-table tr:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(45, 127, 255, 0.04);
 }
 
 /* Glowing Status Badges */
@@ -2491,8 +2624,8 @@ select.select-control {
   background: rgba(22, 29, 54, 0.65) !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.8), 0 0 32px rgba(239, 68, 68, 0.08) !important;
-  transform: scale(0.9) translateY(20px);
-  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform: scale(0.95) translateY(12px);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   padding: 28px !important;
 }
 
@@ -2693,7 +2826,7 @@ select.select-control {
   border: 1.5px solid rgba(255, 255, 255, 0.12);
   border-radius: 6px;
   position: relative;
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   display: inline-block;
   flex-shrink: 0;
   box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.04), 0 2px 4px rgba(0, 0, 0, 0.2);
@@ -2703,7 +2836,7 @@ select.select-control {
 .checkbox-container:hover .custom-checkmark {
   border-color: rgba(45, 127, 255, 0.4);
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.08) 100%);
-  transform: scale(1.06);
+  transform: scale(1.04);
   box-shadow: 0 0 6px rgba(45, 127, 255, 0.12);
 }
 
@@ -2711,7 +2844,7 @@ select.select-control {
 .checkbox-container input:checked ~ .custom-checkmark {
   background: linear-gradient(135deg, var(--color-royal-blue) 0%, #1a6aff 100%);
   border-color: var(--color-royal-blue);
-  transform: scale(1.1);
+  transform: scale(1.05);
   box-shadow: 0 0 8px rgba(45, 127, 255, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.3);
 }
 
@@ -2731,7 +2864,7 @@ select.select-control {
   border-width: 0 2px 2px 0;
   transform: rotate(45deg) scale(0);
   opacity: 0;
-  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.15s ease;
 }
 
 .checkbox-container input:checked ~ .custom-checkmark:after {
@@ -3168,20 +3301,20 @@ select.select-control {
   border: 1.5px solid rgba(255, 255, 255, 0.12);
   border-radius: 50%;
   position: relative;
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   display: inline-block;
   box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.04), 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .radio-container:hover .custom-radio {
   border-color: rgba(45, 127, 255, 0.5);
-  transform: scale(1.06);
+  transform: scale(1.04);
 }
 
 .radio-container input:checked ~ .custom-radio {
   background: linear-gradient(135deg, #2d7fff 0%, #0057d9 100%);
   border-color: #2d7fff;
-  transform: scale(1.1);
+  transform: scale(1.05);
   box-shadow: 0 0 12px rgba(45, 127, 255, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.3);
 }
 
@@ -3195,7 +3328,7 @@ select.select-control {
   background: white;
   border-radius: 50%;
   transform: scale(0);
-  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .radio-container input:checked ~ .custom-radio:after {
@@ -3453,68 +3586,27 @@ select.select-control {
 }
 
 .custom-select-options {
-  background: #111427; /* solid background prevents nested backdrop-filter rendering bugs in WebKit */
+  background: #111427;
   border: 1px solid var(--border-glass-active);
   border-radius: 8px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 20px rgba(45, 127, 255, 0.12);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.75), 0 0 24px rgba(45, 127, 255, 0.15);
   padding: 4px 0;
-  max-height: 250px;
+  max-height: 240px;
   overflow-y: auto;
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  width: 100%;
+  position: fixed;
   box-sizing: border-box;
-  z-index: 1000;
-  transform-origin: top center;
+  z-index: 999999 !important;
   
-  /* Transition state when closed */
   opacity: 0;
-  transform: translateY(-8px) scale(0.97);
+  transform: translateY(-4px) scale(0.98);
   pointer-events: none;
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
+  transition: opacity 0.15s ease, transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Elevate stacking context of parent elements when select is active */
-.custom-select-container.open {
-  z-index: 99999;
-}
-.setting-card.has-active-dropdown,
-.wizard-step.has-active-dropdown {
-  z-index: 99999 !important;
-}
-
-.setting-card.has-active-dropdown {
-  overflow: visible;
-}
-
-/* Discrete Scrollbar inside dropdown */
-.custom-select-options::-webkit-scrollbar-thumb {
-  background: transparent !important;
-}
-.custom-select-options:hover::-webkit-scrollbar-thumb {
-  background: rgba(45, 127, 255, 0.22) !important;
-}
-.custom-select-options::-webkit-scrollbar-thumb:hover {
-  background: rgba(45, 127, 255, 0.55) !important;
-}
-
-/* Transition states when open */
-.custom-select-container.open .custom-select-options {
+.custom-select-options.open {
   opacity: 1;
   transform: translateY(0) scale(1);
   pointer-events: auto;
-}
-
-.custom-select-container.open-upward .custom-select-options {
-  top: auto;
-  bottom: calc(100% + 6px);
-  transform-origin: bottom center;
-  transform: translateY(8px) scale(0.97);
-}
-
-.custom-select-container.open.open-upward .custom-select-options {
-  transform: translateY(0) scale(1);
 }
 
 .custom-select-option {
