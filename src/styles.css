@@ -522,14 +522,7 @@ header {
   transition: var(--transition-smooth);
 }
 
-.glass-card:hover {
-  background: var(--bg-card-hover);
-  border-color: rgba(255, 255, 255, 0.09);
-  box-shadow:
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.05),
-    0 12px 40px rgba(0, 0, 0, 0.55),
-    0 0 20px rgba(45, 127, 255, 0.04);
-}
+
 
 /* Disable hover background changes and apply premium micro-floating and glowing effects for the large intro/dashboard layout cards */
 .intro-welcome:hover,
@@ -815,10 +808,9 @@ header {
 #backend-CUDA { animation-delay: 0.16s; }
 
 .backend-card:hover {
-  background: var(--bg-card-hover);
-  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(18, 25, 46, 0.65);
+  border-color: rgba(45, 127, 255, 0.18);
   box-shadow:
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.05),
     0 12px 40px rgba(0, 0, 0, 0.55),
     0 0 20px rgba(45, 127, 255, 0.04);
   transform: none;
@@ -827,7 +819,6 @@ header {
 .backend-card.active {
   border-color: rgba(45, 127, 255, 0.4);
   box-shadow:
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
     0 0 0 1px rgba(45, 127, 255, 0.15),
     0 0 10px rgba(45, 127, 255, 0.08);
   background: linear-gradient(135deg, rgba(45, 127, 255, 0.08) 0%, rgba(45, 127, 255, 0.02) 100%);
@@ -835,11 +826,10 @@ header {
 
 .backend-card.active:hover {
   background: linear-gradient(135deg, rgba(45, 127, 255, 0.14) 0%, rgba(45, 127, 255, 0.06) 100%);
-  border-color: rgba(45, 127, 255, 0.7);
+  border-color: rgba(45, 127, 255, 0.6);
   box-shadow:
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.12),
     0 0 0 1px rgba(45, 127, 255, 0.3),
-    0 0 18px rgba(45, 127, 255, 0.18);
+    0 0 18px rgba(45, 127, 255, 0.15);
   transform: none;
 }
 
@@ -1073,8 +1063,8 @@ header {
 }
 
 .preset-btn:hover:not(.active) {
-  border-color: rgba(255, 255, 255, 0.15) !important;
-  background: rgba(255, 255, 255, 0.02) !important;
+  border-color: rgba(45, 127, 255, 0.25) !important;
+  background: rgba(45, 127, 255, 0.06) !important;
   color: var(--color-text) !important;
 }
 
@@ -1130,23 +1120,9 @@ header {
   flex-shrink: 0 !important;
 }
 
-.setting-card:hover {
-  background: var(--bg-card-hover);
-  border-color: rgba(255, 255, 255, 0.08);
-  box-shadow: 
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.05),
-    0 8px 24px rgba(0, 0, 0, 0.35);
-  transform: none;
-}
-
 .setting-card .btn-secondary:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.setting-card:has(.setting-control:hover) {
-  background: rgba(255, 255, 255, 0.01);
-  border-color: var(--border-glass);
-  box-shadow: none;
+  background: rgba(45, 127, 255, 0.08);
+  border-color: rgba(45, 127, 255, 0.25);
 }
 
 .setting-card:nth-child(1) { animation-delay: 0.02s; }
@@ -1362,10 +1338,15 @@ select.select-control {
   padding: 8px;
 }
 
+.select-control:hover {
+  border-color: rgba(45, 127, 255, 0.35) !important;
+  box-shadow: 0 0 10px rgba(45, 127, 255, 0.12) !important;
+}
+
 .select-control:focus {
   outline: none;
   border-color: var(--color-royal-blue) !important;
-  box-shadow: 0 0 8px rgba(45, 127, 255, 0.25) !important;
+  box-shadow: 0 0 12px rgba(45, 127, 255, 0.3) !important;
 }
 
 /* 4. Transcribe File View */
@@ -1407,28 +1388,12 @@ select.select-control {
   transition: var(--transition-smooth);
 }
 
-.wizard-step:hover {
-  background: var(--bg-card-hover);
-  border-color: rgba(255, 255, 255, 0.08);
-  transform: none;
-}
-
 .wizard-step.active {
   border-color: rgba(45, 127, 255, 0.4);
   box-shadow:
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.08),
     0 8px 24px rgba(0, 0, 0, 0.35),
     0 0 10px rgba(45, 127, 255, 0.05);
   overflow: hidden;
-}
-
-.wizard-step.active:hover {
-  border-color: rgba(45, 127, 255, 0.4);
-  box-shadow: 
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.12),
-    0 8px 28px rgba(0, 0, 0, 0.4),
-    0 0 18px rgba(45, 127, 255, 0.18);
-  transform: none;
 }
 
 .wizard-step-header {
@@ -1443,7 +1408,7 @@ select.select-control {
 }
 
 .wizard-step-header:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(45, 127, 255, 0.03);
 }
 
 .wizard-step-icon {
@@ -1535,8 +1500,8 @@ select.select-control {
 }
 
 .media-drop-zone:hover {
-  border-color: rgba(255, 255, 255, 0.16);
-  background: rgba(45, 127, 255, 0.01);
+  border-color: rgba(45, 127, 255, 0.35);
+  background: rgba(45, 127, 255, 0.02);
 }
 
 .media-drop-zone.drag-over {
@@ -2240,9 +2205,9 @@ select.select-control {
 }
 
 .backend-tile.compiled:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.15);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  background: rgba(45, 127, 255, 0.08);
+  border-color: rgba(45, 127, 255, 0.3);
+  box-shadow: 0 4px 14px rgba(45, 127, 255, 0.1);
   color: #fff;
 }
 
@@ -2820,9 +2785,9 @@ select.select-control {
 }
 
 .btn-filter:hover {
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: rgba(45, 127, 255, 0.3);
   color: #ffffff;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(45, 127, 255, 0.06);
 }
 
 .btn-filter.active {
@@ -2964,9 +2929,9 @@ select.select-control {
 
 .provider-tile:hover {
   transform: translateY(-4px);
-  border-color: rgba(255, 255, 255, 0.15);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
-  background: rgba(22, 29, 54, 0.55);
+  border-color: rgba(45, 127, 255, 0.25);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25), 0 0 15px rgba(45, 127, 255, 0.05);
+  background: rgba(22, 29, 54, 0.65);
 }
 
 .provider-tile.active {
@@ -3465,8 +3430,8 @@ select.select-control {
 }
 
 .custom-select-trigger:hover {
-  border-color: rgba(255, 255, 255, 0.15);
-  background-color: rgba(255, 255, 255, 0.02);
+  border-color: rgba(45, 127, 255, 0.35);
+  background-color: rgba(45, 127, 255, 0.04);
 }
 
 .custom-select-container.open .custom-select-trigger {
