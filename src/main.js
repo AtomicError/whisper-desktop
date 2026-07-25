@@ -941,17 +941,69 @@ function setupTauriListeners() {
     }
   });
 
-  // Model download progress
+  // Model download progress event listener (Event-driven targeted DOM update)
   on('model-download-status', (event) => {
     const payload = event.payload;
-    
-    // Reload model statuses grid to show the progress update in real-time
-    loadModelStatusesGrid(true);
-    
-    if (!payload.active) {
-      if (payload.error) {
+    if (!payload || !payload.model_name) return;
+
+    if (payload.active) {
+      const card = document.querySelector(`[data-model="${payload.model_name}"]`);
+      if (card) {
+        const pct = (payload.progress * 100).toFixed(0);
+        const dlMB = (payload.downloaded_bytes / 1024 / 1024).toFixed(0);
+        const totalMB = (payload.total_bytes / 1024 / 1024).toFixed(0);
+        
+        let speedText = 'Connecting...';
+        let remainingText = '';
+        if (payload.speed_bps > 0) {
+          const speedMbps = (payload.speed_bps * 8 / 1000 / 1000).toFixed(1);
+          speedText = `${speedMbps} Mbps`;
+          if (typeof lastKnownSpeedMap !== 'undefined') {
+            lastKnownSpeedMap.set(payload.model_name, speedText);
+          }
+          const remainingBytes = payload.total_bytes - payload.downloaded_bytes;
+          const remainingSeconds = Math.round(remainingBytes / payload.speed_bps);
+          remainingText = ` • ETA: ${formatRemainingTime(remainingSeconds)}`;
+        } else if (payload.downloaded_bytes > 0) {
+          speedText = (typeof lastKnownSpeedMap !== 'undefined' && lastKnownSpeedMap.get(payload.model_name)) || '0.0 Mbps';
+        }
+
+        // 1. Update progress bar fill in-place
+        const barContainer = card.querySelector('.progress-bar-container');
+        if (barContainer) barContainer.style.display = 'block';
+        const barFill = card.querySelector('.progress-bar-fill');
+        if (barFill) barFill.style.width = `${pct}%`;
+
+        // 2. Update description text inline without DOM recreation
+        const descEl = card.querySelector('.setting-desc');
+        if (descEl) {
+          const isQuant = payload.model_name.includes("-q");
+          descEl.innerHTML = `
+            <span class="model-badge badge-downloading">Downloading</span>
+            <span style="color: rgba(255,255,255,0.1);">|</span>
+            <span>Expected Size: ${totalMB} MB</span>
+            <span style="color: rgba(255,255,255,0.1);">|</span>
+            <span style="color: ${isQuant ? 'var(--color-cyan)' : 'var(--color-royal-blue)'}; font-weight: 500;">
+              ${isQuant ? 'Quantized Optimized (5-bit/8-bit)' : 'Full Precision (16-bit)'}
+            </span>
+            <span style="color: rgba(255,255,255,0.1);">|</span>
+            <span style="color: var(--color-cyan);">${dlMB} MB (${pct}%) • Speed: ${speedText}${remainingText}</span>
+          `;
+        }
+
+        // 3. Ensure button status is dynamically updated to "Pause" in-place
+        const ctrlEl = card.querySelector('.setting-control');
+        if (ctrlEl && !ctrlEl.querySelector('[data-action="pause"]')) {
+          ctrlEl.innerHTML = `<button class="btn-secondary" style="border-color: var(--color-gold); color: var(--color-gold); margin: 0; padding: 6px 14px; font-size: 0.8rem;" data-action="pause">Pause</button>`;
+        }
+      }
+      // If card is NOT in current view/tab, do NOTHING to prevent tab re-rendering!
+    } else {
+      // Download finished, paused, or errored -> Reload grid state once
+      loadModelStatusesGrid(true);
+      if (payload.error && !payload.is_paused) {
         showNotification(`Model download failed: ${payload.error}`, "error");
-      } else {
+      } else if (payload.progress >= 1.0) {
         showNotification(`Finished downloading ggml-${payload.model_name}.bin successfully!`, "success");
         scanAndPopulateModels();
       }
@@ -2646,9 +2698,15 @@ let currentCategoryFilter = 'recommended';
 function formatRemainingTime(seconds) {
   if (seconds <= 0 || !isFinite(seconds)) return "Unknown";
   if (seconds < 60) return `${seconds}s`;
-  const m = Math.floor(seconds / 60);
+  if (seconds < 3600) {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}m ${s}s`;
+  }
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
   const s = seconds % 60;
-  return `${m}m ${s}s`;
+  return `${h}h ${m}m ${s}s`;
 }
 
 window.switchModelCategory = function(category) {
@@ -2668,7 +2726,14 @@ window.switchModelCategory = function(category) {
 };
 
 window.loadModelStatusesGrid = async function(isSilent = false) {
-  if (!settingsState) return;
+  if (!settingsState) {
+    try {
+      settingsState = await invoke('load_settings');
+    } catch (e) {
+      console.error("Failed to load settings in loadModelStatusesGrid:", e);
+      return;
+    }
+  }
   
   // 1. Fetch system specifications if not already loaded
   if (!systemSpecs) {
@@ -2700,10 +2765,12 @@ window.loadModelStatusesGrid = async function(isSilent = false) {
   
   try {
     const statuses = await invoke('get_all_models_status', { modelsDir: settingsState.modelsDir });
+
     const grid = document.getElementById('models-list-scroll');
     if (!grid) return;
     
-    const query = document.getElementById('model-search').value.toLowerCase();
+    const searchInput = document.getElementById('model-search');
+    const query = searchInput ? searchInput.value.toLowerCase() : '';
     
     grid.innerHTML = '';
     if (!grid._modelDelegate) {
@@ -2779,6 +2846,7 @@ window.loadModelStatusesGrid = async function(isSilent = false) {
       const card = document.createElement('div');
       card.className = 'setting-card';
       card.dataset.name = m.name;
+      card.setAttribute('data-model', m.name);
       
       let badgeHtml = '';
       if (m.status === 'Downloading') {
@@ -2807,8 +2875,8 @@ window.loadModelStatusesGrid = async function(isSilent = false) {
         
         if (deltaBytes > 0 && deltaTime > 0) {
           const speedBytesPerSec = deltaBytes / deltaTime;
-          const speedMBPerSec = (speedBytesPerSec / 1024 / 1024).toFixed(1);
-          speedText = `${speedMBPerSec} MB/s`;
+          const speedMbps = (speedBytesPerSec * 8 / 1000 / 1000).toFixed(1);
+          speedText = `${speedMbps} Mbps`;
           lastKnownSpeedMap.set(m.name, speedText);
           
           const remainingBytes = m.sizeBytes - m.downloadedBytes;
@@ -2818,7 +2886,7 @@ window.loadModelStatusesGrid = async function(isSilent = false) {
           if (m.downloadedBytes === 0) {
             speedText = 'Starting...';
           } else {
-            speedText = lastKnownSpeedMap.get(m.name) || '0.0 MB/s';
+            speedText = lastKnownSpeedMap.get(m.name) || '0.0 Mbps';
           }
         }
       } else {
@@ -2915,15 +2983,22 @@ window.downloadModelClick = async function(name) {
   try {
     showNotification(`Downloading ggml-${name}.bin...`, "info");
     
+    // Immediate in-place button swap to Pause
+    const card = document.querySelector(`[data-model="${name}"]`);
+    if (card) {
+      const ctrlEl = card.querySelector('.setting-control');
+      if (ctrlEl) {
+        ctrlEl.innerHTML = `<button class="btn-secondary" style="border-color: var(--color-gold); color: var(--color-gold); margin: 0; padding: 6px 14px; font-size: 0.8rem;" data-action="pause">Pause</button>`;
+      }
+    }
+
     await invoke('start_download_model_task', {
       modelsDir: settingsState.modelsDir,
       modelName: name
     });
-    
-    // Refresh UI
-    await loadModelStatusesGrid();
   } catch (err) {
     showNotification("Failed to start download: " + err, "error");
+    await loadModelStatusesGrid();
   } finally {
     _modelActionsInProgress.delete(name);
   }

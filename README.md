@@ -27,36 +27,21 @@ Running AI models locally often requires navigating command-line interfaces, ins
 * **🔒 100% Local & Private:** Speech recognition and audio conversion run entirely on your local machine. No data is sent to external servers.
 * **⚡ Multi-Backend Acceleration:** Switch seamlessly between **CPU**, **Vulkan**, **CUDA**, or **OpenVINO** directly from the interface for near-instant transcription.
 * **🎞️ Direct Smart Media Import:** Drop any video or audio file directly into the app—no manual audio conversion or pre-extraction required.
-* **🎙️ Voice Activity Detection (VAD):** Integrated Silero VAD automatically strips silence, boosting speed and accuracy.
-* **🤖 Multi-Provider AI Translation:** Post-process and translate subtitles into Persian or any target language using OpenAI, Anthropic, Gemini, or local LLMs (LM Studio/Ollama) with secure system keyring storage.
+* **🎛️ Complete Engine Orchestration:** Fine-tune decoding parameters, Silero VAD silence filtering, beam sizes, and thread concurrency.
+* **🤖 Multi-Provider AI Translation:** Post-process and translate subtitles into 40+ languages using OpenAI, Anthropic, Gemini, or local LLMs (LM Studio/Ollama) with secure system keyring storage.
 * **✨ Glassmorphic UI & Real-Time Telemetry:** Dark-mode interface featuring dynamic hardware metrics (CPU/RAM/GPU), drag-and-drop file queue, and live transcript highlighting.
 
 ---
 
 ## 📸 Screenshots & Visual Walkthrough
 
-<table width="100%">
-  <tr>
-    <td width="50%" align="center" valign="top">
-      <h4>🎛️ Dashboard Home</h4>
-      <img src="assets/screenshots/dashboard.png" alt="Dashboard Home" width="100%">
-    </td>
-    <td width="50%" align="center" valign="top">
-      <h4>🛠️ Configuration Step</h4>
-      <img src="assets/screenshots/configuration.png" alt="Configuration Step" width="100%">
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" align="center" valign="top">
-      <h4>📥 Model Hub</h4>
-      <img src="assets/screenshots/models.png" alt="Model Hub" width="100%">
-    </td>
-    <td width="50%" align="center" valign="top">
-      <h4>🎙️ Transcription Screen</h4>
-      <img src="assets/screenshots/transcription.png" alt="Transcription Screen" width="100%">
-    </td>
-  </tr>
-</table>
+<div align="center">
+  <img src="assets/screenshots/dashboard.png" alt="Dashboard Home" width="48%" style="max-width:100%; height:auto; margin: 4px;" />
+  <img src="assets/screenshots/configuration.png" alt="Configuration Step" width="48%" style="max-width:100%; height:auto; margin: 4px;" />
+  <br/><br/>
+  <img src="assets/screenshots/models.png" alt="Model Hub" width="48%" style="max-width:100%; height:auto; margin: 4px;" />
+  <img src="assets/screenshots/transcription.png" alt="Transcription Screen" width="48%" style="max-width:100%; height:auto; margin: 4px;" />
+</div>
 
 ---
 
@@ -71,8 +56,8 @@ Running AI models locally often requires navigating command-line interfaces, ins
 * **📄 Flexible Export Formats:** Export transcripts as **SRT, VTT, LRC, TXT, CSV, JSON**, and full word-level timestamp files.
 * **★ Hardware-Guided Recommendations:** Recommends optimal model sizes and quantization formats based on detected RAM, CPU cores, and GPU type.
 
-### 🗣️ Voice Activity Detection (VAD)
-* **Silero VAD Integration:** Detects speech segments and automatically bypasses silent sections to dramatically improve transcription speed.
+### 🎛️ Advanced Engine Orchestration & VAD Tuning
+* **Complete Parameter Control:** Granular control over VAD thresholds, minimum speech/silence duration, beam search size, temperature fallbacks, diarization, and word-level DTW timestamps.
 * **Granular Controls:** Configurable VAD threshold, minimum speech duration, minimum silence duration, speech padding, and segment overlap.
 
 ### 🤖 AI Subtitle Translation Pipeline

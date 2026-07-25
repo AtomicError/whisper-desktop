@@ -9,12 +9,14 @@ use std::fs;
 // Managed state for downloads
 pub struct DownloadSession {
     pub active_downloads: HashMap<String, u32>, // model_name -> child_pid
+    pub paused_downloads: std::collections::HashSet<String>, // model_name
 }
 
 impl DownloadSession {
     pub fn new() -> Self {
         DownloadSession {
             active_downloads: HashMap::new(),
+            paused_downloads: std::collections::HashSet::new(),
         }
     }
 }
@@ -86,7 +88,11 @@ pub struct ModelStatus {
 pub struct ModelDownloadProgress {
     pub model_name: String,
     pub progress: f64, // 0.0 to 1.0
+    pub downloaded_bytes: u64,
+    pub total_bytes: u64,
+    pub speed_bps: f64,
     pub active: bool,
+    pub is_paused: bool,
     pub error: Option<String>,
 }
 
@@ -176,25 +182,97 @@ pub async fn run_model_download(
         }
     }
 
+    let expected_size = get_expected_model_size(&clean_name);
+
     // Emit initial status
     let _ = app.emit(
         "model-download-status",
         ModelDownloadProgress {
             model_name: clean_name.clone(),
             progress: 0.0,
+            downloaded_bytes: 0,
+            total_bytes: expected_size,
+            speed_bps: 0.0,
             active: true,
+            is_paused: false,
             error: None,
         },
     );
 
+    let initial_bytes = fs::metadata(&tmp_path).map(|m| m.len()).unwrap_or(0);
+
+    // Live progress emitter loop in Rust while curl is executing
+    let app_handle = app.clone();
+    let name_clone = clean_name.clone();
+    let tmp_path_clone = tmp_path.clone();
+    let download_state_clone = download_state.clone();
+
+    let monitor_handle = tokio::spawn(async move {
+        let mut last_bytes = initial_bytes;
+        let mut last_time = std::time::Instant::now();
+
+        loop {
+            tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
+
+            let is_still_active = if let Ok(lock) = download_state_clone.lock() {
+                lock.active_downloads.contains_key(&name_clone)
+            } else {
+                false
+            };
+
+            if !is_still_active {
+                break;
+            }
+
+            if let Ok(meta) = fs::metadata(&tmp_path_clone) {
+                let current_bytes = meta.len();
+                let now = std::time::Instant::now();
+                let elapsed_secs = now.duration_since(last_time).as_secs_f64();
+
+                let progress = if expected_size > 0 {
+                    (current_bytes as f64 / expected_size as f64).min(0.99)
+                } else {
+                    0.0
+                };
+
+                let speed_bps = if elapsed_secs > 0.1 && current_bytes > last_bytes {
+                    (current_bytes - last_bytes) as f64 / elapsed_secs
+                } else {
+                    0.0
+                };
+
+                let _ = app_handle.emit(
+                    "model-download-status",
+                    ModelDownloadProgress {
+                        model_name: name_clone.clone(),
+                        progress,
+                        downloaded_bytes: current_bytes,
+                        total_bytes: expected_size,
+                        speed_bps,
+                        active: true,
+                        is_paused: false,
+                        error: None,
+                    },
+                );
+
+                if current_bytes > last_bytes {
+                    last_bytes = current_bytes;
+                    last_time = now;
+                }
+            }
+        }
+    });
+
     // Wait for curl to finish
     let status = child.wait().await.map_err(|e| format!("curl failed: {}", e))?;
+    monitor_handle.abort();
 
-    {
-        if let Ok(mut lock) = download_state.lock() {
-            lock.active_downloads.remove(&clean_name);
-        }
-    }
+    let was_paused = if let Ok(mut lock) = download_state.lock() {
+        lock.active_downloads.remove(&clean_name);
+        lock.paused_downloads.remove(&clean_name)
+    } else {
+        false
+    };
 
     if status.success() {
         // Rename temp file to final destination
@@ -206,7 +284,26 @@ pub async fn run_model_download(
             ModelDownloadProgress {
                 model_name: clean_name.clone(),
                 progress: 1.0,
+                downloaded_bytes: expected_size,
+                total_bytes: expected_size,
+                speed_bps: 0.0,
                 active: false,
+                is_paused: false,
+                error: None,
+            },
+        );
+        Ok(())
+    } else if was_paused {
+        let _ = app.emit(
+            "model-download-status",
+            ModelDownloadProgress {
+                model_name: clean_name.clone(),
+                progress: 0.0,
+                downloaded_bytes: 0,
+                total_bytes: expected_size,
+                speed_bps: 0.0,
+                active: false,
+                is_paused: true,
                 error: None,
             },
         );
@@ -219,7 +316,11 @@ pub async fn run_model_download(
             ModelDownloadProgress {
                 model_name: clean_name.clone(),
                 progress: 0.0,
+                downloaded_bytes: 0,
+                total_bytes: expected_size,
+                speed_bps: 0.0,
                 active: false,
+                is_paused: false,
                 error: Some(error_msg.clone()),
             },
         );
@@ -317,10 +418,12 @@ pub fn pause_download_model(
         .unwrap_or(&model_name)
         .to_string();
 
-    let mut pid_to_kill = None;
-    if let Ok(lock) = download_state.0.lock() {
-        pid_to_kill = lock.active_downloads.get(&clean_name).copied();
-    }
+    let pid_to_kill = if let Ok(mut lock) = download_state.0.lock() {
+        lock.paused_downloads.insert(clean_name.clone());
+        lock.active_downloads.get(&clean_name).copied()
+    } else {
+        None
+    };
 
     if let Some(pid) = pid_to_kill {
         // Kill the curl process
