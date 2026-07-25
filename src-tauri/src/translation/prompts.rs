@@ -19,8 +19,8 @@ pub fn build_system_prompt(custom_prompt: &str, target_lang: &str, polish: bool)
 
     if polish {
         prompt.push_str(
-            "Translation Quality Directive: Produce natural, fluent spoken dialogue translations. \
-            Use authentic conversational idioms and phrasing rather than rigid literal translation, while keeping lines concise for subtitle reading speed.\n"
+            "Translation Quality Directive: Deliver an accurate, high-quality translation of spoken dialogue. \
+            Ensure the translation is fully faithful to the original content and nuances, maintaining complete narrative integrity while expressing the dialogue in natural, idiomatic, and fluent spoken language.\n"
         );
     } else {
         prompt.push_str(
