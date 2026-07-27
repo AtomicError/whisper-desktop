@@ -56,10 +56,22 @@ export class HardsubController {
   private positionYVal: HTMLElement | null = null;
   private outlineSizeSlider: HTMLInputElement | null = null;
   private outlineSizeVal: HTMLElement | null = null;
+
+  // Color controls
   private primaryColorPicker: HTMLInputElement | null = null;
   private outlineColorPicker: HTMLInputElement | null = null;
   private bgBoxToggle: HTMLInputElement | null = null;
   private bgBoxColorPicker: HTMLInputElement | null = null;
+
+  // Color Swatches & Hex Indicators
+  private swatchText: HTMLElement | null = null;
+  private swatchOutline: HTMLElement | null = null;
+  private swatchBg: HTMLElement | null = null;
+  private hexTextLabel: HTMLElement | null = null;
+  private hexOutlineLabel: HTMLElement | null = null;
+  private hexBgLabel: HTMLElement | null = null;
+
+  // Buttons & Toggles
   private boldToggle: HTMLButtonElement | null = null;
   private italicToggle: HTMLButtonElement | null = null;
   private formatSelect: HTMLSelectElement | null = null;
@@ -67,12 +79,17 @@ export class HardsubController {
   private hwSelect: HTMLSelectElement | null = null;
   private audioSelect: HTMLSelectElement | null = null;
   private alignmentButtons: NodeListOf<HTMLButtonElement> | null = null;
-  
+  private cancelBtn: HTMLButtonElement | null = null;
+
   // Preview elements
   private previewBox: HTMLElement | null = null;
   private previewText: HTMLElement | null = null;
-  private progressBar: HTMLElement | null = null;
+
+  // Telemetry HUD elements
+  private progressFill: HTMLElement | null = null;
   private progressStatusText: HTMLElement | null = null;
+  private progressPctText: HTMLElement | null = null;
+  private hudPulseDot: HTMLElement | null = null;
 
   // Internal state
   private state: HardsubSettings = {
@@ -100,13 +117,13 @@ export class HardsubController {
   private isEncoding: boolean = false;
 
   constructor() {
-    // Wait for DOM to load before initializing elements
     document.addEventListener('DOMContentLoaded', () => {
       this.initDOMElements();
       this.loadFontsAndHardware();
       this.setupEventListeners();
       this.listenToProgressEvents();
       this.updateLivePreview();
+      this.updateEncodingUIState(false);
     });
   }
 
@@ -120,10 +137,19 @@ export class HardsubController {
     this.positionYVal = document.getElementById('hardsub-posy-val');
     this.outlineSizeSlider = document.getElementById('hardsub-outline-size') as HTMLInputElement;
     this.outlineSizeVal = document.getElementById('hardsub-outline-val');
+
     this.primaryColorPicker = document.getElementById('hardsub-color-text') as HTMLInputElement;
     this.outlineColorPicker = document.getElementById('hardsub-color-outline') as HTMLInputElement;
     this.bgBoxToggle = document.getElementById('hardsub-bgbox-toggle') as HTMLInputElement;
     this.bgBoxColorPicker = document.getElementById('hardsub-color-bg') as HTMLInputElement;
+
+    this.swatchText = document.getElementById('hardsub-swatch-text');
+    this.swatchOutline = document.getElementById('hardsub-swatch-outline');
+    this.swatchBg = document.getElementById('hardsub-swatch-bg');
+    this.hexTextLabel = document.getElementById('hardsub-hex-text');
+    this.hexOutlineLabel = document.getElementById('hardsub-hex-outline');
+    this.hexBgLabel = document.getElementById('hardsub-hex-bg');
+
     this.boldToggle = document.getElementById('hardsub-btn-bold') as HTMLButtonElement;
     this.italicToggle = document.getElementById('hardsub-btn-italic') as HTMLButtonElement;
     this.formatSelect = document.getElementById('hardsub-format') as HTMLSelectElement;
@@ -131,16 +157,18 @@ export class HardsubController {
     this.hwSelect = document.getElementById('hardsub-hw') as HTMLSelectElement;
     this.audioSelect = document.getElementById('hardsub-audio') as HTMLSelectElement;
     this.alignmentButtons = document.querySelectorAll('.align-btn');
+    this.cancelBtn = document.getElementById('btn-cancel-hardsub') as HTMLButtonElement;
 
     this.previewBox = document.getElementById('hardsub-preview-box');
     this.previewText = document.getElementById('hardsub-preview-text');
-    this.progressBar = document.getElementById('hardsub-progress-bar');
+    this.progressFill = document.getElementById('hardsub-progress-fill');
     this.progressStatusText = document.getElementById('hardsub-status-text');
+    this.progressPctText = document.getElementById('hardsub-pct-text');
+    this.hudPulseDot = document.getElementById('hardsub-hud-pulse');
   }
 
   private async loadFontsAndHardware() {
     try {
-      // 1. Fetch system & bundled fonts from Rust
       const fonts = await invoke<FontItem[]>('get_system_fonts');
       if (this.fontSelect && fonts.length > 0) {
         this.fontSelect.innerHTML = '';
@@ -171,7 +199,6 @@ export class HardsubController {
     }
 
     try {
-      // 2. Probe hardware encoders (Intel QSV, NVENC, VAAPI)
       const hwStatus = await invoke<HardwareStatus>('check_hardware_encoders');
       if (this.hwSelect) {
         const qsvOpt = this.hwSelect.querySelector('option[value="qsv"]') as HTMLOptionElement;
@@ -219,50 +246,83 @@ export class HardsubController {
       this.updateLivePreview();
     });
 
-    // Font Size Slider
+    // Font Size Slider & Reset
     this.fontSizeSlider?.addEventListener('input', () => {
       const val = parseInt(this.fontSizeSlider!.value, 10);
       this.state.fontSize = val;
       if (this.fontSizeVal) this.fontSizeVal.textContent = `${val}px`;
       this.updateLivePreview();
     });
+    document.getElementById('reset-fontsize')?.addEventListener('click', () => {
+      this.state.fontSize = 24;
+      if (this.fontSizeSlider) this.fontSizeSlider.value = '24';
+      if (this.fontSizeVal) this.fontSizeVal.textContent = '24px';
+      this.updateLivePreview();
+    });
 
-    // Position Y Slider
+    // Position Y Slider & Reset
     this.positionYSlider?.addEventListener('input', () => {
       const val = parseInt(this.positionYSlider!.value, 10);
       this.state.positionY = val;
       if (this.positionYVal) this.positionYVal.textContent = `${val}px`;
       this.updateLivePreview();
     });
+    document.getElementById('reset-posy')?.addEventListener('click', () => {
+      this.state.positionY = 30;
+      if (this.positionYSlider) this.positionYSlider.value = '30';
+      if (this.positionYVal) this.positionYVal.textContent = '30px';
+      this.updateLivePreview();
+    });
 
-    // Outline Size Slider
+    // Outline Size Slider & Reset
     this.outlineSizeSlider?.addEventListener('input', () => {
       const val = parseInt(this.outlineSizeSlider!.value, 10);
       this.state.outlineSize = val;
       if (this.outlineSizeVal) this.outlineSizeVal.textContent = `${val}px`;
+      if (this.hexOutlineLabel) this.hexOutlineLabel.textContent = `${this.state.outlineColor} (${val}px)`;
+      this.updateLivePreview();
+    });
+    document.getElementById('reset-outline')?.addEventListener('click', () => {
+      this.state.outlineSize = 2;
+      if (this.outlineSizeSlider) this.outlineSizeSlider.value = '2';
+      if (this.outlineSizeVal) this.outlineSizeVal.textContent = '2px';
+      if (this.hexOutlineLabel) this.hexOutlineLabel.textContent = `${this.state.outlineColor} (2px)`;
       this.updateLivePreview();
     });
 
-    // Primary Text Color
+    // Color Pickers & Preset Swatches
     this.primaryColorPicker?.addEventListener('input', () => {
-      this.state.primaryColor = this.primaryColorPicker!.value;
+      this.state.primaryColor = this.primaryColorPicker!.value.toUpperCase();
+      this.updateColorSwatches();
       this.updateLivePreview();
     });
 
-    // Outline Color
     this.outlineColorPicker?.addEventListener('input', () => {
-      this.state.outlineColor = this.outlineColorPicker!.value;
+      this.state.outlineColor = this.outlineColorPicker!.value.toUpperCase();
+      this.updateColorSwatches();
       this.updateLivePreview();
     });
 
-    // Background Box Toggle & Color
     this.bgBoxToggle?.addEventListener('change', () => {
       this.state.bgBox = this.bgBoxToggle!.checked;
       this.updateLivePreview();
     });
     this.bgBoxColorPicker?.addEventListener('input', () => {
-      this.state.bgBoxColor = this.bgBoxColorPicker!.value;
+      this.state.bgBoxColor = this.bgBoxColorPicker!.value.toUpperCase();
+      this.updateColorSwatches();
       this.updateLivePreview();
+    });
+
+    // Color Preset Buttons
+    document.querySelectorAll('.color-preset-dot').forEach((dot) => {
+      dot.addEventListener('click', (e) => {
+        const btn = e.currentTarget as HTMLButtonElement;
+        const color = btn.dataset.color || '#FFFFFF';
+        this.state.primaryColor = color;
+        if (this.primaryColorPicker) this.primaryColorPicker.value = color;
+        this.updateColorSwatches();
+        this.updateLivePreview();
+      });
     });
 
     // Bold Toggle
@@ -310,9 +370,10 @@ export class HardsubController {
     });
 
     // Cancel Hardsub Button
-    document.getElementById('btn-cancel-hardsub')?.addEventListener('click', async () => {
+    this.cancelBtn?.addEventListener('click', async () => {
       try {
         await invoke('cancel_transcription');
+        this.updateEncodingUIState(false);
       } catch (e) {
         console.warn('Cancel hardsub error:', e);
       }
@@ -348,6 +409,17 @@ export class HardsubController {
     }
   }
 
+  private updateColorSwatches() {
+    if (this.swatchText) this.swatchText.style.background = this.state.primaryColor;
+    if (this.hexTextLabel) this.hexTextLabel.textContent = this.state.primaryColor;
+
+    if (this.swatchOutline) this.swatchOutline.style.background = this.state.outlineColor;
+    if (this.hexOutlineLabel) this.hexOutlineLabel.textContent = `${this.state.outlineColor} (${this.state.outlineSize}px)`;
+
+    if (this.swatchBg) this.swatchBg.style.background = this.state.bgBoxColor;
+    if (this.hexBgLabel) this.hexBgLabel.textContent = this.state.bgBoxColor;
+  }
+
   private updateLivePreview() {
     if (!this.previewText) return;
 
@@ -358,7 +430,7 @@ export class HardsubController {
     this.previewText.style.fontStyle = this.state.italic ? 'italic' : 'normal';
     this.previewText.style.marginBottom = `${this.state.positionY}px`;
 
-    // Text Outline / Stroke Effect via CSS text-shadow
+    // Outline / Stroke
     if (this.state.outlineSize > 0) {
       const s = this.state.outlineSize;
       const c = this.state.outlineColor;
@@ -379,46 +451,67 @@ export class HardsubController {
     // Background Box
     if (this.state.bgBox) {
       this.previewText.style.backgroundColor = this.state.bgBoxColor;
-      this.previewText.style.padding = '4px 12px';
-      this.previewText.style.borderRadius = '4px';
+      this.previewText.style.padding = '4px 14px';
+      this.previewText.style.borderRadius = '6px';
     } else {
       this.previewText.style.backgroundColor = 'transparent';
       this.previewText.style.padding = '0';
     }
 
-    // Alignment
+    // Flexbox Alignment mapping
     if (this.previewBox) {
       switch (this.state.alignment) {
         case 1: // Bottom Left
-          this.previewBox.style.justifyContent = 'flex-start';
-          this.previewBox.style.alignItems = 'flex-end';
+          this.previewBox.style.justifyContent = 'flex-end';
+          this.previewBox.style.alignItems = 'flex-start';
           break;
         case 3: // Bottom Right
           this.previewBox.style.justifyContent = 'flex-end';
           this.previewBox.style.alignItems = 'flex-end';
           break;
         case 6: // Top Center
-          this.previewBox.style.justifyContent = 'center';
-          this.previewBox.style.alignItems = 'flex-start';
+          this.previewBox.style.justifyContent = 'flex-start';
+          this.previewBox.style.alignItems = 'center';
           break;
         default: // 2 = Bottom Center
-          this.previewBox.style.justifyContent = 'center';
-          this.previewBox.style.alignItems = 'flex-end';
+          this.previewBox.style.justifyContent = 'flex-end';
+          this.previewBox.style.alignItems = 'center';
           break;
       }
+    }
+
+    this.updateColorSwatches();
+  }
+
+  private updateEncodingUIState(active: boolean) {
+    this.isEncoding = active;
+
+    if (this.cancelBtn) {
+      this.cancelBtn.style.display = active ? 'inline-flex' : 'none';
+    }
+
+    if (this.hudPulseDot) {
+      this.hudPulseDot.style.background = active ? 'var(--color-royal-blue)' : '#9ca3af';
+      this.hudPulseDot.classList.toggle('pulse-active', active);
     }
   }
 
   private listenToProgressEvents() {
     listen<{ progress: number; message: string; active: boolean }>('hardsub-status', (event) => {
       const data = event.payload;
-      if (this.progressBar) {
-        this.progressBar.style.width = `${Math.round(data.progress * 100)}%`;
+      const pct = Math.round(data.progress * 100);
+
+      if (this.progressFill) {
+        this.progressFill.style.width = `${pct}%`;
+      }
+      if (this.progressPctText) {
+        this.progressPctText.textContent = `${pct}%`;
       }
       if (this.progressStatusText) {
         this.progressStatusText.textContent = data.message;
       }
-      this.isEncoding = data.active;
+
+      this.updateEncodingUIState(data.active);
     });
   }
 
@@ -440,9 +533,9 @@ export class HardsubController {
     }
 
     try {
-      this.isEncoding = true;
+      this.updateEncodingUIState(true);
       if (this.progressStatusText) {
-        this.progressStatusText.textContent = 'Starting FFmpeg encoding...';
+        this.progressStatusText.textContent = 'Initializing FFmpeg encoder...';
       }
       
       await invoke('start_hardsub_task', {
@@ -455,10 +548,9 @@ export class HardsubController {
         this.progressStatusText.textContent = `Error: ${e}`;
       }
     } finally {
-      this.isEncoding = false;
+      this.updateEncodingUIState(false);
     }
   }
 }
 
-// Instantiate global controller instance
 export const hardsubController = new HardsubController();
