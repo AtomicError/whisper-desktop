@@ -291,7 +291,21 @@ async fn select_file(app: AppHandle) -> Option<String> {
     let (tx, rx) = tokio::sync::oneshot::channel();
     app.dialog()
         .file()
-        .add_filter("Audio/Video", &["mp4", "mkv", "avi", "mov", "flv", "webm", "m4v", "mp3", "wav", "ogg", "m4a", "flac", "aac", "wma"])
+        .add_filter("Video Files (*.mp4, *.mkv, *.webm)", &["mp4", "mkv", "avi", "mov", "flv", "webm", "m4v", "MP4", "MKV", "WEBM", "MOV", "AVI", "FLV"])
+        .add_filter("All Files (*)", &["*"])
+        .pick_file(move |file| {
+            let _ = tx.send(file);
+        });
+    rx.await.ok().flatten().and_then(|p| p.into_path().ok()).map(|p| p.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+async fn select_subtitle_file(app: AppHandle) -> Option<String> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .file()
+        .add_filter("Subtitle Files (*.srt, *.vtt, *.ass)", &["srt", "vtt", "ass", "ssa", "sub", "SRT", "VTT", "ASS", "SSA", "SUB"])
+        .add_filter("All Files (*)", &["*"])
         .pick_file(move |file| {
             let _ = tx.send(file);
         });
@@ -469,6 +483,7 @@ fn main() {
             clear_logs,
             scan_models,
             select_file,
+            select_subtitle_file,
             select_files,
             select_directory,
             read_text_file_content,

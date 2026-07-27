@@ -1676,10 +1676,15 @@
                   </div>
 
                   <!-- Frame Viewport -->
-                  <div class="hardsub-preview-frame" id="hardsub-preview-box" style="height: 220px; background: linear-gradient(135deg, #0f172a, #1e293b); border-radius: 10px; border: 1px solid rgba(255,255,255,0.12); position: relative; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding: 16px; overflow: hidden; box-shadow: inset 0 0 30px rgba(0,0,0,0.8);">
-                    <div id="hardsub-preview-text" style="text-align: center; max-width: 90%; transition: all 0.15s ease;">
-                      این یک نمونه پیش‌نمایش زیرنویس فارسی است
+                  <div class="hardsub-preview-frame" id="hardsub-preview-box" style="height: 200px; background: linear-gradient(135deg, #0f172a, #1e293b); border-radius: 10px; border: 1px solid rgba(255,255,255,0.12); position: relative; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding: 16px; overflow: hidden; box-shadow: inset 0 0 30px rgba(0,0,0,0.8);">
+                    <div id="hardsub-preview-text" style="text-align: center; max-width: 90%; transition: opacity 0.15s ease;">
+                      Sample Subtitle Live Preview Text
                     </div>
+                  </div>
+
+                  <!-- Custom Live Preview Text Input -->
+                  <div style="margin-top: 10px;">
+                    <input type="text" class="text-input" id="hardsub-preview-input" value="Sample Subtitle Live Preview Text" placeholder="Type custom sample text to test font rendering..." style="width: 100%; font-size: 0.85rem;" />
                   </div>
                 </div>
 
@@ -1716,14 +1721,15 @@
                 
                 <!-- Typography Styling Controls Card -->
                 <div class="glass-card" style="padding: 18px;">
-                  <h3 style="margin-top: 0; margin-bottom: 14px; font-size: 1.05rem; color: var(--color-royal-blue); display: flex; align-items: center; gap: 8px;">
+                  <h3 style="margin-top: 0; margin-bottom: 16px; font-size: 1.05rem; color: var(--color-royal-blue); display: flex; align-items: center; gap: 8px;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px; height:20px;"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
                     Subtitle Typography & Style
                   </h3>
 
-                  <div style="display: flex; flex-direction: column; gap: 14px;">
-                    <!-- Font Select & Style Pills -->
-                    <div style="display: grid; grid-template-columns: 1.8fr 1.2fr; gap: 10px; align-items: center;">
+                  <div style="display: flex; flex-direction: column; gap: 16px;">
+                    
+                    <!-- Row 1: Font Family & Style Weight (Bold / Italic) -->
+                    <div style="display: grid; grid-template-columns: 1.6fr 1fr; gap: 12px; align-items: end;">
                       <div>
                         <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Font Family</label>
                         <select class="select-control" id="hardsub-font" style="width:100%;">
@@ -1744,10 +1750,62 @@
                       </div>
                     </div>
 
-                    <!-- Size & Position Sliders with Resets -->
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <!-- Row 2: Text Color Swatch & Background Box Swatch (Color Pickers Side-by-Side) -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: center;">
+                      
+                      <!-- Text Color Card -->
                       <div>
-                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--color-text-muted); margin-bottom: 4px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--color-text-muted); margin-bottom: 6px;">
+                          <span>Text Color</span>
+                          <span id="hardsub-hex-text" style="font-family: monospace; font-size: 0.78rem; color: var(--color-royal-blue); font-weight: 600;">#FFFFFF</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                          <div class="color-picker-wrapper" style="position: relative; width: 32px; height: 32px; border-radius: 50%; overflow: hidden; border: 2px solid rgba(255,255,255,0.3); cursor: pointer; flex-shrink: 0;">
+                            <div id="hardsub-swatch-text" style="width:100%; height:100%; background: #FFFFFF;"></div>
+                            <input type="color" id="hardsub-color-text" value="#FFFFFF" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: none; padding: 0; margin: 0;" />
+                          </div>
+                          <!-- Quick Presets -->
+                          <div style="display: flex; gap: 4px;">
+                            <button class="color-preset-dot" data-target="text" data-color="#FFFFFF" style="background:#FFFFFF;" title="White"></button>
+                            <button class="color-preset-dot" data-target="text" data-color="#FFD700" style="background:#FFD700;" title="Yellow"></button>
+                            <button class="color-preset-dot" data-target="text" data-color="#2D7FFF" style="background:#2D7FFF;" title="Royal Blue"></button>
+                            <button class="color-preset-dot" data-target="text" data-color="#FF3B30" style="background:#FF3B30;" title="Red"></button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- Background Box Control (Color Swatch identical to Text Color) -->
+                      <div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; margin-bottom: 6px;">
+                          <label class="checkbox-container" style="margin:0; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                            <input type="checkbox" id="hardsub-bgbox-toggle" />
+                            <span class="custom-checkmark"></span>
+                            <span style="font-weight: 500; color: var(--color-text-muted);">Background Box</span>
+                          </label>
+                          <span id="hardsub-hex-bg" style="font-family: monospace; font-size: 0.78rem; color: var(--color-royal-blue); font-weight: 600;">#000000</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                          <div class="color-picker-wrapper" style="position: relative; width: 32px; height: 32px; border-radius: 50%; overflow: hidden; border: 2px solid rgba(255,255,255,0.3); cursor: pointer; flex-shrink: 0;" title="Box Fill Color">
+                            <div id="hardsub-swatch-bg" style="width:100%; height:100%; background: #000000;"></div>
+                            <input type="color" id="hardsub-color-bg" value="#000000" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: none; padding: 0; margin: 0;" />
+                          </div>
+                          <!-- Quick Presets for Box -->
+                          <div style="display: flex; gap: 4px;">
+                            <button class="color-preset-dot" data-target="bg" data-color="#000000" style="background:#000000; border-color:rgba(255,255,255,0.4);" title="Black"></button>
+                            <button class="color-preset-dot" data-target="bg" data-color="#0B0E1B" style="background:#0B0E1B; border-color:rgba(255,255,255,0.4);" title="Dark Navy"></button>
+                            <button class="color-preset-dot" data-target="bg" data-color="#1E293B" style="background:#1E293B; border-color:rgba(255,255,255,0.4);" title="Slate"></button>
+                            <button class="color-preset-dot" data-target="bg" data-color="#2D7FFF" style="background:#2D7FFF;" title="Royal Blue"></button>
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
+
+                    <!-- Row 3: Font Size Slider & Outline Size Slider -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: center;">
+                      <!-- Font Size Slider -->
+                      <div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--color-text-muted); margin-bottom: 6px;">
                           <span>Font Size</span>
                           <div style="display: flex; align-items: center; gap: 6px;">
                             <span id="hardsub-fontsize-val" style="color: var(--color-royal-blue); font-weight: 600;">24px</span>
@@ -1757,93 +1815,49 @@
                         <input type="range" class="range-slider" id="hardsub-fontsize" min="12" max="64" value="24" style="width:100%;" />
                       </div>
 
+                      <!-- Outline Color & Size Slider -->
                       <div>
-                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--color-text-muted); margin-bottom: 4px;">
-                          <span>Vertical Offset (موقعیت عمودی)</span>
+                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--color-text-muted); margin-bottom: 6px;">
+                          <span>Outline Size</span>
+                          <div style="display: flex; align-items: center; gap: 6px;">
+                            <span id="hardsub-outline-val" style="color: var(--color-royal-blue); font-weight: 600;">2px</span>
+                            <button class="reset-link-btn" id="reset-outline" title="Reset outline size to 2px">↺ Reset</button>
+                          </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                          <div class="color-picker-wrapper" style="position: relative; width: 28px; height: 28px; border-radius: 50%; overflow: hidden; border: 2px solid rgba(255,255,255,0.3); cursor: pointer; flex-shrink: 0;" title="Outline Color">
+                            <div id="hardsub-swatch-outline" style="width:100%; height:100%; background: #000000;"></div>
+                            <input type="color" id="hardsub-color-outline" value="#000000" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: none; padding: 0; margin: 0;" />
+                          </div>
+                          <input type="range" class="range-slider" id="hardsub-outline-size" min="0" max="8" value="2" style="flex:1;" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Row 4: Alignment (Left) & Vertical Offset (Right) Side-by-Side -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: center; padding-top: 6px; border-top: 1px dashed rgba(255,255,255,0.08);">
+                      
+                      <!-- Alignment Segmented Control (Left side) -->
+                      <div>
+                        <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 6px;">Alignment</label>
+                        <div style="display: flex; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 3px; gap: 2px;">
+                          <button class="pill-btn align-btn" data-align="1" title="Bottom Left" style="flex:1; padding:6px 4px; font-size:0.75rem; white-space:nowrap; border:none; border-radius:6px;">↙ Left</button>
+                          <button class="pill-btn align-btn active" data-align="2" title="Bottom Center" style="flex:1; padding:6px 4px; font-size:0.75rem; white-space:nowrap; border:none; border-radius:6px;">↓ Center</button>
+                          <button class="pill-btn align-btn" data-align="3" title="Bottom Right" style="flex:1; padding:6px 4px; font-size:0.75rem; white-space:nowrap; border:none; border-radius:6px;">↘ Right</button>
+                          <button class="pill-btn align-btn" data-align="6" title="Top Center" style="flex:1; padding:6px 4px; font-size:0.75rem; white-space:nowrap; border:none; border-radius:6px;">↑ Top</button>
+                        </div>
+                      </div>
+
+                      <!-- Vertical Offset Slider (Right side) -->
+                      <div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--color-text-muted); margin-bottom: 6px;">
+                          <span>Vertical Offset</span>
                           <div style="display: flex; align-items: center; gap: 6px;">
                             <span id="hardsub-posy-val" style="color: var(--color-royal-blue); font-weight: 600;">30px</span>
                             <button class="reset-link-btn" id="reset-posy" title="Reset vertical position to 30px">↺ Reset</button>
                           </div>
                         </div>
                         <input type="range" class="range-slider" id="hardsub-posy" min="0" max="150" value="30" style="width:100%;" />
-                      </div>
-                    </div>
-
-                    <!-- Custom Color Swatches Section -->
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                      
-                      <!-- Text Color Swatch Card -->
-                      <div class="swatch-card" style="padding: 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                          <label style="font-size: 0.78rem; color: var(--color-text-muted);">Text Color</label>
-                          <span id="hardsub-hex-text" style="font-family: monospace; font-size: 0.75rem; color: var(--color-royal-blue);">#FFFFFF</span>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                          <div class="color-picker-wrapper" style="position: relative; width: 32px; height: 32px; border-radius: 50%; overflow: hidden; border: 2px solid rgba(255,255,255,0.3); cursor: pointer; flex-shrink: 0;">
-                            <div id="hardsub-swatch-text" style="width:100%; height:100%; background: #FFFFFF;"></div>
-                            <input type="color" id="hardsub-color-text" value="#FFFFFF" style="position: absolute; top: -10px; left: -10px; width: 60px; height: 60px; opacity: 0; cursor: pointer;" />
-                          </div>
-                          <!-- Quick Presets -->
-                          <div style="display: flex; gap: 4px; flex-wrap: wrap;">
-                            <button class="color-preset-dot" data-target="text" data-color="#FFFFFF" style="background:#FFFFFF; title='White'"></button>
-                            <button class="color-preset-dot" data-target="text" data-color="#FFD700" style="background:#FFD700; title='Yellow'"></button>
-                            <button class="color-preset-dot" data-target="text" data-color="#2D7FFF" style="background:#2D7FFF; title='Royal Blue'"></button>
-                            <button class="color-preset-dot" data-target="text" data-color="#FF3B30" style="background:#FF3B30; title='Red'"></button>
-                          </div>
-                        </div>
-                      </div>
-
-                      <!-- Outline Color Swatch Card -->
-                      <div class="swatch-card" style="padding: 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                          <div style="display: flex; align-items: center; gap: 6px;">
-                            <label style="font-size: 0.78rem; color: var(--color-text-muted);">Outline</label>
-                            <button class="reset-link-btn" id="reset-outline" title="Reset outline size to 2px">↺</button>
-                          </div>
-                          <span id="hardsub-hex-outline" style="font-family: monospace; font-size: 0.75rem; color: var(--color-royal-blue);">#000000 (2px)</span>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                          <div class="color-picker-wrapper" style="position: relative; width: 32px; height: 32px; border-radius: 50%; overflow: hidden; border: 2px solid rgba(255,255,255,0.3); cursor: pointer; flex-shrink: 0;">
-                            <div id="hardsub-swatch-outline" style="width:100%; height:100%; background: #000000;"></div>
-                            <input type="color" id="hardsub-color-outline" value="#000000" style="position: absolute; top: -10px; left: -10px; width: 60px; height: 60px; opacity: 0; cursor: pointer;" />
-                          </div>
-                          <input type="range" class="range-slider" id="hardsub-outline-size" min="0" max="8" value="2" style="flex:1;" />
-                        </div>
-                      </div>
-
-                    </div>
-
-                    <!-- Background Box & Alignment -->
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: center;">
-                      
-                      <!-- Background Box Card -->
-                      <div class="swatch-card" style="padding: 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                          <label class="checkbox-container" style="font-size: 0.8rem; margin:0;">
-                            <input type="checkbox" id="hardsub-bgbox-toggle" />
-                            <span class="custom-checkmark"></span>
-                            <span>Background Box</span>
-                          </label>
-                          <span id="hardsub-hex-bg" style="font-family: monospace; font-size: 0.75rem; color: var(--color-text-muted);">#000000</span>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                          <div class="color-picker-wrapper" style="position: relative; width: 28px; height: 28px; border-radius: 6px; overflow: hidden; border: 1px solid rgba(255,255,255,0.2); cursor: pointer; flex-shrink: 0;">
-                            <div id="hardsub-swatch-bg" style="width:100%; height:100%; background: #000000;"></div>
-                            <input type="color" id="hardsub-color-bg" value="#000000" style="position: absolute; top: -10px; left: -10px; width: 60px; height: 60px; opacity: 0; cursor: pointer;" />
-                          </div>
-                          <span style="font-size: 0.75rem; color: var(--color-text-muted);">50% Box Opacity</span>
-                        </div>
-                      </div>
-
-                      <!-- Alignment Card -->
-                      <div>
-                        <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Alignment (موقعیت متن)</label>
-                        <div style="display: flex; gap: 4px;">
-                          <button class="pill-btn align-btn" data-align="1" title="Bottom Left" style="flex:1;">Bottom-Left</button>
-                          <button class="pill-btn align-btn active" data-align="2" title="Bottom Center" style="flex:1;">Center</button>
-                          <button class="pill-btn align-btn" data-align="3" title="Bottom Right" style="flex:1;">Bottom-Right</button>
-                          <button class="pill-btn align-btn" data-align="6" title="Top Center" style="flex:1;">Top</button>
-                        </div>
                       </div>
 
                     </div>

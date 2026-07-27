@@ -84,6 +84,7 @@ export class HardsubController {
   // Preview elements
   private previewBox: HTMLElement | null = null;
   private previewText: HTMLElement | null = null;
+  private previewInput: HTMLInputElement | null = null;
 
   // Telemetry HUD elements
   private progressFill: HTMLElement | null = null;
@@ -161,6 +162,7 @@ export class HardsubController {
 
     this.previewBox = document.getElementById('hardsub-preview-box');
     this.previewText = document.getElementById('hardsub-preview-text');
+    this.previewInput = document.getElementById('hardsub-preview-input') as HTMLInputElement;
     this.progressFill = document.getElementById('hardsub-progress-fill');
     this.progressStatusText = document.getElementById('hardsub-status-text');
     this.progressPctText = document.getElementById('hardsub-pct-text');
@@ -233,7 +235,7 @@ export class HardsubController {
 
     // Browse Subtitle File
     document.getElementById('btn-browse-sub')?.addEventListener('click', async () => {
-      const selected = await invoke<string | null>('select_file');
+      const selected = await invoke<string | null>('select_subtitle_file');
       if (selected && this.subtitlePathInput) {
         this.subtitlePathInput.value = selected;
         this.state.subtitlePath = selected;
@@ -243,6 +245,11 @@ export class HardsubController {
     // Font Select
     this.fontSelect?.addEventListener('change', () => {
       this.state.fontName = this.fontSelect!.value;
+      this.updateLivePreview();
+    });
+
+    // Custom Live Preview Text Input
+    this.previewInput?.addEventListener('input', () => {
       this.updateLivePreview();
     });
 
@@ -318,8 +325,14 @@ export class HardsubController {
       dot.addEventListener('click', (e) => {
         const btn = e.currentTarget as HTMLButtonElement;
         const color = btn.dataset.color || '#FFFFFF';
-        this.state.primaryColor = color;
-        if (this.primaryColorPicker) this.primaryColorPicker.value = color;
+        const target = btn.dataset.target || 'text';
+        if (target === 'bg') {
+          this.state.bgBoxColor = color;
+          if (this.bgBoxColorPicker) this.bgBoxColorPicker.value = color;
+        } else {
+          this.state.primaryColor = color;
+          if (this.primaryColorPicker) this.primaryColorPicker.value = color;
+        }
         this.updateColorSwatches();
         this.updateLivePreview();
       });
@@ -423,6 +436,10 @@ export class HardsubController {
   private updateLivePreview() {
     if (!this.previewText) return;
 
+    if (this.previewInput && this.previewInput.value) {
+      this.previewText.textContent = this.previewInput.value;
+    }
+
     this.previewText.style.fontFamily = `'${this.state.fontName}', sans-serif`;
     this.previewText.style.fontSize = `${this.state.fontSize}px`;
     this.previewText.style.color = this.state.primaryColor;
@@ -430,21 +447,15 @@ export class HardsubController {
     this.previewText.style.fontStyle = this.state.italic ? 'italic' : 'normal';
     this.previewText.style.marginBottom = `${this.state.positionY}px`;
 
-    // Outline / Stroke
+    // Outline / Stroke using crisp hardware-accelerated WebKit text stroke & paint-order
     if (this.state.outlineSize > 0) {
       const s = this.state.outlineSize;
       const c = this.state.outlineColor;
-      this.previewText.style.textShadow = `
-        -${s}px -${s}px 0 ${c},
-         ${s}px -${s}px 0 ${c},
-        -${s}px  ${s}px 0 ${c},
-         ${s}px  ${s}px 0 ${c},
-         0px -${s}px 0 ${c},
-         0px  ${s}px 0 ${c},
-        -${s}px  0px 0 ${c},
-         ${s}px  0px 0 ${c}
-      `;
+      (this.previewText.style as any).webkitTextStroke = `${s}px ${c}`;
+      (this.previewText.style as any).paintOrder = 'stroke fill';
+      this.previewText.style.textShadow = '0 2px 10px rgba(0,0,0,0.6)';
     } else {
+      (this.previewText.style as any).webkitTextStroke = '0px transparent';
       this.previewText.style.textShadow = 'none';
     }
 
