@@ -5,6 +5,7 @@ mod builder;
 mod transcribe;
 mod downloader;
 mod translation;
+mod hardsub;
 
 use std::sync::{Arc, Mutex};
 use std::path::Path;
@@ -24,6 +25,7 @@ use translation::{
     get_keyring_credential,
     delete_keyring_credential,
 };
+use hardsub::{get_system_fonts, check_hardware_encoders, start_hardsub_task};
 
 // Tauri Managed States
 struct HardwareState(Arc<Mutex<HardwareMonitor>>);
@@ -481,7 +483,10 @@ fn main() {
             preview_translate_first_lines,
             store_keyring_credential,
             get_keyring_credential,
-            delete_keyring_credential
+            delete_keyring_credential,
+            get_system_fonts,
+            check_hardware_encoders,
+            start_hardsub_task
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

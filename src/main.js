@@ -1,3 +1,5 @@
+import { hardsubController } from './hardsub.ts';
+
 // Global error catcher for visual debugging in frontend
 window.onerror = function(message, source, lineno, colno, error) {
   const errDiv = document.createElement('div');
@@ -818,6 +820,7 @@ window.switchView = function(viewName) {
     'settings': 'Configuration Grid',
     'models': 'Model Hub',
     'transcribe': 'Transcribe File',
+    'hardsub': 'Hardsub Video Studio',
     'logs': 'Central Logging Center'
   };
   document.getElementById('current-view-title').textContent = titleMap[viewName] || 'Whisper Manager';
