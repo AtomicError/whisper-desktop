@@ -102,18 +102,27 @@ impl HardwareMonitor {
 
     fn get_intel_gpu_stats(&mut self) -> String {
         for card in ["card0", "card1", "card2"] {
-            let residency_path_1 = format!("/sys/class/drm/{}/device/gt/gt0/rc6_residency_ms", card);
-            let residency_path_2 = format!("/sys/class/drm/{}/gt/gt0/rc6_residency_ms", card);
+            // Intel Xe KMD & Intel i915 sysfs residency paths
+            let residency_paths = [
+                format!("/sys/class/drm/{}/device/tile0/gt0/gtidle/idle_residency_ms", card),
+                format!("/sys/class/drm/{}/device/gt/gt0/rc6_residency_ms", card),
+                format!("/sys/class/drm/{}/gt/gt0/rc6_residency_ms", card),
+            ];
+
+            let active_residency_path = residency_paths.iter().find(|p| Path::new(p).exists());
             
-            let has_residency = Path::new(&residency_path_1).exists() || Path::new(&residency_path_2).exists();
-            if has_residency {
-                let current_residency = if Path::new(&residency_path_2).exists() {
-                    get_file_as_u64(&residency_path_2)
-                } else {
-                    get_file_as_u64(&residency_path_1)
-                };
-                
+            if let Some(res_path) = active_residency_path {
+                let current_residency = get_file_as_u64(res_path);
                 let now = std::time::Instant::now();
+
+                // Freq paths for Xe KMD and i915
+                let cur_freq_paths = [
+                    format!("/sys/class/drm/{}/device/tile0/gt0/freq0/cur_freq", card),
+                    format!("/sys/class/drm/{}/device/tile0/gt0/freq0/act_freq", card),
+                    format!("/sys/class/drm/{}/gt/gt0/rps_act_freq_mhz", card),
+                    format!("/sys/class/drm/{}/gt_cur_freq_mhz", card),
+                ];
+                let cur_freq = cur_freq_paths.iter().map(get_file_as_int).find(|&f| f > 0).unwrap_or(0);
                 
                 if let (Some(last_time), Some(last_res)) = (self.last_intel_time, self.last_intel_residency) {
                     let elapsed_ms = now.duration_since(last_time).as_millis() as f64;
@@ -127,13 +136,6 @@ impl HardwareMonitor {
                         let usage_pct = (100.0 - (idle_ratio * 100.0)).round() as i32;
                         let usage_pct = usage_pct.clamp(0, 100);
                         
-                        let cur_path_1 = format!("/sys/class/drm/{}/gt_cur_freq_mhz", card);
-                        let cur_path_2 = format!("/sys/class/drm/{}/gt/gt0/rps_act_freq_mhz", card);
-                        let mut cur_freq = get_file_as_int(&cur_path_2);
-                        if cur_freq == 0 {
-                            cur_freq = get_file_as_int(&cur_path_1);
-                        }
-                        
                         if cur_freq > 0 {
                             return format!("Intel: {}% ({}MHz)", usage_pct, cur_freq);
                         } else {
@@ -144,12 +146,6 @@ impl HardwareMonitor {
                     self.last_intel_time = Some(now);
                     self.last_intel_residency = Some(current_residency);
                     
-                    let cur_path_1 = format!("/sys/class/drm/{}/gt_cur_freq_mhz", card);
-                    let cur_path_2 = format!("/sys/class/drm/{}/gt/gt0/rps_act_freq_mhz", card);
-                    let mut cur_freq = get_file_as_int(&cur_path_2);
-                    if cur_freq == 0 {
-                        cur_freq = get_file_as_int(&cur_path_1);
-                    }
                     if cur_freq > 0 {
                         return format!("Intel: 0% ({}MHz)", cur_freq);
                     }
@@ -160,22 +156,22 @@ impl HardwareMonitor {
         
         // Fallback: frequency ratio if residency is not exposed
         for card in ["card0", "card1", "card2"] {
-            let cur_path_1 = format!("/sys/class/drm/{}/gt_cur_freq_mhz", card);
-            let cur_path_2 = format!("/sys/class/drm/{}/gt/gt0/rps_act_freq_mhz", card);
+            let cur_freq_paths = [
+                format!("/sys/class/drm/{}/device/tile0/gt0/freq0/cur_freq", card),
+                format!("/sys/class/drm/{}/device/tile0/gt0/freq0/act_freq", card),
+                format!("/sys/class/drm/{}/gt/gt0/rps_act_freq_mhz", card),
+                format!("/sys/class/drm/{}/gt_cur_freq_mhz", card),
+            ];
             
-            let mut cur_freq = get_file_as_int(&cur_path_2);
-            if cur_freq == 0 {
-                cur_freq = get_file_as_int(&cur_path_1);
-            }
+            let cur_freq = cur_freq_paths.iter().map(get_file_as_int).find(|&f| f > 0).unwrap_or(0);
             
             if cur_freq > 0 {
-                let max_path_1 = format!("/sys/class/drm/{}/gt_max_freq_mhz", card);
-                let max_path_2 = format!("/sys/class/drm/{}/gt/gt0/rps_max_freq_mhz", card);
-                
-                let mut max_freq = get_file_as_int(&max_path_2);
-                if max_freq == 0 {
-                    max_freq = get_file_as_int(&max_path_1);
-                }
+                let max_freq_paths = [
+                    format!("/sys/class/drm/{}/device/tile0/gt0/freq0/max_freq", card),
+                    format!("/sys/class/drm/{}/gt/gt0/rps_max_freq_mhz", card),
+                    format!("/sys/class/drm/{}/gt_max_freq_mhz", card),
+                ];
+                let max_freq = max_freq_paths.iter().map(get_file_as_int).find(|&f| f > 0).unwrap_or(0);
                 
                 if max_freq > 0 {
                     let pct = (cur_freq as f64 / max_freq as f64 * 100.0).round() as i32;
@@ -202,11 +198,13 @@ fn detect_gpu_type() -> String {
         }
     }
     
-    // 3. Check for Intel gpu sysfs path in cards 0-2
+    // 3. Check for Intel gpu sysfs path in cards 0-2 (both i915 and Xe KMD)
     for card in ["card0", "card1", "card2"] {
         let path1 = format!("/sys/class/drm/{}/gt_cur_freq_mhz", card);
         let path2 = format!("/sys/class/drm/{}/gt/gt0/rps_act_freq_mhz", card);
-        if Path::new(&path1).exists() || Path::new(&path2).exists() {
+        let path3 = format!("/sys/class/drm/{}/device/tile0/gt0/freq0/cur_freq", card);
+        let path4 = format!("/sys/class/drm/{}/device/tile0/gt0/gtidle/idle_residency_ms", card);
+        if Path::new(&path1).exists() || Path::new(&path2).exists() || Path::new(&path3).exists() || Path::new(&path4).exists() {
             return "intel".to_string();
         }
     }

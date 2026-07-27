@@ -208,6 +208,7 @@ pub async fn run_hardsub_task(
     }
 
     // Construct Subtitle Style (force_style parameters)
+    let safe_font_name = settings.font_name.replace(',', "").replace('\'', "").replace('"', "");
     let ass_primary_color = hex_to_ass_color(&settings.primary_color, 0); // 00 = fully opaque
     let ass_outline_color = hex_to_ass_color(&settings.outline_color, 0);
     let border_style = if settings.bg_box { 3 } else { 1 };
@@ -215,7 +216,7 @@ pub async fn run_hardsub_task(
 
     let mut force_style = format!(
         "FontName={},FontSize={},PrimaryColour={},OutlineColour={},Outline={},BorderStyle={},MarginV={},Alignment={},Bold={},Italic={}",
-        settings.font_name,
+        safe_font_name,
         settings.font_size,
         ass_primary_color,
         ass_outline_color,
@@ -231,11 +232,14 @@ pub async fn run_hardsub_task(
         force_style.push_str(&format!(",BackColour={}", ass_bg_color));
     }
 
-    // Resolve subtitle path escaping
+    // Resolve subtitle path escaping for FFmpeg filtergraph
     let escaped_sub_path = settings.subtitle_path
         .replace('\\', "/")
         .replace(':', "\\:")
-        .replace('\'', "'\\''");
+        .replace('\'', "'\\''")
+        .replace('[', "\\[")
+        .replace(']', "\\]")
+        .replace(',', "\\,");
 
     let sub_filter = format!("subtitles='{}':force_style='{}'", escaped_sub_path, force_style);
 
@@ -247,10 +251,16 @@ pub async fn run_hardsub_task(
         "qsv" => {
             ffmpeg_args.push("-hwaccel".to_string());
             ffmpeg_args.push("qsv".to_string());
-            ffmpeg_args.push("-hwaccel_output_format".to_string());
-            ffmpeg_args.push("qsv".to_string());
+        }
+        "nvenc" => {
+            ffmpeg_args.push("-hwaccel".to_string());
+            ffmpeg_args.push("cuda".to_string());
         }
         "vaapi" => {
+            if Path::new("/dev/dri/renderD128").exists() {
+                ffmpeg_args.push("-vaapi_device".to_string());
+                ffmpeg_args.push("/dev/dri/renderD128".to_string());
+            }
             ffmpeg_args.push("-hwaccel".to_string());
             ffmpeg_args.push("vaapi".to_string());
         }
@@ -375,8 +385,8 @@ pub async fn run_hardsub_task(
     let stderr = child.stderr.take().ok_or("Failed to capture ffmpeg stderr")?;
     let mut stderr_reader = BufReader::new(stderr).lines();
 
-    // Regex for parsing time=HH:MM:SS.ss progress
-    let time_regex = regex::Regex::new(r"time=(\d+):(\d+):(\d+\.\d+)").unwrap();
+    // Regex for parsing time=HH:MM:SS.ss progress (compiled once outside loop)
+    let time_regex = regex::Regex::new(r"time=(\d+):(\d+):(\d+(?:\.\d+)?)").unwrap();
 
     while let Ok(Some(line)) = stderr_reader.next_line().await {
         logs.log(&app, "FFmpeg", &line);

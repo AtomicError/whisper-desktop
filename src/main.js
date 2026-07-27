@@ -465,6 +465,10 @@ class CustomSelect {
 
     this.optionsContainer = document.createElement('div');
     this.optionsContainer.className = 'custom-select-options';
+    if (this.select.id) {
+      this.optionsContainer.classList.add(`options-for-${this.select.id}`);
+      this.optionsContainer.dataset.selectId = this.select.id;
+    }
     document.body.appendChild(this.optionsContainer);
 
     this.select.parentNode.insertBefore(this.container, this.select.nextSibling);
@@ -721,6 +725,18 @@ async function initApp() {
   
   // Setup custom CSD titlebar controls
   setupTitlebar();
+
+  // Setup capturing scroll activity listener for target scrollbar containers (Font & AI Models)
+  document.addEventListener('scroll', (e) => {
+    const target = e.target;
+    if (target && target.matches && target.matches('#models-list-scroll, .providers-table-wrapper, #provider-tab-models, #provider-tab-providers, .provider-grid, #hardsub-font, #opt-translateAiModel')) {
+      target.classList.add('scrolling-active');
+      clearTimeout(target._scrollTimer);
+      target._scrollTimer = setTimeout(() => {
+        target.classList.remove('scrolling-active');
+      }, 1500);
+    }
+  }, true);
   
   // Initialize Custom Select components
   initializeCustomSelects();

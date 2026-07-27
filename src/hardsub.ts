@@ -14,8 +14,8 @@ const listen = async <T>(event: string, handler: (e: { payload: T }) => void) =>
 };
 
 export interface FontItem {
-  name: String;
-  source: String;
+  name: string;
+  source: string;
 }
 
 export interface HardwareStatus {
@@ -118,14 +118,20 @@ export class HardsubController {
   private isEncoding: boolean = false;
 
   constructor() {
-    document.addEventListener('DOMContentLoaded', () => {
+    const init = () => {
       this.initDOMElements();
       this.loadFontsAndHardware();
       this.setupEventListeners();
       this.listenToProgressEvents();
       this.updateLivePreview();
       this.updateEncodingUIState(false);
-    });
+    };
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
   }
 
   private initDOMElements() {
@@ -242,7 +248,15 @@ export class HardsubController {
       }
     });
 
-    // Font Select
+    // Font Select & Scroll Activity
+    let fontScrollTimer: any = null;
+    this.fontSelect?.addEventListener('scroll', () => {
+      this.fontSelect?.classList.add('scrolling-active');
+      clearTimeout(fontScrollTimer);
+      fontScrollTimer = setTimeout(() => {
+        this.fontSelect?.classList.remove('scrolling-active');
+      }, 1500);
+    });
     this.fontSelect?.addEventListener('change', () => {
       this.state.fontName = this.fontSelect!.value;
       this.updateLivePreview();
@@ -441,7 +455,12 @@ export class HardsubController {
     }
 
     this.previewText.style.fontFamily = `'${this.state.fontName}', sans-serif`;
-    this.previewText.style.fontSize = `${this.state.fontSize}px`;
+    
+    // Scale font size proportionally to preview container height vs ASS baseline (288)
+    const previewHeight = this.previewBox?.clientHeight || 200;
+    const scaledFontSize = Math.max(10, (this.state.fontSize * previewHeight) / 288);
+    this.previewText.style.fontSize = `${scaledFontSize}px`;
+
     this.previewText.style.color = this.state.primaryColor;
     this.previewText.style.fontWeight = this.state.bold ? 'bold' : 'normal';
     this.previewText.style.fontStyle = this.state.italic ? 'italic' : 'normal';
@@ -453,6 +472,7 @@ export class HardsubController {
       const c = this.state.outlineColor;
       (this.previewText.style as any).webkitTextStroke = `${s}px ${c}`;
       (this.previewText.style as any).paintOrder = 'stroke fill';
+      (this.previewText.style as any).strokeLinejoin = 'round';
       this.previewText.style.textShadow = '0 2px 10px rgba(0,0,0,0.6)';
     } else {
       (this.previewText.style as any).webkitTextStroke = '0px transparent';

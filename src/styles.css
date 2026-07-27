@@ -49,83 +49,122 @@ html {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(45, 127, 255, 0.3) transparent;
 }
 
-*:hover {
-  scrollbar-color: rgba(45, 127, 255, 0.55) transparent;
-}
-
-/* Custom Scrollbars */
+/* ==========================================================================
+   GLOBAL INVISIBLE SCROLLBAR DEFAULTS (EVERYWHERE IN THE APP)
+   ========================================================================== */
 ::-webkit-scrollbar {
-  width: 6px !important;
-  height: 6px !important;
+  width: 5px !important;
+  height: 5px !important;
   background: transparent !important;
+  background-color: transparent !important;
   border: none !important;
 }
-::-webkit-scrollbar-track {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  outline: none !important;
-}
-::-webkit-scrollbar-track-piece {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  outline: none !important;
-}
-::-webkit-scrollbar-thumb {
-  background: rgba(45, 127, 255, 0.22) !important;
-  border-radius: 4px !important;
-  border: none !important;
-  box-shadow: none !important;
-  outline: none !important;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(45, 127, 255, 0.45) !important;
-}
-::-webkit-scrollbar-thumb:active {
-  background: rgba(45, 127, 255, 0.65) !important;
-}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-track-piece,
+::-webkit-scrollbar-corner,
 ::-webkit-scrollbar-button {
-  display: none !important;
-  width: 0 !important;
-  height: 0 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
-::-webkit-scrollbar-corner {
+
+/* Global Default: Thumb is 100% transparent everywhere */
+::-webkit-scrollbar-thumb {
   background: transparent !important;
   border: none !important;
   outline: none !important;
+  box-shadow: none !important;
 }
 
-/* Discrete Scrollbars on Hover */
-.settings-scroll-container::-webkit-scrollbar-thumb,
-.log-viewport::-webkit-scrollbar-thumb,
-.transcript-viewport::-webkit-scrollbar-thumb,
-.transcribe-left-panel::-webkit-scrollbar-thumb,
-#models-list-scroll::-webkit-scrollbar-thumb,
-.settings-categories::-webkit-scrollbar-thumb {
+/* ==========================================================================
+   EXCLUSIVE BLUE FLOATING THUMB (ONLY FONT SELECT & AI TRANSLATION MODELS)
+   ========================================================================== */
+.options-for-hardsub-font::-webkit-scrollbar,
+.options-for-opt-translateAiModel::-webkit-scrollbar,
+#models-list-scroll::-webkit-scrollbar,
+.providers-table-wrapper::-webkit-scrollbar,
+#provider-tab-models::-webkit-scrollbar,
+.custom-select-options::-webkit-scrollbar {
+  width: 8px !important;
+  height: 8px !important;
   background: transparent !important;
+  background-color: transparent !important;
 }
 
-.settings-scroll-container:hover::-webkit-scrollbar-thumb,
-.log-viewport:hover::-webkit-scrollbar-thumb,
-.transcript-viewport:hover::-webkit-scrollbar-thumb,
-.transcribe-left-panel:hover::-webkit-scrollbar-thumb,
+.options-for-hardsub-font::-webkit-scrollbar-track,
+.options-for-opt-translateAiModel::-webkit-scrollbar-track,
+#models-list-scroll::-webkit-scrollbar-track,
+.providers-table-wrapper::-webkit-scrollbar-track,
+#provider-tab-models::-webkit-scrollbar-track,
+.custom-select-options::-webkit-scrollbar-track {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.options-for-hardsub-font::-webkit-scrollbar-thumb,
+.options-for-opt-translateAiModel::-webkit-scrollbar-thumb,
+#custom-select-hardsub-font .custom-select-options::-webkit-scrollbar-thumb,
+#custom-select-opt-translateAiModel .custom-select-options::-webkit-scrollbar-thumb,
+#hardsub-font::-webkit-scrollbar-thumb,
+#opt-translateAiModel::-webkit-scrollbar-thumb,
+#models-list-scroll::-webkit-scrollbar-thumb,
+.providers-table-wrapper::-webkit-scrollbar-thumb,
+#provider-tab-models::-webkit-scrollbar-thumb,
+#provider-tab-providers::-webkit-scrollbar-thumb,
+.provider-grid::-webkit-scrollbar-thumb,
+.custom-select-options::-webkit-scrollbar-thumb {
+  background: #2d7fff !important;
+  border-radius: 9999px !important;
+  border: 2px solid transparent !important;
+  background-clip: padding-box !important;
+  opacity: 0.4 !important;
+  transition: opacity 0.3s ease, background 0.3s ease;
+}
+
+.options-for-hardsub-font:hover::-webkit-scrollbar-thumb,
+.options-for-opt-translateAiModel:hover::-webkit-scrollbar-thumb,
+#custom-select-hardsub-font .custom-select-options:hover::-webkit-scrollbar-thumb,
+#custom-select-opt-translateAiModel .custom-select-options:hover::-webkit-scrollbar-thumb,
+#hardsub-font:hover::-webkit-scrollbar-thumb,
+#opt-translateAiModel:hover::-webkit-scrollbar-thumb,
 #models-list-scroll:hover::-webkit-scrollbar-thumb,
-.settings-categories:hover::-webkit-scrollbar-thumb {
-  background: rgba(45, 127, 255, 0.22) !important;
+.providers-table-wrapper:hover::-webkit-scrollbar-thumb,
+#provider-tab-models:hover::-webkit-scrollbar-thumb,
+#provider-tab-providers:hover::-webkit-scrollbar-thumb,
+.provider-grid:hover::-webkit-scrollbar-thumb,
+.custom-select-options:hover::-webkit-scrollbar-thumb,
+.scrolling-active::-webkit-scrollbar-thumb {
+  background: #3b82f6 !important;
+  border: 1px solid transparent !important;
+  background-clip: padding-box !important;
+  opacity: 0.85 !important;
 }
 
-.settings-scroll-container::-webkit-scrollbar-thumb:hover,
-.log-viewport::-webkit-scrollbar-thumb:hover,
-.transcript-viewport::-webkit-scrollbar-thumb:hover,
-.transcribe-left-panel::-webkit-scrollbar-thumb:hover,
+.options-for-hardsub-font::-webkit-scrollbar-thumb:hover,
+.options-for-opt-translateAiModel::-webkit-scrollbar-thumb:hover,
+#custom-select-hardsub-font .custom-select-options::-webkit-scrollbar-thumb:hover,
+#custom-select-opt-translateAiModel .custom-select-options::-webkit-scrollbar-thumb:hover,
+#hardsub-font::-webkit-scrollbar-thumb:hover,
+#opt-translateAiModel::-webkit-scrollbar-thumb:hover,
 #models-list-scroll::-webkit-scrollbar-thumb:hover,
-.settings-categories::-webkit-scrollbar-thumb:hover {
-  background: rgba(45, 127, 255, 0.55) !important;
+.providers-table-wrapper::-webkit-scrollbar-thumb:hover,
+#provider-tab-models::-webkit-scrollbar-thumb:hover,
+#provider-tab-providers::-webkit-scrollbar-thumb:hover,
+.provider-grid::-webkit-scrollbar-thumb:hover,
+.custom-select-options::-webkit-scrollbar-thumb:hover {
+  background: #60a5fa !important;
+  border: 0px solid transparent !important;
+  background-clip: padding-box !important;
+  opacity: 1 !important;
+  box-shadow: 0 0 8px rgba(96, 165, 250, 0.6) !important;
 }
 
 html, body {
