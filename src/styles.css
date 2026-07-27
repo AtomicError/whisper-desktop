@@ -3883,6 +3883,20 @@ select.select-control {
 /* ==========================================================================
    11. Hardsub Video Panel Custom Styles
    ========================================================================== */
+.hardsub-grid-container {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .hardsub-grid-container {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+}
+
 .pill-btn {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -3954,17 +3968,46 @@ select.select-control {
   background: transparent;
   border: none;
   color: var(--color-text-muted);
-  font-size: 0.72rem;
+  font-size: 0.82rem;
   cursor: pointer;
-  padding: 0 4px;
-  opacity: 0.7;
+  padding: 2px 4px;
+  border-radius: 4px;
+  opacity: 0.75;
   transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .reset-link-btn:hover {
   opacity: 1;
-  color: var(--color-royal-blue);
-  text-decoration: underline;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.15);
+}
+
+.color-picker-wrapper {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 0.2s ease, transform 0.15s ease, border-color 0.2s ease;
+}
+
+.color-picker-wrapper:hover {
+  border-color: rgba(255, 255, 255, 0.7);
+  transform: scale(1.06);
+}
+
+.control-disabled {
+  opacity: 0.35 !important;
+  pointer-events: none !important;
+  user-select: none !important;
+  filter: grayscale(0.7);
+  transition: opacity 0.2s ease, filter 0.2s ease;
 }
 
 .color-preset-dot {
@@ -3989,6 +4032,7 @@ select.select-control {
 .swatch-card:hover {
   border-color: rgba(255, 255, 255, 0.2) !important;
 }
+
 
 
 

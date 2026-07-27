@@ -472,10 +472,14 @@ export class HardsubController {
       const c = this.state.outlineColor;
       (this.previewText.style as any).webkitTextStroke = `${s}px ${c}`;
       (this.previewText.style as any).paintOrder = 'stroke fill';
+      (this.previewText.style as any).webkitPaintOrder = 'stroke fill';
       (this.previewText.style as any).strokeLinejoin = 'round';
-      this.previewText.style.textShadow = '0 2px 10px rgba(0,0,0,0.6)';
+      (this.previewText.style as any).webkitStrokeLinejoin = 'round';
+      this.previewText.style.textShadow = `0 1px 3px ${c}`;
     } else {
       (this.previewText.style as any).webkitTextStroke = '0px transparent';
+      (this.previewText.style as any).paintOrder = 'normal';
+      (this.previewText.style as any).webkitPaintOrder = 'normal';
       this.previewText.style.textShadow = 'none';
     }
 
@@ -512,18 +516,56 @@ export class HardsubController {
     }
 
     this.updateColorSwatches();
+    this.updateUIControlsState();
+  }
+
+  private updateUIControlsState() {
+    // 1. Reset buttons visibility (only show when modified from default)
+    const resetFont = document.getElementById('reset-fontsize');
+    if (resetFont) resetFont.style.display = this.state.fontSize !== 24 ? 'inline-flex' : 'none';
+
+    const resetOutline = document.getElementById('reset-outline');
+    if (resetOutline) resetOutline.style.display = this.state.outlineSize !== 2 ? 'inline-flex' : 'none';
+
+    const resetPosy = document.getElementById('reset-posy');
+    if (resetPosy) resetPosy.style.display = this.state.positionY !== 30 ? 'inline-flex' : 'none';
+
+    // 2. Background Box Controls disabled state
+    const bgControls = document.getElementById('hardsub-bg-controls');
+    if (bgControls) {
+      bgControls.classList.toggle('control-disabled', !this.state.bgBox);
+    }
+
+    // 3. Outline Color Picker disabled state when outline size is 0
+    const outlinePicker = document.getElementById('hardsub-outline-picker-wrapper');
+    if (outlinePicker) {
+      outlinePicker.classList.toggle('control-disabled', this.state.outlineSize === 0);
+    }
   }
 
   private updateEncodingUIState(active: boolean) {
     this.isEncoding = active;
+
+    const startBtn = document.getElementById('btn-start-hardsub') as HTMLButtonElement;
+    if (startBtn) {
+      startBtn.disabled = active;
+      startBtn.textContent = active ? 'Embedding Subtitles...' : 'Embed Subtitles into Video';
+      startBtn.style.opacity = active ? '0.7' : '1';
+      startBtn.style.cursor = active ? 'not-allowed' : 'pointer';
+    }
 
     if (this.cancelBtn) {
       this.cancelBtn.style.display = active ? 'inline-flex' : 'none';
     }
 
     if (this.hudPulseDot) {
-      this.hudPulseDot.style.background = active ? 'var(--color-royal-blue)' : '#9ca3af';
-      this.hudPulseDot.classList.toggle('pulse-active', active);
+      if (active) {
+        this.hudPulseDot.classList.add('active');
+        this.hudPulseDot.style.backgroundColor = '';
+      } else {
+        this.hudPulseDot.classList.remove('active');
+        this.hudPulseDot.style.backgroundColor = 'var(--color-text-dim)';
+      }
     }
   }
 
@@ -566,7 +608,7 @@ export class HardsubController {
     try {
       this.updateEncodingUIState(true);
       if (this.progressStatusText) {
-        this.progressStatusText.textContent = 'Initializing FFmpeg encoder...';
+        this.progressStatusText.textContent = 'Initializing FFmpeg Encoder...';
       }
       
       await invoke('start_hardsub_task', {
@@ -574,9 +616,17 @@ export class HardsubController {
       });
 
     } catch (e: any) {
-      alert(`Hardsub failed: ${e}`);
-      if (this.progressStatusText) {
-        this.progressStatusText.textContent = `Error: ${e}`;
+      const msg = String(e || '');
+      if (msg.includes('cancelled') || msg.includes('Cancelled')) {
+        console.log('Hardsub task cancelled by user');
+        if (this.progressStatusText) {
+          this.progressStatusText.textContent = 'Encoding cancelled.';
+        }
+      } else {
+        alert(`Hardsub failed: ${e}`);
+        if (this.progressStatusText) {
+          this.progressStatusText.textContent = `Error: ${e}`;
+        }
       }
     } finally {
       this.updateEncodingUIState(false);

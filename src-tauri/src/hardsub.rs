@@ -158,20 +158,51 @@ pub async fn start_hardsub_task(
     run_hardsub_task(app, logs, session, settings).await
 }
 
+/// Resolves a unique output path by appending (1), (2), etc. if the file already exists on disk
+fn resolve_unique_output_path(target_path: &str) -> String {
+    let path = Path::new(target_path);
+    if !path.exists() {
+        return target_path.to_string();
+    }
+
+    let parent = path.parent().unwrap_or_else(|| Path::new(""));
+    let stem = path.file_stem().unwrap_or_default().to_string_lossy();
+    let ext = path.extension().unwrap_or_default().to_string_lossy();
+
+    let mut count = 1;
+    loop {
+        let new_filename = if ext.is_empty() {
+            format!("{} ({})", stem, count)
+        } else {
+            format!("{} ({}).{}", stem, count, ext)
+        };
+        let candidate = parent.join(new_filename);
+        if !candidate.exists() {
+            return candidate.to_string_lossy().to_string();
+        }
+        count += 1;
+    }
+}
+
 pub async fn run_hardsub_task(
     app: AppHandle,
     logs: Arc<AppLogs>,
     session: Arc<std::sync::Mutex<crate::TranscriptionSession>>,
-    settings: HardsubSettings,
+    mut settings: HardsubSettings,
 ) -> Result<HardsubResult, String> {
     let start_time = Instant::now();
+
+    // Auto-increment output filename if file already exists on disk
+    let final_output_path = resolve_unique_output_path(&settings.output_path);
+    settings.output_path = final_output_path.clone();
+
     let video_name = Path::new(&settings.video_path)
         .file_name()
         .unwrap_or_default()
         .to_string_lossy()
         .to_string();
 
-    logs.log(&app, "Hardsub", &format!("Starting hardsub task for: {}", video_name));
+    logs.log(&app, "Hardsub", &format!("Starting hardsub task for: {} (Output: {})", video_name, settings.output_path));
 
     // Register pid and set phase
     {
@@ -187,7 +218,7 @@ pub async fn run_hardsub_task(
 
     let _ = app.emit("hardsub-status", TranscribeProgress {
         progress: 0.0,
-        message: "Initializing FFmpeg encoder...".to_string(),
+        message: "Initializing FFmpeg Encoder...".to_string(),
         active: true,
     });
 
@@ -215,7 +246,7 @@ pub async fn run_hardsub_task(
     let ass_bg_color = hex_to_ass_color(&settings.bg_box_color, 128); // 80 = 50% opacity
 
     let mut force_style = format!(
-        "FontName={},FontSize={},PrimaryColour={},OutlineColour={},Outline={},BorderStyle={},MarginV={},Alignment={},Bold={},Italic={}",
+        "FontName={},FontSize={},PrimaryColour={},OutlineColour={},Outline={},BorderStyle={},Shadow=0,MarginV={},Alignment={},Bold={},Italic={}",
         safe_font_name,
         settings.font_size,
         ass_primary_color,
@@ -385,44 +416,65 @@ pub async fn run_hardsub_task(
     let stderr = child.stderr.take().ok_or("Failed to capture ffmpeg stderr")?;
     let mut stderr_reader = BufReader::new(stderr).lines();
 
-    // Regex for parsing time=HH:MM:SS.ss progress (compiled once outside loop)
+    // Regex for parsing time=HH:MM:SS.ss progress
     let time_regex = regex::Regex::new(r"time=(\d+):(\d+):(\d+(?:\.\d+)?)").unwrap();
 
     while let Ok(Some(line)) = stderr_reader.next_line().await {
         logs.log(&app, "FFmpeg", &line);
 
-        // Parse progress time
-        if total_duration_sec > 0.0 {
-            if let Some(caps) = time_regex.captures(&line) {
-                let hours: f64 = caps[1].parse().unwrap_or(0.0);
-                let mins: f64 = caps[2].parse().unwrap_or(0.0);
-                let secs: f64 = caps[3].parse().unwrap_or(0.0);
-                let current_sec = hours * 3600.0 + mins * 60.0 + secs;
+        if let Some(caps) = time_regex.captures(&line) {
+            let hours: f64 = caps[1].parse().unwrap_or(0.0);
+            let mins: f64 = caps[2].parse().unwrap_or(0.0);
+            let secs: f64 = caps[3].parse().unwrap_or(0.0);
+            let current_sec = hours * 3600.0 + mins * 60.0 + secs;
 
-                let progress = (current_sec / total_duration_sec).min(1.0);
-                let percent = (progress * 100.0) as u32;
+            let (progress, msg) = if total_duration_sec > 0.0 {
+                let p = (current_sec / total_duration_sec).min(0.99);
+                let percent = (p * 100.0) as u32;
+                (p, format!("Embedding Subtitles into Video... {}%", percent))
+            } else {
+                (0.5, "Embedding Subtitles into Video...".to_string())
+            };
 
-                let _ = app.emit("hardsub-status", TranscribeProgress {
-                    progress,
-                    message: format!("Hardsubbing video... {}%", percent),
-                    active: true,
-                });
-            }
+            let _ = app.emit("hardsub-status", TranscribeProgress {
+                progress,
+                message: msg,
+                active: true,
+            });
         }
     }
 
     let status = child.wait().await.map_err(|e| format!("ffmpeg execution failed: {}", e))?;
 
-    // Reset session phase
-    if let Ok(mut lock) = session.lock() {
+    // Check cancellation requested flag
+    let was_cancelled = if let Ok(mut lock) = session.lock() {
+        let cancelled = lock.cancel_requested;
         lock.child_pid = None;
         lock.phase = crate::SessionPhase::Idle;
-    }
+        cancelled
+    } else {
+        false
+    };
 
-    if !status.success() {
+    if was_cancelled || !status.success() {
+        // Clean up partial output file if present
+        if Path::new(&settings.output_path).exists() {
+            let _ = std::fs::remove_file(&settings.output_path);
+            logs.log(&app, "Hardsub", &format!("Removed partial output file: {}", settings.output_path));
+        }
+
+        if was_cancelled {
+            let _ = app.emit("hardsub-status", TranscribeProgress {
+                progress: 0.0,
+                message: "Hardsubbing cancelled by user.".to_string(),
+                active: false,
+            });
+            return Err("Hardsubbing cancelled by user.".to_string());
+        }
+
         let _ = app.emit("hardsub-status", TranscribeProgress {
             progress: 0.0,
-            message: "Hardsubbing failed or was cancelled.".to_string(),
+            message: "Hardsubbing encoding failed.".to_string(),
             active: false,
         });
         return Err(format!("FFmpeg failed with exit code: {:?}", status.code()));
@@ -440,7 +492,7 @@ pub async fn run_hardsub_task(
 
     let _ = app.emit("hardsub-status", TranscribeProgress {
         progress: 1.0,
-        message: "Hardsubbing complete! Output ready.".to_string(),
+        message: "Subtitles embedded successfully!".to_string(),
         active: false,
     });
 
