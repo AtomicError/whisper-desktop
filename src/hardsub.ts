@@ -13,6 +13,17 @@ const listen = async <T>(event: string, handler: (e: { payload: T }) => void) =>
   }
 };
 
+function convertFileSrc(filePath: string): string {
+  const tauri = (window as any).__TAURI__;
+  if (tauri && tauri.core && tauri.core.convertFileSrc) {
+    return tauri.core.convertFileSrc(filePath);
+  }
+  if (tauri && tauri.tauri && tauri.tauri.convertFileSrc) {
+    return tauri.tauri.convertFileSrc(filePath);
+  }
+  return filePath.startsWith('/') ? `asset://localhost${filePath}` : filePath;
+}
+
 export interface FontItem {
   name: string;
   source: string;
@@ -44,6 +55,119 @@ export interface HardsubSettings {
   italic: boolean;
   alignment: number;
   audioMode: string;
+}
+
+export interface SubtitleCue {
+  id: number;
+  startMs: number;
+  endMs: number;
+  startTimeStr: string;
+  endTimeStr: string;
+  text: string;
+}
+
+function parseTimeToMs(timeStr: string): number {
+  const parts = timeStr.trim().split(/[:,\.]/);
+  if (parts.length < 3) return 0;
+  const h = parseInt(parts[0], 10) || 0;
+  const m = parseInt(parts[1], 10) || 0;
+  const s = parseInt(parts[2], 10) || 0;
+  let ms = 0;
+  if (parts[3]) {
+    const rawMs = parts[3].padEnd(3, '0').substring(0, 3);
+    ms = parseInt(rawMs, 10) || 0;
+  }
+  return h * 3600000 + m * 60000 + s * 1000 + ms;
+}
+
+function msToSrtTime(ms: number): string {
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  const s = Math.floor((ms % 60000) / 1000);
+  const msec = Math.floor(ms % 1000);
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')},${String(msec).padStart(3, '0')}`;
+}
+
+function formatSecondsToDisplay(seconds: number): string {
+  if (isNaN(seconds) || seconds < 0) return '00:00';
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function parseSubtitleContent(content: string, ext: string): SubtitleCue[] {
+  const cues: SubtitleCue[] = [];
+  const normalized = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  if (ext === 'ass') {
+    const lines = normalized.split('\n');
+    let inEvents = false;
+    let cueId = 1;
+    for (const line of lines) {
+      if (line.startsWith('[Events]')) {
+        inEvents = true;
+        continue;
+      }
+      if (inEvents && line.startsWith('Dialogue:')) {
+        const parts = line.substring(9).split(',');
+        if (parts.length >= 10) {
+          const startStr = parts[1].trim();
+          const endStr = parts[2].trim();
+          const text = parts.slice(9).join(',').replace(/\\N/g, '\n').replace(/\{[^}]+\}/g, '').trim();
+          const startMs = parseTimeToMs(startStr);
+          const endMs = parseTimeToMs(endStr);
+          cues.push({
+            id: cueId++,
+            startMs,
+            endMs,
+            startTimeStr: startStr,
+            endTimeStr: endStr,
+            text,
+          });
+        }
+      }
+    }
+  } else {
+    const blocks = normalized.split(/\n\n+/);
+    let cueId = 1;
+    for (const block of blocks) {
+      const lines = block.trim().split('\n');
+      let timeLineIdx = -1;
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].includes('-->')) {
+          timeLineIdx = i;
+          break;
+        }
+      }
+      if (timeLineIdx !== -1) {
+        const times = lines[timeLineIdx].split('-->');
+        if (times.length === 2) {
+          const startStr = times[0].trim();
+          const endStr = times[1].trim();
+          const text = lines.slice(timeLineIdx + 1).join('\n').trim();
+          const startMs = parseTimeToMs(startStr);
+          const endMs = parseTimeToMs(endStr);
+          cues.push({
+            id: cueId++,
+            startMs,
+            endMs,
+            startTimeStr: startStr.split(' ')[0],
+            endTimeStr: endStr.split(' ')[0],
+            text,
+          });
+        }
+      }
+    }
+  }
+  return cues;
+}
+
+function convertCuesToSrt(cues: SubtitleCue[]): string {
+  return cues
+    .map((cue, idx) => {
+      return `${idx + 1}\n${msToSrtTime(cue.startMs)} --> ${msToSrtTime(cue.endMs)}\n${cue.text}\n`;
+    })
+    .join('\n');
 }
 
 export class HardsubController {
@@ -86,13 +210,45 @@ export class HardsubController {
   private previewText: HTMLElement | null = null;
   private previewInput: HTMLInputElement | null = null;
 
+  // Real Video Player & Media Controls
+  private videoElement: HTMLVideoElement | null = null;
+  private videoPlaceholder: HTMLElement | null = null;
+  private videoStatusBadge: HTMLElement | null = null;
+  private videoPlayBtn: HTMLButtonElement | null = null;
+  private videoIconPlay: HTMLElement | null = null;
+  private videoIconPause: HTMLElement | null = null;
+  private videoSeekSlider: HTMLInputElement | null = null;
+  private videoTimeDisplay: HTMLElement | null = null;
+  private prevCueBtn: HTMLButtonElement | null = null;
+  private nextCueBtn: HTMLButtonElement | null = null;
+
+  // Dual Tab Studio Navigation
+  private tabBtnEditor: HTMLButtonElement | null = null;
+  private tabBtnSettings: HTMLButtonElement | null = null;
+  private tabViewEditor: HTMLElement | null = null;
+  private tabViewSettings: HTMLElement | null = null;
+
+  // Block Subtitle Editor Elements
+  private searchInput: HTMLInputElement | null = null;
+  private subtitleCountBadge: HTMLElement | null = null;
+  private subtitleListContainer: HTMLElement | null = null;
+  private emptyCueNotice: HTMLElement | null = null;
+
+  // Dropzone Elements
+  private videoDropZone: HTMLElement | null = null;
+  private subDropZone: HTMLElement | null = null;
+  private lblVideoName: HTMLElement | null = null;
+  private lblVideoPath: HTMLElement | null = null;
+  private lblSubName: HTMLElement | null = null;
+  private lblSubPath: HTMLElement | null = null;
+
   // Telemetry HUD elements
   private progressFill: HTMLElement | null = null;
   private progressStatusText: HTMLElement | null = null;
   private progressPctText: HTMLElement | null = null;
   private hudPulseDot: HTMLElement | null = null;
 
-  // Internal state
+  // Internal State
   private state: HardsubSettings = {
     videoPath: '',
     subtitlePath: '',
@@ -116,12 +272,20 @@ export class HardsubController {
   };
 
   private isEncoding: boolean = false;
+  private subtitleCues: SubtitleCue[] = [];
+  private activeCueId: number | null = null;
+  private searchFilterQuery: string = '';
+  private isUserSeeking: boolean = false;
+  private isSubtitlesModified: boolean = false;
 
   constructor() {
     const init = () => {
       this.initDOMElements();
       this.loadFontsAndHardware();
       this.setupEventListeners();
+      this.setupVideoPlayerEvents();
+      this.setupStudioTabEvents();
+      this.setupDragAndDropListeners();
       this.listenToProgressEvents();
       this.updateLivePreview();
       this.updateEncodingUIState(false);
@@ -169,6 +333,40 @@ export class HardsubController {
     this.previewBox = document.getElementById('hardsub-preview-box');
     this.previewText = document.getElementById('hardsub-preview-text');
     this.previewInput = document.getElementById('hardsub-preview-input') as HTMLInputElement;
+
+    // Video Player & Controls
+    this.videoElement = document.getElementById('hardsub-video-element') as HTMLVideoElement;
+    this.videoPlaceholder = document.getElementById('hardsub-video-placeholder');
+    this.videoStatusBadge = document.getElementById('hardsub-video-status-badge');
+    this.videoPlayBtn = document.getElementById('hardsub-btn-play') as HTMLButtonElement;
+    this.videoIconPlay = document.getElementById('hardsub-icon-play');
+    this.videoIconPause = document.getElementById('hardsub-icon-pause');
+    this.videoSeekSlider = document.getElementById('hardsub-video-seek') as HTMLInputElement;
+    this.videoTimeDisplay = document.getElementById('hardsub-video-time');
+    this.prevCueBtn = document.getElementById('hardsub-btn-prev-cue') as HTMLButtonElement;
+    this.nextCueBtn = document.getElementById('hardsub-btn-next-cue') as HTMLButtonElement;
+
+    // Dropzone Elements
+    this.videoDropZone = document.getElementById('hardsub-video-drop-zone');
+    this.subDropZone = document.getElementById('hardsub-sub-drop-zone');
+    this.lblVideoName = document.getElementById('lbl-hardsub-video-name');
+    this.lblVideoPath = document.getElementById('lbl-hardsub-video-path');
+    this.lblSubName = document.getElementById('lbl-hardsub-sub-name');
+    this.lblSubPath = document.getElementById('lbl-hardsub-sub-path');
+
+    // Tabs
+    this.tabBtnEditor = document.getElementById('hardsub-tab-btn-editor') as HTMLButtonElement;
+    this.tabBtnSettings = document.getElementById('hardsub-tab-btn-settings') as HTMLButtonElement;
+    this.tabViewEditor = document.getElementById('hardsub-tab-view-editor');
+    this.tabViewSettings = document.getElementById('hardsub-tab-view-settings');
+
+    // Subtitle Editor Block List
+    this.searchInput = document.getElementById('hardsub-search-input') as HTMLInputElement;
+    this.subtitleCountBadge = document.getElementById('hardsub-subtitle-count');
+    this.subtitleListContainer = document.getElementById('hardsub-subtitle-list');
+    this.emptyCueNotice = document.getElementById('hardsub-empty-cue-notice');
+
+    // HUD
     this.progressFill = document.getElementById('hardsub-progress-fill');
     this.progressStatusText = document.getElementById('hardsub-status-text');
     this.progressPctText = document.getElementById('hardsub-pct-text');
@@ -180,10 +378,10 @@ export class HardsubController {
       const fonts = await invoke<FontItem[]>('get_system_fonts');
       if (this.fontSelect && fonts.length > 0) {
         this.fontSelect.innerHTML = '';
-        
+
         const bundledGroup = document.createElement('optgroup');
         bundledGroup.label = '— Bundled Fonts —';
-        
+
         const systemGroup = document.createElement('optgroup');
         systemGroup.label = '— System Fonts —';
 
@@ -232,9 +430,10 @@ export class HardsubController {
     // Browse Video File
     document.getElementById('btn-browse-video')?.addEventListener('click', async () => {
       const selected = await invoke<string | null>('select_file');
-      if (selected && this.videoPathInput) {
-        this.videoPathInput.value = selected;
+      if (selected) {
+        if (this.videoPathInput) this.videoPathInput.value = selected;
         this.state.videoPath = selected;
+        this.loadVideoMedia(selected);
         this.autoSuggestSubtitleAndOutput(selected);
       }
     });
@@ -242,21 +441,14 @@ export class HardsubController {
     // Browse Subtitle File
     document.getElementById('btn-browse-sub')?.addEventListener('click', async () => {
       const selected = await invoke<string | null>('select_subtitle_file');
-      if (selected && this.subtitlePathInput) {
-        this.subtitlePathInput.value = selected;
+      if (selected) {
+        if (this.subtitlePathInput) this.subtitlePathInput.value = selected;
         this.state.subtitlePath = selected;
+        this.loadSubtitleFile(selected);
       }
     });
 
-    // Font Select & Scroll Activity
-    let fontScrollTimer: any = null;
-    this.fontSelect?.addEventListener('scroll', () => {
-      this.fontSelect?.classList.add('scrolling-active');
-      clearTimeout(fontScrollTimer);
-      fontScrollTimer = setTimeout(() => {
-        this.fontSelect?.classList.remove('scrolling-active');
-      }, 1500);
-    });
+    // Font Select
     this.fontSelect?.addEventListener('change', () => {
       this.state.fontName = this.fontSelect!.value;
       this.updateLivePreview();
@@ -267,7 +459,7 @@ export class HardsubController {
       this.updateLivePreview();
     });
 
-    // Font Size Slider & Reset
+    // Font Size Slider
     this.fontSizeSlider?.addEventListener('input', () => {
       const val = parseInt(this.fontSizeSlider!.value, 10);
       this.state.fontSize = val;
@@ -281,7 +473,7 @@ export class HardsubController {
       this.updateLivePreview();
     });
 
-    // Position Y Slider & Reset
+    // Position Y Slider
     this.positionYSlider?.addEventListener('input', () => {
       const val = parseInt(this.positionYSlider!.value, 10);
       this.state.positionY = val;
@@ -295,7 +487,7 @@ export class HardsubController {
       this.updateLivePreview();
     });
 
-    // Outline Size Slider & Reset
+    // Outline Size Slider
     this.outlineSizeSlider?.addEventListener('input', () => {
       const val = parseInt(this.outlineSizeSlider!.value, 10);
       this.state.outlineSize = val;
@@ -311,7 +503,7 @@ export class HardsubController {
       this.updateLivePreview();
     });
 
-    // Color Pickers & Preset Swatches
+    // Color Pickers
     this.primaryColorPicker?.addEventListener('input', () => {
       this.state.primaryColor = this.primaryColorPicker!.value.toUpperCase();
       this.updateColorSwatches();
@@ -334,7 +526,7 @@ export class HardsubController {
       this.updateLivePreview();
     });
 
-    // Color Preset Buttons
+    // Color Preset Dots
     document.querySelectorAll('.color-preset-dot').forEach((dot) => {
       dot.addEventListener('click', (e) => {
         const btn = e.currentTarget as HTMLButtonElement;
@@ -391,6 +583,12 @@ export class HardsubController {
       });
     });
 
+    // Subtitle Search Input
+    this.searchInput?.addEventListener('input', () => {
+      this.searchFilterQuery = this.searchInput!.value.trim().toLowerCase();
+      this.renderSubtitleCards();
+    });
+
     // Start Hardsub Button
     document.getElementById('btn-start-hardsub')?.addEventListener('click', () => {
       this.startHardsub();
@@ -407,14 +605,357 @@ export class HardsubController {
     });
   }
 
-  public prefillFilePaths(videoPath: string, subPath: string) {
-    if (this.videoPathInput) {
-      this.videoPathInput.value = videoPath;
-      this.state.videoPath = videoPath;
+  private setupStudioTabEvents() {
+    this.tabBtnEditor?.addEventListener('click', () => {
+      this.tabBtnEditor?.classList.add('active');
+      this.tabBtnSettings?.classList.remove('active');
+      if (this.tabViewEditor) this.tabViewEditor.style.display = 'flex';
+      if (this.tabViewSettings) this.tabViewSettings.style.display = 'none';
+    });
+
+    this.tabBtnSettings?.addEventListener('click', () => {
+      this.tabBtnSettings?.classList.add('active');
+      this.tabBtnEditor?.classList.remove('active');
+      if (this.tabViewSettings) this.tabViewSettings.style.display = 'flex';
+      if (this.tabViewEditor) this.tabViewEditor.style.display = 'none';
+    });
+  }
+
+  private setupVideoPlayerEvents() {
+    if (!this.videoElement) return;
+
+    // Play / Pause Toggle
+    this.videoPlayBtn?.addEventListener('click', () => {
+      if (this.videoElement?.paused) {
+        this.videoElement.play();
+      } else {
+        this.videoElement?.pause();
+      }
+    });
+
+    this.videoElement.addEventListener('play', () => {
+      if (this.videoIconPlay) this.videoIconPlay.style.display = 'none';
+      if (this.videoIconPause) this.videoIconPause.style.display = 'block';
+      if (this.videoStatusBadge) {
+        this.videoStatusBadge.textContent = 'Playing Live';
+        this.videoStatusBadge.style.background = 'rgba(16, 185, 129, 0.2)';
+        this.videoStatusBadge.style.color = '#10B981';
+      }
+    });
+
+    this.videoElement.addEventListener('pause', () => {
+      if (this.videoIconPlay) this.videoIconPlay.style.display = 'block';
+      if (this.videoIconPause) this.videoIconPause.style.display = 'none';
+      if (this.videoStatusBadge) {
+        this.videoStatusBadge.textContent = 'Paused';
+        this.videoStatusBadge.style.background = 'rgba(45, 127, 255, 0.15)';
+        this.videoStatusBadge.style.color = 'var(--color-cyan)';
+      }
+    });
+
+    // Time update & Sync subtitle overlay
+    this.videoElement.addEventListener('timeupdate', () => {
+      if (!this.videoElement) return;
+      const cur = this.videoElement.currentTime;
+      const dur = this.videoElement.duration || 1;
+
+      if (!this.isUserSeeking && this.videoSeekSlider) {
+        this.videoSeekSlider.value = String((cur / dur) * 100);
+      }
+
+      if (this.videoTimeDisplay) {
+        this.videoTimeDisplay.textContent = `${formatSecondsToDisplay(cur)} / ${formatSecondsToDisplay(dur)}`;
+      }
+
+      this.syncActiveSubtitleWithTime(cur * 1000);
+    });
+
+    // Seek Slider Drag
+    this.videoSeekSlider?.addEventListener('input', () => {
+      this.isUserSeeking = true;
+      if (this.videoElement && this.videoSeekSlider) {
+        const pct = parseFloat(this.videoSeekSlider.value) / 100;
+        const targetTime = (this.videoElement.duration || 0) * pct;
+        this.videoElement.currentTime = targetTime;
+      }
+    });
+
+    this.videoSeekSlider?.addEventListener('change', () => {
+      this.isUserSeeking = false;
+    });
+
+    // Jump to Prev / Next Cue
+    this.prevCueBtn?.addEventListener('click', () => {
+      if (!this.videoElement || this.subtitleCues.length === 0) return;
+      const curMs = this.videoElement.currentTime * 1000;
+      const prev = [...this.subtitleCues].reverse().find((c) => c.startMs < curMs - 300);
+      if (prev) {
+        this.videoElement.currentTime = prev.startMs / 1000;
+      }
+    });
+
+    this.nextCueBtn?.addEventListener('click', () => {
+      if (!this.videoElement || this.subtitleCues.length === 0) return;
+      const curMs = this.videoElement.currentTime * 1000;
+      const next = this.subtitleCues.find((c) => c.startMs > curMs + 100);
+      if (next) {
+        this.videoElement.currentTime = next.startMs / 1000;
+      }
+    });
+  }
+
+  private setupDragAndDropListeners() {
+    const videoDrop = document.getElementById('hardsub-video-drop-zone');
+    const subDrop = document.getElementById('hardsub-sub-drop-zone');
+    const hardsubPanel = document.getElementById('panel-hardsub');
+
+    const handleFiles = (files: string[]) => {
+      files.forEach((filePath) => {
+        const lower = filePath.toLowerCase();
+        if (
+          lower.endsWith('.mp4') ||
+          lower.endsWith('.mkv') ||
+          lower.endsWith('.webm') ||
+          lower.endsWith('.mov') ||
+          lower.endsWith('.avi') ||
+          lower.endsWith('.flv') ||
+          lower.endsWith('.wmv') ||
+          lower.endsWith('.m4v')
+        ) {
+          if (this.videoPathInput) this.videoPathInput.value = filePath;
+          this.state.videoPath = filePath;
+          this.loadVideoMedia(filePath);
+          this.autoSuggestSubtitleAndOutput(filePath);
+        } else if (
+          lower.endsWith('.srt') ||
+          lower.endsWith('.vtt') ||
+          lower.endsWith('.ass') ||
+          lower.endsWith('.lrc')
+        ) {
+          if (this.subtitlePathInput) this.subtitlePathInput.value = filePath;
+          this.state.subtitlePath = filePath;
+          this.loadSubtitleFile(filePath);
+        }
+      });
+    };
+
+    [videoDrop, subDrop].forEach((zone) => {
+      if (!zone) return;
+
+      zone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        zone.classList.add('drag-over');
+      });
+
+      zone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        zone.classList.remove('drag-over');
+      });
+
+      zone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        zone.classList.remove('drag-over');
+
+        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          const filePaths: string[] = Array.from(e.dataTransfer.files).map(
+            (f: any) => f.path || f.name
+          );
+          handleFiles(filePaths);
+        }
+      });
+    });
+
+    listen<{ paths: string[]; position: { x: number; y: number } }>('tauri://drag-drop', (event) => {
+      if (hardsubPanel && hardsubPanel.style.display !== 'none') {
+        const files = event.payload.paths;
+        if (files && files.length > 0) {
+          handleFiles(files);
+        }
+      }
+    });
+  }
+
+  private updateVideoDropzoneUI(videoPath: string) {
+    if (!videoPath) {
+      if (this.lblVideoName) this.lblVideoName.textContent = 'No Video Loaded';
+      if (this.lblVideoPath) this.lblVideoPath.textContent = 'Drag & drop video (.mp4, .mkv, .mov)';
+      this.videoDropZone?.classList.remove('has-file');
+      return;
     }
-    if (this.subtitlePathInput) {
-      this.subtitlePathInput.value = subPath;
+
+    const lastSlash = Math.max(videoPath.lastIndexOf('/'), videoPath.lastIndexOf('\\'));
+    const fileName = lastSlash >= 0 ? videoPath.substring(lastSlash + 1) : videoPath;
+
+    if (this.lblVideoName) this.lblVideoName.textContent = `✓ ${fileName}`;
+    if (this.lblVideoPath) this.lblVideoPath.textContent = videoPath;
+    this.videoDropZone?.classList.add('has-file');
+  }
+
+  private updateSubDropzoneUI(subPath: string, cueCount?: number) {
+    if (!subPath) {
+      if (this.lblSubName) this.lblSubName.textContent = 'No Subtitle Loaded';
+      if (this.lblSubPath) this.lblSubPath.textContent = 'Drag & drop subtitle (.srt, .vtt, .ass)';
+      this.subDropZone?.classList.remove('has-file');
+      return;
+    }
+
+    const lastSlash = Math.max(subPath.lastIndexOf('/'), subPath.lastIndexOf('\\'));
+    const fileName = lastSlash >= 0 ? subPath.substring(lastSlash + 1) : subPath;
+    const countStr = typeof cueCount === 'number' ? ` (${cueCount} Cues)` : '';
+
+    if (this.lblSubName) this.lblSubName.textContent = `✓ ${fileName}${countStr}`;
+    if (this.lblSubPath) this.lblSubPath.textContent = subPath;
+    this.subDropZone?.classList.add('has-file');
+  }
+
+  private loadVideoMedia(videoPath: string) {
+    if (!videoPath || !this.videoElement) return;
+    try {
+      const assetUrl = convertFileSrc(videoPath);
+      this.videoElement.src = assetUrl;
+      this.videoElement.style.display = 'block';
+      if (this.videoPlaceholder) this.videoPlaceholder.style.display = 'none';
+      if (this.videoStatusBadge) {
+        this.videoStatusBadge.textContent = 'Video Loaded';
+      }
+      this.updateVideoDropzoneUI(videoPath);
+    } catch (e) {
+      console.warn('Failed to load video asset URL:', e);
+    }
+  }
+
+  private async loadSubtitleFile(subPath: string) {
+    if (!subPath) return;
+    try {
+      const content = await invoke<string>('read_text_file_content', { filePath: subPath });
+      const lastDot = subPath.lastIndexOf('.');
+      const ext = lastDot > 0 ? subPath.substring(lastDot + 1).toLowerCase() : 'srt';
+      this.subtitleCues = parseSubtitleContent(content, ext);
+      this.isSubtitlesModified = false;
+      this.updateSubDropzoneUI(subPath, this.subtitleCues.length);
+      this.renderSubtitleCards();
+    } catch (e) {
+      console.warn('Failed to read subtitle file content:', e);
+    }
+  }
+
+  private renderSubtitleCards() {
+    if (!this.subtitleListContainer) return;
+
+    if (this.subtitleCues.length === 0) {
+      this.subtitleListContainer.innerHTML = '';
+      if (this.emptyCueNotice) this.emptyCueNotice.style.display = 'flex';
+      if (this.subtitleCountBadge) this.subtitleCountBadge.textContent = '0 Cues';
+      return;
+    }
+
+    if (this.emptyCueNotice) this.emptyCueNotice.style.display = 'none';
+
+    const filtered = this.subtitleCues.filter((cue) => {
+      if (!this.searchFilterQuery) return true;
+      return cue.text.toLowerCase().includes(this.searchFilterQuery);
+    });
+
+    if (this.subtitleCountBadge) {
+      this.subtitleCountBadge.textContent = `${filtered.length} Cues`;
+    }
+
+    this.subtitleListContainer.innerHTML = '';
+
+    filtered.forEach((cue) => {
+      const card = document.createElement('div');
+      card.className = `subtitle-cue-card ${this.activeCueId === cue.id ? 'active' : ''}`;
+      card.id = `subtitle-cue-${cue.id}`;
+
+      card.innerHTML = `
+        <div class="subtitle-cue-header">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span class="subtitle-cue-time">${cue.startTimeStr} → ${cue.endTimeStr}</span>
+            <span class="subtitle-cue-active-badge">ACTIVE</span>
+          </div>
+          <button class="pill-btn jump-cue-btn" style="padding: 2px 8px; font-size: 0.72rem; height: 22px;" title="Jump video to cue time">
+            ▶ Play
+          </button>
+        </div>
+        <textarea class="subtitle-cue-textarea" data-cue-id="${cue.id}">${cue.text}</textarea>
+      `;
+
+      card.querySelector('.jump-cue-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (this.videoElement) {
+          this.videoElement.currentTime = cue.startMs / 1000;
+          this.videoElement.play();
+        }
+      });
+
+      card.addEventListener('click', () => {
+        if (this.videoElement) {
+          this.videoElement.currentTime = cue.startMs / 1000;
+        }
+      });
+
+      const textarea = card.querySelector('textarea') as HTMLTextAreaElement;
+      textarea?.addEventListener('input', () => {
+        cue.text = textarea.value;
+        this.isSubtitlesModified = true;
+        if (this.activeCueId === cue.id && this.previewText) {
+          this.previewText.textContent = cue.text;
+        }
+      });
+
+      this.subtitleListContainer?.appendChild(card);
+    });
+  }
+
+  private syncActiveSubtitleWithTime(curMs: number) {
+    const activeCue = this.subtitleCues.find((c) => curMs >= c.startMs && curMs <= c.endMs);
+
+    if (activeCue) {
+      if (this.activeCueId !== activeCue.id) {
+        this.activeCueId = activeCue.id;
+        this.highlightActiveCard(activeCue.id);
+      }
+      if (this.previewText) {
+        this.previewText.textContent = activeCue.text;
+      }
+    } else {
+      if (this.activeCueId !== null) {
+        this.activeCueId = null;
+        this.highlightActiveCard(null);
+      }
+      if (this.previewText && this.previewInput) {
+        this.previewText.textContent = this.previewInput.value || 'Sample Subtitle Live Preview Text';
+      }
+    }
+  }
+
+  private highlightActiveCard(cueId: number | null) {
+    document.querySelectorAll('.subtitle-cue-card').forEach((el) => {
+      el.classList.remove('active');
+    });
+
+    if (cueId !== null) {
+      const activeEl = document.getElementById(`subtitle-cue-${cueId}`);
+      if (activeEl) {
+        activeEl.classList.add('active');
+        activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+  }
+
+  public prefillFilePaths(videoPath: string, subPath: string) {
+    if (videoPath) {
+      if (this.videoPathInput) this.videoPathInput.value = videoPath;
+      this.state.videoPath = videoPath;
+      this.loadVideoMedia(videoPath);
+    }
+    if (subPath) {
+      if (this.subtitlePathInput) this.subtitlePathInput.value = subPath;
       this.state.subtitlePath = subPath;
+      this.loadSubtitleFile(subPath);
     }
     if (videoPath) {
       this.autoSuggestSubtitleAndOutput(videoPath);
@@ -430,6 +971,7 @@ export class HardsubController {
         if (this.subtitlePathInput) {
           this.subtitlePathInput.value = srtPath;
           this.state.subtitlePath = srtPath;
+          this.loadSubtitleFile(srtPath);
         }
       }
       this.state.outputPath = `${basePath}_hardsub.${this.state.outputFormat}`;
@@ -450,14 +992,13 @@ export class HardsubController {
   private updateLivePreview() {
     if (!this.previewText) return;
 
-    if (this.previewInput && this.previewInput.value) {
+    if (this.previewInput && this.previewInput.value && !this.activeCueId) {
       this.previewText.textContent = this.previewInput.value;
     }
 
     this.previewText.style.fontFamily = `'${this.state.fontName}', sans-serif`;
-    
-    // Scale font size proportionally to preview container height vs ASS baseline (288)
-    const previewHeight = this.previewBox?.clientHeight || 200;
+
+    const previewHeight = this.previewBox?.clientHeight || 240;
     const scaledFontSize = Math.max(10, (this.state.fontSize * previewHeight) / 288);
     this.previewText.style.fontSize = `${scaledFontSize}px`;
 
@@ -466,7 +1007,6 @@ export class HardsubController {
     this.previewText.style.fontStyle = this.state.italic ? 'italic' : 'normal';
     this.previewText.style.marginBottom = `${this.state.positionY}px`;
 
-    // Outline / Stroke using crisp hardware-accelerated WebKit text stroke & paint-order
     if (this.state.outlineSize > 0) {
       const s = this.state.outlineSize;
       const c = this.state.outlineColor;
@@ -483,7 +1023,6 @@ export class HardsubController {
       this.previewText.style.textShadow = 'none';
     }
 
-    // Background Box
     if (this.state.bgBox) {
       this.previewText.style.backgroundColor = this.state.bgBoxColor;
       this.previewText.style.padding = '4px 14px';
@@ -493,22 +1032,21 @@ export class HardsubController {
       this.previewText.style.padding = '0';
     }
 
-    // Flexbox Alignment mapping
     if (this.previewBox) {
       switch (this.state.alignment) {
-        case 1: // Bottom Left
+        case 1:
           this.previewBox.style.justifyContent = 'flex-end';
           this.previewBox.style.alignItems = 'flex-start';
           break;
-        case 3: // Bottom Right
+        case 3:
           this.previewBox.style.justifyContent = 'flex-end';
           this.previewBox.style.alignItems = 'flex-end';
           break;
-        case 6: // Top Center
+        case 6:
           this.previewBox.style.justifyContent = 'flex-start';
           this.previewBox.style.alignItems = 'center';
           break;
-        default: // 2 = Bottom Center
+        default:
           this.previewBox.style.justifyContent = 'flex-end';
           this.previewBox.style.alignItems = 'center';
           break;
@@ -520,7 +1058,6 @@ export class HardsubController {
   }
 
   private updateUIControlsState() {
-    // 1. Reset buttons visibility (only show when modified from default)
     const resetFont = document.getElementById('reset-fontsize');
     if (resetFont) resetFont.style.display = this.state.fontSize !== 24 ? 'inline-flex' : 'none';
 
@@ -530,13 +1067,11 @@ export class HardsubController {
     const resetPosy = document.getElementById('reset-posy');
     if (resetPosy) resetPosy.style.display = this.state.positionY !== 30 ? 'inline-flex' : 'none';
 
-    // 2. Background Box Controls disabled state
     const bgControls = document.getElementById('hardsub-bg-controls');
     if (bgControls) {
       bgControls.classList.toggle('control-disabled', !this.state.bgBox);
     }
 
-    // 3. Outline Color Picker disabled state when outline size is 0
     const outlinePicker = document.getElementById('hardsub-outline-picker-wrapper');
     if (outlinePicker) {
       outlinePicker.classList.toggle('control-disabled', this.state.outlineSize === 0);
@@ -601,6 +1136,19 @@ export class HardsubController {
       return;
     }
 
+    if (this.isSubtitlesModified && this.subtitleCues.length > 0) {
+      try {
+        const srtContent = convertCuesToSrt(this.subtitleCues);
+        await invoke('write_text_file_content', {
+          filePath: this.state.subtitlePath,
+          content: srtContent,
+        });
+        console.log('Saved modified subtitle content to disk');
+      } catch (e) {
+        console.warn('Failed to save edited subtitles to disk:', e);
+      }
+    }
+
     if (!this.state.outputPath) {
       this.autoSuggestSubtitleAndOutput(this.state.videoPath);
     }
@@ -610,11 +1158,10 @@ export class HardsubController {
       if (this.progressStatusText) {
         this.progressStatusText.textContent = 'Initializing FFmpeg Encoder...';
       }
-      
+
       await invoke('start_hardsub_task', {
         settings: this.state,
       });
-
     } catch (e: any) {
       const msg = String(e || '');
       if (msg.includes('cancelled') || msg.includes('Cancelled')) {

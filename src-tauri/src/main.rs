@@ -341,13 +341,24 @@ async fn select_directory(app: AppHandle) -> Option<String> {
 #[tauri::command]
 fn read_text_file_content(file_path: String) -> Result<String, String> {
     let path = std::path::Path::new(&file_path);
-    let allowed_exts = ["txt", "srt", "vtt", "lrc"];
+    let allowed_exts = ["txt", "srt", "vtt", "lrc", "ass"];
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
     if !allowed_exts.contains(&ext) {
         return Err("File type not allowed".into());
     }
     let canonical = path.canonicalize().map_err(|_| "Invalid file path".to_string())?;
     read_text_file(canonical.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn write_text_file_content(file_path: String, content: String) -> Result<(), String> {
+    let path = std::path::Path::new(&file_path);
+    let allowed_exts = ["txt", "srt", "vtt", "lrc", "ass"];
+    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+    if !allowed_exts.contains(&ext) {
+        return Err("File type not allowed for writing".into());
+    }
+    std::fs::write(path, content).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -487,6 +498,7 @@ fn main() {
             select_files,
             select_directory,
             read_text_file_content,
+            write_text_file_content,
             start_download_model_task,
             get_model_download_progress,
             get_all_models_status,

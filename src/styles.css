@@ -1562,6 +1562,15 @@ select.select-control {
   box-shadow: 0 0 15px rgba(6, 182, 212, 0.1) !important;
 }
 
+.media-drop-zone.has-file {
+  border-color: rgba(45, 127, 255, 0.4);
+  background: rgba(45, 127, 255, 0.04);
+}
+
+.media-drop-zone.has-file .media-icon {
+  color: var(--color-cyan);
+}
+
 .media-icon {
   width: 38px;
   height: 38px;
@@ -3962,6 +3971,102 @@ select.select-control {
   stroke-miterlimit: 2 !important;
   -webkit-stroke-miterlimit: 2 !important;
   paint-order: stroke fill !important;
+}
+
+/* Studio Hardsub 2.0 Subtitle Block Cards & Scrollbar */
+.subtitle-cue-card {
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.subtitle-cue-card:hover {
+  background: rgba(30, 41, 59, 0.7);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.subtitle-cue-card.active {
+  background: rgba(30, 58, 138, 0.35);
+  border-color: var(--color-cyan);
+  box-shadow: 0 0 12px rgba(45, 127, 255, 0.3);
+}
+
+.subtitle-cue-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.76rem;
+  font-family: monospace;
+}
+
+.subtitle-cue-time {
+  color: var(--color-cyan);
+  background: rgba(45, 127, 255, 0.12);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.subtitle-cue-active-badge {
+  display: none;
+  font-size: 0.7rem;
+  background: var(--color-royal-blue);
+  color: #fff;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+
+.subtitle-cue-card.active .subtitle-cue-active-badge {
+  display: inline-block;
+}
+
+.subtitle-cue-textarea {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.88rem;
+  padding: 6px 10px;
+  resize: vertical;
+  min-height: 48px;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.subtitle-cue-textarea:focus {
+  border-color: var(--color-royal-blue);
+  background: rgba(0, 0, 0, 0.4);
+}
+
+#hardsub-subtitle-list {
+  --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+  --scrollbar-track: rgba(0, 0, 0, 0.2);
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  scrollbar-width: thin;
+}
+
+@supports not (scrollbar-color: auto) {
+  #hardsub-subtitle-list::-webkit-scrollbar {
+    width: 6px;
+  }
+  #hardsub-subtitle-list::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 3px;
+  }
+  #hardsub-subtitle-list::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+  }
 }
 
 .reset-link-btn {
