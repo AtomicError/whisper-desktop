@@ -281,6 +281,9 @@ export class HardsubController {
   private activeCueId: number | null = null;
   private searchFilterQuery: string = '';
   private isUserSeeking: boolean = false;
+  private isManualSeeking: boolean = false;
+  private targetClickedCueId: number | null = null;
+  private clickLockTimer: any = null;
   private isSubtitlesModified: boolean = false;
 
   constructor() {
@@ -294,6 +297,7 @@ export class HardsubController {
       this.listenToProgressEvents();
       this.updateLivePreview();
       this.updateEncodingUIState(false);
+      window.addEventListener('resize', () => this.updateVideoPreviewOverlayBounds());
     };
 
     if (document.readyState === 'loading') {
@@ -634,14 +638,7 @@ export class HardsubController {
       if (this.videoElement?.paused) {
         const p = this.videoElement.play();
         if (p !== undefined) {
-          p.catch((err) => {
-            console.warn('Video playback failed:', err);
-            if (this.videoStatusBadge) {
-              this.videoStatusBadge.textContent = 'Media Codec Warning';
-              this.videoStatusBadge.style.background = 'rgba(239, 68, 68, 0.2)';
-              this.videoStatusBadge.style.color = '#EF4444';
-            }
-          });
+          p.catch((err) => console.warn('Video playback notice:', err));
         }
       } else {
         this.videoElement?.pause();
@@ -652,13 +649,33 @@ export class HardsubController {
       const err = this.videoElement?.error;
       console.warn('HTML5 Video Error:', err);
       if (this.videoStatusBadge) {
-        this.videoStatusBadge.textContent = 'Format Not Supported';
+        this.videoStatusBadge.textContent = 'Format Error';
         this.videoStatusBadge.style.background = 'rgba(239, 68, 68, 0.2)';
         this.videoStatusBadge.style.color = '#EF4444';
       }
     });
 
-    this.videoElement.addEventListener('play', () => {
+    this.videoElement.addEventListener('loadedmetadata', () => {
+      this.updateVideoPreviewOverlayBounds();
+      this.updateLivePreview();
+    });
+
+    this.videoElement.addEventListener('seeked', () => {
+      this.isManualSeeking = false;
+      if (this.videoElement) {
+        this.syncActiveSubtitleWithTime(this.videoElement.currentTime * 1000);
+      }
+    });
+
+    this.videoElement.addEventListener('canplay', () => {
+      if (this.videoStatusBadge && this.videoElement?.paused) {
+        this.videoStatusBadge.textContent = 'Video Loaded';
+        this.videoStatusBadge.style.background = 'rgba(45, 127, 255, 0.15)';
+        this.videoStatusBadge.style.color = 'var(--color-cyan)';
+      }
+    });
+
+    this.videoElement.addEventListener('playing', () => {
       if (this.videoIconPlay) this.videoIconPlay.style.display = 'none';
       if (this.videoIconPause) this.videoIconPause.style.display = 'block';
       if (this.videoStatusBadge) {
@@ -683,9 +700,11 @@ export class HardsubController {
       if (!this.videoElement) return;
       const cur = this.videoElement.currentTime;
       const dur = this.videoElement.duration || 1;
+      const pct = (cur / dur) * 100;
 
       if (!this.isUserSeeking && this.videoSeekSlider) {
-        this.videoSeekSlider.value = String((cur / dur) * 100);
+        this.videoSeekSlider.value = String(pct);
+        this.updateSeekSliderProgress(pct);
       }
 
       if (this.videoTimeDisplay) {
@@ -699,8 +718,9 @@ export class HardsubController {
     this.videoSeekSlider?.addEventListener('input', () => {
       this.isUserSeeking = true;
       if (this.videoElement && this.videoSeekSlider) {
-        const pct = parseFloat(this.videoSeekSlider.value) / 100;
-        const targetTime = (this.videoElement.duration || 0) * pct;
+        const pct = parseFloat(this.videoSeekSlider.value);
+        this.updateSeekSliderProgress(pct);
+        const targetTime = (this.videoElement.duration || 0) * (pct / 100);
         this.videoElement.currentTime = targetTime;
       }
     });
@@ -803,6 +823,56 @@ export class HardsubController {
     });
   }
 
+  private updateVideoPreviewOverlayBounds() {
+    if (!this.videoElement || !this.previewBox) return;
+
+    const container = document.getElementById('hardsub-player-container');
+    if (!container) return;
+
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
+
+    const videoW = this.videoElement.videoWidth;
+    const videoH = this.videoElement.videoHeight;
+
+    if (!videoW || !videoH || containerWidth === 0 || containerHeight === 0) {
+      this.previewBox.style.width = '100%';
+      this.previewBox.style.height = '100%';
+      this.previewBox.style.left = '0px';
+      this.previewBox.style.top = '0px';
+      return;
+    }
+
+    const containerAspect = containerWidth / containerHeight;
+    const videoAspect = videoW / videoH;
+
+    let displayWidth: number;
+    let displayHeight: number;
+
+    if (videoAspect > containerAspect) {
+      displayWidth = containerWidth;
+      displayHeight = containerWidth / videoAspect;
+    } else {
+      displayHeight = containerHeight;
+      displayWidth = containerHeight * videoAspect;
+    }
+
+    const left = (containerWidth - displayWidth) / 2;
+    const top = (containerHeight - displayHeight) / 2;
+
+    this.previewBox.style.width = `${displayWidth}px`;
+    this.previewBox.style.height = `${displayHeight}px`;
+    this.previewBox.style.left = `${left}px`;
+    this.previewBox.style.top = `${top}px`;
+  }
+
+  private updateSeekSliderProgress(pct: number) {
+    if (this.videoSeekSlider) {
+      const val = Math.max(0, Math.min(100, pct));
+      this.videoSeekSlider.style.background = `linear-gradient(to right, var(--color-royal-blue) 0%, var(--color-royal-blue) ${val}%, rgba(255, 255, 255, 0.1) ${val}%, rgba(255, 255, 255, 0.1) 100%)`;
+    }
+  }
+
   private updateVideoDropzoneUI(videoPath: string) {
     if (!videoPath) {
       if (this.lblVideoName) this.lblVideoName.textContent = 'No Video Loaded';
@@ -856,6 +926,7 @@ export class HardsubController {
         this.videoStatusBadge.style.color = 'var(--color-cyan)';
       }
       this.updateVideoDropzoneUI(videoPath);
+      this.updateVideoPreviewOverlayBounds();
     } catch (e) {
       console.warn('Failed to load video media URL:', e);
     }
@@ -920,7 +991,18 @@ export class HardsubController {
       card.querySelector('.jump-cue-btn')?.addEventListener('click', (e) => {
         e.stopPropagation();
         if (this.videoElement) {
-          this.videoElement.currentTime = cue.startMs / 1000;
+          this.targetClickedCueId = cue.id;
+          this.activeCueId = cue.id;
+          this.highlightActiveCard(cue.id);
+          if (this.previewText) {
+            this.previewText.textContent = cue.text;
+          }
+          if (this.clickLockTimer) clearTimeout(this.clickLockTimer);
+          this.clickLockTimer = setTimeout(() => {
+            this.targetClickedCueId = null;
+          }, 800);
+
+          this.videoElement.currentTime = (cue.startMs + 50) / 1000;
           const p = this.videoElement.play();
           if (p !== undefined) {
             p.catch((err) => console.warn('Jump play warning:', err));
@@ -930,7 +1012,18 @@ export class HardsubController {
 
       card.addEventListener('click', () => {
         if (this.videoElement) {
-          this.videoElement.currentTime = cue.startMs / 1000;
+          this.targetClickedCueId = cue.id;
+          this.activeCueId = cue.id;
+          this.highlightActiveCard(cue.id);
+          if (this.previewText) {
+            this.previewText.textContent = cue.text;
+          }
+          if (this.clickLockTimer) clearTimeout(this.clickLockTimer);
+          this.clickLockTimer = setTimeout(() => {
+            this.targetClickedCueId = null;
+          }, 800);
+
+          this.videoElement.currentTime = (cue.startMs + 50) / 1000;
         }
       });
 
@@ -948,7 +1041,21 @@ export class HardsubController {
   }
 
   private syncActiveSubtitleWithTime(curMs: number) {
-    const activeCue = this.subtitleCues.find((c) => curMs >= c.startMs && curMs <= c.endMs);
+    if (this.targetClickedCueId !== null) {
+      const clickedCue = this.subtitleCues.find((c) => c.id === this.targetClickedCueId);
+      if (clickedCue) {
+        if (this.activeCueId !== clickedCue.id) {
+          this.activeCueId = clickedCue.id;
+          this.highlightActiveCard(clickedCue.id);
+        }
+        if (this.previewText) {
+          this.previewText.textContent = clickedCue.text;
+        }
+        return;
+      }
+    }
+
+    const activeCue = this.subtitleCues.find((c) => curMs >= c.startMs && curMs < c.endMs);
 
     if (activeCue) {
       if (this.activeCueId !== activeCue.id) {
@@ -1028,6 +1135,8 @@ export class HardsubController {
 
   private updateLivePreview() {
     if (!this.previewText) return;
+
+    this.updateVideoPreviewOverlayBounds();
 
     if (this.previewInput && this.previewInput.value && !this.activeCueId) {
       this.previewText.textContent = this.previewInput.value;
@@ -1119,9 +1228,12 @@ export class HardsubController {
     this.isEncoding = active;
 
     const startBtn = document.getElementById('btn-start-hardsub') as HTMLButtonElement;
+    const startBtnSpan = startBtn?.querySelector('span');
     if (startBtn) {
       startBtn.disabled = active;
-      startBtn.textContent = active ? 'Embedding Subtitles...' : 'Embed Subtitles into Video';
+      if (startBtnSpan) {
+        startBtnSpan.textContent = active ? 'Exporting Hardsub Video...' : 'Export Hardsub Video';
+      }
       startBtn.style.opacity = active ? '0.7' : '1';
       startBtn.style.cursor = active ? 'not-allowed' : 'pointer';
     }
