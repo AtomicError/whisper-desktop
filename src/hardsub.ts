@@ -14,14 +14,19 @@ const listen = async <T>(event: string, handler: (e: { payload: T }) => void) =>
 };
 
 function convertFileSrc(filePath: string): string {
+  let cleanPath = filePath.trim();
+  if (cleanPath.startsWith('file://')) {
+    cleanPath = decodeURIComponent(cleanPath.substring(7));
+  }
+
   const tauri = (window as any).__TAURI__;
   if (tauri && tauri.core && tauri.core.convertFileSrc) {
-    return tauri.core.convertFileSrc(filePath);
+    return tauri.core.convertFileSrc(cleanPath);
   }
   if (tauri && tauri.tauri && tauri.tauri.convertFileSrc) {
-    return tauri.tauri.convertFileSrc(filePath);
+    return tauri.tauri.convertFileSrc(cleanPath);
   }
-  return filePath.startsWith('/') ? `asset://localhost${filePath}` : filePath;
+  return cleanPath.startsWith('/') ? `asset://localhost${cleanPath}` : cleanPath;
 }
 
 export interface FontItem {
@@ -627,9 +632,29 @@ export class HardsubController {
     // Play / Pause Toggle
     this.videoPlayBtn?.addEventListener('click', () => {
       if (this.videoElement?.paused) {
-        this.videoElement.play();
+        const p = this.videoElement.play();
+        if (p !== undefined) {
+          p.catch((err) => {
+            console.warn('Video playback failed:', err);
+            if (this.videoStatusBadge) {
+              this.videoStatusBadge.textContent = 'Media Codec Warning';
+              this.videoStatusBadge.style.background = 'rgba(239, 68, 68, 0.2)';
+              this.videoStatusBadge.style.color = '#EF4444';
+            }
+          });
+        }
       } else {
         this.videoElement?.pause();
+      }
+    });
+
+    this.videoElement.addEventListener('error', () => {
+      const err = this.videoElement?.error;
+      console.warn('HTML5 Video Error:', err);
+      if (this.videoStatusBadge) {
+        this.videoStatusBadge.textContent = 'Format Not Supported';
+        this.videoStatusBadge.style.background = 'rgba(239, 68, 68, 0.2)';
+        this.videoStatusBadge.style.color = '#EF4444';
       }
     });
 
@@ -811,19 +836,28 @@ export class HardsubController {
     this.subDropZone?.classList.add('has-file');
   }
 
-  private loadVideoMedia(videoPath: string) {
+  private async loadVideoMedia(videoPath: string) {
     if (!videoPath || !this.videoElement) return;
     try {
-      const assetUrl = convertFileSrc(videoPath);
-      this.videoElement.src = assetUrl;
+      let streamUrl = '';
+      try {
+        streamUrl = await invoke<string>('get_media_stream_url', { path: videoPath });
+      } catch (err) {
+        console.warn('Fallback to convertFileSrc:', err);
+        streamUrl = convertFileSrc(videoPath);
+      }
+
+      this.videoElement.src = streamUrl;
       this.videoElement.style.display = 'block';
       if (this.videoPlaceholder) this.videoPlaceholder.style.display = 'none';
       if (this.videoStatusBadge) {
         this.videoStatusBadge.textContent = 'Video Loaded';
+        this.videoStatusBadge.style.background = 'rgba(45, 127, 255, 0.15)';
+        this.videoStatusBadge.style.color = 'var(--color-cyan)';
       }
       this.updateVideoDropzoneUI(videoPath);
     } catch (e) {
-      console.warn('Failed to load video asset URL:', e);
+      console.warn('Failed to load video media URL:', e);
     }
   }
 
@@ -887,7 +921,10 @@ export class HardsubController {
         e.stopPropagation();
         if (this.videoElement) {
           this.videoElement.currentTime = cue.startMs / 1000;
-          this.videoElement.play();
+          const p = this.videoElement.play();
+          if (p !== undefined) {
+            p.catch((err) => console.warn('Jump play warning:', err));
+          }
         }
       });
 

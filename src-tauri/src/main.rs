@@ -6,6 +6,7 @@ mod transcribe;
 mod downloader;
 mod translation;
 mod hardsub;
+mod video_server;
 
 use std::sync::{Arc, Mutex};
 use std::path::Path;
@@ -513,7 +514,8 @@ fn main() {
             delete_keyring_credential,
             get_system_fonts,
             check_hardware_encoders,
-            start_hardsub_task
+            start_hardsub_task,
+            video_server::get_media_stream_url
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -36,5 +36,7 @@ allow = [
   "preview_translate_first_lines",
   "store_keyring_credential",
   "get_keyring_credential",
-  "delete_keyring_credential"
+  "delete_keyring_credential",
+  "write_text_file_content",
+  "get_media_stream_url"
 ]
