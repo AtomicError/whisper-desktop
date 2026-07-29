@@ -264,24 +264,6 @@ pub async fn run_hardsub_task(
     let border_style = if settings.bg_box { 3 } else { 1 };
     let ass_bg_color = hex_to_ass_color(&settings.bg_box_color, 128); // 80 = 50% opacity
 
-    let mut force_style = format!(
-        "FontName={},FontSize={},PrimaryColour={},OutlineColour={},Outline={},BorderStyle={},Shadow=0,MarginV={},Alignment={},Bold={},Italic={}",
-        safe_font_name,
-        settings.font_size,
-        ass_primary_color,
-        ass_outline_color,
-        settings.outline_size,
-        border_style,
-        settings.position_y,
-        settings.alignment,
-        if settings.bold { 1 } else { 0 },
-        if settings.italic { 1 } else { 0 },
-    );
-
-    if settings.bg_box {
-        force_style.push_str(&format!(",BackColour={}", ass_bg_color));
-    }
-
     // Resolve subtitle path escaping for FFmpeg filtergraph
     let escaped_sub_path = settings.subtitle_path
         .replace('\\', "/")
@@ -291,10 +273,34 @@ pub async fn run_hardsub_task(
         .replace(']', "\\]")
         .replace(',', "\\,");
 
-    // Calculate original size for FFmpeg to match the 288px height preview scale
+    // Calculate reference dimensions for FFmpeg to match the 288px height preview scale
     let video_aspect = if video_height > 0 { video_width as f64 / video_height as f64 } else { 1.777 };
     let ref_height = 288;
     let ref_width = (288.0 * video_aspect).round() as u32;
+
+    // Convert widthMargin percentage (e.g. 90 = text uses 90% of width) to ASS pixel margins
+    // Each side margin = (100 - widthMargin) / 2 * ref_width / 100
+    let margin_lr = ((100u32.saturating_sub(settings.width_margin)) as f64 / 200.0 * ref_width as f64).round() as u32;
+
+    let mut force_style = format!(
+        "FontName={},FontSize={},PrimaryColour={},OutlineColour={},Outline={},BorderStyle={},Shadow=0,MarginV={},MarginL={},MarginR={},Alignment={},Bold={},Italic={}",
+        safe_font_name,
+        settings.font_size,
+        ass_primary_color,
+        ass_outline_color,
+        settings.outline_size,
+        border_style,
+        settings.position_y,
+        margin_lr,
+        margin_lr,
+        settings.alignment,
+        if settings.bold { 1 } else { 0 },
+        if settings.italic { 1 } else { 0 },
+    );
+
+    if settings.bg_box {
+        force_style.push_str(&format!(",BackColour={}", ass_bg_color));
+    }
 
     let sub_filter = format!(
         "subtitles='{}':original_size={}x{}:force_style='{}'",

@@ -210,9 +210,16 @@ export class HardsubController {
   private alignmentButtons: NodeListOf<HTMLButtonElement> | null = null;
   private cancelBtn: HTMLButtonElement | null = null;
 
-  // Preview elements
-  private previewBox: HTMLElement | null = null;
-  private previewText: HTMLElement | null = null;
+  // Canvas-based subtitle preview (ASS-matching renderer)
+  private subtitleCanvas: HTMLCanvasElement | null = null;
+  private canvasCtx: CanvasRenderingContext2D | null = null;
+  private currentSubtitleText: string = 'Sample Subtitle Text';
+
+  // Computed video display dimensions (updated by updateVideoPreviewOverlayBounds)
+  private videoDisplayWidth: number = 0;
+  private videoDisplayHeight: number = 0;
+  private videoDisplayLeft: number = 0;
+  private videoDisplayTop: number = 0;
 
   // Real Video Player & Media Controls
   private videoElement: HTMLVideoElement | null = null;
@@ -356,8 +363,10 @@ export class HardsubController {
     this.alignmentButtons = document.querySelectorAll('.align-btn');
     this.cancelBtn = document.getElementById('btn-cancel-hardsub') as HTMLButtonElement;
 
-    this.previewBox = document.getElementById('hardsub-preview-box');
-    this.previewText = document.getElementById('hardsub-preview-text');
+    this.subtitleCanvas = document.getElementById('hardsub-subtitle-canvas') as HTMLCanvasElement;
+    if (this.subtitleCanvas) {
+      this.canvasCtx = this.subtitleCanvas.getContext('2d');
+    }
 
     // Video Player & Controls
     this.videoElement = document.getElementById('hardsub-video-element') as HTMLVideoElement;
@@ -933,7 +942,7 @@ export class HardsubController {
   }
 
   private updateVideoPreviewOverlayBounds() {
-    if (!this.videoElement || !this.previewBox) return;
+    if (!this.videoElement || !this.subtitleCanvas) return;
 
     const container = document.getElementById('hardsub-player-container');
     if (!container) return;
@@ -945,12 +954,14 @@ export class HardsubController {
     const videoH = this.videoElement.videoHeight;
 
     if (!videoW || !videoH || containerWidth === 0 || containerHeight === 0) {
-      this.previewBox.style.width = '100%';
-      this.previewBox.style.height = '100%';
-      this.previewBox.style.left = '0px';
-      this.previewBox.style.top = '0px';
-      this.previewBox.style.right = 'auto';
-      this.previewBox.style.bottom = 'auto';
+      this.videoDisplayWidth = containerWidth;
+      this.videoDisplayHeight = containerHeight;
+      this.videoDisplayLeft = 0;
+      this.videoDisplayTop = 0;
+      this.subtitleCanvas.width = containerWidth;
+      this.subtitleCanvas.height = containerHeight;
+      this.subtitleCanvas.style.left = '0px';
+      this.subtitleCanvas.style.top = '0px';
       return;
     }
 
@@ -971,12 +982,20 @@ export class HardsubController {
     const left = (containerWidth - displayWidth) / 2;
     const top = (containerHeight - displayHeight) / 2;
 
-    this.previewBox.style.width = `${displayWidth}px`;
-    this.previewBox.style.height = `${displayHeight}px`;
-    this.previewBox.style.left = `${left}px`;
-    this.previewBox.style.top = `${top}px`;
-    this.previewBox.style.right = 'auto';
-    this.previewBox.style.bottom = 'auto';
+    // Store computed dimensions for canvas renderer
+    this.videoDisplayWidth = displayWidth;
+    this.videoDisplayHeight = displayHeight;
+    this.videoDisplayLeft = left;
+    this.videoDisplayTop = top;
+
+    // Size and position the canvas to exactly cover the video display area
+    this.subtitleCanvas.width = Math.round(displayWidth);
+    this.subtitleCanvas.height = Math.round(displayHeight);
+    this.subtitleCanvas.style.left = `${left}px`;
+    this.subtitleCanvas.style.top = `${top}px`;
+
+    // Redraw subtitle on resized canvas
+    this.renderSubtitleOnCanvas();
   }
 
   private updateSeekSliderProgress(pct: number) {
@@ -1052,7 +1071,7 @@ export class HardsubController {
       this.videoElement.src = streamUrl;
       this.videoElement.style.display = 'block';
       if (this.videoPlaceholder) this.videoPlaceholder.style.display = 'none';
-      if (this.previewBox) this.previewBox.style.display = 'flex';
+      if (this.subtitleCanvas) this.subtitleCanvas.style.display = 'block';
       if (this.videoStatusBadge) {
         this.videoStatusBadge.textContent = 'Video Loaded';
         this.videoStatusBadge.style.background = 'rgba(45, 127, 255, 0.15)';
@@ -1127,9 +1146,8 @@ export class HardsubController {
           this.targetClickedCueId = cue.id;
           this.activeCueId = cue.id;
           this.highlightActiveCard(cue.id);
-          if (this.previewText) {
-            this.previewText.textContent = cue.text;
-          }
+          this.currentSubtitleText = cue.text;
+          this.renderSubtitleOnCanvas();
           if (this.clickLockTimer) clearTimeout(this.clickLockTimer);
           this.clickLockTimer = setTimeout(() => {
             this.targetClickedCueId = null;
@@ -1148,9 +1166,8 @@ export class HardsubController {
           this.targetClickedCueId = cue.id;
           this.activeCueId = cue.id;
           this.highlightActiveCard(cue.id);
-          if (this.previewText) {
-            this.previewText.textContent = cue.text;
-          }
+          this.currentSubtitleText = cue.text;
+          this.renderSubtitleOnCanvas();
           if (this.clickLockTimer) clearTimeout(this.clickLockTimer);
           this.clickLockTimer = setTimeout(() => {
             this.targetClickedCueId = null;
@@ -1164,8 +1181,9 @@ export class HardsubController {
       textarea?.addEventListener('input', () => {
         cue.text = textarea.value;
         this.isSubtitlesModified = true;
-        if (this.activeCueId === cue.id && this.previewText) {
-          this.previewText.textContent = cue.text;
+        if (this.activeCueId === cue.id) {
+          this.currentSubtitleText = cue.text;
+          this.renderSubtitleOnCanvas();
         }
       });
 
@@ -1181,9 +1199,8 @@ export class HardsubController {
           this.activeCueId = clickedCue.id;
           this.highlightActiveCard(clickedCue.id);
         }
-        if (this.previewText) {
-          this.previewText.textContent = clickedCue.text;
-        }
+        this.currentSubtitleText = clickedCue.text;
+        this.renderSubtitleOnCanvas();
         return;
       }
     }
@@ -1195,17 +1212,15 @@ export class HardsubController {
         this.activeCueId = activeCue.id;
         this.highlightActiveCard(activeCue.id);
       }
-      if (this.previewText) {
-        this.previewText.textContent = activeCue.text;
-      }
+      this.currentSubtitleText = activeCue.text;
+      this.renderSubtitleOnCanvas();
     } else {
       if (this.activeCueId !== null) {
         this.activeCueId = null;
         this.highlightActiveCard(null);
       }
-      if (this.previewText) {
-        this.previewText.textContent = 'Sample Subtitle Text';
-      }
+      this.currentSubtitleText = 'Sample Subtitle Text';
+      this.renderSubtitleOnCanvas();
     }
   }
 
@@ -1267,74 +1282,186 @@ export class HardsubController {
   }
 
   private updateLivePreview() {
-    if (!this.previewText) return;
-
     this.updateVideoPreviewOverlayBounds();
+    this.updateColorSwatches();
 
-    if (!this.activeCueId) {
-      this.previewText.textContent = 'Sample Subtitle Text';
-    }
+    // Ensure font is loaded before rendering on canvas
+    const fontSpec = `${this.state.bold ? 'bold ' : ''}${this.state.italic ? 'italic ' : ''}16px '${this.state.fontName}'`;
+    document.fonts.load(fontSpec).then(() => {
+      this.renderSubtitleOnCanvas();
+    }).catch(() => {
+      // Fallback: render with whatever font is available
+      this.renderSubtitleOnCanvas();
+    });
+  }
 
-    this.previewText.style.fontFamily = `'${this.state.fontName}', sans-serif`;
+  /**
+   * Canvas-based subtitle renderer that matches libass/ASS rendering algorithm.
+   * Uses the same PlayResY=288 reference height and scaling logic as FFmpeg's
+   * subtitles filter with original_size parameter.
+   */
+  private renderSubtitleOnCanvas() {
+    const ctx = this.canvasCtx;
+    const canvas = this.subtitleCanvas;
+    if (!ctx || !canvas) return;
 
-    const previewHeight = this.previewBox?.clientHeight || 240;
-    const scaledFontSize = Math.max(4, (this.state.fontSize * previewHeight) / 288);
-    this.previewText.style.fontSize = `${scaledFontSize}px`;
+    const canvasW = canvas.width;
+    const canvasH = canvas.height;
+    if (canvasW === 0 || canvasH === 0) return;
 
-    this.previewText.style.color = this.state.primaryColor;
-    this.previewText.style.fontWeight = this.state.bold ? 'bold' : 'normal';
-    this.previewText.style.fontStyle = this.state.italic ? 'italic' : 'normal';
+    // Clear entire canvas
+    ctx.clearRect(0, 0, canvasW, canvasH);
+
+    const text = this.currentSubtitleText;
+    if (!text) return;
+
+    // --- ASS-matching scale factor ---
+    // PlayResY = 288 (our reference canvas height, same as original_size in FFmpeg)
+    const PLAY_RES_Y = 288;
+    const scaleFactor = canvasH / PLAY_RES_Y;
+
+    const renderedFontSize = Math.max(4, this.state.fontSize * scaleFactor);
+    const renderedOutline = this.state.outlineSize * scaleFactor;
+    const renderedMarginV = this.state.positionY * scaleFactor;
+
+    // --- Font setup ---
+    const fontWeight = this.state.bold ? 'bold' : 'normal';
+    const fontStyle = this.state.italic ? 'italic' : 'normal';
+    ctx.font = `${fontStyle} ${fontWeight} ${renderedFontSize}px '${this.state.fontName}', sans-serif`;
+    ctx.textBaseline = 'alphabetic';
+
+    // --- Split text into lines ---
+    const lines = text.split('\n');
+    const lineHeight = renderedFontSize * 1.35; // ASS default line spacing ≈ 1.35x
+
+    // --- widthMargin is a percentage (e.g. 90 = text occupies 90% of canvas width) ---
+    // Convert to actual pixel side-margin for positioning
+    const maxTextWidth = canvasW * (this.state.widthMargin / 100);
+    const sideMarginPx = (canvasW - maxTextWidth) / 2;
     
-    const scaledPositionY = (this.state.positionY * previewHeight) / 288;
-    this.previewText.style.marginBottom = `${scaledPositionY}px`;
-
-    if (this.state.outlineSize > 0) {
-      const scaledOutlineSize = (this.state.outlineSize * previewHeight) / 288;
-      const c = this.state.outlineColor;
-      (this.previewText.style as any).webkitTextStroke = `${scaledOutlineSize}px ${c}`;
-      (this.previewText.style as any).paintOrder = 'stroke fill';
-      (this.previewText.style as any).webkitPaintOrder = 'stroke fill';
-      (this.previewText.style as any).strokeLinejoin = 'round';
-      (this.previewText.style as any).webkitStrokeLinejoin = 'round';
-      this.previewText.style.textShadow = `0 1px 3px ${c}`;
-    } else {
-      (this.previewText.style as any).webkitTextStroke = '0px transparent';
-      (this.previewText.style as any).paintOrder = 'normal';
-      (this.previewText.style as any).webkitPaintOrder = 'normal';
-      this.previewText.style.textShadow = 'none';
-    }
-
-    if (this.state.bgBox) {
-      const scaledPaddingV = (4 * previewHeight) / 288;
-      const scaledPaddingH = (14 * previewHeight) / 288;
-      const scaledBorderRadius = (6 * previewHeight) / 288;
-      this.previewText.style.backgroundColor = this.state.bgBoxColor;
-      this.previewText.style.padding = `${scaledPaddingV}px ${scaledPaddingH}px`;
-      this.previewText.style.borderRadius = `${scaledBorderRadius}px`;
-    } else {
-      this.previewText.style.backgroundColor = 'transparent';
-      this.previewText.style.padding = '0';
-    }
-
-    if (this.previewBox) {
-      switch (this.state.alignment) {
-        case 1:
-          this.previewBox.style.justifyContent = 'flex-end';
-          this.previewBox.style.alignItems = 'flex-start';
-          break;
-        case 3:
-          this.previewBox.style.justifyContent = 'flex-end';
-          this.previewBox.style.alignItems = 'flex-end';
-          break;
-        case 6:
-          this.previewBox.style.justifyContent = 'flex-start';
-          this.previewBox.style.alignItems = 'center';
-          break;
-        default:
-          this.previewBox.style.justifyContent = 'flex-end';
-          this.previewBox.style.alignItems = 'center';
-          break;
+    // --- Wrap long lines if they exceed available width ---
+    const wrappedLines: string[] = [];
+    for (const line of lines) {
+      const measured = ctx.measureText(line);
+      if (measured.width <= maxTextWidth) {
+        wrappedLines.push(line);
+      } else {
+        // Word-wrap: split by spaces
+        const words = line.split(/(\s+)/);
+        let currentLine = '';
+        for (const word of words) {
+          const testLine = currentLine + word;
+          if (ctx.measureText(testLine).width > maxTextWidth && currentLine.trim()) {
+            wrappedLines.push(currentLine.trim());
+            currentLine = word;
+          } else {
+            currentLine = testLine;
+          }
+        }
+        if (currentLine.trim()) {
+          wrappedLines.push(currentLine.trim());
+        }
       }
+    }
+
+    // --- Compute text block dimensions ---
+    const totalTextHeight = wrappedLines.length * lineHeight;
+
+    // --- Compute alignment-based position (ASS numpad alignment) ---
+    // ASS alignment: 1=BL, 2=BC, 3=BR, 4=ML, 5=MC, 6=TC (mapped as top-center in this app)
+    let anchorX: number; // horizontal anchor
+    let anchorY: number; // Y of the BOTTOM line's baseline
+
+    // Horizontal alignment
+    switch (this.state.alignment) {
+      case 1: // Bottom-Left
+        ctx.textAlign = 'left';
+        anchorX = sideMarginPx;
+        break;
+      case 3: // Bottom-Right
+        ctx.textAlign = 'right';
+        anchorX = canvasW - sideMarginPx;
+        break;
+      case 6: // Top-Center
+        ctx.textAlign = 'center';
+        anchorX = canvasW / 2;
+        break;
+      case 2: // Bottom-Center (default)
+      default:
+        ctx.textAlign = 'center';
+        anchorX = canvasW / 2;
+        break;
+    }
+
+    // Vertical position
+    if (this.state.alignment === 6) {
+      // Top alignment: MarginV from top edge to first line baseline
+      anchorY = renderedMarginV + renderedFontSize;
+    } else {
+      // Bottom alignment: MarginV from bottom edge to last line baseline
+      anchorY = canvasH - renderedMarginV;
+    }
+
+    // --- Draw each line ---
+    for (let i = 0; i < wrappedLines.length; i++) {
+      const lineText = wrappedLines[i];
+      let y: number;
+
+      if (this.state.alignment === 6) {
+        // Top alignment: lines go downward
+        y = anchorY + (i * lineHeight);
+      } else {
+        // Bottom alignment: lines stack upward from bottom
+        y = anchorY - ((wrappedLines.length - 1 - i) * lineHeight);
+      }
+
+      const metrics = ctx.measureText(lineText);
+      
+      // --- Background Box (matching ASS BorderStyle=3) ---
+      if (this.state.bgBox) {
+        const bgColor = this.state.bgBoxColor;
+        const paddingH = 6 * scaleFactor;
+        const paddingV = 2 * scaleFactor;
+
+        // Parse hex color and apply 50% opacity (matching Rust's alpha=128)
+        ctx.save();
+        ctx.fillStyle = bgColor;
+        ctx.globalAlpha = 0.5;
+
+        // Compute box bounds based on text alignment
+        let boxX: number;
+        const boxWidth = metrics.width + paddingH * 2;
+        
+        if (ctx.textAlign === 'center') {
+          boxX = anchorX - metrics.width / 2 - paddingH;
+        } else if (ctx.textAlign === 'right') {
+          boxX = anchorX - metrics.width - paddingH;
+        } else {
+          boxX = anchorX - paddingH;
+        }
+
+        const boxY = y - renderedFontSize - paddingV;
+        const boxHeight = lineHeight + paddingV * 2;
+
+        // Sharp rectangle — NO border-radius (matching ASS BorderStyle=3)
+        ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+        ctx.restore();
+      }
+
+      // --- Outline (matching ASS Outline with contour expansion) ---
+      if (renderedOutline > 0) {
+        ctx.save();
+        ctx.strokeStyle = this.state.outlineColor;
+        ctx.lineWidth = renderedOutline * 2; // ASS Outline expands outward; strokeText is centered
+        ctx.lineJoin = 'round';
+        ctx.miterLimit = 2;
+        ctx.strokeText(lineText, anchorX, y);
+        ctx.restore();
+      }
+
+      // --- Fill text (primary color) ---
+      ctx.fillStyle = this.state.primaryColor;
+      ctx.fillText(lineText, anchorX, y);
     }
 
     this.updateColorSwatches();

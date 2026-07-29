@@ -3961,16 +3961,10 @@ select.select-control {
   background: #3b82f6;
 }
 
-.hardsub-preview-frame {
-  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.6);
-}
-
-#hardsub-preview-text {
-  stroke-linejoin: round !important;
-  -webkit-stroke-linejoin: round !important;
-  stroke-miterlimit: 2 !important;
-  -webkit-stroke-miterlimit: 2 !important;
-  paint-order: stroke fill !important;
+/* Canvas-based subtitle overlay (ASS-matching renderer) */
+#hardsub-subtitle-canvas {
+  image-rendering: auto;
+  /* Position and size controlled by JS to match exact video display area */
 }
 
 /* Studio Hardsub 2.0 Subtitle Block Cards & Scrollbar */
