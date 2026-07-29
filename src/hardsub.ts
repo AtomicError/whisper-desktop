@@ -213,7 +213,6 @@ export class HardsubController {
   // Preview elements
   private previewBox: HTMLElement | null = null;
   private previewText: HTMLElement | null = null;
-  private previewInput: HTMLInputElement | null = null;
 
   // Real Video Player & Media Controls
   private videoElement: HTMLVideoElement | null = null;
@@ -226,6 +225,16 @@ export class HardsubController {
   private videoTimeDisplay: HTMLElement | null = null;
   private prevCueBtn: HTMLButtonElement | null = null;
   private nextCueBtn: HTMLButtonElement | null = null;
+
+  // Player Volume & Fullscreen Controls
+  private videoVolumeBtn: HTMLButtonElement | null = null;
+  private videoIconVolUp: HTMLElement | null = null;
+  private videoIconVolMute: HTMLElement | null = null;
+  private videoVolumeSlider: HTMLInputElement | null = null;
+  private videoFullscreenBtn: HTMLButtonElement | null = null;
+  private videoIconFsEnter: HTMLElement | null = null;
+  private videoIconFsExit: HTMLElement | null = null;
+  private lastVolume: number = 1.0;
 
   // Dual Tab Studio Navigation
   private tabBtnEditor: HTMLButtonElement | null = null;
@@ -295,9 +304,17 @@ export class HardsubController {
       this.setupStudioTabEvents();
       this.setupDragAndDropListeners();
       this.listenToProgressEvents();
-      this.updateLivePreview();
       this.updateEncodingUIState(false);
-      window.addEventListener('resize', () => this.updateVideoPreviewOverlayBounds());
+      this.updateVolumeIcons(1.0, false);
+
+      const container = document.getElementById('hardsub-player-container');
+      if (container) {
+        const resizeObserver = new ResizeObserver(() => {
+          this.updateVideoPreviewOverlayBounds();
+          this.updateLivePreview();
+        });
+        resizeObserver.observe(container);
+      }
     };
 
     if (document.readyState === 'loading') {
@@ -341,7 +358,6 @@ export class HardsubController {
 
     this.previewBox = document.getElementById('hardsub-preview-box');
     this.previewText = document.getElementById('hardsub-preview-text');
-    this.previewInput = document.getElementById('hardsub-preview-input') as HTMLInputElement;
 
     // Video Player & Controls
     this.videoElement = document.getElementById('hardsub-video-element') as HTMLVideoElement;
@@ -354,6 +370,15 @@ export class HardsubController {
     this.videoTimeDisplay = document.getElementById('hardsub-video-time');
     this.prevCueBtn = document.getElementById('hardsub-btn-prev-cue') as HTMLButtonElement;
     this.nextCueBtn = document.getElementById('hardsub-btn-next-cue') as HTMLButtonElement;
+
+    // Player Volume & Fullscreen Controls
+    this.videoVolumeBtn = document.getElementById('hardsub-btn-volume') as HTMLButtonElement;
+    this.videoIconVolUp = document.getElementById('hardsub-icon-vol-up');
+    this.videoIconVolMute = document.getElementById('hardsub-icon-vol-mute');
+    this.videoVolumeSlider = document.getElementById('hardsub-volume-slider') as HTMLInputElement;
+    this.videoFullscreenBtn = document.getElementById('hardsub-btn-fullscreen') as HTMLButtonElement;
+    this.videoIconFsEnter = document.getElementById('hardsub-icon-fs-enter');
+    this.videoIconFsExit = document.getElementById('hardsub-icon-fs-exit');
 
     // Dropzone Elements
     this.videoDropZone = document.getElementById('hardsub-video-drop-zone');
@@ -460,11 +485,6 @@ export class HardsubController {
     // Font Select
     this.fontSelect?.addEventListener('change', () => {
       this.state.fontName = this.fontSelect!.value;
-      this.updateLivePreview();
-    });
-
-    // Custom Live Preview Text Input
-    this.previewInput?.addEventListener('input', () => {
       this.updateLivePreview();
     });
 
@@ -671,7 +691,7 @@ export class HardsubController {
       if (this.videoStatusBadge && this.videoElement?.paused) {
         this.videoStatusBadge.textContent = 'Video Loaded';
         this.videoStatusBadge.style.background = 'rgba(45, 127, 255, 0.15)';
-        this.videoStatusBadge.style.color = 'var(--color-cyan)';
+        this.videoStatusBadge.style.color = 'var(--color-royal-blue)';
       }
     });
 
@@ -691,7 +711,7 @@ export class HardsubController {
       if (this.videoStatusBadge) {
         this.videoStatusBadge.textContent = 'Paused';
         this.videoStatusBadge.style.background = 'rgba(45, 127, 255, 0.15)';
-        this.videoStatusBadge.style.color = 'var(--color-cyan)';
+        this.videoStatusBadge.style.color = 'var(--color-royal-blue)';
       }
     });
 
@@ -747,6 +767,95 @@ export class HardsubController {
         this.videoElement.currentTime = next.startMs / 1000;
       }
     });
+
+    // Volume slider & Mute button listeners
+    this.videoVolumeSlider?.addEventListener('input', () => {
+      if (this.videoElement && this.videoVolumeSlider) {
+        const val = parseFloat(this.videoVolumeSlider.value);
+        this.videoElement.volume = val;
+        this.videoElement.muted = (val === 0);
+        this.updateVolumeIcons(val, this.videoElement.muted);
+        if (val > 0) {
+          this.lastVolume = val;
+        }
+      }
+    });
+
+    this.videoVolumeSlider?.addEventListener('change', () => {
+      this.videoVolumeSlider?.blur();
+    });
+
+    this.videoVolumeBtn?.addEventListener('click', () => {
+      if (this.videoElement) {
+        const isMuted = !this.videoElement.muted;
+        this.videoElement.muted = isMuted;
+        
+        let volumeToSet = parseFloat(this.videoVolumeSlider?.value || '1');
+        if (isMuted) {
+          const currentSliderVal = parseFloat(this.videoVolumeSlider?.value || '1');
+          if (currentSliderVal > 0) {
+            this.lastVolume = currentSliderVal;
+          }
+          volumeToSet = 0;
+        } else {
+          volumeToSet = this.lastVolume > 0 ? this.lastVolume : 0.8;
+          this.videoElement.volume = volumeToSet;
+        }
+        
+        this.updateVolumeIcons(volumeToSet, isMuted);
+        this.videoVolumeBtn?.blur();
+      }
+    });
+
+    // Fullscreen Toggle
+    this.videoFullscreenBtn?.addEventListener('click', () => {
+      const container = document.getElementById('hardsub-player-container');
+      if (!container) return;
+
+      if (!document.fullscreenElement) {
+        container.requestFullscreen().catch((err) => {
+          console.warn('Error entering fullscreen:', err);
+        });
+      } else {
+        document.exitFullscreen();
+      }
+    });
+
+    // Listen to Fullscreen changes
+    document.addEventListener('fullscreenchange', () => {
+      const isFs = !!document.fullscreenElement;
+      if (this.videoIconFsEnter) this.videoIconFsEnter.style.display = isFs ? 'none' : 'block';
+      if (this.videoIconFsExit) this.videoIconFsExit.style.display = isFs ? 'block' : 'none';
+    });
+
+    // Auto-hide controls inside player container on mouse inactivity (especially for fullscreen)
+    const container = document.getElementById('hardsub-player-container');
+    const controls = document.getElementById('hardsub-video-controls');
+    let controlsTimeout: any = null;
+
+    const showControlsFunc = () => {
+      if (!controls) return;
+      controls.classList.add('show-controls');
+      if (container) container.style.cursor = 'default';
+      
+      if (controlsTimeout) clearTimeout(controlsTimeout);
+      controlsTimeout = setTimeout(() => {
+        const isHoveringControls = controls.matches(':hover');
+        if (this.videoElement && !this.videoElement.paused && !isHoveringControls) {
+          controls.classList.remove('show-controls');
+          if (document.fullscreenElement && container) {
+            container.style.cursor = 'none';
+          }
+        }
+      }, 2500);
+    };
+
+    container?.addEventListener('mousemove', showControlsFunc);
+    container?.addEventListener('mouseenter', showControlsFunc);
+    container?.addEventListener('click', showControlsFunc);
+
+    this.videoElement.addEventListener('play', showControlsFunc);
+    this.videoElement.addEventListener('pause', showControlsFunc);
   }
 
   private setupDragAndDropListeners() {
@@ -840,6 +949,8 @@ export class HardsubController {
       this.previewBox.style.height = '100%';
       this.previewBox.style.left = '0px';
       this.previewBox.style.top = '0px';
+      this.previewBox.style.right = 'auto';
+      this.previewBox.style.bottom = 'auto';
       return;
     }
 
@@ -864,12 +975,33 @@ export class HardsubController {
     this.previewBox.style.height = `${displayHeight}px`;
     this.previewBox.style.left = `${left}px`;
     this.previewBox.style.top = `${top}px`;
+    this.previewBox.style.right = 'auto';
+    this.previewBox.style.bottom = 'auto';
   }
 
   private updateSeekSliderProgress(pct: number) {
     if (this.videoSeekSlider) {
       const val = Math.max(0, Math.min(100, pct));
       this.videoSeekSlider.style.background = `linear-gradient(to right, var(--color-royal-blue) 0%, var(--color-royal-blue) ${val}%, rgba(255, 255, 255, 0.1) ${val}%, rgba(255, 255, 255, 0.1) 100%)`;
+    }
+  }
+
+  private updateVolumeIcons(volume: number, muted: boolean) {
+    if (muted || volume === 0) {
+      if (this.videoIconVolUp) this.videoIconVolUp.style.display = 'none';
+      if (this.videoIconVolMute) this.videoIconVolMute.style.display = 'block';
+      if (this.videoVolumeSlider) {
+        this.videoVolumeSlider.value = '0';
+        this.videoVolumeSlider.style.background = `linear-gradient(to right, var(--color-royal-blue) 0%, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.1) 100%)`;
+      }
+    } else {
+      if (this.videoIconVolUp) this.videoIconVolUp.style.display = 'block';
+      if (this.videoIconVolMute) this.videoIconVolMute.style.display = 'none';
+      if (this.videoVolumeSlider) {
+        this.videoVolumeSlider.value = String(volume);
+        const pct = volume * 100;
+        this.videoVolumeSlider.style.background = `linear-gradient(to right, var(--color-royal-blue) 0%, var(--color-royal-blue) ${pct}%, rgba(255, 255, 255, 0.1) ${pct}%, rgba(255, 255, 255, 0.1) 100%)`;
+      }
     }
   }
 
@@ -920,10 +1052,11 @@ export class HardsubController {
       this.videoElement.src = streamUrl;
       this.videoElement.style.display = 'block';
       if (this.videoPlaceholder) this.videoPlaceholder.style.display = 'none';
+      if (this.previewBox) this.previewBox.style.display = 'flex';
       if (this.videoStatusBadge) {
         this.videoStatusBadge.textContent = 'Video Loaded';
         this.videoStatusBadge.style.background = 'rgba(45, 127, 255, 0.15)';
-        this.videoStatusBadge.style.color = 'var(--color-cyan)';
+        this.videoStatusBadge.style.color = 'var(--color-royal-blue)';
       }
       this.updateVideoDropzoneUI(videoPath);
       this.updateVideoPreviewOverlayBounds();
@@ -1070,8 +1203,8 @@ export class HardsubController {
         this.activeCueId = null;
         this.highlightActiveCard(null);
       }
-      if (this.previewText && this.previewInput) {
-        this.previewText.textContent = this.previewInput.value || 'Sample Subtitle Live Preview Text';
+      if (this.previewText) {
+        this.previewText.textContent = 'Sample Subtitle Text';
       }
     }
   }
@@ -1138,25 +1271,27 @@ export class HardsubController {
 
     this.updateVideoPreviewOverlayBounds();
 
-    if (this.previewInput && this.previewInput.value && !this.activeCueId) {
-      this.previewText.textContent = this.previewInput.value;
+    if (!this.activeCueId) {
+      this.previewText.textContent = 'Sample Subtitle Text';
     }
 
     this.previewText.style.fontFamily = `'${this.state.fontName}', sans-serif`;
 
     const previewHeight = this.previewBox?.clientHeight || 240;
-    const scaledFontSize = Math.max(10, (this.state.fontSize * previewHeight) / 288);
+    const scaledFontSize = Math.max(4, (this.state.fontSize * previewHeight) / 288);
     this.previewText.style.fontSize = `${scaledFontSize}px`;
 
     this.previewText.style.color = this.state.primaryColor;
     this.previewText.style.fontWeight = this.state.bold ? 'bold' : 'normal';
     this.previewText.style.fontStyle = this.state.italic ? 'italic' : 'normal';
-    this.previewText.style.marginBottom = `${this.state.positionY}px`;
+    
+    const scaledPositionY = (this.state.positionY * previewHeight) / 288;
+    this.previewText.style.marginBottom = `${scaledPositionY}px`;
 
     if (this.state.outlineSize > 0) {
-      const s = this.state.outlineSize;
+      const scaledOutlineSize = (this.state.outlineSize * previewHeight) / 288;
       const c = this.state.outlineColor;
-      (this.previewText.style as any).webkitTextStroke = `${s}px ${c}`;
+      (this.previewText.style as any).webkitTextStroke = `${scaledOutlineSize}px ${c}`;
       (this.previewText.style as any).paintOrder = 'stroke fill';
       (this.previewText.style as any).webkitPaintOrder = 'stroke fill';
       (this.previewText.style as any).strokeLinejoin = 'round';
@@ -1170,9 +1305,12 @@ export class HardsubController {
     }
 
     if (this.state.bgBox) {
+      const scaledPaddingV = (4 * previewHeight) / 288;
+      const scaledPaddingH = (14 * previewHeight) / 288;
+      const scaledBorderRadius = (6 * previewHeight) / 288;
       this.previewText.style.backgroundColor = this.state.bgBoxColor;
-      this.previewText.style.padding = '4px 14px';
-      this.previewText.style.borderRadius = '6px';
+      this.previewText.style.padding = `${scaledPaddingV}px ${scaledPaddingH}px`;
+      this.previewText.style.borderRadius = `${scaledBorderRadius}px`;
     } else {
       this.previewText.style.backgroundColor = 'transparent';
       this.previewText.style.padding = '0';

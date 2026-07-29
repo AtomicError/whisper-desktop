@@ -222,21 +222,40 @@ pub async fn run_hardsub_task(
         active: true,
     });
 
-    // Probe duration using ffprobe
+    // Probe duration, width, and height using ffprobe
     let mut total_duration_sec = 0.0;
+    let mut video_width = 1920;
+    let mut video_height = 1080;
+
     let probe_out = std::process::Command::new("ffprobe")
         .args([
             "-v", "error",
-            "-show_entries", "format=duration",
-            "-of", "default=noprint_wrappers=1:nokey=1",
+            "-show_entries", "format=duration:stream=width,height",
+            "-of", "json",
             &settings.video_path,
         ])
         .output();
+
     if let Ok(out) = probe_out {
-        if let Ok(secs) = String::from_utf8_lossy(&out.stdout).trim().parse::<f64>() {
-            total_duration_sec = secs;
+        if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&out.stdout) {
+            if let Some(duration_str) = json.pointer("/format/duration").and_then(|v| v.as_str()) {
+                if let Ok(secs) = duration_str.parse::<f64>() {
+                    total_duration_sec = secs;
+                }
+            }
+            if let Some(streams) = json.pointer("/streams").and_then(|v| v.as_array()) {
+                for stream in streams {
+                    if let (Some(w), Some(h)) = (stream.get("width").and_then(|v| v.as_u64()), stream.get("height").and_then(|v| v.as_u64())) {
+                        video_width = w as u32;
+                        video_height = h as u32;
+                        break;
+                    }
+                }
+            }
         }
     }
+
+    logs.log(&app, "Hardsub", &format!("Probed video dimensions: {}x{} (Aspect: {:.3})", video_width, video_height, video_width as f64 / video_height as f64));
 
     // Construct Subtitle Style (force_style parameters)
     let safe_font_name = settings.font_name.replace(',', "").replace('\'', "").replace('"', "");
@@ -272,7 +291,18 @@ pub async fn run_hardsub_task(
         .replace(']', "\\]")
         .replace(',', "\\,");
 
-    let sub_filter = format!("subtitles='{}':force_style='{}'", escaped_sub_path, force_style);
+    // Calculate original size for FFmpeg to match the 288px height preview scale
+    let video_aspect = if video_height > 0 { video_width as f64 / video_height as f64 } else { 1.777 };
+    let ref_height = 288;
+    let ref_width = (288.0 * video_aspect).round() as u32;
+
+    let sub_filter = format!(
+        "subtitles='{}':original_size={}x{}:force_style='{}'",
+        escaped_sub_path,
+        ref_width,
+        ref_height,
+        force_style
+    );
 
     // Build FFmpeg Arguments
     let mut ffmpeg_args: Vec<String> = Vec::new();

@@ -1693,7 +1693,7 @@
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px; height:20px;"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
                       Real Video Frame Preview
                     </h3>
-                    <span id="hardsub-video-status-badge" style="font-size: 0.75rem; background: rgba(45, 127, 255, 0.15); color: var(--color-cyan); padding: 3px 8px; border-radius: 12px; font-weight: 500;">Standing By</span>
+                    <span id="hardsub-video-status-badge" style="font-size: 0.75rem; background: rgba(45, 127, 255, 0.15); color: var(--color-royal-blue); padding: 3px 8px; border-radius: 12px; font-weight: 500;">Standing By</span>
                   </div>
 
                   <!-- Frame Viewport Outer Container -->
@@ -1703,48 +1703,73 @@
                     <video id="hardsub-video-element" style="width: 100%; height: 100%; max-height: 320px; object-fit: contain; display: none;"></video>
                     
                     <!-- Video Placeholder state when no video is selected -->
-                    <div id="hardsub-video-placeholder" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 40px; color: var(--color-text-muted); text-align: center;">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width: 48px; height: 48px; opacity: 0.5;"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
-                      <span style="font-size: 0.88rem;">Select a video file above to enable real-frame live preview</span>
+                    <div id="hardsub-video-placeholder" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 40px; text-align: center; cursor: pointer;">
+                      <div class="premium-play-trigger" title="Select a video file">
+                        <svg class="modern-player-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <!-- Waveform play emblem in the center -->
+                          <path class="wave-bar bar-1" d="M18 14V34" stroke="url(#btn-grad)" stroke-width="3" stroke-linecap="round"/>
+                          <path class="wave-bar bar-2" d="M24 18V30" stroke="url(#btn-grad)" stroke-width="3" stroke-linecap="round"/>
+                          <path class="wave-bar bar-3" d="M30 21V27" stroke="url(#btn-grad)" stroke-width="3" stroke-linecap="round"/>
+                          <path class="wave-bar bar-4" d="M36 24V24" stroke="url(#btn-grad)" stroke-width="3" stroke-linecap="round"/>
+                          
+                          <!-- Gradient definition -->
+                          <defs>
+                            <linearGradient id="btn-grad" x1="4" y1="4" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+                              <stop offset="0%" stop-color="var(--color-royal-blue)" />
+                              <stop offset="100%" stop-color="var(--color-cyan)" />
+                            </linearGradient>
+                          </defs>
+                        </svg>
+                      </div>
+                      <span style="font-size: 0.85rem; color: var(--color-text-muted); font-weight: 500; max-width: 240px; line-height: 1.4;">Select a video file above to enable real-frame live preview</span>
                     </div>
 
                     <!-- Live Subtitle Overlay Box -->
-                    <div class="hardsub-preview-frame" id="hardsub-preview-box" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding: 16px; box-sizing: border-box; overflow: hidden; z-index: 5;">
+                    <div class="hardsub-preview-frame" id="hardsub-preview-box" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; display: none; flex-direction: column; justify-content: flex-end; align-items: center; padding: 16px; box-sizing: border-box; overflow: hidden; z-index: 5;">
                       <div id="hardsub-preview-text" style="text-align: center; max-width: 90%; transition: opacity 0.1s ease; text-wrap: pretty;">
-                        Sample Subtitle Live Preview Text
+                        Sample Subtitle Text
                       </div>
                     </div>
-                  </div>
 
-                  <!-- Custom Interactive Video Control Bar -->
-                  <div id="hardsub-video-controls" style="display: flex; flex-direction: column; gap: 8px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); padding: 10px 14px; border-radius: 8px;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                      <!-- Play / Pause Button -->
-                      <button id="hardsub-btn-play" class="pill-btn" style="padding: 6px 12px; height: 32px; gap: 4px;" title="Play / Pause Video">
-                        <svg id="hardsub-icon-play" viewBox="0 0 24 24" fill="currentColor" style="width:14px; height:14px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                        <svg id="hardsub-icon-pause" viewBox="0 0 24 24" fill="currentColor" style="width:14px; height:14px; display:none;"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-                      </button>
+                    <!-- Custom Interactive Video Control Bar (Inside player container for fullscreen) -->
+                    <div id="hardsub-video-controls">
+                      <div style="display: flex; align-items: center; gap: 10px;">
+                        <!-- Play / Pause Button -->
+                        <button id="hardsub-btn-play" class="pill-btn" style="padding: 6px 12px; height: 32px; gap: 4px;" title="Play / Pause Video">
+                          <svg id="hardsub-icon-play" viewBox="0 0 24 24" fill="currentColor" style="width:14px; height:14px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                          <svg id="hardsub-icon-pause" viewBox="0 0 24 24" fill="currentColor" style="width:14px; height:14px; display:none;"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                        </button>
 
-                      <!-- Prev / Next Subtitle Jump Buttons -->
-                      <button id="hardsub-btn-prev-cue" class="pill-btn" style="padding: 6px 8px; height: 32px;" title="Previous Subtitle Cue">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/></svg>
-                      </button>
-                      <button id="hardsub-btn-next-cue" class="pill-btn" style="padding: 6px 8px; height: 32px;" title="Next Subtitle Cue">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
-                      </button>
+                        <!-- Prev / Next Subtitle Jump Buttons -->
+                        <button id="hardsub-btn-prev-cue" class="pill-btn" style="padding: 6px 8px; height: 32px;" title="Previous Subtitle Cue">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/></svg>
+                        </button>
+                        <button id="hardsub-btn-next-cue" class="pill-btn" style="padding: 6px 8px; height: 32px;" title="Next Subtitle Cue">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
+                        </button>
 
-                      <!-- Scrub Slider -->
-                      <input type="range" id="hardsub-video-seek" min="0" max="100" value="0" step="0.1" class="range-slider" style="flex:1;" />
+                        <!-- Volume Controls -->
+                        <div class="volume-control-wrapper">
+                          <button id="hardsub-btn-volume" class="pill-btn" style="padding: 6px 8px; height: 32px; z-index: 2;" title="Mute / Unmute">
+                            <svg id="hardsub-icon-vol-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                            <svg id="hardsub-icon-vol-mute" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px; display:none;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+                          </button>
+                          <input type="range" id="hardsub-volume-slider" min="0" max="1" step="0.05" value="1" class="volume-slider" style="width: 0px; opacity: 0; pointer-events: none; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); height: 4px; margin: 0; -webkit-appearance: none; appearance: none; background: rgba(255, 255, 255, 0.1); border-radius: 2px; outline: none;" />
+                        </div>
 
-                      <!-- Time Display -->
-                      <span id="hardsub-video-time" style="font-family: monospace; font-size: 0.98rem; font-weight: 600; color: var(--color-cyan); min-width: 120px; text-align: right;">00:00 / 00:00</span>
+                        <!-- Scrub Slider -->
+                        <input type="range" id="hardsub-video-seek" min="0" max="100" value="0" step="0.1" class="range-slider" style="flex:1;" />
+
+                        <!-- Time Display -->
+                        <span id="hardsub-video-time" style="font-family: monospace; font-size: 0.98rem; font-weight: 600; color: var(--color-royal-blue); min-width: 120px; text-align: right;">00:00 / 00:00</span>
+
+                        <!-- Fullscreen Button -->
+                        <button id="hardsub-btn-fullscreen" class="pill-btn" style="padding: 6px 8px; height: 32px;" title="Toggle Fullscreen">
+                          <svg id="hardsub-icon-fs-enter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+                          <svg id="hardsub-icon-fs-exit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px; display:none;"><path d="M4 14h6v6m10-6h-6v6M4 10h6V4m10 6h-6V4"/></svg>
+                        </button>
+                      </div>
                     </div>
-                  </div>
-
-                  <!-- Custom Live Preview Text Input -->
-                  <div>
-                    <label style="font-size: 0.78rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Custom Sample Text (for test rendering when paused)</label>
-                    <input type="text" class="text-input" id="hardsub-preview-input" value="Sample Subtitle Live Preview Text" placeholder="Type sample text to test font rendering..." style="width: 100%; font-size: 0.85rem;" />
                   </div>
                 </div>
 
@@ -1756,12 +1781,12 @@
                         <div class="hud-pulse-dot" id="hardsub-hud-pulse"></div>
                         <span class="radial-msg" id="hardsub-status-text" style="font-weight: 600; font-size: 0.92rem;">Standing By</span>
                       </div>
-                      <span class="radial-pct" id="hardsub-pct-text" style="font-weight: 700; color: var(--color-cyan); font-family: monospace; font-size: 1.15rem;">0%</span>
+                      <span class="radial-pct" id="hardsub-pct-text" style="font-weight: 700; color: var(--color-royal-blue); font-family: monospace; font-size: 1.15rem;">0%</span>
                     </div>
 
                     <!-- Enhanced High-Tech Progress Bar -->
                     <div class="progress-linear-track" style="height: 12px; background: rgba(0,0,0,0.5); border-radius: 6px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); position: relative; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);">
-                      <div class="progress-linear-fill" id="hardsub-progress-fill" style="width: 0%; height:100%; background: linear-gradient(90deg, var(--color-royal-blue), var(--color-cyan)); border-radius: 6px; transition: width 0.3s ease; box-shadow: 0 0 12px rgba(45,127,255,0.6);"></div>
+                      <div class="progress-linear-fill" id="hardsub-progress-fill" style="width: 0%; height:100%; background: var(--color-royal-blue); border-radius: 6px; transition: width 0.3s ease; box-shadow: 0 0 12px rgba(45,127,255,0.6);"></div>
                     </div>
                   </div>
 
@@ -1802,7 +1827,7 @@
                       <input type="text" id="hardsub-search-input" class="text-input" placeholder="Search subtitle text..." style="width: 100%; padding-left: 32px; font-size: 0.85rem;" />
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--color-text-muted);"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                     </div>
-                    <span id="hardsub-subtitle-count" style="font-size: 0.95rem; font-weight: 600; font-family: monospace; background: rgba(255,255,255,0.08); padding: 8px 14px; border-radius: 8px; color: var(--color-cyan); white-space: nowrap; border: 1px solid rgba(255,255,255,0.08);">0 Cues</span>
+                    <span id="hardsub-subtitle-count" style="font-size: 0.95rem; font-weight: 600; font-family: monospace; background: rgba(45, 127, 255, 0.05); padding: 8px 14px; border-radius: 8px; color: var(--color-royal-blue); white-space: nowrap; border: 1px solid rgba(45, 127, 255, 0.2);">0 Cues</span>
                   </div>
 
                   <!-- Subtitle Cue Blocks Scrollable List -->
@@ -1912,7 +1937,7 @@
                               </button>
                             </div>
                           </div>
-                          <input type="range" class="range-slider" id="hardsub-fontsize" min="12" max="64" value="24" style="width:100%;" />
+                          <input type="range" class="range-slider" id="hardsub-fontsize" min="6" max="64" value="24" style="width:100%;" />
                         </div>
 
                         <!-- Outline Color & Size Slider -->

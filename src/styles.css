@@ -3929,7 +3929,7 @@ select.select-control {
 .pill-btn.active {
   background: var(--color-royal-blue);
   color: #ffffff;
-  border-color: var(--color-cyan);
+  border-color: rgba(255, 255, 255, 0.25);
   box-shadow: 0 0 10px rgba(45, 127, 255, 0.4);
 }
 
@@ -3993,7 +3993,7 @@ select.select-control {
 
 .subtitle-cue-card.active {
   background: rgba(30, 58, 138, 0.35);
-  border-color: var(--color-cyan);
+  border-color: var(--color-royal-blue);
   box-shadow: 0 0 12px rgba(45, 127, 255, 0.3);
 }
 
@@ -4006,7 +4006,7 @@ select.select-control {
 }
 
 .subtitle-cue-time {
-  color: var(--color-cyan);
+  color: var(--color-royal-blue);
   background: rgba(45, 127, 255, 0.12);
   padding: 2px 6px;
   border-radius: 4px;
@@ -4130,12 +4130,166 @@ select.select-control {
   box-shadow: 0 0 6px rgba(255, 255, 255, 0.5);
 }
 
-.swatch-card {
-  transition: border-color 0.2s ease;
-}
-
 .swatch-card:hover {
   border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Hover-to-expand Volume Controller */
+.volume-control-wrapper {
+  display: flex;
+  align-items: center;
+  transition: all 0.25s ease;
+}
+
+.volume-control-wrapper:hover .volume-slider,
+.volume-control-wrapper:focus-within .volume-slider {
+  width: 60px !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  margin-left: 8px !important;
+}
+
+/* Custom styling for the volume slider to make its thumb smaller and elegant */
+.volume-slider {
+  background: rgba(255, 255, 255, 0.1);
+  height: 4px;
+  border-radius: 2px;
+  outline: none;
+  transition: background 0.15s ease, width 0.25s ease, opacity 0.25s ease;
+}
+
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 4px rgba(45, 127, 255, 0.8);
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.volume-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.25);
+}
+
+.volume-slider::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 4px rgba(45, 127, 255, 0.8);
+  cursor: pointer;
+  border: none;
+  transition: transform 0.1s ease;
+}
+
+.volume-slider::-moz-range-thumb:hover {
+  transform: scale(1.25);
+}
+
+/* Premium Floating Play Trigger (No background) */
+.premium-play-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+.premium-play-trigger:hover {
+  transform: scale(1.08);
+}
+
+.premium-play-trigger:active {
+  transform: scale(0.96);
+}
+
+.modern-player-icon {
+  width: 56px;
+  height: 56px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.premium-play-trigger:hover .modern-player-icon {
+  filter: drop-shadow(0 0 8px var(--color-royal-blue)) drop-shadow(0 0 16px rgba(6, 182, 212, 0.4));
+}
+
+.wave-bar {
+  transition: opacity 0.2s ease;
+}
+
+/* High-Contrast Video Controls & Auto-Hide positioning */
+#hardsub-video-element {
+  width: 100%;
+  height: 100%;
+  max-height: 320px;
+  object-fit: contain;
+}
+
+/* In fullscreen mode, allow video to scale fully without capping height */
+#hardsub-player-container:fullscreen #hardsub-video-element {
+  max-height: 100% !important;
+}
+
+#hardsub-video-controls {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.4) 75%, transparent 100%) !important;
+  border: none !important;
+  border-radius: 0 0 10px 10px;
+  padding: 24px 16px 12px 16px !important;
+  box-sizing: border-box;
+  
+  /* Hide by default, show on container hover or show-controls class active */
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+              transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#hardsub-player-container:hover #hardsub-video-controls,
+#hardsub-video-controls.show-controls {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+#hardsub-video-controls .pill-btn {
+  color: rgba(255, 255, 255, 0.8) !important; /* Brighter default text/icon color */
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: all 0.15s ease;
+}
+
+#hardsub-video-controls .pill-btn:hover {
+  color: #ffffff !important; /* Pure white on hover */
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+#hardsub-video-controls .pill-btn:active {
+  background: rgba(255, 255, 255, 0.18);
+  transform: scale(0.96);
+}
+
+#hardsub-video-controls .pill-btn.active {
+  background: var(--color-royal-blue);
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.25);
 }
 
 
