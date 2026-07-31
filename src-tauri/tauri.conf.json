@@ -38,7 +38,8 @@
       "resources/whisper-cli-standard",
       "resources/whisper-cli-vulkan",
       "resources/whisper-cli-openvino",
-      "resources/whisper-cli-cuda"
+      "resources/whisper-cli-cuda",
+      "resources/fonts/*"
     ],
     "category": "Utility",
     "icon": [

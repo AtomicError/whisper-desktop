@@ -259,7 +259,7 @@ export class HardsubController {
   // Canvas-based subtitle preview (ASS-matching renderer)
   private subtitleCanvas: HTMLCanvasElement | null = null;
   private canvasCtx: CanvasRenderingContext2D | null = null;
-  private currentSubtitleText: string = 'Sample Subtitle Text';
+  private currentSubtitleText: string = '';
 
   // Computed video display dimensions (updated by updateVideoPreviewOverlayBounds)
   private videoDisplayWidth: number = 0;
@@ -1281,7 +1281,7 @@ export class HardsubController {
         this.activeCueId = null;
         this.highlightActiveCard(null);
       }
-      this.currentSubtitleText = 'Sample Subtitle Text';
+      this.currentSubtitleText = '';
       this.renderSubtitleOnCanvas();
     }
   }

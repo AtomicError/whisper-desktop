@@ -3,7 +3,7 @@ use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use std::time::Instant;
 
 use crate::logger::AppLogs;
@@ -61,7 +61,6 @@ pub fn get_system_fonts(_app: AppHandle) -> Vec<FontItem> {
         ("Shabnam", "bundled"),
         ("Samim", "bundled"),
         ("Sahel", "bundled"),
-        ("Lalezar", "bundled"),
         ("Inter", "bundled"),
         ("Roboto", "bundled"),
         ("Outfit", "bundled"),
@@ -353,16 +352,28 @@ pub async fn run_hardsub_task(
         force_style.push_str(&format!(",BackColour={}", ass_bg_color));
     }
 
+    let fonts_dir_opt = if let Ok(path) = app.path().resolve("resources/fonts", tauri::path::BaseDirectory::Resource) {
+        if path.exists() {
+            format!(":fontsdir='{}'", path.to_string_lossy().replace('\\', "/").replace('\'', "'\\''"))
+        } else {
+            "".to_string()
+        }
+    } else {
+        "".to_string()
+    };
+
     let is_ass = settings.subtitle_path.ends_with(".ass") || settings.subtitle_path.ends_with(".temp.ass");
     let sub_filter = if is_ass {
         format!(
-            "subtitles='{}'",
-            escaped_sub_path
+            "subtitles='{}'{}",
+            escaped_sub_path,
+            fonts_dir_opt
         )
     } else {
         format!(
-            "subtitles='{}':original_size={}x{}:force_style='{}'",
+            "subtitles='{}'{}:original_size={}x{}:force_style='{}'",
             escaped_sub_path,
+            fonts_dir_opt,
             ref_width,
             ref_height,
             force_style
