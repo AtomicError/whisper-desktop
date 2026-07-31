@@ -25,6 +25,8 @@ pub struct HardsubSettings {
     pub outline_size: u32,
     pub bg_box: bool,
     pub bg_box_color: String,
+    pub bg_box_opacity: u8,
+    pub bg_box_radius: u32,
     pub position_y: u32,       // MarginV offset
     pub width_margin: u32,
     pub bold: bool,
@@ -146,6 +148,25 @@ fn hex_to_ass_color(hex: &str, alpha: u8) -> String {
     format!("&H{:02X}{}{}{}&", alpha, b, g, r)
 }
 
+/// ASS stores transparency inversely: 00 is fully opaque and FF is fully transparent.
+fn opacity_percent_to_ass_alpha(opacity: u8) -> u8 {
+    let clamped = opacity.min(100);
+    255 - ((clamped as u16 * 255 + 50) / 100) as u8
+}
+
+#[cfg(test)]
+mod tests {
+    use super::opacity_percent_to_ass_alpha;
+
+    #[test]
+    fn converts_opacity_to_ass_transparency() {
+        assert_eq!(opacity_percent_to_ass_alpha(0), 255);
+        assert_eq!(opacity_percent_to_ass_alpha(50), 127);
+        assert_eq!(opacity_percent_to_ass_alpha(100), 0);
+        assert_eq!(opacity_percent_to_ass_alpha(255), 0);
+    }
+}
+
 #[tauri::command]
 pub async fn start_hardsub_task(
     app: AppHandle,
@@ -190,6 +211,30 @@ pub async fn run_hardsub_task(
     session: Arc<std::sync::Mutex<crate::TranscriptionSession>>,
     mut settings: HardsubSettings,
 ) -> Result<HardsubResult, String> {
+    struct TempAssCleanupGuard<'a> {
+        path: &'a str,
+        logs: Arc<AppLogs>,
+        app: AppHandle,
+    }
+
+    impl<'a> Drop for TempAssCleanupGuard<'a> {
+        fn drop(&mut self) {
+            if self.path.ends_with(".temp.ass") {
+                let p = Path::new(self.path);
+                if p.exists() {
+                    let _ = std::fs::remove_file(p);
+                    self.logs.log(&self.app, "Hardsub", &format!("Cleaned up temporary subtitle file: {}", self.path));
+                }
+            }
+        }
+    }
+
+    let _cleanup_guard = TempAssCleanupGuard {
+        path: &settings.subtitle_path,
+        logs: logs.clone(),
+        app: app.clone(),
+    };
+
     let start_time = Instant::now();
 
     // Auto-increment output filename if file already exists on disk
@@ -261,8 +306,13 @@ pub async fn run_hardsub_task(
     let safe_font_name = settings.font_name.replace(',', "").replace('\'', "").replace('"', "");
     let ass_primary_color = hex_to_ass_color(&settings.primary_color, 0); // 00 = fully opaque
     let ass_outline_color = hex_to_ass_color(&settings.outline_color, 0);
-    let border_style = if settings.bg_box { 3 } else { 1 };
-    let ass_bg_color = hex_to_ass_color(&settings.bg_box_color, 128); // 80 = 50% opacity
+    // BorderStyle=4 is a libass extension that renders one background box for
+    // the entire subtitle event. BorderStyle=3 creates one box per line.
+    let border_style = if settings.bg_box { 4 } else { 1 };
+    let ass_bg_color = hex_to_ass_color(
+        &settings.bg_box_color,
+        opacity_percent_to_ass_alpha(settings.bg_box_opacity),
+    );
 
     // Resolve subtitle path escaping for FFmpeg filtergraph
     let escaped_sub_path = settings.subtitle_path
@@ -283,13 +333,14 @@ pub async fn run_hardsub_task(
     let margin_lr = ((100u32.saturating_sub(settings.width_margin)) as f64 / 200.0 * ref_width as f64).round() as u32;
 
     let mut force_style = format!(
-        "FontName={},FontSize={},PrimaryColour={},OutlineColour={},Outline={},BorderStyle={},Shadow=0,MarginV={},MarginL={},MarginR={},Alignment={},Bold={},Italic={}",
+        "FontName={},FontSize={},PrimaryColour={},OutlineColour={},Outline={},BorderStyle={},Shadow={},MarginV={},MarginL={},MarginR={},Alignment={},Bold={},Italic={}",
         safe_font_name,
         settings.font_size,
         ass_primary_color,
         ass_outline_color,
         settings.outline_size,
         border_style,
+        if settings.bg_box { 6 } else { 0 },
         settings.position_y,
         margin_lr,
         margin_lr,
@@ -302,13 +353,21 @@ pub async fn run_hardsub_task(
         force_style.push_str(&format!(",BackColour={}", ass_bg_color));
     }
 
-    let sub_filter = format!(
-        "subtitles='{}':original_size={}x{}:force_style='{}'",
-        escaped_sub_path,
-        ref_width,
-        ref_height,
-        force_style
-    );
+    let is_ass = settings.subtitle_path.ends_with(".ass") || settings.subtitle_path.ends_with(".temp.ass");
+    let sub_filter = if is_ass {
+        format!(
+            "subtitles='{}'",
+            escaped_sub_path
+        )
+    } else {
+        format!(
+            "subtitles='{}':original_size={}x{}:force_style='{}'",
+            escaped_sub_path,
+            ref_width,
+            ref_height,
+            force_style
+        )
+    };
 
     // Build FFmpeg Arguments
     let mut ffmpeg_args: Vec<String> = Vec::new();

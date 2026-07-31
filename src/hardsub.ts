@@ -54,6 +54,8 @@ export interface HardsubSettings {
   outlineSize: number;
   bgBox: boolean;
   bgBoxColor: string;
+  bgBoxOpacity: number;
+  bgBoxRadius: number;
   positionY: number;
   widthMargin: number;
   bold: boolean;
@@ -91,6 +93,46 @@ function msToSrtTime(ms: number): string {
   const s = Math.floor((ms % 60000) / 1000);
   const msec = Math.floor(ms % 1000);
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')},${String(msec).padStart(3, '0')}`;
+}
+
+function msToAssTime(ms: number): string {
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  const s = Math.floor((ms % 60000) / 1000);
+  const cs = Math.floor((ms % 1000) / 10);
+  return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(cs).padStart(2, '0')}`;
+}
+
+function hexToAssColorAndAlpha(hex: string, opacity: number): string {
+  const clean = hex.replace('#', '');
+  let r = 'FF', g = 'FF', b = 'FF';
+  if (clean.length >= 6) {
+    r = clean.substring(0, 2);
+    g = clean.substring(2, 4);
+    b = clean.substring(4, 6);
+  }
+  const clamped = Math.max(0, Math.min(100, opacity));
+  const alphaVal = Math.round(255 - (clamped * 2.55));
+  const alphaHex = alphaVal.toString(16).toUpperCase().padStart(2, '0');
+  return `&H${alphaHex}${b}${g}${r}`;
+}
+
+function generateRoundedRectASS(x: number, y: number, w: number, h: number, radius: number): string {
+  let r = radius;
+  r = Math.min(r, w / 2, h / 2);
+
+  const commands = [];
+  commands.push(`m ${Math.round(x + r)} ${Math.round(y)}`);
+  commands.push(`l ${Math.round(x + w - r)} ${Math.round(y)}`);
+  commands.push(`b ${Math.round(x + w - r + r * 0.55)} ${Math.round(y)} ${Math.round(x + w)} ${Math.round(y + r * 0.45)} ${Math.round(x + w)} ${Math.round(y + r)}`);
+  commands.push(`l ${Math.round(x + w)} ${Math.round(y + h - r)}`);
+  commands.push(`b ${Math.round(x + w)} ${Math.round(y + h - r + r * 0.55)} ${Math.round(x + w - r + r * 0.45)} ${Math.round(y + h)} ${Math.round(x + w - r)} ${Math.round(y + h)}`);
+  commands.push(`l ${Math.round(x + r)} ${Math.round(y + h)}`);
+  commands.push(`b ${Math.round(x + r * 0.45)} ${Math.round(y + h)} ${Math.round(x)} ${Math.round(y + h - r + r * 0.45)} ${Math.round(x)} ${Math.round(y + h - r)}`);
+  commands.push(`l ${Math.round(x)} ${Math.round(y + r)}`);
+  commands.push(`b ${Math.round(x)} ${Math.round(y + r * 0.45)} ${Math.round(x + r * 0.45)} ${Math.round(y)} ${Math.round(x + r)} ${Math.round(y)}`);
+
+  return commands.join(' ');
 }
 
 function formatSecondsToDisplay(seconds: number): string {
@@ -191,6 +233,10 @@ export class HardsubController {
   private outlineColorPicker: HTMLInputElement | null = null;
   private bgBoxToggle: HTMLInputElement | null = null;
   private bgBoxColorPicker: HTMLInputElement | null = null;
+  private bgBoxOpacitySlider: HTMLInputElement | null = null;
+  private bgBoxOpacityVal: HTMLElement | null = null;
+  private bgBoxRadiusSlider: HTMLInputElement | null = null;
+  private bgBoxRadiusVal: HTMLElement | null = null;
 
   // Color Swatches & Hex Indicators
   private swatchText: HTMLElement | null = null;
@@ -284,6 +330,8 @@ export class HardsubController {
     outlineSize: 2,
     bgBox: false,
     bgBoxColor: '#000000',
+    bgBoxOpacity: 50,
+    bgBoxRadius: 0,
     positionY: 30,
     widthMargin: 90,
     bold: true,
@@ -346,6 +394,10 @@ export class HardsubController {
     this.outlineColorPicker = document.getElementById('hardsub-color-outline') as HTMLInputElement;
     this.bgBoxToggle = document.getElementById('hardsub-bgbox-toggle') as HTMLInputElement;
     this.bgBoxColorPicker = document.getElementById('hardsub-color-bg') as HTMLInputElement;
+    this.bgBoxOpacitySlider = document.getElementById('hardsub-bgbox-opacity') as HTMLInputElement;
+    this.bgBoxOpacityVal = document.getElementById('hardsub-bgbox-opacity-val');
+    this.bgBoxRadiusSlider = document.getElementById('hardsub-bgbox-radius') as HTMLInputElement;
+    this.bgBoxRadiusVal = document.getElementById('hardsub-bgbox-radius-val');
 
     this.swatchText = document.getElementById('hardsub-swatch-text');
     this.swatchOutline = document.getElementById('hardsub-swatch-outline');
@@ -561,6 +613,16 @@ export class HardsubController {
     this.bgBoxColorPicker?.addEventListener('input', () => {
       this.state.bgBoxColor = this.bgBoxColorPicker!.value.toUpperCase();
       this.updateColorSwatches();
+      this.updateLivePreview();
+    });
+    this.bgBoxOpacitySlider?.addEventListener('input', () => {
+      this.state.bgBoxOpacity = parseInt(this.bgBoxOpacitySlider!.value, 10);
+      if (this.bgBoxOpacityVal) this.bgBoxOpacityVal.textContent = `${this.state.bgBoxOpacity}%`;
+      this.updateLivePreview();
+    });
+    this.bgBoxRadiusSlider?.addEventListener('input', () => {
+      this.state.bgBoxRadius = parseInt(this.bgBoxRadiusSlider!.value, 10);
+      if (this.bgBoxRadiusVal) this.bgBoxRadiusVal.textContent = `${this.state.bgBoxRadius}px`;
       this.updateLivePreview();
     });
 
@@ -1402,6 +1464,40 @@ export class HardsubController {
       anchorY = canvasH - renderedMarginV;
     }
 
+    // --- Draw one background around the entire caption block ---
+    // Drawing it before text prevents individual line backgrounds from colliding.
+    const lineMetrics = wrappedLines.map((line) => ctx.measureText(line));
+    const maxLineWidth = Math.max(...lineMetrics.map((metrics) => metrics.width));
+    const firstBaselineY = this.state.alignment === 6
+      ? anchorY
+      : anchorY - ((wrappedLines.length - 1) * lineHeight);
+    const lastBaselineY = this.state.alignment === 6
+      ? anchorY + ((wrappedLines.length - 1) * lineHeight)
+      : anchorY;
+
+    if (this.state.bgBox) {
+      const padding = 6 * scaleFactor;
+      const textAscent = renderedFontSize * 0.85;
+      const textDescent = renderedFontSize * 0.25;
+      const boxWidth = maxLineWidth + padding * 2;
+      const boxHeight = (lastBaselineY - firstBaselineY) + textAscent + textDescent + padding * 2;
+      const boxX = ctx.textAlign === 'center'
+        ? anchorX - boxWidth / 2
+        : ctx.textAlign === 'right'
+          ? anchorX - boxWidth
+          : anchorX - padding;
+      const boxY = firstBaselineY - textAscent - padding;
+      const radius = Math.min(this.state.bgBoxRadius * scaleFactor, boxWidth / 2, boxHeight / 2);
+
+      ctx.save();
+      ctx.fillStyle = this.state.bgBoxColor;
+      ctx.globalAlpha = this.state.bgBoxOpacity / 100;
+      ctx.beginPath();
+      ctx.roundRect(boxX, boxY, boxWidth, boxHeight, radius);
+      ctx.fill();
+      ctx.restore();
+    }
+
     // --- Draw each line ---
     for (let i = 0; i < wrappedLines.length; i++) {
       const lineText = wrappedLines[i];
@@ -1413,39 +1509,6 @@ export class HardsubController {
       } else {
         // Bottom alignment: lines stack upward from bottom
         y = anchorY - ((wrappedLines.length - 1 - i) * lineHeight);
-      }
-
-      const metrics = ctx.measureText(lineText);
-      
-      // --- Background Box (matching ASS BorderStyle=3) ---
-      if (this.state.bgBox) {
-        const bgColor = this.state.bgBoxColor;
-        const paddingH = 6 * scaleFactor;
-        const paddingV = 2 * scaleFactor;
-
-        // Parse hex color and apply 50% opacity (matching Rust's alpha=128)
-        ctx.save();
-        ctx.fillStyle = bgColor;
-        ctx.globalAlpha = 0.5;
-
-        // Compute box bounds based on text alignment
-        let boxX: number;
-        const boxWidth = metrics.width + paddingH * 2;
-        
-        if (ctx.textAlign === 'center') {
-          boxX = anchorX - metrics.width / 2 - paddingH;
-        } else if (ctx.textAlign === 'right') {
-          boxX = anchorX - metrics.width - paddingH;
-        } else {
-          boxX = anchorX - paddingH;
-        }
-
-        const boxY = y - renderedFontSize - paddingV;
-        const boxHeight = lineHeight + paddingV * 2;
-
-        // Sharp rectangle — NO border-radius (matching ASS BorderStyle=3)
-        ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
-        ctx.restore();
       }
 
       // --- Outline (matching ASS Outline with contour expansion) ---
@@ -1479,8 +1542,12 @@ export class HardsubController {
     if (resetPosy) resetPosy.style.display = this.state.positionY !== 30 ? 'inline-flex' : 'none';
 
     const bgControls = document.getElementById('hardsub-bg-controls');
+    const bgExtraControls = document.getElementById('hardsub-bg-extra-controls');
     if (bgControls) {
       bgControls.classList.toggle('control-disabled', !this.state.bgBox);
+    }
+    if (bgExtraControls) {
+      bgExtraControls.classList.toggle('control-disabled', !this.state.bgBox);
     }
 
     const outlinePicker = document.getElementById('hardsub-outline-picker-wrapper');
@@ -1537,6 +1604,155 @@ export class HardsubController {
     });
   }
 
+  private generateAssContent(): string {
+    const videoW = this.videoElement?.videoWidth || 1920;
+    const videoH = this.videoElement?.videoHeight || 1080;
+    const videoAspect = videoH > 0 ? videoW / videoH : 1.777;
+
+    // Use the actual video resolution as the ASS script resolution to bypass libass scaling and DPI bugs
+    const PLAY_RES_Y = videoH;
+    const PLAY_RES_X = Math.round(PLAY_RES_Y * videoAspect);
+
+    // The scale factor relative to the 288px reference height
+    const scaleFactor = videoH / 288;
+
+    const safeFontName = this.state.fontName.replace(/,/g, '').replace(/['"]/g, '');
+    const assPrimary = hexToAssColorAndAlpha(this.state.primaryColor, 100);
+    const assOutline = hexToAssColorAndAlpha(this.state.outlineColor, 100);
+    const assBg = hexToAssColorAndAlpha(this.state.bgBoxColor, this.state.bgBoxOpacity);
+    const alignment = this.state.alignment;
+    const assAlignment = alignment === 6 ? 8 : alignment;
+    const marginLR = Math.round(((100 - this.state.widthMargin) / 200) * PLAY_RES_X);
+
+    // Create temp canvas to measure text widths and perform line wrapping
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = PLAY_RES_X;
+    tempCanvas.height = PLAY_RES_Y;
+    const tempCtx = tempCanvas.getContext('2d');
+
+    const assFontSize = Math.round(this.state.fontSize * scaleFactor);
+
+    const textStyle = `Style: TextStyle,${safeFontName},${assFontSize},${assPrimary},&H000000FF,${assOutline},&HFFFFFFFF,${this.state.bold ? -1 : 0},${this.state.italic ? -1 : 0},0,0,100,100,0,0,1,${this.state.outlineSize * scaleFactor},0,${assAlignment},${marginLR},${marginLR},${Math.round(this.state.positionY * scaleFactor)},1`;
+    const boxStyle = `Style: BoxStyle,${safeFontName},${assFontSize},${assBg},&H000000FF,${assBg},${assBg},0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1`;
+
+    let events = '';
+    if (tempCtx) {
+      // Re-apply the font on tempCtx using the scaled assFontSize so that all text measurements
+      // (line wrapping, box width, box height) are calculated at the exact same scale as rendered in libass
+      const fontWeight = this.state.bold ? 'bold' : 'normal';
+      const fontStyle = this.state.italic ? 'italic' : 'normal';
+      tempCtx.font = `${fontStyle} ${fontWeight} ${assFontSize}px '${this.state.fontName}', sans-serif`;
+      tempCtx.textBaseline = 'alphabetic';
+
+      const maxTextWidth = PLAY_RES_X * (this.state.widthMargin / 100);
+      const lineHeight = assFontSize * 1.35;
+      const textAscent = assFontSize * 0.85;
+      const textDescent = assFontSize * 0.25;
+      const padding = 6 * scaleFactor;
+
+      this.subtitleCues.forEach((cue) => {
+        const startStr = msToAssTime(cue.startMs);
+        const endStr = msToAssTime(cue.endMs);
+        const lines = cue.text.split('\n');
+
+        const wrappedLines: string[] = [];
+        for (const line of lines) {
+          const measured = tempCtx.measureText(line);
+          if (measured.width <= maxTextWidth) {
+            wrappedLines.push(line);
+          } else {
+            const words = line.split(/(\s+)/);
+            let currentLine = '';
+            for (const word of words) {
+              const testLine = currentLine + word;
+              if (tempCtx.measureText(testLine).width > maxTextWidth && currentLine.trim()) {
+                wrappedLines.push(currentLine.trim());
+                currentLine = word;
+              } else {
+                currentLine = testLine;
+              }
+            }
+            if (currentLine.trim()) {
+              wrappedLines.push(currentLine.trim());
+            }
+          }
+        }
+
+        const lineMetrics = wrappedLines.map((line) => tempCtx.measureText(line));
+        const maxLineWidth = Math.max(...lineMetrics.map((m) => m.width), 0);
+
+        let X = 0;
+        if (alignment === 1) {
+          X = marginLR;
+        } else if (alignment === 3) {
+          X = PLAY_RES_X - marginLR;
+        } else {
+          X = PLAY_RES_X / 2;
+        }
+
+        let Y = 0;
+        if (alignment === 6) {
+          Y = this.state.positionY * scaleFactor;
+        } else {
+          Y = PLAY_RES_Y - (this.state.positionY * scaleFactor);
+        }
+
+        const Y_box = alignment === 6 ? Y + textAscent : Y - textDescent;
+
+        if (this.state.bgBox && maxLineWidth > 0) {
+          const boxWidth = maxLineWidth + padding * 2;
+          const boxHeight = (wrappedLines.length - 1) * lineHeight + textAscent + textDescent + padding * 2;
+          
+          let x = 0;
+          if (alignment === 1) {
+            x = -padding;
+          } else if (alignment === 3) {
+            x = -boxWidth + padding;
+          } else {
+            x = -boxWidth / 2;
+          }
+
+          let y = 0;
+          if (alignment === 6) {
+            y = -textAscent - padding;
+          } else {
+            y = -((wrappedLines.length - 1) * lineHeight) - textAscent - padding;
+          }
+
+          const drawingPath = generateRoundedRectASS(x, y, boxWidth, boxHeight, this.state.bgBoxRadius * scaleFactor);
+          events += `Dialogue: 0,${startStr},${endStr},BoxStyle,,0,0,0,,{\\an7}{\\pos(${X},${Y_box})}{\\p1}${drawingPath}{\\p0}\n`;
+        }
+
+        wrappedLines.forEach((lineText, index) => {
+          let lineY = 0;
+          if (alignment === 6) {
+            lineY = Y + index * lineHeight;
+          } else {
+            lineY = Y - (wrappedLines.length - 1 - index) * lineHeight;
+          }
+          events += `Dialogue: 1,${startStr},${endStr},TextStyle,,0,0,0,,{\\an${assAlignment}}{\\pos(${X},${lineY})}${lineText}\n`;
+        });
+      });
+    }
+
+    return `[Script Info]
+Title: Hardsub Temporary Script
+ScriptType: v4.00+
+WrapStyle: 2
+ScaledBorderAndShadow: yes
+PlayResX: ${PLAY_RES_X}
+PlayResY: ${PLAY_RES_Y}
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+${textStyle}
+${boxStyle}
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+${events}`;
+  }
+
   private async startHardsub() {
     this.state.videoPath = this.videoPathInput?.value.trim() || '';
     this.state.subtitlePath = this.subtitlePathInput?.value.trim() || '';
@@ -1550,11 +1766,17 @@ export class HardsubController {
       return;
     }
 
+    const originalSubPath = this.state.subtitlePath;
+
+    if (this.subtitleCues.length === 0 && originalSubPath) {
+      await this.loadSubtitleFile(originalSubPath);
+    }
+
     if (this.isSubtitlesModified && this.subtitleCues.length > 0) {
       try {
         const srtContent = convertCuesToSrt(this.subtitleCues);
         await invoke('write_text_file_content', {
-          filePath: this.state.subtitlePath,
+          filePath: originalSubPath,
           content: srtContent,
         });
         console.log('Saved modified subtitle content to disk');
@@ -1565,6 +1787,27 @@ export class HardsubController {
 
     if (!this.state.outputPath) {
       this.autoSuggestSubtitleAndOutput(this.state.videoPath);
+    }
+
+    if (this.subtitleCues.length > 0) {
+      try {
+        const lastDot = this.state.videoPath.lastIndexOf('.');
+        const tempAssPath = this.state.videoPath.substring(0, lastDot) + '.temp.ass';
+        const assContent = this.generateAssContent();
+        await invoke('write_text_file_content', {
+          filePath: tempAssPath,
+          content: assContent,
+        });
+        // Save a debug copy in the project root to inspect the exact styles and events
+        await invoke('write_text_file_content', {
+          filePath: '/home/ahmad/Projects/whisper-desktop/debug_subtitles.ass',
+          content: assContent,
+        });
+        console.log('Generated temporary ASS subtitle file with styled vector boxes');
+        this.state.subtitlePath = tempAssPath;
+      } catch (e) {
+        console.warn('Failed to generate temporary ASS subtitles, falling back to original:', e);
+      }
     }
 
     try {
@@ -1591,6 +1834,7 @@ export class HardsubController {
       }
     } finally {
       this.updateEncodingUIState(false);
+      this.state.subtitlePath = originalSubPath; // Restore original path in UI state
     }
   }
 }
