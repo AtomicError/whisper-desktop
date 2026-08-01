@@ -350,6 +350,11 @@ export class HardsubController {
   private clickLockTimer: any = null;
   private isSubtitlesModified: boolean = false;
 
+  // libass interprets \fs as the GDI cell height (usWinAscent+usWinDescent) while the
+  // canvas preview uses CSS (em) semantics; this factor reconciles the two (see
+  // get_font_render_scale on the Rust side).
+  private fontRenderScale: number = 1;
+
   constructor() {
     const init = () => {
       this.initDOMElements();
@@ -499,6 +504,8 @@ export class HardsubController {
       console.warn('Failed to load system fonts:', e);
     }
 
+    this.refreshFontRenderScale();
+
     try {
       const hwStatus = await invoke<HardwareStatus>('check_hardware_encoders');
       if (this.hwSelect) {
@@ -518,6 +525,19 @@ export class HardsubController {
       }
     } catch (e) {
       console.warn('Failed to probe hardware encoders:', e);
+    }
+  }
+
+  private async refreshFontRenderScale() {
+    try {
+      this.fontRenderScale = await invoke<number>('get_font_render_scale', {
+        fontName: this.state.fontName,
+        bold: this.state.bold,
+        italic: this.state.italic,
+      });
+    } catch (e) {
+      console.warn('Failed to fetch font render scale, using 1.0:', e);
+      this.fontRenderScale = 1;
     }
   }
 
@@ -546,6 +566,7 @@ export class HardsubController {
     // Font Select
     this.fontSelect?.addEventListener('change', () => {
       this.state.fontName = this.fontSelect!.value;
+      this.refreshFontRenderScale();
       this.updateLivePreview();
     });
 
@@ -648,6 +669,7 @@ export class HardsubController {
     this.boldToggle?.addEventListener('click', () => {
       this.state.bold = !this.state.bold;
       this.boldToggle!.classList.toggle('active', this.state.bold);
+      this.refreshFontRenderScale();
       this.updateLivePreview();
     });
 
@@ -655,6 +677,7 @@ export class HardsubController {
     this.italicToggle?.addEventListener('click', () => {
       this.state.italic = !this.state.italic;
       this.italicToggle!.classList.toggle('active', this.state.italic);
+      this.refreshFontRenderScale();
       this.updateLivePreview();
     });
 
@@ -1603,18 +1626,17 @@ export class HardsubController {
       this.updateEncodingUIState(data.active);
     });
   }
-
   private generateAssContent(): string {
     const videoW = this.videoElement?.videoWidth || 1920;
     const videoH = this.videoElement?.videoHeight || 1080;
     const videoAspect = videoH > 0 ? videoW / videoH : 1.777;
 
-    // Use the actual video resolution as the ASS script resolution to bypass libass scaling and DPI bugs
-    const PLAY_RES_Y = videoH;
+    // Use a reference resolution of 288px (same as the canvas preview logic)
+    const PLAY_RES_Y = 288;
     const PLAY_RES_X = Math.round(PLAY_RES_Y * videoAspect);
 
-    // The scale factor relative to the 288px reference height
-    const scaleFactor = videoH / 288;
+    // All coordinates and sizing are written in the 288p script coordinate space (scaleFactor = 1)
+    const scaleFactor = 1;
 
     const safeFontName = this.state.fontName.replace(/,/g, '').replace(/['"]/g, '');
     const assPrimary = hexToAssColorAndAlpha(this.state.primaryColor, 100);
@@ -1630,9 +1652,12 @@ export class HardsubController {
     tempCanvas.height = PLAY_RES_Y;
     const tempCtx = tempCanvas.getContext('2d');
 
-    const assFontSize = Math.round(this.state.fontSize * scaleFactor);
+    // libass sizes glyphs by the font's GDI cell height (usWinAscent+usWinDescent)
+    // instead of the em box, so divide the font size to make the hardsub match
+    // the canvas preview (which uses CSS em semantics).
+    const assFontSize = Math.round((this.state.fontSize / this.fontRenderScale) * 100) / 100;
 
-    const textStyle = `Style: TextStyle,${safeFontName},${assFontSize},${assPrimary},&H000000FF,${assOutline},&HFFFFFFFF,${this.state.bold ? -1 : 0},${this.state.italic ? -1 : 0},0,0,100,100,0,0,1,${this.state.outlineSize * scaleFactor},0,${assAlignment},${marginLR},${marginLR},${Math.round(this.state.positionY * scaleFactor)},1`;
+    const textStyle = `Style: TextStyle,${safeFontName},${assFontSize},${assPrimary},&H000000FF,${assOutline},&HFFFFFFFF,${this.state.bold ? -1 : 0},${this.state.italic ? -1 : 0},0,0,100,100,0,0,1,${this.state.outlineSize},0,${assAlignment},${marginLR},${marginLR},${this.state.positionY},1`;
     const boxStyle = `Style: BoxStyle,${safeFontName},${assFontSize},${assBg},&H000000FF,${assBg},${assBg},0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1`;
 
     let events = '';
@@ -1754,6 +1779,10 @@ ${events}`;
   }
 
   private async startHardsub() {
+    // Make sure the font render scale is up to date before generating the ASS
+    // (avoids a race with a pending refreshFontRenderScale() call).
+    await this.refreshFontRenderScale();
+
     this.state.videoPath = this.videoPathInput?.value.trim() || '';
     this.state.subtitlePath = this.subtitlePathInput?.value.trim() || '';
 
@@ -1796,11 +1825,6 @@ ${events}`;
         const assContent = this.generateAssContent();
         await invoke('write_text_file_content', {
           filePath: tempAssPath,
-          content: assContent,
-        });
-        // Save a debug copy in the project root to inspect the exact styles and events
-        await invoke('write_text_file_content', {
-          filePath: '/home/ahmad/Projects/whisper-desktop/debug_subtitles.ass',
           content: assContent,
         });
         console.log('Generated temporary ASS subtitle file with styled vector boxes');

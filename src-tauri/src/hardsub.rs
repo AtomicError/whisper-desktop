@@ -102,6 +102,176 @@ pub fn get_system_fonts(_app: AppHandle) -> Vec<FontItem> {
     fonts
 }
 
+fn read_u16(data: &[u8], off: usize) -> Option<u16> {
+    Some(u16::from_be_bytes([*data.get(off)?, *data.get(off + 1)?]))
+}
+
+fn read_i16(data: &[u8], off: usize) -> Option<i16> {
+    Some(i16::from_be_bytes([*data.get(off)?, *data.get(off + 1)?]))
+}
+
+fn read_u32(data: &[u8], off: usize) -> Option<u32> {
+    Some(u32::from_be_bytes([*data.get(off)?, *data.get(off + 1)?, *data.get(off + 2)?, *data.get(off + 3)?]))
+}
+
+/// Reads a TTF/OTF file and returns (unitsPerEm, line height in font units).
+///
+/// The height follows the same priority libass uses in `set_font_metrics`
+/// (which FreeType's `FT_SIZE_REQUEST_TYPE_REAL_DIM` uses to scale glyphs):
+/// OS/2 usWinAscent+usWinDescent, then OS/2 sTypo metrics (when USE_TYPO_METRICS
+/// is set), then hhea, then the head bbox.
+fn read_font_line_height(path: &Path) -> Option<(u16, u32)> {
+    let data = std::fs::read(path).ok()?;
+
+    // TTC collections: read the first font offset table
+    let data = if data.starts_with(b"ttcf") {
+        let offset = read_u32(&data, 12)? as usize;
+        data.get(offset..)?
+    } else {
+        &data[..]
+    };
+
+    let sfnt_ok = data.starts_with(b"\x00\x01\x00\x00")
+        || data.starts_with(b"OTTO")
+        || data.starts_with(b"true");
+    if !sfnt_ok {
+        return None;
+    }
+
+    let num_tables = read_u16(data, 4)? as usize;
+    let find_table = |tag: &[u8; 4]| -> Option<(usize, usize)> {
+        for i in 0..num_tables {
+            let rec = 12 + i * 16;
+            if data.get(rec..rec + 4) != Some(&tag[..]) {
+                continue;
+            }
+            let off = read_u32(data, rec + 8)? as usize;
+            let len = read_u32(data, rec + 12)? as usize;
+            return Some((off, len));
+        }
+        None
+    };
+
+    let upem = find_table(b"head").and_then(|(o, l)| {
+        if l >= 20 { read_u16(data, o + 18) } else { None }
+    })?;
+    if upem == 0 {
+        return None;
+    }
+
+    // OS/2 table
+    let os2_height = find_table(b"OS/2").and_then(|(o, l)| {
+        if l < 78 {
+            return None;
+        }
+        let fs_selection = read_u16(data, o + 62)?;
+        let typo_ascender = read_i16(data, o + 68)?;
+        let typo_descender = read_i16(data, o + 70)?;
+        let win_ascent = read_u16(data, o + 74)?;
+        let win_descent = read_u16(data, o + 76)?;
+        if win_ascent + win_descent != 0 {
+            Some(win_ascent as i32 + win_descent as i32)
+        } else if fs_selection & 0x80 != 0 {
+            Some(typo_ascender as i32 - typo_descender as i32)
+        } else {
+            None
+        }
+    });
+
+    let height = if let Some(h) = os2_height {
+        h
+    } else {
+        let hhea_height = find_table(b"hhea").and_then(|(o, l)| {
+            if l < 8 {
+                return None;
+            }
+            let ascender = read_i16(data, o + 4)?;
+            let descender = read_i16(data, o + 6)?;
+            Some(ascender as i32 - descender as i32)
+        });
+        if let Some(h) = hhea_height {
+            h
+        } else {
+            let bbox_height = find_table(b"head").and_then(|(o, l)| {
+                if l < 42 {
+                    return None;
+                }
+                let y_min = read_i16(data, o + 38)?;
+                let y_max = read_i16(data, o + 42)?;
+                Some(y_max as i32 - y_min as i32)
+            });
+            bbox_height?
+        }
+    };
+
+    if height <= 0 {
+        return None;
+    }
+    Some((upem, height as u32))
+}
+
+/// Resolves the font file libass would use: fontconfig first (mirroring libass
+/// fontselect), then the bundled fonts directory as fallback.
+fn resolve_font_file(font_name: &str, bold: bool, italic: bool, app: &AppHandle) -> Option<std::path::PathBuf> {
+    let mut pattern = font_name.to_string();
+    if bold {
+        pattern.push_str(":bold");
+    }
+    if italic {
+        pattern.push_str(":italic");
+    }
+    if let Ok(out) = std::process::Command::new("fc-match")
+        .args(["-f", "%{file}\t%{family}", &pattern])
+        .output()
+    {
+        if out.status.success() {
+            let stdout = String::from_utf8_lossy(&out.stdout);
+            let mut parts = stdout.trim().split('\t');
+            if let Some(file) = parts.next() {
+                let family = parts.next().unwrap_or("");
+                let path = std::path::Path::new(file);
+                if path.exists()
+                    && family
+                        .split(',')
+                        .any(|f| f.trim().eq_ignore_ascii_case(font_name))
+                {
+                    return Some(path.to_path_buf());
+                }
+            }
+        }
+    }
+
+    if let Ok(dir) = app.path().resolve("resources/fonts", tauri::path::BaseDirectory::Resource) {
+        for ext in ["ttf", "otf"] {
+            let p = dir.join(format!("{}.{}", font_name, ext));
+            if p.exists() {
+                return Some(p);
+            }
+        }
+    }
+
+    None
+}
+
+/// Computes the factor to multiply an ASS `\fs`/FontSize by so that libass
+/// renders glyphs at their nominal (em) size.
+///
+/// libass (like VSFilter/GDI) interprets a font size as the font's "cell height"
+/// (usWinAscent + usWinDescent from the OS/2 table), not as the em box. For fonts
+/// whose win metrics exceed unitsPerEm (e.g. Vazirmatn: 3500 vs 2048) the rendered
+/// glyphs are proportionally smaller. The canvas preview uses CSS (em) semantics,
+/// so this factor reconciles the two. Returns 1.0 when the font cannot be resolved.
+#[tauri::command]
+pub fn get_font_render_scale(app: AppHandle, font_name: String, bold: bool, italic: bool) -> f64 {
+    let Some(path) = resolve_font_file(&font_name, bold, italic, &app) else {
+        return 1.0;
+    };
+    let Some((upem, height)) = read_font_line_height(&path) else {
+        return 1.0;
+    };
+    upem as f64 / height as f64
+}
+
 #[derive(serde::Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct HardwareEncodersStatus {
@@ -156,6 +326,8 @@ fn opacity_percent_to_ass_alpha(opacity: u8) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::opacity_percent_to_ass_alpha;
+    use super::read_font_line_height;
+    use std::path::Path;
 
     #[test]
     fn converts_opacity_to_ass_transparency() {
@@ -163,6 +335,17 @@ mod tests {
         assert_eq!(opacity_percent_to_ass_alpha(50), 127);
         assert_eq!(opacity_percent_to_ass_alpha(100), 0);
         assert_eq!(opacity_percent_to_ass_alpha(255), 0);
+    }
+
+    #[test]
+    fn reads_vazirmatn_metrics_and_scale() {
+        // usWinAscent=2200, usWinDescent=1300, unitsPerEm=2048
+        // -> render scale = 2048/3500 = 0.5851
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("resources/fonts/Vazirmatn.ttf");
+        let (upem, height) = read_font_line_height(&path).expect("bundled Vazirmatn should parse");
+        assert_eq!(upem, 2048);
+        assert_eq!(height, 3500);
+        assert!((upem as f64 / height as f64 - 2048.0 / 3500.0).abs() < 1e-9);
     }
 }
 
@@ -274,12 +457,13 @@ pub async fn run_hardsub_task(
     let probe_out = std::process::Command::new("ffprobe")
         .args([
             "-v", "error",
-            "-show_entries", "format=duration:stream=width,height",
+            "-show_entries", "format=duration:stream=width,height,codec_type,side_data_list,tags",
             "-of", "json",
             &settings.video_path,
         ])
         .output();
 
+    let mut rotation = 0;
     if let Ok(out) = probe_out {
         if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&out.stdout) {
             if let Some(duration_str) = json.pointer("/format/duration").and_then(|v| v.as_str()) {
@@ -289,20 +473,59 @@ pub async fn run_hardsub_task(
             }
             if let Some(streams) = json.pointer("/streams").and_then(|v| v.as_array()) {
                 for stream in streams {
+                    if stream.get("codec_type").and_then(|v| v.as_str()) != Some("video") {
+                        continue;
+                    }
                     if let (Some(w), Some(h)) = (stream.get("width").and_then(|v| v.as_u64()), stream.get("height").and_then(|v| v.as_u64())) {
                         video_width = w as u32;
                         video_height = h as u32;
-                        break;
                     }
+                    
+                    // Try parsing rotation from Display Matrix in side_data_list
+                    if let Some(side_data_list) = stream.get("side_data_list").and_then(|v| v.as_array()) {
+                        for sd in side_data_list {
+                            if sd.get("side_data_type").and_then(|v| v.as_str()) == Some("Display Matrix") {
+                                if let Some(r) = sd.get("rotation").and_then(|v| v.as_i64()) {
+                                    rotation = r;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Try parsing rotation from tags
+                    if rotation == 0 {
+                        if let Some(tags) = stream.get("tags") {
+                            if let Some(r_str) = tags.get("rotate").and_then(|v| v.as_str()) {
+                                if let Ok(r) = r_str.parse::<i64>() {
+                                    rotation = r;
+                                }
+                            }
+                        }
+                    }
+                    break;
                 }
             }
         }
+    }
+
+    let normalized_rotation = ((rotation % 360 + 360) % 360) as u32;
+    if normalized_rotation == 90 || normalized_rotation == 270 {
+        std::mem::swap(&mut video_width, &mut video_height);
     }
 
     logs.log(&app, "Hardsub", &format!("Probed video dimensions: {}x{} (Aspect: {:.3})", video_width, video_height, video_width as f64 / video_height as f64));
 
     // Construct Subtitle Style (force_style parameters)
     let safe_font_name = settings.font_name.replace(',', "").replace('\'', "").replace('"', "");
+
+    // libass interprets a font size as the GDI cell height (usWinAscent+usWinDescent),
+    // not the em box, so glyphs render smaller than the canvas preview for fonts whose
+    // win metrics exceed unitsPerEm. Multiply the font size to compensate (see
+    // get_font_render_scale).
+    let font_render_scale = get_font_render_scale(app.clone(), settings.font_name.clone(), settings.bold, settings.italic);
+    let compensated_font_size = ((settings.font_size as f64) / font_render_scale).round() as u32;
+    logs.log(&app, "Hardsub", &format!("Font render scale for '{}' (bold={}, italic={}): {:.4} -> FontSize {} -> {}", settings.font_name, settings.bold, settings.italic, font_render_scale, settings.font_size, compensated_font_size));
+
     let ass_primary_color = hex_to_ass_color(&settings.primary_color, 0); // 00 = fully opaque
     let ass_outline_color = hex_to_ass_color(&settings.outline_color, 0);
     // BorderStyle=4 is a libass extension that renders one background box for
@@ -334,7 +557,7 @@ pub async fn run_hardsub_task(
     let mut force_style = format!(
         "FontName={},FontSize={},PrimaryColour={},OutlineColour={},Outline={},BorderStyle={},Shadow={},MarginV={},MarginL={},MarginR={},Alignment={},Bold={},Italic={}",
         safe_font_name,
-        settings.font_size,
+        compensated_font_size,
         ass_primary_color,
         ass_outline_color,
         settings.outline_size,
@@ -404,13 +627,36 @@ pub async fn run_hardsub_task(
         _ => {}
     }
 
+    // Disable FFmpeg auto-rotation so that we can rotate manually at the start of the filtergraph.
+    // This ensures libass renders subtitles on the rotated vertical frame at the correct aspect ratio.
+    ffmpeg_args.push("-noautorotate".to_string());
     ffmpeg_args.push("-y".to_string());
     ffmpeg_args.push("-i".to_string());
     ffmpeg_args.push(settings.video_path.clone());
 
     // 2. Video Filter
+    let mut vf_filters = Vec::new();
+    if normalized_rotation == 90 {
+        vf_filters.push("transpose=1".to_string());
+    } else if normalized_rotation == 180 {
+        vf_filters.push("transpose=1,transpose=1".to_string());
+    } else if normalized_rotation == 270 {
+        vf_filters.push("transpose=2".to_string());
+    }
+    vf_filters.push(sub_filter);
+    
+    let vf_arg = vf_filters.join(",");
+
     ffmpeg_args.push("-vf".to_string());
-    ffmpeg_args.push(sub_filter);
+    ffmpeg_args.push(vf_arg);
+
+    // After a manual transpose, clear the source rotation metadata: mp4 muxers
+    // drop it, but matroska copies the ROTATE tag into the output, which would
+    // rotate the already-transposed video a second time in players.
+    if normalized_rotation != 0 {
+        ffmpeg_args.push("-metadata:s:v".to_string());
+        ffmpeg_args.push("rotate=0".to_string());
+    }
 
     // 3. Video Encoder Selection
     match (settings.hw_accel.as_str(), settings.video_codec.as_str()) {

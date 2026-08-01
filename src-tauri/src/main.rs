@@ -26,7 +26,7 @@ use translation::{
     get_keyring_credential,
     delete_keyring_credential,
 };
-use hardsub::{get_system_fonts, check_hardware_encoders, start_hardsub_task};
+use hardsub::{get_system_fonts, check_hardware_encoders, get_font_render_scale, start_hardsub_task};
 
 // Tauri Managed States
 struct HardwareState(Arc<Mutex<HardwareMonitor>>);
@@ -514,6 +514,7 @@ fn main() {
             delete_keyring_credential,
             get_system_fonts,
             check_hardware_encoders,
+            get_font_render_scale,
             start_hardsub_task,
             video_server::get_media_stream_url
         ])
