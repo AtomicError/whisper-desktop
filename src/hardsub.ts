@@ -354,6 +354,8 @@ export class HardsubController {
   private targetClickedCueId: number | null = null;
   private clickLockTimer: any = null;
   private isSubtitlesModified: boolean = false;
+  private isSeekingVideo: boolean = false;
+  private pendingSeekTime: number | null = null;
 
   // libass interprets \fs as the GDI cell height (usWinAscent+usWinDescent) while the
   // canvas preview uses CSS (em) semantics; this factor reconciles the two (see
@@ -363,6 +365,15 @@ export class HardsubController {
   constructor() {
     const init = () => {
       this.initDOMElements();
+      [
+        this.fontSizeSlider,
+        this.positionYSlider,
+        this.outlineSizeSlider,
+        this.bgBoxOpacitySlider,
+        this.bgBoxRadiusSlider,
+      ].forEach((slider) => {
+        if (slider) this.updateSliderBackground(slider);
+      });
       this.loadFontsAndHardware();
       this.setupEventListeners();
       this.setupVideoPlayerEvents();
@@ -580,11 +591,15 @@ export class HardsubController {
       const val = parseInt(this.fontSizeSlider!.value, 10);
       this.state.fontSize = val;
       if (this.fontSizeVal) this.fontSizeVal.textContent = `${val}px`;
+      this.updateSliderBackground(this.fontSizeSlider!);
       this.updateLivePreview();
     });
     document.getElementById('reset-fontsize')?.addEventListener('click', () => {
       this.state.fontSize = 24;
-      if (this.fontSizeSlider) this.fontSizeSlider.value = '24';
+      if (this.fontSizeSlider) {
+        this.fontSizeSlider.value = '24';
+        this.updateSliderBackground(this.fontSizeSlider);
+      }
       if (this.fontSizeVal) this.fontSizeVal.textContent = '24px';
       this.updateLivePreview();
     });
@@ -594,11 +609,15 @@ export class HardsubController {
       const val = parseInt(this.positionYSlider!.value, 10);
       this.state.positionY = val;
       if (this.positionYVal) this.positionYVal.textContent = `${val}px`;
+      this.updateSliderBackground(this.positionYSlider!);
       this.updateLivePreview();
     });
     document.getElementById('reset-posy')?.addEventListener('click', () => {
       this.state.positionY = 30;
-      if (this.positionYSlider) this.positionYSlider.value = '30';
+      if (this.positionYSlider) {
+        this.positionYSlider.value = '30';
+        this.updateSliderBackground(this.positionYSlider);
+      }
       if (this.positionYVal) this.positionYVal.textContent = '30px';
       this.updateLivePreview();
     });
@@ -609,11 +628,15 @@ export class HardsubController {
       this.state.outlineSize = val;
       if (this.outlineSizeVal) this.outlineSizeVal.textContent = `${val}px`;
       if (this.hexOutlineLabel) this.hexOutlineLabel.textContent = `${this.state.outlineColor} (${val}px)`;
+      this.updateSliderBackground(this.outlineSizeSlider!);
       this.updateLivePreview();
     });
     document.getElementById('reset-outline')?.addEventListener('click', () => {
       this.state.outlineSize = 2;
-      if (this.outlineSizeSlider) this.outlineSizeSlider.value = '2';
+      if (this.outlineSizeSlider) {
+        this.outlineSizeSlider.value = '2';
+        this.updateSliderBackground(this.outlineSizeSlider);
+      }
       if (this.outlineSizeVal) this.outlineSizeVal.textContent = '2px';
       if (this.hexOutlineLabel) this.hexOutlineLabel.textContent = `${this.state.outlineColor} (2px)`;
       this.updateLivePreview();
@@ -644,11 +667,13 @@ export class HardsubController {
     this.bgBoxOpacitySlider?.addEventListener('input', () => {
       this.state.bgBoxOpacity = parseInt(this.bgBoxOpacitySlider!.value, 10);
       if (this.bgBoxOpacityVal) this.bgBoxOpacityVal.textContent = `${this.state.bgBoxOpacity}%`;
+      this.updateSliderBackground(this.bgBoxOpacitySlider!);
       this.updateLivePreview();
     });
     this.bgBoxRadiusSlider?.addEventListener('input', () => {
       this.state.bgBoxRadius = parseInt(this.bgBoxRadiusSlider!.value, 10);
       if (this.bgBoxRadiusVal) this.bgBoxRadiusVal.textContent = `${this.state.bgBoxRadius}px`;
+      this.updateSliderBackground(this.bgBoxRadiusSlider!);
       this.updateLivePreview();
     });
 
@@ -784,6 +809,13 @@ export class HardsubController {
       if (this.videoElement) {
         this.syncActiveSubtitleWithTime(this.videoElement.currentTime * 1000);
       }
+      if (this.pendingSeekTime !== null && this.videoElement) {
+        const nextTime = this.pendingSeekTime;
+        this.pendingSeekTime = null;
+        this.videoElement.currentTime = nextTime;
+      } else {
+        this.isSeekingVideo = false;
+      }
     });
 
     this.videoElement.addEventListener('canplay', () => {
@@ -840,7 +872,17 @@ export class HardsubController {
         const pct = parseFloat(this.videoSeekSlider.value);
         this.updateSeekSliderProgress(pct);
         const targetTime = (this.videoElement.duration || 0) * (pct / 100);
-        this.videoElement.currentTime = targetTime;
+        
+        if (this.videoTimeDisplay) {
+          this.videoTimeDisplay.textContent = `${formatSecondsToDisplay(targetTime)} / ${formatSecondsToDisplay(this.videoElement.duration || 0)}`;
+        }
+
+        if (this.isSeekingVideo) {
+          this.pendingSeekTime = targetTime;
+        } else {
+          this.isSeekingVideo = true;
+          this.videoElement.currentTime = targetTime;
+        }
       }
     });
 
@@ -953,8 +995,54 @@ export class HardsubController {
     container?.addEventListener('mouseenter', showControlsFunc);
     container?.addEventListener('click', showControlsFunc);
 
-    this.videoElement.addEventListener('play', showControlsFunc);
-    this.videoElement.addEventListener('pause', showControlsFunc);
+    // Global Keyboard Shortcuts for player
+    document.addEventListener('keydown', (e) => {
+      // Ignore shortcuts if the user is typing in form inputs, textareas or contenteditables
+      const activeEl = document.activeElement;
+      if (
+        activeEl &&
+        (activeEl.tagName === 'INPUT' ||
+          activeEl.tagName === 'TEXTAREA' ||
+          (activeEl as HTMLElement).isContentEditable)
+      ) {
+        return;
+      }
+
+      if (!this.videoElement) return;
+
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        this.videoElement.currentTime = Math.max(0, this.videoElement.currentTime - 10);
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        this.videoElement.currentTime = Math.min(this.videoElement.duration || 0, this.videoElement.currentTime + 10);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (this.videoVolumeSlider) {
+          const newVal = Math.min(1, this.videoElement.volume + 0.05);
+          this.videoElement.volume = newVal;
+          this.videoElement.muted = (newVal === 0);
+          this.videoVolumeSlider.value = String(newVal);
+          this.updateVolumeIcons(newVal, this.videoElement.muted);
+        }
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (this.videoVolumeSlider) {
+          const newVal = Math.max(0, this.videoElement.volume - 0.05);
+          this.videoElement.volume = newVal;
+          this.videoElement.muted = (newVal === 0);
+          this.videoVolumeSlider.value = String(newVal);
+          this.updateVolumeIcons(newVal, this.videoElement.muted);
+        }
+      } else if (e.key === ' ' || e.key === 'Spacebar') {
+        e.preventDefault();
+        if (this.videoElement.paused) {
+          this.videoElement.play().catch((err) => console.warn('Video playback notice:', err));
+        } else {
+          this.videoElement.pause();
+        }
+      }
+    });
   }
 
   private setupDragAndDropListeners() {
@@ -1160,6 +1248,8 @@ export class HardsubController {
 
       this.videoElement.src = streamUrl;
       this.videoElement.style.display = 'block';
+      this.isSeekingVideo = false;
+      this.pendingSeekTime = null;
       if (this.videoPlaceholder) this.videoPlaceholder.style.display = 'none';
       if (this.subtitleCanvas) this.subtitleCanvas.style.display = 'block';
       if (this.videoStatusBadge) {
@@ -1314,6 +1404,14 @@ export class HardsubController {
     }
   }
 
+  private updateSliderBackground(slider: HTMLInputElement) {
+    const min = parseFloat(slider.min) || 0;
+    const max = parseFloat(slider.max) || 100;
+    const val = parseFloat(slider.value) || 0;
+    const pct = ((val - min) / (max - min)) * 100;
+    slider.style.background = `linear-gradient(to right, var(--color-royal-blue) 0%, var(--color-royal-blue) ${pct}%, rgba(255, 255, 255, 0.1) ${pct}%, rgba(255, 255, 255, 0.1) 100%)`;
+  }
+
   private highlightActiveCard(cueId: number | null) {
     document.querySelectorAll('.subtitle-cue-card').forEach((el) => {
       el.classList.remove('active');
@@ -1323,7 +1421,9 @@ export class HardsubController {
       const activeEl = document.getElementById(`subtitle-cue-${cueId}`);
       if (activeEl) {
         activeEl.classList.add('active');
-        activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        if (!this.isUserSeeking) {
+          activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
       }
     }
   }
