@@ -103,6 +103,11 @@ function msToAssTime(ms: number): string {
   return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(cs).padStart(2, '0')}`;
 }
 
+function hasRtlCharacters(text: string): boolean {
+  const rtlRegex = /[\u0600-\u06FF\u0750-\u077F\u0590-\u05FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+  return rtlRegex.test(text);
+}
+
 function hexToAssColorAndAlpha(hex: string, opacity: number): string {
   const clean = hex.replace('#', '');
   let r = 'FF', g = 'FF', b = 'FF';
@@ -1222,7 +1227,7 @@ export class HardsubController {
             ▶ Play
           </button>
         </div>
-        <textarea class="subtitle-cue-textarea" data-cue-id="${cue.id}">${cue.text}</textarea>
+        <textarea class="subtitle-cue-textarea" dir="auto" data-cue-id="${cue.id}">${cue.text}</textarea>
       `;
 
       card.querySelector('.jump-cue-btn')?.addEventListener('click', (e) => {
@@ -1534,6 +1539,8 @@ export class HardsubController {
         y = anchorY - ((wrappedLines.length - 1 - i) * lineHeight);
       }
 
+      const finalLineText = hasRtlCharacters(lineText) ? `\u202B${lineText}\u202C` : lineText;
+
       // --- Outline (matching ASS Outline with contour expansion) ---
       if (renderedOutline > 0) {
         ctx.save();
@@ -1541,13 +1548,13 @@ export class HardsubController {
         ctx.lineWidth = renderedOutline * 2; // ASS Outline expands outward; strokeText is centered
         ctx.lineJoin = 'round';
         ctx.miterLimit = 2;
-        ctx.strokeText(lineText, anchorX, y);
+        ctx.strokeText(finalLineText, anchorX, y);
         ctx.restore();
       }
 
       // --- Fill text (primary color) ---
       ctx.fillStyle = this.state.primaryColor;
-      ctx.fillText(lineText, anchorX, y);
+      ctx.fillText(finalLineText, anchorX, y);
     }
 
     this.updateColorSwatches();
@@ -1756,7 +1763,8 @@ export class HardsubController {
           } else {
             lineY = Y - (wrappedLines.length - 1 - index) * lineHeight;
           }
-          events += `Dialogue: 1,${startStr},${endStr},TextStyle,,0,0,0,,{\\an${assAlignment}}{\\pos(${X},${lineY})}${lineText}\n`;
+          const finalLineText = hasRtlCharacters(lineText) ? `\u202B${lineText}\u202C` : lineText;
+          events += `Dialogue: 1,${startStr},${endStr},TextStyle,,0,0,0,,{\\an${assAlignment}}{\\pos(${X},${lineY})}${finalLineText}\n`;
         });
       });
     }
