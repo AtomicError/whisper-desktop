@@ -1498,10 +1498,10 @@ export class HardsubController {
     const maxLineWidth = Math.max(...lineMetrics.map((metrics) => metrics.width));
     const firstBaselineY = this.state.alignment === 6
       ? anchorY
-      : anchorY - ((wrappedLines.length - 1) * lineHeight);
+      : anchorY - ((wrappedLines.length - 1) * lineHeight) / 2;
     const lastBaselineY = this.state.alignment === 6
       ? anchorY + ((wrappedLines.length - 1) * lineHeight)
-      : anchorY;
+      : anchorY + ((wrappedLines.length - 1) * lineHeight) / 2;
 
     if (this.state.bgBox) {
       const padding = 6 * scaleFactor;
@@ -1535,8 +1535,8 @@ export class HardsubController {
         // Top alignment: lines go downward
         y = anchorY + (i * lineHeight);
       } else {
-        // Bottom alignment: lines stack upward from bottom
-        y = anchorY - ((wrappedLines.length - 1 - i) * lineHeight);
+        // Bottom alignment: lines are vertically centered around anchorY
+        y = anchorY - ((wrappedLines.length - 1) * lineHeight) / 2 + (i * lineHeight);
       }
 
       const finalLineText = hasRtlCharacters(lineText) ? `\u202B${lineText}\u202C` : lineText;
@@ -1749,7 +1749,7 @@ export class HardsubController {
           if (alignment === 6) {
             y = -textAscent - padding;
           } else {
-            y = -((wrappedLines.length - 1) * lineHeight) - textAscent - padding;
+            y = -((wrappedLines.length - 1) * lineHeight) / 2 - textAscent - padding + textDescent;
           }
 
           const drawingPath = generateRoundedRectASS(x, y, boxWidth, boxHeight, this.state.bgBoxRadius * scaleFactor);
@@ -1761,7 +1761,7 @@ export class HardsubController {
           if (alignment === 6) {
             lineY = Y + index * lineHeight;
           } else {
-            lineY = Y - (wrappedLines.length - 1 - index) * lineHeight;
+            lineY = Y - ((wrappedLines.length - 1) * lineHeight) / 2 + index * lineHeight;
           }
           const finalLineText = hasRtlCharacters(lineText) ? `\u202B${lineText}\u202C` : lineText;
           events += `Dialogue: 1,${startStr},${endStr},TextStyle,,0,0,0,,{\\an${assAlignment}}{\\pos(${X},${lineY})}${finalLineText}\n`;
