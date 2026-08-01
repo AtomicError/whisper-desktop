@@ -23,6 +23,7 @@ allow = [
   "select_directory",
   "get_system_fonts",
   "check_hardware_encoders",
+  "get_font_render_scale",
   "start_hardsub_task",
   "read_text_file_content",
   "start_download_model_task",

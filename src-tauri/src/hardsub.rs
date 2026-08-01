@@ -212,7 +212,9 @@ fn read_font_line_height(path: &Path) -> Option<(u16, u32)> {
 
 /// Resolves the font file libass would use: fontconfig first (mirroring libass
 /// fontselect), then the bundled fonts directory as fallback.
-fn resolve_font_file(font_name: &str, bold: bool, italic: bool, app: &AppHandle) -> Option<std::path::PathBuf> {
+/// Resolves the font file libass would use: fontconfig first (mirroring libass
+/// fontselect), then the bundled fonts directory as fallback.
+fn resolve_font_file<R: tauri::Runtime>(font_name: &str, bold: bool, italic: bool, app: &tauri::AppHandle<R>) -> Option<std::path::PathBuf> {
     let mut pattern = font_name.to_string();
     if bold {
         pattern.push_str(":bold");
@@ -241,7 +243,17 @@ fn resolve_font_file(font_name: &str, bold: bool, italic: bool, app: &AppHandle)
         }
     }
 
-    if let Ok(dir) = app.path().resolve("resources/fonts", tauri::path::BaseDirectory::Resource) {
+    let mut resolved_dir = app.path().resolve("resources/fonts", tauri::path::BaseDirectory::Resource).ok();
+    if resolved_dir.is_none() || !resolved_dir.as_ref().unwrap().exists() {
+        if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
+            let dev_path = std::path::Path::new(&manifest_dir).join("resources/fonts");
+            if dev_path.exists() {
+                resolved_dir = Some(dev_path);
+            }
+        }
+    }
+
+    if let Some(dir) = resolved_dir {
         for ext in ["ttf", "otf"] {
             let p = dir.join(format!("{}.{}", font_name, ext));
             if p.exists() {
@@ -346,6 +358,15 @@ mod tests {
         assert_eq!(upem, 2048);
         assert_eq!(height, 3500);
         assert!((upem as f64 / height as f64 - 2048.0 / 3500.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_resolve_font_file() {
+        let app = tauri::test::mock_app();
+        let handle = app.handle();
+        let path = super::resolve_font_file("Roboto", false, false, &handle);
+        println!("Resolved Roboto path: {:?}", path);
+        assert!(path.is_some());
     }
 }
 
@@ -575,12 +596,18 @@ pub async fn run_hardsub_task(
         force_style.push_str(&format!(",BackColour={}", ass_bg_color));
     }
 
-    let fonts_dir_opt = if let Ok(path) = app.path().resolve("resources/fonts", tauri::path::BaseDirectory::Resource) {
-        if path.exists() {
-            format!(":fontsdir='{}'", path.to_string_lossy().replace('\\', "/").replace('\'', "'\\''"))
-        } else {
-            "".to_string()
+    let mut resolved_fonts_dir = app.path().resolve("resources/fonts", tauri::path::BaseDirectory::Resource).ok();
+    if resolved_fonts_dir.is_none() || !resolved_fonts_dir.as_ref().unwrap().exists() {
+        if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
+            let dev_path = std::path::Path::new(&manifest_dir).join("resources/fonts");
+            if dev_path.exists() {
+                resolved_fonts_dir = Some(dev_path);
+            }
         }
+    }
+
+    let fonts_dir_opt = if let Some(path) = resolved_fonts_dir {
+        format!(":fontsdir='{}'", path.to_string_lossy().replace('\\', "/").replace('\'', "'\\''"))
     } else {
         "".to_string()
     };

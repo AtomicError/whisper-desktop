@@ -535,7 +535,7 @@ export class HardsubController {
         bold: this.state.bold,
         italic: this.state.italic,
       });
-    } catch (e) {
+    } catch (e: any) {
       console.warn('Failed to fetch font render scale, using 1.0:', e);
       this.fontRenderScale = 1;
     }
@@ -1371,7 +1371,7 @@ export class HardsubController {
     this.updateColorSwatches();
 
     // Ensure font is loaded before rendering on canvas
-    const fontSpec = `${this.state.bold ? 'bold ' : ''}${this.state.italic ? 'italic ' : ''}16px '${this.state.fontName}'`;
+    const fontSpec = `16px '${this.state.fontName}'`;
     document.fonts.load(fontSpec).then(() => {
       this.renderSubtitleOnCanvas();
     }).catch(() => {
@@ -1662,17 +1662,18 @@ export class HardsubController {
 
     let events = '';
     if (tempCtx) {
-      // Re-apply the font on tempCtx using the scaled assFontSize so that all text measurements
-      // (line wrapping, box width, box height) are calculated at the exact same scale as rendered in libass
+      // libass renders the text at its nominal size visually after applying the scale compensation factor,
+      // so we must perform all positioning, line spacing, and background box calculations using the
+      // original (uncompensated) fontSize to match the visual rendering and CSS preview.
       const fontWeight = this.state.bold ? 'bold' : 'normal';
       const fontStyle = this.state.italic ? 'italic' : 'normal';
-      tempCtx.font = `${fontStyle} ${fontWeight} ${assFontSize}px '${this.state.fontName}', sans-serif`;
+      tempCtx.font = `${fontStyle} ${fontWeight} ${this.state.fontSize}px '${this.state.fontName}', sans-serif`;
       tempCtx.textBaseline = 'alphabetic';
 
       const maxTextWidth = PLAY_RES_X * (this.state.widthMargin / 100);
-      const lineHeight = assFontSize * 1.35;
-      const textAscent = assFontSize * 0.85;
-      const textDescent = assFontSize * 0.25;
+      const lineHeight = this.state.fontSize * 1.35;
+      const textAscent = this.state.fontSize * 0.85;
+      const textDescent = this.state.fontSize * 0.25;
       const padding = 6 * scaleFactor;
 
       this.subtitleCues.forEach((cue) => {
@@ -1767,6 +1768,9 @@ WrapStyle: 2
 ScaledBorderAndShadow: yes
 PlayResX: ${PLAY_RES_X}
 PlayResY: ${PLAY_RES_Y}
+; FontRenderScale: ${this.fontRenderScale}
+; FontSize: ${this.state.fontSize}
+; AssFontSize: ${assFontSize}
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
@@ -1827,6 +1831,12 @@ ${events}`;
           filePath: tempAssPath,
           content: assContent,
         });
+        // Save a debug copy in the project root to inspect the exact styles and events
+        await invoke('write_text_file_content', {
+          filePath: '/home/ahmad/Projects/whisper-desktop/debug_subtitles.ass',
+          content: assContent,
+        });
+
         console.log('Generated temporary ASS subtitle file with styled vector boxes');
         this.state.subtitlePath = tempAssPath;
       } catch (e) {
