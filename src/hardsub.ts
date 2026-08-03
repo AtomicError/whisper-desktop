@@ -1600,18 +1600,19 @@ export class HardsubController {
     // Drawing it before text prevents individual line backgrounds from colliding.
     const lineMetrics = wrappedLines.map((line) => ctx.measureText(line));
     const maxLineWidth = Math.max(...lineMetrics.map((metrics) => metrics.width));
+    const totalFontHeight = renderedFontSize / this.fontMetrics.scale;
+    const textAscent = totalFontHeight * this.fontMetrics.ascentRatio;
+    const textDescent = totalFontHeight * this.fontMetrics.descentRatio;
+
     const firstBaselineY = this.state.alignment === 6
-      ? anchorY
-      : anchorY - ((wrappedLines.length - 1) * lineHeight) / 2;
+      ? anchorY - textAscent
+      : anchorY - ((wrappedLines.length - 1) * lineHeight) / 2 + textDescent;
     const lastBaselineY = this.state.alignment === 6
-      ? anchorY + ((wrappedLines.length - 1) * lineHeight)
-      : anchorY + ((wrappedLines.length - 1) * lineHeight) / 2;
+      ? anchorY + ((wrappedLines.length - 1) * lineHeight) - textAscent
+      : anchorY + ((wrappedLines.length - 1) * lineHeight) / 2 + textDescent;
 
     if (this.state.bgBox) {
       const padding = 6 * scaleFactor;
-      const totalFontHeight = renderedFontSize / this.fontMetrics.scale;
-      const textAscent = totalFontHeight * this.fontMetrics.ascentRatio;
-      const textDescent = totalFontHeight * this.fontMetrics.descentRatio;
       const boxWidth = maxLineWidth + padding * 2;
       const boxHeight = (lastBaselineY - firstBaselineY) + textAscent + textDescent + padding * 2;
       const boxX = ctx.textAlign === 'center'
@@ -1638,10 +1639,10 @@ export class HardsubController {
 
       if (this.state.alignment === 6) {
         // Top alignment: lines go downward
-        y = anchorY + (i * lineHeight);
+        y = anchorY + (i * lineHeight) - textAscent;
       } else {
         // Bottom alignment: lines are vertically centered around anchorY
-        y = anchorY - ((wrappedLines.length - 1) * lineHeight) / 2 + (i * lineHeight);
+        y = anchorY - ((wrappedLines.length - 1) * lineHeight) / 2 + (i * lineHeight) + textDescent;
       }
 
       const finalLineText = hasRtlCharacters(lineText) ? `\u202B${lineText}\u202C` : lineText;
@@ -1750,7 +1751,7 @@ export class HardsubController {
     // All coordinates and sizing are written in the 288p script coordinate space (scaleFactor = 1)
     const scaleFactor = 1;
 
-    const safeFontName = this.state.fontName.replace(/,/g, '').replace(/['"]/g, '');
+    const safeFontName = this.state.fontName === 'Inter' ? 'Inter 24pt' : this.state.fontName.replace(/,/g, '').replace(/['"]/g, '');
     const assPrimary = hexToAssColorAndAlpha(this.state.primaryColor, 100);
     const assOutline = hexToAssColorAndAlpha(this.state.outlineColor, 100);
     const assBg = hexToAssColorAndAlpha(this.state.bgBoxColor, this.state.bgBoxOpacity);

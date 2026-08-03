@@ -548,7 +548,10 @@ pub async fn run_hardsub_task(
     logs.log(&app, "Hardsub", &format!("Probed video dimensions: {}x{} (Aspect: {:.3})", video_width, video_height, video_width as f64 / video_height as f64));
 
     // Construct Subtitle Style (force_style parameters)
-    let safe_font_name = settings.font_name.replace(',', "").replace('\'', "").replace('"', "");
+    let mut safe_font_name = settings.font_name.replace(',', "").replace('\'', "").replace('"', "");
+    if safe_font_name == "Inter" {
+        safe_font_name = "Inter 24pt".to_string();
+    }
 
     let font_metrics = get_font_render_scale(app.clone(), settings.font_name.clone(), settings.bold, settings.italic);
     let compensated_font_size = ((settings.font_size as f64) / font_metrics.scale).round() as u32;
