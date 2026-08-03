@@ -358,9 +358,13 @@ export class HardsubController {
   private pendingSeekTime: number | null = null;
 
   // libass interprets \fs as the GDI cell height (usWinAscent+usWinDescent) while the
-  // canvas preview uses CSS (em) semantics; this factor reconciles the two (see
-  // get_font_render_scale on the Rust side).
-  private fontRenderScale: number = 1;
+  // canvas preview uses CSS (em) semantics; these metrics reconcile the layout bounds
+  // (see get_font_render_scale on the Rust side).
+  private fontMetrics: { scale: number; ascentRatio: number; descentRatio: number } = {
+    scale: 1,
+    ascentRatio: 0.78,
+    descentRatio: 0.22,
+  };
 
   constructor() {
     const init = () => {
@@ -546,14 +550,14 @@ export class HardsubController {
 
   private async refreshFontRenderScale() {
     try {
-      this.fontRenderScale = await invoke<number>('get_font_render_scale', {
+      this.fontMetrics = await invoke<{ scale: number; ascentRatio: number; descentRatio: number }>('get_font_render_scale', {
         fontName: this.state.fontName,
         bold: this.state.bold,
         italic: this.state.italic,
       });
     } catch (e: any) {
-      console.warn('Failed to fetch font render scale, using 1.0:', e);
-      this.fontRenderScale = 1;
+      console.warn('Failed to fetch font render scale, using defaults:', e);
+      this.fontMetrics = { scale: 1, ascentRatio: 0.78, descentRatio: 0.22 };
     }
   }
 
@@ -1605,8 +1609,9 @@ export class HardsubController {
 
     if (this.state.bgBox) {
       const padding = 6 * scaleFactor;
-      const textAscent = renderedFontSize * 0.85;
-      const textDescent = renderedFontSize * 0.25;
+      const totalFontHeight = renderedFontSize / this.fontMetrics.scale;
+      const textAscent = totalFontHeight * this.fontMetrics.ascentRatio;
+      const textDescent = totalFontHeight * this.fontMetrics.descentRatio;
       const boxWidth = maxLineWidth + padding * 2;
       const boxHeight = (lastBaselineY - firstBaselineY) + textAscent + textDescent + padding * 2;
       const boxX = ctx.textAlign === 'center'
@@ -1762,7 +1767,7 @@ export class HardsubController {
     // libass sizes glyphs by the font's GDI cell height (usWinAscent+usWinDescent)
     // instead of the em box, so divide the font size to make the hardsub match
     // the canvas preview (which uses CSS em semantics).
-    const assFontSize = Math.round((this.state.fontSize / this.fontRenderScale) * 100) / 100;
+    const assFontSize = Math.round((this.state.fontSize / this.fontMetrics.scale) * 100) / 100;
 
     const textStyle = `Style: TextStyle,${safeFontName},${assFontSize},${assPrimary},&H000000FF,${assOutline},&HFFFFFFFF,${this.state.bold ? -1 : 0},${this.state.italic ? -1 : 0},0,0,100,100,0,0,1,${this.state.outlineSize},0,${assAlignment},${marginLR},${marginLR},${this.state.positionY},1`;
     const boxStyle = `Style: BoxStyle,${safeFontName},${assFontSize},${assBg},&H000000FF,${assBg},${assBg},0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1`;
@@ -1779,8 +1784,9 @@ export class HardsubController {
 
       const maxTextWidth = PLAY_RES_X * (this.state.widthMargin / 100);
       const lineHeight = this.state.fontSize * 1.35;
-      const textAscent = this.state.fontSize * 0.85;
-      const textDescent = this.state.fontSize * 0.25;
+      const totalFontHeight = this.state.fontSize / this.fontMetrics.scale;
+      const textAscent = totalFontHeight * this.fontMetrics.ascentRatio;
+      const textDescent = totalFontHeight * this.fontMetrics.descentRatio;
       const padding = 6 * scaleFactor;
 
       this.subtitleCues.forEach((cue) => {
@@ -1859,9 +1865,9 @@ export class HardsubController {
         wrappedLines.forEach((lineText, index) => {
           let lineY = 0;
           if (alignment === 6) {
-            lineY = Y + index * lineHeight;
+            lineY = Y + index * lineHeight - textAscent;
           } else {
-            lineY = Y - ((wrappedLines.length - 1) * lineHeight) / 2 + index * lineHeight;
+            lineY = Y - ((wrappedLines.length - 1) * lineHeight) / 2 + index * lineHeight + textDescent;
           }
           const finalLineText = hasRtlCharacters(lineText) ? `\u202B${lineText}\u202C` : lineText;
           events += `Dialogue: 1,${startStr},${endStr},TextStyle,,0,0,0,,{\\an${assAlignment}}{\\pos(${X},${lineY})}${finalLineText}\n`;
@@ -1876,7 +1882,7 @@ WrapStyle: 2
 ScaledBorderAndShadow: yes
 PlayResX: ${PLAY_RES_X}
 PlayResY: ${PLAY_RES_Y}
-; FontRenderScale: ${this.fontRenderScale}
+; FontRenderScale: ${this.fontMetrics.scale}
 ; FontSize: ${this.state.fontSize}
 ; AssFontSize: ${assFontSize}
 

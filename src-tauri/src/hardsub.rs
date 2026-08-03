@@ -114,13 +114,12 @@ fn read_u32(data: &[u8], off: usize) -> Option<u32> {
     Some(u32::from_be_bytes([*data.get(off)?, *data.get(off + 1)?, *data.get(off + 2)?, *data.get(off + 3)?]))
 }
 
-/// Reads a TTF/OTF file and returns (unitsPerEm, line height in font units).
+/// Reads a TTF/OTF file and returns (unitsPerEm, ascent, descent) in font units.
 ///
-/// The height follows the same priority libass uses in `set_font_metrics`
+/// The dimensions follow the same priority libass uses in `set_font_metrics`
 /// (which FreeType's `FT_SIZE_REQUEST_TYPE_REAL_DIM` uses to scale glyphs):
-/// OS/2 usWinAscent+usWinDescent, then OS/2 sTypo metrics (when USE_TYPO_METRICS
-/// is set), then hhea, then the head bbox.
-fn read_font_line_height(path: &Path) -> Option<(u16, u32)> {
+/// OS/2 winAscent/winDescent, then OS/2 typo metrics, then hhea, then head bbox.
+fn read_font_metrics(path: &Path) -> Option<(u16, u32, u32)> {
     let data = std::fs::read(path).ok()?;
 
     // TTC collections: read the first font offset table
@@ -160,7 +159,7 @@ fn read_font_line_height(path: &Path) -> Option<(u16, u32)> {
     }
 
     // OS/2 table
-    let os2_height = find_table(b"OS/2").and_then(|(o, l)| {
+    let os2_metrics = find_table(b"OS/2").and_then(|(o, l)| {
         if l < 78 {
             return None;
         }
@@ -170,44 +169,44 @@ fn read_font_line_height(path: &Path) -> Option<(u16, u32)> {
         let win_ascent = read_u16(data, o + 74)?;
         let win_descent = read_u16(data, o + 76)?;
         if win_ascent + win_descent != 0 {
-            Some(win_ascent as i32 + win_descent as i32)
+            Some((win_ascent as u32, win_descent as u32))
         } else if fs_selection & 0x80 != 0 {
-            Some(typo_ascender as i32 - typo_descender as i32)
+            Some((typo_ascender as u32, typo_descender.unsigned_abs() as u32))
         } else {
             None
         }
     });
 
-    let height = if let Some(h) = os2_height {
-        h
+    let (ascent, descent) = if let Some(m) = os2_metrics {
+        m
     } else {
-        let hhea_height = find_table(b"hhea").and_then(|(o, l)| {
+        let hhea_metrics = find_table(b"hhea").and_then(|(o, l)| {
             if l < 8 {
                 return None;
             }
             let ascender = read_i16(data, o + 4)?;
             let descender = read_i16(data, o + 6)?;
-            Some(ascender as i32 - descender as i32)
+            Some((ascender as u32, descender.unsigned_abs() as u32))
         });
-        if let Some(h) = hhea_height {
-            h
+        if let Some(m) = hhea_metrics {
+            m
         } else {
-            let bbox_height = find_table(b"head").and_then(|(o, l)| {
+            let bbox_metrics = find_table(b"head").and_then(|(o, l)| {
                 if l < 42 {
                     return None;
                 }
                 let y_min = read_i16(data, o + 38)?;
                 let y_max = read_i16(data, o + 42)?;
-                Some(y_max as i32 - y_min as i32)
+                Some((y_max as u32, y_min.unsigned_abs() as u32))
             });
-            bbox_height?
+            bbox_metrics?
         }
     };
 
-    if height <= 0 {
+    if ascent + descent == 0 {
         return None;
     }
-    Some((upem, height as u32))
+    Some((upem, ascent, descent))
 }
 
 /// Resolves the font file libass would use: fontconfig first (mirroring libass
@@ -265,23 +264,35 @@ fn resolve_font_file<R: tauri::Runtime>(font_name: &str, bold: bool, italic: boo
     None
 }
 
-/// Computes the factor to multiply an ASS `\fs`/FontSize by so that libass
-/// renders glyphs at their nominal (em) size.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FontMetrics {
+    pub scale: f64,
+    pub ascent_ratio: f64,
+    pub descent_ratio: f64,
+}
+
+/// Computes the layout metrics for an ASS font.
 ///
-/// libass (like VSFilter/GDI) interprets a font size as the font's "cell height"
-/// (usWinAscent + usWinDescent from the OS/2 table), not as the em box. For fonts
-/// whose win metrics exceed unitsPerEm (e.g. Vazirmatn: 3500 vs 2048) the rendered
-/// glyphs are proportionally smaller. The canvas preview uses CSS (em) semantics,
-/// so this factor reconciles the two. Returns 1.0 when the font cannot be resolved.
+/// Returns the scaling factor to match Canvas/CSS em semantics with libass cell height,
+/// as well as the relative ascent and descent ratios from the font file.
 #[tauri::command]
-pub fn get_font_render_scale(app: AppHandle, font_name: String, bold: bool, italic: bool) -> f64 {
+pub fn get_font_render_scale(app: AppHandle, font_name: String, bold: bool, italic: bool) -> FontMetrics {
     let Some(path) = resolve_font_file(&font_name, bold, italic, &app) else {
-        return 1.0;
+        return FontMetrics { scale: 1.0, ascent_ratio: 0.78, descent_ratio: 0.22 };
     };
-    let Some((upem, height)) = read_font_line_height(&path) else {
-        return 1.0;
+    let Some((upem, ascent, descent)) = read_font_metrics(&path) else {
+        return FontMetrics { scale: 1.0, ascent_ratio: 0.78, descent_ratio: 0.22 };
     };
-    upem as f64 / height as f64
+    let height = ascent + descent;
+    if height == 0 {
+        return FontMetrics { scale: 1.0, ascent_ratio: 0.78, descent_ratio: 0.22 };
+    }
+    FontMetrics {
+        scale: upem as f64 / height as f64,
+        ascent_ratio: ascent as f64 / height as f64,
+        descent_ratio: descent as f64 / height as f64,
+    }
 }
 
 #[derive(serde::Serialize, Clone, Debug)]
@@ -338,7 +349,7 @@ fn opacity_percent_to_ass_alpha(opacity: u8) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::opacity_percent_to_ass_alpha;
-    use super::read_font_line_height;
+    use super::read_font_metrics;
     use std::path::Path;
 
     #[test]
@@ -354,10 +365,10 @@ mod tests {
         // usWinAscent=2200, usWinDescent=1300, unitsPerEm=2048
         // -> render scale = 2048/3500 = 0.5851
         let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("resources/fonts/Vazirmatn.ttf");
-        let (upem, height) = read_font_line_height(&path).expect("bundled Vazirmatn should parse");
+        let (upem, ascent, descent) = read_font_metrics(&path).expect("bundled Vazirmatn should parse");
         assert_eq!(upem, 2048);
-        assert_eq!(height, 3500);
-        assert!((upem as f64 / height as f64 - 2048.0 / 3500.0).abs() < 1e-9);
+        assert_eq!(ascent, 2200);
+        assert_eq!(descent, 1300);
     }
 
     #[test]
@@ -539,13 +550,9 @@ pub async fn run_hardsub_task(
     // Construct Subtitle Style (force_style parameters)
     let safe_font_name = settings.font_name.replace(',', "").replace('\'', "").replace('"', "");
 
-    // libass interprets a font size as the GDI cell height (usWinAscent+usWinDescent),
-    // not the em box, so glyphs render smaller than the canvas preview for fonts whose
-    // win metrics exceed unitsPerEm. Multiply the font size to compensate (see
-    // get_font_render_scale).
-    let font_render_scale = get_font_render_scale(app.clone(), settings.font_name.clone(), settings.bold, settings.italic);
-    let compensated_font_size = ((settings.font_size as f64) / font_render_scale).round() as u32;
-    logs.log(&app, "Hardsub", &format!("Font render scale for '{}' (bold={}, italic={}): {:.4} -> FontSize {} -> {}", settings.font_name, settings.bold, settings.italic, font_render_scale, settings.font_size, compensated_font_size));
+    let font_metrics = get_font_render_scale(app.clone(), settings.font_name.clone(), settings.bold, settings.italic);
+    let compensated_font_size = ((settings.font_size as f64) / font_metrics.scale).round() as u32;
+    logs.log(&app, "Hardsub", &format!("Font render scale for '{}' (bold={}, italic={}): {:.4} -> FontSize {} -> {}", settings.font_name, settings.bold, settings.italic, font_metrics.scale, settings.font_size, compensated_font_size));
 
     let ass_primary_color = hex_to_ass_color(&settings.primary_color, 0); // 00 = fully opaque
     let ass_outline_color = hex_to_ass_color(&settings.outline_color, 0);
