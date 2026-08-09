@@ -294,6 +294,20 @@ export class HardsubController {
   private videoIconFsExit: HTMLElement | null = null;
   private lastVolume: number = 1.0;
 
+  // Player Volume HUD & Custom Viewport Controls
+  private volumeHud: HTMLElement | null = null;
+  private hudVolUp: HTMLElement | null = null;
+  private hudVolLow: HTMLElement | null = null;
+  private hudVolMute: HTMLElement | null = null;
+  private hudVolText: HTMLElement | null = null;
+  private hudTimeout: any = null;
+
+  // Trackpad scroll seeking state
+  private isScrollingSeek: boolean = false;
+  private virtualCurrentTime: number = 0;
+  private scrollSeekTimeout: any = null;
+  private lastThrottleSeekTime: number = 0;
+
   // Dual Tab Studio Navigation
   private tabBtnEditor: HTMLButtonElement | null = null;
   private tabBtnSettings: HTMLButtonElement | null = null;
@@ -465,6 +479,13 @@ export class HardsubController {
     this.videoFullscreenBtn = document.getElementById('hardsub-btn-fullscreen') as HTMLButtonElement;
     this.videoIconFsEnter = document.getElementById('hardsub-icon-fs-enter');
     this.videoIconFsExit = document.getElementById('hardsub-icon-fs-exit');
+
+    // Query HUD elements
+    this.volumeHud = document.getElementById('hardsub-volume-hud');
+    this.hudVolUp = document.getElementById('hardsub-hud-vol-up');
+    this.hudVolLow = document.getElementById('hardsub-hud-vol-low');
+    this.hudVolMute = document.getElementById('hardsub-hud-vol-mute');
+    this.hudVolText = document.getElementById('hardsub-volume-hud-text');
 
     // Dropzone Elements
     this.videoDropZone = document.getElementById('hardsub-video-drop-zone');
@@ -805,6 +826,9 @@ export class HardsubController {
 
     this.videoElement.addEventListener('loadedmetadata', () => {
       this.updateVideoPreviewOverlayBounds();
+      if (this.videoElement) {
+        this.syncActiveSubtitleWithTime(this.videoElement.currentTime * 1000);
+      }
       this.updateLivePreview();
     });
 
@@ -850,9 +874,8 @@ export class HardsubController {
       }
     });
 
-    // Time update & Sync subtitle overlay
     this.videoElement.addEventListener('timeupdate', () => {
-      if (!this.videoElement) return;
+      if (!this.videoElement || this.isUserSeeking || this.isScrollingSeek) return;
       const cur = this.videoElement.currentTime;
       const dur = this.videoElement.duration || 1;
       const pct = (cur / dur) * 100;
@@ -954,16 +977,7 @@ export class HardsubController {
 
     // Fullscreen Toggle
     this.videoFullscreenBtn?.addEventListener('click', () => {
-      const container = document.getElementById('hardsub-player-container');
-      if (!container) return;
-
-      if (!document.fullscreenElement) {
-        container.requestFullscreen().catch((err) => {
-          console.warn('Error entering fullscreen:', err);
-        });
-      } else {
-        document.exitFullscreen();
-      }
+      this.toggleFullscreen();
     });
 
     // Listen to Fullscreen changes
@@ -999,6 +1013,98 @@ export class HardsubController {
     container?.addEventListener('mouseenter', showControlsFunc);
     container?.addEventListener('click', showControlsFunc);
 
+    // Custom Viewport mouse interactions on container (Play/Pause, Fullscreen, Volume HUD)
+    let clickTimeout: any = null;
+    container?.addEventListener('click', (e) => {
+      const controls = document.getElementById('hardsub-video-controls');
+      if (controls && (e.target === controls || controls.contains(e.target as Node))) {
+        return;
+      }
+
+      if (clickTimeout) {
+        clearTimeout(clickTimeout);
+        clickTimeout = null;
+        this.toggleFullscreen();
+      } else {
+        clickTimeout = setTimeout(() => {
+          clickTimeout = null;
+          if (this.videoElement) {
+            if (this.videoElement.paused) {
+              this.videoElement.play().catch((err) => console.warn('Video playback notice:', err));
+            } else {
+              this.videoElement.pause();
+            }
+          }
+        }, 200);
+      }
+    });
+
+    container?.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      if (!this.videoElement) return;
+
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        // Horizontal scroll: seek video virtually
+        if (!this.isScrollingSeek) {
+          this.isScrollingSeek = true;
+          this.virtualCurrentTime = this.videoElement.currentTime;
+        }
+
+        const duration = this.videoElement.duration || 0;
+        if (duration > 0) {
+          // Accumulate horizontal scroll delta (scaled for smooth velocity-based seeking)
+          this.virtualCurrentTime = Math.max(0, Math.min(duration, this.virtualCurrentTime + e.deltaX * 0.03));
+
+          // 1. Instantly update seek slider
+          const pct = (this.virtualCurrentTime / duration) * 100;
+          if (this.videoSeekSlider) {
+            this.videoSeekSlider.value = String(pct);
+            this.updateSeekSliderProgress(pct);
+          }
+
+          // 2. Instantly update time display
+          if (this.videoTimeDisplay) {
+            this.videoTimeDisplay.textContent = `${formatSecondsToDisplay(this.virtualCurrentTime)} / ${formatSecondsToDisplay(duration)}`;
+          }
+
+          // 3. Instantly update canvas subtitle overlay
+          this.syncActiveSubtitleWithTime(this.virtualCurrentTime * 1000);
+
+          // 4. Throttle seeking the actual video element (max once every 80ms)
+          const now = Date.now();
+          if (now - this.lastThrottleSeekTime > 80) {
+            this.videoElement.currentTime = this.virtualCurrentTime;
+            this.lastThrottleSeekTime = now;
+          }
+
+          // 5. Debounce the final precise seek when scrolling stops
+          if (this.scrollSeekTimeout) clearTimeout(this.scrollSeekTimeout);
+          this.scrollSeekTimeout = setTimeout(() => {
+            if (this.videoElement) {
+              this.videoElement.currentTime = this.virtualCurrentTime;
+            }
+            this.isScrollingSeek = false;
+          }, 150);
+        }
+      } else {
+        // Vertical scroll: adjust volume
+        const delta = e.deltaY > 0 ? -0.05 : 0.05;
+        const newVal = Math.max(0, Math.min(1, this.videoElement.volume + delta));
+        
+        this.videoElement.volume = newVal;
+        this.videoElement.muted = (newVal === 0);
+        if (this.videoVolumeSlider) {
+          this.videoVolumeSlider.value = String(newVal);
+        }
+        this.updateVolumeIcons(newVal, this.videoElement.muted);
+        if (newVal > 0) {
+          this.lastVolume = newVal;
+        }
+
+        this.showVolumeHUD(newVal, this.videoElement.muted);
+      }
+    }, { passive: false });
+
     // Global Keyboard Shortcuts for player
     document.addEventListener('keydown', (e) => {
       // Ignore shortcuts if the user is typing in form inputs, textareas or contenteditables
@@ -1028,6 +1134,7 @@ export class HardsubController {
           this.videoElement.muted = (newVal === 0);
           this.videoVolumeSlider.value = String(newVal);
           this.updateVolumeIcons(newVal, this.videoElement.muted);
+          this.showVolumeHUD(newVal, this.videoElement.muted);
         }
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -1037,6 +1144,7 @@ export class HardsubController {
           this.videoElement.muted = (newVal === 0);
           this.videoVolumeSlider.value = String(newVal);
           this.updateVolumeIcons(newVal, this.videoElement.muted);
+          this.showVolumeHUD(newVal, this.videoElement.muted);
         }
       } else if (e.key === ' ' || e.key === 'Spacebar') {
         e.preventDefault();
@@ -1208,6 +1316,69 @@ export class HardsubController {
     }
   }
 
+  private toggleFullscreen() {
+    const container = document.getElementById('hardsub-player-container');
+    if (!container) return;
+
+    if (!document.fullscreenElement) {
+      container.requestFullscreen().catch((err) => {
+        console.warn('Error entering fullscreen:', err);
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  }
+
+  private showVolumeHUD(volume: number, muted: boolean) {
+    if (!this.volumeHud) return;
+
+    if (this.hudTimeout) {
+      clearTimeout(this.hudTimeout);
+      this.hudTimeout = null;
+    }
+
+    const pct = Math.round(volume * 100);
+    if (this.hudVolText) {
+      this.hudVolText.textContent = `${pct}%`;
+    }
+
+    // Toggle icons
+    if (muted || volume === 0) {
+      if (this.hudVolUp) this.hudVolUp.style.display = 'none';
+      if (this.hudVolLow) this.hudVolLow.style.display = 'none';
+      if (this.hudVolMute) this.hudVolMute.style.display = 'block';
+    } else if (volume <= 0.5) {
+      if (this.hudVolUp) this.hudVolUp.style.display = 'none';
+      if (this.hudVolLow) this.hudVolLow.style.display = 'block';
+      if (this.hudVolMute) this.hudVolMute.style.display = 'none';
+    } else {
+      if (this.hudVolUp) this.hudVolUp.style.display = 'block';
+      if (this.hudVolLow) this.hudVolLow.style.display = 'none';
+      if (this.hudVolMute) this.hudVolMute.style.display = 'none';
+    }
+
+    // Show HUD
+    this.volumeHud.style.display = 'flex';
+    // Force reflow to ensure the transition is animated
+    this.volumeHud.offsetHeight;
+    this.volumeHud.style.opacity = '1';
+    this.volumeHud.style.transform = 'translateY(0)';
+
+    // Schedule hide
+    this.hudTimeout = setTimeout(() => {
+      if (this.volumeHud) {
+        this.volumeHud.style.opacity = '0';
+        this.volumeHud.style.transform = 'translateY(-10px)';
+        // Wait for CSS transition to complete (250ms) before hiding
+        this.hudTimeout = setTimeout(() => {
+          if (this.volumeHud && this.volumeHud.style.opacity === '0') {
+            this.volumeHud.style.display = 'none';
+          }
+        }, 250);
+      }
+    }, 1500);
+  }
+
   private updateVideoDropzoneUI(videoPath: string) {
     if (!videoPath) {
       if (this.lblVideoName) this.lblVideoName.textContent = 'No Video Loaded';
@@ -1280,6 +1451,9 @@ export class HardsubController {
       this.isSubtitlesModified = false;
       this.updateSubDropzoneUI(subPath, this.subtitleCues.length);
       this.renderSubtitleCards();
+      if (this.videoElement) {
+        this.syncActiveSubtitleWithTime(this.videoElement.currentTime * 1000);
+      }
     } catch (e) {
       console.warn('Failed to read subtitle file content:', e);
     }
@@ -1497,6 +1671,9 @@ export class HardsubController {
    * subtitles filter with original_size parameter.
    */
   private renderSubtitleOnCanvas() {
+    this.updateUIControlsState();
+    this.updateColorSwatches();
+
     const ctx = this.canvasCtx;
     const canvas = this.subtitleCanvas;
     if (!ctx || !canvas) return;
@@ -1664,9 +1841,6 @@ export class HardsubController {
       ctx.fillStyle = this.state.primaryColor;
       ctx.fillText(finalLineText, anchorX, y);
     }
-
-    this.updateColorSwatches();
-    this.updateUIControlsState();
   }
 
   private updateUIControlsState() {
