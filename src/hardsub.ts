@@ -1134,8 +1134,10 @@ export class HardsubController {
 
     const videoW = this.videoElement.videoWidth;
     const videoH = this.videoElement.videoHeight;
+    const videoElW = this.videoElement.clientWidth;
+    const videoElH = this.videoElement.clientHeight;
 
-    if (!videoW || !videoH || containerWidth === 0 || containerHeight === 0) {
+    if (!videoW || !videoH || containerWidth === 0 || containerHeight === 0 || videoElW === 0 || videoElH === 0) {
       this.videoDisplayWidth = containerWidth;
       this.videoDisplayHeight = containerHeight;
       this.videoDisplayLeft = 0;
@@ -1147,22 +1149,22 @@ export class HardsubController {
       return;
     }
 
-    const containerAspect = containerWidth / containerHeight;
+    const videoElAspect = videoElW / videoElH;
     const videoAspect = videoW / videoH;
 
     let displayWidth: number;
     let displayHeight: number;
 
-    if (videoAspect > containerAspect) {
-      displayWidth = containerWidth;
-      displayHeight = containerWidth / videoAspect;
+    if (videoAspect > videoElAspect) {
+      displayWidth = videoElW;
+      displayHeight = videoElW / videoAspect;
     } else {
-      displayHeight = containerHeight;
-      displayWidth = containerHeight * videoAspect;
+      displayHeight = videoElH;
+      displayWidth = videoElH * videoAspect;
     }
 
-    const left = (containerWidth - displayWidth) / 2;
-    const top = (containerHeight - displayHeight) / 2;
+    const left = this.videoElement.offsetLeft + (videoElW - displayWidth) / 2;
+    const top = this.videoElement.offsetTop + (videoElH - displayHeight) / 2;
 
     // Store computed dimensions for canvas renderer
     this.videoDisplayWidth = displayWidth;
@@ -1606,10 +1608,10 @@ export class HardsubController {
 
     const firstBaselineY = this.state.alignment === 6
       ? anchorY - textAscent
-      : anchorY - ((wrappedLines.length - 1) * lineHeight) / 2 + textDescent;
+      : anchorY - ((wrappedLines.length - 1) * lineHeight) / 2;
     const lastBaselineY = this.state.alignment === 6
       ? anchorY + ((wrappedLines.length - 1) * lineHeight) - textAscent
-      : anchorY + ((wrappedLines.length - 1) * lineHeight) / 2 + textDescent;
+      : anchorY + ((wrappedLines.length - 1) * lineHeight) / 2;
 
     if (this.state.bgBox) {
       const padding = 6 * scaleFactor;
@@ -1642,7 +1644,7 @@ export class HardsubController {
         y = anchorY + (i * lineHeight) - textAscent;
       } else {
         // Bottom alignment: lines are vertically centered around anchorY
-        y = anchorY - ((wrappedLines.length - 1) * lineHeight) / 2 + (i * lineHeight) + textDescent;
+        y = anchorY - ((wrappedLines.length - 1) * lineHeight) / 2 + (i * lineHeight);
       }
 
       const finalLineText = hasRtlCharacters(lineText) ? `\u202B${lineText}\u202C` : lineText;
@@ -1839,9 +1841,19 @@ export class HardsubController {
 
         const Y_box = alignment === 6 ? Y + textAscent : Y - textDescent;
 
+        const firstBaselineY = alignment === 6
+          ? Y - textAscent
+          : Y - ((wrappedLines.length - 1) * lineHeight) / 2;
+
+        const lastBaselineY = alignment === 6
+          ? Y + ((wrappedLines.length - 1) * lineHeight) - textAscent
+          : Y + ((wrappedLines.length - 1) * lineHeight) / 2;
+
+        const boxY = firstBaselineY - textAscent - padding;
+
         if (this.state.bgBox && maxLineWidth > 0) {
           const boxWidth = maxLineWidth + padding * 2;
-          const boxHeight = (wrappedLines.length - 1) * lineHeight + textAscent + textDescent + padding * 2;
+          const boxHeight = (lastBaselineY - firstBaselineY) + textAscent + textDescent + padding * 2;
           
           let x = 0;
           if (alignment === 1) {
@@ -1852,15 +1864,8 @@ export class HardsubController {
             x = -boxWidth / 2;
           }
 
-          let y = 0;
-          if (alignment === 6) {
-            y = -textAscent - padding;
-          } else {
-            y = -((wrappedLines.length - 1) * lineHeight) / 2 - textAscent - padding + textDescent;
-          }
-
-          const drawingPath = generateRoundedRectASS(x, y, boxWidth, boxHeight, this.state.bgBoxRadius * scaleFactor);
-          events += `Dialogue: 0,${startStr},${endStr},BoxStyle,,0,0,0,,{\\an7}{\\pos(${X},${Y_box})}{\\p1}${drawingPath}{\\p0}\n`;
+          const drawingPath = generateRoundedRectASS(x, 0, boxWidth, boxHeight, this.state.bgBoxRadius * scaleFactor);
+          events += `Dialogue: 0,${startStr},${endStr},BoxStyle,,0,0,0,,{\\an7}{\\pos(${X},${boxY})}{\\p1}${drawingPath}{\\p0}\n`;
         }
 
         wrappedLines.forEach((lineText, index) => {
