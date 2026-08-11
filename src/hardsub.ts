@@ -750,14 +750,63 @@ export class HardsubController {
       this.state.audioMode = this.audioSelect!.value;
     });
 
-    // Alignment Buttons
-    this.alignmentButtons?.forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const alignVal = parseInt(btn.dataset.align || '2', 10);
-        this.state.alignment = alignVal;
-        this.alignmentButtons?.forEach((b) => b.classList.remove('active'));
-        btn.classList.add('active');
-        this.updateLivePreview();
+    // Alignment Controls (Independent Vertical + Horizontal Segmented Pickers)
+    const alignValLabel = document.getElementById('hardsub-align-val');
+    const alignMap: Record<string, number> = {
+      'top-left': 7, 'top-center': 8, 'top-right': 9,
+      'middle-left': 4, 'middle-center': 5, 'middle-right': 6,
+      'bottom-left': 1, 'bottom-center': 2, 'bottom-right': 3
+    };
+    const alignNames: Record<number, string> = {
+      7: 'Top Left', 8: 'Top Center', 9: 'Top Right',
+      4: 'Middle Left', 5: 'Middle Center', 6: 'Middle Right',
+      1: 'Bottom Left', 2: 'Bottom Center', 3: 'Bottom Right'
+    };
+
+    let currentV = 'bottom';
+    let currentH = 'center';
+
+    const updateAlignmentState = () => {
+      const key = `${currentV}-${currentH}`;
+      const code = alignMap[key] || 2;
+      this.state.alignment = code;
+      if (alignValLabel) {
+        alignValLabel.textContent = alignNames[code] || 'Bottom Center';
+      }
+
+      // Disable/gray out Vertical Offset when aligned to Middle (as MarginV has no effect in ASS for middle alignment)
+      const posyWrapper = document.getElementById('hardsub-posy-wrapper');
+      const posyTitle = document.getElementById('lbl-posy-title');
+      if (posyWrapper) {
+        if (currentV === 'middle') {
+          posyWrapper.classList.add('control-disabled');
+          if (posyTitle) posyTitle.textContent = 'Vertical Offset (Middle Locked)';
+        } else {
+          posyWrapper.classList.remove('control-disabled');
+          if (posyTitle) posyTitle.textContent = `Vertical Margin (${currentV === 'top' ? 'Top' : 'Bottom'})`;
+        }
+      }
+
+      this.updateLivePreview();
+    };
+
+    document.querySelectorAll('.align-v-btn').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        const target = e.currentTarget as HTMLButtonElement;
+        currentV = target.dataset.v || 'bottom';
+        document.querySelectorAll('.align-v-btn').forEach((b) => b.classList.remove('active'));
+        target.classList.add('active');
+        updateAlignmentState();
+      });
+    });
+
+    document.querySelectorAll('.align-h-btn').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        const target = e.currentTarget as HTMLButtonElement;
+        currentH = target.dataset.h || 'center';
+        document.querySelectorAll('.align-h-btn').forEach((b) => b.classList.remove('active'));
+        target.classList.add('active');
+        updateAlignmentState();
       });
     });
 
@@ -1748,47 +1797,55 @@ export class HardsubController {
     // Horizontal alignment
     switch (this.state.alignment) {
       case 1: // Bottom-Left
+      case 4: // Middle-Left
+      case 7: // Top-Left
         ctx.textAlign = 'left';
         anchorX = sideMarginPx;
         break;
       case 3: // Bottom-Right
+      case 6: // Middle-Right
+      case 9: // Top-Right
         ctx.textAlign = 'right';
         anchorX = canvasW - sideMarginPx;
         break;
-      case 6: // Top-Center
-        ctx.textAlign = 'center';
-        anchorX = canvasW / 2;
-        break;
-      case 2: // Bottom-Center (default)
+      case 2: // Bottom-Center
+      case 5: // Middle-Center
+      case 8: // Top-Center
       default:
         ctx.textAlign = 'center';
         anchorX = canvasW / 2;
         break;
     }
 
-    // Vertical position
-    if (this.state.alignment === 6) {
-      // Top alignment: MarginV from top edge to first line baseline
+    // Vertical position (7,8,9 = Top; 4,5,6 = Middle; 1,2,3 = Bottom)
+    const isTop = [7, 8, 9].includes(this.state.alignment);
+    const isMiddle = [4, 5, 6].includes(this.state.alignment);
+
+    if (isTop) {
       anchorY = renderedMarginV + renderedFontSize;
+    } else if (isMiddle) {
+      anchorY = canvasH / 2;
     } else {
-      // Bottom alignment: MarginV from bottom edge to last line baseline
       anchorY = canvasH - renderedMarginV;
     }
 
     // --- Draw one background around the entire caption block ---
-    // Drawing it before text prevents individual line backgrounds from colliding.
     const lineMetrics = wrappedLines.map((line) => ctx.measureText(line));
     const maxLineWidth = Math.max(...lineMetrics.map((metrics) => metrics.width));
     const totalFontHeight = renderedFontSize / this.fontMetrics.scale;
     const textAscent = totalFontHeight * this.fontMetrics.ascentRatio;
     const textDescent = totalFontHeight * this.fontMetrics.descentRatio;
 
-    const firstBaselineY = this.state.alignment === 6
+    const firstBaselineY = isTop
       ? anchorY - textAscent
-      : anchorY - ((wrappedLines.length - 1) * lineHeight) / 2;
-    const lastBaselineY = this.state.alignment === 6
+      : isMiddle
+        ? anchorY - ((wrappedLines.length - 1) * lineHeight) / 2
+        : anchorY - ((wrappedLines.length - 1) * lineHeight) / 2;
+    const lastBaselineY = isTop
       ? anchorY + ((wrappedLines.length - 1) * lineHeight) - textAscent
-      : anchorY + ((wrappedLines.length - 1) * lineHeight) / 2;
+      : isMiddle
+        ? anchorY + ((wrappedLines.length - 1) * lineHeight) / 2
+        : anchorY + ((wrappedLines.length - 1) * lineHeight) / 2;
 
     if (this.state.bgBox) {
       const padding = 6 * scaleFactor;
@@ -1816,11 +1873,11 @@ export class HardsubController {
       const lineText = wrappedLines[i];
       let y: number;
 
-      if (this.state.alignment === 6) {
-        // Top alignment: lines go downward
+      if (isTop) {
         y = anchorY + (i * lineHeight) - textAscent;
+      } else if (isMiddle) {
+        y = anchorY - ((wrappedLines.length - 1) * lineHeight) / 2 + (i * lineHeight);
       } else {
-        // Bottom alignment: lines are vertically centered around anchorY
         y = anchorY - ((wrappedLines.length - 1) * lineHeight) / 2 + (i * lineHeight);
       }
 
@@ -1932,7 +1989,11 @@ export class HardsubController {
     const assOutline = hexToAssColorAndAlpha(this.state.outlineColor, 100);
     const assBg = hexToAssColorAndAlpha(this.state.bgBoxColor, this.state.bgBoxOpacity);
     const alignment = this.state.alignment;
-    const assAlignment = alignment === 6 ? 8 : alignment;
+    const assAlignment = alignment;
+    const isTopAss = [7, 8, 9].includes(alignment);
+    const isMiddleAss = [4, 5, 6].includes(alignment);
+    const isLeftAss = [1, 4, 7].includes(alignment);
+    const isRightAss = [3, 6, 9].includes(alignment);
     const marginLR = Math.round(((100 - this.state.widthMargin) / 200) * PLAY_RES_X);
 
     // Create temp canvas to measure text widths and perform line wrapping
@@ -1998,28 +2059,30 @@ export class HardsubController {
         const maxLineWidth = Math.max(...lineMetrics.map((m) => m.width), 0);
 
         let X = 0;
-        if (alignment === 1) {
+        if (isLeftAss) {
           X = marginLR;
-        } else if (alignment === 3) {
+        } else if (isRightAss) {
           X = PLAY_RES_X - marginLR;
         } else {
           X = PLAY_RES_X / 2;
         }
 
         let Y = 0;
-        if (alignment === 6) {
+        if (isTopAss) {
           Y = this.state.positionY * scaleFactor;
+        } else if (isMiddleAss) {
+          Y = PLAY_RES_Y / 2;
         } else {
           Y = PLAY_RES_Y - (this.state.positionY * scaleFactor);
         }
 
-        const Y_box = alignment === 6 ? Y + textAscent : Y - textDescent;
+        const Y_box = isTopAss ? Y + textAscent : Y - textDescent;
 
-        const firstBaselineY = alignment === 6
+        const firstBaselineY = isTopAss
           ? Y - textAscent
           : Y - ((wrappedLines.length - 1) * lineHeight) / 2;
 
-        const lastBaselineY = alignment === 6
+        const lastBaselineY = isTopAss
           ? Y + ((wrappedLines.length - 1) * lineHeight) - textAscent
           : Y + ((wrappedLines.length - 1) * lineHeight) / 2;
 
@@ -2030,9 +2093,9 @@ export class HardsubController {
           const boxHeight = (lastBaselineY - firstBaselineY) + textAscent + textDescent + padding * 2;
           
           let x = 0;
-          if (alignment === 1) {
+          if (isLeftAss) {
             x = -padding;
-          } else if (alignment === 3) {
+          } else if (isRightAss) {
             x = -boxWidth + padding;
           } else {
             x = -boxWidth / 2;
@@ -2044,7 +2107,7 @@ export class HardsubController {
 
         wrappedLines.forEach((lineText, index) => {
           let lineY = 0;
-          if (alignment === 6) {
+          if (isTopAss) {
             lineY = Y + index * lineHeight - textAscent;
           } else {
             lineY = Y - ((wrappedLines.length - 1) * lineHeight) / 2 + index * lineHeight + textDescent;

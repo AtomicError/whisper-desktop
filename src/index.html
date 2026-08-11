@@ -1777,29 +1777,33 @@
                   </div>
                 </div>
 
-                <!-- Telemetry Progress & Action Card -->
-                <div class="glass-card" style="padding: 18px;">
-                  <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                      <div class="hud-status-subtitle" style="margin:0;">
-                        <div class="hud-pulse-dot" id="hardsub-hud-pulse"></div>
-                        <span class="radial-msg" id="hardsub-status-text" style="font-weight: 600; font-size: 0.92rem;">Standing By</span>
-                      </div>
-                      <span class="radial-pct" id="hardsub-pct-text" style="font-weight: 700; color: var(--color-royal-blue); font-family: monospace; font-size: 1.15rem;">0%</span>
+                <!-- Telemetry Progress & Action Card (Dark Glassmorphic Studio Theme) -->
+                <div class="glass-card telemetry-hud" style="margin-bottom: 0; padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+                  <div class="progress-linear-wrapper" style="margin: 0; width: 100%;">
+                    <div class="hud-stats-row" style="margin-bottom: 8px;">
+                      <span class="hud-stat-label">HARDSUB ENCODING PROGRESS</span>
+                      <span class="radial-pct" id="hardsub-pct-text">0%</span>
                     </div>
-
-                    <!-- Enhanced High-Tech Progress Bar -->
-                    <div class="progress-linear-track" style="height: 12px; background: rgba(0,0,0,0.5); border-radius: 6px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); position: relative; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);">
-                      <div class="progress-linear-fill" id="hardsub-progress-fill" style="width: 0%; height:100%; background: var(--color-royal-blue); border-radius: 6px; transition: width 0.3s ease; box-shadow: 0 0 12px rgba(45,127,255,0.6);"></div>
+                    
+                    <div class="progress-linear-track" style="height: 10px;">
+                      <div class="progress-linear-fill" id="hardsub-progress-fill" style="width: 0%;">
+                        <div class="progress-linear-glow"></div>
+                        <div class="progress-linear-scanner"></div>
+                      </div>
+                    </div>
+                    
+                    <div class="hud-status-subtitle" style="margin-top: 10px;">
+                      <div class="hud-pulse-dot" id="hardsub-hud-pulse"></div>
+                      <span class="radial-msg" id="hardsub-status-text">Standing By</span>
                     </div>
                   </div>
 
-                  <div style="display: flex; gap: 10px;">
-                    <button class="btn-primary" id="btn-start-hardsub" style="flex:1; justify-content: center; padding: 12px 18px; font-size: 0.98rem; font-weight: 600; gap: 8px;">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px; height:18px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  <div style="display: flex; gap: 10px; margin-top: 4px;">
+                    <button class="btn-primary" id="btn-start-hardsub" style="flex: 1; justify-content: center; padding: 12px 18px; font-size: 0.95rem; font-weight: 600; gap: 10px;">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width: 18px; height: 18px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                       <span>Export Hardsub Video</span>
                     </button>
-                    <button class="btn-secondary" id="btn-cancel-hardsub" style="display:none; padding: 12px 18px; border-color: var(--color-red); color: var(--color-red); font-weight: 600;">
+                    <button class="btn-secondary" id="btn-cancel-hardsub" style="display: none; padding: 12px 18px; border-color: rgba(239, 68, 68, 0.4); color: #ef4444; background: rgba(239, 68, 68, 0.1); font-weight: 600;">
                       Cancel
                     </button>
                   </div>
@@ -1984,33 +1988,32 @@
                       <!-- Row 4: Alignment & Vertical Offset -->
                       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: center; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.07); margin-top: 4px;">
                         
-                        <!-- Alignment Control -->
+                        <!-- Alignment Control (2 Segmented Pickers) -->
                         <div>
-                          <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 6px;">Alignment</label>
-                          <div style="display: flex; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 3px; gap: 2px;">
-                            <button class="pill-btn align-btn" data-align="1" title="Bottom Left" style="flex:1; padding:6px 2px; border:none; border-radius:6px; gap:4px;">
-                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/></svg>
-                              <span style="font-size:0.72rem;">Left</span>
-                            </button>
-                            <button class="pill-btn align-btn active" data-align="2" title="Bottom Center" style="flex:1; padding:6px 2px; border:none; border-radius:6px; gap:4px;">
-                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;"><line x1="18" y1="10" x2="6" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="18" y1="18" x2="6" y2="18"/></svg>
-                              <span style="font-size:0.72rem;">Center</span>
-                            </button>
-                            <button class="pill-btn align-btn" data-align="3" title="Bottom Right" style="flex:1; padding:6px 2px; border:none; border-radius:6px; gap:4px;">
-                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;"><line x1="21" y1="10" x2="7" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="7" y2="18"/></svg>
-                              <span style="font-size:0.72rem;">Right</span>
-                            </button>
-                            <button class="pill-btn align-btn" data-align="6" title="Top Center" style="flex:1; padding:6px 2px; border:none; border-radius:6px; gap:4px;">
-                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;"><path d="M12 21V7"/><path d="m19 14-7-7-7 7"/><line x1="4" y1="3" x2="20" y2="3"/></svg>
-                              <span style="font-size:0.72rem;">Top</span>
-                            </button>
+                          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <label style="font-size: 0.8rem; color: var(--color-text-muted);">Alignment</label>
+                            <span id="hardsub-align-val" style="font-size: 0.75rem; color: var(--color-royal-blue); font-weight: 600;">Bottom Center</span>
+                          </div>
+                          <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <!-- Vertical Segmented Control -->
+                            <div style="display: flex; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 2px; gap: 2px;">
+                              <button class="pill-btn align-v-btn" data-v="top" style="flex:1; padding: 4px 0; font-size: 0.73rem; border:none; border-radius:4px;">Top</button>
+                              <button class="pill-btn align-v-btn" data-v="middle" style="flex:1; padding: 4px 0; font-size: 0.73rem; border:none; border-radius:4px;">Middle</button>
+                              <button class="pill-btn align-v-btn active" data-v="bottom" style="flex:1; padding: 4px 0; font-size: 0.73rem; border:none; border-radius:4px;">Bottom</button>
+                            </div>
+                            <!-- Horizontal Segmented Control -->
+                            <div style="display: flex; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 2px; gap: 2px;">
+                              <button class="pill-btn align-h-btn" data-h="left" style="flex:1; padding: 4px 0; font-size: 0.73rem; border:none; border-radius:4px;">Left</button>
+                              <button class="pill-btn align-h-btn active" data-h="center" style="flex:1; padding: 4px 0; font-size: 0.73rem; border:none; border-radius:4px;">Center</button>
+                              <button class="pill-btn align-h-btn" data-h="right" style="flex:1; padding: 4px 0; font-size: 0.73rem; border:none; border-radius:4px;">Right</button>
+                            </div>
                           </div>
                         </div>
 
                         <!-- Vertical Offset Slider -->
-                        <div>
+                        <div id="hardsub-posy-wrapper">
                           <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--color-text-muted); margin-bottom: 6px;">
-                            <span title="Adjust subtitle vertical distance from bottom edge">Vertical Offset</span>
+                            <span id="lbl-posy-title" title="Adjust subtitle vertical distance from edge">Vertical Margin Offset</span>
                             <div style="display: flex; align-items: center; gap: 4px;">
                               <span id="hardsub-posy-val" style="color: var(--color-royal-blue); font-weight: 600; line-height: 1;">30px</span>
                               <button class="reset-link-btn" id="reset-posy" title="Reset vertical position to 30px" style="display: none; padding: 2px;">

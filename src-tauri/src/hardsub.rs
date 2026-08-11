@@ -881,7 +881,7 @@ pub async fn run_hardsub_task(
 
     let _ = app.emit("hardsub-status", TranscribeProgress {
         progress: 1.0,
-        message: "Subtitles embedded successfully!".to_string(),
+        message: "Hardsub video exported successfully!".to_string(),
         active: false,
     });
 
