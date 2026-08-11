@@ -2,7 +2,9 @@ use tauri::{AppHandle, Manager};
 
 pub fn check_build_exists(app: &AppHandle, backend: &str) -> bool {
     let dir_name = backend.to_lowercase();
-    let bin_name = format!("whisper-cli-{}", dir_name);
+    let exe_ext = std::env::consts::EXE_SUFFIX;
+    let bin_name = format!("whisper-cli-{}{}", dir_name, exe_ext);
+
     
     let is_valid_executable = |path: &std::path::Path| -> bool {
         if !path.exists() {

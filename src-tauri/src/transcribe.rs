@@ -4,6 +4,11 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
+use tauri_plugin_notification::NotificationExt;
+
+fn send_notification(app: &AppHandle, title: &str, body: &str) {
+    let _ = app.notification().builder().title(title).body(body).show();
+}
 use regex::Regex;
 use std::fs;
 use std::time::Instant;
@@ -222,13 +227,13 @@ pub async fn run_transcription(
         .to_string();
         
     // Trigger OS-level notification
-    let _ = std::process::Command::new("notify-send")
-        .args(["Transcription Started", &format!("Processing {}...", file_name)])
-        .spawn();
+    send_notification(&app, "Transcription Started", &format!("Processing {}...", file_name));
         
     let root = Path::new(&settings.models_dir);
     let backend_name = settings.selected_backend.to_lowercase();
-    let bin_name = format!("whisper-cli-{}", backend_name);
+    let exe_ext = std::env::consts::EXE_SUFFIX;
+    let bin_name = format!("whisper-cli-{}{}", backend_name, exe_ext);
+
     
     use tauri::Manager;
     let mut bin_path = match app.path().resolve(format!("resources/{}", bin_name), tauri::path::BaseDirectory::Resource) {
@@ -578,15 +583,11 @@ pub async fn run_transcription(
         let cancelled = session.lock().map(|l| l.cancel_requested).unwrap_or(false);
         if cancelled {
             let _ = app.emit("transcribe-status", TranscribeProgress { progress: 0.0, message: "Aborted".to_string(), active: false });
-            let _ = std::process::Command::new("notify-send")
-                .args(["Transcription Cancelled", &format!("Whisper process cancelled for {}!", file_name)])
-                .spawn();
+            send_notification(&app, "Transcription Cancelled", &format!("Whisper process cancelled for {}!", file_name));
             return Err("Whisper process was cancelled by the user.".to_string());
         } else {
             let _ = app.emit("transcribe-status", TranscribeProgress { progress: 0.0, message: "Task Failed".to_string(), active: false });
-            let _ = std::process::Command::new("notify-send")
-                .args(["Transcription Failed", &format!("Whisper process terminated for {}!", file_name)])
-                .spawn();
+            send_notification(&app, "Transcription Failed", &format!("Whisper process terminated for {}!", file_name));
 
             let detailed_err = match status.code() {
                 Some(10) => {
@@ -642,9 +643,8 @@ pub async fn run_transcription(
     logs.log(&app, "Whisper", "Transcription completed successfully!");
     
     // Emitting OS notification
-    let _ = std::process::Command::new("notify-send")
-        .args(["Transcription Complete", &format!("Successfully processed {}!", file_name)])
-        .spawn();
+    send_notification(&app, "Transcription Complete", &format!("Successfully processed {}!", file_name));
+
         
     let _ = app.emit("transcribe-status", TranscribeProgress {
         progress: 1.0,

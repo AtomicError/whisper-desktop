@@ -4,6 +4,7 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager};
+use tauri_plugin_notification::NotificationExt;
 use std::time::Instant;
 
 use crate::logger::AppLogs;
@@ -73,34 +74,74 @@ pub fn get_system_fonts(_app: AppHandle) -> Vec<FontItem> {
         });
     }
 
-    // 2. Scan system fonts via fc-list
+    // 2. Scan system fonts via fc-list (if fontconfig is installed)
+    let mut scanned_system = false;
     if let Ok(output) = std::process::Command::new("fc-list")
         .args([":", "family"])
         .output()
     {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let mut system_font_names: Vec<String> = stdout
-            .lines()
-            .flat_map(|line| line.split(','))
-            .map(|f| f.trim().to_string())
-            .filter(|f| !f.is_empty())
-            .collect();
+        if output.status.success() {
+            scanned_system = true;
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let mut system_font_names: Vec<String> = stdout
+                .lines()
+                .flat_map(|line| line.split(','))
+                .map(|f| f.trim().to_string())
+                .filter(|f| !f.is_empty())
+                .collect();
 
-        system_font_names.sort();
-        system_font_names.dedup();
+            system_font_names.sort();
+            system_font_names.dedup();
 
-        for font_name in system_font_names {
-            if !fonts.iter().any(|f| f.name.eq_ignore_ascii_case(&font_name)) {
-                fonts.push(FontItem {
-                    name: font_name,
-                    source: "system".to_string(),
-                });
+            for font_name in system_font_names {
+                if !fonts.iter().any(|f| f.name.eq_ignore_ascii_case(&font_name)) {
+                    fonts.push(FontItem {
+                        name: font_name,
+                        source: "system".to_string(),
+                    });
+                }
+            }
+        }
+    }
+
+    // 3. Fallback: Scan OS-specific font directories directly if fc-list is unavailable
+    if !scanned_system {
+        let font_dirs: Vec<&str> = if cfg!(target_os = "windows") {
+            vec!["C:\\Windows\\Fonts"]
+        } else if cfg!(target_os = "macos") {
+            vec!["/Library/Fonts", "/System/Library/Fonts"]
+        } else {
+            vec!["/usr/share/fonts", "/usr/local/share/fonts"]
+        };
+
+        for dir_path in font_dirs {
+            let p = Path::new(dir_path);
+            if p.exists() && p.is_dir() {
+                if let Ok(entries) = std::fs::read_dir(p) {
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                            if ext.eq_ignore_ascii_case("ttf") || ext.eq_ignore_ascii_case("otf") {
+                                if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                                    let clean_name = stem.replace('-', " ").replace('_', " ");
+                                    if !fonts.iter().any(|f| f.name.eq_ignore_ascii_case(&clean_name)) {
+                                        fonts.push(FontItem {
+                                            name: clean_name,
+                                            source: "system".to_string(),
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
 
     fonts
 }
+
 
 fn read_u16(data: &[u8], off: usize) -> Option<u16> {
     Some(u16::from_be_bytes([*data.get(off)?, *data.get(off + 1)?]))
@@ -471,9 +512,7 @@ pub async fn run_hardsub_task(
     }
 
     // Trigger OS notification
-    let _ = std::process::Command::new("notify-send")
-        .args(["Hardsub Video Started", &format!("Encoding {}...", video_name)])
-        .spawn();
+    let _ = app.notification().builder().title("Hardsub Video Started").body(&format!("Encoding {}...", video_name)).show();
 
     let _ = app.emit("hardsub-status", TranscribeProgress {
         progress: 0.0,
@@ -886,9 +925,7 @@ pub async fn run_hardsub_task(
     });
 
     // Notify OS
-    let _ = std::process::Command::new("notify-send")
-        .args(["Hardsub Completed", &format!("Video saved to {}", settings.output_path)])
-        .spawn();
+    let _ = app.notification().builder().title("Hardsub Completed").body(&format!("Video saved to {}", settings.output_path)).show();
 
     Ok(HardsubResult {
         duration_ms,

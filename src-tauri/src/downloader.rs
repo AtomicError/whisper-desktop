@@ -427,10 +427,16 @@ pub fn pause_download_model(
 
     if let Some(pid) = pid_to_kill {
         // Kill the curl process
-        let status = std::process::Command::new("kill")
-            .arg("-9")
-            .arg(pid.to_string())
-            .status();
+            #[cfg(unix)]
+            let status = std::process::Command::new("kill")
+                .arg("-9")
+                .arg(pid.to_string())
+                .status();
+
+            #[cfg(windows)]
+            let status = std::process::Command::new("taskkill")
+                .args(["/F", "/PID", &pid.to_string()])
+                .status();
 
         match status {
             Ok(s) if s.success() => {

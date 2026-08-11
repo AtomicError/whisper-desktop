@@ -185,40 +185,49 @@ impl HardwareMonitor {
 }
 
 fn detect_gpu_type() -> String {
-    // 1. Check for nvidia-smi
-    if Command::new("which").arg("nvidia-smi").output().map(|o| o.status.success()).unwrap_or(false) {
+    // 1. Check for nvidia-smi (works on Windows & Linux)
+    if Command::new("nvidia-smi").arg("-L").output().map(|o| o.status.success()).unwrap_or(false) {
         return "nvidia".to_string();
     }
-    
-    // 2. Check for AMD gpu sysfs path in cards 0-2
-    for card in ["card0", "card1", "card2"] {
-        let path = format!("/sys/class/drm/{}/device/gpu_busy_percent", card);
-        if Path::new(&path).exists() {
-            return "amd".to_string();
-        }
+
+    #[cfg(target_os = "macos")]
+    {
+        return "apple_silicon".to_string();
     }
     
-    // 3. Check for Intel gpu sysfs path in cards 0-2 (both i915 and Xe KMD)
-    for card in ["card0", "card1", "card2"] {
-        let path1 = format!("/sys/class/drm/{}/gt_cur_freq_mhz", card);
-        let path2 = format!("/sys/class/drm/{}/gt/gt0/rps_act_freq_mhz", card);
-        let path3 = format!("/sys/class/drm/{}/device/tile0/gt0/freq0/cur_freq", card);
-        let path4 = format!("/sys/class/drm/{}/device/tile0/gt0/gtidle/idle_residency_ms", card);
-        if Path::new(&path1).exists() || Path::new(&path2).exists() || Path::new(&path3).exists() || Path::new(&path4).exists() {
-            return "intel".to_string();
+    #[cfg(target_os = "linux")]
+    {
+        // 2. Check for AMD gpu sysfs path in cards 0-2
+        for card in ["card0", "card1", "card2"] {
+            let path = format!("/sys/class/drm/{}/device/gpu_busy_percent", card);
+            if Path::new(&path).exists() {
+                return "amd".to_string();
+            }
         }
-    }
-    
-    // 4. Fallback: check lspci for Intel Graphics
-    if let Ok(output) = Command::new("lspci").output() {
-        let lspci_str = String::from_utf8_lossy(&output.stdout).to_lowercase();
-        if lspci_str.contains("intel") && (lspci_str.contains("graphics") || lspci_str.contains("gpu") || lspci_str.contains("vga")) {
-            return "intel".to_string();
+        
+        // 3. Check for Intel gpu sysfs path in cards 0-2 (both i915 and Xe KMD)
+        for card in ["card0", "card1", "card2"] {
+            let path1 = format!("/sys/class/drm/{}/gt_cur_freq_mhz", card);
+            let path2 = format!("/sys/class/drm/{}/gt/gt0/rps_act_freq_mhz", card);
+            let path3 = format!("/sys/class/drm/{}/device/tile0/gt0/freq0/cur_freq", card);
+            let path4 = format!("/sys/class/drm/{}/device/tile0/gt0/gtidle/idle_residency_ms", card);
+            if Path::new(&path1).exists() || Path::new(&path2).exists() || Path::new(&path3).exists() || Path::new(&path4).exists() {
+                return "intel".to_string();
+            }
+        }
+        
+        // 4. Fallback: check lspci for Intel Graphics
+        if let Ok(output) = Command::new("lspci").output() {
+            let lspci_str = String::from_utf8_lossy(&output.stdout).to_lowercase();
+            if lspci_str.contains("intel") && (lspci_str.contains("graphics") || lspci_str.contains("gpu") || lspci_str.contains("vga")) {
+                return "intel".to_string();
+            }
         }
     }
     
     "unknown".to_string()
 }
+
 
 fn get_file_as_int<P: AsRef<Path>>(path: P) -> i32 {
     if let Ok(content) = fs::read_to_string(path) {
