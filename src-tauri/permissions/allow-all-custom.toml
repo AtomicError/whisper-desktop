@@ -18,8 +18,13 @@ allow = [
   "clear_logs",
   "scan_models",
   "select_file",
+  "select_subtitle_file",
   "select_files",
   "select_directory",
+  "get_system_fonts",
+  "check_hardware_encoders",
+  "get_font_render_scale",
+  "start_hardsub_task",
   "read_text_file_content",
   "start_download_model_task",
   "get_model_download_progress",
@@ -32,5 +37,7 @@ allow = [
   "preview_translate_first_lines",
   "store_keyring_credential",
   "get_keyring_credential",
-  "delete_keyring_credential"
+  "delete_keyring_credential",
+  "write_text_file_content",
+  "get_media_stream_url"
 ]

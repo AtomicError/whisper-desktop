@@ -90,6 +90,14 @@
             </svg>
             <span>Transcribe File</span>
           </div>
+
+          <div class="nav-item" onclick="switchView('hardsub')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="23 7 16 12 23 17 23 7"/>
+              <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+            </svg>
+            <span>Hardsub Video</span>
+          </div>
           
           <div class="nav-item" onclick="switchView('logs')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1623,6 +1631,460 @@
               <div class="log-viewport" id="log-viewport"></div>
             </div>
           </div>
+
+            <div class="view-panel" id="panel-hardsub" style="overflow-y: auto; padding-bottom: 30px;">
+            <div class="hardsub-grid-container">
+              
+              <!-- Left Column: Media Source, Real Video Frame Preview, Media Controls & Telemetry -->
+              <div style="display: flex; flex-direction: column; gap: 16px;">
+                
+                <!-- File Selection Card (Dual Premium Dropzones matching Transcribe page style) -->
+                <div class="glass-card" style="padding: 18px;">
+                  <h3 style="margin-top: 0; margin-bottom: 14px; font-size: 1.05rem; color: var(--color-royal-blue); display: flex; align-items: center; justify-content: space-between;">
+                    <span style="display: flex; align-items: center; gap: 8px;">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px; height:20px;"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+                      Media & Subtitle Source
+                    </span>
+                    <span style="font-size: 0.75rem; color: var(--color-text-muted); font-weight: normal;">Drag & Drop Supported</span>
+                  </h3>
+
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                    
+                    <!-- Video File Dropzone -->
+                    <div class="media-drop-zone" id="hardsub-video-drop-zone" style="padding: 20px 14px; gap: 10px; position: relative;">
+                      <svg class="media-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width: 32px; height: 32px;">
+                        <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
+                        <line x1="7" y1="2" x2="7" y2="22"/>
+                        <line x1="17" y1="2" x2="17" y2="22"/>
+                        <line x1="2" y1="12" x2="22" y2="12"/>
+                        <line x1="2" y1="7" x2="7" y2="7"/>
+                        <line x1="2" y1="17" x2="7" y2="17"/>
+                      </svg>
+                      <div style="flex:1; overflow: hidden; max-width: 100%;">
+                        <p style="font-weight:600; margin-bottom:4px; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-video-name">No Video Loaded</p>
+                        <p style="font-size:0.75rem; color:var(--color-text-muted); margin:0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-video-path">Drag & drop video (.mp4, .mkv, .mov)</p>
+                      </div>
+                      <button class="btn-secondary" id="btn-browse-video" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap;">Browse Video</button>
+                      <input type="hidden" id="hardsub-video-path" />
+                    </div>
+
+                    <!-- Subtitle File Dropzone -->
+                    <div class="media-drop-zone" id="hardsub-sub-drop-zone" style="padding: 20px 14px; gap: 10px; position: relative;">
+                      <svg class="media-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width: 32px; height: 32px;">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        <line x1="7" y1="8" x2="17" y2="8"/>
+                        <line x1="7" y1="12" x2="14" y2="12"/>
+                      </svg>
+                      <div style="flex:1; overflow: hidden; max-width: 100%;">
+                        <p style="font-weight:600; margin-bottom:4px; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-sub-name">No Subtitle Loaded</p>
+                        <p style="font-size:0.75rem; color:var(--color-text-muted); margin:0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-sub-path">Drag & drop subtitle (.srt, .vtt, .ass)</p>
+                      </div>
+                      <button class="btn-secondary" id="btn-browse-sub" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap;">Browse Subtitle</button>
+                      <input type="hidden" id="hardsub-sub-path" />
+                    </div>
+
+                  </div>
+                </div>
+
+                <!-- Real Video Frame & Live Subtitle Visual Preview Card -->
+                <div class="glass-card" style="padding: 18px; display: flex; flex-direction: column; gap: 12px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0; font-size: 1.05rem; color: var(--color-royal-blue); display: flex; align-items: center; gap: 8px;">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px; height:20px;"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                      Real Video Frame Preview
+                    </h3>
+                    <span id="hardsub-video-status-badge" style="font-size: 0.75rem; background: rgba(45, 127, 255, 0.15); color: var(--color-royal-blue); padding: 3px 8px; border-radius: 12px; font-weight: 500;">Standing By</span>
+                  </div>
+
+                  <!-- Frame Viewport Outer Container -->
+                  <div id="hardsub-player-container" style="position: relative; width: 100%; min-height: 240px; background: #000; border-radius: 10px; border: 1px solid rgba(255,255,255,0.12); overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 0 40px rgba(0,0,0,0.9);">
+                    
+                    <!-- HTML5 Video Player -->
+                    <video id="hardsub-video-element" style="width: 100%; height: 100%; max-height: 320px; object-fit: contain; display: none;"></video>
+                    
+                    <!-- Video Placeholder state when no video is selected -->
+                    <div id="hardsub-video-placeholder" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 40px; text-align: center; cursor: pointer;">
+                      <div class="premium-play-trigger" title="Select a video file">
+                        <svg class="modern-player-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <!-- Waveform play emblem in the center -->
+                          <path class="wave-bar bar-1" d="M18 14V34" stroke="url(#btn-grad)" stroke-width="3" stroke-linecap="round"/>
+                          <path class="wave-bar bar-2" d="M24 18V30" stroke="url(#btn-grad)" stroke-width="3" stroke-linecap="round"/>
+                          <path class="wave-bar bar-3" d="M30 21V27" stroke="url(#btn-grad)" stroke-width="3" stroke-linecap="round"/>
+                          <path class="wave-bar bar-4" d="M36 24V24" stroke="url(#btn-grad)" stroke-width="3" stroke-linecap="round"/>
+                          
+                          <!-- Gradient definition -->
+                          <defs>
+                            <linearGradient id="btn-grad" x1="4" y1="4" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+                              <stop offset="0%" stop-color="var(--color-royal-blue)" />
+                              <stop offset="100%" stop-color="var(--color-cyan)" />
+                            </linearGradient>
+                          </defs>
+                        </svg>
+                      </div>
+                      <span style="font-size: 0.85rem; color: var(--color-text-muted); font-weight: 500; max-width: 240px; line-height: 1.4;">Select a video file above to enable real-frame live preview</span>
+                    </div>
+
+                    <!-- Canvas Subtitle Overlay (ASS-matching renderer) -->
+                    <canvas id="hardsub-subtitle-canvas" style="position: absolute; top: 0; left: 0; pointer-events: none; display: none; z-index: 5;"></canvas>
+
+                    <!-- Volume HUD Indicator -->
+                    <div id="hardsub-volume-hud" style="position: absolute; top: 15px; right: 15px; z-index: 15; pointer-events: none; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.15); padding: 8px 14px; border-radius: 20px; display: flex; align-items: center; gap: 8px; color: #fff; opacity: 0; transform: translateY(-10px); transition: opacity 0.25s ease, transform 0.25s ease; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 0.85rem; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
+                      <svg id="hardsub-hud-vol-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; display: none;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                      <svg id="hardsub-hud-vol-low" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; display: none;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                      <svg id="hardsub-hud-vol-mute" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; display: none;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+                      <span id="hardsub-volume-hud-text">100%</span>
+                    </div>
+
+                    <!-- Custom Interactive Video Control Bar (Inside player container for fullscreen) -->
+                    <div id="hardsub-video-controls">
+                      <div style="display: flex; align-items: center; gap: 10px;">
+                        <!-- Play / Pause Button -->
+                        <button id="hardsub-btn-play" class="pill-btn" style="padding: 6px 12px; height: 32px; gap: 4px;" title="Play / Pause Video">
+                          <svg id="hardsub-icon-play" viewBox="0 0 24 24" fill="currentColor" style="width:14px; height:14px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                          <svg id="hardsub-icon-pause" viewBox="0 0 24 24" fill="currentColor" style="width:14px; height:14px; display:none;"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                        </button>
+
+                        <!-- Prev / Next Subtitle Jump Buttons -->
+                        <button id="hardsub-btn-prev-cue" class="pill-btn" style="padding: 6px 8px; height: 32px;" title="Previous Subtitle Cue">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/></svg>
+                        </button>
+                        <button id="hardsub-btn-next-cue" class="pill-btn" style="padding: 6px 8px; height: 32px;" title="Next Subtitle Cue">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
+                        </button>
+
+                        <!-- Volume Controls -->
+                        <div class="volume-control-wrapper">
+                          <button id="hardsub-btn-volume" class="pill-btn" style="padding: 6px 8px; height: 32px; z-index: 2;" title="Mute / Unmute">
+                            <svg id="hardsub-icon-vol-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                            <svg id="hardsub-icon-vol-mute" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px; display:none;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+                          </button>
+                          <input type="range" id="hardsub-volume-slider" min="0" max="1" step="0.05" value="1" class="volume-slider" style="width: 0px; opacity: 0; pointer-events: none; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); height: 4px; margin: 0; -webkit-appearance: none; appearance: none; background: rgba(255, 255, 255, 0.1); border-radius: 2px; outline: none;" />
+                        </div>
+
+                        <!-- Scrub Slider -->
+                        <input type="range" id="hardsub-video-seek" min="0" max="100" value="0" step="0.1" class="range-slider" style="flex:1;" />
+
+                        <!-- Time Display -->
+                        <span id="hardsub-video-time" style="font-family: monospace; font-size: 0.98rem; font-weight: 600; color: var(--color-royal-blue); min-width: 120px; text-align: right;">00:00 / 00:00</span>
+
+                        <!-- Fullscreen Button -->
+                        <button id="hardsub-btn-fullscreen" class="pill-btn" style="padding: 6px 8px; height: 32px;" title="Toggle Fullscreen">
+                          <svg id="hardsub-icon-fs-enter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+                          <svg id="hardsub-icon-fs-exit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px; display:none;"><path d="M4 14h6v6m10-6h-6v6M4 10h6V4m10 6h-6V4"/></svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Telemetry Progress & Action Card (Dark Glassmorphic Studio Theme) -->
+                <div class="glass-card telemetry-hud" style="margin-bottom: 0; padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+                  <div class="progress-linear-wrapper" style="margin: 0; width: 100%;">
+                    <div class="hud-stats-row" style="margin-bottom: 8px;">
+                      <span class="hud-stat-label">HARDSUB ENCODING PROGRESS</span>
+                      <span class="radial-pct" id="hardsub-pct-text">0%</span>
+                    </div>
+                    
+                    <div class="progress-linear-track" style="height: 10px;">
+                      <div class="progress-linear-fill" id="hardsub-progress-fill" style="width: 0%;">
+                        <div class="progress-linear-glow"></div>
+                        <div class="progress-linear-scanner"></div>
+                      </div>
+                    </div>
+                    
+                    <div class="hud-status-subtitle" style="margin-top: 10px;">
+                      <div class="hud-pulse-dot" id="hardsub-hud-pulse"></div>
+                      <span class="radial-msg" id="hardsub-status-text">Standing By</span>
+                    </div>
+                  </div>
+
+                  <div style="display: flex; gap: 10px; margin-top: 4px;">
+                    <button class="btn-primary" id="btn-start-hardsub" style="flex: 1; justify-content: center; padding: 12px 18px; font-size: 0.95rem; font-weight: 600; gap: 10px;">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width: 18px; height: 18px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                      <span>Export Hardsub Video</span>
+                    </button>
+                    <button class="btn-secondary" id="btn-cancel-hardsub" style="display: none; padding: 12px 18px; border-color: rgba(239, 68, 68, 0.4); color: #ef4444; background: rgba(239, 68, 68, 0.1); font-weight: 600;">
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- Right Column: Dual-Tab Studio Panel (Subtitles Block Editor & Typography/Encoding) -->
+              <div style="display: flex; flex-direction: column; gap: 16px;">
+                
+                <!-- Studio Navigation Tabs Bar -->
+                <div class="glass-card" style="padding: 6px; display: flex; gap: 6px; background: rgba(15, 23, 42, 0.6);">
+                  <button id="hardsub-tab-btn-editor" class="pill-btn active" style="flex:1; padding: 10px; justify-content: center; border-radius: 8px; font-weight: 600; gap: 6px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px; height:16px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                    <span>Subtitles Editor</span>
+                  </button>
+                  <button id="hardsub-tab-btn-settings" class="pill-btn" style="flex:1; padding: 10px; justify-content: center; border-radius: 8px; font-weight: 600; gap: 6px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px; height:16px;"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/><path d="M12 22a10 10 0 0 0 10-10c0-2.3-.8-4.3-2-6"/></svg>
+                    <span>Style & Export</span>
+                  </button>
+                </div>
+
+                <!-- Tab 1: Block-Based Subtitle Editor View -->
+                <div id="hardsub-tab-view-editor" class="glass-card" style="padding: 18px; display: flex; flex-direction: column; gap: 14px; flex: 1;">
+                  
+                  <!-- Editor Top Bar: Search & Subtitle Counter -->
+                  <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                    <div style="position: relative; flex: 1;">
+                      <input type="text" id="hardsub-search-input" class="text-input" placeholder="Search subtitle text..." style="width: 100%; padding-left: 32px; font-size: 0.85rem;" />
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--color-text-muted);"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    </div>
+                    <span id="hardsub-subtitle-count" style="font-size: 0.95rem; font-weight: 600; font-family: monospace; background: rgba(45, 127, 255, 0.05); padding: 8px 14px; border-radius: 8px; color: var(--color-royal-blue); white-space: nowrap; border: 1px solid rgba(45, 127, 255, 0.2);">0 Cues</span>
+                  </div>
+
+                  <!-- Subtitle Cue Blocks Scrollable List -->
+                  <div id="hardsub-subtitle-list" class="scroller" style="max-height: 520px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 4px;">
+                    <div id="hardsub-empty-cue-notice" style="text-align: center; padding: 40px 20px; color: var(--color-text-muted); display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width: 40px; height: 40px; opacity: 0.5;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                      <span style="font-size: 0.88rem;">No subtitle loaded.<br>Select a subtitle file above to edit block cues.</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Tab 2: Subtitle Typography, Style & Encoding View -->
+                <div id="hardsub-tab-view-settings" style="display: none; flex-direction: column; gap: 16px;">
+                  
+                  <!-- Typography Styling Controls Card -->
+                  <div class="glass-card" style="padding: 18px;">
+                    <h3 style="margin-top: 0; margin-bottom: 16px; font-size: 1.05rem; color: var(--color-royal-blue); display: flex; align-items: center; gap: 8px;">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px; height:20px;"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+                      Subtitle Typography & Style
+                    </h3>
+
+                    <div style="display: flex; flex-direction: column; gap: 16px;">
+                      
+                      <!-- Row 1: Font Family & Style Format (Bold / Italic) -->
+                      <div style="display: grid; grid-template-columns: 1.6fr 1fr; gap: 12px; align-items: end;">
+                        <div>
+                          <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Font Family</label>
+                          <select class="select-control" id="hardsub-font" style="width:100%; height:38px; box-sizing:border-box;">
+                            <option value="Vazirmatn">★ Vazirmatn (Persian UI)</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Style Format</label>
+                          <div style="display: flex; gap: 6px; height: 38px;">
+                            <button class="pill-btn active" id="hardsub-btn-bold" title="Toggle Bold Text" style="flex:1; font-weight:700; height:38px; box-sizing:border-box;">
+                              <strong>B</strong>
+                            </button>
+                            <button class="pill-btn" id="hardsub-btn-italic" title="Toggle Italic Text" style="flex:1; font-style:italic; font-family:serif; height:38px; box-sizing:border-box;">
+                              <em>I</em>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- Row 2: Text Color Swatch & Background Box Swatch -->
+                      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: center;">
+                        
+                        <!-- Text Color Card -->
+                        <div>
+                          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--color-text-muted); margin-bottom: 6px;">
+                            <span>Text Color</span>
+                            <span id="hardsub-hex-text" style="font-family: monospace; font-size: 0.78rem; color: var(--color-royal-blue); font-weight: 600;">#FFFFFF</span>
+                          </div>
+                          <div style="display: flex; align-items: center; gap: 8px;">
+                            <div class="color-picker-wrapper" title="Text Color">
+                              <div id="hardsub-swatch-text" style="width:100%; height:100%; background: #FFFFFF;"></div>
+                              <input type="color" id="hardsub-color-text" value="#FFFFFF" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: none; padding: 0; margin: 0;" />
+                            </div>
+                            <!-- Quick Presets -->
+                            <div style="display: flex; gap: 4px;">
+                              <button class="color-preset-dot" data-target="text" data-color="#FFFFFF" style="background:#FFFFFF;" title="White"></button>
+                              <button class="color-preset-dot" data-target="text" data-color="#FFD700" style="background:#FFD700;" title="Yellow"></button>
+                              <button class="color-preset-dot" data-target="text" data-color="#2D7FFF" style="background:#2D7FFF;" title="Royal Blue"></button>
+                              <button class="color-preset-dot" data-target="text" data-color="#FF3B30" style="background:#FF3B30;" title="Red"></button>
+                            </div>
+                          </div>
+                        </div>
+
+                        <!-- Background Box Control -->
+                        <div>
+                          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; margin-bottom: 6px;">
+                            <label class="checkbox-container" style="margin:0; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                              <input type="checkbox" id="hardsub-bgbox-toggle" />
+                              <span class="custom-checkmark" style="margin-left: 5px; flex-shrink: 0;"></span>
+                              <span style="font-weight: 500; color: var(--color-text-muted);">Background Box</span>
+                            </label>
+                            <span id="hardsub-hex-bg" style="font-family: monospace; font-size: 0.78rem; color: var(--color-royal-blue); font-weight: 600;">#000000</span>
+                          </div>
+                          <div id="hardsub-bg-controls" class="control-disabled" style="display: flex; align-items: center; gap: 8px;">
+                            <div class="color-picker-wrapper" title="Box Fill Color">
+                              <div id="hardsub-swatch-bg" style="width:100%; height:100%; background: #000000;"></div>
+                              <input type="color" id="hardsub-color-bg" value="#000000" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: none; padding: 0; margin: 0;" />
+                            </div>
+                            <!-- Quick Presets for Box -->
+                            <div style="display: flex; gap: 4px;">
+                              <button class="color-preset-dot" data-target="bg" data-color="#000000" style="background:#000000; border-color:rgba(255,255,255,0.4);" title="Black"></button>
+                              <button class="color-preset-dot" data-target="bg" data-color="#0B0E1B" style="background:#0B0E1B; border-color:rgba(255,255,255,0.4);" title="Dark Navy"></button>
+                              <button class="color-preset-dot" data-target="bg" data-color="#1E293B" style="background:#1E293B; border-color:rgba(255,255,255,0.4);" title="Slate"></button>
+                              <button class="color-preset-dot" data-target="bg" data-color="#2D7FFF" style="background:#2D7FFF;" title="Royal Blue"></button>
+                            </div>
+                          </div>
+                          <div id="hardsub-bg-extra-controls" class="control-disabled" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px;">
+                            <div>
+                              <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.76rem; color: var(--color-text-muted); margin-bottom: 4px;">
+                                <label for="hardsub-bgbox-opacity">Box Opacity</label>
+                                <span id="hardsub-bgbox-opacity-val" style="color: var(--color-royal-blue); font-weight: 600;">50%</span>
+                              </div>
+                              <input type="range" class="range-slider" id="hardsub-bgbox-opacity" min="0" max="100" value="50" style="width:100%;" />
+                            </div>
+                            <div>
+                              <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.76rem; color: var(--color-text-muted); margin-bottom: 4px;">
+                                <label for="hardsub-bgbox-radius">Corner Radius</label>
+                                <span id="hardsub-bgbox-radius-val" style="color: var(--color-royal-blue); font-weight: 600;">0px</span>
+                              </div>
+                              <input type="range" class="range-slider" id="hardsub-bgbox-radius" min="0" max="24" value="0" style="width:100%;" />
+                            </div>
+                          </div>
+                        </div>
+
+                      </div>
+
+                      <!-- Row 3: Font Size Slider & Outline Size Slider -->
+                      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: center;">
+                        <!-- Font Size Slider -->
+                        <div>
+                          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--color-text-muted); margin-bottom: 6px;">
+                            <span>Font Size</span>
+                            <div style="display: flex; align-items: center; gap: 4px;">
+                              <span id="hardsub-fontsize-val" style="color: var(--color-royal-blue); font-weight: 600; line-height: 1;">24px</span>
+                              <button class="reset-link-btn" id="reset-fontsize" title="Reset font size to 24px" style="display: none; padding: 2px;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:12px; height:12px; display:block;"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                              </button>
+                            </div>
+                          </div>
+                          <input type="range" class="range-slider" id="hardsub-fontsize" min="6" max="64" value="24" style="width:100%;" />
+                        </div>
+
+                        <!-- Outline Color & Size Slider -->
+                        <div>
+                          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--color-text-muted); margin-bottom: 6px;">
+                            <span>Outline Size</span>
+                            <div style="display: flex; align-items: center; gap: 4px;">
+                              <span id="hardsub-outline-val" style="color: var(--color-royal-blue); font-weight: 600; line-height: 1;">2px</span>
+                              <button class="reset-link-btn" id="reset-outline" title="Reset outline size to 2px" style="display: none; padding: 2px;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:12px; height:12px; display:block;"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                              </button>
+                            </div>
+                          </div>
+                          <div style="display: flex; align-items: center; gap: 10px;">
+                            <div id="hardsub-outline-picker-wrapper" class="color-picker-wrapper" title="Outline Color">
+                              <div id="hardsub-swatch-outline" style="width:100%; height:100%; background: #000000;"></div>
+                              <input type="color" id="hardsub-color-outline" value="#000000" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: none; padding: 0; margin: 0;" />
+                            </div>
+                            <input type="range" class="range-slider" id="hardsub-outline-size" min="0" max="8" value="2" style="flex:1;" />
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- Row 4: Alignment & Vertical Offset -->
+                      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: center; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.07); margin-top: 4px;">
+                        
+                        <!-- Alignment Control (2 Segmented Pickers) -->
+                        <div>
+                          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <label style="font-size: 0.8rem; color: var(--color-text-muted);">Alignment</label>
+                            <span id="hardsub-align-val" style="font-size: 0.75rem; color: var(--color-royal-blue); font-weight: 600;">Bottom Center</span>
+                          </div>
+                          <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <!-- Vertical Segmented Control -->
+                            <div style="display: flex; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 2px; gap: 2px;">
+                              <button class="pill-btn align-v-btn" data-v="top" style="flex:1; padding: 4px 0; font-size: 0.73rem; border:none; border-radius:4px;">Top</button>
+                              <button class="pill-btn align-v-btn" data-v="middle" style="flex:1; padding: 4px 0; font-size: 0.73rem; border:none; border-radius:4px;">Middle</button>
+                              <button class="pill-btn align-v-btn active" data-v="bottom" style="flex:1; padding: 4px 0; font-size: 0.73rem; border:none; border-radius:4px;">Bottom</button>
+                            </div>
+                            <!-- Horizontal Segmented Control -->
+                            <div style="display: flex; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 2px; gap: 2px;">
+                              <button class="pill-btn align-h-btn" data-h="left" style="flex:1; padding: 4px 0; font-size: 0.73rem; border:none; border-radius:4px;">Left</button>
+                              <button class="pill-btn align-h-btn active" data-h="center" style="flex:1; padding: 4px 0; font-size: 0.73rem; border:none; border-radius:4px;">Center</button>
+                              <button class="pill-btn align-h-btn" data-h="right" style="flex:1; padding: 4px 0; font-size: 0.73rem; border:none; border-radius:4px;">Right</button>
+                            </div>
+                          </div>
+                        </div>
+
+                        <!-- Vertical Offset Slider -->
+                        <div id="hardsub-posy-wrapper">
+                          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--color-text-muted); margin-bottom: 6px;">
+                            <span id="lbl-posy-title" title="Adjust subtitle vertical distance from edge">Vertical Margin Offset</span>
+                            <div style="display: flex; align-items: center; gap: 4px;">
+                              <span id="hardsub-posy-val" style="color: var(--color-royal-blue); font-weight: 600; line-height: 1;">30px</span>
+                              <button class="reset-link-btn" id="reset-posy" title="Reset vertical position to 30px" style="display: none; padding: 2px;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:12px; height:12px; display:block;"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                              </button>
+                            </div>
+                          </div>
+                          <input type="range" class="range-slider" id="hardsub-posy" min="0" max="250" value="30" style="width:100%;" />
+                        </div>
+
+                      </div>
+
+                    </div>
+                  </div>
+
+                  <!-- Hardware & Format Options Card -->
+                  <div class="glass-card" style="padding: 18px;">
+                    <h3 style="margin-top: 0; margin-bottom: 14px; font-size: 1.05rem; color: var(--color-royal-blue); display: flex; align-items: center; gap: 8px;">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px; height:20px;"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+                      Encoding & Hardware Acceleration
+                    </h3>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                      <div>
+                        <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Output Format</label>
+                        <select class="select-control" id="hardsub-format" style="width:100%;">
+                          <option value="mp4">MP4 (.mp4)</option>
+                          <option value="mkv">MKV (.mkv)</option>
+                          <option value="webm">WebM (.webm)</option>
+                          <option value="mov">MOV (.mov)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Video Codec</label>
+                        <select class="select-control" id="hardsub-codec" style="width:100%;">
+                          <option value="h264">H.264 / AVC (Universal)</option>
+                          <option value="h265">H.265 / HEVC (High Efficiency)</option>
+                          <option value="av1">AV1 (Next Gen)</option>
+                          <option value="vp9">VP9 (Web Optimized)</option>
+                          <option value="prores">ProRes (Lossless)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Hardware Accelerator</label>
+                        <select class="select-control" id="hardsub-hw" style="width:100%;">
+                          <option value="cpu">Standard CPU (libx264/x265)</option>
+                          <option value="qsv">Intel QSV (QuickSync HW)</option>
+                          <option value="nvenc">NVIDIA NVENC (GPU Acceleration)</option>
+                          <option value="vaapi">Linux VA-API (AMD/Intel)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Audio Mode</label>
+                        <select class="select-control" id="hardsub-audio" style="width:100%;">
+                          <option value="copy">Pass-through Audio (-c:a copy)</option>
+                          <option value="aac">Re-encode Audio (AAC 192k)</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+              </div>
+            </div>
+          </div></div>
+            </div>
+          </div>
         </main>
       </div>
     </div>
@@ -1760,4 +2222,3 @@
     </div>
   </div>
 </html>
-

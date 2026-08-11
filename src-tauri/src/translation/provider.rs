@@ -75,7 +75,8 @@ impl AiProvider {
                             "role": "user",
                             "content": user_content
                         }
-                    ]
+                    ],
+                    "stream": false
                 })
             }
             "Responses" => {
@@ -113,7 +114,8 @@ impl AiProvider {
                             "role": "user",
                             "content": user_content
                         }
-                    ]
+                    ],
+                    "stream": false
                 })
             }
         }

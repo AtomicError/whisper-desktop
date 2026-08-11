@@ -54,3 +54,9 @@ Thumbs.db
 *.ntvs*
 *.njsproj
 *.sln
+
+# --- Temporary Subtitles & Diagnostic Logs ---
+debug_subtitles.ass
+*.temp.ass
+debug_error.log
+debug_rust.log

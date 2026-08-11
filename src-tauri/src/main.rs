@@ -5,6 +5,8 @@ mod builder;
 mod transcribe;
 mod downloader;
 mod translation;
+mod hardsub;
+mod video_server;
 
 use std::sync::{Arc, Mutex};
 use std::path::Path;
@@ -24,6 +26,7 @@ use translation::{
     get_keyring_credential,
     delete_keyring_credential,
 };
+use hardsub::{get_system_fonts, check_hardware_encoders, get_font_render_scale, start_hardsub_task};
 
 // Tauri Managed States
 struct HardwareState(Arc<Mutex<HardwareMonitor>>);
@@ -289,7 +292,21 @@ async fn select_file(app: AppHandle) -> Option<String> {
     let (tx, rx) = tokio::sync::oneshot::channel();
     app.dialog()
         .file()
-        .add_filter("Audio/Video", &["mp4", "mkv", "avi", "mov", "flv", "webm", "m4v", "mp3", "wav", "ogg", "m4a", "flac", "aac", "wma"])
+        .add_filter("Video Files (*.mp4, *.mkv, *.webm)", &["mp4", "mkv", "avi", "mov", "flv", "webm", "m4v", "MP4", "MKV", "WEBM", "MOV", "AVI", "FLV"])
+        .add_filter("All Files (*)", &["*"])
+        .pick_file(move |file| {
+            let _ = tx.send(file);
+        });
+    rx.await.ok().flatten().and_then(|p| p.into_path().ok()).map(|p| p.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+async fn select_subtitle_file(app: AppHandle) -> Option<String> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .file()
+        .add_filter("Subtitle Files (*.srt, *.vtt, *.ass)", &["srt", "vtt", "ass", "ssa", "sub", "SRT", "VTT", "ASS", "SSA", "SUB"])
+        .add_filter("All Files (*)", &["*"])
         .pick_file(move |file| {
             let _ = tx.send(file);
         });
@@ -325,13 +342,24 @@ async fn select_directory(app: AppHandle) -> Option<String> {
 #[tauri::command]
 fn read_text_file_content(file_path: String) -> Result<String, String> {
     let path = std::path::Path::new(&file_path);
-    let allowed_exts = ["txt", "srt", "vtt", "lrc"];
+    let allowed_exts = ["txt", "srt", "vtt", "lrc", "ass"];
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
     if !allowed_exts.contains(&ext) {
         return Err("File type not allowed".into());
     }
     let canonical = path.canonicalize().map_err(|_| "Invalid file path".to_string())?;
     read_text_file(canonical.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn write_text_file_content(file_path: String, content: String) -> Result<(), String> {
+    let path = std::path::Path::new(&file_path);
+    let allowed_exts = ["txt", "srt", "vtt", "lrc", "ass"];
+    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+    if !allowed_exts.contains(&ext) {
+        return Err("File type not allowed for writing".into());
+    }
+    std::fs::write(path, content).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -467,9 +495,11 @@ fn main() {
             clear_logs,
             scan_models,
             select_file,
+            select_subtitle_file,
             select_files,
             select_directory,
             read_text_file_content,
+            write_text_file_content,
             start_download_model_task,
             get_model_download_progress,
             get_all_models_status,
@@ -481,7 +511,12 @@ fn main() {
             preview_translate_first_lines,
             store_keyring_credential,
             get_keyring_credential,
-            delete_keyring_credential
+            delete_keyring_credential,
+            get_system_fonts,
+            check_hardware_encoders,
+            get_font_render_scale,
+            start_hardsub_task,
+            video_server::get_media_stream_url
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
