@@ -222,6 +222,263 @@ function convertCuesToSrt(cues: SubtitleCue[]): string {
     .join('\n');
 }
 
+interface TextSpan {
+  text: string;
+  bold: boolean;
+  italic: boolean;
+  underline: boolean;
+  color: string;
+}
+
+const TAG_REGEX = /<\/?(?:i|b|u|font)\b[^>]*>|\{\\an[1-9]\}|\{\\[^}]+\}/gi;
+
+function parseLineToSpans(text: string, defaultColor: string): { spans: TextSpan[], alignmentOverride: number | null } {
+  let alignmentOverride: number | null = null;
+  const spans: TextSpan[] = [];
+  
+  let bold = false;
+  let italic = false;
+  let underline = false;
+  const colorStack: string[] = [defaultColor];
+
+  TAG_REGEX.lastIndex = 0;
+  let lastIndex = 0;
+  
+  const matches = [...text.matchAll(TAG_REGEX)];
+  
+  for (const match of matches) {
+    const startIndex = match.index ?? 0;
+    
+    if (startIndex > lastIndex) {
+      const txt = text.substring(lastIndex, startIndex);
+      if (txt) {
+        spans.push({
+          text: txt,
+          bold,
+          italic,
+          underline,
+          color: colorStack[colorStack.length - 1]
+        });
+      }
+    }
+    
+    const tag = match[0];
+    if (tag.startsWith('<')) {
+      const lower = tag.toLowerCase();
+      if (lower.startsWith('<i>') || lower.startsWith('<i ')) {
+        italic = true;
+      } else if (lower === '</i>') {
+        italic = false;
+      } else if (lower.startsWith('<b>') || lower.startsWith('<b ')) {
+        bold = true;
+      } else if (lower === '</b>') {
+        bold = false;
+      } else if (lower.startsWith('<u>') || lower.startsWith('<u ')) {
+        underline = true;
+      } else if (lower === '</u>') {
+        underline = false;
+      } else if (lower.startsWith('<font') && lower.includes('color=')) {
+        const colorMatch = /color=["']#?([0-9a-fA-F]{6}|[a-zA-Z]+)["']/i.exec(tag);
+        if (colorMatch) {
+          const val = colorMatch[1];
+          const colorHex = /^[0-9a-fA-F]{6}$/.test(val) ? `#${val}` : val;
+          colorStack.push(colorHex);
+        } else {
+          colorStack.push(defaultColor);
+        }
+      } else if (lower === '</font>') {
+        if (colorStack.length > 1) {
+          colorStack.pop();
+        }
+      }
+    } else if (tag.startsWith('{')) {
+      const commands = tag.substring(1, tag.length - 1).split('\\');
+      for (const cmd of commands) {
+        if (cmd.startsWith('an')) {
+          const val = cmd.substring(2).trim();
+          alignmentOverride = parseInt(val, 10) || null;
+        } else if (cmd.startsWith('i')) {
+          const val = cmd.substring(1).trim();
+          italic = val === '1';
+        } else if (cmd.startsWith('b')) {
+          const val = cmd.substring(1).trim();
+          bold = val === '1';
+        } else if (cmd.startsWith('u')) {
+          const val = cmd.substring(1).trim();
+          underline = val === '1';
+        } else if (cmd.startsWith('c&H') || cmd.startsWith('1c&H')) {
+          const colorMatch = /(?:1?c&H)([0-9a-fA-F]+)&?/i.exec(cmd);
+          if (colorMatch) {
+            const hex = colorMatch[1];
+            let cleanHex = hex;
+            if (cleanHex.length > 6) {
+              cleanHex = cleanHex.substring(cleanHex.length - 6);
+            } else {
+              cleanHex = cleanHex.padStart(6, '0');
+            }
+            const b = cleanHex.substring(0, 2);
+            const g = cleanHex.substring(2, 4);
+            const r = cleanHex.substring(4, 6);
+            colorStack.push(`#${r}${g}${b}`);
+          }
+        } else if (cmd === 'c' || cmd === '1c') {
+          if (colorStack.length > 1) {
+            colorStack.pop();
+          }
+        }
+      }
+    }
+    
+    lastIndex = startIndex + tag.length;
+  }
+  
+  if (lastIndex < text.length) {
+    const txt = text.substring(lastIndex);
+    if (txt) {
+      spans.push({
+        text: txt,
+        bold,
+        italic,
+        underline,
+        color: colorStack[colorStack.length - 1]
+      });
+    }
+  }
+  
+  return { spans, alignmentOverride };
+}
+
+function splitSpanIntoWords(span: TextSpan): TextSpan[] {
+  const words = span.text.split(/(\s+)/);
+  return words
+    .filter(w => w.length > 0)
+    .map(w => ({
+      text: w,
+      bold: span.bold,
+      italic: span.italic,
+      underline: span.underline,
+      color: span.color
+    }));
+}
+
+function setSpanFont(ctx: CanvasRenderingContext2D, family: string, size: number, bold: boolean, italic: boolean) {
+  const style = italic ? 'italic' : 'normal';
+  const weight = bold ? 'bold' : 'normal';
+  ctx.font = `${style} ${weight} ${size}px '${family}', sans-serif`;
+}
+
+function trimTrailingWhitespace(line: TextSpan[]): TextSpan[] {
+  const result = [...line];
+  while (result.length > 0) {
+    const last = result[result.length - 1];
+    if (/^\s+$/.test(last.text)) {
+      result.pop();
+    } else {
+      break;
+    }
+  }
+  return result;
+}
+
+function wrapSpans(
+  spans: TextSpan[],
+  maxTextWidth: number,
+  ctx: CanvasRenderingContext2D,
+  fontFamily: string,
+  baseFontSize: number
+): TextSpan[][] {
+  const wrappedLines: TextSpan[][] = [];
+  let currentLine: TextSpan[] = [];
+  let currentLineWidth = 0;
+
+  const wordSpans: TextSpan[] = [];
+  for (const span of spans) {
+    wordSpans.push(...splitSpanIntoWords(span));
+  }
+
+  for (const wordSpan of wordSpans) {
+    ctx.save();
+    setSpanFont(ctx, fontFamily, baseFontSize, wordSpan.bold, wordSpan.italic);
+    const wordWidth = ctx.measureText(wordSpan.text).width;
+    ctx.restore();
+
+    const isWhitespace = /^\s+$/.test(wordSpan.text);
+
+    if (currentLineWidth + wordWidth > maxTextWidth && currentLine.length > 0 && !isWhitespace) {
+      wrappedLines.push(trimTrailingWhitespace(currentLine));
+      if (isWhitespace) {
+        currentLine = [];
+        currentLineWidth = 0;
+      } else {
+        currentLine = [wordSpan];
+        currentLineWidth = wordWidth;
+      }
+    } else {
+      currentLine.push(wordSpan);
+      currentLineWidth += wordWidth;
+    }
+  }
+
+  if (currentLine.length > 0) {
+    const trimmed = trimTrailingWhitespace(currentLine);
+    if (trimmed.length > 0) {
+      wrappedLines.push(trimmed);
+    }
+  }
+
+  return wrappedLines;
+}
+
+function measureSpansWidth(ctx: CanvasRenderingContext2D, spans: TextSpan[], fontFamily: string, baseFontSize: number): number {
+  let width = 0;
+  for (const span of spans) {
+    ctx.save();
+    setSpanFont(ctx, fontFamily, baseFontSize, span.bold, span.italic);
+    width += ctx.measureText(span.text).width;
+    ctx.restore();
+  }
+  return width;
+}
+
+function drawUnderline(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  fontSize: number,
+  x: number,
+  baselineY: number,
+  color: string
+): void {
+  if (width <= 0) return;
+  const underlineY = baselineY + Math.max(1, fontSize * 0.08);
+  ctx.save();
+  ctx.beginPath();
+  ctx.lineWidth = Math.max(1, fontSize * 0.05);
+  ctx.strokeStyle = color;
+  ctx.moveTo(x, underlineY);
+  ctx.lineTo(x + width, underlineY);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function convertHtmlToAssTags(text: string): string {
+  let result = text;
+  result = result.replace(/<i>/gi, '{\\i1}').replace(/<\/i>/gi, '{\\i0}');
+  result = result.replace(/<b>/gi, '{\\b1}').replace(/<\/b>/gi, '{\\b0}');
+  result = result.replace(/<u>/gi, '{\\u1}').replace(/<\/u>/gi, '{\\u0}');
+  result = result.replace(/<font\s+color=["']#?([0-9a-fA-F]{6})["']>/gi, (match, hex) => {
+    const r = hex.substring(0, 2);
+    const g = hex.substring(2, 4);
+    const b = hex.substring(4, 6);
+    return `{\\c&H${b}${g}${r}&}`;
+  });
+  result = result.replace(/<\/font>/gi, '{\\c}');
+  return result;
+}
+
+function stripTags(text: string): string {
+  return text.replace(/<[^>]+>/g, '').replace(/\{[^}]+\}/g, '');
+}
+
 export class HardsubController {
   private videoPathInput: HTMLInputElement | null = null;
   private subtitlePathInput: HTMLInputElement | null = null;
@@ -1746,12 +2003,6 @@ export class HardsubController {
     const renderedOutline = this.state.outlineSize * scaleFactor;
     const renderedMarginV = this.state.positionY * scaleFactor;
 
-    // --- Font setup ---
-    const fontWeight = this.state.bold ? 'bold' : 'normal';
-    const fontStyle = this.state.italic ? 'italic' : 'normal';
-    ctx.font = `${fontStyle} ${fontWeight} ${renderedFontSize}px '${this.state.fontName}', sans-serif`;
-    ctx.textBaseline = 'alphabetic';
-
     // --- Split text into lines ---
     const lines = text.split('\n');
     const lineHeight = renderedFontSize * 1.35; // ASS default line spacing ≈ 1.35x
@@ -1760,67 +2011,51 @@ export class HardsubController {
     // Convert to actual pixel side-margin for positioning
     const maxTextWidth = canvasW * (this.state.widthMargin / 100);
     const sideMarginPx = (canvasW - maxTextWidth) / 2;
-    
-    // --- Wrap long lines if they exceed available width ---
-    const wrappedLines: string[] = [];
-    for (const line of lines) {
-      const measured = ctx.measureText(line);
-      if (measured.width <= maxTextWidth) {
-        wrappedLines.push(line);
-      } else {
-        // Word-wrap: split by spaces
-        const words = line.split(/(\s+)/);
-        let currentLine = '';
-        for (const word of words) {
-          const testLine = currentLine + word;
-          if (ctx.measureText(testLine).width > maxTextWidth && currentLine.trim()) {
-            wrappedLines.push(currentLine.trim());
-            currentLine = word;
-          } else {
-            currentLine = testLine;
-          }
-        }
-        if (currentLine.trim()) {
-          wrappedLines.push(currentLine.trim());
-        }
+
+    // --- Parse and Wrap spans ---
+    const parsedLines: { spans: TextSpan[]; alignmentOverride: number | null }[] = lines.map((line) =>
+      parseLineToSpans(line, this.state.primaryColor)
+    );
+
+    // alignmentOverride from any of the parsed lines (if present)
+    let alignmentOverride: number | null = null;
+    for (const parsed of parsedLines) {
+      if (parsed.alignmentOverride !== null) {
+        alignmentOverride = parsed.alignmentOverride;
+        break;
       }
     }
 
-    // --- Compute text block dimensions ---
-    const totalTextHeight = wrappedLines.length * lineHeight;
+    const activeAlignment = alignmentOverride ?? this.state.alignment;
+
+    const wrappedLines: TextSpan[][] = [];
+    for (const parsed of parsedLines) {
+      const lineWrapped = wrapSpans(parsed.spans, maxTextWidth, ctx, this.state.fontName, renderedFontSize);
+      wrappedLines.push(...lineWrapped);
+    }
 
     // --- Compute alignment-based position (ASS numpad alignment) ---
-    // ASS alignment: 1=BL, 2=BC, 3=BR, 4=ML, 5=MC, 6=TC (mapped as top-center in this app)
     let anchorX: number; // horizontal anchor
     let anchorY: number; // Y of the BOTTOM line's baseline
 
+    const isTop = [7, 8, 9].includes(activeAlignment);
+    const isMiddle = [4, 5, 6].includes(activeAlignment);
+    const isLeft = [1, 4, 7].includes(activeAlignment);
+    const isRight = [3, 6, 9].includes(activeAlignment);
+    const isCenter = [2, 5, 8].includes(activeAlignment);
+
+    const textAlignmentStr = isLeft ? 'left' : isRight ? 'right' : 'center';
+
     // Horizontal alignment
-    switch (this.state.alignment) {
-      case 1: // Bottom-Left
-      case 4: // Middle-Left
-      case 7: // Top-Left
-        ctx.textAlign = 'left';
-        anchorX = sideMarginPx;
-        break;
-      case 3: // Bottom-Right
-      case 6: // Middle-Right
-      case 9: // Top-Right
-        ctx.textAlign = 'right';
-        anchorX = canvasW - sideMarginPx;
-        break;
-      case 2: // Bottom-Center
-      case 5: // Middle-Center
-      case 8: // Top-Center
-      default:
-        ctx.textAlign = 'center';
-        anchorX = canvasW / 2;
-        break;
+    if (isLeft) {
+      anchorX = sideMarginPx;
+    } else if (isRight) {
+      anchorX = canvasW - sideMarginPx;
+    } else {
+      anchorX = canvasW / 2;
     }
 
     // Vertical position (7,8,9 = Top; 4,5,6 = Middle; 1,2,3 = Bottom)
-    const isTop = [7, 8, 9].includes(this.state.alignment);
-    const isMiddle = [4, 5, 6].includes(this.state.alignment);
-
     if (isTop) {
       anchorY = renderedMarginV + renderedFontSize;
     } else if (isMiddle) {
@@ -1830,8 +2065,8 @@ export class HardsubController {
     }
 
     // --- Draw one background around the entire caption block ---
-    const lineMetrics = wrappedLines.map((line) => ctx.measureText(line));
-    const maxLineWidth = Math.max(...lineMetrics.map((metrics) => metrics.width));
+    const lineMetrics = wrappedLines.map((line) => measureSpansWidth(ctx, line, this.state.fontName, renderedFontSize));
+    const maxLineWidth = Math.max(...lineMetrics, 0);
     const totalFontHeight = renderedFontSize / this.fontMetrics.scale;
     const textAscent = totalFontHeight * this.fontMetrics.ascentRatio;
     const textDescent = totalFontHeight * this.fontMetrics.descentRatio;
@@ -1847,13 +2082,13 @@ export class HardsubController {
         ? anchorY + ((wrappedLines.length - 1) * lineHeight) / 2
         : anchorY + ((wrappedLines.length - 1) * lineHeight) / 2;
 
-    if (this.state.bgBox) {
+    if (this.state.bgBox && maxLineWidth > 0) {
       const padding = 6 * scaleFactor;
       const boxWidth = maxLineWidth + padding * 2;
       const boxHeight = (lastBaselineY - firstBaselineY) + textAscent + textDescent + padding * 2;
-      const boxX = ctx.textAlign === 'center'
+      const boxX = textAlignmentStr === 'center'
         ? anchorX - boxWidth / 2
-        : ctx.textAlign === 'right'
+        : textAlignmentStr === 'right'
           ? anchorX - boxWidth
           : anchorX - padding;
       const boxY = firstBaselineY - textAscent - padding;
@@ -1869,8 +2104,10 @@ export class HardsubController {
     }
 
     // --- Draw each line ---
+    ctx.textBaseline = 'alphabetic';
+
     for (let i = 0; i < wrappedLines.length; i++) {
-      const lineText = wrappedLines[i];
+      const lineSpans = wrappedLines[i];
       let y: number;
 
       if (isTop) {
@@ -1881,22 +2118,48 @@ export class HardsubController {
         y = anchorY - ((wrappedLines.length - 1) * lineHeight) / 2 + (i * lineHeight);
       }
 
-      const finalLineText = hasRtlCharacters(lineText) ? `\u202B${lineText}\u202C` : lineText;
-
-      // --- Outline (matching ASS Outline with contour expansion) ---
-      if (renderedOutline > 0) {
-        ctx.save();
-        ctx.strokeStyle = this.state.outlineColor;
-        ctx.lineWidth = renderedOutline * 2; // ASS Outline expands outward; strokeText is centered
-        ctx.lineJoin = 'round';
-        ctx.miterLimit = 2;
-        ctx.strokeText(finalLineText, anchorX, y);
-        ctx.restore();
+      // Calculate startX for this line based on alignment and width
+      const totalLineWidth = measureSpansWidth(ctx, lineSpans, this.state.fontName, renderedFontSize);
+      let startX: number;
+      if (textAlignmentStr === 'left') {
+        startX = anchorX;
+      } else if (textAlignmentStr === 'right') {
+        startX = anchorX - totalLineWidth;
+      } else {
+        startX = anchorX - totalLineWidth / 2;
       }
 
-      // --- Fill text (primary color) ---
-      ctx.fillStyle = this.state.primaryColor;
-      ctx.fillText(finalLineText, anchorX, y);
+      let currentX = startX;
+      ctx.textAlign = 'left'; // Draw spans left-to-right from startX
+
+      for (const span of lineSpans) {
+        setSpanFont(ctx, this.state.fontName, renderedFontSize, span.bold, span.italic);
+
+        const spanText = hasRtlCharacters(span.text) ? `\u202B${span.text}\u202C` : span.text;
+        const spanWidth = ctx.measureText(span.text).width;
+
+        // --- Outline (matching ASS Outline with contour expansion) ---
+        if (renderedOutline > 0) {
+          ctx.save();
+          ctx.strokeStyle = this.state.outlineColor;
+          ctx.lineWidth = renderedOutline * 2; // ASS Outline expands outward; strokeText is centered
+          ctx.lineJoin = 'round';
+          ctx.miterLimit = 2;
+          ctx.strokeText(spanText, currentX, y);
+          ctx.restore();
+        }
+
+        // --- Fill text (primary color) ---
+        ctx.fillStyle = span.color;
+        ctx.fillText(spanText, currentX, y);
+
+        // --- Draw underline if requested ---
+        if (span.underline) {
+          drawUnderline(ctx, spanWidth, renderedFontSize, currentX, y, span.color);
+        }
+
+        currentX += spanWidth;
+      }
     }
   }
 
@@ -1990,10 +2253,6 @@ export class HardsubController {
     const assBg = hexToAssColorAndAlpha(this.state.bgBoxColor, this.state.bgBoxOpacity);
     const alignment = this.state.alignment;
     const assAlignment = alignment;
-    const isTopAss = [7, 8, 9].includes(alignment);
-    const isMiddleAss = [4, 5, 6].includes(alignment);
-    const isLeftAss = [1, 4, 7].includes(alignment);
-    const isRightAss = [3, 6, 9].includes(alignment);
     const marginLR = Math.round(((100 - this.state.widthMargin) / 200) * PLAY_RES_X);
 
     // Create temp canvas to measure text widths and perform line wrapping
@@ -2012,12 +2271,6 @@ export class HardsubController {
 
     let events = '';
     if (tempCtx) {
-      // libass renders the text at its nominal size visually after applying the scale compensation factor,
-      // so we must perform all positioning, line spacing, and background box calculations using the
-      // original (uncompensated) fontSize to match the visual rendering and CSS preview.
-      const fontWeight = this.state.bold ? 'bold' : 'normal';
-      const fontStyle = this.state.italic ? 'italic' : 'normal';
-      tempCtx.font = `${fontStyle} ${fontWeight} ${this.state.fontSize}px '${this.state.fontName}', sans-serif`;
       tempCtx.textBaseline = 'alphabetic';
 
       const maxTextWidth = PLAY_RES_X * (this.state.widthMargin / 100);
@@ -2032,59 +2285,61 @@ export class HardsubController {
         const endStr = msToAssTime(cue.endMs);
         const lines = cue.text.split('\n');
 
-        const wrappedLines: string[] = [];
-        for (const line of lines) {
-          const measured = tempCtx.measureText(line);
-          if (measured.width <= maxTextWidth) {
-            wrappedLines.push(line);
-          } else {
-            const words = line.split(/(\s+)/);
-            let currentLine = '';
-            for (const word of words) {
-              const testLine = currentLine + word;
-              if (tempCtx.measureText(testLine).width > maxTextWidth && currentLine.trim()) {
-                wrappedLines.push(currentLine.trim());
-                currentLine = word;
-              } else {
-                currentLine = testLine;
-              }
-            }
-            if (currentLine.trim()) {
-              wrappedLines.push(currentLine.trim());
-            }
+        // Parse lines to spans
+        const parsedLines = lines.map((line) => parseLineToSpans(line, this.state.primaryColor));
+
+        // Find active alignment override for the cue
+        let alignmentOverride: number | null = null;
+        for (const parsed of parsedLines) {
+          if (parsed.alignmentOverride !== null) {
+            alignmentOverride = parsed.alignmentOverride;
+            break;
           }
         }
+        const activeAlignment = alignmentOverride ?? this.state.alignment;
 
-        const lineMetrics = wrappedLines.map((line) => tempCtx.measureText(line));
-        const maxLineWidth = Math.max(...lineMetrics.map((m) => m.width), 0);
+        const cueIsTopAss = [7, 8, 9].includes(activeAlignment);
+        const cueIsMiddleAss = [4, 5, 6].includes(activeAlignment);
+        const cueIsLeftAss = [1, 4, 7].includes(activeAlignment);
+        const cueIsRightAss = [3, 6, 9].includes(activeAlignment);
+
+        // Wrap spans to fit within maxTextWidth
+        const wrappedLines: TextSpan[][] = [];
+        for (const parsed of parsedLines) {
+          const lineWrapped = wrapSpans(parsed.spans, maxTextWidth, tempCtx, this.state.fontName, this.state.fontSize);
+          wrappedLines.push(...lineWrapped);
+        }
+
+        const lineMetrics = wrappedLines.map((line) => measureSpansWidth(tempCtx, line, this.state.fontName, this.state.fontSize));
+        const maxLineWidth = Math.max(...lineMetrics, 0);
 
         let X = 0;
-        if (isLeftAss) {
+        if (cueIsLeftAss) {
           X = marginLR;
-        } else if (isRightAss) {
+        } else if (cueIsRightAss) {
           X = PLAY_RES_X - marginLR;
         } else {
           X = PLAY_RES_X / 2;
         }
 
         let Y = 0;
-        if (isTopAss) {
+        if (cueIsTopAss) {
           Y = this.state.positionY * scaleFactor;
-        } else if (isMiddleAss) {
+        } else if (cueIsMiddleAss) {
           Y = PLAY_RES_Y / 2;
         } else {
           Y = PLAY_RES_Y - (this.state.positionY * scaleFactor);
         }
 
-        const Y_box = isTopAss ? Y + textAscent : Y - textDescent;
+        const anchorY = cueIsTopAss ? Y + this.state.fontSize : Y;
 
-        const firstBaselineY = isTopAss
-          ? Y - textAscent
-          : Y - ((wrappedLines.length - 1) * lineHeight) / 2;
+        const firstBaselineY = cueIsTopAss
+          ? anchorY - textAscent
+          : anchorY - ((wrappedLines.length - 1) * lineHeight) / 2;
 
-        const lastBaselineY = isTopAss
-          ? Y + ((wrappedLines.length - 1) * lineHeight) - textAscent
-          : Y + ((wrappedLines.length - 1) * lineHeight) / 2;
+        const lastBaselineY = cueIsTopAss
+          ? anchorY + ((wrappedLines.length - 1) * lineHeight) - textAscent
+          : anchorY + ((wrappedLines.length - 1) * lineHeight) / 2;
 
         const boxY = firstBaselineY - textAscent - padding;
 
@@ -2093,9 +2348,9 @@ export class HardsubController {
           const boxHeight = (lastBaselineY - firstBaselineY) + textAscent + textDescent + padding * 2;
           
           let x = 0;
-          if (isLeftAss) {
+          if (cueIsLeftAss) {
             x = -padding;
-          } else if (isRightAss) {
+          } else if (cueIsRightAss) {
             x = -boxWidth + padding;
           } else {
             x = -boxWidth / 2;
@@ -2105,15 +2360,42 @@ export class HardsubController {
           events += `Dialogue: 0,${startStr},${endStr},BoxStyle,,0,0,0,,{\\an7}{\\pos(${X},${boxY})}{\\p1}${drawingPath}{\\p0}\n`;
         }
 
-        wrappedLines.forEach((lineText, index) => {
-          let lineY = 0;
-          if (isTopAss) {
-            lineY = Y + index * lineHeight - textAscent;
+        wrappedLines.forEach((lineSpans, index) => {
+          let lineBaselineY = 0;
+          if (cueIsTopAss) {
+            lineBaselineY = anchorY + index * lineHeight - textAscent;
           } else {
-            lineY = Y - ((wrappedLines.length - 1) * lineHeight) / 2 + index * lineHeight + textDescent;
+            lineBaselineY = anchorY - ((wrappedLines.length - 1) * lineHeight) / 2 + index * lineHeight;
           }
-          const finalLineText = hasRtlCharacters(lineText) ? `\u202B${lineText}\u202C` : lineText;
-          events += `Dialogue: 1,${startStr},${endStr},TextStyle,,0,0,0,,{\\an${assAlignment}}{\\pos(${X},${lineY})}${finalLineText}\n`;
+          const lineY = lineBaselineY - textAscent;
+          let dialogueAlignment = 8;
+          if (cueIsLeftAss) {
+            dialogueAlignment = 7;
+          } else if (cueIsRightAss) {
+            dialogueAlignment = 9;
+          }
+
+          let assLineText = '';
+          for (const span of lineSpans) {
+            const bTag = span.bold ? '\\b1' : '\\b0';
+            const iTag = span.italic ? '\\i1' : '\\i0';
+            const uTag = span.underline ? '\\u1' : '\\u0';
+
+            const cleanColor = span.color.replace('#', '');
+            let assColor = 'FFFFFF';
+            if (cleanColor.length === 6) {
+              const r = cleanColor.substring(0, 2);
+              const g = cleanColor.substring(2, 4);
+              const b = cleanColor.substring(4, 6);
+              assColor = `${b}${g}${r}`;
+            }
+            const cTag = `\\c&H${assColor}&`;
+
+            assLineText += `{${bTag}${iTag}${uTag}${cTag}}${span.text}`;
+          }
+
+          const finalLineText = hasRtlCharacters(assLineText) ? `\u202B${assLineText}\u202C` : assLineText;
+          events += `Dialogue: 1,${startStr},${endStr},TextStyle,,0,0,0,,{\\an${dialogueAlignment}}{\\pos(${X},${lineY})}${finalLineText}\n`;
         });
       });
     }
