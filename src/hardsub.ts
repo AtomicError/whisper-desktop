@@ -840,6 +840,73 @@ export class HardsubController {
   }
 
   private setupEventListeners() {
+    // Delegated click and input events on subtitleListContainer for high-performance cue interaction
+    this.subtitleListContainer?.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      if (!target) return;
+
+      const jumpBtn = target.closest('.jump-cue-btn') as HTMLElement;
+      if (jumpBtn) {
+        e.stopPropagation();
+        const card = jumpBtn.closest('.subtitle-cue-card') as HTMLElement;
+        const cueId = card ? parseInt(card.dataset.cueId || '0', 10) : 0;
+        const cue = this.subtitleCues.find((c) => c.id === cueId);
+        if (cue && this.videoElement) {
+          this.targetClickedCueId = cue.id;
+          this.activeCueId = cue.id;
+          this.highlightActiveCard(cue.id);
+          this.currentSubtitleText = cue.text;
+          this.renderSubtitleOnCanvas();
+          if (this.clickLockTimer) clearTimeout(this.clickLockTimer);
+          this.clickLockTimer = setTimeout(() => {
+            this.targetClickedCueId = null;
+          }, 800);
+
+          this.videoElement.currentTime = (cue.startMs + 50) / 1000;
+          const p = this.videoElement.play();
+          if (p !== undefined) {
+            p.catch((err) => console.warn('Jump play warning:', err));
+          }
+        }
+        return;
+      }
+
+      const card = target.closest('.subtitle-cue-card') as HTMLElement;
+      if (card && !target.closest('textarea')) {
+        const cueId = parseInt(card.dataset.cueId || '0', 10);
+        const cue = this.subtitleCues.find((c) => c.id === cueId);
+        if (cue && this.videoElement) {
+          this.targetClickedCueId = cue.id;
+          this.activeCueId = cue.id;
+          this.highlightActiveCard(cue.id);
+          this.currentSubtitleText = cue.text;
+          this.renderSubtitleOnCanvas();
+          if (this.clickLockTimer) clearTimeout(this.clickLockTimer);
+          this.clickLockTimer = setTimeout(() => {
+            this.targetClickedCueId = null;
+          }, 800);
+
+          this.videoElement.currentTime = (cue.startMs + 50) / 1000;
+        }
+      }
+    });
+
+    this.subtitleListContainer?.addEventListener('input', (e) => {
+      const textarea = (e.target as HTMLElement).closest('textarea.subtitle-cue-textarea') as HTMLTextAreaElement;
+      if (textarea) {
+        const cueId = parseInt(textarea.dataset.cueId || '0', 10);
+        const cue = this.subtitleCues.find((c) => c.id === cueId);
+        if (cue) {
+          cue.text = textarea.value;
+          this.isSubtitlesModified = true;
+          if (this.activeCueId === cue.id) {
+            this.currentSubtitleText = cue.text;
+            this.renderSubtitleOnCanvas();
+          }
+        }
+      }
+    });
+
     // Browse Video File
     document.getElementById('btn-browse-video')?.addEventListener('click', async () => {
       const selected = await invoke<string | null>('select_file');
@@ -1788,10 +1855,13 @@ export class HardsubController {
 
     this.subtitleListContainer.innerHTML = '';
 
+    const frag = document.createDocumentFragment();
+
     filtered.forEach((cue) => {
       const card = document.createElement('div');
       card.className = `subtitle-cue-card ${this.activeCueId === cue.id ? 'active' : ''}`;
       card.id = `subtitle-cue-${cue.id}`;
+      card.dataset.cueId = String(cue.id);
 
       card.innerHTML = `
         <div class="subtitle-cue-header">
@@ -1806,55 +1876,10 @@ export class HardsubController {
         <textarea class="subtitle-cue-textarea" dir="auto" data-cue-id="${cue.id}">${cue.text}</textarea>
       `;
 
-      card.querySelector('.jump-cue-btn')?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (this.videoElement) {
-          this.targetClickedCueId = cue.id;
-          this.activeCueId = cue.id;
-          this.highlightActiveCard(cue.id);
-          this.currentSubtitleText = cue.text;
-          this.renderSubtitleOnCanvas();
-          if (this.clickLockTimer) clearTimeout(this.clickLockTimer);
-          this.clickLockTimer = setTimeout(() => {
-            this.targetClickedCueId = null;
-          }, 800);
-
-          this.videoElement.currentTime = (cue.startMs + 50) / 1000;
-          const p = this.videoElement.play();
-          if (p !== undefined) {
-            p.catch((err) => console.warn('Jump play warning:', err));
-          }
-        }
-      });
-
-      card.addEventListener('click', () => {
-        if (this.videoElement) {
-          this.targetClickedCueId = cue.id;
-          this.activeCueId = cue.id;
-          this.highlightActiveCard(cue.id);
-          this.currentSubtitleText = cue.text;
-          this.renderSubtitleOnCanvas();
-          if (this.clickLockTimer) clearTimeout(this.clickLockTimer);
-          this.clickLockTimer = setTimeout(() => {
-            this.targetClickedCueId = null;
-          }, 800);
-
-          this.videoElement.currentTime = (cue.startMs + 50) / 1000;
-        }
-      });
-
-      const textarea = card.querySelector('textarea') as HTMLTextAreaElement;
-      textarea?.addEventListener('input', () => {
-        cue.text = textarea.value;
-        this.isSubtitlesModified = true;
-        if (this.activeCueId === cue.id) {
-          this.currentSubtitleText = cue.text;
-          this.renderSubtitleOnCanvas();
-        }
-      });
-
-      this.subtitleListContainer?.appendChild(card);
+      frag.appendChild(card);
     });
+
+    this.subtitleListContainer.appendChild(frag);
   }
 
   private syncActiveSubtitleWithTime(curMs: number) {

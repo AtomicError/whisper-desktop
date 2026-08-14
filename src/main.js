@@ -490,8 +490,17 @@ class CustomSelect {
         this.updatePosition();
       }
     };
-    window.addEventListener('scroll', this._scrollResizeHandler, true);
-    window.addEventListener('resize', this._scrollResizeHandler);
+
+    // Event delegation on optionsContainer for efficient option selection
+    this.optionsContainer.addEventListener('click', (e) => {
+      const optDiv = e.target.closest('.custom-select-option');
+      if (optDiv && optDiv.dataset.value !== undefined) {
+        e.stopPropagation();
+        this.select.value = optDiv.dataset.value;
+        this.select.dispatchEvent(new Event('change'));
+        this.close();
+      }
+    });
 
     this.updateOptions();
 
@@ -511,23 +520,17 @@ class CustomSelect {
   updateOptions() {
     this.optionsContainer.innerHTML = '';
     const options = Array.from(this.select.options);
+    const frag = document.createDocumentFragment();
 
     options.forEach(opt => {
       const optDiv = document.createElement('div');
       optDiv.className = 'custom-select-option';
       optDiv.textContent = opt.textContent;
       optDiv.dataset.value = opt.value;
-
-      optDiv.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.select.value = opt.value;
-        this.select.dispatchEvent(new Event('change'));
-        this.close();
-      });
-
-      this.optionsContainer.appendChild(optDiv);
+      frag.appendChild(optDiv);
     });
 
+    this.optionsContainer.appendChild(frag);
     this.syncSelectedValue();
   }
 
@@ -581,19 +584,50 @@ class CustomSelect {
       if (c !== this.container) c.classList.remove('open');
     });
     document.querySelectorAll('.custom-select-options').forEach(opt => {
-      if (opt !== this.optionsContainer) opt.classList.remove('open');
+      if (opt !== this.optionsContainer) {
+        opt.classList.remove('open');
+        opt.style.willChange = 'auto';
+      }
     });
 
-    this.container.classList.add('open');
-    this.optionsContainer.classList.add('open');
+    // 1. Promote to GPU compositing layer right before animation begins
+    this.optionsContainer.style.willChange = 'transform, opacity';
+
+    // 2. Position the container first while it's still closed
     this.isOpen = true;
     this.updatePosition();
+
+    // Attach scroll and resize listeners only while open
+    window.addEventListener('scroll', this._scrollResizeHandler, true);
+    window.addEventListener('resize', this._scrollResizeHandler);
+
+    // 3. Use double requestAnimationFrame to defer class additions to the next frames,
+    // avoiding layout thrashing/reflow block while starting CSS transitions.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (this.isOpen) {
+          this.container.classList.add('open');
+          this.optionsContainer.classList.add('open');
+        }
+      });
+    });
   }
 
   close() {
     this.container.classList.remove('open');
     this.optionsContainer.classList.remove('open');
     this.isOpen = false;
+
+    // Detach scroll and resize listeners immediately on close
+    window.removeEventListener('scroll', this._scrollResizeHandler, true);
+    window.removeEventListener('resize', this._scrollResizeHandler);
+
+    // Reset will-change after transition ends to release GPU memory
+    this.optionsContainer.addEventListener('transitionend', () => {
+      if (!this.isOpen) {
+        this.optionsContainer.style.willChange = 'auto';
+      }
+    }, { once: true });
   }
 
   destroy() {
@@ -602,6 +636,9 @@ class CustomSelect {
     window.removeEventListener('resize', this._scrollResizeHandler);
     if (this.optionsContainer && this.optionsContainer.parentNode) {
       this.optionsContainer.parentNode.removeChild(this.optionsContainer);
+    }
+    if (this.container && this.container.parentNode) {
+      this.container.parentNode.removeChild(this.container);
     }
     this.observer.disconnect();
     window.customSelectsMap.delete(this.select.id || this.select);
@@ -642,41 +679,11 @@ function setupResponsiveMenuFadeIn() {
     if (e.matches) {
       if (isCurrentlyCollapsed === true) return;
       isCurrentlyCollapsed = true;
-
-      // Clear any leftover inline styles from previous animation
-      document.querySelectorAll('.nav-links .nav-item').forEach(el => el.style.transitionDelay = '');
-      document.querySelectorAll('.nav-links .nav-item span').forEach(el => el.style.transitionDelay = '');
-      
-      // Narrow → collapse sidebar
-      sidebar.style.willChange = 'width, padding';
       sidebar.classList.add('sidebar-collapsed');
-      setTimeout(() => {
-        sidebar.style.willChange = 'auto';
-      }, 500);
     } else {
       if (isCurrentlyCollapsed === false) return;
       isCurrentlyCollapsed = false;
-
-      // Wide → expand sidebar
-      sidebar.style.willChange = 'width, padding';
-
-      const items = document.querySelectorAll('.nav-links .nav-item');
-      const spans = document.querySelectorAll('.nav-links .nav-item span');
-
-      items.forEach((item, index) => {
-        item.style.transitionDelay = `${Math.min(index * 0.03, 0.30).toFixed(2)}s`;
-      });
-      spans.forEach((span, index) => {
-        span.style.transitionDelay = `${Math.min(index * 0.03, 0.30).toFixed(2)}s`;
-      });
-
       sidebar.classList.remove('sidebar-collapsed');
-
-      setTimeout(() => {
-        items.forEach(item => item.style.transitionDelay = '');
-        spans.forEach(span => span.style.transitionDelay = '');
-        sidebar.style.willChange = 'auto';
-      }, 700);
     }
   };
 
@@ -686,11 +693,6 @@ function setupResponsiveMenuFadeIn() {
   } else if (sidebarMql.addListener) {
     sidebarMql.addListener(handler);
   }
-
-  // Backup event listener for standard window resize events
-  window.addEventListener('resize', () => {
-    handler(sidebarMql);
-  });
 
   // Apply initial state
   handler(sidebarMql);
@@ -863,15 +865,28 @@ window.switchView = function(viewName) {
 
 function reanimateSlideIn(selector, stagger = 0.03) {
   const items = document.querySelectorAll(selector);
-  items.forEach((item, index) => {
+  if (items.length === 0) return;
+  items.forEach(item => {
     item.style.animation = 'none';
-    void item.offsetWidth;
+  });
+  // Flush single layout recalculation on parent instead of every item
+  if (items[0].parentElement) {
+    void items[0].parentElement.offsetWidth;
+  }
+  items.forEach((item, index) => {
     item.style.animation = '';
     item.style.animationDelay = `${(index * stagger).toFixed(2)}s`;
   });
 }
 
 // ----------------- HUD Statistics Poll -----------------
+
+function stopHudPoll() {
+  if (_hudInterval) {
+    clearInterval(_hudInterval);
+    _hudInterval = null;
+  }
+}
 
 function startHudPoll() {
   if (_hudInterval) return;
@@ -881,21 +896,37 @@ function startHudPoll() {
       
       // Update CPU
       const cpuEl = document.getElementById('stat-cpu');
-      cpuEl.textContent = `${stats.cpu.toFixed(1)}%`;
-      cpuEl.className = 'stat-value ' + (stats.cpu > 70 ? 'warm' : 'active');
+      if (cpuEl) {
+        cpuEl.textContent = `${stats.cpu.toFixed(1)}%`;
+        cpuEl.className = 'stat-value ' + (stats.cpu > 70 ? 'warm' : 'active');
+      }
       
       // Update RAM
-      document.getElementById('stat-ram').textContent = stats.ram;
+      const ramEl = document.getElementById('stat-ram');
+      if (ramEl) {
+        ramEl.textContent = stats.ram;
+      }
       
       // Update GPU
       const gpuEl = document.getElementById('stat-gpu');
-      gpuEl.textContent = stats.gpu;
-      gpuEl.className = 'stat-value ' + (stats.gpu.includes('N/A') ? '' : 'active');
+      if (gpuEl) {
+        gpuEl.textContent = stats.gpu;
+        gpuEl.className = 'stat-value ' + (stats.gpu.includes('N/A') ? '' : 'active');
+      }
     } catch (e) {
       console.error("Failed to query system stats:", e);
     }
   }, 2000);
 }
+
+// Automatically pause HUD polling when app is minimized/hidden to save CPU
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    stopHudPoll();
+  } else {
+    startHudPoll();
+  }
+});
 
 // ----------------- Real-Time Listeners -----------------
 
@@ -1079,6 +1110,11 @@ function appendLogToViewport(payload) {
   
   viewport.appendChild(logLine);
   
+  // Cap DOM children in viewport to max 1500 to prevent unbounded memory bloat
+  if (viewport.children.length > 1500) {
+    viewport.removeChild(viewport.firstElementChild);
+  }
+  
   // Handle Auto Scroll — debounced to avoid forced layout on every line
   const autoScroll = document.getElementById('log-autoscroll').checked;
   if (autoScroll) {
@@ -1229,13 +1265,14 @@ window.switchSettingsCategory = function(catName) {
     // per category to keep the nice intro without leaving any card stuck at
     // opacity:0.
     const cards = targetGroup.querySelectorAll('.setting-card');
-    cards.forEach((card, idx) => {
-      card.classList.remove('setting-card-anim');
-      // Force reflow so the animation restarts even if already applied.
-      void card.offsetWidth;
-      card.classList.add('setting-card-anim');
-      card.style.animationDelay = `${(idx * 0.03).toFixed(2)}s`;
-    });
+    if (cards.length > 0) {
+      cards.forEach(card => card.classList.remove('setting-card-anim'));
+      void targetGroup.offsetWidth; // single layout flush on targetGroup
+      cards.forEach((card, idx) => {
+        card.classList.add('setting-card-anim');
+        card.style.animationDelay = `${(idx * 0.03).toFixed(2)}s`;
+      });
+    }
 
     // Re-sync any custom dropdowns living inside this group so they recompute
     // their size/position now that the group is visible.
