@@ -334,12 +334,13 @@ sidebar {
 }
 
 sidebar.sidebar-collapsed {
-  width: 68px;
-  padding: 20px 12px;
+  width: 72px;
+  padding: 20px 13px;
 }
 
 sidebar.sidebar-collapsed .brand {
-  padding: 0 6px;
+  padding: 0;
+  justify-content: center;
   gap: 0;
 }
 
@@ -354,28 +355,74 @@ sidebar.sidebar-collapsed .brand-name {
 }
 
 sidebar.sidebar-collapsed .nav-item {
-  padding: 10px 12px;
-  justify-content: flex-start;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  padding: 0;
+  justify-content: center;
+  margin: 0 auto;
+}
+
+sidebar.sidebar-collapsed .nav-item svg {
+  margin: 0;
 }
 
 sidebar.sidebar-collapsed .nav-item span {
   max-width: 0px;
   margin-left: 0px;
+  opacity: 0;
   transform: translateX(-16px);
   clip-path: inset(0 100% 0 0);
   overflow: hidden;
   pointer-events: none;
 }
 
+sidebar.sidebar-collapsed .nav-item.active {
+  box-shadow: 
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.1),
+    0 0 14px rgba(45, 127, 255, 0.35);
+}
+
+sidebar.sidebar-collapsed .nav-item.active:hover {
+  box-shadow: 
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.15),
+    0 0 18px rgba(45, 127, 255, 0.55);
+}
+
 sidebar.sidebar-collapsed .developer-credit {
-  transform: translateX(-20px);
-  clip-path: inset(0 100% 0 0);
-  max-height: 0;
-  overflow: hidden;
-  margin: 0;
-  padding: 0;
-  border-top: none;
-  pointer-events: none;
+  width: 100%;
+  margin-top: auto;
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+}
+
+sidebar.sidebar-collapsed .credit-divider {
+  width: 44px;
+  height: 1px;
+  background: rgba(0, 0, 0, 0.42);
+  margin: 0 auto 10px auto;
+}
+
+sidebar.sidebar-collapsed .credit-content {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+sidebar.sidebar-collapsed .credit-github-icon {
+  margin: 0 auto;
+  width: 20px;
+  height: 20px;
+}
+
+sidebar.sidebar-collapsed .credit-content span {
+  display: none;
 }
 
 .brand {
@@ -421,30 +468,30 @@ sidebar.sidebar-collapsed .developer-credit {
 .nav-links {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   flex-grow: 1;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
-  padding: 10px 12px;
-  border-radius: 10px;
+  padding: 0 14px;
+  border-radius: 12px;
   color: var(--color-text-muted);
   font-weight: 500;
   text-decoration: none;
   cursor: pointer;
   border: 1px solid transparent;
-  height: 42px;
+  height: 46px;
   box-sizing: border-box;
   overflow: hidden;
-  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, width 0.38s cubic-bezier(0.34, 1.45, 0.64, 1), padding 0.38s cubic-bezier(0.34, 1.45, 0.64, 1);
 }
 
 .nav-item svg {
-  width: 20px;
-  min-width: 20px;
-  height: 20px;
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
   flex-shrink: 0;
   position: relative;
   z-index: 2;
@@ -452,8 +499,10 @@ sidebar.sidebar-collapsed .developer-credit {
 }
 
 .nav-item span {
-  max-width: 150px;
-  margin-left: 12px;
+  font-size: 0.95rem;
+  font-weight: 550;
+  max-width: 160px;
+  margin-left: 14px;
   transform: translateX(0);
   clip-path: inset(0 0 0 0);
   overflow: hidden;
@@ -495,24 +544,81 @@ sidebar.sidebar-collapsed .developer-credit {
 }
 
 .developer-credit {
-  font-size: 0.75rem;
-  color: var(--color-text-dim);
-  text-align: center;
-  padding-top: 14px;
-  border-top: 1px solid var(--border-glass);
-  transform: translateX(0);
-  clip-path: inset(0 0 0 0);
-  max-height: 40px;
-  overflow: hidden;
-  white-space: nowrap;
-  transition: transform 0.38s cubic-bezier(0.34, 1.45, 0.64, 1),
-              clip-path 0.34s cubic-bezier(0.16, 1, 0.3, 1),
-              max-height 0.35s ease;
+  width: 100%;
+  margin-top: auto;
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: none;
+  cursor: pointer;
+  user-select: none;
 }
 
-.developer-credit span {
+.credit-divider {
+  width: 100%;
+  height: 1px;
+  background: rgba(0, 0, 0, 0.42);
+  margin-bottom: 10px;
+  transition: width 0.38s cubic-bezier(0.34, 1.45, 0.64, 1);
+}
+
+.credit-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--color-text-dim);
+  white-space: nowrap;
+  transition: color 0.25s ease;
+}
+
+.developer-credit:hover .credit-content {
+  color: var(--color-text-main);
+}
+
+.credit-github-icon {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  transition: color 0.25s ease, transform 0.25s ease;
+}
+
+.developer-credit:hover .credit-github-icon {
+  color: var(--color-royal-blue);
+  transform: scale(1.1);
+}
+
+.credit-content span {
+  white-space: nowrap;
+  transition: opacity 0.28s ease, max-width 0.35s ease;
+}
+
+.credit-content strong {
+  position: relative;
   color: var(--color-royal-blue);
   font-weight: 600;
+  display: inline-block;
+}
+
+.credit-content strong::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  width: 100%;
+  height: 1.5px;
+  background: var(--color-royal-blue);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.developer-credit:hover .credit-content strong::after {
+  transform: scaleX(1);
 }
 
 /* Main Workspace */
