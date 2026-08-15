@@ -10,7 +10,8 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square&color=2d7fff" alt="License MIT"></a>
-  <img src="https://img.shields.io/badge/Platform-Linux-orange?style=flat-square&logo=linux&logoColor=white&color=0057d9" alt="Platform Linux">
+  <img src="https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-orange?style=flat-square&color=0057d9" alt="Platform Cross-Platform">
+  <img src="https://img.shields.io/badge/Arch-x86__64%20%7C%20ARM64-green?style=flat-square&color=10b981" alt="Arch x86_64 & ARM64">
   <img src="https://img.shields.io/badge/Built%20With-Rust%20%26%20Tauri-red?style=flat-square&logo=tauri&logoColor=white&color=8b5cf6" alt="Built With Rust & Tauri">
 </p>
 
@@ -28,7 +29,7 @@ Running AI models locally often requires navigating command-line interfaces, ins
 * **⚡ Multi-Backend Acceleration:** Switch seamlessly between **CPU**, **Vulkan**, **CUDA**, or **OpenVINO** directly from the interface for near-instant transcription.
 * **🎞️ Direct Smart Media Import:** Drop any video or audio file directly into the app—no manual audio conversion or pre-extraction required.
 * **🎛️ Complete Engine Orchestration:** Fine-tune decoding parameters, Silero VAD silence filtering, beam sizes, and thread concurrency.
-* **🤖 Multi-Provider AI Translation:** Post-process and translate subtitles into 40+ languages using OpenAI, Anthropic, Gemini, or local LLMs (LM Studio/Ollama) with secure system keyring storage.
+* **🤖 Multi-Provider AI Translation:** Post-process and translate subtitles into 120+ languages using OpenAI, Anthropic, Gemini, or local LLMs (LM Studio/Ollama) with secure system keyring storage.
 * **✨ Glassmorphic UI & Real-Time Telemetry:** Dark-mode interface featuring dynamic hardware metrics (CPU/RAM/GPU), drag-and-drop file queue, and live transcript highlighting.
 
 ---
@@ -178,5 +179,25 @@ All speech transcription, audio conversion, and model execution run **100% local
 
 ---
 
+## 💖 Support the Project
+
+If you find **Whisper Desktop** helpful and want to support its ongoing development, maintenance, and new features, donations are greatly appreciated:
+
+* **TRON (TRX / TRC20):**
+  ```text
+  TDXH4vErrWunXfd6nHJX5mTNr4uHuPD1im
+  ```
+
+---
+
+## 📬 Contact & Community
+
+Have a question, feedback, or want to collaborate? Feel free to reach out:
+
+* **Telegram:** [@TheMrAhmad](https://t.me/TheMrAhmad)
+
+---
+
 ## 📄 License
 This project is licensed under the [MIT License](LICENSE).
+

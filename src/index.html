@@ -153,7 +153,7 @@
                   A modern, high-performance desktop application designed to orchestrate Whisper.cpp AI speech recognition and multi-language translation on Linux.
                 </p>
                 <p>
-                  Features out-of-the-box pre-compiled GPU acceleration backends, an integrated HuggingFace model downloader, advanced Whisper engine orchestration, 40+ language AI translations, and real-time subtitle generation.
+                  Features out-of-the-box pre-compiled GPU acceleration backends, an integrated HuggingFace model downloader, advanced Whisper engine orchestration, 120+ language AI translations, and real-time subtitle generation.
                 </p>
                 <div class="features-list">
                   <div class="feature-item">
@@ -173,8 +173,8 @@
                   <div class="feature-item">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
                     <div>
-                      <div class="feature-title">40+ Languages AI Translation & Subtitles</div>
-                      <div class="feature-desc">Translate speech into 40+ world languages and export SRT, VTT, TXT, LRC, CSV, JSON, and word-level Karaoke timing formats.</div>
+                      <div class="feature-title">120+ Languages AI Translation & Subtitles</div>
+                      <div class="feature-desc">Translate speech into 120+ world languages and export SRT, VTT, TXT, LRC, CSV, JSON, and word-level Karaoke timing formats.</div>
                     </div>
                   </div>
                   <div class="feature-item">
@@ -1105,46 +1105,128 @@
                     </div>
                     <div class="setting-control">
                       <select class="select-control" id="opt-translateAiTargetLang" onchange="saveCurrentSettings()">
-                        <option value="Persian">Persian (Farsi)</option>
+                        <option value="Persian">Persian (فارسی)</option>
                         <option value="English">English</option>
-                        <option value="Spanish">Spanish</option>
-                        <option value="French">French</option>
-                        <option value="German">German</option>
-                        <option value="Italian">Italian</option>
-                        <option value="Russian">Russian</option>
-                        <option value="Chinese (Simplified)">Chinese (Simplified)</option>
-                        <option value="Chinese (Traditional)">Chinese (Traditional)</option>
-                        <option value="Arabic">Arabic</option>
-                        <option value="Turkish">Turkish</option>
-                        <option value="Portuguese">Portuguese</option>
-                        <option value="Japanese">Japanese</option>
-                        <option value="Korean">Korean</option>
-                        <option value="Dutch">Dutch</option>
-                        <option value="Polish">Polish</option>
-                        <option value="Swedish">Swedish</option>
-                        <option value="Norwegian">Norwegian</option>
-                        <option value="Danish">Danish</option>
-                        <option value="Finnish">Finnish</option>
-                        <option value="Greek">Greek</option>
-                        <option value="Czech">Czech</option>
-                        <option value="Romanian">Romanian</option>
-                        <option value="Hungarian">Hungarian</option>
-                        <option value="Ukrainian">Ukrainian</option>
-                        <option value="Hebrew">Hebrew</option>
-                        <option value="Hindi">Hindi</option>
-                        <option value="Urdu">Urdu</option>
-                        <option value="Bengali">Bengali</option>
-                        <option value="Indonesian">Indonesian</option>
-                        <option value="Malay">Malay</option>
-                        <option value="Vietnamese">Vietnamese</option>
-                        <option value="Thai">Thai</option>
-                        <option value="Kurdish">Kurdish</option>
-                        <option value="Pashto">Pashto</option>
-                        <option value="Azerbaijani">Azerbaijani</option>
-                        <option value="Uzbek">Uzbek</option>
-                        <option value="Kazakh">Kazakh</option>
-                        <option value="Tagalog">Tagalog (Filipino)</option>
-                        <option value="Swahili">Swahili</option>
+                        <option value="Simplified Chinese">Chinese (Simplified / 简体)</option>
+                        <option value="Traditional Chinese">Chinese (Traditional / 繁體)</option>
+                        <option value="Spanish">Spanish (Español)</option>
+                        <option value="French">French (Français)</option>
+                        <option value="German">German (Deutsch)</option>
+                        <option value="Japanese">Japanese (日本語)</option>
+                        <option value="Korean">Korean (한국어)</option>
+                        <option value="Hindi">Hindi (हिन्दी)</option>
+                        <option value="Arabic">Arabic (العربية)</option>
+                        <option value="Russian">Russian (Русский)</option>
+                        <option value="Portuguese (Brazil)">Portuguese (Brasil)</option>
+                        <option value="Portuguese (Portugal)">Portuguese (Portugal)</option>
+                        <option value="Indonesian">Indonesian (Bahasa Indonesia)</option>
+                        <option value="Vietnamese">Vietnamese (Tiếng Việt)</option>
+                        <option value="Italian">Italian (Italiano)</option>
+                        <option value="Cantonese">Cantonese (粵語)</option>
+                        <option value="Turkish">Turkish (Türkçe)</option>
+                        <option value="Hebrew">Hebrew (עברית)</option>
+                        <option value="Urdu">Urdu (اردو)</option>
+                        <option value="Pashto">Pashto (پښتو)</option>
+                        <option value="Dari">Dari (دری)</option>
+                        <option value="Central Kurdish">Central Kurdish (کوردی / Sorani)</option>
+                        <option value="Northern Kurdish">Northern Kurdish (Kurdî / Kurmanji)</option>
+                        <option value="Polish">Polish (Polski)</option>
+                        <option value="Ukrainian">Ukrainian (Українська)</option>
+                        <option value="Dutch">Dutch (Nederlands)</option>
+                        <option value="Romanian">Romanian (Română)</option>
+                        <option value="Greek">Greek (Ελληνικά)</option>
+                        <option value="Hungarian">Hungarian (Magyar)</option>
+                        <option value="Swedish">Swedish (Svenska)</option>
+                        <option value="Czech">Czech (Čeština)</option>
+                        <option value="Catalan">Catalan (Català)</option>
+                        <option value="Serbian">Serbian (Српски)</option>
+                        <option value="Bulgarian">Bulgarian (Български)</option>
+                        <option value="Armenian">Armenian (Հայերեն)</option>
+                        <option value="Danish">Danish (Dansk)</option>
+                        <option value="Albanian">Albanian (Shqip)</option>
+                        <option value="Finnish">Finnish (Suomi)</option>
+                        <option value="Norwegian Bokmål">Norwegian (Norsk bokmål)</option>
+                        <option value="Slovak">Slovak (Slovenčina)</option>
+                        <option value="Croatian">Croatian (Hrvatski)</option>
+                        <option value="Belarusian">Belarusian (Беларуская)</option>
+                        <option value="Sicilian">Sicilian (Sicilianu)</option>
+                        <option value="Georgian">Georgian (ქართული)</option>
+                        <option value="Lombard">Lombard (Lombard)</option>
+                        <option value="Lithuanian">Lithuanian (Lietuvių)</option>
+                        <option value="Galician">Galician (Galego)</option>
+                        <option value="Bosnian">Bosnian (Bosanski)</option>
+                        <option value="Slovenian">Slovenian (Slovenščina)</option>
+                        <option value="Macedonian">Macedonian (Македонски)</option>
+                        <option value="Latvian">Latvian (Latviešu)</option>
+                        <option value="Estonian">Estonian (Eesti)</option>
+                        <option value="Icelandic">Icelandic (Íslenska)</option>
+                        <option value="Maltese">Maltese (Malti)</option>
+                        <option value="Welsh">Welsh (Cymraeg)</option>
+                        <option value="Irish">Irish (Gaeilge)</option>
+                        <option value="Breton">Breton (Brezhoneg)</option>
+                        <option value="Basque">Basque (Euskara)</option>
+                        <option value="Yiddish">Yiddish (ייִדיש)</option>
+                        <option value="Luxembourgish">Luxembourgish (Lëtzebuergesch)</option>
+                        <option value="Occitan">Occitan (Occitan)</option>
+                        <option value="Aragonese">Aragonese (Aragonés)</option>
+                        <option value="Latin">Latin (Latina)</option>
+                        <option value="Esperanto">Esperanto</option>
+                        <option value="Uzbek">Uzbek (Oʻzbekcha)</option>
+                        <option value="Kazakh">Kazakh (Қазақ тілі)</option>
+                        <option value="Kyrgyz">Kyrgyz (Кыргызча)</option>
+                        <option value="Turkmen">Turkmen (Türkmençe)</option>
+                        <option value="Azerbaijani">Azerbaijani (Azərbaycan)</option>
+                        <option value="Tajik">Tajik (Тоҷикӣ)</option>
+                        <option value="Mongolian">Mongolian (Монгол)</option>
+                        <option value="Bashkir">Bashkir (Башҡортса)</option>
+                        <option value="Tatar">Tatar (Татар теле)</option>
+                        <option value="Uyghur">Uyghur (ئۇيغۇرچە)</option>
+                        <option value="Bengali">Bengali (বাংলা)</option>
+                        <option value="Marathi">Marathi (मराठी)</option>
+                        <option value="Telugu">Telugu (తెలుగు)</option>
+                        <option value="Tamil">Tamil (தமிழ்)</option>
+                        <option value="Gujarati">Gujarati (ગુજરાતી)</option>
+                        <option value="Kannada">Kannada (ಕನ್ನಡ)</option>
+                        <option value="Punjabi">Punjabi (ਪੰਜਾਬੀ)</option>
+                        <option value="Malayalam">Malayalam (മലയാളം)</option>
+                        <option value="Bhojpuri">Bhojpuri (भोजपुरी)</option>
+                        <option value="Maithili">Maithili (मैथिلی)</option>
+                        <option value="Nepali">Nepali (नेपाली)</option>
+                        <option value="Sinhala">Sinhala (සිංහල)</option>
+                        <option value="Assamese">Assamese (অসমীয়া)</option>
+                        <option value="Konkani">Konkani (कोंकणी)</option>
+                        <option value="Sanskrit">Sanskrit (संस्कृतम्)</option>
+                        <option value="Thai">Thai (ไทย)</option>
+                        <option value="Lao">Lao (ລາວ)</option>
+                        <option value="Burmese">Burmese (မြန်မာ)</option>
+                        <option value="Khmer">Khmer (ខ្មែរ)</option>
+                        <option value="Malay">Malay (Bahasa Melayu)</option>
+                        <option value="Filipino">Filipino (Tagalog)</option>
+                        <option value="Javanese">Javanese (Basa Jawa)</option>
+                        <option value="Sundanese">Sundanese (Basa Sunda)</option>
+                        <option value="Acehnese">Acehnese (Acèh)</option>
+                        <option value="Pangasinan">Pangasinan (Salitan Pangasinan)</option>
+                        <option value="Pampangan">Pampangan (Kapampangan)</option>
+                        <option value="Cebuano">Cebuano</option>
+                        <option value="Swahili">Swahili (Kiswahili)</option>
+                        <option value="Hausa">Hausa (هَرْشٜىٰن هَوْسَا)</option>
+                        <option value="Amharic">Amharic (አማርኛ)</option>
+                        <option value="Igbo">Igbo</option>
+                        <option value="Wolof">Wolof</option>
+                        <option value="Xhosa">Xhosa (isiXhosa)</option>
+                        <option value="Zulu">Zulu (isiZulu)</option>
+                        <option value="Afrikaans">Afrikaans</option>
+                        <option value="Oromo">Oromo (Afaan Oromoo)</option>
+                        <option value="Southern Sotho">Southern Sotho (Sesotho)</option>
+                        <option value="Tswana">Tswana (Setswana)</option>
+                        <option value="Tsonga">Tsonga (Xitsonga)</option>
+                        <option value="Malagasy">Malagasy</option>
+                        <option value="Lingala">Lingala (Lingála)</option>
+                        <option value="Haitian Creole">Haitian Creole (Kreyòl ayisyen)</option>
+                        <option value="Quechua">Quechua (Runa Simi)</option>
+                        <option value="Aymara">Aymara (Aymar aru)</option>
+                        <option value="Guarani">Guarani (Avañe'ẽ)</option>
+                        <option value="Maori">Maori (Māori)</option>
                       </select>
                     </div>
                   </div>

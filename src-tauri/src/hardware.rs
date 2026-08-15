@@ -189,7 +189,7 @@ fn detect_gpu_type() -> String {
 
     #[cfg(target_os = "macos")]
     {
-        return "apple_silicon".to_string();
+        "apple_silicon".to_string()
     }
     
     #[cfg(target_os = "linux")]
@@ -220,9 +220,14 @@ fn detect_gpu_type() -> String {
                 return "intel".to_string();
             }
         }
+
+        "unknown".to_string()
     }
-    
-    "unknown".to_string()
+
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    {
+        "unknown".to_string()
+    }
 }
 
 

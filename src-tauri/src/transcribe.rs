@@ -236,7 +236,7 @@ pub async fn run_transcription(
 
     
     use tauri::Manager;
-    let mut bin_path = match app.path().resolve(format!("resources/{}", bin_name), tauri::path::BaseDirectory::Resource) {
+    let bin_path = match app.path().resolve(format!("resources/{}", bin_name), tauri::path::BaseDirectory::Resource) {
         Ok(path) => {
             if path.exists() {
                 path
@@ -272,6 +272,8 @@ pub async fn run_transcription(
     // Ensure executable permissions on Unix platforms.
     // If the binary is inside a read-only filesystem (like an AppImage mount) or execution is restricted,
     // we copy the binary to the user's writable cache directory first and make it executable there.
+    #[cfg(unix)]
+    let mut bin_path = bin_path;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;

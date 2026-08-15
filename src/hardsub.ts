@@ -364,7 +364,7 @@ function splitSpanIntoWords(span: TextSpan): TextSpan[] {
 function setSpanFont(ctx: CanvasRenderingContext2D, family: string, size: number, bold: boolean, italic: boolean) {
   const style = italic ? 'italic' : 'normal';
   const weight = bold ? 'bold' : 'normal';
-  ctx.font = `${style} ${weight} ${size}px '${family}', sans-serif`;
+  ctx.font = `${style} ${weight} ${size}px '${family}', 'Vazirmatn', 'Vazir', sans-serif`;
 }
 
 function trimTrailingWhitespace(line: TextSpan[]): TextSpan[] {

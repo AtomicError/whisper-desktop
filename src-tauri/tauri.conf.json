@@ -55,12 +55,7 @@
         "desktopTemplate": "./desktop.desktop"
       },
       "appimage": {
-        "bundleMediaFramework": false,
-        "files": {
-          "/usr/lib/x86_64-linux-gnu/libicudata.so.74": "/usr/lib/x86_64-linux-gnu/libicudata.so.74",
-          "/usr/lib/x86_64-linux-gnu/libicuuc.so.74": "/usr/lib/x86_64-linux-gnu/libicuuc.so.74",
-          "/usr/lib/x86_64-linux-gnu/libicui18n.so.74": "/usr/lib/x86_64-linux-gnu/libicui18n.so.74"
-        }
+        "bundleMediaFramework": false
       }
     }
   }

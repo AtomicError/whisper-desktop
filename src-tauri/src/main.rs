@@ -502,12 +502,12 @@ fn main() {
     let download_session = Arc::new(Mutex::new(DownloadSession::new()));
     
     tauri::Builder::default()
-        .setup(|app| {
+        .setup(|_app| {
             #[cfg(target_os = "linux")]
             {
                 use tauri::Manager;
                 use webkit2gtk::{WebViewExt, PermissionRequestExt};
-                if let Some(window) = app.get_webview_window("main") {
+                if let Some(window) = _app.get_webview_window("main") {
                     let _ = window.with_webview(|webview| {
                         let webview = webview.inner();
                         webview.connect_permission_request(|_webview, req| {
