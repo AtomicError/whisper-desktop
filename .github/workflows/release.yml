@@ -56,7 +56,8 @@ jobs:
             libvulkan-dev \
             glslc \
             glslang-tools \
-            spirv-headers
+            spirv-headers \
+            xdg-utils
 
       - name: Install CUDA Toolkit
         uses: Jimver/cuda-toolkit@v0.2.35
