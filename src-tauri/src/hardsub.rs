@@ -336,31 +336,87 @@ pub fn get_font_render_scale(app: AppHandle, font_name: String, bold: bool, ital
     }
 }
 
+pub fn find_vaapi_render_device() -> Option<String> {
+    for i in 128..=136 {
+        let path = format!("/dev/dri/renderD{}", i);
+        if std::path::Path::new(&path).exists() {
+            return Some(path);
+        }
+    }
+    None
+}
+
 #[derive(serde::Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct HardwareEncodersStatus {
     pub has_qsv: bool,
     pub has_nvenc: bool,
     pub has_vaapi: bool,
+    pub has_videotoolbox: bool,
 }
 
 #[tauri::command]
-pub fn check_hardware_encoders() -> HardwareEncodersStatus {
-    let check_encoder = |encoder: &str| -> bool {
-        if let Ok(output) = std::process::Command::new("ffmpeg")
-            .args(["-h", &format!("encoder={}", encoder)])
+pub async fn check_hardware_encoders(app: tauri::AppHandle) -> HardwareEncodersStatus {
+    let ffmpeg_bin = crate::ffmpeg_resolver::get_ffmpeg_path(Some(&app));
+
+    let f1 = ffmpeg_bin.clone();
+    let qsv_task = tokio::task::spawn_blocking(move || {
+        std::process::Command::new(&f1)
+            .args(["-f", "lavfi", "-i", "nullsrc", "-frames:v", "1", "-c:v", "h264_qsv", "-f", "null", "-"])
             .output()
-        {
-            output.status.success()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+    });
+
+    let f2 = ffmpeg_bin.clone();
+    let nvenc_task = tokio::task::spawn_blocking(move || {
+        std::process::Command::new(&f2)
+            .args(["-f", "lavfi", "-i", "nullsrc", "-frames:v", "1", "-c:v", "h264_nvenc", "-f", "null", "-"])
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+    });
+
+    let f3 = ffmpeg_bin.clone();
+    let vaapi_task = tokio::task::spawn_blocking(move || {
+        if let Some(dev) = find_vaapi_render_device() {
+            std::process::Command::new(&f3)
+                .args([
+                    "-vaapi_device", &dev,
+                    "-f", "lavfi", "-i", "nullsrc", "-frames:v", "1",
+                    "-vf", "format=nv12,hwupload",
+                    "-c:v", "h264_vaapi",
+                    "-f", "null", "-",
+                ])
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false)
         } else {
             false
         }
-    };
+    });
+
+    let f4 = ffmpeg_bin.clone();
+    let videotoolbox_task = tokio::task::spawn_blocking(move || {
+        std::process::Command::new(&f4)
+            .args(["-f", "lavfi", "-i", "nullsrc", "-frames:v", "1", "-c:v", "h264_videotoolbox", "-f", "null", "-"])
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+    });
+
+    let (has_qsv, has_nvenc, has_vaapi, has_videotoolbox) = tokio::join!(
+        async { qsv_task.await.unwrap_or(false) },
+        async { nvenc_task.await.unwrap_or(false) },
+        async { vaapi_task.await.unwrap_or(false) },
+        async { videotoolbox_task.await.unwrap_or(false) },
+    );
 
     HardwareEncodersStatus {
-        has_qsv: check_encoder("h264_qsv"),
-        has_nvenc: check_encoder("h264_nvenc"),
-        has_vaapi: check_encoder("h264_vaapi"),
+        has_qsv,
+        has_nvenc,
+        has_vaapi,
+        has_videotoolbox,
     }
 }
 
@@ -521,14 +577,17 @@ pub async fn run_hardsub_task(
     });
 
     // Probe duration, width, and height using ffprobe
+    let ffprobe_bin = crate::ffmpeg_resolver::get_ffprobe_path(Some(&app));
+    let ffmpeg_bin = crate::ffmpeg_resolver::get_ffmpeg_path(Some(&app));
+
     let mut total_duration_sec = 0.0;
     let mut video_width = 1920;
     let mut video_height = 1080;
 
-    let probe_out = std::process::Command::new("ffprobe")
+    let probe_out = std::process::Command::new(&ffprobe_bin)
         .args([
             "-v", "error",
-            "-show_entries", "format=duration:stream=width,height,codec_type,side_data_list,tags",
+            "-show_entries", "format=duration:stream=duration,width,height,codec_type,side_data_list,tags",
             "-of", "json",
             &settings.video_path,
         ])
@@ -546,6 +605,15 @@ pub async fn run_hardsub_task(
                 for stream in streams {
                     if stream.get("codec_type").and_then(|v| v.as_str()) != Some("video") {
                         continue;
+                    }
+                    if total_duration_sec <= 0.0 {
+                        if let Some(d_str) = stream.get("duration").and_then(|v| v.as_str()) {
+                            if let Ok(secs) = d_str.parse::<f64>() {
+                                if secs > 0.0 {
+                                    total_duration_sec = secs;
+                                }
+                            }
+                        }
                     }
                     if let (Some(w), Some(h)) = (stream.get("width").and_then(|v| v.as_u64()), stream.get("height").and_then(|v| v.as_u64())) {
                         video_width = w as u32;
@@ -586,6 +654,11 @@ pub async fn run_hardsub_task(
 
     logs.log(&app, "Hardsub", &format!("Probed video dimensions: {}x{} (Aspect: {:.3})", video_width, video_height, video_width as f64 / video_height as f64));
 
+    // Calculate dynamic 288p reference canvas dimensions preserving video aspect ratio (for 16:9, 9:16, 4:3, 21:9, etc.)
+    let aspect = (video_width as f64) / (video_height.max(1) as f64);
+    let ref_height: u32 = 288;
+    let ref_width = ((ref_height as f64) * aspect).round().max(1.0) as u32;
+
     // Construct Subtitle Style (force_style parameters)
     let mut safe_font_name = settings.font_name.replace(',', "").replace('\'', "").replace('"', "");
     if safe_font_name == "Inter" {
@@ -598,52 +671,35 @@ pub async fn run_hardsub_task(
 
     let ass_primary_color = hex_to_ass_color(&settings.primary_color, 0); // 00 = fully opaque
     let ass_outline_color = hex_to_ass_color(&settings.outline_color, 0);
-    // BorderStyle=4 is a libass extension that renders one background box for
-    // the entire subtitle event. BorderStyle=3 creates one box per line.
-    let border_style = if settings.bg_box { 4 } else { 1 };
-    let ass_bg_color = hex_to_ass_color(
-        &settings.bg_box_color,
-        opacity_percent_to_ass_alpha(settings.bg_box_opacity),
-    );
+    let ass_bg_color = hex_to_ass_color(&settings.bg_box_color, opacity_percent_to_ass_alpha(settings.bg_box_opacity));
 
-    // Resolve subtitle path escaping for FFmpeg filtergraph
-    let escaped_sub_path = settings.subtitle_path
-        .replace('\\', "/")
-        .replace(':', "\\:")
-        .replace('\'', "'\\''")
-        .replace('[', "\\[")
-        .replace(']', "\\]")
-        .replace(',', "\\,");
+    let border_style = if settings.bg_box {
+        3 // Opaque box style
+    } else {
+        1 // Outline + shadow style
+    };
 
-    // Calculate reference dimensions for FFmpeg to match the 288px height preview scale
-    let video_aspect = if video_height > 0 { video_width as f64 / video_height as f64 } else { 1.777 };
-    let ref_height = 288;
-    let ref_width = (288.0 * video_aspect).round() as u32;
+    let alignment = settings.alignment;
 
-    // Convert widthMargin percentage (e.g. 90 = text uses 90% of width) to ASS pixel margins
-    // Each side margin = (100 - widthMargin) / 2 * ref_width / 100
-    let margin_lr = ((100u32.saturating_sub(settings.width_margin)) as f64 / 200.0 * ref_width as f64).round() as u32;
-
-    let mut force_style = format!(
-        "FontName={},FontSize={},PrimaryColour={},OutlineColour={},Outline={},BorderStyle={},Shadow={},MarginV={},MarginL={},MarginR={},Alignment={},Bold={},Italic={}",
+    // Use libass style overrides to format subtitle typography and position precisely.
+    // MarginV sets bottom vertical distance in 288p coordinate space, while margin_lr scales with ref_width.
+    let margin_lr = ((100 - settings.width_margin.min(100)) as f64 / 200.0 * (ref_width as f64)).round() as u32;
+    let force_style = format!(
+        "FontName={},FontSize={},Bold={},Italic={},PrimaryColour={},OutlineColour={},BackColour={},BorderStyle={},Outline={},Shadow=0,Alignment={},MarginV={},MarginL={},MarginR={}",
         safe_font_name,
         compensated_font_size,
-        ass_primary_color,
-        ass_outline_color,
-        settings.outline_size,
-        border_style,
-        if settings.bg_box { 6 } else { 0 },
-        settings.position_y,
-        margin_lr,
-        margin_lr,
-        settings.alignment,
         if settings.bold { 1 } else { 0 },
         if settings.italic { 1 } else { 0 },
+        ass_primary_color,
+        ass_outline_color,
+        ass_bg_color,
+        border_style,
+        settings.outline_size,
+        alignment,
+        settings.position_y,
+        margin_lr,
+        margin_lr
     );
-
-    if settings.bg_box {
-        force_style.push_str(&format!(",BackColour={}", ass_bg_color));
-    }
 
     let mut resolved_fonts_dir = app.path().resolve("resources/fonts", tauri::path::BaseDirectory::Resource).ok();
     if resolved_fonts_dir.is_none() || !resolved_fonts_dir.as_ref().unwrap().exists() {
@@ -661,46 +717,38 @@ pub async fn run_hardsub_task(
         "".to_string()
     };
 
-    let is_ass = settings.subtitle_path.ends_with(".ass") || settings.subtitle_path.ends_with(".temp.ass");
-    let sub_filter = if is_ass {
-        format!(
-            "subtitles='{}'{}",
-            escaped_sub_path,
-            fonts_dir_opt
-        )
+    let escaped_sub_path = settings.subtitle_path
+        .replace('\\', "/")
+        .replace(':', "\\:")
+        .replace('\'', "'\\''")
+        .replace('[', "\\[")
+        .replace(']', "\\]")
+        .replace(',', "\\,");
+
+    // Choose subtitles filter mode based on extension (.ass -> subtitles filter preserving native formatting; .srt -> force_style with dynamic reference resolution)
+    let is_ass_file = settings.subtitle_path.to_lowercase().ends_with(".ass");
+    let sub_filter = if is_ass_file {
+        // ASS script has complete style and header metadata defined
+        format!("subtitles='{}'{}", escaped_sub_path, fonts_dir_opt)
     } else {
-        format!(
-            "subtitles='{}'{}:original_size={}x{}:force_style='{}'",
-            escaped_sub_path,
-            fonts_dir_opt,
-            ref_width,
-            ref_height,
-            force_style
-        )
+        format!("subtitles='{}':original_size={}x{}{}:force_style='{}'", escaped_sub_path, ref_width, ref_height, fonts_dir_opt, force_style)
     };
 
     // Build FFmpeg Arguments
     let mut ffmpeg_args: Vec<String> = Vec::new();
 
+    // Pass global non-interactive flags and machine-readable progress on stdout
+    ffmpeg_args.push("-nostdin".to_string());
+    ffmpeg_args.push("-progress".to_string());
+    ffmpeg_args.push("pipe:1".to_string());
+
     // 1. Hardware acceleration flags before -i
-    match settings.hw_accel.as_str() {
-        "qsv" => {
-            ffmpeg_args.push("-hwaccel".to_string());
-            ffmpeg_args.push("qsv".to_string());
+    let vaapi_dev = find_vaapi_render_device();
+    if settings.hw_accel == "vaapi" {
+        if let Some(ref dev) = vaapi_dev {
+            ffmpeg_args.push("-vaapi_device".to_string());
+            ffmpeg_args.push(dev.clone());
         }
-        "nvenc" => {
-            ffmpeg_args.push("-hwaccel".to_string());
-            ffmpeg_args.push("cuda".to_string());
-        }
-        "vaapi" => {
-            if Path::new("/dev/dri/renderD128").exists() {
-                ffmpeg_args.push("-vaapi_device".to_string());
-                ffmpeg_args.push("/dev/dri/renderD128".to_string());
-            }
-            ffmpeg_args.push("-hwaccel".to_string());
-            ffmpeg_args.push("vaapi".to_string());
-        }
-        _ => {}
     }
 
     // Disable FFmpeg auto-rotation so that we can rotate manually at the start of the filtergraph.
@@ -720,6 +768,11 @@ pub async fn run_hardsub_task(
         vf_filters.push("transpose=2".to_string());
     }
     vf_filters.push(sub_filter);
+
+    // If using VA-API hardware encoder, upload processed frames to VAAPI GPU surface
+    if settings.hw_accel == "vaapi" {
+        vf_filters.push("format=nv12,hwupload".to_string());
+    }
     
     let vf_arg = vf_filters.join(",");
 
@@ -735,6 +788,49 @@ pub async fn run_hardsub_task(
     }
 
     // 3. Video Encoder Selection
+    let apply_cpu_encoder = |args: &mut Vec<String>, codec: &str| {
+        match codec {
+            "h265" => {
+                args.push("-c:v".to_string());
+                args.push("libx265".to_string());
+                args.push("-crf".to_string());
+                args.push("23".to_string());
+                args.push("-preset".to_string());
+                args.push("medium".to_string());
+            }
+            "av1" => {
+                args.push("-c:v".to_string());
+                args.push("libsvtav1".to_string());
+                args.push("-crf".to_string());
+                args.push("28".to_string());
+                args.push("-preset".to_string());
+                args.push("6".to_string());
+            }
+            "vp9" => {
+                args.push("-c:v".to_string());
+                args.push("libvpx-vp9".to_string());
+                args.push("-crf".to_string());
+                args.push("30".to_string());
+                args.push("-b:v".to_string());
+                args.push("0".to_string());
+            }
+            "prores" => {
+                args.push("-c:v".to_string());
+                args.push("prores_ks".to_string());
+                args.push("-profile:v".to_string());
+                args.push("3".to_string());
+            }
+            _ => {
+                args.push("-c:v".to_string());
+                args.push("libx264".to_string());
+                args.push("-crf".to_string());
+                args.push("22".to_string());
+                args.push("-preset".to_string());
+                args.push("medium".to_string());
+            }
+        }
+    };
+
     match (settings.hw_accel.as_str(), settings.video_codec.as_str()) {
         ("qsv", "h264") => {
             ffmpeg_args.push("-c:v".to_string());
@@ -743,10 +839,6 @@ pub async fn run_hardsub_task(
             ffmpeg_args.push("slow".to_string());
             ffmpeg_args.push("-global_quality".to_string());
             ffmpeg_args.push("23".to_string());
-            ffmpeg_args.push("-look_ahead".to_string());
-            ffmpeg_args.push("1".to_string());
-            ffmpeg_args.push("-look_ahead_depth".to_string());
-            ffmpeg_args.push("50".to_string());
         }
         ("qsv", "h265") => {
             ffmpeg_args.push("-c:v".to_string());
@@ -755,6 +847,14 @@ pub async fn run_hardsub_task(
             ffmpeg_args.push("slow".to_string());
             ffmpeg_args.push("-global_quality".to_string());
             ffmpeg_args.push("23".to_string());
+        }
+        ("qsv", "av1") => {
+            ffmpeg_args.push("-c:v".to_string());
+            ffmpeg_args.push("av1_qsv".to_string());
+            ffmpeg_args.push("-preset".to_string());
+            ffmpeg_args.push("medium".to_string());
+            ffmpeg_args.push("-global_quality".to_string());
+            ffmpeg_args.push("25".to_string());
         }
         ("nvenc", "h264") => {
             ffmpeg_args.push("-c:v".to_string());
@@ -772,44 +872,52 @@ pub async fn run_hardsub_task(
             ffmpeg_args.push("-cq".to_string());
             ffmpeg_args.push("23".to_string());
         }
-        ("vaapi", _) => {
+        ("nvenc", "av1") => {
+            ffmpeg_args.push("-c:v".to_string());
+            ffmpeg_args.push("av1_nvenc".to_string());
+            ffmpeg_args.push("-preset".to_string());
+            ffmpeg_args.push("p4".to_string());
+            ffmpeg_args.push("-cq".to_string());
+            ffmpeg_args.push("25".to_string());
+        }
+        ("vaapi", "h265") => {
+            ffmpeg_args.push("-c:v".to_string());
+            ffmpeg_args.push("hevc_vaapi".to_string());
+        }
+        ("vaapi", "av1") => {
+            ffmpeg_args.push("-c:v".to_string());
+            ffmpeg_args.push("av1_vaapi".to_string());
+        }
+        ("vaapi", "h264") => {
             ffmpeg_args.push("-c:v".to_string());
             ffmpeg_args.push("h264_vaapi".to_string());
         }
+        ("vaapi", other) => {
+            logs.log(&app, "Hardsub", &format!("VA-API does not support codec '{}'. Falling back to standard CPU encoder.", other));
+            apply_cpu_encoder(&mut ffmpeg_args, other);
+        }
+        ("videotoolbox", "h265") => {
+            ffmpeg_args.push("-c:v".to_string());
+            ffmpeg_args.push("hevc_videotoolbox".to_string());
+            ffmpeg_args.push("-q:v".to_string());
+            ffmpeg_args.push("65".to_string());
+        }
+        ("videotoolbox", "prores") => {
+            ffmpeg_args.push("-c:v".to_string());
+            ffmpeg_args.push("prores_videotoolbox".to_string());
+        }
+        ("videotoolbox", "h264") => {
+            ffmpeg_args.push("-c:v".to_string());
+            ffmpeg_args.push("h264_videotoolbox".to_string());
+            ffmpeg_args.push("-q:v".to_string());
+            ffmpeg_args.push("65".to_string());
+        }
+        ("videotoolbox", other) => {
+            logs.log(&app, "Hardsub", &format!("VideoToolbox does not support codec '{}'. Falling back to standard CPU encoder.", other));
+            apply_cpu_encoder(&mut ffmpeg_args, other);
+        }
         _ => {
-            // Standard CPU
-            match settings.video_codec.as_str() {
-                "h265" => {
-                    ffmpeg_args.push("-c:v".to_string());
-                    ffmpeg_args.push("libx265".to_string());
-                    ffmpeg_args.push("-crf".to_string());
-                    ffmpeg_args.push("23".to_string());
-                    ffmpeg_args.push("-preset".to_string());
-                    ffmpeg_args.push("medium".to_string());
-                }
-                "vp9" => {
-                    ffmpeg_args.push("-c:v".to_string());
-                    ffmpeg_args.push("libvpx-vp9".to_string());
-                    ffmpeg_args.push("-crf".to_string());
-                    ffmpeg_args.push("30".to_string());
-                    ffmpeg_args.push("-b:v".to_string());
-                    ffmpeg_args.push("0".to_string());
-                }
-                "prores" => {
-                    ffmpeg_args.push("-c:v".to_string());
-                    ffmpeg_args.push("prores_ks".to_string());
-                    ffmpeg_args.push("-profile:v".to_string());
-                    ffmpeg_args.push("3".to_string());
-                }
-                _ => {
-                    ffmpeg_args.push("-c:v".to_string());
-                    ffmpeg_args.push("libx264".to_string());
-                    ffmpeg_args.push("-crf".to_string());
-                    ffmpeg_args.push("22".to_string());
-                    ffmpeg_args.push("-preset".to_string());
-                    ffmpeg_args.push("medium".to_string());
-                }
-            }
+            apply_cpu_encoder(&mut ffmpeg_args, &settings.video_codec);
         }
     }
 
@@ -827,48 +935,137 @@ pub async fn run_hardsub_task(
     // 5. Output file
     ffmpeg_args.push(settings.output_path.clone());
 
-    logs.log(&app, "FFmpeg", &format!("Executing command: ffmpeg {}", ffmpeg_args.join(" ")));
+    logs.log(&app, "FFmpeg", &format!("Executing command: {} {}", ffmpeg_bin.display(), ffmpeg_args.join(" ")));
 
-    let mut child = Command::new("ffmpeg")
+    let mut child = Command::new(&ffmpeg_bin)
         .args(&ffmpeg_args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| format!("Failed to spawn ffmpeg: {}", e))?;
+        .map_err(|e| format!("Failed to spawn ffmpeg ({}): {}", ffmpeg_bin.display(), e))?;
 
     let child_pid = child.id();
     if let Ok(mut lock) = session.lock() {
         lock.child_pid = child_pid;
     }
 
+    let stdout = child.stdout.take().ok_or("Failed to capture ffmpeg stdout")?;
     let stderr = child.stderr.take().ok_or("Failed to capture ffmpeg stderr")?;
+
+    let mut stdout_reader = BufReader::new(stdout).lines();
     let mut stderr_reader = BufReader::new(stderr).lines();
 
-    // Regex for parsing time=HH:MM:SS.ss progress
-    let time_regex = regex::Regex::new(r"time=(\d+):(\d+):(\d+(?:\.\d+)?)").unwrap();
+    let mut stdout_done = false;
+    let mut stderr_done = false;
 
-    while let Ok(Some(line)) = stderr_reader.next_line().await {
-        logs.log(&app, "FFmpeg", &line);
+    let mut current_speed = String::new();
+    let mut current_fps = String::new();
+    let mut max_progress: f64 = 0.0;
+    let mut last_emit_time = Instant::now() - std::time::Duration::from_secs(1);
+    let mut last_emitted_percent: Option<u32> = None;
 
-        if let Some(caps) = time_regex.captures(&line) {
-            let hours: f64 = caps[1].parse().unwrap_or(0.0);
-            let mins: f64 = caps[2].parse().unwrap_or(0.0);
-            let secs: f64 = caps[3].parse().unwrap_or(0.0);
-            let current_sec = hours * 3600.0 + mins * 60.0 + secs;
+    let parse_time_str = |time_str: &str| -> Option<f64> {
+        let parts: Vec<&str> = time_str.split(':').collect();
+        if parts.len() == 3 {
+            let h = parts[0].parse::<f64>().ok()?;
+            let m = parts[1].parse::<f64>().ok()?;
+            let s = parts[2].parse::<f64>().ok()?;
+            Some(h * 3600.0 + m * 60.0 + s)
+        } else {
+            None
+        }
+    };
 
-            let (progress, msg) = if total_duration_sec > 0.0 {
-                let p = (current_sec / total_duration_sec).min(0.99);
-                let percent = (p * 100.0) as u32;
-                (p, format!("Embedding Subtitles into Video... {}%", percent))
-            } else {
-                (0.5, "Embedding Subtitles into Video...".to_string())
-            };
+    while !stdout_done || !stderr_done {
+        tokio::select! {
+            res = stdout_reader.next_line(), if !stdout_done => {
+                match res {
+                    Ok(Some(line)) => {
+                        let trimmed = line.trim();
+                        if let Some((k, v)) = trimmed.split_once('=') {
+                            let k = k.trim();
+                            let v = v.trim();
+                            
+                            let parsed_sec: Option<f64> = match k {
+                                "out_time_us" => v.parse::<f64>().ok().map(|us| us / 1_000_000.0),
+                                "out_time_ms" => v.parse::<f64>().ok().map(|val| {
+                                    if val > 1_000_000.0 { val / 1_000_000.0 } else { val / 1000.0 }
+                                }),
+                                "out_time" => parse_time_str(v),
+                                _ => None,
+                            };
 
-            let _ = app.emit("hardsub-status", TranscribeProgress {
-                progress,
-                message: msg,
-                active: true,
-            });
+                            if let Some(current_sec) = parsed_sec {
+                                if total_duration_sec > 0.0 {
+                                    let raw_p = (current_sec / total_duration_sec).clamp(0.0, 0.99);
+                                    // Enforce strictly monotonic progress (never moves backwards)
+                                    max_progress = max_progress.max(raw_p);
+                                    let p = max_progress;
+                                    let percent = (p * 100.0) as u32;
+
+                                    let now = Instant::now();
+                                    let time_since_last_emit = now.duration_since(last_emit_time);
+                                    let percent_changed = last_emitted_percent != Some(percent);
+
+                                    // Throttle IPC events to at most every 150ms or on integer percentage changes
+                                    if percent_changed || time_since_last_emit >= std::time::Duration::from_millis(150) {
+                                        last_emit_time = now;
+                                        last_emitted_percent = Some(percent);
+
+                                        let mut detail = Vec::new();
+                                        if !current_speed.is_empty() && current_speed != "N/A" {
+                                            detail.push(format!("Speed: {}", current_speed));
+                                        }
+                                        if !current_fps.is_empty() && current_fps != "0.00" && current_fps != "N/A" {
+                                            detail.push(format!("{} FPS", current_fps));
+                                        }
+
+                                        let msg = if !detail.is_empty() {
+                                            format!("Embedding Subtitles into Video... {}% ({})", percent, detail.join(" | "))
+                                        } else {
+                                            format!("Embedding Subtitles into Video... {}%", percent)
+                                        };
+
+                                        let _ = app.emit("hardsub-status", TranscribeProgress {
+                                            progress: p,
+                                            message: msg,
+                                            active: true,
+                                        });
+                                    }
+                                }
+                            }
+
+                            match k {
+                                "speed" => {
+                                    current_speed = v.to_string();
+                                }
+                                "fps" => {
+                                    current_fps = v.to_string();
+                                }
+                                "progress" => {
+                                    if v == "end" {
+                                        let _ = app.emit("hardsub-status", TranscribeProgress {
+                                            progress: 0.99,
+                                            message: "Finalizing video export...".to_string(),
+                                            active: true,
+                                        });
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                    _ => stdout_done = true,
+                }
+            }
+            res = stderr_reader.next_line(), if !stderr_done => {
+                match res {
+                    Ok(Some(line)) => {
+                        logs.log(&app, "FFmpeg", &line);
+                    }
+                    _ => stderr_done = true,
+                }
+            }
         }
     }
 

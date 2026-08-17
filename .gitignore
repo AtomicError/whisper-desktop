@@ -60,3 +60,7 @@ debug_subtitles.ass
 *.temp.ass
 debug_error.log
 debug_rust.log
+
+# --- Local & Bundled Standalone Media Binaries ---
+src-tauri/resources/ffmpeg*
+src-tauri/resources/ffprobe*

@@ -1902,20 +1902,24 @@
               <!-- Right Column: Dual-Tab Studio Panel (Subtitles Block Editor & Typography/Encoding) -->
               <div style="display: flex; flex-direction: column; gap: 16px;">
                 
-                <!-- Studio Navigation Tabs Bar -->
-                <div class="glass-card" style="padding: 6px; display: flex; gap: 6px; background: rgba(15, 23, 42, 0.6);">
-                  <button id="hardsub-tab-btn-editor" class="pill-btn active" style="flex:1; padding: 10px; justify-content: center; border-radius: 8px; font-weight: 600; gap: 6px;">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px; height:16px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                    <span>Subtitles Editor</span>
+                <!-- Studio Navigation Tabs Bar (3 Dedicated Tabs) -->
+                <div class="hardsub-tabs-container">
+                  <button id="hardsub-tab-btn-editor" class="pill-btn hardsub-tab-pill active" style="flex:1; padding: 10px; justify-content: center; border-radius: 8px; font-weight: 600; gap: 6px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px;"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                    <span>Editor</span>
                   </button>
-                  <button id="hardsub-tab-btn-settings" class="pill-btn" style="flex:1; padding: 10px; justify-content: center; border-radius: 8px; font-weight: 600; gap: 6px;">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px; height:16px;"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/><path d="M12 22a10 10 0 0 0 10-10c0-2.3-.8-4.3-2-6"/></svg>
-                    <span>Style & Export</span>
+                  <button id="hardsub-tab-btn-style" class="pill-btn hardsub-tab-pill" style="flex:1; padding: 10px; justify-content: center; border-radius: 8px; font-weight: 600; gap: 6px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px;"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
+                    <span>Style</span>
+                  </button>
+                  <button id="hardsub-tab-btn-export" class="pill-btn hardsub-tab-pill" style="flex:1; padding: 10px; justify-content: center; border-radius: 8px; font-weight: 600; gap: 6px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px;"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                    <span>Export</span>
                   </button>
                 </div>
 
                 <!-- Tab 1: Block-Based Subtitle Editor View -->
-                <div id="hardsub-tab-view-editor" class="glass-card" style="padding: 18px; display: flex; flex-direction: column; gap: 14px; flex: 1;">
+                <div id="hardsub-tab-view-editor" class="glass-card hardsub-tab-view" style="padding: 18px; display: flex; flex-direction: column; gap: 14px; flex: 1;">
                   
                   <!-- Editor Top Bar: Search & Subtitle Counter -->
                   <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
@@ -1935,13 +1939,13 @@
                   </div>
                 </div>
 
-                <!-- Tab 2: Subtitle Typography, Style & Encoding View -->
-                <div id="hardsub-tab-view-settings" style="display: none; flex-direction: column; gap: 16px;">
+                <!-- Tab 2: Subtitle Typography & Style Design View -->
+                <div id="hardsub-tab-view-style" class="hardsub-tab-view" style="display: none; flex-direction: column; gap: 16px;">
                   
                   <!-- Typography Styling Controls Card -->
                   <div class="glass-card" style="padding: 18px;">
                     <h3 style="margin-top: 0; margin-bottom: 16px; font-size: 1.05rem; color: var(--color-royal-blue); display: flex; align-items: center; gap: 8px;">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px; height:20px;"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px;"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
                       Subtitle Typography & Style
                     </h3>
 
@@ -2116,15 +2120,19 @@
 
                     </div>
                   </div>
+                </div>
 
+                <!-- Tab 3: Video Export & Encoding View -->
+                <div id="hardsub-tab-view-export" class="hardsub-tab-view" style="display: none; flex-direction: column; gap: 16px;">
+                  
                   <!-- Hardware & Format Options Card -->
                   <div class="glass-card" style="padding: 18px;">
                     <h3 style="margin-top: 0; margin-bottom: 14px; font-size: 1.05rem; color: var(--color-royal-blue); display: flex; align-items: center; gap: 8px;">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px; height:20px;"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px;"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
                       Encoding & Hardware Acceleration
                     </h3>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
                       <div>
                         <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Output Format</label>
                         <select class="select-control" id="hardsub-format" style="width:100%;">
@@ -2149,9 +2157,10 @@
                       <div>
                         <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Hardware Accelerator</label>
                         <select class="select-control" id="hardsub-hw" style="width:100%;">
-                          <option value="cpu">Standard CPU (libx264/x265)</option>
-                          <option value="qsv">Intel QSV (QuickSync HW)</option>
+                          <option value="cpu">Standard CPU (Universal)</option>
+                          <option value="videotoolbox">Apple VideoToolbox (macOS / Apple Silicon)</option>
                           <option value="nvenc">NVIDIA NVENC (GPU Acceleration)</option>
+                          <option value="qsv">Intel QSV (QuickSync HW)</option>
                           <option value="vaapi">Linux VA-API (AMD/Intel)</option>
                         </select>
                       </div>

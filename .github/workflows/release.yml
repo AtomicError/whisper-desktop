@@ -112,6 +112,24 @@ jobs:
           cp whisper.cpp-src/build-cuda/bin/whisper-cli src-tauri/resources/whisper-cli-cuda
           chmod +x src-tauri/resources/whisper-cli-*
 
+      - name: Cache FFmpeg Binaries
+        id: ffmpeg-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            src-tauri/resources/ffmpeg*
+            src-tauri/resources/ffprobe*
+          key: ffmpeg-release-linux-x64-v2
+
+      - name: Download Static FFmpeg and FFprobe
+        if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        run: |
+          echo "Downloading static standalone FFmpeg and FFprobe for Linux x64..."
+          wget -q https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+          tar -xJf ffmpeg-release-amd64-static.tar.xz --strip-components=1 -C src-tauri/resources/ ffmpeg-*-amd64-static/ffmpeg ffmpeg-*-amd64-static/ffprobe
+          rm -f ffmpeg-release-amd64-static.tar.xz
+          chmod +x src-tauri/resources/ffmpeg src-tauri/resources/ffprobe
+
       - name: Build Tauri Application
         run: npm run tauri build
         env:

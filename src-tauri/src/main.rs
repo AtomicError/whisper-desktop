@@ -7,6 +7,7 @@ mod downloader;
 mod translation;
 mod hardsub;
 mod video_server;
+pub mod ffmpeg_resolver;
 
 use std::sync::{Arc, Mutex};
 use std::path::Path;

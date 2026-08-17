@@ -38,6 +38,7 @@ export interface HardwareStatus {
   hasQsv: boolean;
   hasNvenc: boolean;
   hasVaapi: boolean;
+  hasVideotoolbox: boolean;
 }
 
 export interface HardsubSettings {
@@ -565,11 +566,14 @@ export class HardsubController {
   private scrollSeekTimeout: any = null;
   private lastThrottleSeekTime: number = 0;
 
-  // Dual Tab Studio Navigation
+  // Triple Tab Studio Navigation (Editor, Style, Export)
   private tabBtnEditor: HTMLButtonElement | null = null;
-  private tabBtnSettings: HTMLButtonElement | null = null;
+  private tabBtnStyle: HTMLButtonElement | null = null;
+  private tabBtnExport: HTMLButtonElement | null = null;
   private tabViewEditor: HTMLElement | null = null;
-  private tabViewSettings: HTMLElement | null = null;
+  private tabViewStyle: HTMLElement | null = null;
+  private tabViewExport: HTMLElement | null = null;
+  private currentStudioTab: 'editor' | 'style' | 'export' = 'editor';
 
   // Block Subtitle Editor Elements
   private searchInput: HTMLInputElement | null = null;
@@ -752,11 +756,13 @@ export class HardsubController {
     this.lblSubName = document.getElementById('lbl-hardsub-sub-name');
     this.lblSubPath = document.getElementById('lbl-hardsub-sub-path');
 
-    // Tabs
+    // Tabs (3 Dedicated Studio Panels)
     this.tabBtnEditor = document.getElementById('hardsub-tab-btn-editor') as HTMLButtonElement;
-    this.tabBtnSettings = document.getElementById('hardsub-tab-btn-settings') as HTMLButtonElement;
+    this.tabBtnStyle = document.getElementById('hardsub-tab-btn-style') as HTMLButtonElement;
+    this.tabBtnExport = document.getElementById('hardsub-tab-btn-export') as HTMLButtonElement;
     this.tabViewEditor = document.getElementById('hardsub-tab-view-editor');
-    this.tabViewSettings = document.getElementById('hardsub-tab-view-settings');
+    this.tabViewStyle = document.getElementById('hardsub-tab-view-style');
+    this.tabViewExport = document.getElementById('hardsub-tab-view-export');
 
     // Subtitle Editor Block List
     this.searchInput = document.getElementById('hardsub-search-input') as HTMLInputElement;
@@ -807,22 +813,125 @@ export class HardsubController {
     try {
       const hwStatus = await invoke<HardwareStatus>('check_hardware_encoders');
       if (this.hwSelect) {
-        const qsvOpt = this.hwSelect.querySelector('option[value="qsv"]') as HTMLOptionElement;
-        const nvencOpt = this.hwSelect.querySelector('option[value="nvenc"]') as HTMLOptionElement;
-        const vaapiOpt = this.hwSelect.querySelector('option[value="vaapi"]') as HTMLOptionElement;
+        this.hwSelect.innerHTML = '';
 
-        if (qsvOpt) {
-          qsvOpt.textContent = hwStatus.hasQsv ? 'Intel QSV (QuickSync HW)' : 'Intel QSV (Not detected)';
+        // Standard CPU is always available on all platforms
+        const cpuOpt = document.createElement('option');
+        cpuOpt.value = 'cpu';
+        cpuOpt.textContent = 'Standard CPU (Universal)';
+        this.hwSelect.appendChild(cpuOpt);
+
+        if (hwStatus.hasVideotoolbox) {
+          const vtOpt = document.createElement('option');
+          vtOpt.value = 'videotoolbox';
+          vtOpt.textContent = 'Apple VideoToolbox (Apple Silicon / Mac GPU)';
+          this.hwSelect.appendChild(vtOpt);
         }
-        if (nvencOpt) {
-          nvencOpt.textContent = hwStatus.hasNvenc ? 'NVIDIA NVENC (GPU Acceleration)' : 'NVIDIA NVENC (Not detected)';
+
+        if (hwStatus.hasNvenc) {
+          const nvencOpt = document.createElement('option');
+          nvencOpt.value = 'nvenc';
+          nvencOpt.textContent = 'NVIDIA NVENC (GPU Acceleration)';
+          this.hwSelect.appendChild(nvencOpt);
         }
-        if (vaapiOpt) {
-          vaapiOpt.textContent = hwStatus.hasVaapi ? 'Linux VA-API (AMD/Intel)' : 'Linux VA-API (Not detected)';
+
+        if (hwStatus.hasQsv) {
+          const qsvOpt = document.createElement('option');
+          qsvOpt.value = 'qsv';
+          qsvOpt.textContent = 'Intel QSV (QuickSync HW)';
+          this.hwSelect.appendChild(qsvOpt);
         }
+
+        if (hwStatus.hasVaapi) {
+          const vaapiOpt = document.createElement('option');
+          vaapiOpt.value = 'vaapi';
+          vaapiOpt.textContent = 'Linux VA-API (AMD/Intel)';
+          this.hwSelect.appendChild(vaapiOpt);
+        }
+
+        // Verify if currently selected hwAccel is supported on this device
+        const matchingOption = this.hwSelect.querySelector(`option[value="${this.state.hwAccel}"]`);
+        if (matchingOption) {
+          this.hwSelect.value = this.state.hwAccel;
+        } else {
+          const prevChoice = this.state.hwAccel;
+          // Prefer fastest available GPU accelerator or fallback to CPU
+          let fallback = 'cpu';
+          if (hwStatus.hasVideotoolbox) fallback = 'videotoolbox';
+          else if (hwStatus.hasNvenc) fallback = 'nvenc';
+          else if (hwStatus.hasVaapi) fallback = 'vaapi';
+          else if (hwStatus.hasQsv) fallback = 'qsv';
+
+          this.state.hwAccel = fallback;
+          this.hwSelect.value = fallback;
+
+          if (prevChoice && prevChoice !== 'cpu' && prevChoice !== fallback) {
+            const notifyFn = (window as any).showNotification;
+            const newLabel = this.hwSelect.options[this.hwSelect.selectedIndex]?.text || fallback;
+            if (typeof notifyFn === 'function') {
+              notifyFn(`Selected hardware accelerator '${prevChoice}' is not supported on this device. Switched to '${newLabel}'.`, 'info', 5000);
+            }
+          }
+        }
+        this.updateSupportedCodecs();
       }
     } catch (e) {
       console.warn('Failed to probe hardware encoders:', e);
+    }
+  }
+
+  private updateSupportedCodecs() {
+    if (!this.codecSelect) return;
+    const hw = this.state.hwAccel || 'cpu';
+
+    // Map of supported codecs per hardware accelerator
+    const codecDefinitions: Record<string, Array<{ value: string; label: string }>> = {
+      cpu: [
+        { value: 'h264', label: 'H.264 / AVC (libx264)' },
+        { value: 'h265', label: 'H.265 / HEVC (libx265)' },
+        { value: 'av1', label: 'AV1 (libsvtav1 / Next Gen)' },
+        { value: 'vp9', label: 'VP9 (Web Optimized)' },
+        { value: 'prores', label: 'ProRes (Lossless / HQ)' },
+      ],
+      videotoolbox: [
+        { value: 'h264', label: 'H.264 (VideoToolbox Hardware)' },
+        { value: 'h265', label: 'H.265 / HEVC (VideoToolbox Hardware)' },
+        { value: 'prores', label: 'ProRes (VideoToolbox Hardware)' },
+      ],
+      nvenc: [
+        { value: 'h264', label: 'H.264 (NVIDIA NVENC)' },
+        { value: 'h265', label: 'H.265 / HEVC (NVIDIA NVENC)' },
+        { value: 'av1', label: 'AV1 (NVIDIA NVENC)' },
+      ],
+      qsv: [
+        { value: 'h264', label: 'H.264 (Intel QuickSync)' },
+        { value: 'h265', label: 'H.265 / HEVC (Intel QuickSync)' },
+        { value: 'av1', label: 'AV1 (Intel QuickSync)' },
+      ],
+      vaapi: [
+        { value: 'h264', label: 'H.264 (Linux VA-API)' },
+        { value: 'h265', label: 'H.265 / HEVC (Linux VA-API)' },
+        { value: 'av1', label: 'AV1 (Linux VA-API)' },
+      ],
+    };
+
+    const options = codecDefinitions[hw] || codecDefinitions.cpu;
+    const currentCodec = this.state.videoCodec;
+
+    this.codecSelect.innerHTML = '';
+    for (const opt of options) {
+      const el = document.createElement('option');
+      el.value = opt.value;
+      el.textContent = opt.label;
+      this.codecSelect.appendChild(el);
+    }
+
+    const hasCurrent = options.some((o) => o.value === currentCodec);
+    if (hasCurrent) {
+      this.codecSelect.value = currentCodec;
+    } else {
+      this.state.videoCodec = options[0].value;
+      this.codecSelect.value = options[0].value;
     }
   }
 
@@ -1069,6 +1178,7 @@ export class HardsubController {
     });
     this.hwSelect?.addEventListener('change', () => {
       this.state.hwAccel = this.hwSelect!.value;
+      this.updateSupportedCodecs();
     });
     this.audioSelect?.addEventListener('change', () => {
       this.state.audioMode = this.audioSelect!.value;
@@ -1157,19 +1267,45 @@ export class HardsubController {
   }
 
   private setupStudioTabEvents() {
-    this.tabBtnEditor?.addEventListener('click', () => {
-      this.tabBtnEditor?.classList.add('active');
-      this.tabBtnSettings?.classList.remove('active');
-      if (this.tabViewEditor) this.tabViewEditor.style.display = 'flex';
-      if (this.tabViewSettings) this.tabViewSettings.style.display = 'none';
-    });
+    const tabIndices: Record<'editor' | 'style' | 'export', number> = {
+      editor: 0,
+      style: 1,
+      export: 2,
+    };
 
-    this.tabBtnSettings?.addEventListener('click', () => {
-      this.tabBtnSettings?.classList.add('active');
-      this.tabBtnEditor?.classList.remove('active');
-      if (this.tabViewSettings) this.tabViewSettings.style.display = 'flex';
-      if (this.tabViewEditor) this.tabViewEditor.style.display = 'none';
-    });
+    const switchTab = (tab: 'editor' | 'style' | 'export') => {
+      if (this.currentStudioTab === tab) return;
+
+      const prevIdx = tabIndices[this.currentStudioTab];
+      const newIdx = tabIndices[tab];
+      const isForward = newIdx > prevIdx;
+      this.currentStudioTab = tab;
+
+      this.tabBtnEditor?.classList.toggle('active', tab === 'editor');
+      this.tabBtnStyle?.classList.toggle('active', tab === 'style');
+      this.tabBtnExport?.classList.toggle('active', tab === 'export');
+
+      const updateView = (el: HTMLElement | null, isActive: boolean) => {
+        if (!el) return;
+        if (isActive) {
+          el.style.display = 'flex';
+          el.classList.remove('slide-from-right', 'slide-from-left', 'fade-enter');
+          void el.offsetHeight; // force DOM reflow
+          el.classList.add(isForward ? 'slide-from-right' : 'slide-from-left');
+        } else {
+          el.style.display = 'none';
+          el.classList.remove('slide-from-right', 'slide-from-left', 'fade-enter');
+        }
+      };
+
+      updateView(this.tabViewEditor, tab === 'editor');
+      updateView(this.tabViewStyle, tab === 'style');
+      updateView(this.tabViewExport, tab === 'export');
+    };
+
+    this.tabBtnEditor?.addEventListener('click', () => switchTab('editor'));
+    this.tabBtnStyle?.addEventListener('click', () => switchTab('style'));
+    this.tabBtnExport?.addEventListener('click', () => switchTab('export'));
   }
 
   private setupVideoPlayerEvents() {
@@ -2509,7 +2645,27 @@ ${events}`;
     }
 
     try {
+      // Ensure all export settings dropdown values are synced with state
+      if (this.codecSelect?.value) {
+        this.state.videoCodec = this.codecSelect.value;
+      }
+      if (this.formatSelect?.value) {
+        this.state.outputFormat = this.formatSelect.value;
+      }
+      if (this.hwSelect?.value) {
+        this.state.hwAccel = this.hwSelect.value;
+      }
+      if (this.audioSelect?.value) {
+        this.state.audioMode = this.audioSelect.value;
+      }
+
       this.updateEncodingUIState(true);
+      if (this.progressFill) {
+        this.progressFill.style.width = '0%';
+      }
+      if (this.progressPctText) {
+        this.progressPctText.textContent = '0%';
+      }
       if (this.progressStatusText) {
         this.progressStatusText.textContent = 'Initializing FFmpeg Encoder...';
       }

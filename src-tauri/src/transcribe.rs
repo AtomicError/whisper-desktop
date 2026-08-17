@@ -140,7 +140,8 @@ pub async fn convert_to_wav(
     } else {
         file_path.clone()
     };
-    let mut child = Command::new("ffmpeg")
+    let ffmpeg_bin = crate::ffmpeg_resolver::get_ffmpeg_path(Some(&app));
+    let mut child = Command::new(&ffmpeg_bin)
         .args([
             "-y",
             "-i", &safe_input,
@@ -152,7 +153,7 @@ pub async fn convert_to_wav(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| format!("Failed to spawn ffmpeg: {}", e))?;
+        .map_err(|e| format!("Failed to spawn ffmpeg ({}): {}", ffmpeg_bin.display(), e))?;
         
     let stdout = child.stdout.take().ok_or("Failed to capture ffmpeg stdout")?;
     let stderr = child.stderr.take().ok_or("Failed to capture ffmpeg stderr")?;

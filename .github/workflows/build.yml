@@ -66,6 +66,70 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Cache FFmpeg Binaries
+        id: ffmpeg-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            src-tauri/resources/ffmpeg*
+            src-tauri/resources/ffprobe*
+          key: ffmpeg-${{ matrix.platform }}-${{ matrix.rust-target }}-v2
+
+      - name: Download Static FFmpeg (Linux x86_64)
+        if: matrix.platform == 'ubuntu-22.04' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p src-tauri/resources
+          wget -q https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+          tar -xJf ffmpeg-release-amd64-static.tar.xz --strip-components=1 -C src-tauri/resources/ ffmpeg-*-amd64-static/ffmpeg ffmpeg-*-amd64-static/ffprobe
+          rm -f ffmpeg-release-amd64-static.tar.xz
+          chmod +x src-tauri/resources/ffmpeg src-tauri/resources/ffprobe
+
+      - name: Download Static FFmpeg (Linux arm64)
+        if: matrix.platform == 'ubuntu-24.04-arm' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p src-tauri/resources
+          wget -q https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-arm64-static.tar.xz
+          tar -xJf ffmpeg-release-arm64-static.tar.xz --strip-components=1 -C src-tauri/resources/ ffmpeg-*-arm64-static/ffmpeg ffmpeg-*-arm64-static/ffprobe
+          rm -f ffmpeg-release-arm64-static.tar.xz
+          chmod +x src-tauri/resources/ffmpeg src-tauri/resources/ffprobe
+
+      - name: Download Static FFmpeg (Windows x64 - Full Build)
+        if: matrix.platform == 'windows-latest' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path src-tauri/resources
+          Invoke-WebRequest -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.7z" -OutFile "ffmpeg.7z"
+          7z x ffmpeg.7z -offmpeg-extracted -y
+          $binFolder = Get-ChildItem -Path "ffmpeg-extracted" -Recurse -Directory -Filter "bin" | Select-Object -First 1
+          Copy-Item -Path "$($binFolder.FullName)\ffmpeg.exe" -Destination "src-tauri/resources/ffmpeg.exe"
+          Copy-Item -Path "$($binFolder.FullName)\ffprobe.exe" -Destination "src-tauri/resources/ffprobe.exe"
+          Remove-Item -Recurse -Force "ffmpeg.7z", "ffmpeg-extracted"
+
+      - name: Download Static FFmpeg & FFprobe (macOS Universal Native)
+        if: matrix.platform == 'macos-latest' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p src-tauri/resources
+          # 1. FFmpeg Universal Mach-O binary (ARM64 with SVT-AV1 + x86_64)
+          curl -L -o ffmpeg-arm64.zip "https://ffmpeg.martin-riedl.de/download/macos/arm64/1785863997_9.0/ffmpeg.zip"
+          unzip -q -o ffmpeg-arm64.zip -d ./ffmpeg-arm64-dir
+          curl -L -o ffmpeg-x64.zip "https://evermeet.cx/ffmpeg/getrelease/zip"
+          unzip -q -o ffmpeg-x64.zip -d ./ffmpeg-x64-dir
+          lipo -create ./ffmpeg-arm64-dir/ffmpeg ./ffmpeg-x64-dir/ffmpeg -output src-tauri/resources/ffmpeg
+          rm -rf ffmpeg-arm64.zip ffmpeg-x64.zip ./ffmpeg-arm64-dir ./ffmpeg-x64-dir
+
+          # 2. FFprobe Universal Mach-O binary (ARM64 + x86_64)
+          curl -L -o ffprobe-arm64.zip "https://ffmpeg.martin-riedl.de/download/macos/arm64/1785863997_9.0/ffprobe.zip"
+          unzip -q -o ffprobe-arm64.zip -d ./ffprobe-arm64-dir
+          curl -L -o ffprobe-x64.zip "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip"
+          unzip -q -o ffprobe-x64.zip -d ./ffprobe-x64-dir
+          lipo -create ./ffprobe-arm64-dir/ffprobe ./ffprobe-x64-dir/ffprobe -output src-tauri/resources/ffprobe
+          rm -rf ffprobe-arm64.zip ffprobe-x64.zip ./ffprobe-arm64-dir ./ffprobe-x64-dir
+
+          # 3. Fix permissions and ad-hoc code sign for Apple Silicon Gatekeeper
+          chmod +x src-tauri/resources/ffmpeg src-tauri/resources/ffprobe
+          codesign --force --sign - src-tauri/resources/ffmpeg
+          codesign --force --sign - src-tauri/resources/ffprobe
+
       - name: Build Tauri Application
         uses: tauri-apps/tauri-action@v0
         env:

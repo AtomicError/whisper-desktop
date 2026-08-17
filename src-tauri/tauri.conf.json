@@ -36,6 +36,8 @@
     "targets": "all",
     "resources": [
       "resources/whisper-cli-*",
+      "resources/ffmpeg*",
+      "resources/ffprobe*",
       "resources/fonts/*"
     ],
 
