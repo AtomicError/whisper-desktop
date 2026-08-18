@@ -344,6 +344,16 @@ const invoke = async function(cmd, args = {}) {
       vadModels: ['ggml-silero-v6.2.0.bin']
     };
   }
+  if (cmd === 'get_ffmpeg_status') {
+    const src = (args && args.source) || 'bundled';
+    return {
+      configuredSource: src,
+      resolvedPath: '/usr/bin/ffmpeg',
+      isAvailable: true,
+      version: 'ffmpeg version 7.1',
+      errorMessage: null
+    };
+  }
   return null;
 };
 
@@ -1359,6 +1369,9 @@ function bindSettingsToDOM() {
           if (key === 'selectedBackend') {
             refreshBuildStatuses();
           }
+          if (key === 'ffmpegSource') {
+            refreshFFmpegStatus(val, true);
+          }
           if (key === 'translateAiProvider') {
             if (typeof onProviderChanged === 'function') {
               onProviderChanged();
@@ -1372,9 +1385,54 @@ function bindSettingsToDOM() {
   // Update build selection card highlight based on settings backend
   selectBackend(settingsState.selectedBackend, true);
   
+  // Update FFmpeg engine status badge (passive initial check)
+  refreshFFmpegStatus(settingsState.ffmpegSource, false);
+
   // Sync custom dropdown views
   if (window.syncCustomSelects) {
     window.syncCustomSelects();
+  }
+}
+
+async function refreshFFmpegStatus(sourceOverride, userInitiated = false) {
+  const badgeEl = document.getElementById('ffmpeg-status-badge');
+  if (!badgeEl) return;
+
+  const currentSource = sourceOverride || (settingsState ? settingsState.ffmpegSource : 'bundled');
+
+  try {
+    const info = await invoke('get_ffmpeg_status', { source: currentSource });
+    if (info.isAvailable) {
+      let verFormatted = 'Ready';
+      if (info.version && info.version !== 'Unknown version' && info.version !== 'N/A') {
+        const match = info.version.match(/version\s+([^\s]+)/i);
+        let raw = match ? match[1] : info.version;
+        raw = raw.split('-')[0].split('_')[0];
+        if (raw.startsWith('n') || raw.startsWith('N')) {
+          raw = raw.substring(1);
+        }
+        if (!raw.startsWith('v') && !raw.startsWith('V')) {
+          raw = `v${raw}`;
+        }
+        verFormatted = raw;
+      }
+      badgeEl.className = 'setting-status-pill ready';
+      badgeEl.innerHTML = `<span class="ffmpeg-status-dot blue"></span> ${verFormatted}`;
+      badgeEl.title = `Source: ${info.configuredSource}\nPath: ${info.resolvedPath}\n${info.version}`;
+    } else {
+      badgeEl.className = 'setting-status-pill missing';
+      badgeEl.innerHTML = `<span class="ffmpeg-status-dot red"></span> Not Found`;
+      badgeEl.title = info.errorMessage || 'FFmpeg binary was not found';
+      if (currentSource === 'system' && userInitiated) {
+        showNotification("Warning: System FFmpeg was not found in PATH. Media tasks will fail until FFmpeg is installed or switched to Internal mode.", "warning");
+      }
+    }
+  } catch (err) {
+    console.warn("Failed to check FFmpeg status:", err);
+    if (badgeEl) {
+      badgeEl.className = 'setting-status-pill error';
+      badgeEl.innerHTML = `<span class="ffmpeg-status-dot yellow"></span> Status Error`;
+    }
   }
 }
 

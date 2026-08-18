@@ -81,6 +81,12 @@ pub struct WhisperSettings {
     pub translate_ai_custom_prompt: String,
     #[serde(default)]
     pub translate_ai_polish: bool,
+    #[serde(default = "default_ffmpeg_source")]
+    pub ffmpeg_source: String, // "bundled" or "system"
+}
+
+fn default_ffmpeg_source() -> String {
+    "bundled".to_string()
 }
 
 fn default_target_lang() -> String {
@@ -164,6 +170,7 @@ impl WhisperSettings {
             translate_ai_providers: "[]".to_string(),
             translate_ai_custom_prompt: "".to_string(),
             translate_ai_polish: false,
+            ffmpeg_source: "bundled".to_string(),
         }
     }
 
@@ -228,12 +235,15 @@ impl AppSettings {
     pub fn set_active(&mut self, settings: WhisperSettings) {
         let models_dir = settings.models_dir.clone();
         let backend = settings.selected_backend.clone();
+        let ffmpeg_source = settings.ffmpeg_source.clone();
         
         // Sync global values across both profiles
         self.safe.models_dir = models_dir.clone();
         self.professional.models_dir = models_dir;
         self.safe.selected_backend = backend.clone();
         self.professional.selected_backend = backend;
+        self.safe.ffmpeg_source = ffmpeg_source.clone();
+        self.professional.ffmpeg_source = ffmpeg_source;
         
         if self.active_preset.to_lowercase() == "professional" {
             self.professional = settings;

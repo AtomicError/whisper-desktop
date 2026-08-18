@@ -67,7 +67,9 @@ fn load_settings() -> WhisperSettings {
 
 #[tauri::command]
 fn save_settings(settings: WhisperSettings) -> Result<(), String> {
-    save_settings_file(&settings)
+    save_settings_file(&settings)?;
+    crate::ffmpeg_resolver::invalidate_ffmpeg_cache();
+    Ok(())
 }
 
 #[tauri::command]
@@ -75,6 +77,7 @@ fn apply_preset(preset: String) -> Result<WhisperSettings, String> {
     let mut app_settings = load_app_settings();
     app_settings.active_preset = preset.to_lowercase();
     save_app_settings(&app_settings)?;
+    crate::ffmpeg_resolver::invalidate_ffmpeg_cache();
     Ok(app_settings.get_active())
 }
 
@@ -84,8 +87,8 @@ fn check_build(app: AppHandle, backend: String) -> bool {
 }
 
 #[tauri::command]
-fn probe_media_file(file_path: String) -> FileMetadata {
-    probe_file_metadata(&file_path)
+fn probe_media_file(app: AppHandle, file_path: String) -> FileMetadata {
+    probe_file_metadata(Some(&app), &file_path)
 }
 
 #[derive(serde::Serialize)]
@@ -477,6 +480,11 @@ fn get_model_download_progress(models_dir: String, model_name: String) -> Result
     Ok(0.0)
 }
 
+#[tauri::command]
+fn get_ffmpeg_status(app: AppHandle, source: Option<String>) -> crate::ffmpeg_resolver::FFmpegStatus {
+    crate::ffmpeg_resolver::get_current_ffmpeg_status(Some(&app), source)
+}
+
 fn main() {
     // Resolve WebKit subprocess ICU dependency loading crashes inside the AppImage environment.
     if std::env::var("APPIMAGE").is_ok() {
@@ -563,6 +571,7 @@ fn main() {
             check_hardware_encoders,
             get_font_render_scale,
             start_hardsub_task,
+            get_ffmpeg_status,
             video_server::get_media_stream_url
         ])
         .run(tauri::generate_context!())

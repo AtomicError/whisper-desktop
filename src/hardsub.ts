@@ -2681,7 +2681,11 @@ ${events}`;
           this.progressStatusText.textContent = 'Encoding cancelled.';
         }
       } else {
-        alert(`Hardsub failed: ${e}`);
+        if ((window as any).showNotification) {
+          (window as any).showNotification(`Hardsub encoding failed: ${e}`, "error");
+        } else {
+          alert(`Hardsub failed: ${e}`);
+        }
         if (this.progressStatusText) {
           this.progressStatusText.textContent = `Error: ${e}`;
         }

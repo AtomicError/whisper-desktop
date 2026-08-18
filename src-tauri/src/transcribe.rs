@@ -50,7 +50,7 @@ pub struct TranscriptionResult {
     pub generated_files: Vec<String>,
 }
 
-pub fn probe_file_metadata(file_path: &str) -> FileMetadata {
+pub fn probe_file_metadata(app: Option<&AppHandle>, file_path: &str) -> FileMetadata {
     let path = Path::new(file_path);
     let mut meta = FileMetadata {
         name: path.file_name().unwrap_or_default().to_string_lossy().to_string(),
@@ -93,7 +93,8 @@ pub fn probe_file_metadata(file_path: &str) -> FileMetadata {
     } else {
         file_path.to_string()
     };
-    let output = std::process::Command::new("ffprobe")
+    let ffprobe_bin = crate::ffmpeg_resolver::get_ffprobe_path(app);
+    let output = std::process::Command::new(&ffprobe_bin)
         .args([
             "-v", "error",
             "-show_entries", "format=duration",
@@ -140,7 +141,7 @@ pub async fn convert_to_wav(
     } else {
         file_path.clone()
     };
-    let ffmpeg_bin = crate::ffmpeg_resolver::get_ffmpeg_path(Some(&app));
+    let ffmpeg_bin = crate::ffmpeg_resolver::ensure_ffmpeg_available(Some(&app))?;
     let mut child = Command::new(&ffmpeg_bin)
         .args([
             "-y",
@@ -153,7 +154,7 @@ pub async fn convert_to_wav(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| format!("Failed to spawn ffmpeg ({}): {}", ffmpeg_bin.display(), e))?;
+        .map_err(|e| format!("Failed to execute FFmpeg ({}): {}", ffmpeg_bin.display(), e))?;
         
     let stdout = child.stdout.take().ok_or("Failed to capture ffmpeg stdout")?;
     let stderr = child.stderr.take().ok_or("Failed to capture ffmpeg stderr")?;

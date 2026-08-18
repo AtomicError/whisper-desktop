@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
@@ -357,7 +357,8 @@ pub struct HardwareEncodersStatus {
 
 #[tauri::command]
 pub async fn check_hardware_encoders(app: tauri::AppHandle) -> HardwareEncodersStatus {
-    let ffmpeg_bin = crate::ffmpeg_resolver::get_ffmpeg_path(Some(&app));
+    let ffmpeg_bin = crate::ffmpeg_resolver::ensure_ffmpeg_available(Some(&app))
+        .unwrap_or_else(|_| PathBuf::from("ffmpeg"));
 
     let f1 = ffmpeg_bin.clone();
     let qsv_task = tokio::task::spawn_blocking(move || {
@@ -577,8 +578,8 @@ pub async fn run_hardsub_task(
     });
 
     // Probe duration, width, and height using ffprobe
-    let ffprobe_bin = crate::ffmpeg_resolver::get_ffprobe_path(Some(&app));
-    let ffmpeg_bin = crate::ffmpeg_resolver::get_ffmpeg_path(Some(&app));
+    let ffprobe_bin = crate::ffmpeg_resolver::ensure_ffprobe_available(Some(&app))?;
+    let ffmpeg_bin = crate::ffmpeg_resolver::ensure_ffmpeg_available(Some(&app))?;
 
     let mut total_duration_sec = 0.0;
     let mut video_width = 1920;

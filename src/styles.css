@@ -1390,6 +1390,68 @@ header {
   border-radius: 4px;
 }
 
+.setting-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 400;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: none;
+  transition: all 0.2s ease;
+  user-select: none;
+  line-height: 1.2;
+}
+
+.setting-status-pill.ready {
+  background: rgba(45, 127, 255, 0.08);
+  color: var(--color-royal-blue);
+  border: none;
+}
+
+.setting-status-pill.missing {
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--color-red);
+  border: none;
+}
+
+.setting-status-pill.error {
+  background: rgba(245, 158, 11, 0.08);
+  color: var(--color-gold);
+  border: none;
+}
+
+.setting-status-pill.checking {
+  background: rgba(45, 127, 255, 0.08);
+  color: var(--color-royal-blue);
+  border: none;
+}
+
+.ffmpeg-status-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.ffmpeg-status-dot.blue {
+  background: var(--color-royal-blue);
+  box-shadow: 0 0 5px rgba(45, 127, 255, 0.8);
+}
+
+.ffmpeg-status-dot.red {
+  background: var(--color-red);
+  box-shadow: 0 0 5px rgba(239, 68, 68, 0.8);
+}
+
+.ffmpeg-status-dot.yellow {
+  background: var(--color-gold);
+  box-shadow: 0 0 5px rgba(245, 158, 11, 0.8);
+}
+
 .setting-desc {
   font-size: 0.85rem;
   color: var(--color-text-muted);

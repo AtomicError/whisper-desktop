@@ -344,6 +344,22 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
+                        <span class="setting-title">FFmpeg Engine</span>
+                        <span id="ffmpeg-status-badge" class="setting-status-pill checking"><span class="ffmpeg-status-dot blue"></span> Checking...</span>
+                      </div>
+                      <div class="setting-desc">Choose between the internal standalone FFmpeg (Recommended) or the system installation.</div>
+                    </div>
+                    <div class="setting-control">
+                      <select class="select-control" id="opt-ffmpegSource">
+                        <option value="bundled">Internal</option>
+                        <option value="system">System</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
                         <span class="setting-title">Language Spoken</span>
                         <span class="setting-flag">-l</span>
                       </div>
