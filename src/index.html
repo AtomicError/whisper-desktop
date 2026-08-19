@@ -118,7 +118,7 @@
           </div>
           <div class="hud-metrics">
             <!-- CPU Metric -->
-            <div class="hud-metric-row" id="hud-metric-cpu" data-tooltip="CPU: 0.0%">
+            <div class="hud-metric-row" id="hud-metric-cpu" tabindex="0" role="button" aria-haspopup="true" aria-expanded="false" aria-describedby="hud-telemetry-popover" aria-label="CPU Utilization and Telemetry">
               <div class="metric-top">
                 <div class="metric-info">
                   <svg class="metric-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -143,7 +143,7 @@
             </div>
 
             <!-- RAM Metric -->
-            <div class="hud-metric-row" id="hud-metric-ram" data-tooltip="RAM: 0.0GB / 0.0GB">
+            <div class="hud-metric-row" id="hud-metric-ram" tabindex="0" role="button" aria-haspopup="true" aria-expanded="false" aria-describedby="hud-telemetry-popover" aria-label="Memory Allocation and Telemetry">
               <div class="metric-top">
                 <div class="metric-info">
                   <svg class="metric-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -167,7 +167,7 @@
             </div>
 
             <!-- GPU Metric -->
-            <div class="hud-metric-row" id="hud-metric-gpu" data-tooltip="GPU: N/A">
+            <div class="hud-metric-row" id="hud-metric-gpu" tabindex="0" role="button" aria-haspopup="true" aria-expanded="false" aria-describedby="hud-telemetry-popover" aria-label="GPU Acceleration and Telemetry">
               <div class="metric-top">
                 <div class="metric-info">
                   <svg class="metric-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -189,10 +189,10 @@
         </div>
 
         <!-- Floating Telemetry Card Popover -->
-        <div id="hud-telemetry-popover" class="hud-telemetry-popover" aria-hidden="true">
+        <div id="hud-telemetry-popover" class="hud-telemetry-popover" role="tooltip" aria-hidden="true">
           <div class="telemetry-card-header">
             <div class="telemetry-title-group">
-              <span class="telemetry-icon-wrap" id="telemetry-icon"></span>
+              <span class="telemetry-icon-wrap" id="telemetry-icon" aria-hidden="true"></span>
               <span class="telemetry-title" id="telemetry-title">CPU Utilization</span>
             </div>
             <span class="telemetry-badge" id="telemetry-badge">Optimal</span>
