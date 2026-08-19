@@ -898,35 +898,118 @@ function stopHudPoll() {
   }
 }
 
+let _lastHudCpu = -1;
+let _lastHudRamStr = '';
+let _lastHudGpuStr = '';
+
 function startHudPoll() {
   if (_hudInterval) return;
   _hudInterval = setInterval(async () => {
     try {
       const stats = await invoke('get_system_stats');
+      if (!stats) return;
       
-      // Update CPU
-      const cpuEl = document.getElementById('stat-cpu');
-      if (cpuEl) {
-        cpuEl.textContent = `${stats.cpu.toFixed(1)}%`;
-        cpuEl.className = 'stat-value ' + (stats.cpu > 70 ? 'warm' : 'active');
+      // Update CPU only if changed
+      const cpuVal = typeof stats.cpu === 'number' ? stats.cpu : parseFloat(stats.cpu) || 0;
+      if (Math.abs(cpuVal - _lastHudCpu) > 0.05) {
+        _lastHudCpu = cpuVal;
+        const cpuEl = document.getElementById('stat-cpu');
+        const cpuBarEl = document.getElementById('stat-cpu-bar');
+        const cpuRowEl = document.getElementById('hud-metric-cpu');
+        
+        if (cpuEl) {
+          cpuEl.textContent = `${cpuVal.toFixed(1)}%`;
+          cpuEl.className = 'metric-value ' + (cpuVal > 85 ? 'hot' : cpuVal > 60 ? 'warm' : 'active');
+        }
+        if (cpuBarEl) {
+          cpuBarEl.style.width = `${Math.min(Math.max(cpuVal, 0), 100).toFixed(1)}%`;
+          cpuBarEl.className = 'metric-bar-fill ' + (cpuVal > 85 ? 'hot' : cpuVal > 60 ? 'warm' : '');
+        }
+        if (cpuRowEl) {
+          const cpuStr = `CPU Usage: ${cpuVal.toFixed(1)}%`;
+          cpuRowEl.setAttribute('data-tooltip', cpuStr);
+          cpuRowEl.setAttribute('title', cpuStr);
+        }
       }
       
-      // Update RAM
-      const ramEl = document.getElementById('stat-ram');
-      if (ramEl) {
-        ramEl.textContent = stats.ram;
+      // Update RAM only if changed
+      if (stats.ram !== _lastHudRamStr) {
+        _lastHudRamStr = stats.ram || '';
+        const ramEl = document.getElementById('stat-ram');
+        const ramBarEl = document.getElementById('stat-ram-bar');
+        const ramRowEl = document.getElementById('hud-metric-ram');
+        let ramPercent = 0;
+        
+        if (stats.ram && typeof stats.ram === 'string') {
+          const ramMatch = stats.ram.match(/([\d.]+)\s*(?:GB)?\s*\/\s*([\d.]+)\s*(?:GB)?/i);
+          if (ramMatch) {
+            const used = parseFloat(ramMatch[1]);
+            const total = parseFloat(ramMatch[2]);
+            if (total > 0) {
+              ramPercent = (used / total) * 100;
+            }
+          }
+        }
+        
+        if (ramEl) {
+          ramEl.textContent = `${ramPercent.toFixed(1)}%`;
+          ramEl.className = 'metric-value ' + (ramPercent > 85 ? 'hot' : ramPercent > 70 ? 'warm' : 'active');
+        }
+        if (ramBarEl) {
+          ramBarEl.style.width = `${Math.min(Math.max(ramPercent, 0), 100).toFixed(1)}%`;
+          ramBarEl.className = 'metric-bar-fill ' + (ramPercent > 85 ? 'hot' : ramPercent > 70 ? 'warm' : '');
+        }
+        if (ramRowEl) {
+          const detailStr = stats.ram ? `RAM: ${stats.ram} (${ramPercent.toFixed(1)}%)` : `RAM: ${ramPercent.toFixed(1)}%`;
+          ramRowEl.setAttribute('data-tooltip', detailStr);
+          ramRowEl.setAttribute('title', detailStr);
+        }
       }
       
-      // Update GPU
-      const gpuEl = document.getElementById('stat-gpu');
-      if (gpuEl) {
-        gpuEl.textContent = stats.gpu;
-        gpuEl.className = 'stat-value ' + (stats.gpu.includes('N/A') ? '' : 'active');
+      // Update GPU only if changed
+      if (stats.gpu !== _lastHudGpuStr) {
+        _lastHudGpuStr = stats.gpu || '';
+        const gpuEl = document.getElementById('stat-gpu');
+        const gpuBarEl = document.getElementById('stat-gpu-bar');
+        const gpuRowEl = document.getElementById('hud-metric-gpu');
+        const isGpuNa = !stats.gpu || stats.gpu.includes('N/A');
+        let gpuPercent = 0;
+        
+        if (!isGpuNa && typeof stats.gpu === 'string') {
+          const gpuMatch = stats.gpu.match(/(\d+(?:\.\d+)?)\s*%/);
+          if (gpuMatch) {
+            gpuPercent = parseFloat(gpuMatch[1]);
+          } else {
+            gpuPercent = 15; // Active indicator level
+          }
+        }
+        
+        if (gpuEl) {
+          gpuEl.textContent = isGpuNa ? 'N/A' : `${gpuPercent.toFixed(1)}%`;
+          gpuEl.className = 'metric-value ' + (isGpuNa ? '' : gpuPercent > 85 ? 'hot' : gpuPercent > 60 ? 'warm' : 'active');
+        }
+        if (gpuBarEl) {
+          if (isGpuNa) {
+            gpuBarEl.style.width = '0%';
+            gpuBarEl.className = 'metric-bar-fill disabled';
+          } else {
+            gpuBarEl.style.width = `${Math.min(Math.max(gpuPercent, 0), 100).toFixed(1)}%`;
+            gpuBarEl.className = 'metric-bar-fill ' + (gpuPercent > 85 ? 'hot' : gpuPercent > 60 ? 'warm' : '');
+          }
+        }
+        if (gpuRowEl) {
+          let gpuStr = 'GPU: Not Available';
+          if (!isGpuNa) {
+            gpuStr = stats.gpu.startsWith('GPU:') ? stats.gpu : `GPU: ${stats.gpu}`;
+          }
+          gpuRowEl.setAttribute('data-tooltip', gpuStr);
+          gpuRowEl.setAttribute('title', gpuStr);
+        }
       }
     } catch (e) {
       console.error("Failed to query system stats:", e);
     }
-  }, 2000);
+  }, 3000);
 }
 
 // Automatically pause HUD polling when app is minimized/hidden to save CPU

@@ -1,4 +1,4 @@
-use sysinfo::System;
+use sysinfo::{CpuRefreshKind, MemoryRefreshKind, RefreshKind, System};
 use std::process::Command;
 use std::fs;
 use std::path::Path;
@@ -19,8 +19,13 @@ pub struct HardwareMonitor {
 
 impl HardwareMonitor {
     pub fn new() -> Self {
-        let mut sys = System::new_all();
-        sys.refresh_all();
+        let mut sys = System::new_with_specifics(
+            RefreshKind::new()
+                .with_cpu(CpuRefreshKind::everything())
+                .with_memory(MemoryRefreshKind::everything()),
+        );
+        sys.refresh_cpu_usage();
+        sys.refresh_memory();
         
         let gpu_type = detect_gpu_type();
         
@@ -33,7 +38,7 @@ impl HardwareMonitor {
     }
 
     pub fn get_stats(&mut self) -> SystemStats {
-        self.sys.refresh_cpu();
+        self.sys.refresh_cpu_usage();
         self.sys.refresh_memory();
         
         let cpu_usage = self.sys.global_cpu_info().cpu_usage() as f64;

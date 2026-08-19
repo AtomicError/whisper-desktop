@@ -108,6 +108,86 @@
           </div>
         </div>
         
+        <!-- Sidebar System Status HUD -->
+        <div class="sidebar-system-hud" id="sidebar-system-hud">
+          <div class="hud-header">
+            <div class="hud-header-title">
+              <span class="hud-live-dot"></span>
+              <span>SYSTEM STATUS</span>
+            </div>
+          </div>
+          <div class="hud-metrics">
+            <!-- CPU Metric -->
+            <div class="hud-metric-row" id="hud-metric-cpu" data-tooltip="CPU: 0.0%">
+              <div class="metric-top">
+                <div class="metric-info">
+                  <svg class="metric-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="4" y="4" width="16" height="16" rx="2"/>
+                    <rect x="9" y="9" width="6" height="6"/>
+                    <line x1="9" y1="1" x2="9" y2="4"/>
+                    <line x1="15" y1="1" x2="15" y2="4"/>
+                    <line x1="9" y1="20" x2="9" y2="23"/>
+                    <line x1="15" y1="20" x2="15" y2="23"/>
+                    <line x1="20" y1="9" x2="23" y2="9"/>
+                    <line x1="20" y1="14" x2="23" y2="14"/>
+                    <line x1="1" y1="9" x2="4" y2="9"/>
+                    <line x1="1" y1="14" x2="4" y2="14"/>
+                  </svg>
+                  <span class="metric-name">CPU</span>
+                </div>
+                <span class="metric-value" id="stat-cpu">0.0%</span>
+              </div>
+              <div class="metric-bar-track">
+                <div class="metric-bar-fill" id="stat-cpu-bar" style="width: 0%;"></div>
+              </div>
+            </div>
+
+            <!-- RAM Metric -->
+            <div class="hud-metric-row" id="hud-metric-ram" data-tooltip="RAM: 0.0GB / 0.0GB">
+              <div class="metric-top">
+                <div class="metric-info">
+                  <svg class="metric-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M6 19v-3"/>
+                    <path d="M10 19v-3"/>
+                    <path d="M14 19v-3"/>
+                    <path d="M18 19v-3"/>
+                    <path d="M2 5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5z"/>
+                    <path d="M6 7v4"/>
+                    <path d="M10 7v4"/>
+                    <path d="M14 7v4"/>
+                    <path d="M18 7v4"/>
+                  </svg>
+                  <span class="metric-name">RAM</span>
+                </div>
+                <span class="metric-value" id="stat-ram">0.0%</span>
+              </div>
+              <div class="metric-bar-track">
+                <div class="metric-bar-fill" id="stat-ram-bar" style="width: 0%;"></div>
+              </div>
+            </div>
+
+            <!-- GPU Metric -->
+            <div class="hud-metric-row" id="hud-metric-gpu" data-tooltip="GPU: N/A">
+              <div class="metric-top">
+                <div class="metric-info">
+                  <svg class="metric-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="6" width="20" height="12" rx="2"/>
+                    <circle cx="8" cy="12" r="2.5"/>
+                    <circle cx="16" cy="12" r="2.5"/>
+                    <path d="M6 2v4"/>
+                    <path d="M18 2v4"/>
+                  </svg>
+                  <span class="metric-name">GPU</span>
+                </div>
+                <span class="metric-value" id="stat-gpu">N/A</span>
+              </div>
+              <div class="metric-bar-track">
+                <div class="metric-bar-fill" id="stat-gpu-bar" style="width: 0%;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="developer-credit" onclick="openUrl('https://github.com/AtomicError/whisper-desktop')" title="Developed by TheMrAhmad (GitHub)">
           <div class="credit-divider"></div>
           <div class="credit-content">
@@ -122,23 +202,9 @@
       <!-- Right Workspace -->
       <div class="workspace">
         
-        <!-- Top HUD for Live System Performance -->
+        <!-- Top Workspace Header -->
         <header>
           <div class="view-title" id="current-view-title">Dashboard</div>
-          <div class="system-stats-hud">
-            <div class="hud-item">
-              <span class="stat-label">CPU:</span>
-              <span class="stat-value active" id="stat-cpu">0.0%</span>
-            </div>
-            <div class="hud-item">
-              <span class="stat-label">RAM:</span>
-              <span class="stat-value active" id="stat-ram">0.0GB / 0.0GB</span>
-            </div>
-            <div class="hud-item">
-              <span class="stat-label">GPU:</span>
-              <span class="stat-value active" id="stat-gpu">N/A</span>
-            </div>
-          </div>
         </header>
 
         <!-- View Panels -->
