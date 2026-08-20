@@ -137,7 +137,28 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'Whisper Desktop ${{ github.ref_name }}'
-          releaseBody: 'See the assets below to download Whisper Desktop for your operating system.'
+          releaseBody: |
+            ## Whisper Desktop ${{ github.ref_name }} 🎙️
+
+            A high-performance, private, and offline speech-to-text desktop application powered by `whisper.cpp` and `Tauri`.
+
+            ### 📦 Download & Package Guide
+
+            | Platform | Architecture / Format | Target File | Notes |
+            | :--- | :--- | :--- | :--- |
+            | 🪟 **Windows** | Setup Installer (x64) | `WhisperDesktop_*_x64-setup.exe` | Compatible with Intel/AMD & Windows on ARM |
+            | 🪟 **Windows** | MSI Package (x64) | `WhisperDesktop_*_x64_en-US.msi` | Enterprise & System-wide deployment |
+            | 🍎 **macOS** | Universal DMG | `WhisperDesktop_*_universal.dmg` | Native on Apple Silicon (M1-M4) & Intel |
+            | 🐧 **Linux** | Portable AppImage (x86_64) | `WhisperDesktop_*_amd64.AppImage` | Standalone executable for Intel/AMD |
+            | 🐧 **Linux** | Portable AppImage (ARM64) | `WhisperDesktop_*_aarch64.AppImage` | Standalone executable for ARM64 |
+            | 🐧 **Linux (Debian/Ubuntu)** | DEB Package (Intel/AMD) | `WhisperDesktop_*_amd64.deb` | Standard package for Ubuntu/Debian |
+            | 🐧 **Linux (Debian/Ubuntu)** | DEB Package (ARM64) | `WhisperDesktop_*_arm64.deb` | Standard package for ARM64 |
+            | 🐧 **Linux (Fedora/RHEL)** | RPM Package (x86_64) | `WhisperDesktop-*-1.x86_64.rpm` | Red Hat / Fedora / openSUSE |
+            | 🐧 **Linux (Fedora/RHEL)** | RPM Package (ARM64) | `WhisperDesktop-*-1.aarch64.rpm` | Red Hat / Fedora on ARM64 |
+
+            ---
+            > 💡 **Windows on ARM:** Windows 11 ARM64 devices (Snapdragon X Elite, Surface Pro, etc.) run the `x64-setup.exe` installer with near-native performance via Microsoft Prism emulation.
+            > 💡 **macOS Universal:** The DMG package contains a Universal binary natively optimized for both Apple Silicon (M1/M2/M3/M4) and Intel Macs.
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}

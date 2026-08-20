@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Whisper Desktop",
+  "productName": "WhisperDesktop",
   "version": "2.3.0",
   "identifier": "com.whisper.desktop",
   "build": {
