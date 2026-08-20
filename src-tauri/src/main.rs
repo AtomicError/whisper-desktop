@@ -48,16 +48,26 @@ pub struct TranscriptionSession {
 pub struct TranscriptionState(pub Arc<Mutex<TranscriptionSession>>);
 
 #[tauri::command]
-fn get_system_stats(state: State<'_, HardwareState>) -> SystemStats {
-    if let Ok(mut monitor) = state.0.lock() {
-        monitor.get_stats()
-    } else {
-        SystemStats {
+async fn get_system_stats(state: State<'_, HardwareState>) -> Result<SystemStats, String> {
+    // Clone the Arc out and drop the State borrow immediately so we don't hold
+    // Tauri's managed-state reference. get_stats() refreshes sysinfo and polls
+    // the GPU (which can spawn nvidia-smi or scan /proc/*/fdinfo/*), so run it
+    // on a blocking thread to avoid stalling the async runtime and other IPC calls.
+    let monitor = state.0.clone();
+    let stats = tokio::task::spawn_blocking(move || match monitor.lock() {
+        Ok(mut monitor) => monitor.get_stats(),
+        Err(_) => SystemStats {
             cpu: 0.0,
             ram: "0GB / 0GB".to_string(),
             gpu: "N/A".to_string(),
-        }
-    }
+        },
+    })
+    .await
+    .map_err(|e| format!("system stats task failed: {}", e))?;
+
+    // A panicking worker is recoverable: report degraded zeroed stats rather than
+    // surfacing an error that would throw on the frontend's HUD poll.
+    Ok(stats)
 }
 
 #[tauri::command]
