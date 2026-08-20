@@ -124,10 +124,12 @@ fn get_system_specs(hardware_state: State<'_, HardwareState>) -> SystemSpecs {
 async fn convert_media_file(
     app: AppHandle,
     state: State<'_, LogState>,
+    session_state: State<'_, TranscriptionState>,
     file_path: String,
 ) -> Result<String, String> {
     let logs = state.0.clone();
-    convert_to_wav(app, logs, file_path).await
+    let session = session_state.0.clone();
+    convert_to_wav(app, logs, session, file_path).await
 }
 
 #[tauri::command]
@@ -145,37 +147,72 @@ async fn start_transcription_task(
 }
 
 #[tauri::command]
-fn cancel_transcription(session_state: State<'_, TranscriptionState>) -> Result<(), String> {
+async fn cancel_transcription(session_state: State<'_, TranscriptionState>) -> Result<(), String> {
     let pid_to_kill = {
         let mut lock = session_state.0.lock().map_err(|e| format!("Lock error: {}", e))?;
         if lock.phase == SessionPhase::Idle {
             return Err("No active transcription or translation session".to_string());
         }
         lock.cancel_requested = true;
-        lock.child_pid.take()
+        lock.child_pid
     };
 
-    match pid_to_kill {
-        Some(pid) => {
-            #[cfg(unix)]
-            let status = std::process::Command::new("kill")
-                .arg("-9")
-                .arg(pid.to_string())
-                .status();
+    if let Some(pid) = pid_to_kill {
+        // Graceful escalation: ask the process to terminate gracefully first (SIGTERM / taskkill),
+        // then escalate to hard-kill (SIGKILL / taskkill /F) if the session does not transition to Idle.
+        const GRACE_DURATION: std::time::Duration = std::time::Duration::from_millis(1500);
 
-            #[cfg(windows)]
-            let status = std::process::Command::new("taskkill")
-                .args(["/F", "/PID", &pid.to_string()])
-                .status();
+        #[cfg(unix)]
+        {
+            let _ = tokio::process::Command::new("kill")
+                .args(["-TERM", &pid.to_string()])
+                .status()
+                .await;
+        }
 
-            match status {
-                Ok(s) if s.success() => Ok(()),
-                Ok(s) => Err(format!("Kill command returned exit code: {:?}", s.code())),
-                Err(e) => Err(format!("Failed to execute kill command: {}", e)),
+        #[cfg(windows)]
+        {
+            let _ = tokio::process::Command::new("taskkill")
+                .args(["/T", "/PID", &pid.to_string()])
+                .status()
+                .await;
+        }
+
+        // Poll session state instead of raw PID to avoid zombie process traps on Unix
+        // and localized string parsing bugs from `tasklist` on non-English Windows.
+        let deadline = std::time::Instant::now() + GRACE_DURATION;
+        let mut session_ended = false;
+
+        while std::time::Instant::now() < deadline {
+            tokio::time::sleep(std::time::Duration::from_millis(75)).await;
+            if let Ok(lock) = session_state.0.lock() {
+                if lock.phase == SessionPhase::Idle {
+                    session_ended = true;
+                    break;
+                }
             }
         }
-        None => Ok(()),
+
+        if !session_ended {
+            #[cfg(unix)]
+            {
+                let _ = tokio::process::Command::new("kill")
+                    .args(["-KILL", &pid.to_string()])
+                    .status()
+                    .await;
+            }
+
+            #[cfg(windows)]
+            {
+                let _ = tokio::process::Command::new("taskkill")
+                    .args(["/F", "/T", "/PID", &pid.to_string()])
+                    .status()
+                    .await;
+            }
+        }
     }
+
+    Ok(())
 }
 
 #[tauri::command]

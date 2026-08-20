@@ -113,13 +113,41 @@ pub fn probe_file_metadata(app: Option<&AppHandle>, file_path: &str) -> FileMeta
     meta
 }
 
+/// Drop guard that resets session state when a background task finishes or errors.
+pub struct ActiveSessionGuard {
+    pub session: std::sync::Arc<std::sync::Mutex<crate::TranscriptionSession>>,
+}
+
+impl Drop for ActiveSessionGuard {
+    fn drop(&mut self) {
+        if let Ok(mut lock) = self.session.lock() {
+            lock.child_pid = None;
+            lock.phase = crate::SessionPhase::Idle;
+            lock.cancel_requested = false;
+        }
+    }
+}
+
 pub async fn convert_to_wav(
     app: AppHandle,
     logs: Arc<AppLogs>,
+    session: Arc<std::sync::Mutex<crate::TranscriptionSession>>,
     file_path: String,
 ) -> Result<String, String> {
     logs.log(&app, "FFmpeg", &format!("Starting conversion for: {}", file_path));
     
+    // Register phase in session
+    {
+        let mut lock = session.lock().map_err(|e| format!("Lock error: {}", e))?;
+        if lock.phase != crate::SessionPhase::Idle {
+            return Err("Another transcription, translation, or encoding task is already running.".to_string());
+        }
+        lock.phase = crate::SessionPhase::Transcribing;
+        lock.cancel_requested = false;
+        lock.child_pid = None;
+    }
+    let _session_guard = ActiveSessionGuard { session: session.clone() };
+
     // Generate temp wav file name in /tmp or system temp dir
     let timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -142,6 +170,17 @@ pub async fn convert_to_wav(
         file_path.clone()
     };
     let ffmpeg_bin = crate::ffmpeg_resolver::ensure_ffmpeg_available(Some(&app))?;
+
+    // Check cancellation before spawning
+    if session.lock().map(|l| l.cancel_requested).unwrap_or(false) {
+        let _ = app.emit("transcribe-status", TranscribeProgress {
+            progress: 0.0,
+            message: "Aborted".to_string(),
+            active: false,
+        });
+        return Err("WAV conversion was cancelled by the user.".to_string());
+    }
+
     let mut child = Command::new(&ffmpeg_bin)
         .args([
             "-y",
@@ -155,6 +194,29 @@ pub async fn convert_to_wav(
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("Failed to execute FFmpeg ({}): {}", ffmpeg_bin.display(), e))?;
+        
+    let pid = child.id();
+    let is_cancelled = if let Ok(mut lock) = session.lock() {
+        if lock.cancel_requested {
+            true
+        } else {
+            lock.child_pid = pid;
+            false
+        }
+    } else {
+        false
+    };
+
+    if is_cancelled {
+        let _ = child.kill().await;
+        let _ = fs::remove_file(&tmp_wav);
+        let _ = app.emit("transcribe-status", TranscribeProgress {
+            progress: 0.0,
+            message: "Aborted".to_string(),
+            active: false,
+        });
+        return Err("WAV conversion was cancelled by the user.".to_string());
+    }
         
     let stdout = child.stdout.take().ok_or("Failed to capture ffmpeg stdout")?;
     let stderr = child.stderr.take().ok_or("Failed to capture ffmpeg stderr")?;
@@ -183,6 +245,18 @@ pub async fn convert_to_wav(
     }
     
     let status = child.wait().await.map_err(|e| format!("ffmpeg execution failed: {}", e))?;
+
+    let was_cancelled = session.lock().map(|l| l.cancel_requested).unwrap_or(false);
+    if was_cancelled {
+        let _ = fs::remove_file(&tmp_wav);
+        let _ = app.emit("transcribe-status", TranscribeProgress {
+            progress: 0.0,
+            message: "Aborted".to_string(),
+            active: false,
+        });
+        return Err("WAV conversion was cancelled by the user.".to_string());
+    }
+
     if !status.success() {
         let _ = fs::remove_file(&tmp_wav);
         return Err(format!("FFmpeg failed with exit code: {:?}", status.code()));
@@ -198,20 +272,6 @@ pub async fn convert_to_wav(
     Ok(tmp_wav_str)
 }
 
-struct ActiveSessionGuard {
-    session: std::sync::Arc<std::sync::Mutex<crate::TranscriptionSession>>,
-}
-
-impl Drop for ActiveSessionGuard {
-    fn drop(&mut self) {
-        if let Ok(mut lock) = self.session.lock() {
-            lock.child_pid = None;
-            lock.phase = crate::SessionPhase::Idle;
-            lock.cancel_requested = false;
-        }
-    }
-}
-
 pub async fn run_transcription(
     app: AppHandle,
     logs: std::sync::Arc<AppLogs>,
@@ -220,6 +280,16 @@ pub async fn run_transcription(
     wav_path: String,
     mut duration_sec: f64,
 ) -> Result<TranscriptionResult, String> {
+    {
+        let mut lock = session.lock().map_err(|e| format!("Session lock error: {}", e))?;
+        if lock.phase != crate::SessionPhase::Idle {
+            return Err("Another transcription, translation, or encoding task is already running.".to_string());
+        }
+        lock.phase = crate::SessionPhase::Transcribing;
+        lock.cancel_requested = false;
+        lock.child_pid = None;
+    }
+    let _guard = ActiveSessionGuard { session: session.clone() };
     let _wav_guard = FileGuard(std::path::PathBuf::from(&wav_path));
     let start_time = Instant::now();
     let file_name = Path::new(&settings.input_file)
@@ -486,6 +556,16 @@ pub async fn run_transcription(
         args.push("-vo".to_string()); args.push(format!("{:.2}", settings.vad_overlap));
     }
     
+    // Check cancellation before spawning
+    if session.lock().map(|l| l.cancel_requested).unwrap_or(false) {
+        let _ = app.emit("transcribe-status", TranscribeProgress {
+            progress: 0.0,
+            message: "Aborted".to_string(),
+            active: false,
+        });
+        return Err("Whisper process was cancelled by the user.".to_string());
+    }
+
     logs.log(&app, "Whisper", &format!("Spawning Whisper CLI: {} {}", bin_path.display(), args.join(" ")));
     let _ = app.emit("transcribe-status", TranscribeProgress {
         progress: 0.0,
@@ -511,11 +591,26 @@ pub async fn run_transcription(
         })?;
         
     let pid = child.id();
-    if let Ok(mut lock) = session.lock() {
-        lock.child_pid = pid;
-        lock.phase = crate::SessionPhase::Transcribing;
+    let is_cancelled = if let Ok(mut lock) = session.lock() {
+        if lock.cancel_requested {
+            true
+        } else {
+            lock.child_pid = pid;
+            false
+        }
+    } else {
+        false
+    };
+
+    if is_cancelled {
+        let _ = child.kill().await;
+        let _ = app.emit("transcribe-status", TranscribeProgress {
+            progress: 0.0,
+            message: "Aborted".to_string(),
+            active: false,
+        });
+        return Err("Whisper process was cancelled by the user.".to_string());
     }
-    let _guard = ActiveSessionGuard { session: session.clone() };
         
     let stdout = child.stdout.take().ok_or("Failed to capture whisper stdout")?;
     let stderr = child.stderr.take().ok_or("Failed to capture whisper stderr")?;

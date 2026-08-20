@@ -541,6 +541,32 @@ pub async fn run_hardsub_task(
         }
     }
 
+    struct HardsubSessionGuard {
+        session: Arc<std::sync::Mutex<crate::TranscriptionSession>>,
+    }
+
+    impl Drop for HardsubSessionGuard {
+        fn drop(&mut self) {
+            if let Ok(mut lock) = self.session.lock() {
+                lock.child_pid = None;
+                lock.phase = crate::SessionPhase::Idle;
+                lock.cancel_requested = false;
+            }
+        }
+    }
+
+    // Register pid and set phase
+    {
+        let mut lock = session.lock().map_err(|e| format!("Session lock failed: {}", e))?;
+        if lock.phase != crate::SessionPhase::Idle {
+            return Err("Another transcription, translation, or encoding task is already running.".to_string());
+        }
+        lock.phase = crate::SessionPhase::Transcribing;
+        lock.cancel_requested = false;
+        lock.child_pid = None;
+    }
+    let _session_guard = HardsubSessionGuard { session: session.clone() };
+
     let _cleanup_guard = TempAssCleanupGuard {
         path: &settings.subtitle_path,
         logs: logs.clone(),
@@ -560,13 +586,6 @@ pub async fn run_hardsub_task(
         .to_string();
 
     logs.log(&app, "Hardsub", &format!("Starting hardsub task for: {} (Output: {})", video_name, settings.output_path));
-
-    // Register pid and set phase
-    {
-        let mut lock = session.lock().map_err(|e| format!("Session lock failed: {}", e))?;
-        lock.phase = crate::SessionPhase::Transcribing;
-        lock.cancel_requested = false;
-    }
 
     // Trigger OS notification
     let _ = app.notification().builder().title("Hardsub Video Started").body(&format!("Encoding {}...", video_name)).show();
@@ -936,6 +955,19 @@ pub async fn run_hardsub_task(
     // 5. Output file
     ffmpeg_args.push(settings.output_path.clone());
 
+    // Check if cancellation was requested while preparing probing/subtitles
+    if session.lock().map(|l| l.cancel_requested).unwrap_or(false) {
+        if Path::new(&settings.output_path).exists() {
+            let _ = std::fs::remove_file(&settings.output_path);
+        }
+        let _ = app.emit("hardsub-status", TranscribeProgress {
+            progress: 0.0,
+            message: "Hardsubbing cancelled by user.".to_string(),
+            active: false,
+        });
+        return Err("Hardsubbing cancelled by user.".to_string());
+    }
+
     logs.log(&app, "FFmpeg", &format!("Executing command: {} {}", ffmpeg_bin.display(), ffmpeg_args.join(" ")));
 
     let mut child = Command::new(&ffmpeg_bin)
@@ -946,8 +978,28 @@ pub async fn run_hardsub_task(
         .map_err(|e| format!("Failed to spawn ffmpeg ({}): {}", ffmpeg_bin.display(), e))?;
 
     let child_pid = child.id();
-    if let Ok(mut lock) = session.lock() {
-        lock.child_pid = child_pid;
+    let is_cancelled = if let Ok(mut lock) = session.lock() {
+        if lock.cancel_requested {
+            true
+        } else {
+            lock.child_pid = child_pid;
+            false
+        }
+    } else {
+        false
+    };
+
+    if is_cancelled {
+        let _ = child.kill().await;
+        if Path::new(&settings.output_path).exists() {
+            let _ = std::fs::remove_file(&settings.output_path);
+        }
+        let _ = app.emit("hardsub-status", TranscribeProgress {
+            progress: 0.0,
+            message: "Hardsubbing cancelled by user.".to_string(),
+            active: false,
+        });
+        return Err("Hardsubbing cancelled by user.".to_string());
     }
 
     let stdout = child.stdout.take().ok_or("Failed to capture ffmpeg stdout")?;
