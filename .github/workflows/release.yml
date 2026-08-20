@@ -126,7 +126,7 @@ jobs:
         run: |
           echo "Downloading static standalone FFmpeg and FFprobe for Linux x64..."
           wget -q https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
-          tar -xJf ffmpeg-release-amd64-static.tar.xz --strip-components=1 -C src-tauri/resources/ ffmpeg-*-amd64-static/ffmpeg ffmpeg-*-amd64-static/ffprobe
+          tar -xJf ffmpeg-release-amd64-static.tar.xz --wildcards --strip-components=1 -C src-tauri/resources/ "ffmpeg-*-amd64-static/ffmpeg" "ffmpeg-*-amd64-static/ffprobe"
           rm -f ffmpeg-release-amd64-static.tar.xz
           chmod +x src-tauri/resources/ffmpeg src-tauri/resources/ffprobe
 

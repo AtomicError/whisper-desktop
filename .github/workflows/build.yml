@@ -44,7 +44,7 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
 
       - name: Install Rust stable
@@ -73,14 +73,14 @@ jobs:
           path: |
             src-tauri/resources/ffmpeg*
             src-tauri/resources/ffprobe*
-          key: ffmpeg-${{ matrix.platform }}-${{ matrix.rust-target }}-v2
+          key: ffmpeg-${{ matrix.platform }}-${{ matrix.arch }}-v2
 
       - name: Download Static FFmpeg (Linux x86_64)
         if: matrix.platform == 'ubuntu-22.04' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p src-tauri/resources
           wget -q https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
-          tar -xJf ffmpeg-release-amd64-static.tar.xz --strip-components=1 -C src-tauri/resources/ ffmpeg-*-amd64-static/ffmpeg ffmpeg-*-amd64-static/ffprobe
+          tar -xJf ffmpeg-release-amd64-static.tar.xz --wildcards --strip-components=1 -C src-tauri/resources/ "ffmpeg-*-amd64-static/ffmpeg" "ffmpeg-*-amd64-static/ffprobe"
           rm -f ffmpeg-release-amd64-static.tar.xz
           chmod +x src-tauri/resources/ffmpeg src-tauri/resources/ffprobe
 
@@ -89,7 +89,7 @@ jobs:
         run: |
           mkdir -p src-tauri/resources
           wget -q https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-arm64-static.tar.xz
-          tar -xJf ffmpeg-release-arm64-static.tar.xz --strip-components=1 -C src-tauri/resources/ ffmpeg-*-arm64-static/ffmpeg ffmpeg-*-arm64-static/ffprobe
+          tar -xJf ffmpeg-release-arm64-static.tar.xz --wildcards --strip-components=1 -C src-tauri/resources/ "ffmpeg-*-arm64-static/ffmpeg" "ffmpeg-*-arm64-static/ffprobe"
           rm -f ffmpeg-release-arm64-static.tar.xz
           chmod +x src-tauri/resources/ffmpeg src-tauri/resources/ffprobe
 
