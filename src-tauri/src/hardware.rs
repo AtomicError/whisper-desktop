@@ -19,6 +19,8 @@ pub struct HardwareMonitor {
     last_poll_time: Option<std::time::Instant>,
 }
 
+const BYTES_TO_GB: f64 = 1024.0 * 1024.0 * 1024.0;
+
 impl HardwareMonitor {
     pub fn new() -> Self {
         let mut sys = System::new_with_specifics(
@@ -47,8 +49,8 @@ impl HardwareMonitor {
         let cpu_usage = self.sys.global_cpu_info().cpu_usage() as f64;
         
         // RAM used vs total
-        let total_mem = self.sys.total_memory() as f64 / 1024.0 / 1024.0 / 1024.0; // GB
-        let used_mem = self.sys.used_memory() as f64 / 1024.0 / 1024.0 / 1024.0; // GB
+        let total_mem = self.sys.total_memory() as f64 / BYTES_TO_GB; // GB
+        let used_mem = self.sys.used_memory() as f64 / BYTES_TO_GB; // GB
         let ram_str = format!("{:.1}GB / {:.1}GB", used_mem, total_mem);
         
         // GPU stats
@@ -59,6 +61,16 @@ impl HardwareMonitor {
             ram: ram_str,
             gpu: gpu_str,
         }
+    }
+
+    /// Returns static system specs (total RAM, CPU core count) from the monitor's
+    /// already-maintained `sysinfo::System`, avoiding a fresh allocation + full
+    /// refresh on every call. These values don't change at runtime, so the
+    /// monitor's existing state is sufficient.
+    pub fn get_specs(&self) -> (f64, usize) {
+        let total_ram_gb = self.sys.total_memory() as f64 / BYTES_TO_GB;
+        let cpu_cores = self.sys.cpus().len();
+        (total_ram_gb, cpu_cores)
     }
 
     fn get_gpu_stats(&mut self) -> String {

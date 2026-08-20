@@ -100,23 +100,22 @@ pub struct SystemSpecs {
 
 #[tauri::command]
 fn get_system_specs(hardware_state: State<'_, HardwareState>) -> SystemSpecs {
-    use sysinfo::System;
-    let mut sys = System::new_all();
-    sys.refresh_all();
-    
-    let total_ram_gb = sys.total_memory() as f64 / 1024.0 / 1024.0 / 1024.0;
-    let cpu_cores = sys.cpus().len();
-    
-    let gpu_type = if let Ok(monitor) = hardware_state.0.lock() {
-        monitor.gpu_type.clone()
+    // Reuse the HardwareMonitor's already-maintained sysinfo::System instead of
+    // allocating a fresh System::new_all() + refresh_all() on every call. These
+    // specs (total RAM, CPU cores) are static and already available on the monitor.
+    if let Ok(monitor) = hardware_state.0.lock() {
+        let (total_ram_gb, cpu_cores) = monitor.get_specs();
+        SystemSpecs {
+            total_ram_gb,
+            cpu_cores,
+            gpu_type: monitor.gpu_type.clone(),
+        }
     } else {
-        "unknown".to_string()
-    };
-    
-    SystemSpecs {
-        total_ram_gb,
-        cpu_cores,
-        gpu_type,
+        SystemSpecs {
+            total_ram_gb: 8.0,
+            cpu_cores: 4,
+            gpu_type: "unknown".to_string(),
+        }
     }
 }
 
