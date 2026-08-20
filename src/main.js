@@ -365,6 +365,79 @@ const listen = function(event, handler) {
   return Promise.resolve(() => {});
 };
 
+// Native clipboard write via tauri-plugin-clipboard-manager with multi-tier fallback.
+// Tier 1: Direct Tauri IPC command invoke('plugin:clipboard-manager|write_text', { text })
+// Tier 2: window.__TAURI__.clipboardManager.writeText(text) (if plugin global JS bundle is present)
+// Tier 3: W3C Navigator Clipboard API (navigator.clipboard.writeText)
+// Tier 4: Document execCommand fallback (for non-secure/legacy webview execution contexts)
+const copyToClipboard = async function(text) {
+  const cleanText = (text === null || text === undefined) ? '' : String(text);
+
+  let lastError = null;
+
+  // 1. Preferred Native IPC via Tauri Plugin Clipboard Manager
+  try {
+    if (typeof invoke === 'function') {
+      await invoke('plugin:clipboard-manager|write_text', { text: cleanText });
+      return;
+    }
+  } catch (err) {
+    lastError = err;
+    console.warn('[Clipboard] Tauri plugin IPC command failed, trying next provider:', err);
+  }
+
+  // 2. Global Tauri Plugin Object (if JS bundle is mounted)
+  try {
+    const tauriClipboard = (typeof window !== 'undefined' && window.__TAURI__ && window.__TAURI__.clipboardManager) || null;
+    if (tauriClipboard && typeof tauriClipboard.writeText === 'function') {
+      await tauriClipboard.writeText(cleanText);
+      return;
+    }
+  } catch (err) {
+    lastError = err;
+    console.warn('[Clipboard] window.__TAURI__.clipboardManager failed:', err);
+  }
+
+  // 3. Web Navigator Clipboard API
+  try {
+    if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      await navigator.clipboard.writeText(cleanText);
+      return;
+    }
+  } catch (err) {
+    lastError = err;
+    console.warn('[Clipboard] navigator.clipboard.writeText failed:', err);
+  }
+
+  // 4. Fallback: Hidden Textarea with document.execCommand('copy') for webview transient activation failures
+  try {
+    if (typeof document !== 'undefined' && document.body) {
+      const textarea = document.createElement('textarea');
+      textarea.value = cleanText;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.top = '-9999px';
+      textarea.style.left = '-9999px';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      if (successful) return;
+    }
+  } catch (err) {
+    lastError = err;
+    console.warn('[Clipboard] document.execCommand copy fallback failed:', err);
+  }
+
+  const errDetail = (lastError && (lastError.message || String(lastError))) || 'No clipboard provider available.';
+  throw new Error(`Failed to copy to clipboard: ${errDetail}`);
+};
+
+// Expose globally for console testing and window access
+window.copyToClipboard = copyToClipboard;
+
 // Global States
 let activeView = 'intro';
 let activeSettingsCat = 'general';
@@ -2265,15 +2338,18 @@ window.abortTranscription = async function() {
   }
 };
 
-window.copyTranscriptToClipboard = async function() {
-  if (!selectedMediaFile) return;
+window.copyMainTranscriptToClipboard = async function() {
+  if (!selectedMediaFile) {
+    showNotification("No media file selected or transcribed yet.", "info");
+    return;
+  }
   
   const base = selectedMediaFile.substring(0, selectedMediaFile.lastIndexOf('.')) || selectedMediaFile;
   const txtFile = `${base}.txt`;
   
   try {
     const content = await invoke('read_text_file_content', { filePath: txtFile });
-    await invoke('copy_to_clipboard', { text: content });
+    await copyToClipboard(content);
     showNotification("Transcription text copied to clipboard successfully!", "success");
   } catch (e) {
     // Fallback: copy Whisper logs
@@ -2283,15 +2359,22 @@ window.copyTranscriptToClipboard = async function() {
       .join('\n');
     if (fallback) {
       try {
-        await invoke('copy_to_clipboard', { text: fallback });
+        await copyToClipboard(fallback);
         showNotification("Transcript file not found; copied log output instead.", "info");
-      } catch(e2) {
-        showNotification("Failed to copy transcript: " + e2, "error");
+      } catch (e2) {
+        const msg = (e2 && (e2.message || e2.toString())) || String(e2);
+        showNotification("Failed to copy transcript: " + msg, "error");
       }
     } else {
-      showNotification("Failed to copy transcript: " + e, "error");
+      const msg = (e && (e.message || e.toString())) || String(e);
+      showNotification("Failed to copy transcript: " + msg, "error");
     }
   }
+};
+
+// Dispatcher alias for backward compatibility
+window.copyTranscriptToClipboard = async function() {
+  await window.copyMainTranscriptToClipboard();
 };
 
 // ----------------- Central Logging Center -----------------
@@ -2350,10 +2433,11 @@ function redrawLogsViewport() {
 window.copyAllLogs = async function() {
   const rawLogs = allLogsArray.map(l => `[${l.timestamp}] [${l.category}] ${l.message}`).join('\n');
   try {
-    await invoke('copy_to_clipboard', { text: rawLogs });
+    await copyToClipboard(rawLogs);
     showNotification("All logs copied to clipboard!", "success");
   } catch (e) {
-    showNotification("Failed to copy logs: " + e, "error");
+    const msg = (e && (e.message || e.toString())) || String(e);
+    showNotification("Failed to copy logs: " + msg, "error");
   }
 };
 
@@ -3519,23 +3603,49 @@ window.loadTranscriptFromFile = async function(fullPath) {
   }
 };
 
-window.copyTranscriptToClipboard = async function() {
-  if (transcriptLines.length === 0) {
-    showNotification("No transcript text to copy.", "info");
-    return;
+window.copyLiveTranscriptToClipboard = async function() {
+  if (transcriptLines && transcriptLines.length > 0) {
+    const textToCopy = transcriptLines
+      .map(l => l.text)
+      .join('\n');
+      
+    try {
+      await copyToClipboard(textToCopy);
+      showNotification("Live transcript copied to clipboard!", "success");
+      return;
+    } catch (err) {
+      const msg = (err && (err.message || err.toString())) || String(err);
+      showNotification("Failed to copy transcript: " + msg, "error");
+      return;
+    }
   }
-  
-  const textToCopy = transcriptLines
-    .map(l => l.text)
-    .join('\n');
-    
-  try {
-    await invoke('copy_to_clipboard', { text: textToCopy });
-    showNotification("Transcript copied to clipboard!", "success");
-  } catch (err) {
-    showNotification("Failed to copy transcript: " + err, "error");
+
+  // Fallback: check transcript viewport text if transcriptLines array is unpopulated
+  const viewport = document.getElementById('transcript-viewport');
+  if (viewport && viewport.innerText && !viewport.innerText.includes("Start transcription to stream")) {
+    const rawPreview = viewport.innerText.trim();
+    if (rawPreview.length > 0) {
+      try {
+        await copyToClipboard(rawPreview);
+        showNotification("Transcript preview copied to clipboard!", "success");
+        return;
+      } catch (err) {
+        const msg = (err && (err.message || err.toString())) || String(err);
+        showNotification("Failed to copy transcript: " + msg, "error");
+        return;
+      }
+    }
+  }
+
+  // If live viewer is empty, attempt to copy the main output file
+  if (selectedMediaFile) {
+    await window.copyMainTranscriptToClipboard();
+  } else {
+    showNotification("No transcript text available to copy.", "info");
   }
 };
+
+window.copyEditorTranscriptToClipboard = window.copyLiveTranscriptToClipboard;
 
 // ----------------- AI Translation Configuration & Providers Handling -----------------
 window.populateProvidersDropdown = function() {

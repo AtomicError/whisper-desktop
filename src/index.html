@@ -1764,7 +1764,7 @@
                       <span class="analytic-label">Generated Files:</span>
                       <div class="outputs-row" id="badge-outputs-row"></div>
                     </div>
-                    <button class="btn-primary" style="margin-top:12px; font-size:0.85rem; padding:10px;" onclick="copyTranscriptToClipboard()">
+                    <button class="btn-primary" id="btn-copy-main-transcript" style="margin-top:12px; font-size:0.85rem; padding:10px;" onclick="copyMainTranscriptToClipboard()" aria-label="Copy main transcript file to clipboard">
                       Copy Main Transcript
                     </button>
                   </div>
@@ -1774,7 +1774,7 @@
                 <div class="glass-card transcript-viewer-card" style="display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 20px; gap: 12px; overflow: hidden;">
                   <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: 10px;">
                     <h3 style="font-weight: 600; font-size: 1rem; margin: 0;">Live Transcript Viewer</h3>
-                    <button class="btn-secondary" id="btn-copy-transcript" onclick="copyTranscriptToClipboard()" style="padding: 4px 10px; font-size: 0.75rem; margin: 0;">Copy</button>
+                    <button class="btn-secondary" id="btn-copy-transcript" onclick="copyLiveTranscriptToClipboard()" aria-label="Copy live transcript preview to clipboard" style="padding: 4px 10px; font-size: 0.75rem; margin: 0;">Copy</button>
                   </div>
                   
                   <div class="transcript-search-box" style="display: flex; gap: 8px; width: 100%;">
@@ -1813,7 +1813,7 @@
                     <span class="custom-checkmark"></span>
                     <span>Auto Scroll</span>
                   </label>
-                  <button class="btn-secondary" style="padding:6px 12px; font-size:0.8rem;" onclick="copyAllLogs()">Copy All</button>
+                  <button class="btn-secondary" id="btn-copy-all-logs" style="padding:6px 12px; font-size:0.8rem;" onclick="copyAllLogs()" aria-label="Copy all execution logs to clipboard">Copy All</button>
                   <button class="btn-secondary" style="padding:6px 12px; font-size:0.8rem; border-color:var(--color-red); color:var(--color-red);" onclick="clearLogsHistory()">Clear</button>
                 </div>
               </div>

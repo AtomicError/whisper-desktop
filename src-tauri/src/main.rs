@@ -179,76 +179,6 @@ fn cancel_transcription(session_state: State<'_, TranscriptionState>) -> Result<
 }
 
 #[tauri::command]
-fn copy_to_clipboard(text: String) -> Result<(), String> {
-    use std::io::Write;
-
-    #[cfg(target_os = "linux")]
-    {
-        let try_copy = |cmd: &str, args: &[&str]| -> Result<(), String> {
-            let mut child = std::process::Command::new(cmd)
-                .args(args)
-                .stdin(std::process::Stdio::piped())
-                .spawn()
-                .map_err(|e| format!("spawn {} failed: {}", cmd, e))?;
-            if let Some(mut stdin) = child.stdin.take() {
-                stdin.write_all(text.as_bytes())
-                    .map_err(|e| format!("write to {} stdin failed: {}", cmd, e))?;
-            }
-            let status = child.wait()
-                .map_err(|e| format!("wait for {} failed: {}", cmd, e))?;
-            if !status.success() {
-                return Err(format!("{} exited with {:?}", cmd, status.code()));
-            }
-            Ok(())
-        };
-
-        for (cmd, args) in [("wl-copy", &[] as &[&str]), ("xclip", &["-selection", "clipboard"]), ("xsel", &["--clipboard", "--input"])] {
-            if try_copy(cmd, args).is_ok() {
-                return Ok(());
-            }
-        }
-        return Err("All clipboard tools (wl-copy, xclip, xsel) failed or are not installed.".to_string());
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        let mut child = std::process::Command::new("pbcopy")
-            .stdin(std::process::Stdio::piped())
-            .spawn()
-            .map_err(|e| format!("spawn pbcopy failed: {}", e))?;
-        if let Some(mut stdin) = child.stdin.take() {
-            stdin.write_all(text.as_bytes())
-                .map_err(|e| format!("write to pbcopy stdin failed: {}", e))?;
-        }
-        let status = child.wait()
-            .map_err(|e| format!("wait for pbcopy failed: {}", e))?;
-        if !status.success() {
-            return Err(format!("pbcopy exited with {:?}", status.code()));
-        }
-        return Ok(());
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        let mut child = std::process::Command::new("clip")
-            .stdin(std::process::Stdio::piped())
-            .spawn()
-            .map_err(|e| format!("spawn clip failed: {}", e))?;
-        if let Some(mut stdin) = child.stdin.take() {
-            stdin.write_all(text.as_bytes())
-                .map_err(|e| format!("write to clip stdin failed: {}", e))?;
-        }
-        let status = child.wait()
-            .map_err(|e| format!("wait for clip failed: {}", e))?;
-        if !status.success() {
-            return Err(format!("clip exited with {:?}", status.code()));
-        }
-        return Ok(());
-    }
-}
-
-
-#[tauri::command]
 fn get_logs(state: State<'_, LogState>) -> String {
     state.0.get_all()
 }
@@ -529,6 +459,7 @@ fn main() {
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .manage(HardwareState(hardware_monitor))
@@ -545,7 +476,6 @@ fn main() {
             convert_media_file,
             start_transcription_task,
             cancel_transcription,
-            copy_to_clipboard,
             get_logs,
             clear_logs,
             scan_models,

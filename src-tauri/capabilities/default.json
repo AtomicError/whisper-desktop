@@ -7,6 +7,7 @@
     "core:default",
     "opener:default",
     "notification:default",
+    "clipboard-manager:default",
     "allow-all-custom",
     "core:window:allow-minimize",
     "core:window:allow-toggle-maximize",
