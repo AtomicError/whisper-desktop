@@ -4230,6 +4230,12 @@ select.select-control {
   background-color: rgba(45, 127, 255, 0.04);
 }
 
+.custom-select-trigger:focus-visible {
+  outline: none;
+  border-color: var(--color-royal-blue);
+  box-shadow: 0 0 0 2px rgba(45, 127, 255, 0.4), 0 0 10px rgba(45, 127, 255, 0.2);
+}
+
 .custom-select-container.open .custom-select-trigger {
   border-color: var(--color-royal-blue);
   box-shadow: 0 0 10px rgba(45, 127, 255, 0.25);
@@ -4298,15 +4304,17 @@ select.select-control {
   opacity: 0;
 }
 
-.custom-select-option:hover {
-  background: rgba(255, 255, 255, 0.02);
+.custom-select-option:hover,
+.custom-select-option.focused {
+  background: rgba(255, 255, 255, 0.04);
   color: #fff;
   padding-left: 24px;
 }
 
-.custom-select-option:hover::before {
+.custom-select-option:hover::before,
+.custom-select-option.focused::before {
   transform: translateY(-50%) scaleY(0.7);
-  opacity: 0.5;
+  opacity: 0.7;
 }
 
 .custom-select-option.selected {
@@ -4319,6 +4327,12 @@ select.select-control {
 .custom-select-option.selected::before {
   transform: translateY(-50%) scaleY(1);
   opacity: 1;
+}
+
+.custom-select-option.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 /* ==========================================================================

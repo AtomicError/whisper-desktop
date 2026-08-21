@@ -325,43 +325,103 @@ async fn scan_models(models_dir: String, backend: String) -> Result<ModelScanRes
 
 use tauri_plugin_dialog::DialogExt;
 
+pub const AUDIO_EXTENSIONS: &[&str] = &[
+    "mp3", "wav", "m4a", "aac", "flac", "ogg", "opus", "wma", "amr", "3ga", "aiff", "aif", "caf", "ape", "alac", "ac3", "dts", "oga",
+];
+
+pub const VIDEO_EXTENSIONS: &[&str] = &[
+    "mp4", "mkv", "avi", "mov", "flv", "webm", "m4v", "wmv", "ts", "mts", "m2ts", "3gp", "3g2", "mpeg", "mpg", "vob", "ogv", "f4v",
+];
+
+pub const SUBTITLE_EXTENSIONS: &[&str] = &[
+    "srt", "vtt", "ass", "ssa", "sub", "lrc",
+];
+
+fn get_filter_variants(exts: &[&str]) -> Vec<String> {
+    let mut v = Vec::with_capacity(exts.len() * 2);
+    for &e in exts {
+        v.push(e.to_lowercase());
+        v.push(e.to_uppercase());
+    }
+    v
+}
+
 #[tauri::command]
 async fn select_file(app: AppHandle) -> Option<String> {
+    let video_variants = get_filter_variants(VIDEO_EXTENSIONS);
+    let video_refs: Vec<&str> = video_variants.iter().map(|s| s.as_str()).collect();
+
     let (tx, rx) = tokio::sync::oneshot::channel();
     app.dialog()
         .file()
-        .add_filter("Video Files (*.mp4, *.mkv, *.webm)", &["mp4", "mkv", "avi", "mov", "flv", "webm", "m4v", "MP4", "MKV", "WEBM", "MOV", "AVI", "FLV"])
+        .add_filter("Video Files (*.mp4, *.mkv, *.webm, ...)", &video_refs)
         .add_filter("All Files (*)", &["*"])
         .pick_file(move |file| {
             let _ = tx.send(file);
         });
-    rx.await.ok().flatten().and_then(|p| p.into_path().ok()).map(|p| p.to_string_lossy().to_string())
+    match rx.await {
+        Ok(Some(file_path)) => file_path.into_path().ok().map(|p| p.to_string_lossy().to_string()),
+        Ok(None) => None,
+        Err(e) => {
+            eprintln!("[Dialog Error] select_file channel error: {}", e);
+            None
+        }
+    }
 }
 
 #[tauri::command]
 async fn select_subtitle_file(app: AppHandle) -> Option<String> {
+    let sub_variants = get_filter_variants(SUBTITLE_EXTENSIONS);
+    let sub_refs: Vec<&str> = sub_variants.iter().map(|s| s.as_str()).collect();
+
     let (tx, rx) = tokio::sync::oneshot::channel();
     app.dialog()
         .file()
-        .add_filter("Subtitle Files (*.srt, *.vtt, *.ass)", &["srt", "vtt", "ass", "ssa", "sub", "SRT", "VTT", "ASS", "SSA", "SUB"])
+        .add_filter("Subtitle Files (*.srt, *.vtt, *.ass, ...)", &sub_refs)
         .add_filter("All Files (*)", &["*"])
         .pick_file(move |file| {
             let _ = tx.send(file);
         });
-    rx.await.ok().flatten().and_then(|p| p.into_path().ok()).map(|p| p.to_string_lossy().to_string())
+    match rx.await {
+        Ok(Some(file_path)) => file_path.into_path().ok().map(|p| p.to_string_lossy().to_string()),
+        Ok(None) => None,
+        Err(e) => {
+            eprintln!("[Dialog Error] select_subtitle_file channel error: {}", e);
+            None
+        }
+    }
 }
 
 #[tauri::command]
 async fn select_files(app: AppHandle) -> Option<Vec<String>> {
+    let audio_variants = get_filter_variants(AUDIO_EXTENSIONS);
+    let video_variants = get_filter_variants(VIDEO_EXTENSIONS);
+    let mut all_media_variants = Vec::with_capacity(audio_variants.len() + video_variants.len());
+    all_media_variants.extend(audio_variants.clone());
+    all_media_variants.extend(video_variants.clone());
+
+    let all_media_refs: Vec<&str> = all_media_variants.iter().map(|s| s.as_str()).collect();
+    let audio_refs: Vec<&str> = audio_variants.iter().map(|s| s.as_str()).collect();
+    let video_refs: Vec<&str> = video_variants.iter().map(|s| s.as_str()).collect();
+
     let (tx, rx) = tokio::sync::oneshot::channel();
     app.dialog()
         .file()
-        .add_filter("Audio/Video", &["mp4", "mkv", "avi", "mov", "flv", "webm", "m4v", "mp3", "wav", "ogg", "m4a", "flac", "aac", "wma"])
+        .add_filter("All Media (*.mp3, *.wav, *.mp4, *.mkv, *.opus, ...)", &all_media_refs)
+        .add_filter("Audio Files (*.mp3, *.wav, *.m4a, *.opus, *.flac, ...)", &audio_refs)
+        .add_filter("Video Files (*.mp4, *.mkv, *.mov, *.webm, ...)", &video_refs)
+        .add_filter("All Files (*)", &["*"])
         .pick_files(move |files| {
             let _ = tx.send(files);
         });
-    rx.await.ok().flatten()
-        .map(|files| files.into_iter().filter_map(|p| p.into_path().ok()).map(|p| p.to_string_lossy().to_string()).collect())
+    match rx.await {
+        Ok(Some(files)) => Some(files.into_iter().filter_map(|p| p.into_path().ok()).map(|p| p.to_string_lossy().to_string()).collect()),
+        Ok(None) => None,
+        Err(e) => {
+            eprintln!("[Dialog Error] select_files channel error: {}", e);
+            None
+        }
+    }
 }
 
 #[tauri::command]

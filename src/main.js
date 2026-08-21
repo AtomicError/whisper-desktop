@@ -507,14 +507,19 @@ function setupTitlebar() {
 
 // ----------------- Custom Dropdown Component -----------------
 window.customSelectsMap = new Map();
+let customSelectInstanceCounter = 0;
 
 class CustomSelect {
   constructor(selectElement) {
     this.select = selectElement;
+    this.instanceId = this.select.id || `custom-select-auto-${++customSelectInstanceCounter}`;
     this.container = null;
     this.trigger = null;
     this.optionsContainer = null;
     this.isOpen = false;
+    this.focusedIndex = -1;
+    this.typeaheadBuffer = '';
+    this.typeaheadTimeout = null;
     this.init();
   }
 
@@ -527,9 +532,7 @@ class CustomSelect {
     if (this.select.className) {
       this.container.classList.add(...this.select.className.split(' ').filter(c => c !== 'select-control'));
     }
-    if (this.select.id) {
-      this.container.id = `custom-select-${this.select.id}`;
-    }
+    this.container.id = `custom-select-${this.instanceId}`;
     
     this.container.style.width = this.select.style.width || '100%';
     this.container.style.height = this.select.style.height || 'auto';
@@ -537,6 +540,12 @@ class CustomSelect {
 
     this.trigger = document.createElement('div');
     this.trigger.className = 'custom-select-trigger';
+    this.trigger.tabIndex = 0;
+    this.trigger.setAttribute('role', 'combobox');
+    this.trigger.setAttribute('aria-haspopup', 'listbox');
+    this.trigger.setAttribute('aria-expanded', 'false');
+    this.trigger.setAttribute('aria-controls', `options-for-${this.instanceId}`);
+
     this.trigger.innerHTML = `
       <span class="custom-select-value"></span>
       <svg class="custom-select-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -547,10 +556,11 @@ class CustomSelect {
 
     this.optionsContainer = document.createElement('div');
     this.optionsContainer.className = 'custom-select-options';
-    if (this.select.id) {
-      this.optionsContainer.classList.add(`options-for-${this.select.id}`);
-      this.optionsContainer.dataset.selectId = this.select.id;
-    }
+    this.optionsContainer.setAttribute('role', 'listbox');
+    this.optionsContainer.tabIndex = -1;
+    this.optionsContainer.id = `options-for-${this.instanceId}`;
+    this.optionsContainer.classList.add(`options-for-${this.instanceId}`);
+    this.optionsContainer.dataset.selectId = this.instanceId;
     document.body.appendChild(this.optionsContainer);
 
     this.select.parentNode.insertBefore(this.container, this.select.nextSibling);
@@ -559,6 +569,102 @@ class CustomSelect {
       e.stopPropagation();
       this.toggle();
     });
+
+    this._keydownHandler = (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        if (!this.isOpen) {
+          this.open();
+        } else {
+          if (this.focusedIndex >= 0 && this.focusedIndex < this.optionsContainer.children.length) {
+            const optDiv = this.optionsContainer.children[this.focusedIndex];
+            if (optDiv && optDiv.dataset.value !== undefined && !optDiv.classList.contains('disabled')) {
+              this.select.value = optDiv.dataset.value;
+              this.select.dispatchEvent(new Event('change'));
+            }
+          }
+          this.close();
+        }
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (!this.isOpen) {
+          this.open();
+        } else {
+          const nextIdx = this.getNextAvailableIndex(this.focusedIndex, 1);
+          if (nextIdx !== -1) this.setFocusedOptionIndex(nextIdx);
+        }
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (!this.isOpen) {
+          this.open();
+        } else {
+          const prevIdx = this.getNextAvailableIndex(this.focusedIndex, -1);
+          if (prevIdx !== -1) this.setFocusedOptionIndex(prevIdx);
+        }
+      } else if (e.key === 'Home') {
+        if (this.isOpen) {
+          e.preventDefault();
+          const firstIdx = this.getFirstAvailableIndex();
+          if (firstIdx !== -1) this.setFocusedOptionIndex(firstIdx);
+        }
+      } else if (e.key === 'End') {
+        if (this.isOpen) {
+          e.preventDefault();
+          const lastIdx = this.getLastAvailableIndex();
+          if (lastIdx !== -1) this.setFocusedOptionIndex(lastIdx);
+        }
+      } else if (e.key === 'Escape') {
+        if (this.isOpen) {
+          e.preventDefault();
+          this.close();
+        }
+      } else if (e.key === 'Tab') {
+        if (this.isOpen) {
+          this.close();
+        }
+      } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // WAI-ARIA Typeahead search with single-letter repeating cycle
+        clearTimeout(this.typeaheadTimeout);
+        const char = e.key.toLowerCase();
+        const isRepeat = this.typeaheadBuffer.length === 1 && this.typeaheadBuffer === char;
+        const options = Array.from(this.optionsContainer.children);
+
+        if (isRepeat) {
+          const startFrom = (this.focusedIndex + 1) % options.length;
+          let matchIdx = -1;
+          for (let offset = 0; offset < options.length; offset++) {
+            const idx = (startFrom + offset) % options.length;
+            const opt = options[idx];
+            if (!opt.classList.contains('disabled') && (opt.textContent || '').trim().toLowerCase().startsWith(char)) {
+              matchIdx = idx;
+              break;
+            }
+          }
+          if (matchIdx !== -1) {
+            if (!this.isOpen) this.open();
+            this.setFocusedOptionIndex(matchIdx);
+          }
+        } else {
+          this.typeaheadBuffer += char;
+          const matchIdx = options.findIndex(opt =>
+            !opt.classList.contains('disabled') &&
+            (opt.textContent || '').trim().toLowerCase().startsWith(this.typeaheadBuffer)
+          );
+
+          if (matchIdx !== -1) {
+            if (!this.isOpen) {
+              this.open();
+            }
+            this.setFocusedOptionIndex(matchIdx);
+          }
+        }
+
+        this.typeaheadTimeout = setTimeout(() => {
+          this.typeaheadBuffer = '';
+        }, 600);
+      }
+    };
+    this.trigger.addEventListener('keydown', this._keydownHandler);
 
     this._documentClickHandler = (e) => {
       if (this.isOpen && !this.container.contains(e.target) && !this.optionsContainer.contains(e.target)) {
@@ -576,7 +682,7 @@ class CustomSelect {
     // Event delegation on optionsContainer for efficient option selection
     this.optionsContainer.addEventListener('click', (e) => {
       const optDiv = e.target.closest('.custom-select-option');
-      if (optDiv && optDiv.dataset.value !== undefined) {
+      if (optDiv && optDiv.dataset.value !== undefined && !optDiv.classList.contains('disabled')) {
         e.stopPropagation();
         this.select.value = optDiv.dataset.value;
         this.select.dispatchEvent(new Event('change'));
@@ -599,16 +705,68 @@ class CustomSelect {
     window.customSelectsMap.set(this.select.id || this.select, this);
   }
 
+  getNextAvailableIndex(fromIdx, direction = 1) {
+    const children = Array.from(this.optionsContainer.children);
+    const len = children.length;
+    if (len === 0) return -1;
+    let curr = fromIdx + direction;
+    while (curr >= 0 && curr < len) {
+      if (!children[curr].classList.contains('disabled')) {
+        return curr;
+      }
+      curr += direction;
+    }
+    return fromIdx >= 0 ? fromIdx : this.getFirstAvailableIndex();
+  }
+
+  getFirstAvailableIndex() {
+    const children = Array.from(this.optionsContainer.children);
+    return children.findIndex(c => !c.classList.contains('disabled'));
+  }
+
+  getLastAvailableIndex() {
+    const children = Array.from(this.optionsContainer.children);
+    for (let i = children.length - 1; i >= 0; i--) {
+      if (!children[i].classList.contains('disabled')) return i;
+    }
+    return -1;
+  }
+
+  setFocusedOptionIndex(idx) {
+    const children = Array.from(this.optionsContainer.children);
+    children.forEach(c => c.classList.remove('focused'));
+
+    if (idx >= 0 && idx < children.length && !children[idx].classList.contains('disabled')) {
+      this.focusedIndex = idx;
+      const target = children[idx];
+      target.classList.add('focused');
+      if (target.id) {
+        this.trigger.setAttribute('aria-activedescendant', target.id);
+      }
+      target.scrollIntoView({ block: 'nearest' });
+    } else {
+      this.focusedIndex = -1;
+      this.trigger.removeAttribute('aria-activedescendant');
+    }
+  }
+
   updateOptions() {
     this.optionsContainer.innerHTML = '';
     const options = Array.from(this.select.options);
     const frag = document.createDocumentFragment();
 
-    options.forEach(opt => {
+    options.forEach((opt, idx) => {
       const optDiv = document.createElement('div');
       optDiv.className = 'custom-select-option';
+      optDiv.id = `opt-${this.instanceId}-${idx}`;
+      optDiv.setAttribute('role', 'option');
+      optDiv.setAttribute('aria-selected', opt.value === this.select.value ? 'true' : 'false');
       optDiv.textContent = opt.textContent;
       optDiv.dataset.value = opt.value;
+      if (opt.disabled) {
+        optDiv.classList.add('disabled');
+        optDiv.setAttribute('aria-disabled', 'true');
+      }
       frag.appendChild(optDiv);
     });
 
@@ -622,10 +780,13 @@ class CustomSelect {
     this.trigger.querySelector('.custom-select-value').textContent = valText;
 
     Array.from(this.optionsContainer.children).forEach(child => {
-      if (child.dataset.value === this.select.value) {
+      const isSelected = child.dataset.value === this.select.value;
+      if (isSelected) {
         child.classList.add('selected');
+        child.setAttribute('aria-selected', 'true');
       } else {
         child.classList.remove('selected');
+        child.setAttribute('aria-selected', 'false');
       }
     });
   }
@@ -677,11 +838,20 @@ class CustomSelect {
 
     // 2. Position the container first while it's still closed
     this.isOpen = true;
+    this.trigger.setAttribute('aria-expanded', 'true');
     this.updatePosition();
 
     // Attach scroll and resize listeners only while open
     window.addEventListener('scroll', this._scrollResizeHandler, true);
     window.addEventListener('resize', this._scrollResizeHandler);
+
+    // Focus active or selected non-disabled option
+    const children = Array.from(this.optionsContainer.children);
+    let selectedIdx = children.findIndex(c => c.classList.contains('selected') && !c.classList.contains('disabled'));
+    if (selectedIdx === -1) {
+      selectedIdx = this.getFirstAvailableIndex();
+    }
+    this.setFocusedOptionIndex(selectedIdx);
 
     // 3. Use double requestAnimationFrame to defer class additions to the next frames,
     // avoiding layout thrashing/reflow block while starting CSS transitions.
@@ -699,6 +869,10 @@ class CustomSelect {
     this.container.classList.remove('open');
     this.optionsContainer.classList.remove('open');
     this.isOpen = false;
+    this.trigger.setAttribute('aria-expanded', 'false');
+    this.setFocusedOptionIndex(-1);
+    this.typeaheadBuffer = '';
+    clearTimeout(this.typeaheadTimeout);
 
     // Detach scroll and resize listeners immediately on close
     window.removeEventListener('scroll', this._scrollResizeHandler, true);
@@ -713,6 +887,10 @@ class CustomSelect {
   }
 
   destroy() {
+    clearTimeout(this.typeaheadTimeout);
+    if (this.trigger && this._keydownHandler) {
+      this.trigger.removeEventListener('keydown', this._keydownHandler);
+    }
     document.removeEventListener('click', this._documentClickHandler);
     window.removeEventListener('scroll', this._scrollResizeHandler, true);
     window.removeEventListener('resize', this._scrollResizeHandler);

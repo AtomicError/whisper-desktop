@@ -75,16 +75,13 @@ pub fn probe_file_metadata(app: Option<&AppHandle>, file_path: &str) -> FileMeta
     
     // Format detection
     let ext = path.extension().unwrap_or_default().to_string_lossy().to_lowercase();
-    match ext.as_str() {
-        "mp4" | "mkv" | "avi" | "mov" | "flv" | "webm" | "m4v" => {
-            meta.format = "🎥 Video".to_string();
-        }
-        "mp3" | "wav" | "ogg" | "m4a" | "flac" | "aac" | "wma" => {
-            meta.format = "🎵 Audio".to_string();
-        }
-        _ => {
-            meta.format = "📁 File".to_string();
-        }
+    let ext_str = ext.as_str();
+    if crate::VIDEO_EXTENSIONS.contains(&ext_str) {
+        meta.format = "🎥 Video".to_string();
+    } else if crate::AUDIO_EXTENSIONS.contains(&ext_str) {
+        meta.format = "🎵 Audio".to_string();
+    } else {
+        meta.format = "📁 File".to_string();
     }
     
     // ffprobe for duration

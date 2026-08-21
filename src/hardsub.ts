@@ -1671,29 +1671,25 @@ export class HardsubController {
     const subDrop = document.getElementById('hardsub-sub-drop-zone');
     const hardsubPanel = document.getElementById('panel-hardsub');
 
+    const SUPPORTED_VIDEO_EXTS = new Set([
+      '.mp4', '.mkv', '.avi', '.mov', '.flv', '.webm', '.m4v', '.wmv',
+      '.ts', '.mts', '.m2ts', '.3gp', '.3g2', '.mpeg', '.mpg', '.vob', '.ogv', '.f4v'
+    ]);
+
+    const SUPPORTED_SUB_EXTS = new Set([
+      '.srt', '.vtt', '.ass', '.ssa', '.sub', '.lrc'
+    ]);
+
     const handleFiles = (files: string[]) => {
       files.forEach((filePath) => {
-        const lower = filePath.toLowerCase();
-        if (
-          lower.endsWith('.mp4') ||
-          lower.endsWith('.mkv') ||
-          lower.endsWith('.webm') ||
-          lower.endsWith('.mov') ||
-          lower.endsWith('.avi') ||
-          lower.endsWith('.flv') ||
-          lower.endsWith('.wmv') ||
-          lower.endsWith('.m4v')
-        ) {
+        const lastDot = filePath.lastIndexOf('.');
+        const ext = lastDot !== -1 ? filePath.substring(lastDot).toLowerCase() : '';
+        if (SUPPORTED_VIDEO_EXTS.has(ext)) {
           if (this.videoPathInput) this.videoPathInput.value = filePath;
           this.state.videoPath = filePath;
           this.loadVideoMedia(filePath);
           this.autoSuggestSubtitleAndOutput(filePath);
-        } else if (
-          lower.endsWith('.srt') ||
-          lower.endsWith('.vtt') ||
-          lower.endsWith('.ass') ||
-          lower.endsWith('.lrc')
-        ) {
+        } else if (SUPPORTED_SUB_EXTS.has(ext)) {
           if (this.subtitlePathInput) this.subtitlePathInput.value = filePath;
           this.state.subtitlePath = filePath;
           this.loadSubtitleFile(filePath);
