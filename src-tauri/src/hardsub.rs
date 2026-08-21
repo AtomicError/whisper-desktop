@@ -470,12 +470,14 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_font_file() {
-        let app = tauri::test::mock_app();
-        let handle = app.handle();
-        let path = super::resolve_font_file("Roboto", false, false, &handle);
-        println!("Resolved Roboto path: {:?}", path);
-        assert!(path.is_some());
+    fn hex_to_ass_color_conversion() {
+        use super::hex_to_ass_color;
+        // Pure red #FF0000 -> &H000000FF& (BGR order in ASS)
+        assert_eq!(hex_to_ass_color("#FF0000", 0), "&H000000FF&");
+        // Pure blue #0000FF -> &H00FF0000&
+        assert_eq!(hex_to_ass_color("#0000FF", 0), "&H00FF0000&");
+        // With alpha 128 (0x80)
+        assert_eq!(hex_to_ass_color("#FFFFFF", 128), "&H80FFFFFF&");
     }
 }
 

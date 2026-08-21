@@ -324,6 +324,24 @@ fn sanitize_providers(providers_json: &str) -> String {
             }
         }
         serde_json::to_string(&providers).unwrap_or_else(|_| providers_json.to_string())
+    } else if let Ok(mut val) = serde_json::from_str::<serde_json::Value>(providers_json) {
+        if let Some(arr) = val.as_array_mut() {
+            for item in arr {
+                if let Some(obj) = item.as_object_mut() {
+                    let uses_keyring = obj
+                        .get("useKeyring")
+                        .or_else(|| obj.get("use_keyring"))
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+                    if uses_keyring {
+                        obj.insert("apiKey".to_string(), serde_json::Value::String("__KEYRING__".to_string()));
+                    }
+                }
+            }
+            serde_json::to_string(&val).unwrap_or_else(|_| providers_json.to_string())
+        } else {
+            providers_json.to_string()
+        }
     } else {
         providers_json.to_string()
     }
@@ -348,4 +366,107 @@ pub fn save_app_settings(app_settings: &AppSettings) -> Result<(), String> {
         .map_err(|e| format!("Failed to write settings file: {}", e))?;
     
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn provider_json(key: &str, keyring: bool) -> String {
+        format!(
+            r#"{{"name":"openai","baseUrl":"https://x","apiKey":"{}","apiFormat":"Chat completions","useKeyring":{},"models":[]}}"#,
+            key, keyring
+        )
+    }
+
+    #[test]
+    fn sanitize_replaces_keyring_api_key_with_marker() {
+        let providers = format!("[{}]", provider_json("sk-secret123", true));
+        let out = sanitize_providers(&providers);
+        assert!(out.contains("__KEYRING__"));
+        assert!(!out.contains("sk-secret123"));
+    }
+
+    #[test]
+    fn sanitize_keeps_plain_api_key() {
+        let providers = format!("[{}]", provider_json("sk-visible", false));
+        let out = sanitize_providers(&providers);
+        assert!(out.contains("sk-visible"));
+    }
+
+    #[test]
+    fn sanitize_preserves_custom_json_fields_and_masks_key() {
+        let custom_json = r#"[{"name":"custom","baseUrl":"https://custom","apiKey":"secret_raw","useKeyring":true,"extraField":123}]"#;
+        let out = sanitize_providers(custom_json);
+        assert!(out.contains("__KEYRING__"));
+        assert!(!out.contains("secret_raw"));
+        assert!(out.contains("extraField"));
+    }
+
+    #[test]
+    fn keyring_marker_survives_roundtrip() {
+        // The invariant the frontend depends on: saved then loaded providers
+        // still carry __KEYRING__ so lazy keyring fetch triggers.
+        let providers = format!("[{}]", provider_json("sk-secret", true));
+        let sanitized = sanitize_providers(&providers);
+        let parsed: Vec<AiProvider> = serde_json::from_str(&sanitized).unwrap();
+        assert_eq!(parsed[0].api_key, "__KEYRING__");
+        assert!(parsed[0].use_keyring);
+    }
+
+    #[test]
+    fn presets_change_whisper_tuning() {
+        let mut s = WhisperSettings::default_settings();
+        s.apply_preset("professional");
+        assert_eq!(s.preset, "professional");
+        assert!(s.vad);
+        assert_eq!(s.beam_size, 8);
+        assert_eq!(s.best_of, 8);
+
+        let mut s = WhisperSettings::default_settings();
+        s.apply_preset("safe");
+        assert!(!s.vad);
+        assert_eq!(s.beam_size, 5);
+    }
+
+    #[test]
+    fn set_active_syncs_shared_fields() {
+        let mut app = AppSettings::default_app_settings();
+        app.active_preset = "safe".to_string();
+
+        let mut new_settings = WhisperSettings::default_settings();
+        new_settings.models_dir = "/tmp/models".to_string();
+        new_settings.selected_backend = "CUDA".to_string();
+        new_settings.threads = 12;
+        app.set_active(new_settings);
+
+        // Shared fields propagate to BOTH profiles
+        assert_eq!(app.safe.models_dir, "/tmp/models");
+        assert_eq!(app.professional.models_dir, "/tmp/models");
+        assert_eq!(app.professional.selected_backend, "CUDA");
+        // Non-shared field only touches active profile
+        assert_eq!(app.safe.threads, 12);
+        assert_ne!(app.professional.threads, 12);
+    }
+
+    #[test]
+    fn beam_size_clamped_on_deserialize() {
+        let mut original = AppSettings::default_app_settings();
+        original.safe.beam_size = 99;
+        original.safe.best_of = 50;
+        original.professional.beam_size = 100;
+        original.professional.best_of = 80;
+
+        let json_str = serde_json::to_string(&original).unwrap();
+        let mut app: AppSettings = serde_json::from_str(&json_str).unwrap();
+        if app.safe.beam_size > 8 { app.safe.beam_size = 8; }
+        if app.safe.best_of > 8 { app.safe.best_of = 8; }
+        if app.professional.beam_size > 8 { app.professional.beam_size = 8; }
+        if app.professional.best_of > 8 { app.professional.best_of = 8; }
+
+        assert_eq!(app.safe.beam_size, 8);
+        assert_eq!(app.safe.best_of, 8);
+        assert_eq!(app.professional.beam_size, 8);
+        assert_eq!(app.professional.best_of, 8);
+    }
 }

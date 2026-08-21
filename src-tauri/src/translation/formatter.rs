@@ -1,5 +1,10 @@
 use std::collections::HashMap;
+use std::sync::LazyLock;
 use regex::Regex;
+
+static LRC_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^(\s*\[\d{2,3}:\d{2}(?:[.:]\d{2,3})?\])(.*)$").expect("valid lrc regex")
+});
 
 #[derive(Clone, Debug)]
 pub struct TimedCue {
@@ -44,9 +49,15 @@ impl ParsedSubtitle {
                     let timeline = line.clone();
                     let mut cue_id = None;
                     
-                    // Check if last line added was a cue ID (pure integer)
+                    // Check if last line added was a cue ID
                     if let Some(FileLine::Other(prev_str)) = file_lines.last() {
-                        if prev_str.trim().chars().all(|c| c.is_ascii_digit()) {
+                        let trimmed = prev_str.trim();
+                        let is_valid_cue_id = if format_lower == "srt" {
+                            trimmed.chars().all(|c| c.is_ascii_digit())
+                        } else {
+                            !trimmed.is_empty() && !trimmed.contains("-->") && !trimmed.starts_with("NOTE") && !trimmed.starts_with("WEBVTT")
+                        };
+                        if is_valid_cue_id {
                             cue_id = Some(prev_str.clone());
                             file_lines.pop(); // Remove it from lines, it belongs to the Cue
                         }
@@ -87,10 +98,8 @@ impl ParsedSubtitle {
                 }
             }
         } else if format_lower == "lrc" {
-            // LRC parser: matching timestamps like [00:12.34] or [00:12:34]
-            let lrc_re = Regex::new(r"^(\s*\[\d{2,3}:\d{2}(?:[.:]\d{2,3})?\])(.*)$").expect("static regex");
             for line in lines {
-                if let Some(caps) = lrc_re.captures(&line) {
+                if let Some(caps) = LRC_RE.captures(&line) {
                     let timeline = caps.get(1).expect("lrc regex group 1").as_str().to_string();
                     let text = caps.get(2).expect("lrc regex group 2").as_str().to_string();
                     
@@ -150,7 +159,11 @@ impl ParsedSubtitle {
                             output_lines.push(cue.timeline.clone());
                             output_lines.push(text.clone());
                         } else if self.format == "lrc" {
-                            output_lines.push(format!("{} {}", cue.timeline, text));
+                            if text.is_empty() {
+                                output_lines.push(cue.timeline.clone());
+                            } else {
+                                output_lines.push(format!("{} {}", cue.timeline, text));
+                            }
                         } else {
                             // TXT
                             output_lines.push(text.clone());
@@ -167,5 +180,69 @@ impl ParsedSubtitle {
         }
         
         output_lines.join("\n")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse(content: &str, format: &str) -> ParsedSubtitle {
+        ParsedSubtitle::parse(content, format)
+    }
+
+    fn map(pairs: &[(usize, &str)]) -> HashMap<usize, String> {
+        pairs.iter().map(|(i, s)| (*i, s.to_string())).collect()
+    }
+
+    #[test]
+    fn srt_roundtrip_with_translation() {
+        let content = "1\n00:00:10,000 --> 00:00:12,000\nHello\n\n2\n00:00:13,000 --> 00:00:15,000\nWorld\n";
+        let p = parse(content, "srt");
+        assert_eq!(p.cues.len(), 2);
+        assert_eq!(p.cues[0].cue_id.as_deref(), Some("1"));
+        assert_eq!(p.cues[0].text, "Hello");
+
+        let out = p.reconstruct(&map(&[(1, "سلام"), (2, "دنیا")]));
+        assert_eq!(
+            out,
+            "1\n00:00:10,000 --> 00:00:12,000\nسلام\n\n2\n00:00:13,000 --> 00:00:15,000\nدنیا\n"
+        );
+    }
+
+    #[test]
+    fn vtt_header_preserved() {
+        let content = "WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nHi\n";
+        let p = parse(content, "vtt");
+        assert_eq!(p.cues.len(), 1);
+        let out = p.reconstruct(&HashMap::new());
+        // Untranslated reconstruct must be byte-identical (incl. trailing newline)
+        assert_eq!(out, content);
+    }
+
+    #[test]
+    fn lrc_multiple_timestamps_parse() {
+        let content = "[00:12.34]First line\n[01:05.00]Second line\nnot a cue\n";
+        let p = parse(content, "lrc");
+        assert_eq!(p.cues.len(), 2);
+        assert_eq!(p.cues[0].timeline, "[00:12.34]");
+        assert_eq!(p.cues[1].text, "Second line");
+    }
+
+    #[test]
+    fn txt_each_line_is_cue() {
+        let p = parse("alpha\n\nbeta\n", "txt");
+        assert_eq!(p.cues.len(), 2);
+        let out = p.reconstruct(&map(&[(1, "one")]));
+        assert!(out.contains("one"));
+        assert!(out.contains("beta"));
+    }
+
+    #[test]
+    fn missing_translations_fall_back_to_original() {
+        let content = "1\n00:00:10,000 --> 00:00:12,000\nKeep\n";
+        let p = parse(content, "srt");
+        let out = p.reconstruct(&HashMap::new());
+        assert!(out.contains("Keep"));
     }
 }

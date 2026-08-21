@@ -329,15 +329,25 @@ pub async fn run_model_download(
 }
 
 #[tauri::command]
-pub fn get_all_models_status(
+pub async fn get_all_models_status(
     download_state: State<'_, DownloadState>,
     models_dir: String,
 ) -> Result<Vec<ModelStatus>, String> {
-    let models_dir_path = Path::new(&models_dir);
-    let active_downloads = if let Ok(lock) = download_state.0.lock() {
-        lock.active_downloads.clone()
-    } else {
-        HashMap::new()
+    // Stats ~80 filesystem paths per call — keep off the IPC thread
+    let session = download_state.0.clone();
+    tokio::task::spawn_blocking(move || get_all_models_status_sync(&session, &models_dir))
+        .await
+        .map_err(|e| format!("model status scan failed: {}", e))?
+}
+
+fn get_all_models_status_sync(
+    download_state: &Arc<Mutex<DownloadSession>>,
+    models_dir: &str,
+) -> Result<Vec<ModelStatus>, String> {
+    let models_dir_path = Path::new(models_dir);
+    let active_models: std::collections::HashSet<String> = match download_state.lock() {
+        Ok(lock) => lock.active_downloads.keys().cloned().collect(),
+        Err(poisoned) => poisoned.into_inner().active_downloads.keys().cloned().collect(),
     };
 
     let mut result = Vec::new();
@@ -351,7 +361,7 @@ pub fn get_all_models_status(
         let tmp_path = models_dir_path.join(&tmp_name);
 
         let expected_size = get_expected_model_size(m);
-        let is_active = active_downloads.contains_key(m);
+        let is_active = active_models.contains(m);
 
         let mut bin_exists = bin_path.exists();
         let mut tmp_exists = tmp_path.exists();

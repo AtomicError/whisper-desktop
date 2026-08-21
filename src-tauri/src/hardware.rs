@@ -17,6 +17,7 @@ pub struct HardwareMonitor {
     last_drm_clients: HashMap<String, (u64, u64)>,
     last_drm_engines: HashMap<String, u64>,
     last_poll_time: Option<std::time::Instant>,
+    last_nvidia_smi: Option<(String, std::time::Instant)>,
 }
 
 const BYTES_TO_GB: f64 = 1024.0 * 1024.0 * 1024.0;
@@ -39,6 +40,7 @@ impl HardwareMonitor {
             last_drm_clients: HashMap::new(),
             last_drm_engines: HashMap::new(),
             last_poll_time: None,
+            last_nvidia_smi: None,
         }
     }
 
@@ -76,16 +78,36 @@ impl HardwareMonitor {
     fn get_gpu_stats(&mut self) -> String {
         match self.gpu_type.as_str() {
             "nvidia" => {
-                if let Ok(output) = Command::new("nvidia-smi")
+                let now = std::time::Instant::now();
+                if let Some((cached, at)) = &self.last_nvidia_smi {
+                    if now.duration_since(*at) < std::time::Duration::from_secs(2) {
+                        return cached.clone();
+                    }
+                }
+                let result = if let Ok(output) = Command::new("nvidia-smi")
                     .args(["--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"])
                     .output()
                 {
-                    let out_str = String::from_utf8_lossy(&output.stdout);
-                    if let Some(line) = out_str.lines().next() {
-                        return format!("NVIDIA: {}%", line.trim());
+                    if output.status.success() {
+                        let out_str = String::from_utf8_lossy(&output.stdout);
+                        if let Some(line) = out_str.lines().next() {
+                            let trimmed = line.trim();
+                            if trimmed.parse::<f64>().is_ok() {
+                                format!("NVIDIA: {}%", trimmed)
+                            } else {
+                                "NVIDIA: N/A".to_string()
+                            }
+                        } else {
+                            "NVIDIA: N/A".to_string()
+                        }
+                    } else {
+                        "NVIDIA: N/A".to_string()
                     }
-                }
-                "NVIDIA: N/A".to_string()
+                } else {
+                    "NVIDIA: N/A".to_string()
+                };
+                self.last_nvidia_smi = Some((result.clone(), now));
+                result
             }
             "amd" => {
                 for card in ["card0", "card1", "card2"] {

@@ -241,23 +241,36 @@ pub struct ModelScanResult {
     pub vad_models: Vec<String>,
 }
 
+const MAX_SCAN_DEPTH: usize = 8;
+
 fn walk_models_dir(
     dir: &Path,
     root: &Path,
     backend: &str,
+    depth: usize,
     trans_models: &mut Vec<String>,
     vad_models: &mut Vec<String>,
 ) {
+    if depth > MAX_SCAN_DEPTH {
+        return;
+    }
+
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.is_dir() {
+            let file_type = match entry.file_type() {
+                Ok(ft) => ft,
+                Err(_) => continue,
+            };
+
+            // Avoid recursing into directory symlinks to prevent infinite recursion loops
+            if file_type.is_dir() && !file_type.is_symlink() {
                 let dir_name = path.file_name().unwrap_or_default().to_string_lossy();
                 // Avoid recursing into hidden directories or huge dependency/build directories
                 if !dir_name.starts_with('.') && dir_name != "node_modules" && dir_name != "target" && dir_name != "build" {
-                    walk_models_dir(&path, root, backend, trans_models, vad_models);
+                    walk_models_dir(&path, root, backend, depth + 1, trans_models, vad_models);
                 }
-            } else if path.is_file() {
+            } else if file_type.is_file() || (file_type.is_symlink() && path.is_file()) {
                 let filename = path.file_name().unwrap_or_default().to_string_lossy();
                 if filename.ends_with(".bin") && (filename.contains("ggml-") || filename.contains("silero")) {
                     let rel_path = path.strip_prefix(root)
@@ -271,9 +284,11 @@ fn walk_models_dir(
                         if backend == "OpenVINO" {
                             let base_name = filename.strip_suffix(".bin").unwrap_or(&filename);
                             let ov_encoder_name = format!("{}-encoder-openvino.bin", base_name);
-                            let ov_encoder_path = path.parent().expect("file path has parent").join(ov_encoder_name);
-                            if ov_encoder_path.exists() {
-                                trans_models.push(rel_path);
+                            if let Some(parent) = path.parent() {
+                                let ov_encoder_path = parent.join(ov_encoder_name);
+                                if ov_encoder_path.exists() {
+                                    trans_models.push(rel_path);
+                                }
                             }
                         } else {
                             trans_models.push(rel_path);
@@ -286,28 +301,26 @@ fn walk_models_dir(
 }
 
 #[tauri::command]
-fn scan_models(models_dir: String, backend: String) -> ModelScanResult {
-    let mut trans_models = Vec::new();
-    let mut vad_models = Vec::new();
-    
-    let root = Path::new(&models_dir);
-    let models_dir_path = root;
-    
-    if models_dir_path.exists() && models_dir_path.is_dir() {
-        walk_models_dir(models_dir_path, root, &backend, &mut trans_models, &mut vad_models);
-    }
-    
-    if trans_models.is_empty() {
-        trans_models.push("No trans models found".to_string());
-    }
-    if vad_models.is_empty() {
-        vad_models.push("No VAD models found".to_string());
-    }
-    
-    trans_models.sort();
-    vad_models.sort();
-    
-    ModelScanResult { trans_models, vad_models }
+async fn scan_models(models_dir: String, backend: String) -> Result<ModelScanResult, String> {
+    // Directory walk can be slow on large/NFS models dirs — keep it off the IPC thread
+    tokio::task::spawn_blocking(move || {
+        let mut trans_models = Vec::new();
+        let mut vad_models = Vec::new();
+
+        let root = Path::new(&models_dir);
+        let models_dir_path = root;
+
+        if models_dir_path.exists() && models_dir_path.is_dir() {
+            walk_models_dir(models_dir_path, root, &backend, 0, &mut trans_models, &mut vad_models);
+        }
+
+        trans_models.sort();
+        vad_models.sort();
+
+        ModelScanResult { trans_models, vad_models }
+    })
+    .await
+    .map_err(|e| format!("model scan failed: {}", e))
 }
 
 use tauri_plugin_dialog::DialogExt;
