@@ -5048,6 +5048,77 @@ select.select-control {
   }
 }
 
+/* Quality Preset Buttons & Segmented Controls */
+.quality-preset-btn {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  color: var(--color-text-main);
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.quality-preset-btn:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.16);
+  transform: translateY(-1px);
+}
+
+.quality-preset-btn:focus-visible {
+  outline: 2px solid var(--color-royal-blue);
+  outline-offset: 2px;
+}
+
+.quality-preset-btn.active {
+  background: rgba(59, 130, 246, 0.16) !important;
+  border-color: var(--color-royal-blue) !important;
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.25);
+}
+
+.quality-preset-btn .preset-title {
+  color: var(--color-text-main);
+  transition: color 0.2s ease;
+}
+
+.quality-preset-btn.active .preset-title,
+.quality-preset-btn.active span:first-child {
+  color: var(--color-royal-blue) !important;
+}
+
+.segmented-chip {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: none;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.segmented-chip:hover {
+  color: var(--color-text-main);
+}
+
+.segmented-chip.active {
+  background: var(--color-royal-blue) !important;
+  color: #ffffff !important;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+}
+
+#hardsub-ffmpeg-cmd-preview::-webkit-scrollbar {
+  height: 4px;
+}
+
+#hardsub-ffmpeg-cmd-preview::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+#hardsub-ffmpeg-cmd-preview::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+
+
 
 
 

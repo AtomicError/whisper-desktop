@@ -48,6 +48,11 @@ export interface HardsubSettings {
   outputFormat: string;
   videoCodec: string;
   hwAccel: string;
+  videoQualityMode: 'preset' | 'custom';
+  videoQualityPreset: 'draft' | 'balanced' | 'high' | 'lossless' | 'custom';
+  videoQualityValue: number;
+  videoPresetSpeed: 'fast' | 'medium' | 'slow';
+  resolutionScale: 'original' | '4k' | '2k' | '1080p' | '720p' | '480p';
   fontName: string;
   fontSize: number;
   primaryColor: string;
@@ -62,7 +67,8 @@ export interface HardsubSettings {
   bold: boolean;
   italic: boolean;
   alignment: number;
-  audioMode: string;
+  audioCodec: 'copy' | 'aac' | 'opus' | 'mp3' | 'mute';
+  audioBitrate: '96k' | '128k' | '192k' | '256k' | '320k';
 }
 
 export interface SubtitleCue {
@@ -515,7 +521,6 @@ export class HardsubController {
   private formatSelect: HTMLSelectElement | null = null;
   private codecSelect: HTMLSelectElement | null = null;
   private hwSelect: HTMLSelectElement | null = null;
-  private audioSelect: HTMLSelectElement | null = null;
   private alignmentButtons: NodeListOf<HTMLButtonElement> | null = null;
   private cancelBtn: HTMLButtonElement | null = null;
 
@@ -595,6 +600,23 @@ export class HardsubController {
   private progressPctText: HTMLElement | null = null;
   private hudPulseDot: HTMLElement | null = null;
 
+  // Export Panel Elements
+  private resolutionSelect: HTMLSelectElement | null = null;
+  private qualityBadge: HTMLElement | null = null;
+  private qualityPresetsContainer: HTMLElement | null = null;
+  private qualityPresetBtns: NodeListOf<HTMLButtonElement> | null = null;
+  private qualitySliderContainer: HTMLElement | null = null;
+  private qualityParamLabel: HTMLElement | null = null;
+  private qualityParamVal: HTMLElement | null = null;
+  private qualitySlider: HTMLInputElement | null = null;
+  private qualityHint: HTMLElement | null = null;
+  private speedPresetSelect: HTMLSelectElement | null = null;
+  private audioCodecSelect: HTMLSelectElement | null = null;
+  private audioBitrateContainer: HTMLElement | null = null;
+  private audioBitrateSelect: HTMLSelectElement | null = null;
+  private ffmpegCmdPreview: HTMLElement | null = null;
+  private btnCopyFfmpegCmd: HTMLButtonElement | null = null;
+
   // Internal State
   private state: HardsubSettings = {
     videoPath: '',
@@ -603,6 +625,11 @@ export class HardsubController {
     outputFormat: 'mp4',
     videoCodec: 'h264',
     hwAccel: 'cpu',
+    videoQualityMode: 'preset',
+    videoQualityPreset: 'balanced',
+    videoQualityValue: 22,
+    videoPresetSpeed: 'medium',
+    resolutionScale: 'original',
     fontName: 'Vazirmatn',
     fontSize: 24,
     primaryColor: '#FFFFFF',
@@ -617,9 +644,15 @@ export class HardsubController {
     bold: true,
     italic: false,
     alignment: 2, // Bottom center
-    audioMode: 'copy',
+    audioCodec: 'copy',
+    audioBitrate: '192k',
   };
 
+  private storageDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private qualityScaleSig: string | null = null;
+  private qualityScaleMin = 0;
+  private qualityScaleMax = 51;
+  private qualityScaleHigherIsBetter = false;
   private isEncoding: boolean = false;
   private subtitleCues: SubtitleCue[] = [];
   private activeCueId: number | null = null;
@@ -650,15 +683,22 @@ export class HardsubController {
         this.outlineSizeSlider,
         this.bgBoxOpacitySlider,
         this.bgBoxRadiusSlider,
+        this.qualitySlider,
       ].forEach((slider) => {
         if (slider) this.updateSliderBackground(slider);
       });
       this.loadFontsAndHardware();
+      this.loadExportSettingsFromStorage();
       this.setupEventListeners();
+      this.setupExportEventListeners();
       this.setupVideoPlayerEvents();
       this.setupStudioTabEvents();
       this.setupDragAndDropListeners();
       this.listenToProgressEvents();
+      this.updateQualitySliderConfig();
+      this.updateQualityUI();
+      this.updateAudioUI();
+      this.updateFfmpegCommandPreview();
       this.updateEncodingUIState(false);
       this.updateVolumeIcons(1.0, false);
 
@@ -711,9 +751,25 @@ export class HardsubController {
     this.formatSelect = document.getElementById('hardsub-format') as HTMLSelectElement;
     this.codecSelect = document.getElementById('hardsub-codec') as HTMLSelectElement;
     this.hwSelect = document.getElementById('hardsub-hw') as HTMLSelectElement;
-    this.audioSelect = document.getElementById('hardsub-audio') as HTMLSelectElement;
     this.alignmentButtons = document.querySelectorAll('.align-btn');
     this.cancelBtn = document.getElementById('btn-cancel-hardsub') as HTMLButtonElement;
+
+    // Export Tab Elements
+    this.resolutionSelect = document.getElementById('hardsub-resolution') as HTMLSelectElement;
+    this.qualityBadge = document.getElementById('hardsub-quality-badge');
+    this.qualityPresetsContainer = document.getElementById('hardsub-quality-presets-container');
+    this.qualityPresetBtns = document.querySelectorAll('.quality-preset-btn');
+    this.qualitySliderContainer = document.getElementById('hardsub-quality-slider-container');
+    this.qualityParamLabel = document.getElementById('hardsub-quality-param-label');
+    this.qualityParamVal = document.getElementById('hardsub-quality-param-val');
+    this.qualitySlider = document.getElementById('hardsub-quality-slider') as HTMLInputElement;
+    this.qualityHint = document.getElementById('hardsub-quality-hint');
+    this.speedPresetSelect = document.getElementById('hardsub-speed-preset') as HTMLSelectElement;
+    this.audioCodecSelect = document.getElementById('hardsub-audio-codec') as HTMLSelectElement;
+    this.audioBitrateContainer = document.getElementById('hardsub-audio-bitrate-container');
+    this.audioBitrateSelect = document.getElementById('hardsub-audio-bitrate') as HTMLSelectElement;
+    this.ffmpegCmdPreview = document.getElementById('hardsub-ffmpeg-cmd-preview');
+    this.btnCopyFfmpegCmd = document.getElementById('btn-copy-ffmpeg-cmd') as HTMLButtonElement;
 
     this.subtitleCanvas = document.getElementById('hardsub-subtitle-canvas') as HTMLCanvasElement;
     if (this.subtitleCanvas) {
@@ -874,9 +930,16 @@ export class HardsubController {
           }
         }
         this.updateSupportedCodecs();
+        this.updateQualitySliderConfig();
+        this.updateQualityUI();
+        this.updateFfmpegCommandPreview();
       }
     } catch (e) {
       console.warn('Failed to probe hardware encoders:', e);
+      this.updateSupportedCodecs();
+      this.updateQualitySliderConfig();
+      this.updateQualityUI();
+      this.updateFfmpegCommandPreview();
     }
   }
 
@@ -1170,19 +1233,6 @@ export class HardsubController {
     });
 
     // Format & Codec & HW Acceleration
-    this.formatSelect?.addEventListener('change', () => {
-      this.state.outputFormat = this.formatSelect!.value;
-    });
-    this.codecSelect?.addEventListener('change', () => {
-      this.state.videoCodec = this.codecSelect!.value;
-    });
-    this.hwSelect?.addEventListener('change', () => {
-      this.state.hwAccel = this.hwSelect!.value;
-      this.updateSupportedCodecs();
-    });
-    this.audioSelect?.addEventListener('change', () => {
-      this.state.audioMode = this.audioSelect!.value;
-    });
 
     // Alignment Controls (Independent Vertical + Horizontal Segmented Pickers)
     const alignValLabel = document.getElementById('hardsub-align-val');
@@ -1264,6 +1314,573 @@ export class HardsubController {
         console.warn('Cancel hardsub error:', e);
       }
     });
+  }
+
+  private setupExportEventListeners() {
+    // Format Select
+    this.formatSelect?.addEventListener('change', () => {
+      this.state.outputFormat = this.formatSelect!.value;
+      if (this.state.videoPath) {
+        this.autoSuggestSubtitleAndOutput(this.state.videoPath);
+      }
+      this.saveExportSettingsToStorage();
+      this.updateFfmpegCommandPreview();
+    });
+
+    // Hardware Accelerator Select
+    this.hwSelect?.addEventListener('change', () => {
+      this.state.hwAccel = this.hwSelect!.value;
+      this.updateSupportedCodecs();
+      this.updateQualitySliderConfig();
+      if (this.state.videoQualityMode === 'preset') {
+        this.syncQualityPresetToSlider();
+      }
+      this.saveExportSettingsToStorage();
+      this.updateFfmpegCommandPreview();
+    });
+
+    // Video Codec Select
+    this.codecSelect?.addEventListener('change', () => {
+      this.state.videoCodec = this.codecSelect!.value;
+      this.updateQualitySliderConfig();
+      if (this.state.videoQualityMode === 'preset') {
+        this.syncQualityPresetToSlider();
+      }
+      this.saveExportSettingsToStorage();
+      this.updateFfmpegCommandPreview();
+    });
+
+    // Resolution Select
+    this.resolutionSelect?.addEventListener('change', () => {
+      this.state.resolutionScale = (this.resolutionSelect!.value || 'original') as any;
+      this.saveExportSettingsToStorage();
+      this.updateFfmpegCommandPreview();
+    });
+
+    // Quality Preset Buttons (Interactive snapping)
+    this.qualityPresetBtns?.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const p = (btn.dataset.preset || 'balanced') as 'draft' | 'balanced' | 'high' | 'lossless';
+        this.state.videoQualityPreset = p;
+        this.state.videoQualityMode = 'preset';
+        this.syncQualityPresetToSlider();
+        this.updateQualityUI();
+        this.saveExportSettingsToStorage();
+        this.updateFfmpegCommandPreview();
+      });
+    });
+
+    // Custom Quality Slider (Interactive bidirectional adjustment)
+    this.qualitySlider?.addEventListener('input', () => {
+      if (!this.qualitySlider) return;
+      const parsedVal = parseInt(this.qualitySlider.value, 10);
+      const val = Number.isNaN(parsedVal) ? this.state.videoQualityValue : parsedVal;
+      this.state.videoQualityValue = val;
+      if (this.qualityParamVal) {
+        this.qualityParamVal.textContent = String(val);
+      }
+      this.updateSliderBackground(this.qualitySlider);
+
+      // Check if current value matches any preset
+      const presets: Array<'draft' | 'balanced' | 'high' | 'lossless'> = ['draft', 'balanced', 'high', 'lossless'];
+      const matched = presets.find((p) => this.getRecommendedQualityValue(p) === val);
+      if (matched) {
+        this.state.videoQualityPreset = matched;
+        this.state.videoQualityMode = 'preset';
+      } else {
+        this.state.videoQualityPreset = 'custom';
+        this.state.videoQualityMode = 'custom';
+      }
+
+      this.updateQualityUI();
+      this.saveExportSettingsToStorage();
+      this.updateFfmpegCommandPreview();
+    });
+
+    // Speed Preset Select
+    this.speedPresetSelect?.addEventListener('change', () => {
+      this.state.videoPresetSpeed = (this.speedPresetSelect!.value || 'medium') as any;
+      this.saveExportSettingsToStorage();
+      this.updateFfmpegCommandPreview();
+    });
+
+    // Audio Codec Select
+    this.audioCodecSelect?.addEventListener('change', () => {
+      this.state.audioCodec = (this.audioCodecSelect!.value || 'copy') as any;
+      this.updateAudioUI();
+      this.saveExportSettingsToStorage();
+      this.updateFfmpegCommandPreview();
+    });
+
+    // Audio Bitrate Select
+    this.audioBitrateSelect?.addEventListener('change', () => {
+      this.state.audioBitrate = (this.audioBitrateSelect!.value || '192k') as any;
+      this.saveExportSettingsToStorage();
+      this.updateFfmpegCommandPreview();
+    });
+
+    // Copy FFmpeg Command Button (uses global multi-tier clipboard helper from main.js)
+    this.btnCopyFfmpegCmd?.addEventListener('click', async () => {
+      const text = this.ffmpegCmdPreview?.textContent?.trim();
+      if (!text) return;
+      const notifyFn = (window as any).showNotification;
+      const notify = (msg: string, type: string) => {
+        if (typeof notifyFn === 'function') {
+          notifyFn(msg, type, 3000);
+        }
+      };
+      try {
+        const copyFn = (window as any).copyToClipboard;
+        if (typeof copyFn === 'function') {
+          await copyFn(text);
+        } else if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+          await navigator.clipboard.writeText(text);
+        } else {
+          throw new Error('No clipboard provider available');
+        }
+        notify('FFmpeg command copied to clipboard!', 'success');
+      } catch (e) {
+        console.warn('Failed to copy command to clipboard:', e);
+        notify('Failed to copy FFmpeg command.', 'error');
+      }
+    });
+  }
+
+  private updateQualitySliderConfig() {
+    if (!this.qualitySlider || !this.qualityParamLabel) return;
+    const hw = this.state.hwAccel || 'cpu';
+    const codec = this.state.videoCodec || 'h264';
+
+    let min = 0;
+    let max = 51;
+
+    if (hw === 'videotoolbox' && codec !== 'prores') {
+      this.qualityParamLabel.textContent = 'Quality % (Apple VideoToolbox)';
+      min = 1;
+      max = 100;
+      if (this.qualityHint) {
+        this.qualityHint.textContent = 'Higher value = Higher visual quality & larger file size (1-100)';
+      }
+    } else if (hw === 'nvenc') {
+      this.qualityParamLabel.textContent = 'CQ (NVIDIA Constant Quality)';
+      min = 1;
+      max = 51;
+      if (this.qualityHint) {
+        this.qualityHint.textContent = 'Lower value = Higher visual quality & larger file size (1-51)';
+      }
+    } else if (hw === 'qsv') {
+      this.qualityParamLabel.textContent = 'Global Quality (Intel QuickSync)';
+      min = 1;
+      max = 51;
+      if (this.qualityHint) {
+        this.qualityHint.textContent = 'Lower value = Higher visual quality & larger file size (1-51)';
+      }
+    } else if (hw === 'vaapi') {
+      this.qualityParamLabel.textContent = 'QP (Linux VA-API Constant QP)';
+      min = 1;
+      max = 51;
+      if (this.qualityHint) {
+        this.qualityHint.textContent = 'Lower value = Higher visual quality & larger file size (1-51)';
+      }
+    } else if (codec === 'prores') {
+      this.qualityParamLabel.textContent = 'ProRes Profile (0=Proxy, 1=LT, 2=Std, 3=HQ, 4=4444)';
+      min = 0;
+      max = 5;
+      if (this.qualityHint) {
+        this.qualityHint.textContent = 'Higher profile = Higher bit depth & lower compression';
+      }
+    } else if (codec === 'av1') {
+      this.qualityParamLabel.textContent = 'CRF (libsvtav1 Constant Rate Factor)';
+      min = 0;
+      max = 63;
+      if (this.qualityHint) {
+        this.qualityHint.textContent = 'Lower value = Higher visual quality & larger file size (0-63)';
+      }
+    } else if (codec === 'vp9') {
+      this.qualityParamLabel.textContent = 'CRF (libvpx-vp9 Constant Rate Factor)';
+      min = 0;
+      max = 63;
+      if (this.qualityHint) {
+        this.qualityHint.textContent = 'Lower value = Higher visual quality & larger file size (0-63)';
+      }
+    } else {
+      const encoderName = codec === 'h265' ? 'libx265' : 'libx264';
+      this.qualityParamLabel.textContent = `CRF (${encoderName} Constant Rate Factor)`;
+      min = 0;
+      max = 51;
+      if (this.qualityHint) {
+        this.qualityHint.textContent = 'Lower value = Higher visual quality & larger file size (0-51)';
+      }
+    }
+
+    this.qualitySlider.min = String(min);
+    this.qualitySlider.max = String(max);
+    this.qualitySlider.step = '1';
+
+    // Direction of the quality scale: for VideoToolbox q:v and ProRes profile,
+    // higher = better; every CRF/CQ/GlobalQuality/QP scale is inverted.
+    const higherIsBetter = codec === 'prores' || hw === 'videotoolbox';
+    const scaleSig = `${hw}|${codec}`;
+
+    if (this.state.videoQualityPreset !== 'custom') {
+      this.syncQualityPresetToSlider();
+    } else {
+      let val = this.state.videoQualityValue;
+      if (this.qualityScaleSig !== null && this.qualityScaleSig !== scaleSig) {
+        // Remap the custom value across encoder scales so the quality *intent*
+        // survives direction-inverted ranges (e.g. x264 CRF 22 -> mid-high
+        // VideoToolbox q:v instead of garbage-low, or a sane ProRes profile
+        // instead of clamping straight to 4444 XQ).
+        const prevSpan = Math.max(1, this.qualityScaleMax - this.qualityScaleMin);
+        const frac = this.qualityScaleHigherIsBetter
+          ? (val - this.qualityScaleMin) / prevSpan
+          : 1 - (val - this.qualityScaleMin) / prevSpan;
+        const q = Math.min(1, Math.max(0, frac));
+        val = higherIsBetter
+          ? Math.round(min + q * (max - min))
+          : Math.round(min + (1 - q) * (max - min));
+      }
+      if (val < min) val = min;
+      if (val > max) val = max;
+      this.state.videoQualityValue = val;
+      this.qualitySlider.value = String(val);
+      if (this.qualityParamVal) {
+        this.qualityParamVal.textContent = String(val);
+      }
+      this.updateSliderBackground(this.qualitySlider);
+    }
+
+    this.qualityScaleSig = scaleSig;
+    this.qualityScaleMin = min;
+    this.qualityScaleMax = max;
+    this.qualityScaleHigherIsBetter = higherIsBetter;
+    this.updateQualityUI();
+  }
+
+  private getRecommendedQualityValue(preset: 'draft' | 'balanced' | 'high' | 'lossless' | 'custom'): number {
+    const hw = this.state.hwAccel || 'cpu';
+    const codec = this.state.videoCodec || 'h264';
+
+    if (hw === 'videotoolbox' && codec === 'prores') {
+      switch (preset) {
+        case 'draft': return 1; // LT
+        case 'high': return 3; // HQ
+        case 'lossless': return 4; // 4444
+        default: return 2; // Standard
+      }
+    }
+
+    if (hw === 'videotoolbox') {
+      switch (preset) {
+        case 'draft': return 50;
+        case 'high': return 78;
+        case 'lossless': return 90;
+        default: return 65;
+      }
+    }
+
+    if ((hw === 'nvenc' || hw === 'qsv' || hw === 'vaapi') && codec === 'av1') {
+      switch (preset) {
+        case 'draft': return 32;
+        case 'high': return 20;
+        case 'lossless': return 16;
+        default: return 26;
+      }
+    }
+
+    if (hw === 'nvenc' || hw === 'qsv' || hw === 'vaapi') {
+      switch (preset) {
+        case 'draft': return 28;
+        case 'high': return 18;
+        case 'lossless': return 14;
+        default: return 22;
+      }
+    }
+
+    if (codec === 'prores') {
+      switch (preset) {
+        case 'draft': return 1; // LT
+        case 'high': return 3; // HQ
+        case 'lossless': return 4; // 4444
+        default: return 2; // Standard
+      }
+    }
+
+    if (codec === 'av1') {
+      switch (preset) {
+        case 'draft': return 34;
+        case 'high': return 22;
+        case 'lossless': return 18;
+        default: return 28;
+      }
+    }
+
+    if (codec === 'vp9') {
+      switch (preset) {
+        case 'draft': return 36;
+        case 'high': return 24;
+        case 'lossless': return 18;
+        default: return 30;
+      }
+    }
+
+    if (codec === 'h265') {
+      switch (preset) {
+        case 'draft': return 29;
+        case 'high': return 20;
+        case 'lossless': return 16;
+        default: return 24;
+      }
+    }
+
+    // Default H.264 (libx264)
+    switch (preset) {
+      case 'draft': return 28;
+      case 'high': return 18;
+      case 'lossless': return 14;
+      default: return 22;
+    }
+  }
+
+  private syncQualityPresetToSlider() {
+    if (this.state.videoQualityPreset !== 'custom') {
+      const recVal = this.getRecommendedQualityValue(this.state.videoQualityPreset);
+      this.state.videoQualityValue = recVal;
+      if (this.qualitySlider) {
+        this.qualitySlider.value = String(recVal);
+        this.updateSliderBackground(this.qualitySlider);
+      }
+      if (this.qualityParamVal) {
+        this.qualityParamVal.textContent = String(recVal);
+      }
+    }
+  }
+
+  private updateQualityUI() {
+    const activePreset = this.state.videoQualityPreset;
+
+    // Active state is styled exclusively via the .quality-preset-btn.active CSS
+    // rules (single source of truth) — no inline style duplication here.
+    this.qualityPresetBtns?.forEach((btn) => {
+      const isActive = btn.dataset.preset === activePreset;
+      btn.classList.toggle('active', isActive);
+      btn.setAttribute('aria-checked', isActive ? 'true' : 'false');
+    });
+
+    if (this.qualityBadge) {
+      const badgeNames: Record<string, string> = {
+        draft: 'Draft',
+        balanced: 'Balanced',
+        high: 'High Quality',
+        lossless: 'Ultra / Master',
+      };
+      if (badgeNames[activePreset]) {
+        this.qualityBadge.textContent = badgeNames[activePreset];
+        this.qualityBadge.style.color = 'var(--color-royal-blue)';
+        this.qualityBadge.style.borderColor = 'rgba(59, 130, 246, 0.3)';
+        this.qualityBadge.style.background = 'rgba(59, 130, 246, 0.15)';
+      } else {
+        this.qualityBadge.textContent = `Custom (${this.state.videoQualityValue})`;
+        this.qualityBadge.style.color = 'var(--color-cyan)';
+        this.qualityBadge.style.borderColor = 'rgba(6, 182, 212, 0.3)';
+        this.qualityBadge.style.background = 'rgba(6, 182, 212, 0.15)';
+      }
+    }
+  }
+
+  private updateAudioUI() {
+    const isCopyOrMute = this.state.audioCodec === 'copy' || this.state.audioCodec === 'mute';
+    if (this.audioBitrateContainer) {
+      this.audioBitrateContainer.style.opacity = isCopyOrMute ? '0.4' : '1';
+      this.audioBitrateContainer.style.pointerEvents = isCopyOrMute ? 'none' : 'auto';
+    }
+    if (this.audioBitrateSelect) {
+      this.audioBitrateSelect.disabled = isCopyOrMute;
+    }
+  }
+
+  private updateFfmpegCommandPreview() {
+    if (!this.ffmpegCmdPreview) return;
+    const args: string[] = ['ffmpeg', '-nostdin', '-progress', 'pipe:1'];
+
+    if (this.state.hwAccel === 'vaapi') {
+      args.push('-vaapi_device', '/dev/dri/renderD128');
+    }
+
+    const inputName = this.state.videoPath ? `"${this.state.videoPath.split(/[/\\]/).pop() || this.state.videoPath}"` : '"input.mp4"';
+    const subName = this.state.subtitlePath ? `"${this.state.subtitlePath.split(/[/\\]/).pop() || this.state.subtitlePath}"` : '"subtitles.ass"';
+    const outputExt = this.state.outputFormat || 'mp4';
+    const outputName = `"output.${outputExt}"`;
+
+    args.push('-noautorotate', '-y', '-i', inputName);
+
+    // Video Filter
+    const vfParts: string[] = [`subtitles=${subName}`];
+    if (this.state.resolutionScale && this.state.resolutionScale !== 'original') {
+      const scaleMap: Record<string, string> = {
+        '4k': 'scale=3840:-2:flags=bicubic',
+        '2k': 'scale=2560:-2:flags=bicubic',
+        '1080p': 'scale=1920:-2:flags=bicubic',
+        '720p': 'scale=1280:-2:flags=bicubic',
+        '480p': 'scale=854:-2:flags=bicubic',
+      };
+      if (scaleMap[this.state.resolutionScale]) {
+        vfParts.push(scaleMap[this.state.resolutionScale]);
+      }
+    }
+    if (this.state.hwAccel === 'vaapi') {
+      vfParts.push('format=nv12,hwupload');
+    }
+    args.push('-vf', `"${vfParts.join(',')}"`);
+
+    // Video Encoder Flags
+    const hw = this.state.hwAccel || 'cpu';
+    const codec = this.state.videoCodec || 'h264';
+    const qVal = this.state.videoQualityValue;
+    const speed = this.state.videoPresetSpeed || 'medium';
+
+    if (hw === 'qsv') {
+      const qsvCodec = codec === 'h265' ? 'hevc_qsv' : codec === 'av1' ? 'av1_qsv' : 'h264_qsv';
+      const qsvPreset = speed === 'fast' ? 'faster' : speed === 'slow' ? 'slow' : 'medium';
+      args.push('-c:v', qsvCodec, '-preset', qsvPreset, '-global_quality', String(qVal));
+    } else if (hw === 'nvenc') {
+      const nvCodec = codec === 'h265' ? 'hevc_nvenc' : codec === 'av1' ? 'av1_nvenc' : 'h264_nvenc';
+      const nvPreset = speed === 'fast' ? 'p2' : speed === 'slow' ? 'p6' : 'p4';
+      args.push('-c:v', nvCodec, '-preset', nvPreset, '-cq', String(qVal));
+    } else if (hw === 'vaapi') {
+      const vaCodec = codec === 'h265' ? 'hevc_vaapi' : codec === 'av1' ? 'av1_vaapi' : 'h264_vaapi';
+      args.push('-c:v', vaCodec, '-qp', String(qVal));
+    } else if (hw === 'videotoolbox') {
+      if (codec === 'prores') {
+        args.push('-c:v', 'prores_videotoolbox', '-profile:v', String(qVal));
+      } else {
+        const vtCodec = codec === 'h265' ? 'hevc_videotoolbox' : 'h264_videotoolbox';
+        args.push('-c:v', vtCodec, '-q:v', String(qVal));
+      }
+    } else {
+      // CPU
+      if (codec === 'h265') {
+        const cpuPreset = speed === 'fast' ? 'fast' : speed === 'slow' ? 'slow' : 'medium';
+        args.push('-c:v', 'libx265', '-crf', String(qVal), '-preset', cpuPreset);
+      } else if (codec === 'av1') {
+        const svtPreset = speed === 'fast' ? '8' : speed === 'slow' ? '4' : '6';
+        args.push('-c:v', 'libsvtav1', '-crf', String(qVal), '-preset', svtPreset);
+      } else if (codec === 'vp9') {
+        const deadline = speed === 'fast' ? 'realtime' : 'good';
+        const cpuUsed = speed === 'fast' ? '4' : speed === 'slow' ? '0' : '2';
+        args.push('-c:v', 'libvpx-vp9', '-crf', String(qVal), '-b:v', '0', '-deadline', deadline, '-cpu-used', cpuUsed);
+      } else if (codec === 'prores') {
+        args.push('-c:v', 'prores_ks', '-profile:v', String(qVal));
+      } else {
+        const cpuPreset = speed === 'fast' ? 'faster' : speed === 'slow' ? 'slow' : 'medium';
+        args.push('-c:v', 'libx264', '-crf', String(qVal), '-preset', cpuPreset);
+      }
+    }
+
+    // Audio Flags
+    if (this.state.audioCodec === 'mute') {
+      args.push('-an');
+    } else if (this.state.audioCodec === 'aac') {
+      args.push('-c:a', 'aac', '-b:a', this.state.audioBitrate || '192k');
+    } else if (this.state.audioCodec === 'opus') {
+      args.push('-c:a', 'libopus', '-b:a', this.state.audioBitrate || '192k');
+    } else if (this.state.audioCodec === 'mp3') {
+      args.push('-c:a', 'libmp3lame', '-b:a', this.state.audioBitrate || '192k');
+    } else {
+      args.push('-c:a', 'copy');
+    }
+
+    args.push(outputName);
+
+    this.ffmpegCmdPreview.textContent = args.join(' ');
+  }
+
+  private loadExportSettingsFromStorage() {
+    try {
+      const raw = localStorage.getItem('whisper_hardsub_export_settings');
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return;
+
+      const validFormats = ['mp4', 'mkv', 'webm', 'mov'];
+      const validSpeeds = ['fast', 'medium', 'slow'];
+      const validScales = ['original', '4k', '2k', '1080p', '720p', '480p'];
+      const validAudioCodecs = ['copy', 'aac', 'opus', 'mp3', 'mute'];
+      const validAudioBitrates = ['96k', '128k', '192k', '256k', '320k'];
+      const validPresets = ['draft', 'balanced', 'high', 'lossless', 'custom'];
+
+      if (typeof parsed.outputFormat === 'string' && validFormats.includes(parsed.outputFormat)) {
+        this.state.outputFormat = parsed.outputFormat;
+      }
+      if (typeof parsed.videoCodec === 'string') {
+        this.state.videoCodec = parsed.videoCodec;
+      }
+      if (typeof parsed.hwAccel === 'string') {
+        this.state.hwAccel = parsed.hwAccel;
+      }
+      if (typeof parsed.videoQualityPreset === 'string' && validPresets.includes(parsed.videoQualityPreset)) {
+        this.state.videoQualityPreset = parsed.videoQualityPreset as any;
+        this.state.videoQualityMode = parsed.videoQualityPreset === 'custom' ? 'custom' : 'preset';
+      }
+      if (typeof parsed.videoQualityValue === 'number' && !Number.isNaN(parsed.videoQualityValue)) {
+        this.state.videoQualityValue = Math.max(0, Math.min(100, parsed.videoQualityValue));
+      }
+      if (typeof parsed.videoPresetSpeed === 'string' && validSpeeds.includes(parsed.videoPresetSpeed)) {
+        this.state.videoPresetSpeed = parsed.videoPresetSpeed as any;
+      }
+      if (typeof parsed.resolutionScale === 'string' && validScales.includes(parsed.resolutionScale)) {
+        this.state.resolutionScale = parsed.resolutionScale as any;
+      }
+      if (typeof parsed.audioCodec === 'string' && validAudioCodecs.includes(parsed.audioCodec)) {
+        this.state.audioCodec = parsed.audioCodec as any;
+      }
+      if (typeof parsed.audioBitrate === 'string' && validAudioBitrates.includes(parsed.audioBitrate)) {
+        this.state.audioBitrate = parsed.audioBitrate as any;
+      }
+
+      // Sync DOM inputs with restored state
+      if (this.formatSelect) this.formatSelect.value = this.state.outputFormat;
+      if (this.hwSelect) this.hwSelect.value = this.state.hwAccel;
+      if (this.resolutionSelect) this.resolutionSelect.value = this.state.resolutionScale;
+      if (this.speedPresetSelect) this.speedPresetSelect.value = this.state.videoPresetSpeed;
+      if (this.audioCodecSelect) this.audioCodecSelect.value = this.state.audioCodec;
+      if (this.audioBitrateSelect) this.audioBitrateSelect.value = this.state.audioBitrate;
+    } catch (e) {
+      console.warn('Failed to load hardsub export settings:', e);
+    }
+  }
+
+  private saveExportSettingsToStorage(immediate = false) {
+    const doSave = () => {
+      try {
+        const toSave = {
+          outputFormat: this.state.outputFormat,
+          videoCodec: this.state.videoCodec,
+          hwAccel: this.state.hwAccel,
+          videoQualityMode: this.state.videoQualityMode,
+          videoQualityPreset: this.state.videoQualityPreset,
+          videoQualityValue: this.state.videoQualityValue,
+          videoPresetSpeed: this.state.videoPresetSpeed,
+          resolutionScale: this.state.resolutionScale,
+          audioCodec: this.state.audioCodec,
+          audioBitrate: this.state.audioBitrate,
+        };
+        localStorage.setItem('whisper_hardsub_export_settings', JSON.stringify(toSave));
+      } catch (e) {
+        console.warn('Failed to save hardsub export settings:', e);
+      }
+    };
+
+    if (immediate) {
+      if (this.storageDebounceTimer) {
+        clearTimeout(this.storageDebounceTimer);
+        this.storageDebounceTimer = null;
+      }
+      doSave();
+    } else {
+      if (this.storageDebounceTimer) clearTimeout(this.storageDebounceTimer);
+      this.storageDebounceTimer = setTimeout(doSave, 120);
+    }
   }
 
   private setupStudioTabEvents() {
@@ -2641,7 +3258,7 @@ ${events}`;
     }
 
     try {
-      // Ensure all export settings dropdown values are synced with state
+      // Ensure all export settings dropdown values and slider values are synced with state
       if (this.codecSelect?.value) {
         this.state.videoCodec = this.codecSelect.value;
       }
@@ -2651,9 +3268,24 @@ ${events}`;
       if (this.hwSelect?.value) {
         this.state.hwAccel = this.hwSelect.value;
       }
-      if (this.audioSelect?.value) {
-        this.state.audioMode = this.audioSelect.value;
+      if (this.resolutionSelect?.value) {
+        this.state.resolutionScale = this.resolutionSelect.value as any;
       }
+      if (this.speedPresetSelect?.value) {
+        this.state.videoPresetSpeed = this.speedPresetSelect.value as any;
+      }
+      if (this.audioCodecSelect?.value) {
+        this.state.audioCodec = this.audioCodecSelect.value as any;
+      }
+      if (this.audioBitrateSelect?.value) {
+        this.state.audioBitrate = this.audioBitrateSelect.value as any;
+      }
+      if (this.qualitySlider?.value) {
+        this.state.videoQualityValue = parseInt(this.qualitySlider.value, 10) || this.state.videoQualityValue;
+      }
+      // Persist immediately: encoding is starting and the app may close before
+      // the debounced write fires.
+      this.saveExportSettingsToStorage(true);
 
       this.updateEncodingUIState(true);
       if (this.progressFill) {

@@ -18,7 +18,17 @@ pub struct HardsubSettings {
     pub output_path: String,
     pub output_format: String, // "mp4", "mkv", "webm", "mov"
     pub video_codec: String,   // "h264", "h265", "av1", "vp9", "prores"
-    pub hw_accel: String,      // "cpu", "qsv", "nvenc", "vaapi"
+    pub hw_accel: String,      // "cpu", "qsv", "nvenc", "vaapi", "videotoolbox"
+    #[serde(default = "default_video_quality_mode")]
+    pub video_quality_mode: String, // "preset" | "custom"
+    #[serde(default = "default_video_quality_preset")]
+    pub video_quality_preset: String, // "draft" | "balanced" | "high" | "lossless"
+    #[serde(default = "default_video_quality_value")]
+    pub video_quality_value: u32, // raw slider value; clamped per encoder: CRF/CQ/GlobalQuality/QP 0-63, q:v 1-100, ProRes profile 0-5
+    #[serde(default = "default_video_preset_speed")]
+    pub video_preset_speed: String, // "fast" | "medium" | "slow"
+    #[serde(default = "default_resolution_scale")]
+    pub resolution_scale: String, // "original" | "4k" | "2k" | "1080p" | "720p" | "480p"
     pub font_name: String,
     pub font_size: u32,
     pub primary_color: String,  // Hex "#FFFFFF"
@@ -33,8 +43,19 @@ pub struct HardsubSettings {
     pub bold: bool,
     pub italic: bool,
     pub alignment: u32,        // 2 = Bottom Center (default), 6 = Top Center, etc.
-    pub audio_mode: String,    // "copy", "aac"
+    #[serde(default = "default_audio_codec")]
+    pub audio_codec: String,   // "copy", "aac", "opus", "mp3", "mute"
+    #[serde(default = "default_audio_bitrate")]
+    pub audio_bitrate: String, // "96k", "128k", "192k", "256k", "320k"
 }
+
+fn default_video_quality_mode() -> String { "preset".to_string() }
+fn default_video_quality_preset() -> String { "balanced".to_string() }
+fn default_video_quality_value() -> u32 { 22 }
+fn default_video_preset_speed() -> String { "medium".to_string() }
+fn default_resolution_scale() -> String { "original".to_string() }
+fn default_audio_codec() -> String { "copy".to_string() }
+fn default_audio_bitrate() -> String { "192k".to_string() }
 
 #[derive(serde::Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -444,10 +465,353 @@ fn opacity_percent_to_ass_alpha(opacity: u8) -> u8 {
     255 - ((clamped as u16 * 255 + 50) / 100) as u8
 }
 
+/// Calculates the downscaling FFmpeg filter maintaining aspect ratio
+pub fn get_resolution_scale_filter(scale_choice: &str, video_width: u32, video_height: u32) -> Option<String> {
+    if scale_choice == "original" || scale_choice.is_empty() {
+        return None;
+    }
+
+    let (target_w, target_h) = match scale_choice {
+        "4k" => (3840, 2160),
+        "2k" => (2560, 1440),
+        "1080p" => (1920, 1080),
+        "720p" => (1280, 720),
+        "480p" => (854, 480),
+        _ => return None,
+    };
+
+    let is_portrait = video_height > video_width;
+    let (max_w, max_h) = if is_portrait {
+        (target_h, target_w)
+    } else {
+        (target_w, target_h)
+    };
+
+    // If source is already smaller or equal, do not upscale
+    if video_width <= max_w && video_height <= max_h {
+        return None;
+    }
+
+    if is_portrait {
+        Some(format!("scale=-2:{}:flags=bicubic", max_h))
+    } else {
+        Some(format!("scale={}:-2:flags=bicubic", max_w))
+    }
+}
+
+/// Unified Single Source of Truth for Recommended Quality Preset Values across all HW & Codec permutations.
+/// Returns exact integer quality parameter (CRF, CQ, Global Quality, QP, q:v %, or ProRes profile).
+pub fn get_preset_quality_value(hw: &str, codec: &str, preset: &str) -> i32 {
+    match (hw, codec) {
+        ("videotoolbox", "prores") => match preset {
+            "draft" => 1, // LT
+            "high" => 3,  // HQ
+            "lossless" => 4, // 4444
+            _ => 2,       // Standard
+        },
+        ("videotoolbox", _) => match preset {
+            "draft" => 50,
+            "high" => 78,
+            "lossless" => 90,
+            _ => 65,
+        },
+        ("nvenc", "av1") | ("qsv", "av1") | ("vaapi", "av1") => match preset {
+            "draft" => 32,
+            "high" => 20,
+            "lossless" => 16,
+            _ => 26,
+        },
+        ("nvenc", _) | ("qsv", _) | ("vaapi", _) => match preset {
+            "draft" => 28,
+            "high" => 18,
+            "lossless" => 14,
+            _ => 22,
+        },
+        (_, "prores") => match preset {
+            "draft" => 1, // LT
+            "high" => 3,  // HQ
+            "lossless" => 4, // 4444
+            _ => 2,       // Standard
+        },
+        (_, "av1") => match preset {
+            "draft" => 34,
+            "high" => 22,
+            "lossless" => 18,
+            _ => 28,
+        },
+        (_, "vp9") => match preset {
+            "draft" => 36,
+            "high" => 24,
+            "lossless" => 18,
+            _ => 30,
+        },
+        (_, "h265") => match preset {
+            "draft" => 29,
+            "high" => 20,
+            "lossless" => 16,
+            _ => 24,
+        },
+        _ => match preset { // libx264 & default fallback
+            "draft" => 28,
+            "high" => 18,
+            "lossless" => 14,
+            _ => 22,
+        },
+    }
+}
+
+/// Builds dynamic video encoder and quality/speed arguments based on codec, hardware accelerator, and quality mode
+pub fn build_video_encoder_flags(settings: &HardsubSettings) -> Vec<String> {
+    let mut args = Vec::new();
+    let is_custom = settings.video_quality_mode == "custom" || settings.video_quality_preset == "custom";
+    let speed = settings.video_preset_speed.as_str();
+    let hw = settings.hw_accel.as_str();
+    let codec = settings.video_codec.as_str();
+
+    match (hw, codec) {
+        ("qsv", "h264") | ("qsv", "h265") | ("qsv", "av1") => {
+            let codec_name = match codec {
+                "h265" => "hevc_qsv",
+                "av1" => "av1_qsv",
+                _ => "h264_qsv",
+            };
+            let qsv_preset = match speed {
+                "fast" => "faster",
+                "slow" => "slow",
+                _ => "medium",
+            };
+            let gq = if is_custom {
+                settings.video_quality_value.clamp(1, 51) as i32
+            } else {
+                get_preset_quality_value(hw, codec, &settings.video_quality_preset)
+            };
+            args.push("-c:v".to_string());
+            args.push(codec_name.to_string());
+            args.push("-preset".to_string());
+            args.push(qsv_preset.to_string());
+            args.push("-global_quality".to_string());
+            args.push(gq.to_string());
+        }
+        ("nvenc", "h264") | ("nvenc", "h265") | ("nvenc", "av1") => {
+            let codec_name = match codec {
+                "h265" => "hevc_nvenc",
+                "av1" => "av1_nvenc",
+                _ => "h264_nvenc",
+            };
+            let nvenc_preset = match speed {
+                "fast" => "p2",
+                "slow" => "p6",
+                _ => "p4",
+            };
+            let cq = if is_custom {
+                settings.video_quality_value.clamp(1, 51) as i32
+            } else {
+                get_preset_quality_value(hw, codec, &settings.video_quality_preset)
+            };
+            args.push("-c:v".to_string());
+            args.push(codec_name.to_string());
+            args.push("-preset".to_string());
+            args.push(nvenc_preset.to_string());
+            args.push("-cq".to_string());
+            args.push(cq.to_string());
+        }
+        ("vaapi", "h264") | ("vaapi", "h265") | ("vaapi", "av1") => {
+            let codec_name = match codec {
+                "h265" => "hevc_vaapi",
+                "av1" => "av1_vaapi",
+                _ => "h264_vaapi",
+            };
+            let qp = if is_custom {
+                settings.video_quality_value.clamp(1, 51) as i32
+            } else {
+                get_preset_quality_value(hw, codec, &settings.video_quality_preset)
+            };
+            args.push("-c:v".to_string());
+            args.push(codec_name.to_string());
+            args.push("-qp".to_string());
+            args.push(qp.to_string());
+        }
+        ("videotoolbox", "h264") | ("videotoolbox", "h265") => {
+            let codec_name = match codec {
+                "h265" => "hevc_videotoolbox",
+                _ => "h264_videotoolbox",
+            };
+            let qv = if is_custom {
+                settings.video_quality_value.clamp(1, 100) as i32
+            } else {
+                get_preset_quality_value(hw, codec, &settings.video_quality_preset)
+            };
+            args.push("-c:v".to_string());
+            args.push(codec_name.to_string());
+            args.push("-q:v".to_string());
+            args.push(qv.to_string());
+        }
+        ("videotoolbox", "prores") => {
+            let profile = if is_custom {
+                settings.video_quality_value.clamp(0, 5) as i32
+            } else {
+                get_preset_quality_value(hw, codec, &settings.video_quality_preset)
+            };
+            args.push("-c:v".to_string());
+            args.push("prores_videotoolbox".to_string());
+            args.push("-profile:v".to_string());
+            args.push(profile.to_string());
+        }
+        // CPU Encoders & Generic fallback
+        _ => {
+            match codec {
+                "h265" => {
+                    let crf = if is_custom {
+                        settings.video_quality_value.clamp(0, 51) as i32
+                    } else {
+                        get_preset_quality_value(hw, codec, &settings.video_quality_preset)
+                    };
+                    let cpu_preset = match speed {
+                        "fast" => "fast",
+                        "slow" => "slow",
+                        _ => "medium",
+                    };
+                    args.push("-c:v".to_string());
+                    args.push("libx265".to_string());
+                    args.push("-crf".to_string());
+                    args.push(crf.to_string());
+                    args.push("-preset".to_string());
+                    args.push(cpu_preset.to_string());
+                }
+                "av1" => {
+                    let crf = if is_custom {
+                        settings.video_quality_value.clamp(0, 63) as i32
+                    } else {
+                        get_preset_quality_value(hw, codec, &settings.video_quality_preset)
+                    };
+                    let svt_preset = match speed {
+                        "fast" => "8",
+                        "slow" => "4",
+                        _ => "6",
+                    };
+                    args.push("-c:v".to_string());
+                    args.push("libsvtav1".to_string());
+                    args.push("-crf".to_string());
+                    args.push(crf.to_string());
+                    args.push("-preset".to_string());
+                    args.push(svt_preset.to_string());
+                }
+                "vp9" => {
+                    let crf = if is_custom {
+                        settings.video_quality_value.clamp(0, 63) as i32
+                    } else {
+                        get_preset_quality_value(hw, codec, &settings.video_quality_preset)
+                    };
+                    args.push("-c:v".to_string());
+                    args.push("libvpx-vp9".to_string());
+                    args.push("-crf".to_string());
+                    args.push(crf.to_string());
+                    args.push("-b:v".to_string());
+                    args.push("0".to_string());
+                    match speed {
+                        "fast" => {
+                            args.push("-deadline".to_string());
+                            args.push("realtime".to_string());
+                            args.push("-cpu-used".to_string());
+                            args.push("4".to_string());
+                        }
+                        "slow" => {
+                            args.push("-deadline".to_string());
+                            args.push("good".to_string());
+                            args.push("-cpu-used".to_string());
+                            args.push("0".to_string());
+                        }
+                        _ => {
+                            args.push("-deadline".to_string());
+                            args.push("good".to_string());
+                            args.push("-cpu-used".to_string());
+                            args.push("2".to_string());
+                        }
+                    }
+                }
+                "prores" => {
+                    let profile = if is_custom {
+                        settings.video_quality_value.clamp(0, 5) as i32
+                    } else {
+                        get_preset_quality_value(hw, codec, &settings.video_quality_preset)
+                    };
+                    args.push("-c:v".to_string());
+                    args.push("prores_ks".to_string());
+                    args.push("-profile:v".to_string());
+                    args.push(profile.to_string());
+                }
+                _ => { // Default H.264 (libx264)
+                    let crf = if is_custom {
+                        settings.video_quality_value.clamp(0, 51) as i32
+                    } else {
+                        get_preset_quality_value(hw, codec, &settings.video_quality_preset)
+                    };
+                    let cpu_preset = match speed {
+                        "fast" => "faster",
+                        "slow" => "slow",
+                        _ => "medium",
+                    };
+                    args.push("-c:v".to_string());
+                    args.push("libx264".to_string());
+                    args.push("-crf".to_string());
+                    args.push(crf.to_string());
+                    args.push("-preset".to_string());
+                    args.push(cpu_preset.to_string());
+                }
+            }
+        }
+    }
+    args
+}
+
+/// Builds audio encoder arguments
+pub fn build_audio_encoder_flags(settings: &HardsubSettings) -> Vec<String> {
+    let mut args = Vec::new();
+    let codec = if settings.audio_codec.is_empty() {
+        "copy"
+    } else {
+        settings.audio_codec.as_str()
+    };
+
+    let bitrate = if settings.audio_bitrate.is_empty() {
+        "192k"
+    } else {
+        settings.audio_bitrate.as_str()
+    };
+
+    match codec {
+        "mute" => {
+            args.push("-an".to_string());
+        }
+        "aac" => {
+            args.push("-c:a".to_string());
+            args.push("aac".to_string());
+            args.push("-b:a".to_string());
+            args.push(bitrate.to_string());
+        }
+        "opus" => {
+            args.push("-c:a".to_string());
+            args.push("libopus".to_string());
+            args.push("-b:a".to_string());
+            args.push(bitrate.to_string());
+        }
+        "mp3" => {
+            args.push("-c:a".to_string());
+            args.push("libmp3lame".to_string());
+            args.push("-b:a".to_string());
+            args.push(bitrate.to_string());
+        }
+        _ => { // "copy"
+            args.push("-c:a".to_string());
+            args.push("copy".to_string());
+        }
+    }
+    args
+}
+
 #[cfg(test)]
 mod tests {
-    use super::opacity_percent_to_ass_alpha;
-    use super::read_font_metrics;
+    use super::*;
     use std::path::Path;
 
     #[test]
@@ -460,8 +824,6 @@ mod tests {
 
     #[test]
     fn reads_vazirmatn_metrics_and_scale() {
-        // usWinAscent=2200, usWinDescent=1300, unitsPerEm=2048
-        // -> render scale = 2048/3500 = 0.5851
         let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("resources/fonts/Vazirmatn.ttf");
         let (upem, ascent, descent) = read_font_metrics(&path).expect("bundled Vazirmatn should parse");
         assert_eq!(upem, 2048);
@@ -471,13 +833,174 @@ mod tests {
 
     #[test]
     fn hex_to_ass_color_conversion() {
-        use super::hex_to_ass_color;
-        // Pure red #FF0000 -> &H000000FF& (BGR order in ASS)
         assert_eq!(hex_to_ass_color("#FF0000", 0), "&H000000FF&");
-        // Pure blue #0000FF -> &H00FF0000&
         assert_eq!(hex_to_ass_color("#0000FF", 0), "&H00FF0000&");
-        // With alpha 128 (0x80)
         assert_eq!(hex_to_ass_color("#FFFFFF", 128), "&H80FFFFFF&");
+    }
+
+    #[test]
+    fn test_resolution_scale_filter() {
+        // Landscape video 4K downscale to 1080p
+        let filter = get_resolution_scale_filter("1080p", 3840, 2160);
+        assert_eq!(filter, Some("scale=1920:-2:flags=bicubic".to_string()));
+
+        // Already 1080p -> should return None
+        let filter_same = get_resolution_scale_filter("1080p", 1920, 1080);
+        assert_eq!(filter_same, None);
+
+        // Portrait 1080x1920 downscale to 720p
+        let filter_portrait = get_resolution_scale_filter("720p", 1080, 1920);
+        assert_eq!(filter_portrait, Some("scale=-2:1280:flags=bicubic".to_string()));
+
+        // Upscale guard: source 1280x720 target 4k -> None (no upscaling)
+        assert_eq!(get_resolution_scale_filter("4k", 1280, 720), None);
+    }
+
+    #[test]
+    fn test_preset_quality_matrix_values() {
+        assert_eq!(get_preset_quality_value("cpu", "h264", "draft"), 28);
+        assert_eq!(get_preset_quality_value("cpu", "h264", "balanced"), 22);
+        assert_eq!(get_preset_quality_value("cpu", "h264", "high"), 18);
+        assert_eq!(get_preset_quality_value("cpu", "h264", "lossless"), 14);
+
+        assert_eq!(get_preset_quality_value("cpu", "h265", "draft"), 29);
+        assert_eq!(get_preset_quality_value("cpu", "h265", "balanced"), 24);
+        assert_eq!(get_preset_quality_value("cpu", "h265", "high"), 20);
+        assert_eq!(get_preset_quality_value("cpu", "h265", "lossless"), 16);
+
+        assert_eq!(get_preset_quality_value("cpu", "av1", "draft"), 34);
+        assert_eq!(get_preset_quality_value("cpu", "av1", "balanced"), 28);
+        assert_eq!(get_preset_quality_value("cpu", "av1", "high"), 22);
+        assert_eq!(get_preset_quality_value("cpu", "av1", "lossless"), 18);
+
+        assert_eq!(get_preset_quality_value("nvenc", "h264", "balanced"), 22);
+        assert_eq!(get_preset_quality_value("nvenc", "av1", "balanced"), 26);
+        assert_eq!(get_preset_quality_value("qsv", "h264", "balanced"), 22);
+        assert_eq!(get_preset_quality_value("vaapi", "h264", "balanced"), 22);
+
+        assert_eq!(get_preset_quality_value("videotoolbox", "h264", "balanced"), 65);
+        assert_eq!(get_preset_quality_value("videotoolbox", "h264", "high"), 78);
+        assert_eq!(get_preset_quality_value("videotoolbox", "prores", "high"), 3);
+        assert_eq!(get_preset_quality_value("cpu", "prores", "balanced"), 2);
+    }
+
+    #[test]
+    fn test_video_encoder_flags_cpu_h264() {
+        let mut settings = HardsubSettings {
+            video_path: "test.mp4".to_string(),
+            subtitle_path: "test.ass".to_string(),
+            output_path: "out.mp4".to_string(),
+            output_format: "mp4".to_string(),
+            video_codec: "h264".to_string(),
+            hw_accel: "cpu".to_string(),
+            video_quality_mode: "preset".to_string(),
+            video_quality_preset: "high".to_string(),
+            video_quality_value: 18,
+            video_preset_speed: "slow".to_string(),
+            resolution_scale: "original".to_string(),
+            font_name: "Vazirmatn".to_string(),
+            font_size: 24,
+            primary_color: "#FFFFFF".to_string(),
+            outline_color: "#000000".to_string(),
+            outline_size: 2,
+            bg_box: false,
+            bg_box_color: "#000000".to_string(),
+            bg_box_opacity: 50,
+            bg_box_radius: 0,
+            position_y: 30,
+            width_margin: 90,
+            bold: true,
+            italic: false,
+            alignment: 2,
+            audio_codec: "aac".to_string(),
+            audio_bitrate: "256k".to_string(),
+        };
+
+        let flags = build_video_encoder_flags(&settings);
+        assert_eq!(flags, vec!["-c:v", "libx264", "-crf", "18", "-preset", "slow"]);
+
+        // Custom CRF mode
+        settings.video_quality_mode = "custom".to_string();
+        settings.video_quality_value = 16;
+        let flags_custom = build_video_encoder_flags(&settings);
+        assert_eq!(flags_custom, vec!["-c:v", "libx264", "-crf", "16", "-preset", "slow"]);
+    }
+
+    #[test]
+    fn test_video_encoder_flags_nvenc() {
+        let settings = HardsubSettings {
+            video_path: "test.mp4".to_string(),
+            subtitle_path: "test.ass".to_string(),
+            output_path: "out.mp4".to_string(),
+            output_format: "mp4".to_string(),
+            video_codec: "h265".to_string(),
+            hw_accel: "nvenc".to_string(),
+            video_quality_mode: "custom".to_string(),
+            video_quality_preset: "balanced".to_string(),
+            video_quality_value: 21,
+            video_preset_speed: "fast".to_string(),
+            resolution_scale: "original".to_string(),
+            font_name: "Vazirmatn".to_string(),
+            font_size: 24,
+            primary_color: "#FFFFFF".to_string(),
+            outline_color: "#000000".to_string(),
+            outline_size: 2,
+            bg_box: false,
+            bg_box_color: "#000000".to_string(),
+            bg_box_opacity: 50,
+            bg_box_radius: 0,
+            position_y: 30,
+            width_margin: 90,
+            bold: true,
+            italic: false,
+            alignment: 2,
+            audio_codec: "copy".to_string(),
+            audio_bitrate: "192k".to_string(),
+        };
+
+        let flags = build_video_encoder_flags(&settings);
+        assert_eq!(flags, vec!["-c:v", "hevc_nvenc", "-preset", "p2", "-cq", "21"]);
+    }
+
+    #[test]
+    fn test_audio_encoder_flags() {
+        let mut settings = HardsubSettings {
+            video_path: "test.mp4".to_string(),
+            subtitle_path: "test.ass".to_string(),
+            output_path: "out.mp4".to_string(),
+            output_format: "mp4".to_string(),
+            video_codec: "h264".to_string(),
+            hw_accel: "cpu".to_string(),
+            video_quality_mode: "preset".to_string(),
+            video_quality_preset: "balanced".to_string(),
+            video_quality_value: 22,
+            video_preset_speed: "medium".to_string(),
+            resolution_scale: "original".to_string(),
+            font_name: "Vazirmatn".to_string(),
+            font_size: 24,
+            primary_color: "#FFFFFF".to_string(),
+            outline_color: "#000000".to_string(),
+            outline_size: 2,
+            bg_box: false,
+            bg_box_color: "#000000".to_string(),
+            bg_box_opacity: 50,
+            bg_box_radius: 0,
+            position_y: 30,
+            width_margin: 90,
+            bold: true,
+            italic: false,
+            alignment: 2,
+            audio_codec: "opus".to_string(),
+            audio_bitrate: "128k".to_string(),
+        };
+
+        assert_eq!(build_audio_encoder_flags(&settings), vec!["-c:a", "libopus", "-b:a", "128k"]);
+
+        settings.audio_codec = "mute".to_string();
+        assert_eq!(build_audio_encoder_flags(&settings), vec!["-an"]);
+
+        settings.audio_codec = "copy".to_string();
+        assert_eq!(build_audio_encoder_flags(&settings), vec!["-c:a", "copy"]);
     }
 }
 
@@ -598,7 +1121,10 @@ pub async fn run_hardsub_task(
         active: true,
     });
 
-    // Probe duration, width, and height using ffprobe
+    // Probe duration, width, and height using ffprobe.
+    // Runs asynchronously with a hard timeout so a hung ffprobe (network mount,
+    // corrupt container) can never wedge the task; the blocking std::process
+    // variant previously stalled a tokio worker thread with no escape.
     let ffprobe_bin = crate::ffmpeg_resolver::ensure_ffprobe_available(Some(&app))?;
     let ffmpeg_bin = crate::ffmpeg_resolver::ensure_ffmpeg_available(Some(&app))?;
 
@@ -606,17 +1132,21 @@ pub async fn run_hardsub_task(
     let mut video_width = 1920;
     let mut video_height = 1080;
 
-    let probe_out = std::process::Command::new(&ffprobe_bin)
-        .args([
-            "-v", "error",
-            "-show_entries", "format=duration:stream=duration,width,height,codec_type,side_data_list,tags",
-            "-of", "json",
-            &settings.video_path,
-        ])
-        .output();
+    let probe_out = tokio::time::timeout(
+        std::time::Duration::from_secs(30),
+        Command::new(&ffprobe_bin)
+            .args([
+                "-v", "error",
+                "-show_entries", "format=duration:stream=duration,width,height,codec_type,side_data_list,tags",
+                "-of", "json",
+                &settings.video_path,
+            ])
+            .output(),
+    )
+    .await;
 
     let mut rotation = 0;
-    if let Ok(out) = probe_out {
+    if let Ok(Ok(out)) = probe_out {
         if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&out.stdout) {
             if let Some(duration_str) = json.pointer("/format/duration").and_then(|v| v.as_str()) {
                 if let Ok(secs) = duration_str.parse::<f64>() {
@@ -672,6 +1202,17 @@ pub async fn run_hardsub_task(
     let normalized_rotation = ((rotation % 360 + 360) % 360) as u32;
     if normalized_rotation == 90 || normalized_rotation == 270 {
         std::mem::swap(&mut video_width, &mut video_height);
+    }
+
+    // Honour a cancellation requested while the probe was running (previously
+    // unreachable: the first check only happened after filter construction).
+    if session.lock().map(|l| l.cancel_requested).unwrap_or(false) {
+        let _ = app.emit("hardsub-status", TranscribeProgress {
+            progress: 0.0,
+            message: "Hardsubbing cancelled by user.".to_string(),
+            active: false,
+        });
+        return Err("Hardsubbing cancelled by user.".to_string());
     }
 
     logs.log(&app, "Hardsub", &format!("Probed video dimensions: {}x{} (Aspect: {:.3})", video_width, video_height, video_width as f64 / video_height as f64));
@@ -791,6 +1332,12 @@ pub async fn run_hardsub_task(
     }
     vf_filters.push(sub_filter);
 
+    // Optional Resolution Downscaling Filter
+    if let Some(scale_filter) = get_resolution_scale_filter(&settings.resolution_scale, video_width, video_height) {
+        logs.log(&app, "Hardsub", &format!("Applying resolution scale filter: '{}' for target '{}'", scale_filter, settings.resolution_scale));
+        vf_filters.push(scale_filter);
+    }
+
     // If using VA-API hardware encoder, upload processed frames to VAAPI GPU surface
     if settings.hw_accel == "vaapi" {
         vf_filters.push("format=nv12,hwupload".to_string());
@@ -809,150 +1356,13 @@ pub async fn run_hardsub_task(
         ffmpeg_args.push("rotate=0".to_string());
     }
 
-    // 3. Video Encoder Selection
-    let apply_cpu_encoder = |args: &mut Vec<String>, codec: &str| {
-        match codec {
-            "h265" => {
-                args.push("-c:v".to_string());
-                args.push("libx265".to_string());
-                args.push("-crf".to_string());
-                args.push("23".to_string());
-                args.push("-preset".to_string());
-                args.push("medium".to_string());
-            }
-            "av1" => {
-                args.push("-c:v".to_string());
-                args.push("libsvtav1".to_string());
-                args.push("-crf".to_string());
-                args.push("28".to_string());
-                args.push("-preset".to_string());
-                args.push("6".to_string());
-            }
-            "vp9" => {
-                args.push("-c:v".to_string());
-                args.push("libvpx-vp9".to_string());
-                args.push("-crf".to_string());
-                args.push("30".to_string());
-                args.push("-b:v".to_string());
-                args.push("0".to_string());
-            }
-            "prores" => {
-                args.push("-c:v".to_string());
-                args.push("prores_ks".to_string());
-                args.push("-profile:v".to_string());
-                args.push("3".to_string());
-            }
-            _ => {
-                args.push("-c:v".to_string());
-                args.push("libx264".to_string());
-                args.push("-crf".to_string());
-                args.push("22".to_string());
-                args.push("-preset".to_string());
-                args.push("medium".to_string());
-            }
-        }
-    };
+    // 3. Video Encoder Selection & Quality Parameters
+    let video_encoder_flags = build_video_encoder_flags(&settings);
+    ffmpeg_args.extend(video_encoder_flags);
 
-    match (settings.hw_accel.as_str(), settings.video_codec.as_str()) {
-        ("qsv", "h264") => {
-            ffmpeg_args.push("-c:v".to_string());
-            ffmpeg_args.push("h264_qsv".to_string());
-            ffmpeg_args.push("-preset".to_string());
-            ffmpeg_args.push("slow".to_string());
-            ffmpeg_args.push("-global_quality".to_string());
-            ffmpeg_args.push("23".to_string());
-        }
-        ("qsv", "h265") => {
-            ffmpeg_args.push("-c:v".to_string());
-            ffmpeg_args.push("hevc_qsv".to_string());
-            ffmpeg_args.push("-preset".to_string());
-            ffmpeg_args.push("slow".to_string());
-            ffmpeg_args.push("-global_quality".to_string());
-            ffmpeg_args.push("23".to_string());
-        }
-        ("qsv", "av1") => {
-            ffmpeg_args.push("-c:v".to_string());
-            ffmpeg_args.push("av1_qsv".to_string());
-            ffmpeg_args.push("-preset".to_string());
-            ffmpeg_args.push("medium".to_string());
-            ffmpeg_args.push("-global_quality".to_string());
-            ffmpeg_args.push("25".to_string());
-        }
-        ("nvenc", "h264") => {
-            ffmpeg_args.push("-c:v".to_string());
-            ffmpeg_args.push("h264_nvenc".to_string());
-            ffmpeg_args.push("-preset".to_string());
-            ffmpeg_args.push("p4".to_string());
-            ffmpeg_args.push("-cq".to_string());
-            ffmpeg_args.push("23".to_string());
-        }
-        ("nvenc", "h265") => {
-            ffmpeg_args.push("-c:v".to_string());
-            ffmpeg_args.push("hevc_nvenc".to_string());
-            ffmpeg_args.push("-preset".to_string());
-            ffmpeg_args.push("p4".to_string());
-            ffmpeg_args.push("-cq".to_string());
-            ffmpeg_args.push("23".to_string());
-        }
-        ("nvenc", "av1") => {
-            ffmpeg_args.push("-c:v".to_string());
-            ffmpeg_args.push("av1_nvenc".to_string());
-            ffmpeg_args.push("-preset".to_string());
-            ffmpeg_args.push("p4".to_string());
-            ffmpeg_args.push("-cq".to_string());
-            ffmpeg_args.push("25".to_string());
-        }
-        ("vaapi", "h265") => {
-            ffmpeg_args.push("-c:v".to_string());
-            ffmpeg_args.push("hevc_vaapi".to_string());
-        }
-        ("vaapi", "av1") => {
-            ffmpeg_args.push("-c:v".to_string());
-            ffmpeg_args.push("av1_vaapi".to_string());
-        }
-        ("vaapi", "h264") => {
-            ffmpeg_args.push("-c:v".to_string());
-            ffmpeg_args.push("h264_vaapi".to_string());
-        }
-        ("vaapi", other) => {
-            logs.log(&app, "Hardsub", &format!("VA-API does not support codec '{}'. Falling back to standard CPU encoder.", other));
-            apply_cpu_encoder(&mut ffmpeg_args, other);
-        }
-        ("videotoolbox", "h265") => {
-            ffmpeg_args.push("-c:v".to_string());
-            ffmpeg_args.push("hevc_videotoolbox".to_string());
-            ffmpeg_args.push("-q:v".to_string());
-            ffmpeg_args.push("65".to_string());
-        }
-        ("videotoolbox", "prores") => {
-            ffmpeg_args.push("-c:v".to_string());
-            ffmpeg_args.push("prores_videotoolbox".to_string());
-        }
-        ("videotoolbox", "h264") => {
-            ffmpeg_args.push("-c:v".to_string());
-            ffmpeg_args.push("h264_videotoolbox".to_string());
-            ffmpeg_args.push("-q:v".to_string());
-            ffmpeg_args.push("65".to_string());
-        }
-        ("videotoolbox", other) => {
-            logs.log(&app, "Hardsub", &format!("VideoToolbox does not support codec '{}'. Falling back to standard CPU encoder.", other));
-            apply_cpu_encoder(&mut ffmpeg_args, other);
-        }
-        _ => {
-            apply_cpu_encoder(&mut ffmpeg_args, &settings.video_codec);
-        }
-    }
-
-    // 4. Audio Codec
-    if settings.audio_mode == "aac" {
-        ffmpeg_args.push("-c:a".to_string());
-        ffmpeg_args.push("aac".to_string());
-        ffmpeg_args.push("-b:a".to_string());
-        ffmpeg_args.push("192k".to_string());
-    } else {
-        ffmpeg_args.push("-c:a".to_string());
-        ffmpeg_args.push("copy".to_string());
-    }
+    // 4. Audio Codec & Bitrate Selection
+    let audio_encoder_flags = build_audio_encoder_flags(&settings);
+    ffmpeg_args.extend(audio_encoder_flags);
 
     // 5. Output file
     ffmpeg_args.push(settings.output_path.clone());

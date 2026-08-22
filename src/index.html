@@ -2228,21 +2228,22 @@
                 <!-- Tab 3: Video Export & Encoding View -->
                 <div id="hardsub-tab-view-export" class="hardsub-tab-view" style="display: none; flex-direction: column; gap: 16px;">
                   
-                  <!-- Hardware & Format Options Card -->
+                  <!-- 1. Format, Codec & Performance Card -->
                   <div class="glass-card" style="padding: 18px;">
                     <h3 style="margin-top: 0; margin-bottom: 14px; font-size: 1.05rem; color: var(--color-royal-blue); display: flex; align-items: center; gap: 8px;">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px;"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-                      Encoding & Hardware Acceleration
+                      Format, Codec & Performance
                     </h3>
 
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
                       <div>
-                        <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Output Format</label>
-                        <select class="select-control" id="hardsub-format" style="width:100%;">
-                          <option value="mp4">MP4 (.mp4)</option>
-                          <option value="mkv">MKV (.mkv)</option>
-                          <option value="webm">WebM (.webm)</option>
-                          <option value="mov">MOV (.mov)</option>
+                        <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Hardware Accelerator</label>
+                        <select class="select-control" id="hardsub-hw" style="width:100%;">
+                          <option value="cpu">Standard CPU (Universal)</option>
+                          <option value="videotoolbox">Apple VideoToolbox (macOS / Apple Silicon)</option>
+                          <option value="nvenc">NVIDIA NVENC (GPU Acceleration)</option>
+                          <option value="qsv">Intel QSV (QuickSync HW)</option>
+                          <option value="vaapi">Linux VA-API (AMD/Intel)</option>
                         </select>
                       </div>
 
@@ -2258,23 +2259,130 @@
                       </div>
 
                       <div>
-                        <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Hardware Accelerator</label>
-                        <select class="select-control" id="hardsub-hw" style="width:100%;">
-                          <option value="cpu">Standard CPU (Universal)</option>
-                          <option value="videotoolbox">Apple VideoToolbox (macOS / Apple Silicon)</option>
-                          <option value="nvenc">NVIDIA NVENC (GPU Acceleration)</option>
-                          <option value="qsv">Intel QSV (QuickSync HW)</option>
-                          <option value="vaapi">Linux VA-API (AMD/Intel)</option>
+                        <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Output Container</label>
+                        <select class="select-control" id="hardsub-format" style="width:100%;">
+                          <option value="mp4">MP4 (.mp4)</option>
+                          <option value="mkv">MKV (.mkv)</option>
+                          <option value="webm">WebM (.webm)</option>
+                          <option value="mov">MOV (.mov)</option>
                         </select>
                       </div>
 
                       <div>
-                        <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Audio Mode</label>
-                        <select class="select-control" id="hardsub-audio" style="width:100%;">
-                          <option value="copy">Pass-through Audio (-c:a copy)</option>
-                          <option value="aac">Re-encode Audio (AAC 192k)</option>
+                        <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Resolution / Scale</label>
+                        <select class="select-control" id="hardsub-resolution" style="width:100%;">
+                          <option value="original">Original (Source Resolution)</option>
+                          <option value="4k">4K UHD (3840×2160)</option>
+                          <option value="2k">2K QHD (2560×1440)</option>
+                          <option value="1080p">1080p FHD (1920×1080)</option>
+                          <option value="720p">720p HD (1280×720)</option>
+                          <option value="480p">480p SD (854×480)</option>
                         </select>
                       </div>
+
+                      <div style="grid-column: span 2;">
+                        <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Encoding Speed & Compression Effort</label>
+                        <select class="select-control" id="hardsub-speed-preset" style="width: 100%;">
+                          <option value="fast">Fast (Quick Export, Slightly Larger Size)</option>
+                          <option value="medium" selected>Balanced / Medium (Recommended)</option>
+                          <option value="slow">Slow (Maximum Compression Efficiency & Quality)</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 2. Video Quality Card (Dedicated & Seamless) -->
+                  <div class="glass-card" style="padding: 18px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                      <h3 style="margin: 0; font-size: 1.05rem; color: var(--color-royal-blue); display: flex; align-items: center; gap: 8px;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                        Video Quality
+                      </h3>
+                      <span id="hardsub-quality-badge" aria-live="polite" style="font-size: 0.75rem; background: rgba(59, 130, 246, 0.15); color: var(--color-royal-blue); padding: 3px 10px; border-radius: 20px; border: 1px solid rgba(59, 130, 246, 0.3); font-weight: 600;">Balanced</span>
+                    </div>
+
+                    <!-- Quick Preset Buttons -->
+                    <div id="hardsub-quality-presets-container" role="radiogroup" aria-label="Video Quality Presets" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px;">
+                      <button type="button" class="quality-preset-btn" role="radio" aria-checked="false" data-preset="draft" style="display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; background: rgba(255,255,255,0.03); color: var(--color-text-main); cursor: pointer; transition: all 0.2s;">
+                        <span class="preset-title" style="font-size: 0.82rem; font-weight: 600;">Draft</span>
+                        <span style="font-size: 0.68rem; color: var(--color-text-muted);">Fast / Compact</span>
+                      </button>
+                      <button type="button" class="quality-preset-btn active" role="radio" aria-checked="true" data-preset="balanced" style="display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px; border: 1px solid var(--color-royal-blue); border-radius: 8px; background: rgba(59, 130, 246, 0.15); color: var(--color-text-main); cursor: pointer; transition: all 0.2s;">
+                        <span class="preset-title" style="font-size: 0.82rem; font-weight: 600;">Balanced</span>
+                        <span style="font-size: 0.68rem; color: var(--color-text-muted);">Recommended</span>
+                      </button>
+                      <button type="button" class="quality-preset-btn" role="radio" aria-checked="false" data-preset="high" style="display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; background: rgba(255,255,255,0.03); color: var(--color-text-main); cursor: pointer; transition: all 0.2s;">
+                        <span class="preset-title" style="font-size: 0.82rem; font-weight: 600;">High Quality</span>
+                        <span style="font-size: 0.68rem; color: var(--color-text-muted);">Crisp Detail</span>
+                      </button>
+                      <button type="button" class="quality-preset-btn" role="radio" aria-checked="false" data-preset="lossless" style="display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 6px; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; background: rgba(255,255,255,0.03); color: var(--color-text-main); cursor: pointer; transition: all 0.2s;">
+                        <span class="preset-title" style="font-size: 0.82rem; font-weight: 600;">Ultra / Master</span>
+                        <span style="font-size: 0.68rem; color: var(--color-text-muted);">Max Fidelity</span>
+                      </button>
+                    </div>
+
+                    <!-- Quality Parameter Slider with Dynamic Label & Value -->
+                    <div id="hardsub-quality-slider-container" style="background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 14px;">
+                      <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; margin-bottom: 8px;">
+                        <span id="hardsub-quality-param-label" style="font-weight: 500; color: var(--color-text-main);">CRF (Constant Rate Factor)</span>
+                        <span id="hardsub-quality-param-val" style="color: var(--color-royal-blue); font-weight: 700; font-size: 0.95rem; background: rgba(59, 130, 246, 0.12); padding: 2px 8px; border-radius: 6px;">22</span>
+                      </div>
+                      <input type="range" class="range-slider" id="hardsub-quality-slider" min="0" max="51" value="22" aria-labelledby="hardsub-quality-param-label" aria-describedby="hardsub-quality-hint" style="width: 100%;" />
+                      <div id="hardsub-quality-hint" style="font-size: 0.72rem; color: var(--color-text-muted); margin-top: 6px; display: flex; align-items: center; gap: 4px;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 13px; height: 13px; flex-shrink: 0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                        Lower value = Higher visual quality & larger file size
+                      </div>
+                    </div>
+
+                  </div>
+
+                  <!-- 3. Audio Codec & Bitrate Card -->
+                  <div class="glass-card" style="padding: 18px;">
+                    <h3 style="margin-top: 0; margin-bottom: 14px; font-size: 1.05rem; color: var(--color-royal-blue); display: flex; align-items: center; gap: 8px;">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px;"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                      Audio Settings
+                    </h3>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                      <div>
+                        <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Audio Codec</label>
+                        <select class="select-control" id="hardsub-audio-codec" style="width:100%;">
+                          <option value="copy">Pass-through Audio (Copy - Fast & Lossless)</option>
+                          <option value="aac">AAC (Universal Compatibility)</option>
+                          <option value="opus">Opus (Modern High Efficiency)</option>
+                          <option value="mp3">MP3 (Legacy Audio)</option>
+                          <option value="mute">Mute / Remove Audio Track</option>
+                        </select>
+                      </div>
+
+                      <div id="hardsub-audio-bitrate-container">
+                        <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Audio Bitrate</label>
+                        <select class="select-control" id="hardsub-audio-bitrate" style="width:100%;">
+                          <option value="96k">96 kbps (Voice / Compact)</option>
+                          <option value="128k">128 kbps (Standard Quality)</option>
+                          <option value="192k" selected>192 kbps (High Quality - Recommended)</option>
+                          <option value="256k">256 kbps (Very High Quality)</option>
+                          <option value="320k">320 kbps (Studio Master Quality)</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 4. Live FFmpeg Command Preview Card -->
+                  <div class="glass-card" style="padding: 18px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                      <h3 style="margin: 0; font-size: 0.95rem; color: var(--color-royal-blue); display: flex; align-items: center; gap: 8px;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px;"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                        FFmpeg Command Preview
+                      </h3>
+                      <button type="button" class="btn-secondary" id="btn-copy-ffmpeg-cmd" style="padding: 4px 12px; font-size: 0.75rem; display: flex; align-items: center; gap: 6px;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px; height:13px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                        Copy Command
+                      </button>
+                    </div>
+                    
+                    <div style="position: relative; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.78rem; color: #a5f3fc; line-height: 1.5; overflow-x: auto; max-height: 100px; white-space: pre-wrap; word-break: break-all;" id="hardsub-ffmpeg-cmd-preview">
+                      ffmpeg -nostdin -progress pipe:1 -i input.mp4 -vf subtitles=... -c:v libx264 -crf 22 -preset medium -c:a copy output.mp4
                     </div>
                   </div>
 
