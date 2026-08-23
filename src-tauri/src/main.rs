@@ -18,7 +18,7 @@ use hardware::{HardwareMonitor, SystemStats};
 use logger::AppLogs;
 use builder::check_build_exists;
 use transcribe::{probe_file_metadata, convert_to_wav, run_transcription, FileMetadata, TranscriptionResult, read_text_file};
-use downloader::{DownloadSession, DownloadState, run_model_download, get_expected_model_size, get_all_models_status, pause_download_model, delete_model_file};
+use downloader::{DownloadSession, DownloadState, start_download, get_all_models_status, pause_download_model, delete_model_file};
 use translation::{
     fetch_provider_models,
     translate_transcription_files,
@@ -452,72 +452,13 @@ fn write_text_file_content(file_path: String, content: String) -> Result<(), Str
 }
 
 #[tauri::command]
-async fn start_download_model_task(
+fn start_download_model_task(
     app: AppHandle,
     download_state: State<'_, DownloadState>,
     models_dir: String,
     model_name: String,
 ) -> Result<(), String> {
-    let state = download_state.0.clone();
-    tokio::spawn(async move {
-        if let Err(e) = run_model_download(app, state, models_dir, model_name).await {
-            eprintln!("[download] model download failed: {}", e);
-        }
-    });
-    Ok(())
-}
-
-#[tauri::command]
-fn get_model_download_progress(models_dir: String, model_name: String) -> Result<f64, String> {
-    let lowered = model_name.to_lowercase();
-    let clean_name = lowered
-        .strip_prefix("ggml-")
-        .unwrap_or(&lowered)
-        .strip_suffix(".bin")
-        .unwrap_or(&lowered)
-        .to_string();
-
-    let models_dir_path = Path::new(&models_dir);
-    let target_path = models_dir_path.join(format!("ggml-{}.bin", clean_name));
-    let tmp_path = models_dir_path.join(format!("ggml-{}.bin.tmp", clean_name));
-
-    let mut target_exists = target_path.exists();
-    let mut tmp_exists = tmp_path.exists();
-    let mut active_tmp = tmp_path;
-
-    if !target_exists {
-        let legacy_target = models_dir_path.join("models").join(format!("ggml-{}.bin", clean_name));
-        if legacy_target.exists() {
-            target_exists = true;
-        }
-    }
-
-    if target_exists {
-        return Ok(1.0);
-    }
-
-    if !tmp_exists {
-        let legacy_tmp = models_dir_path.join("models").join(format!("ggml-{}.bin.tmp", clean_name));
-        if legacy_tmp.exists() {
-            tmp_exists = true;
-            active_tmp = legacy_tmp;
-        }
-    }
-
-    if !tmp_exists {
-        return Ok(0.0);
-    }
-
-    if let Ok(meta) = std::fs::metadata(&active_tmp) {
-        let current_size = meta.len();
-        let expected_size = get_expected_model_size(&clean_name);
-        if expected_size > 0 {
-            let progress = current_size as f64 / expected_size as f64;
-            return Ok(progress.min(0.99)); // Cap at 99% until renamed to .bin
-        }
-    }
-
-    Ok(0.0)
+    start_download(app, download_state.0.clone(), models_dir, model_name)
 }
 
 #[tauri::command]
@@ -602,7 +543,6 @@ fn main() {
             read_text_file_content,
             write_text_file_content,
             start_download_model_task,
-            get_model_download_progress,
             get_all_models_status,
             pause_download_model,
             delete_model_file,

@@ -1584,67 +1584,69 @@ function setupTauriListeners() {
   // Model download progress event listener (Event-driven targeted DOM update)
   on('model-download-status', (event) => {
     const payload = event.payload;
-    if (!payload || !payload.model_name) return;
+    if (!payload || !payload.modelName) return;
 
-    if (payload.active) {
-      const card = document.querySelector(`[data-model="${payload.model_name}"]`);
-      if (card) {
-        const pct = (payload.progress * 100).toFixed(0);
-        const dlMB = (payload.downloaded_bytes / 1024 / 1024).toFixed(0);
-        const totalMB = (payload.total_bytes / 1024 / 1024).toFixed(0);
-        
-        let speedText = 'Connecting...';
-        let remainingText = '';
-        if (payload.speed_bps > 0) {
-          const speedMbps = (payload.speed_bps * 8 / 1000 / 1000).toFixed(1);
+    if (payload.phase === 'starting' || payload.phase === 'downloading') {
+      // CSS.escape prevents selector breakage from quotes/brackets in names
+      const card = document.querySelector(`[data-model="${CSS.escape(payload.modelName)}"]`);
+      if (!card) return;
+
+      const pct = Math.min(100, Math.round((payload.progress || 0) * 100));
+      const dlMB = ((payload.downloadedBytes || 0) / 1048576).toFixed(0);
+      const totalMB = ((payload.totalBytes || 0) / 1048576).toFixed(0);
+      const totalKnown = payload.totalBytes > 0;
+
+      // Backend speed is authoritative — no client-side delta math.
+      let speedText = payload.phase === 'starting' ? 'Connecting...' : '';
+      if (!speedText) {
+        if (payload.speedBps > 0) {
+          const speedMbps = ((payload.speedBps * 8) / 1e6).toFixed(1);
           speedText = `${speedMbps} Mbps`;
-          if (typeof lastKnownSpeedMap !== 'undefined') {
-            lastKnownSpeedMap.set(payload.model_name, speedText);
+          if (totalKnown && payload.downloadedBytes <= payload.totalBytes) {
+            const remainingSeconds = Math.round((payload.totalBytes - payload.downloadedBytes) / payload.speedBps);
+            speedText += ` • ETA: ${formatRemainingTime(remainingSeconds)}`;
           }
-          const remainingBytes = payload.total_bytes - payload.downloaded_bytes;
-          const remainingSeconds = Math.round(remainingBytes / payload.speed_bps);
-          remainingText = ` • ETA: ${formatRemainingTime(remainingSeconds)}`;
-        } else if (payload.downloaded_bytes > 0) {
-          speedText = (typeof lastKnownSpeedMap !== 'undefined' && lastKnownSpeedMap.get(payload.model_name)) || '0.0 Mbps';
+        } else {
+          speedText = (payload.downloadedBytes || 0) > 0 ? '...' : 'Starting...';
         }
+      }
 
-        // 1. Update progress bar fill in-place
-        const barContainer = card.querySelector('.progress-bar-container');
-        if (barContainer) barContainer.style.display = 'block';
-        const barFill = card.querySelector('.progress-bar-fill');
-        if (barFill) barFill.style.width = `${pct}%`;
+      // 1. Progress bar fill in-place
+      const barContainer = card.querySelector('.progress-bar-container');
+      if (barContainer) barContainer.style.display = 'block';
+      const barFill = card.querySelector('.progress-bar-fill');
+      if (barFill) barFill.style.width = `${pct}%`;
 
-        // 2. Update description text inline without DOM recreation
-        const descEl = card.querySelector('.setting-desc');
-        if (descEl) {
-          const isQuant = payload.model_name.includes("-q");
-          descEl.innerHTML = `
-            <span class="model-badge badge-downloading">Downloading</span>
-            <span style="color: rgba(255,255,255,0.1);">|</span>
-            <span>Expected Size: ${totalMB} MB</span>
-            <span style="color: rgba(255,255,255,0.1);">|</span>
-            <span style="color: ${isQuant ? 'var(--color-cyan)' : 'var(--color-royal-blue)'}; font-weight: 500;">
-              ${isQuant ? 'Quantized Optimized (5-bit/8-bit)' : 'Full Precision (16-bit)'}
-            </span>
-            <span style="color: rgba(255,255,255,0.1);">|</span>
-            <span style="color: var(--color-cyan);">${dlMB} MB (${pct}%) • Speed: ${speedText}${remainingText}</span>
-          `;
-        }
+      // 2. Description text inline without DOM recreation
+      const descEl = card.querySelector('.setting-desc');
+      if (descEl) {
+        const isQuant = payload.modelName.includes("-q");
+        descEl.innerHTML = `
+          <span class="model-badge badge-downloading">Downloading</span>
+          <span style="color: rgba(255,255,255,0.1);">|</span>
+          <span>Expected Size: ${totalMB} MB</span>
+          <span style="color: rgba(255,255,255,0.1);">|</span>
+          <span style="color: ${isQuant ? 'var(--color-cyan)' : 'var(--color-royal-blue)'}; font-weight: 500;">
+            ${isQuant ? 'Quantized Optimized (5-bit/8-bit)' : 'Full Precision (16-bit)'}
+          </span>
+          <span style="color: rgba(255,255,255,0.1);">|</span>
+          <span style="color: var(--color-cyan);">${dlMB} MB${totalKnown ? ` (${pct}%)` : ''} • Speed: ${speedText}</span>
+        `;
+      }
 
-        // 3. Ensure button status is dynamically updated to "Pause" in-place
-        const ctrlEl = card.querySelector('.setting-control');
-        if (ctrlEl && !ctrlEl.querySelector('[data-action="pause"]')) {
-          ctrlEl.innerHTML = `<button class="btn-secondary" style="border-color: var(--color-gold); color: var(--color-gold); margin: 0; padding: 6px 14px; font-size: 0.8rem;" data-action="pause">Pause</button>`;
-        }
+      // 3. Ensure button is "Pause" in-place
+      const ctrlEl = card.querySelector('.setting-control');
+      if (ctrlEl && !ctrlEl.querySelector('[data-action="pause"]')) {
+        ctrlEl.innerHTML = `<button class="btn-secondary" style="border-color: var(--color-gold); color: var(--color-gold); margin: 0; padding: 6px 14px; font-size: 0.8rem;" data-action="pause">Pause</button>`;
       }
       // If card is NOT in current view/tab, do NOTHING to prevent tab re-rendering!
     } else {
-      // Download finished, paused, or errored -> Reload grid state once
+      // paused / completed / failed -> Reload grid state once
       loadModelStatusesGrid(true);
-      if (payload.error && !payload.is_paused) {
-        showNotification(`Model download failed: ${payload.error}`, "error");
-      } else if (payload.progress >= 1.0) {
-        showNotification(`Finished downloading ggml-${payload.model_name}.bin successfully!`, "success");
+      if (payload.phase === 'failed') {
+        showNotification(`Model download failed: ${payload.error || 'unknown error'}`, "error");
+      } else if (payload.phase === 'completed') {
+        showNotification(`Finished downloading ggml-${payload.modelName}.bin successfully!`, "success");
         scanAndPopulateModels();
       }
     }
@@ -3376,9 +3378,6 @@ async function handleDashboardDroppedFiles(files) {
 
 
 // ----------------- Models Logic -----------------
-let prevDownloadedBytesMap = new Map();
-let prevTimestampMap = new Map();
-let lastKnownSpeedMap = new Map();
 let currentCategoryFilter = 'recommended';
 
 function formatRemainingTime(seconds) {
@@ -3544,43 +3543,7 @@ window.loadModelStatusesGrid = async function(isSilent = false) {
       let isRecommended = recList.includes(m.name);
       const sizeMB = (m.sizeBytes / 1024 / 1024).toFixed(0);
       const dlMB = (m.downloadedBytes / 1024 / 1024).toFixed(0);
-
-      let speedText = '';
-      let remainingText = '';
-      
-      if (m.status === 'Downloading') {
-        const now = Date.now();
-        const prevBytes = prevDownloadedBytesMap.get(m.name) || 0;
-        const prevTime = prevTimestampMap.get(m.name) || now;
-        
-        const deltaBytes = m.downloadedBytes - prevBytes;
-        const deltaTime = (now - prevTime) / 1000;
-        
-        prevDownloadedBytesMap.set(m.name, m.downloadedBytes);
-        prevTimestampMap.set(m.name, now);
-        
-        if (deltaBytes > 0 && deltaTime > 0) {
-          const speedBytesPerSec = deltaBytes / deltaTime;
-          const speedMbps = (speedBytesPerSec * 8 / 1000 / 1000).toFixed(1);
-          speedText = `${speedMbps} Mbps`;
-          lastKnownSpeedMap.set(m.name, speedText);
-          
-          const remainingBytes = m.sizeBytes - m.downloadedBytes;
-          const remainingSeconds = Math.round(remainingBytes / speedBytesPerSec);
-          remainingText = ` • ETA: ${formatRemainingTime(remainingSeconds)}`;
-        } else {
-          if (m.downloadedBytes === 0) {
-            speedText = 'Starting...';
-          } else {
-            speedText = lastKnownSpeedMap.get(m.name) || '0.0 Mbps';
-          }
-        }
-      } else {
-        prevDownloadedBytesMap.delete(m.name);
-        prevTimestampMap.delete(m.name);
-        lastKnownSpeedMap.delete(m.name);
-      }
-      
+      const pct = Math.round((m.progress || 0) * 100);
       let actionButtons = '';
       if (m.status === 'Downloaded') {
         actionButtons = `
@@ -3601,7 +3564,6 @@ window.loadModelStatusesGrid = async function(isSilent = false) {
         `;
       }
       
-      const pct = (m.progress * 100).toFixed(0);
       const showProgressBlock = m.status === 'Downloading' || m.status === 'Paused' ? 'block' : 'none';
       const isQuant = m.name.includes("-q");
       
@@ -3618,7 +3580,6 @@ window.loadModelStatusesGrid = async function(isSilent = false) {
         recommendedBadge = `<span class="model-badge" style="background: rgba(6, 182, 212, 0.08); color: var(--color-cyan); border: 1px solid rgba(6, 182, 212, 0.25); margin-right: 6px;" title="${reason}">★ ${reason}</span>`;
       }
       
-      card.setAttribute('data-model', m.name);
       const safeName = escapeHTML(m.name);
       card.innerHTML = `
         <div class="setting-info" style="flex-grow: 1; padding-right: 20px;">
@@ -3636,7 +3597,7 @@ window.loadModelStatusesGrid = async function(isSilent = false) {
             </span>
             ${m.status === 'Downloading' ? `
               <span style="color: rgba(255,255,255,0.1);">|</span>
-              <span style="color: var(--color-cyan);">${dlMB} MB (${pct}%) • Speed: ${speedText}${remainingText}</span>
+              <span style="color: var(--color-cyan);">${dlMB} MB (${pct}%) • In progress</span>
             ` : ''}
             ${m.status === 'Paused' ? `
               <span style="color: rgba(255,255,255,0.1);">|</span>
