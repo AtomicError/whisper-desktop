@@ -402,6 +402,7 @@ sidebar.sidebar-collapsed .nav-item.active:hover {
     0 0 18px rgba(45, 127, 255, 0.55);
 }
 
+
 sidebar.sidebar-collapsed .sidebar-system-hud {
   width: 46px;
   margin: auto auto 12px auto;
@@ -567,7 +568,40 @@ sidebar.sidebar-collapsed .credit-content span {
   height: 46px;
   box-sizing: border-box;
   overflow: hidden;
-  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, width 0.38s cubic-bezier(0.34, 1.45, 0.64, 1), padding 0.38s cubic-bezier(0.34, 1.45, 0.64, 1);
+  position: relative;
+  transition: color 0.26s cubic-bezier(0.16, 1, 0.3, 1),
+              background-color 0.26s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.26s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.26s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.26s cubic-bezier(0.16, 1, 0.3, 1),
+              width 0.38s cubic-bezier(0.34, 1.45, 0.64, 1),
+              padding 0.38s cubic-bezier(0.34, 1.45, 0.64, 1);
+}
+
+.nav-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+  transform: translateX(-100%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Transition only on hover-in; on hover-out the sweep resets instantly
+   instead of visibly sweeping back right-to-left. */
+.nav-item:hover::before {
+  transform: translateX(100%);
+  transition: transform 0.5s ease;
+}
+
+.nav-item:hover {
+  color: var(--color-text);
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.06);
 }
 
 .nav-item svg {
@@ -577,12 +611,18 @@ sidebar.sidebar-collapsed .credit-content span {
   flex-shrink: 0;
   position: relative;
   z-index: 2;
-  transition: color 0.2s ease, transform 0.2s ease;
+  transition: transform 0.26s cubic-bezier(0.16, 1, 0.3, 1), color 0.22s ease, filter 0.22s ease;
+}
+
+.nav-item:hover svg {
+  transform: scale(1.1);
+  color: var(--color-royal-blue);
+  filter: drop-shadow(0 0 6px rgba(45, 127, 255, 0.45));
 }
 
 .nav-item span {
   font-size: 0.95rem;
-  font-weight: 550;
+  font-weight: 500;
   max-width: 160px;
   margin-left: 14px;
   transform: translateX(0);
@@ -590,39 +630,44 @@ sidebar.sidebar-collapsed .credit-content span {
   overflow: hidden;
   white-space: nowrap;
   position: relative;
-  z-index: 1;
+  z-index: 2;
   transition: transform 0.38s cubic-bezier(0.34, 1.45, 0.64, 1),
               clip-path 0.34s cubic-bezier(0.16, 1, 0.3, 1),
               max-width 0.38s cubic-bezier(0.34, 1.45, 0.64, 1),
               margin-left 0.38s cubic-bezier(0.34, 1.45, 0.64, 1);
 }
 
-.nav-item:hover {
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--color-text);
-}
-
 .nav-item.active {
-  background: linear-gradient(135deg, rgba(45, 127, 255, 0.18) 0%, rgba(45, 127, 255, 0.05) 100%);
-  border-color: rgba(45, 127, 255, 0.35);
-  color: #fff;
-  box-shadow: 
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.1),
-    -4px 0 12px rgba(45, 127, 255, 0.22),
-    0 0 8px rgba(45, 127, 255, 0.08);
+  background: linear-gradient(135deg, rgba(45, 127, 255, 0.16) 0%, rgba(45, 127, 255, 0.06) 100%);
+  color: var(--color-text);
+  font-weight: 600;
+  border-color: rgba(45, 127, 255, 0.4);
+  box-shadow: 0 4px 16px rgba(45, 127, 255, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.15), inset 0 0 12px rgba(45, 127, 255, 0.1);
+  transform: translateY(-1px);
 }
 
 .nav-item.active:hover {
-  background: linear-gradient(135deg, rgba(45, 127, 255, 0.24) 0%, rgba(45, 127, 255, 0.14) 100%);
-  border-color: rgba(45, 127, 255, 0.65);
-  box-shadow: 
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.15),
-    0 0 16px rgba(45, 127, 255, 0.45);
+  background: linear-gradient(135deg, rgba(45, 127, 255, 0.22) 0%, rgba(45, 127, 255, 0.1) 100%);
+  border-color: rgba(45, 127, 255, 0.58);
+  box-shadow: 0 6px 20px rgba(45, 127, 255, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2), inset 0 0 16px rgba(45, 127, 255, 0.15);
+  transform: translateY(-1px);
 }
 
 .nav-item.active svg {
+  transform: scale(1.12);
   color: var(--color-royal-blue);
-  filter: drop-shadow(0 0 4px rgba(45, 127, 255, 0.5));
+  filter: drop-shadow(0 0 8px rgba(45, 127, 255, 0.75));
+}
+
+.nav-item:active,
+.nav-item.active:active,
+.nav-item.active:hover:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.nav-item:focus-visible {
+  outline: 2px solid var(--color-royal-blue);
+  outline-offset: 2px;
 }
 
 /* Sidebar System Status HUD */
@@ -720,7 +765,7 @@ sidebar.sidebar-collapsed .credit-content span {
 /* Premium Floating Telemetry HUD Popover Card */
 .hud-telemetry-popover {
   position: fixed;
-  width: 240px;
+  width: 260px;
   background: rgba(9, 13, 26, 0.96);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
@@ -808,6 +853,7 @@ sidebar.sidebar-collapsed .credit-content span {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
+  gap: 12px;
   margin-bottom: 6px;
 }
 
@@ -817,12 +863,15 @@ sidebar.sidebar-collapsed .credit-content span {
   font-weight: 700;
   color: #fff;
   letter-spacing: -0.02em;
+  flex-shrink: 0;
 }
 
 .telemetry-stat-desc {
   font-size: 0.68rem;
   font-weight: 500;
   color: var(--color-text-muted);
+  text-align: right;
+  line-height: 1.25;
 }
 
 .telemetry-bar-track {
@@ -850,6 +899,12 @@ sidebar.sidebar-collapsed .credit-content span {
 .telemetry-bar-fill.hot {
   background: linear-gradient(90deg, var(--color-hot) 0%, #e11d48 100%);
   box-shadow: 0 0 10px rgba(244, 63, 94, 0.6);
+}
+
+.telemetry-bar-fill.stale {
+  filter: saturate(0.25) brightness(0.75);
+  opacity: 0.55;
+  box-shadow: none;
 }
 
 .telemetry-subtext {
@@ -946,8 +1001,14 @@ sidebar.sidebar-collapsed .credit-content span {
   .metric-bar-fill,
   .telemetry-bar-fill,
   .hud-telemetry-popover,
-  .sidebar-system-hud {
+  .sidebar-system-hud,
+  .nav-item,
+  .nav-item::before,
+  .nav-item svg,
+  .nav-item span {
     transition: none !important;
+    animation: none !important;
+    transform: none !important;
   }
 }
 

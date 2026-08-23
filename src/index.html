@@ -53,9 +53,10 @@
           <div class="brand-name">Whisper Desktop</div>
         </div>
         
-        <div class="nav-links">
-          <div class="nav-item active" onclick="switchView('intro')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <nav class="sidebar-nav" aria-label="Main Navigation">
+          <div class="nav-links" role="tablist" aria-orientation="vertical">
+          <div class="nav-item active" id="nav-tab-intro" role="tab" data-view="intro" tabindex="0" aria-selected="true" aria-controls="panel-intro" onclick="switchView('intro')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <rect x="3" y="3" width="7" height="7"/>
               <rect x="14" y="3" width="7" height="7"/>
               <rect x="14" y="14" width="7" height="7"/>
@@ -64,10 +65,8 @@
             <span>Dashboard</span>
           </div>
           
-
-          
-          <div class="nav-item" onclick="switchView('models')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <div class="nav-item" id="nav-tab-models" role="tab" data-view="models" tabindex="-1" aria-selected="false" aria-controls="panel-models" onclick="switchView('models')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
               <polyline points="7 10 12 15 17 10"/>
               <line x1="12" y1="15" x2="12" y2="3"/>
@@ -75,38 +74,39 @@
             <span>Model Hub</span>
           </div>
           
-          <div class="nav-item" onclick="switchView('settings')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <div class="nav-item" id="nav-tab-settings" role="tab" data-view="settings" tabindex="-1" aria-selected="false" aria-controls="panel-settings" onclick="switchView('settings')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <circle cx="12" cy="12" r="3"/>
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
             </svg>
             <span>Configuration</span>
           </div>
           
-          <div class="nav-item" onclick="switchView('transcribe')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <div class="nav-item" id="nav-tab-transcribe" role="tab" data-view="transcribe" tabindex="-1" aria-selected="false" aria-controls="panel-transcribe" onclick="switchView('transcribe')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M12 20h9"/>
               <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
             </svg>
             <span>Transcribe File</span>
           </div>
 
-          <div class="nav-item" onclick="switchView('hardsub')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <div class="nav-item" id="nav-tab-hardsub" role="tab" data-view="hardsub" tabindex="-1" aria-selected="false" aria-controls="panel-hardsub" onclick="switchView('hardsub')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <polygon points="23 7 16 12 23 17 23 7"/>
               <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
             </svg>
             <span>Hardsub Video</span>
           </div>
           
-          <div class="nav-item" onclick="switchView('logs')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <div class="nav-item" id="nav-tab-logs" role="tab" data-view="logs" tabindex="-1" aria-selected="false" aria-controls="panel-logs" onclick="switchView('logs')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/>
               <polyline points="13 2 13 9 20 9"/>
             </svg>
             <span>Activity Logs</span>
           </div>
-        </div>
+          </div>
+        </nav>
         
         <!-- Sidebar System Status HUD -->
         <div class="sidebar-system-hud" id="sidebar-system-hud" role="region" aria-label="System Hardware Status">
@@ -232,7 +232,7 @@
         <main style="flex-grow: 1; overflow: hidden; position: relative;">
           
           <!-- 1. INTRO PANEL -->
-          <div class="view-panel active" id="panel-intro">
+          <div class="view-panel active" id="panel-intro" role="tabpanel" aria-labelledby="nav-tab-intro" tabindex="0">
             <div class="intro-grid">
               <div class="glass-card intro-welcome">
                 <h2>Welcome to Whisper Desktop</h2>
@@ -352,7 +352,7 @@
 
 
           <!-- 3. SETTINGS CONFIGURATION PANEL -->
-          <div class="view-panel fixed-layout-panel" id="panel-settings">
+          <div class="view-panel fixed-layout-panel" id="panel-settings" role="tabpanel" aria-labelledby="nav-tab-settings" tabindex="0">
             <div class="presets-container">
               <div>
                 <h3 style="font-size:1.2rem; margin-bottom:4px;">Whisper Engine Configuration</h3>
@@ -1491,7 +1491,7 @@
           </div>
 
           <!-- 3.5. MODEL MANAGER PANEL -->
-          <div class="view-panel fixed-layout-panel" id="panel-models">
+          <div class="view-panel fixed-layout-panel" id="panel-models" role="tabpanel" aria-labelledby="nav-tab-models" tabindex="0">
             <div class="glass-card" style="margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
               <div>
                 <h3 style="font-size: 1.25rem; margin-bottom: 4px;">Whisper Model Hub</h3>
@@ -1545,7 +1545,7 @@
           </div>
 
           <!-- 4. TRANSCRIBE FILE PANEL -->
-          <div class="view-panel fixed-layout-panel" id="panel-transcribe">
+          <div class="view-panel fixed-layout-panel" id="panel-transcribe" role="tabpanel" aria-labelledby="nav-tab-transcribe" tabindex="0">
             <div class="transcribe-layout">
               
               <div class="transcribe-left-panel">
@@ -1793,7 +1793,7 @@
           </div>
 
           <!-- 5. ACTIVITY LOG PANEL -->
-          <div class="view-panel fixed-layout-panel" id="panel-logs">
+          <div class="view-panel fixed-layout-panel" id="panel-logs" role="tabpanel" aria-labelledby="nav-tab-logs" tabindex="0">
             <div class="logs-layout">
               <div class="logs-controls">
                 <div class="log-filters">
@@ -1824,7 +1824,7 @@
           </div>
 
           <!-- 6. HARDSUB STUDIO PANEL -->
-          <div class="view-panel fixed-layout-panel" id="panel-hardsub">
+          <div class="view-panel fixed-layout-panel" id="panel-hardsub" role="tabpanel" aria-labelledby="nav-tab-hardsub" tabindex="0">
             <div class="hardsub-layout">
               
               <!-- Left Column: Media Source, Real Video Frame Preview, Media Controls & Telemetry -->

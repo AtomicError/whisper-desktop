@@ -1019,19 +1019,39 @@ function parseGpuStatsString(gpuStr) {
   return { percent: 0, hasPercent: false, isAvailable: true, raw: gpuStr.trim() };
 }
 
+const HUD_POLL_INTERVAL_MS = 3000;
+const HUD_IPC_TIMEOUT_MS = 5000;
+// A poll that fails/hangs still cycles every (timeout + interval); allow ~2 full
+// dead cycles before flagging the cache as stale.
+const HUD_STALE_AFTER_MS = (HUD_IPC_TIMEOUT_MS + HUD_POLL_INTERVAL_MS) * 2;
+
 let _currentHoveredMetric = null;
+
+let _lastHudPollTimestamp = 0;
+
+function setTelemetryBarState(barEl, percent, opts = {}) {
+  if (!barEl) return;
+  const clamped = Math.min(Math.max(percent, 0), 100);
+  barEl.style.width = `${clamped.toFixed(1)}%`;
+  const level = opts.disabled ? 'disabled'
+    : opts.stale ? 'stale'
+    : clamped > (opts.hotAt ?? 85) ? 'hot'
+    : clamped > (opts.warmAt ?? 60) ? 'warm' : '';
+  barEl.className = 'telemetry-bar-fill ' + level;
+}
 
 function updateTelemetryPopoverContent(metricType) {
   const popover = document.getElementById('hud-telemetry-popover');
-  if (!popover || !popover.classList.contains('visible')) return;
+  if (!popover) return;
 
   const iconEl = document.getElementById('telemetry-icon');
-  const titleEl = document.getElementById('telemetry-title');
-  const badgeEl = document.getElementById('telemetry-badge');
-  const valEl = document.getElementById('telemetry-main-val');
-  const descEl = document.getElementById('telemetry-stat-desc');
-  const barEl = document.getElementById('telemetry-bar');
-  const subtextEl = document.getElementById('telemetry-subtext');
+  const titleEl = popover.querySelector('.telemetry-title');
+  const valEl = popover.querySelector('.telemetry-main-value');
+  const descEl = popover.querySelector('.telemetry-stat-desc');
+  const subtextEl = popover.querySelector('.telemetry-subtext');
+  const barEl = popover.querySelector('.telemetry-bar-fill');
+  const badgeEl = popover.querySelector('.telemetry-badge');
+  const isStale = _lastHudPollTimestamp > 0 && (Date.now() - _lastHudPollTimestamp > HUD_STALE_AFTER_MS);
 
   if (iconEl && HUD_METRIC_ICONS[metricType]) {
     iconEl.innerHTML = HUD_METRIC_ICONS[metricType];
@@ -1039,50 +1059,42 @@ function updateTelemetryPopoverContent(metricType) {
 
   if (metricType === 'cpu') {
     const cpuVal = _lastHudCpu >= 0 ? Math.min(Math.max(_lastHudCpu, 0), 100) : 0;
-    if (titleEl) titleEl.textContent = 'CPU Utilization';
+    if (titleEl) titleEl.textContent = 'CPU Processing Unit';
     if (valEl) valEl.textContent = `${cpuVal.toFixed(1)}%`;
     if (descEl) descEl.textContent = 'Active Load';
-    if (subtextEl) subtextEl.textContent = 'Real-time multi-core processor usage';
-    if (barEl) {
-      barEl.style.width = `${cpuVal.toFixed(1)}%`;
-      barEl.className = 'telemetry-bar-fill ' + (cpuVal > 85 ? 'hot' : cpuVal > 60 ? 'warm' : '');
-    }
+    if (subtextEl) subtextEl.textContent = isStale ? 'Telemetry paused (stale cache)' : 'Real-time multi-core processor usage';
+    setTelemetryBarState(barEl, cpuVal, { stale: isStale });
     if (badgeEl) {
-      badgeEl.textContent = cpuVal > 85 ? 'Heavy Load' : cpuVal > 60 ? 'Elevated' : 'Optimal';
-      badgeEl.className = 'telemetry-badge ' + (cpuVal > 85 ? 'hot' : cpuVal > 60 ? 'warm' : '');
+      badgeEl.textContent = isStale ? 'Cached' : (cpuVal > 85 ? 'Heavy Load' : cpuVal > 60 ? 'Elevated' : 'Optimal');
+      badgeEl.className = 'telemetry-badge ' + (isStale ? 'warm' : (cpuVal > 85 ? 'hot' : cpuVal > 60 ? 'warm' : ''));
     }
   } else if (metricType === 'ram') {
     const { percent: ramPercent, formatted: ramFormatted } = parseRamStatsString(_lastHudRamStr);
     if (titleEl) titleEl.textContent = 'System Memory';
     if (valEl) valEl.textContent = `${ramPercent.toFixed(1)}%`;
     if (descEl) descEl.textContent = ramFormatted || 'RAM Allocated';
-    if (subtextEl) subtextEl.textContent = 'Physical RAM allocated across running apps';
-    if (barEl) {
-      barEl.style.width = `${ramPercent.toFixed(1)}%`;
-      barEl.className = 'telemetry-bar-fill ' + (ramPercent > 85 ? 'hot' : ramPercent > 70 ? 'warm' : '');
-    }
+    if (subtextEl) subtextEl.textContent = isStale ? 'Telemetry paused (stale cache)' : 'Physical RAM allocated across running apps';
+    setTelemetryBarState(barEl, ramPercent, { stale: isStale, warmAt: 70 });
     if (badgeEl) {
-      badgeEl.textContent = ramPercent > 85 ? 'Critical' : ramPercent > 70 ? 'High' : 'Optimal';
-      badgeEl.className = 'telemetry-badge ' + (ramPercent > 85 ? 'hot' : ramPercent > 70 ? 'warm' : '');
+      badgeEl.textContent = isStale ? 'Cached' : (ramPercent > 85 ? 'Critical' : ramPercent > 70 ? 'High' : 'Optimal');
+      badgeEl.className = 'telemetry-badge ' + (isStale ? 'warm' : (ramPercent > 85 ? 'hot' : ramPercent > 70 ? 'warm' : ''));
     }
   } else if (metricType === 'gpu') {
     const gpuInfo = parseGpuStatsString(_lastHudGpuStr);
     if (titleEl) titleEl.textContent = 'Graphics Engine';
     if (valEl) valEl.textContent = !gpuInfo.isAvailable ? 'N/A' : (gpuInfo.hasPercent ? `${gpuInfo.percent.toFixed(1)}%` : 'Active');
     if (descEl) descEl.textContent = !gpuInfo.isAvailable ? 'Not Available' : gpuInfo.raw;
-    if (subtextEl) subtextEl.textContent = !gpuInfo.isAvailable ? 'Hardware acceleration unavailable' : 'GPU acceleration & AI compute load';
+    if (subtextEl) subtextEl.textContent = isStale ? 'Telemetry paused (stale cache)' : (!gpuInfo.isAvailable ? 'Hardware acceleration unavailable' : 'GPU acceleration & AI compute load');
     if (barEl) {
       if (!gpuInfo.isAvailable || !gpuInfo.hasPercent) {
-        barEl.style.width = '0%';
-        barEl.className = 'telemetry-bar-fill disabled';
+        setTelemetryBarState(barEl, 0, { disabled: true });
       } else {
-        barEl.style.width = `${gpuInfo.percent.toFixed(1)}%`;
-        barEl.className = 'telemetry-bar-fill ' + (gpuInfo.percent > 85 ? 'hot' : gpuInfo.percent > 60 ? 'warm' : '');
+        setTelemetryBarState(barEl, gpuInfo.percent, { stale: isStale });
       }
     }
     if (badgeEl) {
-      badgeEl.textContent = !gpuInfo.isAvailable ? 'Offline' : (!gpuInfo.hasPercent ? 'Active' : (gpuInfo.percent > 85 ? 'High Load' : 'Optimal'));
-      badgeEl.className = 'telemetry-badge ' + (!gpuInfo.isAvailable ? 'warm' : (gpuInfo.hasPercent && gpuInfo.percent > 85 ? 'hot' : ''));
+      badgeEl.textContent = isStale ? 'Cached' : (!gpuInfo.isAvailable ? 'Offline' : (!gpuInfo.hasPercent ? 'Active' : (gpuInfo.percent > 85 ? 'High Load' : 'Optimal')));
+      badgeEl.className = 'telemetry-badge ' + (isStale ? 'warm' : (!gpuInfo.isAvailable ? 'warm' : (gpuInfo.hasPercent && gpuInfo.percent > 85 ? 'hot' : '')));
     }
   }
 }
@@ -1095,23 +1107,24 @@ function showTelemetryPopover(targetEl, metricType) {
   targetEl.setAttribute('aria-expanded', 'true');
   popover.setAttribute('aria-hidden', 'false');
   updateTelemetryPopoverContent(metricType);
+  popover.classList.add('visible');
   
-  // Calculate position with Viewport Clamping
+  // Calculate position dynamically with Viewport Clamping
   const rect = targetEl.getBoundingClientRect();
-  const popoverWidth = 240;
-  const popoverHeight = 110;
+  const popoverRect = popover.getBoundingClientRect();
+  const popoverWidth = popoverRect.width || 240;
+  const popoverHeight = popoverRect.height || 110;
   
   let left = rect.right + 14;
   if (left + popoverWidth > window.innerWidth - 12) {
     left = Math.max(12, rect.left - popoverWidth - 14);
   }
   
-  let top = rect.top + (rect.height / 2) - 52;
+  let top = rect.top + (rect.height / 2) - (popoverHeight / 2);
   top = Math.max(12, Math.min(top, window.innerHeight - popoverHeight - 12));
   
   popover.style.left = `${Math.round(left)}px`;
   popover.style.top = `${Math.round(top)}px`;
-  popover.classList.add('visible');
 }
 
 function hideTelemetryPopover(targetEl) {
@@ -1166,12 +1179,20 @@ function stopHudPoll() {
   _isHudPolling = false;
 }
 
-function scheduleNextHudPoll(delayMs = 3000) {
+function scheduleNextHudPoll(delayMs = HUD_POLL_INTERVAL_MS) {
   if (_hudTimeout) {
     clearTimeout(_hudTimeout);
     _hudTimeout = null;
   }
   _hudTimeout = setTimeout(pollHudStats, delayMs);
+}
+
+function invokeWithTimeout(cmd, args, timeoutMs = HUD_IPC_TIMEOUT_MS) {
+  let timerId;
+  const timeoutPromise = new Promise((_, reject) => {
+    timerId = setTimeout(() => reject(new Error(`IPC Timeout after ${timeoutMs}ms for ${cmd}`)), timeoutMs);
+  });
+  return Promise.race([invoke(cmd, args), timeoutPromise]).finally(() => clearTimeout(timerId));
 }
 
 async function pollHudStats() {
@@ -1183,8 +1204,9 @@ async function pollHudStats() {
   _isHudPolling = true;
 
   try {
-    const stats = await invoke('get_system_stats');
+    const stats = await invokeWithTimeout('get_system_stats');
     if (stats) {
+      _lastHudPollTimestamp = Date.now();
       // 1. Update CPU only if changed
       const cpuVal = typeof stats.cpu === 'number' ? stats.cpu : parseFloat(stats.cpu) || 0;
       if (Math.abs(cpuVal - _lastHudCpu) > 0.05) {
@@ -1268,7 +1290,9 @@ async function pollHudStats() {
     console.error("Failed to query system stats:", e);
   } finally {
     _isHudPolling = false;
-    scheduleNextHudPoll(3000);
+    if (!document.hidden) {
+      scheduleNextHudPoll(HUD_POLL_INTERVAL_MS);
+    }
   }
 }
 
@@ -1371,6 +1395,41 @@ async function initApp() {
   // Setup rich floating HUD telemetry popover
   initHudTelemetryPopover();
   
+  // Setup vertical tablist keyboard navigation (WAI-ARIA Roving Tabindex, automatic activation)
+  const navItems = Array.from(document.querySelectorAll('.nav-item'));
+  const moveTabFocus = (e, item) => {
+    let targetIndex = -1;
+    if (e.key === 'ArrowDown') {
+      targetIndex = (navItems.indexOf(item) + 1) % navItems.length;
+    } else if (e.key === 'ArrowUp') {
+      targetIndex = (navItems.indexOf(item) - 1 + navItems.length) % navItems.length;
+    } else if (e.key === 'Home') {
+      targetIndex = 0;
+    } else if (e.key === 'End') {
+      targetIndex = navItems.length - 1;
+    }
+    return targetIndex;
+  };
+
+  navItems.forEach((item) => {
+    item.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        item.click();
+        return;
+      }
+
+      const targetIndex = moveTabFocus(e, item);
+      if (targetIndex >= 0) {
+        e.preventDefault();
+        if (navItems[targetIndex]) {
+          navItems[targetIndex].focus();
+          navItems[targetIndex].click();
+        }
+      }
+    });
+  });
+
   // Switch to default intro view
   switchView('intro');
 }
@@ -1386,13 +1445,18 @@ if (document.readyState === 'loading') {
 window.switchView = function(viewName) {
   activeView = viewName;
   
-  // Update nav link active states
+  // Update nav link active states and accessibility
   const navItems = document.querySelectorAll('.nav-item');
   navItems.forEach(item => {
-    item.classList.remove('active');
-    const onclickStr = item.getAttribute('onclick');
-    if (onclickStr && onclickStr.includes(viewName)) {
+    const isTarget = item.dataset.view === viewName;
+    if (isTarget) {
       item.classList.add('active');
+      item.setAttribute('aria-selected', 'true');
+      item.setAttribute('tabindex', '0');
+    } else {
+      item.classList.remove('active');
+      item.setAttribute('aria-selected', 'false');
+      item.setAttribute('tabindex', '-1');
     }
   });
   
