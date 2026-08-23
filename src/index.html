@@ -1823,11 +1823,12 @@
             </div>
           </div>
 
-            <div class="view-panel" id="panel-hardsub" style="overflow-y: auto; padding-bottom: 30px;">
-            <div class="hardsub-grid-container">
+          <!-- 6. HARDSUB STUDIO PANEL -->
+          <div class="view-panel fixed-layout-panel" id="panel-hardsub">
+            <div class="hardsub-layout">
               
               <!-- Left Column: Media Source, Real Video Frame Preview, Media Controls & Telemetry -->
-              <div style="display: flex; flex-direction: column; gap: 16px;">
+              <div class="hardsub-left-panel">
                 
                 <!-- File Selection Card (Dual Premium Dropzones matching Transcribe page style) -->
                 <div class="glass-card" style="padding: 18px;">
@@ -2003,29 +2004,29 @@
               </div>
 
               <!-- Right Column: Dual-Tab Studio Panel (Subtitles Block Editor & Typography/Encoding) -->
-              <div style="display: flex; flex-direction: column; gap: 16px;">
+              <div class="hardsub-right-panel">
                 
                 <!-- Studio Navigation Tabs Bar (3 Dedicated Tabs) -->
-                <div class="hardsub-tabs-container">
-                  <button id="hardsub-tab-btn-editor" class="pill-btn hardsub-tab-pill active" style="flex:1; padding: 10px; justify-content: center; border-radius: 8px; font-weight: 600; gap: 6px;">
+                <div class="hardsub-tabs-container" role="tablist" aria-label="Hardsub Studio Tabs">
+                  <button id="hardsub-tab-btn-editor" role="tab" aria-selected="true" aria-controls="hardsub-tab-view-editor" tabindex="0" class="pill-btn hardsub-tab-pill active" style="flex:1; padding: 10px; justify-content: center; border-radius: 8px; font-weight: 600; gap: 6px;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px;"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
                     <span>Editor</span>
                   </button>
-                  <button id="hardsub-tab-btn-style" class="pill-btn hardsub-tab-pill" style="flex:1; padding: 10px; justify-content: center; border-radius: 8px; font-weight: 600; gap: 6px;">
+                  <button id="hardsub-tab-btn-style" role="tab" aria-selected="false" aria-controls="hardsub-tab-view-style" tabindex="-1" class="pill-btn hardsub-tab-pill" style="flex:1; padding: 10px; justify-content: center; border-radius: 8px; font-weight: 600; gap: 6px;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px;"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
                     <span>Style</span>
                   </button>
-                  <button id="hardsub-tab-btn-export" class="pill-btn hardsub-tab-pill" style="flex:1; padding: 10px; justify-content: center; border-radius: 8px; font-weight: 600; gap: 6px;">
+                  <button id="hardsub-tab-btn-export" role="tab" aria-selected="false" aria-controls="hardsub-tab-view-export" tabindex="-1" class="pill-btn hardsub-tab-pill" style="flex:1; padding: 10px; justify-content: center; border-radius: 8px; font-weight: 600; gap: 6px;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px;"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
                     <span>Export</span>
                   </button>
                 </div>
 
                 <!-- Tab 1: Block-Based Subtitle Editor View -->
-                <div id="hardsub-tab-view-editor" class="glass-card hardsub-tab-view" style="padding: 18px; display: flex; flex-direction: column; gap: 14px; flex: 1;">
+                <div id="hardsub-tab-view-editor" role="tabpanel" aria-labelledby="hardsub-tab-btn-editor" class="glass-card hardsub-tab-view" style="padding: 18px; display: flex; flex-direction: column; gap: 14px; flex: 1; min-height: 0; overflow: hidden;">
                   
                   <!-- Editor Top Bar: Search & Subtitle Counter -->
-                  <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-shrink: 0;">
                     <div style="position: relative; flex: 1;">
                       <input type="text" id="hardsub-search-input" class="text-input" placeholder="Search subtitle text..." style="width: 100%; padding-left: 32px; font-size: 0.85rem;" />
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--color-text-muted);"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -2034,7 +2035,7 @@
                   </div>
 
                   <!-- Subtitle Cue Blocks Scrollable List -->
-                  <div id="hardsub-subtitle-list" class="scroller" style="max-height: 520px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 4px;">
+                  <div id="hardsub-subtitle-list" style="flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-inline-end: 4px;">
                     <div id="hardsub-empty-cue-notice" style="text-align: center; padding: 40px 20px; color: var(--color-text-muted); display: flex; flex-direction: column; align-items: center; gap: 10px;">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width: 40px; height: 40px; opacity: 0.5;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                       <span style="font-size: 0.88rem;">No subtitle loaded.<br>Select a subtitle file above to edit block cues.</span>
@@ -2043,7 +2044,7 @@
                 </div>
 
                 <!-- Tab 2: Subtitle Typography & Style Design View -->
-                <div id="hardsub-tab-view-style" class="hardsub-tab-view" style="display: none; flex-direction: column; gap: 16px;">
+                <div id="hardsub-tab-view-style" role="tabpanel" aria-labelledby="hardsub-tab-btn-style" class="hardsub-tab-view" style="display: none; flex-direction: column; gap: 16px; flex: 1; min-height: 0; overflow-y: auto; padding-inline-end: 4px;">
                   
                   <!-- Typography Styling Controls Card -->
                   <div class="glass-card" style="padding: 18px;">
@@ -2226,7 +2227,7 @@
                 </div>
 
                 <!-- Tab 3: Video Export & Encoding View -->
-                <div id="hardsub-tab-view-export" class="hardsub-tab-view" style="display: none; flex-direction: column; gap: 16px;">
+                <div id="hardsub-tab-view-export" role="tabpanel" aria-labelledby="hardsub-tab-btn-export" class="hardsub-tab-view" style="display: none; flex-direction: column; gap: 16px; flex: 1; min-height: 0; overflow-y: auto; padding-inline-end: 4px;">
                   
                   <!-- 1. Format, Codec & Performance Card -->
                   <div class="glass-card" style="padding: 18px;">

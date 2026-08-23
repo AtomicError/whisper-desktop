@@ -1884,23 +1884,33 @@ export class HardsubController {
   }
 
   private setupStudioTabEvents() {
-    const tabIndices: Record<'editor' | 'style' | 'export', number> = {
-      editor: 0,
-      style: 1,
-      export: 2,
+    const tabs = ['editor', 'style', 'export'] as const;
+    type StudioTab = (typeof tabs)[number];
+    const tabButtons: Record<StudioTab, HTMLButtonElement | null> = {
+      editor: this.tabBtnEditor,
+      style: this.tabBtnStyle,
+      export: this.tabBtnExport,
     };
 
-    const switchTab = (tab: 'editor' | 'style' | 'export') => {
+    // Roving tabindex per APG: only the active tab stays in the Tab order
+    const syncTabStates = () => {
+      for (const tab of tabs) {
+        const btn = tabButtons[tab];
+        if (!btn) continue;
+        const isActive = tab === this.currentStudioTab;
+        btn.classList.toggle('active', isActive);
+        btn.setAttribute('aria-selected', String(isActive));
+        btn.tabIndex = isActive ? 0 : -1;
+      }
+    };
+
+    const switchTab = (tab: StudioTab, focus = false) => {
+      if (focus) tabButtons[tab]?.focus();
       if (this.currentStudioTab === tab) return;
 
-      const prevIdx = tabIndices[this.currentStudioTab];
-      const newIdx = tabIndices[tab];
-      const isForward = newIdx > prevIdx;
+      const isForward = tabs.indexOf(tab) > tabs.indexOf(this.currentStudioTab);
       this.currentStudioTab = tab;
-
-      this.tabBtnEditor?.classList.toggle('active', tab === 'editor');
-      this.tabBtnStyle?.classList.toggle('active', tab === 'style');
-      this.tabBtnExport?.classList.toggle('active', tab === 'export');
+      syncTabStates();
 
       const updateView = (el: HTMLElement | null, isActive: boolean) => {
         if (!el) return;
@@ -1920,9 +1930,32 @@ export class HardsubController {
       updateView(this.tabViewExport, tab === 'export');
     };
 
+    syncTabStates();
+
     this.tabBtnEditor?.addEventListener('click', () => switchTab('editor'));
     this.tabBtnStyle?.addEventListener('click', () => switchTab('style'));
     this.tabBtnExport?.addEventListener('click', () => switchTab('export'));
+
+    const tabsContainer = this.tabBtnEditor?.closest('.hardsub-tabs-container');
+    tabsContainer?.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      let targetIdx = -1;
+      if (e.key === 'ArrowRight') {
+        targetIdx = (tabs.indexOf(this.currentStudioTab) + 1) % tabs.length;
+      } else if (e.key === 'ArrowLeft') {
+        targetIdx = (tabs.indexOf(this.currentStudioTab) - 1 + tabs.length) % tabs.length;
+      } else if (e.key === 'Home') {
+        targetIdx = 0;
+      } else if (e.key === 'End') {
+        targetIdx = tabs.length - 1;
+      }
+
+      if (targetIdx !== -1) {
+        e.preventDefault();
+        switchTab(tabs[targetIdx], true);
+      }
+    });
   }
 
   private setupVideoPlayerEvents() {
