@@ -273,7 +273,6 @@ const invoke = async function(cmd, args = {}) {
   }
   if (cmd === 'load_settings') {
     return {
-      preset: 'safe',
       selectedBackend: 'Standard',
       modelsDir: '/home/user/whisper.cpp',
       threads: 4,
@@ -1906,14 +1905,6 @@ function bindSettingsToDOM() {
     toggleTranslationSubSettingsVisibility();
   }
   
-  // Update Presets UI
-  document.getElementById('preset-safe').classList.remove('active');
-  document.getElementById('preset-professional').classList.remove('active');
-  const presetBtn = document.getElementById(`preset-${settingsState.preset}`);
-  if (presetBtn) {
-    presetBtn.classList.add('active');
-  }
-  
   // Helper to map keys
   const keys = Object.keys(settingsState);
   keys.forEach(key => {
@@ -2026,17 +2017,6 @@ async function saveCurrentSettings() {
     showNotification("Failed to save settings. Check disk space and file permissions.", "error");
   }
 }
-
-window.switchPreset = async function(preset) {
-  try {
-    settingsState = await invoke('apply_preset', { preset });
-    bindSettingsToDOM();
-    await scanAndPopulateModels();
-    showNotification(`Preset switched to ${preset.toUpperCase()} successfully!`, "success");
-  } catch (e) {
-    showNotification("Failed to apply preset: " + e, "error");
-  }
-};
 
 window.incrementNumber = function(inputId, step) {
   const el = document.getElementById(inputId);
@@ -2342,7 +2322,7 @@ async function probeSelectedFile() {
       document.getElementById('meta-type').textContent = probedMetadata.format;
       document.getElementById('meta-size').textContent = probedMetadata.size;
       
-      const recText = `Backend: ${settingsState.selectedBackend} (${settingsState.threads} threads) | Preset: ${settingsState.preset.toUpperCase()}`;
+      const recText = `Backend: ${settingsState.selectedBackend} (${settingsState.threads} threads)`;
       document.getElementById('meta-recommendation').textContent = recText;
       
       const dur = probedMetadata.durationSec;

@@ -1,12 +1,27 @@
 use serde::{Serialize, Deserialize};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, OnceLock, RwLock};
 use crate::translation::provider::AiProvider;
 
+static SETTINGS_LOCK: RwLock<()> = RwLock::new(());
+type LogSink = Arc<dyn Fn(&str) + Send + Sync>;
+static LOG_SINK: OnceLock<LogSink> = OnceLock::new();
+
+pub fn register_log_sink(sink: LogSink) {
+    let _ = LOG_SINK.set(sink);
+}
+
+fn log_warn(message: &str) {
+    match LOG_SINK.get() {
+        Some(sink) => sink(message),
+        None => eprintln!("[SETTINGS] {}", message),
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", default)]
 pub struct WhisperSettings {
-    pub preset: String,
     pub selected_backend: String, // "Standard", "Vulkan", "OpenVINO", "CUDA"
     #[serde(rename = "modelsDir", alias = "cloneDir")]
     pub models_dir: String,
@@ -67,43 +82,28 @@ pub struct WhisperSettings {
     pub vad_max_speech: f64,
     pub vad_speech_pad: i32,
     pub vad_overlap: f64,
-    #[serde(default)]
     pub translate_ai_enabled: bool,
-    #[serde(default)]
     pub translate_ai_provider: String,
-    #[serde(default)]
     pub translate_ai_model: String,
-    #[serde(default = "default_target_lang")]
     pub translate_ai_target_lang: String,
-    #[serde(default = "default_providers")]
     pub translate_ai_providers: String,
-    #[serde(default)]
     pub translate_ai_custom_prompt: String,
-    #[serde(default)]
     pub translate_ai_polish: bool,
-    #[serde(default = "default_ffmpeg_source")]
     pub ffmpeg_source: String, // "bundled" or "system"
 }
 
-fn default_ffmpeg_source() -> String {
-    "bundled".to_string()
-}
-
-fn default_target_lang() -> String {
-    "Persian".to_string()
-}
-
-fn default_providers() -> String {
-    "[]".to_string()
+impl Default for WhisperSettings {
+    fn default() -> Self {
+        Self::default_settings()
+    }
 }
 
 impl WhisperSettings {
     pub fn default_settings() -> Self {
         let home = std::env::var("HOME").unwrap_or_else(|_| "/home/user".to_string());
         let default_models = format!("{}/whisper.cpp", home);
-        
+
         WhisperSettings {
-            preset: "safe".to_string(),
             selected_backend: "Standard".to_string(),
             models_dir: default_models,
             threads: 4,
@@ -174,83 +174,68 @@ impl WhisperSettings {
         }
     }
 
-    pub fn apply_preset(&mut self, preset_name: &str) {
-        self.preset = preset_name.to_string();
-        if preset_name == "safe" {
-            self.vad = false;
-            self.best_of = 5;
-            self.beam_size = 5;
-            self.max_len = 0;
-            self.split_word = false;
-            self.temperature = 0.00;
-            self.entropy_thold = 2.40;
-            self.logprob_thold = -1.00;
-        } else if preset_name == "professional" {
-            self.vad = true;
-            if self.vad_model.is_empty() {
-                self.vad_model = "ggml-silero-v6.2.0.bin".to_string();
-            }
-            self.best_of = 8;
-            self.beam_size = 8;
-            self.max_len = 0;
-            self.split_word = false;
-            self.temperature = 0.00;
-            self.entropy_thold = 2.40;
-            self.logprob_thold = -1.00;
+    /// Symmetric validation and sanitization executed on BOTH load and save
+    pub fn sanitize_and_validate(&mut self) {
+        self.threads = self.threads.max(1);
+        self.processors = self.processors.max(1);
+
+        self.beam_size = self.beam_size.clamp(1, 8);
+        self.best_of = self.best_of.clamp(1, 8);
+
+        self.offset_t = self.offset_t.max(0);
+        self.offset_n = self.offset_n.max(0);
+        self.duration = self.duration.max(0);
+        self.max_len = self.max_len.max(0);
+        self.audio_ctx = self.audio_ctx.max(0);
+        self.device_id = self.device_id.max(0);
+
+        self.vad_thold = self.vad_thold.clamp(0.0, 1.0);
+        if self.vad_min_speech < 0 {
+            self.vad_min_speech = 250;
+        }
+        if self.vad_min_sil < 0 {
+            self.vad_min_sil = 100;
+        }
+        if self.vad_max_speech < 0.0 {
+            self.vad_max_speech = 30000.0;
+        }
+        if self.vad_speech_pad < 0 {
+            self.vad_speech_pad = 30;
+        }
+        self.vad_overlap = self.vad_overlap.clamp(0.0, 1.0);
+
+        self.temperature = self.temperature.clamp(0.0, 2.0);
+        self.temperature_inc = self.temperature_inc.clamp(0.0, 2.0);
+
+        self.word_thold = self.word_thold.clamp(0.0, 1.0);
+        self.no_speech_thold = self.no_speech_thold.clamp(0.0, 1.0);
+        self.entropy_thold = self.entropy_thold.max(0.0);
+        self.logprob_thold = self.logprob_thold.min(0.0);
+
+        // Backend fallback
+        if self.selected_backend.trim().is_empty() {
+            self.selected_backend = "Standard".to_string();
+        }
+
+        // Models dir fallback
+        if self.models_dir.trim().is_empty() {
+            let home = std::env::var("HOME").unwrap_or_else(|_| "/home/user".to_string());
+            self.models_dir = format!("{}/whisper.cpp", home);
+        }
+
+        // FFmpeg source fallback
+        if self.ffmpeg_source != "bundled" && self.ffmpeg_source != "system" {
+            self.ffmpeg_source = "bundled".to_string();
         }
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct AppSettings {
-    pub active_preset: String,
-    pub safe: WhisperSettings,
-    pub professional: WhisperSettings,
-}
-
-impl AppSettings {
-    pub fn default_app_settings() -> Self {
-        let mut safe = WhisperSettings::default_settings();
-        safe.apply_preset("safe");
-        
-        let mut professional = WhisperSettings::default_settings();
-        professional.apply_preset("professional");
-        
-        AppSettings {
-            active_preset: "safe".to_string(),
-            safe,
-            professional,
-        }
-    }
-
-    pub fn get_active(&self) -> WhisperSettings {
-        if self.active_preset.to_lowercase() == "professional" {
-            self.professional.clone()
-        } else {
-            self.safe.clone()
-        }
-    }
-
-    pub fn set_active(&mut self, settings: WhisperSettings) {
-        let models_dir = settings.models_dir.clone();
-        let backend = settings.selected_backend.clone();
-        let ffmpeg_source = settings.ffmpeg_source.clone();
-        
-        // Sync global values across both profiles
-        self.safe.models_dir = models_dir.clone();
-        self.professional.models_dir = models_dir;
-        self.safe.selected_backend = backend.clone();
-        self.professional.selected_backend = backend;
-        self.safe.ffmpeg_source = ffmpeg_source.clone();
-        self.professional.ffmpeg_source = ffmpeg_source;
-        
-        if self.active_preset.to_lowercase() == "professional" {
-            self.professional = settings;
-        } else {
-            self.safe = settings;
-        }
-    }
+#[derive(Deserialize, Debug, Default)]
+#[serde(rename_all = "camelCase", default)]
+struct LegacyAppSettings {
+    active_preset: Option<String>,
+    safe: Option<WhisperSettings>,
+    professional: Option<WhisperSettings>,
 }
 
 pub fn get_settings_path() -> PathBuf {
@@ -262,57 +247,124 @@ pub fn get_settings_path() -> PathBuf {
     path
 }
 
-pub fn load_settings_file() -> WhisperSettings {
-    let app_settings = load_app_settings();
-    app_settings.get_active()
-}
+pub fn load_settings_from_path(path: &Path) -> WhisperSettings {
+    let _guard = SETTINGS_LOCK.read().unwrap_or_else(|e| e.into_inner());
 
-pub fn save_settings_file(settings: &WhisperSettings) -> Result<(), String> {
-    let mut app_settings = load_app_settings();
-    app_settings.set_active(settings.clone());
-    save_app_settings(&app_settings)
-}
-
-pub fn load_app_settings() -> AppSettings {
-    let path = get_settings_path();
     if path.exists() {
-        if let Ok(data) = fs::read_to_string(&path) {
-            if let Ok(mut app_settings) = serde_json::from_str::<AppSettings>(&data) {
-                if app_settings.safe.beam_size > 8 { app_settings.safe.beam_size = 8; }
-                if app_settings.safe.best_of > 8 { app_settings.safe.best_of = 8; }
-                if app_settings.professional.beam_size > 8 { app_settings.professional.beam_size = 8; }
-                if app_settings.professional.best_of > 8 { app_settings.professional.best_of = 8; }
-                
-                return app_settings;
-            }
-            if let Ok(old_settings) = serde_json::from_str::<WhisperSettings>(&data) {
-                let mut app_settings = AppSettings::default_app_settings();
-                if old_settings.preset.to_lowercase() == "professional" {
-                    app_settings.active_preset = "professional".to_string();
-                    app_settings.professional = old_settings.clone();
-                } else {
-                    app_settings.active_preset = "safe".to_string();
-                    app_settings.safe = old_settings.clone();
+        if let Ok(data) = fs::read_to_string(path) {
+            // 1. Check for legacy format { activePreset, safe, professional }
+            if let Ok(legacy) = serde_json::from_str::<LegacyAppSettings>(&data) {
+                if legacy.safe.is_some() || legacy.professional.is_some() {
+                    let is_pro = legacy
+                        .active_preset
+                        .as_deref()
+                        .unwrap_or("safe")
+                        .to_lowercase()
+                        == "professional";
+                    let mut settings = if is_pro {
+                        legacy.professional.or(legacy.safe).unwrap_or_default()
+                    } else {
+                        legacy.safe.or(legacy.professional).unwrap_or_default()
+                    };
+
+                    settings.sanitize_and_validate();
+
+                    // Release read lock before persisting migrated flat file
+                    drop(_guard);
+                    if let Err(e) = save_settings_to_path(path, &settings) {
+                        log_warn(&format!(
+                            "Failed to persist migrated settings to {}: {}",
+                            path.display(),
+                            e
+                        ));
+                    }
+                    return settings;
                 }
-                app_settings.safe.models_dir = old_settings.models_dir.clone();
-                app_settings.professional.models_dir = old_settings.models_dir.clone();
-                app_settings.safe.selected_backend = old_settings.selected_backend.clone();
-                app_settings.professional.selected_backend = old_settings.selected_backend.clone();
-                
-                if app_settings.safe.beam_size > 8 { app_settings.safe.beam_size = 8; }
-                if app_settings.safe.best_of > 8 { app_settings.safe.best_of = 8; }
-                if app_settings.professional.beam_size > 8 { app_settings.professional.beam_size = 8; }
-                if app_settings.professional.best_of > 8 { app_settings.professional.best_of = 8; }
-                
-                let _ = save_app_settings(&app_settings);
-                return app_settings;
+            }
+
+            // 2. Direct flat WhisperSettings format (with struct-level #[serde(default)] for missing fields)
+            if let Ok(mut settings) = serde_json::from_str::<WhisperSettings>(&data) {
+                settings.sanitize_and_validate();
+                return settings;
+            } else {
+                log_warn(&format!(
+                    "Could not parse settings from {}. Falling back to default configuration.",
+                    path.display()
+                ));
             }
         }
     }
-    
-    let app_settings = AppSettings::default_app_settings();
-    let _ = save_app_settings(&app_settings);
-    app_settings
+
+    let mut default = WhisperSettings::default_settings();
+    default.sanitize_and_validate();
+    drop(_guard);
+    if let Err(e) = save_settings_to_path(path, &default) {
+        log_warn(&format!(
+            "Failed to persist default settings to {}: {}",
+            path.display(),
+            e
+        ));
+    }
+    default
+}
+
+pub fn save_settings_to_path(path: &Path, settings: &WhisperSettings) -> Result<(), String> {
+    let _guard = SETTINGS_LOCK.write().unwrap_or_else(|e| e.into_inner());
+
+    let mut sanitized = settings.clone();
+    sanitized.sanitize_and_validate();
+    sanitized.translate_ai_providers = sanitize_providers(&sanitized.translate_ai_providers);
+
+    if let Some(parent) = path.parent() {
+        if !parent.exists() {
+            fs::create_dir_all(parent).map_err(|e| {
+                format!(
+                    "Failed to create settings directory {}: {}",
+                    parent.display(),
+                    e
+                )
+            })?;
+        }
+    }
+
+    let data = serde_json::to_string_pretty(&sanitized)
+        .map_err(|e| format!("Failed to serialize settings: {}", e))?;
+
+    // Atomic write: stage into a sibling .tmp file then rename over the target,
+    // so a crash mid-write can never leave a truncated settings file behind.
+    let tmp_path = path.with_file_name({
+        let mut name = path.file_name().unwrap_or_default().to_os_string();
+        name.push(".tmp");
+        name
+    });
+
+    fs::write(&tmp_path, data).map_err(|e| {
+        format!(
+            "Failed to write settings temp file {}: {}",
+            tmp_path.display(),
+            e
+        )
+    })?;
+
+    match fs::rename(&tmp_path, path) {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            let _ = fs::remove_file(&tmp_path);
+            Err(format!(
+                "Failed to write settings file {}: {}",
+                path.display(),
+                e
+            ))
+        }
+    }
+}
+
+pub fn load_settings_file() -> WhisperSettings {
+    load_settings_from_path(&get_settings_path())
+}
+
+pub fn save_settings_file(settings: &WhisperSettings) -> Result<(), String> {
+    save_settings_to_path(&get_settings_path(), settings)
 }
 
 /// Strip api_key from providers that use keyring before persisting to disk
@@ -347,36 +399,26 @@ fn sanitize_providers(providers_json: &str) -> String {
     }
 }
 
-pub fn save_app_settings(app_settings: &AppSettings) -> Result<(), String> {
-    let mut sanitized = app_settings.clone();
-    sanitized.safe.translate_ai_providers = sanitize_providers(&sanitized.safe.translate_ai_providers);
-    sanitized.professional.translate_ai_providers = sanitize_providers(&sanitized.professional.translate_ai_providers);
-
-    let path = get_settings_path();
-    if let Some(parent) = path.parent() {
-        if !parent.exists() {
-            let _ = fs::create_dir_all(parent);
-        }
-    }
-    
-    let data = serde_json::to_string_pretty(&sanitized)
-        .map_err(|e| format!("Failed to serialize settings: {}", e))?;
-    
-    fs::write(&path, data)
-        .map_err(|e| format!("Failed to write settings file: {}", e))?;
-    
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     fn provider_json(key: &str, keyring: bool) -> String {
         format!(
             r#"{{"name":"openai","baseUrl":"https://x","apiKey":"{}","apiFormat":"Chat completions","useKeyring":{},"models":[]}}"#,
             key, keyring
         )
+    }
+
+    fn temp_test_file(prefix: &str) -> PathBuf {
+        let ts = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let mut p = std::env::temp_dir();
+        p.push(format!("whisper_test_{}_{}.json", prefix, ts));
+        p
     }
 
     #[test]
@@ -405,8 +447,6 @@ mod tests {
 
     #[test]
     fn keyring_marker_survives_roundtrip() {
-        // The invariant the frontend depends on: saved then loaded providers
-        // still carry __KEYRING__ so lazy keyring fetch triggers.
         let providers = format!("[{}]", provider_json("sk-secret", true));
         let sanitized = sanitize_providers(&providers);
         let parsed: Vec<AiProvider> = serde_json::from_str(&sanitized).unwrap();
@@ -415,58 +455,145 @@ mod tests {
     }
 
     #[test]
-    fn presets_change_whisper_tuning() {
-        let mut s = WhisperSettings::default_settings();
-        s.apply_preset("professional");
-        assert_eq!(s.preset, "professional");
-        assert!(s.vad);
-        assert_eq!(s.beam_size, 8);
-        assert_eq!(s.best_of, 8);
+    fn missing_fields_automatically_filled_with_defaults_without_data_loss() {
+        let temp_path = temp_test_file("missing_fields");
+        // Simulated old version config containing only 3 fields
+        let minimal_old_json = r#"{
+            "modelsDir": "/custom/my-models-dir",
+            "threads": 12,
+            "selectedBackend": "CUDA"
+        }"#;
+        fs::write(&temp_path, minimal_old_json).unwrap();
 
-        let mut s = WhisperSettings::default_settings();
-        s.apply_preset("safe");
-        assert!(!s.vad);
-        assert_eq!(s.beam_size, 5);
+        let loaded = load_settings_from_path(&temp_path);
+        assert_eq!(loaded.models_dir, "/custom/my-models-dir");
+        assert_eq!(loaded.threads, 12);
+        assert_eq!(loaded.selected_backend, "CUDA");
+        // All unprovided fields must have default safe values without failing
+        assert_eq!(loaded.beam_size, 5);
+        assert_eq!(loaded.best_of, 5);
+        assert!(!loaded.vad);
+        assert_eq!(loaded.vad_overlap, 0.10);
+        assert!(loaded.flash_attn);
+
+        let _ = fs::remove_file(&temp_path);
     }
 
     #[test]
-    fn set_active_syncs_shared_fields() {
-        let mut app = AppSettings::default_app_settings();
-        app.active_preset = "safe".to_string();
+    fn legacy_nested_format_auto_migrates_active_profile_and_persists_flat() {
+        let temp_path = temp_test_file("legacy_migration");
+        let legacy_json = r#"{
+            "activePreset": "professional",
+            "safe": {
+                "threads": 2,
+                "beamSize": 4
+            },
+            "professional": {
+                "modelsDir": "/custom/pro-models",
+                "threads": 8,
+                "vad": true,
+                "beamSize": 8
+            }
+        }"#;
+        fs::write(&temp_path, legacy_json).unwrap();
 
-        let mut new_settings = WhisperSettings::default_settings();
-        new_settings.models_dir = "/tmp/models".to_string();
-        new_settings.selected_backend = "CUDA".to_string();
-        new_settings.threads = 12;
-        app.set_active(new_settings);
+        let loaded = load_settings_from_path(&temp_path);
+        assert_eq!(loaded.models_dir, "/custom/pro-models");
+        assert_eq!(loaded.threads, 8);
+        assert!(loaded.vad);
+        assert_eq!(loaded.beam_size, 8);
 
-        // Shared fields propagate to BOTH profiles
-        assert_eq!(app.safe.models_dir, "/tmp/models");
-        assert_eq!(app.professional.models_dir, "/tmp/models");
-        assert_eq!(app.professional.selected_backend, "CUDA");
-        // Non-shared field only touches active profile
-        assert_eq!(app.safe.threads, 12);
-        assert_ne!(app.professional.threads, 12);
+        // Verify the file was converted to a clean flat structure on disk
+        let persisted_text = fs::read_to_string(&temp_path).unwrap();
+        assert!(!persisted_text.contains("\"activePreset\""));
+        assert!(!persisted_text.contains("\"safe\":"));
+        assert!(!persisted_text.contains("\"professional\":"));
+
+        let _ = fs::remove_file(&temp_path);
     }
 
     #[test]
-    fn beam_size_clamped_on_deserialize() {
-        let mut original = AppSettings::default_app_settings();
-        original.safe.beam_size = 99;
-        original.safe.best_of = 50;
-        original.professional.beam_size = 100;
-        original.professional.best_of = 80;
+    fn symmetric_clamping_and_sanitization_on_save_and_load() {
+        let temp_path = temp_test_file("bounds");
+        let mut s = WhisperSettings::default_settings();
+        s.threads = -10;
+        s.beam_size = 999;
+        s.best_of = -5;
+        s.vad_thold = -2.5;
+        s.vad_overlap = 5.0;
+        s.temperature = -1.0;
+        s.temperature_inc = 42.0;
+        s.word_thold = 7.5;
+        s.no_speech_thold = -3.0;
+        s.entropy_thold = -9.9;
+        s.logprob_thold = 4.2;
+        s.offset_t = -100;
+        s.device_id = -1;
+        s.ffmpeg_source = "hack".to_string();
 
-        let json_str = serde_json::to_string(&original).unwrap();
-        let mut app: AppSettings = serde_json::from_str(&json_str).unwrap();
-        if app.safe.beam_size > 8 { app.safe.beam_size = 8; }
-        if app.safe.best_of > 8 { app.safe.best_of = 8; }
-        if app.professional.beam_size > 8 { app.professional.beam_size = 8; }
-        if app.professional.best_of > 8 { app.professional.best_of = 8; }
+        save_settings_to_path(&temp_path, &s).unwrap();
 
-        assert_eq!(app.safe.beam_size, 8);
-        assert_eq!(app.safe.best_of, 8);
-        assert_eq!(app.professional.beam_size, 8);
-        assert_eq!(app.professional.best_of, 8);
+        let loaded = load_settings_from_path(&temp_path);
+        assert_eq!(loaded.threads, 1);
+        assert_eq!(loaded.beam_size, 8);
+        assert_eq!(loaded.best_of, 1);
+        assert_eq!(loaded.vad_thold, 0.0);
+        assert_eq!(loaded.vad_overlap, 1.0);
+        assert_eq!(loaded.temperature, 0.0);
+        assert_eq!(loaded.temperature_inc, 2.0);
+        assert_eq!(loaded.word_thold, 1.0);
+        assert_eq!(loaded.no_speech_thold, 0.0);
+        assert_eq!(loaded.entropy_thold, 0.0);
+        assert_eq!(loaded.logprob_thold, 0.0);
+        assert_eq!(loaded.offset_t, 0);
+        assert_eq!(loaded.device_id, 0);
+        assert_eq!(loaded.ffmpeg_source, "bundled");
+
+        let _ = fs::remove_file(&temp_path);
+    }
+
+    #[test]
+    fn failed_save_leaves_no_tmp_file_and_preserves_target() {
+        let temp_path = temp_test_file("atomic");
+        save_settings_to_path(&temp_path, &WhisperSettings::default_settings()).unwrap();
+        assert!(temp_path.exists());
+
+        // Make the final rename impossible: target is now a directory.
+        fs::remove_file(&temp_path).unwrap();
+        fs::create_dir(&temp_path).unwrap();
+
+        let result = save_settings_to_path(&temp_path, &WhisperSettings::default_settings());
+        assert!(result.is_err());
+
+        let tmp_path = temp_path.with_file_name({
+            let mut name = temp_path.file_name().unwrap().to_os_string();
+            name.push(".tmp");
+            name
+        });
+        assert!(
+            !tmp_path.exists(),
+            "stale .tmp file left behind after failed rename"
+        );
+        assert!(temp_path.is_dir(), "existing target was clobbered");
+
+        fs::remove_dir(&temp_path).unwrap();
+    }
+
+    #[test]
+    fn log_warn_does_not_panic_without_registered_sink() {
+        log_warn("sink-less warning smoke test");
+    }
+
+    #[test]
+    fn corrupt_json_gracefully_falls_back_to_defaults() {
+        let temp_path = temp_test_file("corrupt");
+        fs::write(&temp_path, "{ broken_json: ").unwrap();
+
+        let loaded = load_settings_from_path(&temp_path);
+        assert_eq!(loaded.selected_backend, "Standard");
+        assert_eq!(loaded.threads, 4);
+        assert_eq!(loaded.beam_size, 5);
+
+        let _ = fs::remove_file(&temp_path);
     }
 }

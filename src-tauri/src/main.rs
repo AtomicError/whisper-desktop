@@ -13,7 +13,7 @@ use std::sync::{Arc, Mutex};
 use std::path::Path;
 use tauri::{AppHandle, State};
 
-use settings::{WhisperSettings, load_settings_file, save_settings_file, load_app_settings, save_app_settings};
+use settings::{WhisperSettings, load_settings_file, save_settings_file};
 use hardware::{HardwareMonitor, SystemStats};
 use logger::AppLogs;
 use builder::check_build_exists;
@@ -80,15 +80,6 @@ fn save_settings(settings: WhisperSettings) -> Result<(), String> {
     save_settings_file(&settings)?;
     crate::ffmpeg_resolver::invalidate_ffmpeg_cache();
     Ok(())
-}
-
-#[tauri::command]
-fn apply_preset(preset: String) -> Result<WhisperSettings, String> {
-    let mut app_settings = load_app_settings();
-    app_settings.active_preset = preset.to_lowercase();
-    save_app_settings(&app_settings)?;
-    crate::ffmpeg_resolver::invalidate_ffmpeg_cache();
-    Ok(app_settings.get_active())
 }
 
 #[tauri::command]
@@ -558,9 +549,16 @@ fn main() {
         cancel_requested: false,
     }));
     let download_session = Arc::new(Mutex::new(DownloadSession::new()));
-    
+    let app_logs_for_sink = app_logs.clone();
+
     tauri::Builder::default()
-        .setup(|_app| {
+        .setup(move |_app| {
+            let logs_for_sink = app_logs_for_sink.clone();
+            let handle_for_sink = _app.handle().clone();
+            settings::register_log_sink(Arc::new(move |message| {
+                logs_for_sink.log(&handle_for_sink, "Settings", message);
+            }));
+
             #[cfg(target_os = "linux")]
             {
                 use tauri::Manager;
@@ -589,7 +587,6 @@ fn main() {
             get_system_stats,
             load_settings,
             save_settings,
-            apply_preset,
             check_build,
             probe_media_file,
             convert_media_file,

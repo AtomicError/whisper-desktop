@@ -7,7 +7,6 @@ allow = [
   "get_system_stats",
   "load_settings",
   "save_settings",
-  "apply_preset",
   "check_build",
   "probe_media_file",
   "convert_media_file",

@@ -141,7 +141,7 @@ pub fn resolve_binary_for_execution(app: Option<&tauri::AppHandle>, binary_name:
         }
     }
 
-    let settings = crate::settings::load_app_settings().get_active();
+    let settings = crate::settings::load_settings_file();
     let source = settings.ffmpeg_source.to_lowercase();
 
     let resolved_path = if source == "system" {
@@ -209,7 +209,7 @@ pub fn get_current_ffmpeg_status(app: Option<&tauri::AppHandle>, source_override
     let configured_source = match &source_override {
         Some(s) if !s.is_empty() => s.to_lowercase(),
         _ => {
-            let settings = crate::settings::load_app_settings().get_active();
+            let settings = crate::settings::load_settings_file();
             if settings.ffmpeg_source.is_empty() {
                 "bundled".to_string()
             } else {
