@@ -69,27 +69,55 @@ pub async fn ensure_media_server_started() -> Result<u16, String> {
     loop {
       if let Ok((mut stream, _)) = listener.accept().await {
         tokio::spawn(async move {
-          let mut buffer = [0u8; 4096];
-          let n = match stream.read(&mut buffer).await {
-            Ok(n) if n > 0 => n,
-            _ => return,
-          };
-          let req_str = String::from_utf8_lossy(&buffer[..n]);
+          loop {
+            let mut buffer = [0u8; 8192];
+            let n = match stream.read(&mut buffer).await {
+              Ok(n) if n > 0 => n,
+              _ => break,
+            };
+            let req_str = String::from_utf8_lossy(&buffer[..n]);
 
-          let first_line = req_str.lines().next().unwrap_or("");
-          let mut raw_range_header: Option<String> = None;
+            let mut lines = req_str.lines();
+            let first_line = lines.next().unwrap_or("");
+            let mut parts = first_line.split_whitespace();
+            let method = parts.next().unwrap_or("GET").to_uppercase();
+            let raw_uri = parts.next().unwrap_or("/");
 
-          for line in req_str.lines() {
-            if line.to_lowercase().starts_with("range: bytes=") {
-              raw_range_header = Some(line[13..].trim().to_string());
+            // Handle CORS preflight OPTIONS request
+            if method == "OPTIONS" {
+              let cors_preflight = "HTTP/1.1 204 No Content\r\n\
+Access-Control-Allow-Origin: *\r\n\
+Access-Control-Allow-Methods: GET, HEAD, OPTIONS\r\n\
+Access-Control-Allow-Headers: Range, Content-Type, Accept, Origin, User-Agent\r\n\
+Access-Control-Expose-Headers: Content-Range, Content-Length, Accept-Ranges\r\n\
+Access-Control-Max-Age: 86400\r\n\
+Connection: keep-alive\r\n\r\n";
+              if stream.write_all(cors_preflight.as_bytes()).await.is_err() {
+                break;
+              }
+              continue;
             }
-          }
 
-          // Extract query parameters from request URI line (e.g. GET /video?path=...&token=... HTTP/1.1)
-          let mut path_param = String::new();
-          let mut token_param = String::new();
-          if let Some(uri) = first_line.split_whitespace().nth(1) {
-            if let Some((_, query)) = uri.split_once('?') {
+            let mut raw_range_header: Option<String> = None;
+            let mut should_close = false;
+            for line in lines {
+              if let Some((header_name, header_val)) = line.split_once(':') {
+                let name = header_name.trim();
+                let val = header_val.trim();
+                if name.eq_ignore_ascii_case("range") {
+                  if let Some(rest) = val.strip_prefix("bytes=") {
+                    raw_range_header = Some(rest.trim().to_string());
+                  }
+                } else if name.eq_ignore_ascii_case("connection") && val.eq_ignore_ascii_case("close") {
+                  should_close = true;
+                }
+              }
+            }
+
+            // Extract query parameters from request URI line (e.g. GET /video?path=...&token=... HTTP/1.1)
+            let mut path_param = String::new();
+            let mut token_param = String::new();
+            if let Some((_, query)) = raw_uri.split_once('?') {
               for pair in query.split('&') {
                 if let Some((key, val)) = pair.split_once('=') {
                   match key {
@@ -100,164 +128,212 @@ pub async fn ensure_media_server_started() -> Result<u16, String> {
                 }
               }
             }
-          }
 
-          // Capability check: unknown callers get a generic rejection.
-          let expected_token = SERVER_TOKEN
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .clone();
-          if token_param.is_empty()
-            || expected_token.as_deref() != Some(token_param.as_str())
-          {
-            let _ = stream.write_all(b"HTTP/1.1 403 Forbidden\r\n\r\n").await;
-            return;
-          }
-
-          if path_param.is_empty() {
-            let _ = stream.write_all(b"HTTP/1.1 400 Bad Request\r\n\r\n").await;
-            return;
-          }
-
-          let file_path = std::path::PathBuf::from(&path_param);
-          let mut file = match File::open(&file_path).await {
-            Ok(f) => f,
-            Err(_) => {
-              let _ = stream.write_all(b"HTTP/1.1 404 Not Found\r\n\r\n").await;
-              return;
+            // Capability check: unknown callers get a generic rejection with CORS headers.
+            let expected_token = SERVER_TOKEN
+              .lock()
+              .unwrap_or_else(|e| e.into_inner())
+              .clone();
+            if token_param.is_empty()
+              || expected_token.as_deref() != Some(token_param.as_str())
+            {
+              let forbidden = "HTTP/1.1 403 Forbidden\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n";
+              let _ = stream.write_all(forbidden.as_bytes()).await;
+              break;
             }
-          };
 
-          let file_len = match file.metadata().await {
-            Ok(m) => m.len(),
-            Err(_) => {
-              let _ = stream.write_all(b"HTTP/1.1 500 Internal Server Error\r\n\r\n").await;
-              return;
+            if path_param.is_empty() {
+              let bad_req = "HTTP/1.1 400 Bad Request\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n";
+              let _ = stream.write_all(bad_req.as_bytes()).await;
+              break;
             }
-          };
 
-          let ext = file_path
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("")
-            .to_lowercase();
+            let file_path = std::path::PathBuf::from(&path_param);
+            let mut file = match File::open(&file_path).await {
+              Ok(f) => f,
+              Err(_) => {
+                let not_found = "HTTP/1.1 404 Not Found\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n";
+                let _ = stream.write_all(not_found.as_bytes()).await;
+                break;
+              }
+            };
 
-          let mime_type = match ext.as_str() {
-            "mp4" | "m4v" => "video/mp4",
-            "mkv" => "video/x-matroska",
-            "webm" => "video/webm",
-            "mov" => "video/quicktime",
-            "avi" => "video/x-msvideo",
-            "mp3" => "audio/mpeg",
-            "wav" => "audio/wav",
-            "ogg" | "oga" => "audio/ogg",
-            "opus" => "audio/opus",
-            "flac" => "audio/flac",
-            "aac" => "audio/aac",
-            "m4a" => "audio/mp4",
-            _ => "application/octet-stream",
-          };
+            let file_len = match file.metadata().await {
+              Ok(m) => m.len(),
+              Err(_) => {
+                let internal_err = "HTTP/1.1 500 Internal Server Error\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n";
+                let _ = stream.write_all(internal_err.as_bytes()).await;
+                break;
+              }
+            };
 
-          // Parse RFC 7233 Range headers
-          let (start, end, is_range) = if let Some(ref range_str) = raw_range_header {
-            let parts: Vec<&str> = range_str.split('-').collect();
-            if parts.is_empty() {
-              (0, if file_len > 0 { file_len - 1 } else { 0 }, false)
-            } else if parts[0].is_empty() {
-              // Suffix range: bytes=-500 (last 500 bytes)
-              if parts.len() > 1 && !parts[1].is_empty() {
-                if let Ok(suffix_len) = parts[1].parse::<u64>() {
-                  let s = file_len.saturating_sub(suffix_len);
-                  let e = if file_len > 0 { file_len - 1 } else { 0 };
-                  (s, e, true)
+            let ext = file_path
+              .extension()
+              .and_then(|e| e.to_str())
+              .unwrap_or("")
+              .to_lowercase();
+
+            let mime_type = match ext.as_str() {
+              "mp4" | "m4v" => "video/mp4",
+              "mkv" => "video/x-matroska",
+              "webm" => "video/webm",
+              "mov" => "video/quicktime",
+              "avi" => "video/x-msvideo",
+              "ts" | "mts" | "m2ts" => "video/mp2t",
+              "flv" | "f4v" => "video/x-flv",
+              "wmv" => "video/x-ms-wmv",
+              "ogv" => "video/ogg",
+              "3gp" => "video/3gpp",
+              "3g2" => "video/3gpp2",
+              "mp3" => "audio/mpeg",
+              "wav" => "audio/wav",
+              "ogg" | "oga" => "audio/ogg",
+              "opus" => "audio/opus",
+              "flac" => "audio/flac",
+              "aac" => "audio/aac",
+              "m4a" => "audio/mp4",
+              _ => "application/octet-stream",
+            };
+
+            let conn_header = if should_close { "close" } else { "keep-alive" };
+
+            // Parse RFC 7233 Range headers
+            let (start, end, is_range) = if let Some(ref range_str) = raw_range_header {
+              let parts: Vec<&str> = range_str.split('-').collect();
+              if parts.is_empty() {
+                (0, if file_len > 0 { file_len - 1 } else { 0 }, false)
+              } else if parts[0].is_empty() {
+                // Suffix range: bytes=-500 (last 500 bytes)
+                if parts.len() > 1 && !parts[1].is_empty() {
+                  if let Ok(suffix_len) = parts[1].trim().parse::<u64>() {
+                    let s = file_len.saturating_sub(suffix_len);
+                    let e = if file_len > 0 { file_len - 1 } else { 0 };
+                    (s, e, true)
+                  } else {
+                    (0, if file_len > 0 { file_len - 1 } else { 0 }, false)
+                  }
                 } else {
                   (0, if file_len > 0 { file_len - 1 } else { 0 }, false)
                 }
               } else {
-                (0, if file_len > 0 { file_len - 1 } else { 0 }, false)
+                // Range: bytes=start-end or bytes=start-
+                let s_opt = parts[0].trim().parse::<u64>().ok();
+                let e_opt = if parts.len() > 1 && !parts[1].trim().is_empty() {
+                  parts[1].trim().parse::<u64>().ok()
+                } else {
+                  None
+                };
+
+                match s_opt {
+                  Some(s) => {
+                    let e = e_opt.unwrap_or(if file_len > 0 { file_len - 1 } else { 0 });
+                    (s, e, true)
+                  }
+                  None => (0, if file_len > 0 { file_len - 1 } else { 0 }, false),
+                }
               }
             } else {
-              // Range: bytes=start-end or bytes=start-
-              let s_opt = parts[0].parse::<u64>().ok();
-              let e_opt = if parts.len() > 1 && !parts[1].is_empty() {
-                parts[1].parse::<u64>().ok()
-              } else {
-                None
-              };
+              (0, if file_len > 0 { file_len - 1 } else { 0 }, false)
+            };
 
-              match s_opt {
-                Some(s) => {
-                  let e = e_opt.unwrap_or(if file_len > 0 { file_len - 1 } else { 0 });
-                  (s, e, true)
-                }
-                None => (0, if file_len > 0 { file_len - 1 } else { 0 }, false),
+            if is_range {
+              if file_len == 0 || start >= file_len || start > end {
+                let header_416 = format!(
+                  "HTTP/1.1 416 Range Not Satisfiable\r\n\
+Content-Range: bytes */{}\r\n\
+Access-Control-Allow-Origin: *\r\n\
+Connection: {}\r\n\r\n",
+                  file_len, conn_header
+                );
+                let _ = stream.write_all(header_416.as_bytes()).await;
+                if should_close { break; } else { continue; }
               }
-            }
-          } else {
-            (0, if file_len > 0 { file_len - 1 } else { 0 }, false)
-          };
 
-          if is_range {
-            if file_len == 0 || start >= file_len || start > end {
-              let header_416 = format!(
-                "HTTP/1.1 416 Range Not Satisfiable\r\nContent-Range: bytes */{}\r\n\r\n",
-                file_len
+              let clamped_end = end.min(file_len - 1);
+              let content_length = clamped_end - start + 1;
+
+              let header = format!(
+                "HTTP/1.1 206 Partial Content\r\n\
+Content-Type: {}\r\n\
+Content-Length: {}\r\n\
+Content-Range: bytes {}-{}/{}\r\n\
+Accept-Ranges: bytes\r\n\
+Access-Control-Allow-Origin: *\r\n\
+Access-Control-Allow-Methods: GET, HEAD, OPTIONS\r\n\
+Access-Control-Allow-Headers: Range, Content-Type, Accept, Origin\r\n\
+Access-Control-Expose-Headers: Content-Range, Content-Length, Accept-Ranges\r\n\
+Connection: {}\r\n\r\n",
+                mime_type, content_length, start, clamped_end, file_len, conn_header
               );
-              let _ = stream.write_all(header_416.as_bytes()).await;
-              return;
-            }
 
-            let clamped_end = end.min(file_len - 1);
-            let content_length = clamped_end - start + 1;
-
-            let header = format!(
-              "HTTP/1.1 206 Partial Content\r\nContent-Type: {}\r\nContent-Length: {}\r\nContent-Range: bytes {}-{}/{}\r\nAccept-Ranges: bytes\r\n\r\n",
-              mime_type, content_length, start, clamped_end, file_len
-            );
-
-            if stream.write_all(header.as_bytes()).await.is_err() {
-              return;
-            }
-
-            if file.seek(SeekFrom::Start(start)).await.is_err() {
-              return;
-            }
-
-            let mut remaining = content_length;
-            let mut chunk = [0u8; 65536];
-            while remaining > 0 {
-              let to_read = std::cmp::min(remaining as usize, chunk.len());
-              let n = match file.read(&mut chunk[..to_read]).await {
-                Ok(n) if n > 0 => n,
-                _ => break,
-              };
-              if stream.write_all(&chunk[..n]).await.is_err() {
+              if stream.write_all(header.as_bytes()).await.is_err() {
                 break;
               }
-              remaining -= n as u64;
-            }
-          } else {
-            let header = format!(
-              "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\nAccept-Ranges: bytes\r\n\r\n",
-              mime_type, file_len
-            );
 
-            if stream.write_all(header.as_bytes()).await.is_err() {
-              return;
-            }
+              if method == "HEAD" {
+                if should_close { break; } else { continue; }
+              }
 
-            let mut remaining = file_len;
-            let mut chunk = [0u8; 65536];
-            while remaining > 0 {
-              let to_read = std::cmp::min(remaining as usize, chunk.len());
-              let n = match file.read(&mut chunk[..to_read]).await {
-                Ok(n) if n > 0 => n,
-                _ => break,
-              };
-              if stream.write_all(&chunk[..n]).await.is_err() {
+              if file.seek(SeekFrom::Start(start)).await.is_err() {
                 break;
               }
-              remaining -= n as u64;
+
+              let mut remaining = content_length;
+              let mut chunk = [0u8; 65536];
+              while remaining > 0 {
+                let to_read = std::cmp::min(remaining as usize, chunk.len());
+                let n = match file.read(&mut chunk[..to_read]).await {
+                  Ok(n) if n > 0 => n,
+                  _ => break,
+                };
+                if stream.write_all(&chunk[..n]).await.is_err() {
+                  break;
+                }
+                remaining -= n as u64;
+              }
+
+              if remaining > 0 || should_close {
+                break;
+              }
+            } else {
+              let header = format!(
+                "HTTP/1.1 200 OK\r\n\
+Content-Type: {}\r\n\
+Content-Length: {}\r\n\
+Accept-Ranges: bytes\r\n\
+Access-Control-Allow-Origin: *\r\n\
+Access-Control-Allow-Methods: GET, HEAD, OPTIONS\r\n\
+Access-Control-Allow-Headers: Range, Content-Type, Accept, Origin\r\n\
+Access-Control-Expose-Headers: Content-Range, Content-Length, Accept-Ranges\r\n\
+Connection: {}\r\n\r\n",
+                mime_type, file_len, conn_header
+              );
+
+              if stream.write_all(header.as_bytes()).await.is_err() {
+                break;
+              }
+
+              if method == "HEAD" {
+                if should_close { break; } else { continue; }
+              }
+
+              let mut remaining = file_len;
+              let mut chunk = [0u8; 65536];
+              while remaining > 0 {
+                let to_read = std::cmp::min(remaining as usize, chunk.len());
+                let n = match file.read(&mut chunk[..to_read]).await {
+                  Ok(n) if n > 0 => n,
+                  _ => break,
+                };
+                if stream.write_all(&chunk[..n]).await.is_err() {
+                  break;
+                }
+                remaining -= n as u64;
+              }
+
+              if remaining > 0 || should_close {
+                break;
+              }
             }
           }
         });

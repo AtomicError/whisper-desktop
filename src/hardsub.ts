@@ -529,6 +529,11 @@ export class HardsubController {
   private canvasCtx: CanvasRenderingContext2D | null = null;
   private currentSubtitleText: string = '';
 
+  // Zero-Flicker Frame Buffer Canvas for Seamless Seeking
+  private freezeCanvas: HTMLCanvasElement | null = null;
+  private freezeCtx: CanvasRenderingContext2D | null = null;
+  private isFreezingFrame: boolean = false;
+
   // Computed video display dimensions (updated by updateVideoPreviewOverlayBounds)
   private videoDisplayWidth: number = 0;
   private videoDisplayHeight: number = 0;
@@ -631,7 +636,7 @@ export class HardsubController {
     videoPresetSpeed: 'medium',
     resolutionScale: 'original',
     fontName: 'Vazirmatn',
-    fontSize: 24,
+    fontSize: 14,
     primaryColor: '#FFFFFF',
     outlineColor: '#000000',
     outlineSize: 2,
@@ -666,6 +671,7 @@ export class HardsubController {
   private isSubtitlesModified: boolean = false;
   private isSeekingVideo: boolean = false;
   private pendingSeekTime: number | null = null;
+  private wasPlayingBeforeSeek: boolean = false;
 
   // libass interprets \fs as the GDI cell height (usWinAscent+usWinDescent) while the
   // canvas preview uses CSS (em) semantics; these metrics reconcile the layout bounds
@@ -776,6 +782,11 @@ export class HardsubController {
     this.subtitleCanvas = document.getElementById('hardsub-subtitle-canvas') as HTMLCanvasElement;
     if (this.subtitleCanvas) {
       this.canvasCtx = this.subtitleCanvas.getContext('2d');
+    }
+
+    this.freezeCanvas = document.getElementById('hardsub-freeze-canvas') as HTMLCanvasElement;
+    if (this.freezeCanvas) {
+      this.freezeCtx = this.freezeCanvas.getContext('2d');
     }
 
     // Video Player & Controls
@@ -1036,7 +1047,7 @@ export class HardsubController {
             this.targetClickedCueId = null;
           }, 800);
 
-          this.videoElement.currentTime = (cue.startMs + 50) / 1000;
+          this.performSafeSeek((cue.startMs + 50) / 1000);
           const p = this.videoElement.play();
           if (p !== undefined) {
             p.catch((err) => console.warn('Jump play warning:', err));
@@ -1060,7 +1071,7 @@ export class HardsubController {
             this.targetClickedCueId = null;
           }, 800);
 
-          this.videoElement.currentTime = (cue.startMs + 50) / 1000;
+          this.performSafeSeek((cue.startMs + 50) / 1000);
         }
       }
     });
@@ -1118,12 +1129,12 @@ export class HardsubController {
       this.updateLivePreview();
     });
     document.getElementById('reset-fontsize')?.addEventListener('click', () => {
-      this.state.fontSize = 24;
+      this.state.fontSize = 14;
       if (this.fontSizeSlider) {
-        this.fontSizeSlider.value = '24';
+        this.fontSizeSlider.value = '14';
         this.updateSliderBackground(this.fontSizeSlider);
       }
-      if (this.fontSizeVal) this.fontSizeVal.textContent = '24px';
+      if (this.fontSizeVal) this.fontSizeVal.textContent = '14px';
       this.updateLivePreview();
     });
 
@@ -1983,6 +1994,10 @@ export class HardsubController {
 
     this.videoElement.addEventListener('error', () => {
       const err = this.videoElement?.error;
+      // Abort (code 1) is a normal event when seeking or switching sources; ignore it
+      if (err && (err.code === 1 || (typeof MediaError !== 'undefined' && err.code === MediaError.MEDIA_ERR_ABORTED))) {
+        return;
+      }
       console.warn('HTML5 Video Error:', err);
       if (this.videoStatusBadge) {
         this.videoStatusBadge.textContent = 'Format Error';
@@ -1999,21 +2014,40 @@ export class HardsubController {
       this.updateLivePreview();
     });
 
+    this.videoElement.addEventListener('seeking', () => {
+      this.captureFreezeFrame();
+      if (this.videoElement) {
+        this.syncActiveSubtitleWithTime(this.videoElement.currentTime * 1000);
+      }
+    });
+
     this.videoElement.addEventListener('seeked', () => {
       this.isManualSeeking = false;
       if (this.videoElement) {
         this.syncActiveSubtitleWithTime(this.videoElement.currentTime * 1000);
       }
+
+      // Live Scrubbing Preview: Update the freeze canvas with the newly decoded frame
+      this.captureFreezeFrame(true);
+
       if (this.pendingSeekTime !== null && this.videoElement) {
         const nextTime = this.pendingSeekTime;
         this.pendingSeekTime = null;
-        this.videoElement.currentTime = nextTime;
+        if ((this.isUserSeeking || this.isScrollingSeek) && typeof (this.videoElement as any).fastSeek === 'function') {
+          (this.videoElement as any).fastSeek(nextTime);
+        } else {
+          this.videoElement.currentTime = nextTime;
+        }
       } else {
         this.isSeekingVideo = false;
+        this.scheduleDismissFreezeFrame();
       }
     });
 
     this.videoElement.addEventListener('canplay', () => {
+      if (!this.isSeekingVideo && this.pendingSeekTime === null) {
+        this.scheduleDismissFreezeFrame();
+      }
       if (this.videoStatusBadge && this.videoElement?.paused) {
         this.videoStatusBadge.textContent = 'Video Loaded';
         this.videoStatusBadge.style.background = 'rgba(45, 127, 255, 0.15)';
@@ -2022,6 +2056,7 @@ export class HardsubController {
     });
 
     this.videoElement.addEventListener('playing', () => {
+      this.scheduleDismissFreezeFrame();
       if (this.videoIconPlay) this.videoIconPlay.style.display = 'none';
       if (this.videoIconPause) this.videoIconPause.style.display = 'block';
       if (this.videoStatusBadge) {
@@ -2060,6 +2095,13 @@ export class HardsubController {
     });
 
     // Seek Slider Drag
+    this.videoSeekSlider?.addEventListener('pointerdown', () => {
+      if (this.videoElement && !this.videoElement.paused) {
+        this.wasPlayingBeforeSeek = true;
+        this.videoElement.pause();
+      }
+    });
+
     this.videoSeekSlider?.addEventListener('input', () => {
       this.isUserSeeking = true;
       if (this.videoElement && this.videoSeekSlider) {
@@ -2071,18 +2113,26 @@ export class HardsubController {
           this.videoTimeDisplay.textContent = `${formatSecondsToDisplay(targetTime)} / ${formatSecondsToDisplay(this.videoElement.duration || 0)}`;
         }
 
-        if (this.isSeekingVideo) {
-          this.pendingSeekTime = targetTime;
-        } else {
-          this.isSeekingVideo = true;
-          this.videoElement.currentTime = targetTime;
-        }
+        this.syncActiveSubtitleWithTime(targetTime * 1000);
+        this.performSafeSeek(targetTime, true);
       }
     });
 
-    this.videoSeekSlider?.addEventListener('change', () => {
+    const handleSeekRelease = () => {
       this.isUserSeeking = false;
-    });
+      if (this.videoElement && this.videoSeekSlider) {
+        const pct = parseFloat(this.videoSeekSlider.value);
+        const targetTime = (this.videoElement.duration || 0) * (pct / 100);
+        this.performSafeSeek(targetTime, false);
+      }
+      if (this.wasPlayingBeforeSeek && this.videoElement) {
+        this.wasPlayingBeforeSeek = false;
+        this.videoElement.play().catch(() => {});
+      }
+    };
+
+    this.videoSeekSlider?.addEventListener('change', handleSeekRelease);
+    this.videoSeekSlider?.addEventListener('pointerup', handleSeekRelease);
 
     // Jump to Prev / Next Cue
     this.prevCueBtn?.addEventListener('click', () => {
@@ -2090,7 +2140,7 @@ export class HardsubController {
       const curMs = this.videoElement.currentTime * 1000;
       const prev = [...this.subtitleCues].reverse().find((c) => c.startMs < curMs - 300);
       if (prev) {
-        this.videoElement.currentTime = prev.startMs / 1000;
+        this.performSafeSeek(prev.startMs / 1000);
       }
     });
 
@@ -2099,7 +2149,7 @@ export class HardsubController {
       const curMs = this.videoElement.currentTime * 1000;
       const next = this.subtitleCues.find((c) => c.startMs > curMs + 100);
       if (next) {
-        this.videoElement.currentTime = next.startMs / 1000;
+        this.performSafeSeek(next.startMs / 1000);
       }
     });
 
@@ -2215,6 +2265,10 @@ export class HardsubController {
         if (!this.isScrollingSeek) {
           this.isScrollingSeek = true;
           this.virtualCurrentTime = this.videoElement.currentTime;
+          if (!this.videoElement.paused) {
+            this.wasPlayingBeforeSeek = true;
+            this.videoElement.pause();
+          }
         }
 
         const duration = this.videoElement.duration || 0;
@@ -2237,10 +2291,10 @@ export class HardsubController {
           // 3. Instantly update canvas subtitle overlay
           this.syncActiveSubtitleWithTime(this.virtualCurrentTime * 1000);
 
-          // 4. Throttle seeking the actual video element (max once every 80ms)
+          // 4. Safely seek via single-flight queue (throttled to max once every 30ms)
           const now = Date.now();
-          if (now - this.lastThrottleSeekTime > 80) {
-            this.videoElement.currentTime = this.virtualCurrentTime;
+          if (now - this.lastThrottleSeekTime > 30) {
+            this.performSafeSeek(this.virtualCurrentTime, true);
             this.lastThrottleSeekTime = now;
           }
 
@@ -2248,10 +2302,14 @@ export class HardsubController {
           if (this.scrollSeekTimeout) clearTimeout(this.scrollSeekTimeout);
           this.scrollSeekTimeout = setTimeout(() => {
             if (this.videoElement) {
-              this.videoElement.currentTime = this.virtualCurrentTime;
+              this.performSafeSeek(this.virtualCurrentTime, false);
+              if (this.wasPlayingBeforeSeek) {
+                this.wasPlayingBeforeSeek = false;
+                this.videoElement.play().catch(() => {});
+              }
             }
             this.isScrollingSeek = false;
-          }, 150);
+          }, 120);
         }
       } else {
         // Vertical scroll: adjust volume
@@ -2289,10 +2347,10 @@ export class HardsubController {
 
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
-        this.videoElement.currentTime = Math.max(0, this.videoElement.currentTime - 10);
+        this.performSafeSeek(Math.max(0, this.videoElement.currentTime - 10));
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
-        this.videoElement.currentTime = Math.min(this.videoElement.duration || 0, this.videoElement.currentTime + 10);
+        this.performSafeSeek(Math.min(this.videoElement.duration || 0, this.videoElement.currentTime + 10));
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         if (this.videoVolumeSlider) {
@@ -2417,6 +2475,12 @@ export class HardsubController {
       this.subtitleCanvas.height = containerHeight;
       this.subtitleCanvas.style.left = '0px';
       this.subtitleCanvas.style.top = '0px';
+      if (this.freezeCanvas) {
+        this.freezeCanvas.width = containerWidth;
+        this.freezeCanvas.height = containerHeight;
+        this.freezeCanvas.style.left = '0px';
+        this.freezeCanvas.style.top = '0px';
+      }
       return;
     }
 
@@ -2444,13 +2508,91 @@ export class HardsubController {
     this.videoDisplayTop = top;
 
     // Size and position the canvas to exactly cover the video display area
-    this.subtitleCanvas.width = Math.round(displayWidth);
-    this.subtitleCanvas.height = Math.round(displayHeight);
-    this.subtitleCanvas.style.left = `${left}px`;
-    this.subtitleCanvas.style.top = `${top}px`;
+    const roundedW = Math.round(displayWidth);
+    const roundedH = Math.round(displayHeight);
+    const leftPx = `${Math.round(left)}px`;
+    const topPx = `${Math.round(top)}px`;
+
+    this.subtitleCanvas.width = roundedW;
+    this.subtitleCanvas.height = roundedH;
+    this.subtitleCanvas.style.left = leftPx;
+    this.subtitleCanvas.style.top = topPx;
+
+    if (this.freezeCanvas) {
+      this.freezeCanvas.width = roundedW;
+      this.freezeCanvas.height = roundedH;
+      this.freezeCanvas.style.left = leftPx;
+      this.freezeCanvas.style.top = topPx;
+    }
 
     // Redraw subtitle on resized canvas
     this.renderSubtitleOnCanvas();
+  }
+
+  private captureFreezeFrame(force = false) {
+    if (!this.videoElement || !this.freezeCanvas || !this.freezeCtx) return;
+    if (this.videoElement.readyState < 2) return;
+    // Prevent overwriting a valid frozen frame unless forced (e.g. on intermediate seeked frames)
+    if (!force && this.isFreezingFrame) return;
+
+    try {
+      const w = this.freezeCanvas.width;
+      const h = this.freezeCanvas.height;
+      if (w > 0 && h > 0) {
+        this.freezeCtx.clearRect(0, 0, w, h);
+        this.freezeCtx.drawImage(this.videoElement, 0, 0, w, h);
+        this.freezeCanvas.style.display = 'block';
+        this.isFreezingFrame = true;
+      }
+    } catch {
+      // Ignore cross-origin capture errors if any
+    }
+  }
+
+  private scheduleDismissFreezeFrame() {
+    if (!this.freezeCanvas || !this.isFreezingFrame) return;
+
+    if (this.videoElement && typeof (this.videoElement as any).requestVideoFrameCallback === 'function') {
+      (this.videoElement as any).requestVideoFrameCallback(() => {
+        if (!this.isSeekingVideo && this.pendingSeekTime === null) {
+          this.dismissFreezeFrame();
+        }
+      });
+    } else {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (!this.isSeekingVideo && this.pendingSeekTime === null) {
+            this.dismissFreezeFrame();
+          }
+        });
+      });
+    }
+  }
+
+  private dismissFreezeFrame() {
+    if (!this.freezeCanvas) return;
+    this.freezeCanvas.style.display = 'none';
+    this.isFreezingFrame = false;
+  }
+
+  private performSafeSeek(targetTime: number, fast: boolean = false) {
+    if (!this.videoElement) return;
+    const duration = this.videoElement.duration || 0;
+    const clamped = Math.max(0, Math.min(duration, targetTime));
+
+    this.captureFreezeFrame();
+
+    if (this.isSeekingVideo || this.videoElement.seeking) {
+      this.pendingSeekTime = clamped;
+    } else {
+      this.isSeekingVideo = true;
+      this.pendingSeekTime = null;
+      if (fast && typeof (this.videoElement as any).fastSeek === 'function') {
+        (this.videoElement as any).fastSeek(clamped);
+      } else {
+        this.videoElement.currentTime = clamped;
+      }
+    }
   }
 
   private updateSeekSliderProgress(pct: number) {
@@ -2586,8 +2728,9 @@ export class HardsubController {
         streamUrl = convertFileSrc(videoPath);
       }
 
-      this.videoElement.crossOrigin = "anonymous";
+      this.videoElement.crossOrigin = 'anonymous';
       this.videoElement.src = streamUrl;
+      this.videoElement.load();
       this.videoElement.style.display = 'block';
       this.isSeekingVideo = false;
       this.pendingSeekTime = null;
@@ -2992,7 +3135,7 @@ export class HardsubController {
 
   private updateUIControlsState() {
     const resetFont = document.getElementById('reset-fontsize');
-    if (resetFont) resetFont.style.display = this.state.fontSize !== 24 ? 'inline-flex' : 'none';
+    if (resetFont) resetFont.style.display = this.state.fontSize !== 14 ? 'inline-flex' : 'none';
 
     const resetOutline = document.getElementById('reset-outline');
     if (resetOutline) resetOutline.style.display = this.state.outlineSize !== 2 ? 'inline-flex' : 'none';

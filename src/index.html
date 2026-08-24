@@ -1968,6 +1968,9 @@
                       <span style="font-size: 0.85rem; color: var(--color-text-muted); font-weight: 500; max-width: 240px; line-height: 1.4;">Select a video file above to enable real-frame live preview</span>
                     </div>
 
+                    <!-- Video Frame Freeze Canvas (Seamless Double-Buffering during Seek) -->
+                    <canvas id="hardsub-freeze-canvas" style="position: absolute; top: 0; left: 0; pointer-events: none; display: none; z-index: 3;"></canvas>
+
                     <!-- Canvas Subtitle Overlay (ASS-matching renderer) -->
                     <canvas id="hardsub-subtitle-canvas" style="position: absolute; top: 0; left: 0; pointer-events: none; display: none; z-index: 5;"></canvas>
 
@@ -2135,13 +2138,13 @@
                           <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--color-text-muted); margin-bottom: 6px;">
                             <span>Font Size</span>
                             <div style="display: flex; align-items: center; gap: 6px;">
-                              <span id="hardsub-fontsize-val" style="color: var(--color-royal-blue); font-weight: 700; font-size: 0.88rem; background: rgba(45, 127, 255, 0.12); padding: 1px 7px; border-radius: 6px; line-height: 1.2;">24px</span>
-                              <button class="reset-link-btn" id="reset-fontsize" title="Reset font size to 24px" style="display: none; padding: 2px;">
+                              <span id="hardsub-fontsize-val" style="color: var(--color-royal-blue); font-weight: 700; font-size: 0.88rem; background: rgba(45, 127, 255, 0.12); padding: 1px 7px; border-radius: 6px; line-height: 1.2;">14px</span>
+                              <button class="reset-link-btn" id="reset-fontsize" title="Reset font size to 14px" style="display: none; padding: 2px;">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:12px; height:12px; display:block;"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
                               </button>
                             </div>
                           </div>
-                          <input type="range" class="range-slider" id="hardsub-fontsize" min="6" max="64" value="24" style="width:100%;" />
+                          <input type="range" class="range-slider" id="hardsub-fontsize" min="6" max="64" value="14" style="width:100%;" />
                         </div>
 
                         <!-- Text Color -->
