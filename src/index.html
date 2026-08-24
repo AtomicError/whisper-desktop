@@ -1882,51 +1882,58 @@
               <!-- Left Column: Media Source, Real Video Frame Preview, Media Controls & Telemetry -->
               <div class="hardsub-left-panel">
                 
-                <!-- File Selection Card (Dual Premium Dropzones matching Transcribe page style) -->
-                <div class="glass-card" style="padding: 18px;">
-                  <h3 style="margin-top: 0; margin-bottom: 14px; font-size: 1.05rem; color: var(--color-royal-blue); display: flex; align-items: center; justify-content: space-between;">
-                    <span style="display: flex; align-items: center; gap: 8px;">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px; height:20px;"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
-                      Media & Subtitle Source
-                    </span>
-                    <span style="font-size: 0.75rem; color: var(--color-text-muted); font-weight: normal;">Drag & Drop Supported</span>
-                  </h3>
-
-                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
-                    
-                    <!-- Video File Dropzone -->
-                    <div class="media-drop-zone" id="hardsub-video-drop-zone" style="padding: 20px 14px; gap: 10px; position: relative;">
-                      <svg class="media-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width: 32px; height: 32px;">
-                        <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
-                        <line x1="7" y1="2" x2="7" y2="22"/>
-                        <line x1="17" y1="2" x2="17" y2="22"/>
-                        <line x1="2" y1="12" x2="22" y2="12"/>
-                        <line x1="2" y1="7" x2="7" y2="7"/>
-                        <line x1="2" y1="17" x2="7" y2="17"/>
-                      </svg>
-                      <div style="flex:1; overflow: hidden; max-width: 100%;">
-                        <p style="font-weight:600; margin-bottom:4px; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-video-name">No Video Loaded</p>
-                        <p style="font-size:0.75rem; color:var(--color-text-muted); margin:0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-video-path">Drag & drop video (.mp4, .mkv, .mov)</p>
-                      </div>
-                      <button class="btn-secondary" id="btn-browse-video" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap;">Browse Video</button>
-                      <input type="hidden" id="hardsub-video-path" />
+                <!-- File Selection Accordion (Collapsible Wizard Step matching Transcribe page style) -->
+                <div class="wizard-step active" id="hardsub-media-step">
+                  <div class="wizard-step-header" id="hardsub-media-step-header">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                      <div class="wizard-step-icon" id="hardsub-media-step-icon">1</div>
+                      <div class="wizard-step-title" id="hardsub-media-step-title">Select Media Resource</div>
                     </div>
-
-                    <!-- Subtitle File Dropzone -->
-                    <div class="media-drop-zone" id="hardsub-sub-drop-zone" style="padding: 20px 14px; gap: 10px; position: relative;">
-                      <svg class="media-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width: 32px; height: 32px;">
-                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                        <line x1="7" y1="8" x2="17" y2="8"/>
-                        <line x1="7" y1="12" x2="14" y2="12"/>
-                      </svg>
-                      <div style="flex:1; overflow: hidden; max-width: 100%;">
-                        <p style="font-weight:600; margin-bottom:4px; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-sub-name">No Subtitle Loaded</p>
-                        <p style="font-size:0.75rem; color:var(--color-text-muted); margin:0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-sub-path">Drag & drop subtitle (.srt, .vtt, .ass)</p>
-                      </div>
-                      <button class="btn-secondary" id="btn-browse-sub" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap;">Browse Subtitle</button>
-                      <input type="hidden" id="hardsub-sub-path" />
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <span id="hardsub-media-summary-badge" style="font-size: 0.78rem; color: var(--color-royal-blue); background: rgba(45, 127, 255, 0.12); padding: 2px 8px; border-radius: 6px; font-weight: 600; display: none; max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></span>
+                      <span class="wizard-chevron" id="hardsub-media-chevron">▼</span>
                     </div>
+                  </div>
 
+                  <div class="wizard-step-body" id="hardsub-media-step-body">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                      
+                      <!-- Video File Dropzone -->
+                      <div class="media-drop-zone" id="hardsub-video-drop-zone" style="padding: 20px 14px; gap: 10px; position: relative;">
+                        <svg class="media-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width: 32px; height: 32px;">
+                          <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
+                          <line x1="7" y1="2" x2="7" y2="22"/>
+                          <line x1="17" y1="2" x2="17" y2="22"/>
+                          <line x1="2" y1="12" x2="22" y2="12"/>
+                          <line x1="2" y1="7" x2="7" y2="7"/>
+                          <line x1="2" y1="17" x2="7" y2="17"/>
+                          <line x1="17" y1="17" x2="22" y2="17"/>
+                          <line x1="17" y1="7" x2="22" y2="7"/>
+                        </svg>
+                        <div style="flex:1; overflow: hidden; max-width: 100%;">
+                          <p style="font-weight:600; margin-bottom:4px; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-video-name">No Video Loaded</p>
+                          <p style="font-size:0.75rem; color:var(--color-text-muted); margin:0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-video-path">Drag & drop video (.mp4, .mkv, .mov)</p>
+                        </div>
+                        <button class="btn-secondary" id="btn-browse-video" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap;">Browse Video</button>
+                        <input type="hidden" id="hardsub-video-path" />
+                      </div>
+
+                      <!-- Subtitle File Dropzone -->
+                      <div class="media-drop-zone" id="hardsub-sub-drop-zone" style="padding: 20px 14px; gap: 10px; position: relative;">
+                        <svg class="media-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width: 32px; height: 32px;">
+                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                          <line x1="7" y1="8" x2="17" y2="8"/>
+                          <line x1="7" y1="12" x2="14" y2="12"/>
+                        </svg>
+                        <div style="flex:1; overflow: hidden; max-width: 100%;">
+                          <p style="font-weight:600; margin-bottom:4px; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-sub-name">No Subtitle Loaded</p>
+                          <p style="font-size:0.75rem; color:var(--color-text-muted); margin:0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-sub-path">Drag & drop subtitle (.srt, .vtt, .ass)</p>
+                        </div>
+                        <button class="btn-secondary" id="btn-browse-sub" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap;">Browse Subtitle</button>
+                        <input type="hidden" id="hardsub-sub-path" />
+                      </div>
+
+                    </div>
                   </div>
                 </div>
 

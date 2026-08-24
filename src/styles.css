@@ -2037,6 +2037,7 @@ select.select-control {
   gap: 16px;
   height: 100%;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   padding-right: 8px;
 }
 
@@ -2058,7 +2059,9 @@ select.select-control {
   border: 1px solid var(--border-glass);
   border-radius: 12px;
   overflow: hidden;
-  transition: var(--transition-smooth);
+  flex-shrink: 0;
+  min-height: 0;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
 
 .wizard-step.active {
@@ -2066,7 +2069,6 @@ select.select-control {
   box-shadow:
     0 8px 24px rgba(0, 0, 0, 0.35),
     0 0 10px rgba(45, 127, 255, 0.05);
-  overflow: hidden;
 }
 
 .wizard-step-header {
@@ -2077,7 +2079,7 @@ select.select-control {
   cursor: pointer;
   user-select: none;
   background: rgba(255, 255, 255, 0.01);
-  transition: var(--transition-smooth);
+  transition: background 0.2s ease;
 }
 
 .wizard-step-header:hover {
@@ -2117,7 +2119,7 @@ select.select-control {
   font-weight: 600;
   font-size: 0.95rem;
   color: var(--color-text-muted);
-  transition: var(--transition-smooth);
+  transition: color 0.2s ease;
 }
 
 .wizard-step.active .wizard-step-title,
@@ -2128,7 +2130,8 @@ select.select-control {
 .wizard-chevron {
   font-size: 0.75rem;
   color: var(--color-text-dim);
-  transition: transform 0.3s ease;
+  display: inline-block;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s ease;
 }
 
 .wizard-step.active .wizard-chevron {
@@ -2141,13 +2144,18 @@ select.select-control {
   max-height: 0;
   opacity: 0;
   overflow: hidden;
-  transition: max-height 0.4s cubic-bezier(0.16, 1, 0.3, 1), padding 0.3s ease, opacity 0.3s ease;
+  box-sizing: border-box;
+  transition: max-height 0.3s cubic-bezier(0.16, 1, 0.3, 1), padding 0.25s ease, opacity 0.2s ease;
 }
 
 .wizard-step.active .wizard-step-body {
-  padding: 20px;
-  max-height: 500px; /* Fits all steps comfortably */
+  padding: 0 20px 20px 20px;
+  max-height: 500px;
   opacity: 1;
+}
+
+.wizard-step.active #hardsub-media-summary-badge {
+  display: none !important;
 }
 
 .wizard-next-btn {
@@ -4990,6 +4998,7 @@ select.select-control {
   height: 100%;
   min-height: 0;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   padding-inline-end: 6px;
 }
 

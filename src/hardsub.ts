@@ -591,6 +591,13 @@ export class HardsubController {
   private subtitleListContainer: HTMLElement | null = null;
   private emptyCueNotice: HTMLElement | null = null;
 
+  // Media Resource Accordion Elements
+  private mediaStepEl: HTMLElement | null = null;
+  private mediaStepHeader: HTMLElement | null = null;
+  private mediaStepIcon: HTMLElement | null = null;
+  private mediaStepChevron: HTMLElement | null = null;
+  private mediaSummaryBadge: HTMLElement | null = null;
+
   // Dropzone Elements
   private videoDropZone: HTMLElement | null = null;
   private subDropZone: HTMLElement | null = null;
@@ -712,9 +719,13 @@ export class HardsubController {
 
       const container = document.getElementById('hardsub-player-container');
       if (container) {
+        let rAF: number | null = null;
         const resizeObserver = new ResizeObserver(() => {
-          this.updateVideoPreviewOverlayBounds();
-          this.updateLivePreview();
+          if (rAF !== null) cancelAnimationFrame(rAF);
+          rAF = requestAnimationFrame(() => {
+            rAF = null;
+            this.updateVideoPreviewOverlayBounds();
+          });
         });
         resizeObserver.observe(container);
       }
@@ -816,6 +827,13 @@ export class HardsubController {
     this.hudVolLow = document.getElementById('hardsub-hud-vol-low');
     this.hudVolMute = document.getElementById('hardsub-hud-vol-mute');
     this.hudVolText = document.getElementById('hardsub-volume-hud-text');
+
+    // Media Resource Accordion Elements
+    this.mediaStepEl = document.getElementById('hardsub-media-step');
+    this.mediaStepHeader = document.getElementById('hardsub-media-step-header');
+    this.mediaStepIcon = document.getElementById('hardsub-media-step-icon');
+    this.mediaStepChevron = document.getElementById('hardsub-media-chevron');
+    this.mediaSummaryBadge = document.getElementById('hardsub-media-summary-badge');
 
     // Dropzone Elements
     this.videoDropZone = document.getElementById('hardsub-video-drop-zone');
@@ -1090,6 +1108,17 @@ export class HardsubController {
           }
         }
       }
+    });
+
+    // Media Resource Accordion Toggle
+    this.mediaStepHeader?.addEventListener('click', () => {
+      this.toggleMediaAccordion();
+    });
+
+    // Clicking placeholder in player expands the accordion and triggers browse
+    this.videoPlaceholder?.addEventListener('click', () => {
+      this.toggleMediaAccordion(true);
+      document.getElementById('btn-browse-video')?.click();
     });
 
     // Browse Video File
@@ -2721,11 +2750,55 @@ export class HardsubController {
     }, 1500);
   }
 
+  public toggleMediaAccordion(forceOpen?: boolean) {
+    if (!this.mediaStepEl) return;
+    const shouldOpen = forceOpen !== undefined ? forceOpen : !this.mediaStepEl.classList.contains('active');
+    if (shouldOpen) {
+      this.mediaStepEl.classList.add('active');
+    } else {
+      this.mediaStepEl.classList.remove('active');
+    }
+    this.updateVideoPreviewOverlayBounds();
+  }
+
+  private updateMediaAccordionSummary() {
+    if (!this.mediaStepEl) return;
+    const hasVideo = !!this.state.videoPath;
+    const hasSub = !!this.state.subtitlePath;
+
+    if (hasVideo) {
+      this.mediaStepEl.classList.add('completed');
+      if (this.mediaStepIcon) {
+        this.mediaStepIcon.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="width:14px;height:14px;color:var(--color-green);"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+      }
+    } else {
+      this.mediaStepEl.classList.remove('completed');
+      if (this.mediaStepIcon) {
+        this.mediaStepIcon.textContent = '1';
+      }
+    }
+
+    if (this.mediaSummaryBadge) {
+      if (hasVideo) {
+        const lastSlash = Math.max(this.state.videoPath.lastIndexOf('/'), this.state.videoPath.lastIndexOf('\\'));
+        const vName = lastSlash >= 0 ? this.state.videoPath.substring(lastSlash + 1) : this.state.videoPath;
+        const subCount = this.subtitleCues.length > 0 ? ` • ${this.subtitleCues.length} Cues` : (hasSub ? ' • Sub Loaded' : '');
+        this.mediaSummaryBadge.textContent = `✓ ${vName}${subCount}`;
+        this.mediaSummaryBadge.title = `Video: ${this.state.videoPath}${hasSub ? `\nSubtitle: ${this.state.subtitlePath}` : ''}`;
+        this.mediaSummaryBadge.style.display = 'inline-block';
+      } else {
+        this.mediaSummaryBadge.textContent = '';
+        this.mediaSummaryBadge.style.display = 'none';
+      }
+    }
+  }
+
   private updateVideoDropzoneUI(videoPath: string) {
     if (!videoPath) {
       if (this.lblVideoName) this.lblVideoName.textContent = 'No Video Loaded';
       if (this.lblVideoPath) this.lblVideoPath.textContent = 'Drag & drop video (.mp4, .mkv, .mov)';
       this.videoDropZone?.classList.remove('has-file');
+      this.updateMediaAccordionSummary();
       return;
     }
 
@@ -2735,6 +2808,7 @@ export class HardsubController {
     if (this.lblVideoName) this.lblVideoName.textContent = `✓ ${fileName}`;
     if (this.lblVideoPath) this.lblVideoPath.textContent = videoPath;
     this.videoDropZone?.classList.add('has-file');
+    this.updateMediaAccordionSummary();
   }
 
   private updateSubDropzoneUI(subPath: string, cueCount?: number) {
@@ -2742,6 +2816,7 @@ export class HardsubController {
       if (this.lblSubName) this.lblSubName.textContent = 'No Subtitle Loaded';
       if (this.lblSubPath) this.lblSubPath.textContent = 'Drag & drop subtitle (.srt, .vtt, .ass)';
       this.subDropZone?.classList.remove('has-file');
+      this.updateMediaAccordionSummary();
       return;
     }
 
@@ -2752,6 +2827,7 @@ export class HardsubController {
     if (this.lblSubName) this.lblSubName.textContent = `✓ ${fileName}${countStr}`;
     if (this.lblSubPath) this.lblSubPath.textContent = subPath;
     this.subDropZone?.classList.add('has-file');
+    this.updateMediaAccordionSummary();
   }
 
   private async loadVideoMedia(videoPath: string) {
@@ -2781,6 +2857,11 @@ export class HardsubController {
       this.syncPlayPauseUI(false);
       this.updateVideoDropzoneUI(videoPath);
       this.updateVideoPreviewOverlayBounds();
+
+      // Automatically collapse media selection accordion to maximize video viewport
+      setTimeout(() => {
+        this.toggleMediaAccordion(false);
+      }, 250);
     } catch (e) {
       console.warn('Failed to load video media URL:', e);
     }
