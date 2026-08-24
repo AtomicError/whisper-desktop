@@ -24,6 +24,13 @@ function getBasename(path) {
   return path.replace(/\\/g, '/').split('/').pop();
 }
 
+function getParentDir(path) {
+  if (!path) return '';
+  const clean = path.trim();
+  const lastSlash = Math.max(clean.lastIndexOf('/'), clean.lastIndexOf('\\'));
+  return lastSlash >= 0 ? clean.substring(0, lastSlash) : '';
+}
+
 // Premium Glassmorphic Toast Notification System
 window.showNotification = function(message, type = 'info', customDuration = null) {
   let container = document.getElementById('toast-container');
@@ -2349,6 +2356,7 @@ async function probeSelectedFile() {
     }
   } catch (e) {
     console.error("Probing failed:", e);
+    showNotification("Could not read media metadata. The file may be missing or in an unsupported format.", "error");
   }
 }
 
@@ -2459,10 +2467,11 @@ window.runWhisperTranscription = async function() {
 
     // Load final transcript from the text file
     if (result.generatedFiles && result.generatedFiles.length > 0) {
-      const parentDir = settingsState.inputFile.substring(0, settingsState.inputFile.lastIndexOf('/'));
+      const outputDir = result.outputDir || getParentDir(settingsState.inputFile);
       const txtFile = result.generatedFiles.find(f => f.endsWith('.txt'));
       if (txtFile) {
-        await loadTranscriptFromFile(`${parentDir}/${txtFile}`);
+        const sep = outputDir.includes('\\') && !outputDir.includes('/') ? '\\' : '/';
+        await loadTranscriptFromFile(`${outputDir}${sep}${txtFile}`);
       }
     }
 
@@ -2486,14 +2495,14 @@ window.runWhisperTranscription = async function() {
     // Run AI Translation if enabled
     if (settingsState.translateAiEnabled && result.generatedFiles && result.generatedFiles.length > 0) {
       try {
-        const parentDir = settingsState.inputFile.substring(0, settingsState.inputFile.lastIndexOf('/'));
+        const outputDir = result.outputDir || getParentDir(settingsState.inputFile);
         btn.textContent = 'AI Translating...';
         showNotification("Starting AI translation of generated files...", "info");
 
         const translatedFiles = await invoke('translate_transcription_files', {
           settings: settingsState,
           generatedFiles: result.generatedFiles,
-          parentDir: parentDir
+          parentDir: outputDir
         });
 
         translatedFiles.forEach(f => {
@@ -3052,10 +3061,11 @@ window.runBatchExtraction = async function() {
 
       // Load final transcript from the text file
       if (result.generatedFiles && result.generatedFiles.length > 0) {
-        const parentDir = settingsState.inputFile.substring(0, settingsState.inputFile.lastIndexOf('/'));
+        const outputDir = result.outputDir || getParentDir(item.path);
         const txtFile = result.generatedFiles.find(f => f.endsWith('.txt'));
         if (txtFile) {
-          await loadTranscriptFromFile(`${parentDir}/${txtFile}`);
+          const sep = outputDir.includes('\\') && !outputDir.includes('/') ? '\\' : '/';
+          await loadTranscriptFromFile(`${outputDir}${sep}${txtFile}`);
         }
       }
       
@@ -3074,11 +3084,11 @@ window.runBatchExtraction = async function() {
           // moving instead of freezing at the batch-item fraction.
           if (msgEl) msgEl.textContent = `[${i + 1}/${totalCount}] Translating: '${item.name}'...`;
           
-          const parentDir = item.path.substring(0, item.path.lastIndexOf('/'));
+          const outputDir = result.outputDir || getParentDir(item.path);
           const translatedFiles = await invoke('translate_transcription_files', {
             settings: settingsState,
             generatedFiles: result.generatedFiles,
-            parentDir: parentDir
+            parentDir: outputDir
           });
           
           item.outputs = [...result.generatedFiles, ...translatedFiles];
@@ -3624,7 +3634,13 @@ window.loadModelStatusesGrid = async function(isSilent = false) {
 };
 
 window.filterModelsGrid = function() {
-  loadModelStatusesGrid();
+  // Debounce: the search box calls this per keystroke, and a full grid rebuild
+  // + IPC round-trip on every key makes typing janky.
+  if (filterModelsGrid._timer) clearTimeout(filterModelsGrid._timer);
+  filterModelsGrid._timer = setTimeout(() => {
+    filterModelsGrid._timer = null;
+    loadModelStatusesGrid();
+  }, 250);
 };
 
 window.downloadModelClick = async function(name) {
@@ -3727,6 +3743,14 @@ function appendTranscriptLine(timeRange, text) {
   lineEl.appendChild(timeSpan);
   lineEl.appendChild(textDiv);
   viewport.appendChild(lineEl);
+
+  // Cap DOM children in viewport (mirrors the log-viewport cap) so a very long
+  // transcription can't grow thousands of live <input> nodes. The full data
+  // stays in `transcriptLines` for copy/export.
+  while (viewport.children.length > 2000) {
+    viewport.removeChild(viewport.firstElementChild);
+  }
+
   clearTimeout(viewport._scrollDebounce);
   viewport._scrollDebounce = setTimeout(() => {
     viewport.scrollTop = viewport.scrollHeight;

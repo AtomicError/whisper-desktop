@@ -288,7 +288,7 @@ pub fn load_settings_from_path(path: &Path) -> WhisperSettings {
                 return settings;
             } else {
                 log_warn(&format!(
-                    "Could not parse settings from {}. Falling back to default configuration.",
+                    "Could not parse settings from {}. Using defaults for this session; the existing file was NOT overwritten.",
                     path.display()
                 ));
             }
@@ -297,13 +297,19 @@ pub fn load_settings_from_path(path: &Path) -> WhisperSettings {
 
     let mut default = WhisperSettings::default_settings();
     default.sanitize_and_validate();
-    drop(_guard);
-    if let Err(e) = save_settings_to_path(path, &default) {
-        log_warn(&format!(
-            "Failed to persist default settings to {}: {}",
-            path.display(),
-            e
-        ));
+
+    // Only persist defaults when no settings file exists at all. If a file
+    // exists but failed to parse, leave it on disk so the user (or a future
+    // migration) can recover it instead of destroying their configuration.
+    if !path.exists() {
+        drop(_guard);
+        if let Err(e) = save_settings_to_path(path, &default) {
+            log_warn(&format!(
+                "Failed to persist default settings to {}: {}",
+                path.display(),
+                e
+            ));
+        }
     }
     default
 }

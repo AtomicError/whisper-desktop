@@ -657,6 +657,8 @@ export class HardsubController {
   private subtitleCues: SubtitleCue[] = [];
   private activeCueId: number | null = null;
   private searchFilterQuery: string = '';
+  private searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private _lastRenderKey: string = '';
   private isUserSeeking: boolean = false;
   private isManualSeeking: boolean = false;
   private targetClickedCueId: number | null = null;
@@ -1296,8 +1298,14 @@ export class HardsubController {
 
     // Subtitle Search Input
     this.searchInput?.addEventListener('input', () => {
+      // Debounced: a full cue-list rebuild per keystroke is far too heavy for
+      // feature-length subtitle files (1-2k cues).
       this.searchFilterQuery = this.searchInput!.value.trim().toLowerCase();
-      this.renderSubtitleCards();
+      if (this.searchDebounceTimer) clearTimeout(this.searchDebounceTimer);
+      this.searchDebounceTimer = setTimeout(() => {
+        this.searchDebounceTimer = null;
+        this.renderSubtitleCards();
+      }, 250);
     });
 
     // Start Hardsub Button
@@ -2578,6 +2586,7 @@ export class HardsubController {
         streamUrl = convertFileSrc(videoPath);
       }
 
+      this.videoElement.crossOrigin = "anonymous";
       this.videoElement.src = streamUrl;
       this.videoElement.style.display = 'block';
       this.isSeekingVideo = false;
@@ -2794,6 +2803,17 @@ export class HardsubController {
     const canvasW = canvas.width;
     const canvasH = canvas.height;
     if (canvasW === 0 || canvasH === 0) return;
+
+    // Dirty check: skip the expensive parse/wrap/measure pipeline when nothing
+    // visible changed. This fires on every timeupdate and wheel tick.
+    const renderKey = [
+      this.currentSubtitleText,
+      canvasW, canvasH,
+      JSON.stringify(this.state),
+      JSON.stringify(this.fontMetrics),
+    ].join('|');
+    if (this._lastRenderKey === renderKey) return;
+    this._lastRenderKey = renderKey;
 
     // Clear entire canvas
     ctx.clearRect(0, 0, canvasW, canvasH);

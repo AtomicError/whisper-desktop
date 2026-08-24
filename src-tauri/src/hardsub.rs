@@ -445,7 +445,7 @@ pub async fn check_hardware_encoders(app: tauri::AppHandle) -> HardwareEncodersS
 /// Converts HTML Hex color "#RRGGBB" or "#AARRGGBB" into ASS Color format "&H(AA)BBGGRR&"
 fn hex_to_ass_color(hex: &str, alpha: u8) -> String {
     let clean = hex.trim_start_matches('#');
-    let (r, g, b) = if clean.len() >= 6 {
+    let (r, g, b) = if clean.len() >= 6 && clean.is_char_boundary(6) && clean.as_bytes().iter().take(6).all(u8::is_ascii_hexdigit) {
         (
             &clean[0..2],
             &clean[2..4],
@@ -1453,9 +1453,9 @@ pub async fn run_hardsub_task(
 
     while !stdout_done || !stderr_done {
         tokio::select! {
-            res = stdout_reader.next_line(), if !stdout_done => {
+            res = crate::transcribe::next_line_lossy(&mut stdout_reader), if !stdout_done => {
                 match res {
-                    Ok(Some(line)) => {
+                    Some(line) => {
                         let trimmed = line.trim();
                         if let Some((k, v)) = trimmed.split_once('=') {
                             let k = k.trim();
@@ -1528,15 +1528,15 @@ pub async fn run_hardsub_task(
                             }
                         }
                     }
-                    _ => stdout_done = true,
+                    None => stdout_done = true,
                 }
             }
-            res = stderr_reader.next_line(), if !stderr_done => {
+            res = crate::transcribe::next_line_lossy(&mut stderr_reader), if !stderr_done => {
                 match res {
-                    Ok(Some(line)) => {
+                    Some(line) => {
                         logs.log(&app, "FFmpeg", &line);
                     }
-                    _ => stderr_done = true,
+                    None => stderr_done = true,
                 }
             }
         }

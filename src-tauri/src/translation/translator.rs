@@ -583,7 +583,7 @@ fn percent_encode(value: &str) -> String {
 ///    (e.g. Persian/Arabic text with isolated byte corruption), lossy decode
 ///    preserves the text instead of ruining the entire file into Windows-1252 mojibake.
 /// 4. Windows-1252 / Latin-1 decode for genuine legacy European subtitles.
-fn read_subtitle_string(path: &Path) -> Result<String, String> {
+pub(crate) fn read_subtitle_string(path: &Path) -> Result<String, String> {
     let bytes = fs::read(path)
         .map_err(|e| format!("Failed to read source file '{}': {}", path.display(), e))?;
     // 1. Fast path: valid UTF-8

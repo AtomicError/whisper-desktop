@@ -88,8 +88,13 @@ fn check_build(app: AppHandle, backend: String) -> bool {
 }
 
 #[tauri::command]
-fn probe_media_file(app: AppHandle, file_path: String) -> FileMetadata {
-    probe_file_metadata(Some(&app), &file_path)
+async fn probe_media_file(app: AppHandle, file_path: String) -> Result<FileMetadata, String> {
+    let app = app.clone();
+    let file_path = file_path.clone();
+    // ffprobe can hang indefinitely on network mounts / stalled devices; bound it.
+    tokio::task::spawn_blocking(move || probe_file_metadata(Some(&app), &file_path))
+        .await
+        .map_err(|e| format!("Metadata probe failed: {e}"))
 }
 
 #[derive(serde::Serialize)]
@@ -164,8 +169,9 @@ async fn cancel_transcription(session_state: State<'_, TranscriptionState>) -> R
 
         #[cfg(unix)]
         {
+            // Terminate the process group (-PID) and individual PID using POSIX '--' argument separator
             let _ = tokio::process::Command::new("kill")
-                .args(["-TERM", &pid.to_string()])
+                .args(["-TERM", "--", &format!("-{}", pid), &pid.to_string()])
                 .status()
                 .await;
         }
@@ -194,16 +200,36 @@ async fn cancel_transcription(session_state: State<'_, TranscriptionState>) -> R
         }
 
         if !session_ended {
+            // The child may have exited during the grace window and its PID been
+            // recycled by an unrelated process. Only hard-kill if the process
+            // still exists AND still belongs to our session (phase not Idle).
+            let pid_still_ours = if let Ok(lock) = session_state.0.lock() {
+                lock.phase != SessionPhase::Idle && lock.child_pid == Some(pid)
+            } else {
+                false
+            };
+
             #[cfg(unix)]
-            {
+            let process_alive = {
+                // kill -0 is POSIX-compliant across Linux, macOS, and BSD
+                tokio::process::Command::new("kill")
+                    .args(["-0", &pid.to_string()])
+                    .status()
+                    .await
+                    .map(|s| s.success())
+                    .unwrap_or(false)
+            };
+
+            #[cfg(unix)]
+            if pid_still_ours && process_alive {
                 let _ = tokio::process::Command::new("kill")
-                    .args(["-KILL", &pid.to_string()])
+                    .args(["-KILL", "--", &format!("-{}", pid), &pid.to_string()])
                     .status()
                     .await;
             }
 
             #[cfg(windows)]
-            {
+            if pid_still_ours {
                 let _ = tokio::process::Command::new("taskkill")
                     .args(["/F", "/T", "/PID", &pid.to_string()])
                     .status()
@@ -448,7 +474,22 @@ fn write_text_file_content(file_path: String, content: String) -> Result<(), Str
     if !allowed_exts.contains(&ext) {
         return Err("File type not allowed for writing".into());
     }
-    std::fs::write(path, content).map_err(|e| e.to_string())
+    // Atomic write: stage into a sibling .tmp file then rename over the target,
+    // so a crash or disk-full mid-write cannot truncate the user's transcript.
+    let tmp_path = path.with_file_name({
+        let mut name = path.file_name().unwrap_or_default().to_os_string();
+        name.push(format!(".tmp.{}", std::process::id()));
+        name
+    });
+    std::fs::write(&tmp_path, content)
+        .map_err(|e| format!("Failed to write temp file {}: {}", tmp_path.display(), e))?;
+    match std::fs::rename(&tmp_path, path) {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            let _ = std::fs::remove_file(&tmp_path);
+            Err(format!("Failed to save file {}: {}", path.display(), e))
+        }
+    }
 }
 
 #[tauri::command]

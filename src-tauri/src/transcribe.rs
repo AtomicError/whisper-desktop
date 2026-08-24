@@ -1,6 +1,6 @@
 use std::path::Path;
 use std::process::Stdio;
-use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncBufRead, BufReader};
 use tokio::process::Command;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
@@ -48,6 +48,7 @@ pub struct TranscriptionResult {
     pub duration_ms: u64,
     pub speed_factor: f64,
     pub generated_files: Vec<String>,
+    pub output_dir: String,
 }
 
 pub fn probe_file_metadata(app: Option<&AppHandle>, file_path: &str) -> FileMetadata {
@@ -226,16 +227,16 @@ pub async fn convert_to_wav(
     
     while !stdout_done || !stderr_done {
         tokio::select! {
-            res = stdout_reader.next_line(), if !stdout_done => {
+            res = next_line_lossy(&mut stdout_reader), if !stdout_done => {
                 match res {
-                    Ok(Some(l)) => { logs.log(&app, "FFmpeg", &l); }
-                    _ => stdout_done = true,
+                    Some(l) => { logs.log(&app, "FFmpeg", &l); }
+                    None => stdout_done = true,
                 }
             }
-            res = stderr_reader.next_line(), if !stderr_done => {
+            res = next_line_lossy(&mut stderr_reader), if !stderr_done => {
                 match res {
-                    Ok(Some(l)) => { logs.log(&app, "FFmpeg", &l); }
-                    _ => stderr_done = true,
+                    Some(l) => { logs.log(&app, "FFmpeg", &l); }
+                    None => stderr_done = true,
                 }
             }
         }
@@ -409,11 +410,11 @@ pub async fn run_transcription(
         let name_str = out_name.file_name()
             .map(|f| f.to_string_lossy().into_owned())
             .unwrap_or_default();
-            
-        parent_dir.join(format!("{}.srt", name_str)).exists()
-            || parent_dir.join(format!("{}.txt", name_str)).exists()
+
+        out_dir.join(format!("{}.srt", name_str)).exists()
+            || out_dir.join(format!("{}.txt", name_str)).exists()
     } {
-        out_name = parent_dir.join(format!("{}-{}", base_name, counter));
+        out_name = out_dir.join(format!("{}-{}", base_name, counter));
         counter += 1;
     }
     
@@ -623,9 +624,9 @@ pub async fn run_transcription(
 
     while !stdout_done || !stderr_done {
         tokio::select! {
-            res = stdout_reader.next_line(), if !stdout_done => {
+            res = next_line_lossy(&mut stdout_reader), if !stdout_done => {
                 match res {
-                    Ok(Some(l)) => {
+                    Some(l) => {
                         logs.log(&app, "Whisper", &l);
                         
                         // Parse timestamp to calculate progress
@@ -650,9 +651,9 @@ pub async fn run_transcription(
                     _ => stdout_done = true,
                 }
             }
-            res = stderr_reader.next_line(), if !stderr_done => {
+            res = next_line_lossy(&mut stderr_reader), if !stderr_done => {
                 match res {
-                    Ok(Some(l)) => {
+                    Some(l) => {
                         logs.log(&app, "Whisper", &l);
                         if let Some(caps) = whisper_duration_regex.captures(&l) {
                             if let Some(sec_str) = caps.get(1) {
@@ -662,7 +663,7 @@ pub async fn run_transcription(
                             }
                         }
                     }
-                    _ => stderr_done = true,
+                    None => stderr_done = true,
                 }
             }
         }
@@ -750,6 +751,7 @@ pub async fn run_transcription(
         duration_ms: elapsed,
         speed_factor,
         generated_files,
+        output_dir: out_dir.to_string_lossy().to_string(),
     })
 }
 
@@ -759,8 +761,7 @@ pub fn read_text_file(file_path: String) -> Result<String, String> {
     if !path.exists() {
         return Err("File does not exist".to_string());
     }
-    fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read file: {}", e))
+    crate::translation::translator::read_subtitle_string(path)
 }
 
 fn dtw_token_for_model(model_path: &str) -> Option<&'static str> {
@@ -790,3 +791,19 @@ fn dtw_token_for_model(model_path: &str) -> Option<&'static str> {
     }
 }
 
+
+/// Reads one line from a child-process pipe, lossily decoding non-UTF-8 bytes
+/// instead of erroring. A hard UTF-8 error here would abandon the pipe mid-run;
+/// the child keeps writing, the pipe fills, and `child.wait()` deadlocks forever.
+pub(crate) async fn next_line_lossy<R: AsyncBufRead + Unpin>(
+    reader: &mut tokio::io::Lines<R>,
+) -> Option<String> {
+    match reader.next_line().await {
+        Ok(line) => line,
+        Err(e) if e.kind() == std::io::ErrorKind::InvalidData => {
+            // Invalid UTF-8: drop the partial buffer and keep draining.
+            Some(String::from("<non-utf-8 output skipped>"))
+        }
+        Err(_) => None,
+    }
+}
