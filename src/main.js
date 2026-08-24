@@ -4323,23 +4323,137 @@ window.toEnglishDigits = function(str) {
   return str.replace(/[۰-۹]/g, d => persianMap[d] || d).replace(/[٠-٩]/g, d => arabicMap[d] || d);
 };
 
+window.formatTokensShort = function(num) {
+  const n = parseInt(num, 10);
+  if (isNaN(n) || n <= 0) return '0';
+  
+  // Exact standard model context presets
+  if (n === 2097152 || n === 2000000) return '2M';
+  if (n === 1048576 || n === 1000000) return '1M';
+  if (n === 524288 || n === 512000) return '512K';
+  if (n === 262144 || n === 256000) return '256K';
+  if (n === 131072 || n === 128000) return '128K';
+  if (n === 65536 || n === 64000) return '64K';
+  if (n === 32768 || n === 32000) return '32K';
+  if (n === 16384 || n === 16000) return '16K';
+  if (n === 8192 || n === 8000) return '8K';
+  if (n === 4096 || n === 4000) return '4K';
+  
+  if (n >= 1000000) {
+    if (n % 1000000 === 0) {
+      return (n / 1000000) + 'M';
+    }
+    if (n % 1048576 === 0) {
+      return (n / 1048576) + 'M';
+    }
+    const val = n / 1000000;
+    return (val % 1 === 0 ? val.toFixed(0) : val.toFixed(1).replace(/\.0$/, '')) + 'M';
+  }
+  
+  if (n >= 1000) {
+    if (n % 1000 === 0) {
+      return (n / 1000) + 'K';
+    }
+    if (n % 1024 === 0) {
+      return (n / 1024) + 'K';
+    }
+    const val = n / 1000;
+    return (val % 1 === 0 ? val.toFixed(0) : val.toFixed(1).replace(/\.0$/, '')) + 'K';
+  }
+  return n.toLocaleString();
+};
+
+window.parseTokensInput = function(val) {
+  if (typeof val === 'number') {
+    return !isNaN(val) && val > 0 ? Math.round(val) : 200000;
+  }
+  if (!val) return 200000;
+  const str = toEnglishDigits(String(val).trim().toUpperCase());
+  if (str.endsWith('M')) {
+    const num = parseFloat(str.slice(0, -1));
+    return isNaN(num) || num <= 0 ? 1000000 : Math.round(num * 1000000);
+  }
+  if (str.endsWith('K')) {
+    const num = parseFloat(str.slice(0, -1));
+    return isNaN(num) || num <= 0 ? 128000 : Math.round(num * 1000);
+  }
+  const num = parseInt(str.replace(/[^0-9]/g, ''), 10);
+  return isNaN(num) || num <= 0 ? 200000 : num;
+};
+
+function destroyModelRowCustomSelects(parentEl) {
+  if (!parentEl) return;
+  const selects = parentEl.querySelectorAll('select.model-reasoning-select');
+  selects.forEach(sel => {
+    const inst = window.customSelectsMap ? (window.customSelectsMap.get(sel.id) || window.customSelectsMap.get(sel)) : null;
+    if (inst && typeof inst.destroy === 'function') {
+      inst.destroy();
+    }
+  });
+}
+
+window.updateFilterCountsFromDOM = function() {
+  const rows = document.querySelectorAll('#mgr-models-tbody .model-data-row');
+  let totalCount = 0;
+  let freeCount = 0;
+  let reasoningCount = 0;
+
+  rows.forEach(r => {
+    const idInput = r.querySelector('.model-id-input');
+    if (!idInput) return;
+    const modelId = (idInput.value || '').trim().toLowerCase();
+    if (!modelId) return;
+    totalCount++;
+    if (modelId.includes('free')) freeCount++;
+    const reasoning = r.dataset.reasoning || 'None';
+    if (reasoning !== 'None') reasoningCount++;
+  });
+
+  const countBadge = document.getElementById('provider-models-count');
+  if (countBadge) countBadge.textContent = totalCount;
+  
+  const elAll = document.getElementById('filter-count-all');
+  const elFree = document.getElementById('filter-count-free');
+  const elReasoning = document.getElementById('filter-count-reasoning');
+  if (elAll) elAll.textContent = totalCount;
+  if (elFree) elFree.textContent = freeCount;
+  if (elReasoning) elReasoning.textContent = reasoningCount;
+};
+
+window.clearModelsSearch = function() {
+  const searchInput = document.getElementById('mgr-models-search');
+  const clearBtn = document.getElementById('mgr-models-search-clear');
+  if (searchInput) searchInput.value = '';
+  if (clearBtn) clearBtn.style.display = 'none';
+  window.filterModelsStatus('all', 0);
+  if (searchInput) searchInput.focus();
+};
+
 window.renderModelsRegistryTable = function(provider) {
   const tbody = document.getElementById('mgr-models-tbody');
   if (!tbody) return;
+  
+  destroyModelRowCustomSelects(tbody);
   tbody.innerHTML = '';
   
   const models = provider.models || [];
-  document.getElementById('provider-models-count').textContent = models.length;
+  const totalCount = models.length;
+  const freeCount = models.filter(m => (m.id || '').toLowerCase().includes('free')).length;
+  const reasoningCount = models.filter(m => m.reasoning && m.reasoning !== 'None').length;
+
+  const countBadge = document.getElementById('provider-models-count');
+  if (countBadge) countBadge.textContent = totalCount;
   
-  // Sort: active model first, then the rest
+  const elAll = document.getElementById('filter-count-all');
+  const elFree = document.getElementById('filter-count-free');
+  const elReasoning = document.getElementById('filter-count-reasoning');
+  if (elAll) elAll.textContent = totalCount;
+  if (elFree) elFree.textContent = freeCount;
+  if (elReasoning) elReasoning.textContent = reasoningCount;
+  
   const activeModelId = settingsState.translateAiModel;
-  const sortedModels = [...models].sort((a, b) => {
-    if (a.id === activeModelId) return -1;
-    if (b.id === activeModelId) return 1;
-    return 0;
-  });
   
-  sortedModels.forEach(m => {
+  models.forEach(m => {
     const isModelActive = m.id === activeModelId;
     addManualModelRow(
       m.id || '',
@@ -4348,61 +4462,75 @@ window.renderModelsRegistryTable = function(provider) {
       isModelActive
     );
   });
+
+  filterModelsTable(0);
 };
+
+let modelSaveDebounceTimer = null;
 
 window.addManualModelRow = function(modelId = "", contextWindow = 200000, reasoning = "None", isActive = false, focus = false) {
   const tbody = document.getElementById('mgr-models-tbody');
   if (!tbody) return;
   
-  const tr = document.createElement('tr');
-  tr.style.borderBottom = '1px solid rgba(255, 255, 255, 0.04)';
-  tr.dataset.modelId = modelId.toLowerCase();
-  tr.dataset.reasoning = reasoning;
-  if (isActive) {
-    tr.classList.add('active-model-row');
-  }
+  const row = document.createElement('div');
+  row.className = `model-data-row${isActive ? ' active-model-row' : ''}${focus ? ' row-anim-enter' : ''}`;
+  row.dataset.modelId = modelId.trim().toLowerCase();
+  row.dataset.reasoning = reasoning;
   
-  tr.innerHTML = `
-    <td style="width: 15%; text-align: center;">
-      <label class="radio-container">
+  const isFree = modelId.toLowerCase().includes('free');
+  const formattedCtx = window.formatTokensShort(contextWindow);
+
+  row.innerHTML = `
+    <div class="td-cell td-active">
+      <label class="radio-container" title="${isActive ? 'Active Model' : 'Set as Active Model'}">
         <input type="radio" name="mgr-active-model" class="model-active-radio" ${isActive ? 'checked' : ''} />
         <span class="custom-radio"></span>
       </label>
-    </td>
-    <td style="width: 40%;"><input type="text" class="model-row-input model-id-input" value="${escapeHTML(modelId)}" placeholder="e.g. gpt-4o-mini" /></td>
-    <td style="width: 20%;"><input type="text" inputmode="numeric" class="model-row-input model-ctx-input" value="${contextWindow}" /></td>
-    <td style="width: 15%;">
+    </div>
+    <div class="td-cell td-id">
+      <input type="text" class="model-cell-input model-id-input" value="${escapeHTML(modelId)}" placeholder="e.g. gpt-4o-mini" title="${escapeHTML(modelId || 'Model Identifier')}" />
+      ${isFree ? '<span class="model-tag-free">FREE</span>' : ''}
+    </div>
+    <div class="td-cell td-ctx">
+      <input type="text" class="model-cell-input model-ctx-input" value="${formattedCtx}" data-raw-tokens="${contextWindow}" placeholder="128K" title="Context tokens: ${formattedCtx} (${Number(contextWindow).toLocaleString()})" />
+    </div>
+    <div class="td-cell td-reasoning">
       <select class="select-control model-reasoning-select">
         <option value="None" ${reasoning === 'None' ? 'selected' : ''}>None</option>
         <option value="Low" ${reasoning === 'Low' ? 'selected' : ''}>Low</option>
         <option value="Medium" ${reasoning === 'Medium' ? 'selected' : ''}>Medium</option>
         <option value="High" ${reasoning === 'High' ? 'selected' : ''}>High</option>
       </select>
-    </td>
-    <td style="width: 10%; text-align: center;">
-      <button class="model-btn-trash" title="Remove Model Row">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+    </div>
+    <div class="td-cell td-action">
+      <button type="button" class="model-btn-trash" title="Remove Model Row">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <line x1="18" y1="6" x2="6" y2="18"/>
           <line x1="6" y1="6" x2="18" y2="18"/>
         </svg>
       </button>
-    </td>
+    </div>
   `;
   if (focus) {
-    tbody.insertBefore(tr, tbody.firstChild);
+    tbody.insertBefore(row, tbody.firstChild);
   } else {
-    tbody.appendChild(tr);
+    tbody.appendChild(row);
   }
 
-  const idInput = tr.querySelector('.model-id-input');
-  const ctxInput = tr.querySelector('.model-ctx-input');
-  const reasoningSelect = tr.querySelector('.model-reasoning-select');
+  const idInput = row.querySelector('.model-id-input');
+  const idCell = row.querySelector('.td-id');
+  const ctxInput = row.querySelector('.model-ctx-input');
+  const reasoningSelect = row.querySelector('.model-reasoning-select');
   new CustomSelect(reasoningSelect);
-  const activeRadio = tr.querySelector('.model-active-radio');
-  const trashBtn = tr.querySelector('.model-btn-trash');
+  const activeRadio = row.querySelector('.model-active-radio');
+  const trashBtn = row.querySelector('.model-btn-trash');
   
-  const triggerAutoSave = () => {
-    saveActiveProviderModels(true, true);
+  const updateStatsAndSave = () => {
+    updateFilterCountsFromDOM();
+    clearTimeout(modelSaveDebounceTimer);
+    modelSaveDebounceTimer = setTimeout(() => {
+      saveActiveProviderModels(true, true);
+    }, 150);
   };
   
   const updateReasoningStyle = () => {
@@ -4416,34 +4544,83 @@ window.addManualModelRow = function(modelId = "", contextWindow = 200000, reason
     }
   };
   
+  idInput.addEventListener('input', () => {
+    const val = idInput.value.trim();
+    row.dataset.modelId = val.toLowerCase();
+    idInput.title = val || "Model Identifier";
+    
+    let freeTag = idCell.querySelector('.model-tag-free');
+    if (val.toLowerCase().includes('free')) {
+      if (!freeTag) {
+        freeTag = document.createElement('span');
+        freeTag.className = 'model-tag-free';
+        freeTag.textContent = 'FREE';
+        idCell.appendChild(freeTag);
+      }
+    } else {
+      if (freeTag) freeTag.remove();
+    }
+    updateFilterCountsFromDOM();
+  });
+
   idInput.addEventListener('change', () => {
-    tr.dataset.modelId = idInput.value.toLowerCase();
-    triggerAutoSave();
+    const val = idInput.value.trim();
+    row.dataset.modelId = val.toLowerCase();
+    idInput.title = val || "Model Identifier";
+    updateStatsAndSave();
   });
   
-  ctxInput.addEventListener('input', () => {
-    let cleanVal = toEnglishDigits(ctxInput.value).replace(/[^0-9]/g, '');
-    ctxInput.value = cleanVal;
+  ctxInput.addEventListener('change', () => {
+    const rawTokens = window.parseTokensInput(ctxInput.value);
+    ctxInput.dataset.rawTokens = rawTokens;
+    const formatted = window.formatTokensShort(rawTokens);
+    ctxInput.value = formatted;
+    ctxInput.title = `Context tokens: ${formatted} (${Number(rawTokens).toLocaleString()})`;
+    updateStatsAndSave();
   });
-  ctxInput.addEventListener('change', triggerAutoSave);
+
+  // Smooth keyboard navigation across rows
+  const handleKeyNavigation = (e) => {
+    if (e.key === 'ArrowDown') {
+      let next = row.nextElementSibling;
+      while (next && (next.style.display === 'none' || !next.classList.contains('model-data-row'))) {
+        next = next.nextElementSibling;
+      }
+      if (next) {
+        e.preventDefault();
+        const targetInput = next.querySelector(e.target.classList.contains('model-ctx-input') ? '.model-ctx-input' : '.model-id-input');
+        if (targetInput) targetInput.focus();
+      }
+    } else if (e.key === 'ArrowUp') {
+      let prev = row.previousElementSibling;
+      while (prev && (prev.style.display === 'none' || !prev.classList.contains('model-data-row'))) {
+        prev = prev.previousElementSibling;
+      }
+      if (prev) {
+        e.preventDefault();
+        const targetInput = prev.querySelector(e.target.classList.contains('model-ctx-input') ? '.model-ctx-input' : '.model-id-input');
+        if (targetInput) targetInput.focus();
+      }
+    }
+  };
+
+  idInput.addEventListener('keydown', handleKeyNavigation);
+  ctxInput.addEventListener('keydown', handleKeyNavigation);
   
   reasoningSelect.addEventListener('change', () => {
-    tr.dataset.reasoning = reasoningSelect.value;
+    row.dataset.reasoning = reasoningSelect.value;
     updateReasoningStyle();
-    triggerAutoSave();
+    updateStatsAndSave();
   });
   
   updateReasoningStyle();
   
   activeRadio.addEventListener('change', () => {
-    const siblingRows = tbody.querySelectorAll('tr');
+    const siblingRows = tbody.querySelectorAll('.model-data-row');
     siblingRows.forEach(r => r.classList.remove('active-model-row'));
-    tr.classList.add('active-model-row');
+    row.classList.add('active-model-row');
     
-    // Move this row to the very top of tbody immediately
-    tbody.insertBefore(tr, tbody.firstChild);
-    
-    triggerAutoSave();
+    updateStatsAndSave();
   });
   
   trashBtn.addEventListener('click', () => {
@@ -4451,8 +4628,10 @@ window.addManualModelRow = function(modelId = "", contextWindow = 200000, reason
       showNotification("The active model row cannot be deleted. Please set another model as active first.", "info");
       return;
     }
-    tr.remove();
-    triggerAutoSave();
+    destroyModelRowCustomSelects(row);
+    row.remove();
+    updateStatsAndSave();
+    filterModelsTable(0);
   });
 
   if (focus) {
@@ -4490,7 +4669,13 @@ window.fetchActiveProviderModels = async function() {
   
   const btn = document.getElementById('mgr-btn-fetch-models');
   btn.disabled = true;
-  btn.textContent = 'Fetching...';
+  const originalHtml = btn.innerHTML;
+  btn.innerHTML = `
+    <svg class="btn-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation: spin 1s linear infinite;">
+      <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+    </svg>
+    <span>Fetching...</span>
+  `;
   
   if ((!apiKey || apiKey === '••••••••••••••••') && (provider.useKeyring || provider.apiKey === '__KEYRING__' || provider.api_key === '__KEYRING__')) {
     try {
@@ -4501,6 +4686,7 @@ window.fetchActiveProviderModels = async function() {
   try {
     const modelsList = await invoke('fetch_provider_models', { baseUrl, apiKey, apiFormat });
     const tbody = document.getElementById('mgr-models-tbody');
+    destroyModelRowCustomSelects(tbody);
     tbody.innerHTML = '';
     
     const currentActive = settingsState.translateAiModel;
@@ -4520,7 +4706,7 @@ window.fetchActiveProviderModels = async function() {
     showNotification("Failed to fetch models: " + e, "error");
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Fetch Models';
+    btn.innerHTML = originalHtml;
   }
 };
 
@@ -4541,7 +4727,7 @@ window.saveActiveProviderModels = async function(keepCurrentTab = false, skipTab
   
   const provider = providers[providerIdx];
   const models = [];
-  const rows = document.querySelectorAll('#mgr-models-tbody tr');
+  const rows = document.querySelectorAll('#mgr-models-tbody .model-data-row');
   let activeModelId = '';
   
   rows.forEach(row => {
@@ -4552,7 +4738,7 @@ window.saveActiveProviderModels = async function(keepCurrentTab = false, skipTab
     if (!idInput) return;
     
     const modelId = idInput.value.trim();
-    const contextWindow = parseInt(ctxInput.value) || 200000;
+    const contextWindow = window.parseTokensInput(ctxInput.dataset.rawTokens || ctxInput.value);
     const reasoning = reasoningSelect.value;
     
     if (modelId) {
@@ -4612,22 +4798,24 @@ let filterTimeout;
 window.filterModelsTable = function(delay = 150) {
   clearTimeout(filterTimeout);
   filterTimeout = setTimeout(() => {
-    const query = document.getElementById('mgr-models-search').value.toLowerCase();
-    const rows = document.querySelectorAll('#mgr-models-tbody tr');
+    const searchEl = document.getElementById('mgr-models-search');
+    const query = searchEl ? searchEl.value.trim().toLowerCase() : '';
+    const clearBtn = document.getElementById('mgr-models-search-clear');
+    if (clearBtn) {
+      clearBtn.style.display = query ? 'flex' : 'none';
+    }
+
+    const rows = document.querySelectorAll('#mgr-models-tbody .model-data-row');
+    let visibleCount = 0;
+    const totalRows = rows.length;
     
     rows.forEach(row => {
-      // Active model row is ALWAYS shown, regardless of query or status filter!
-      if (row.classList.contains('active-model-row')) {
-        row.style.display = '';
-        return;
-      }
-      
       const modelId = row.dataset.modelId || '';
       const isFree = modelId.includes('free');
       const reasoning = row.dataset.reasoning || 'None';
       const hasReasoning = reasoning !== 'None';
       
-      const matchQuery = modelId.includes(query);
+      const matchQuery = !query || modelId.includes(query);
       let matchStatus = true;
       
       if (currentModelStatusFilter === 'free') {
@@ -4638,10 +4826,51 @@ window.filterModelsTable = function(delay = 150) {
       
       if (matchQuery && matchStatus) {
         row.style.display = '';
+        visibleCount++;
       } else {
         row.style.display = 'none';
       }
     });
+
+    const showingCountEl = document.getElementById('models-showing-count');
+    if (showingCountEl) {
+      if (totalRows === 0) {
+        showingCountEl.textContent = '0 models';
+      } else if (query || currentModelStatusFilter !== 'all') {
+        showingCountEl.textContent = `Showing ${visibleCount} of ${totalRows} models`;
+      } else {
+        showingCountEl.textContent = `Showing all ${totalRows} models`;
+      }
+    }
+
+    const emptyState = document.getElementById('mgr-models-empty-state');
+    const emptyTitle = emptyState ? emptyState.querySelector('.models-empty-title') : null;
+    const emptyDesc = emptyState ? emptyState.querySelector('.models-empty-desc') : null;
+    const emptyResetBtn = document.getElementById('mgr-models-empty-reset-btn');
+    const headEl = document.querySelector('.models-table-head');
+    const bodyEl = document.querySelector('.models-table-body');
+
+    if (emptyState) {
+      if (totalRows === 0) {
+        emptyState.style.display = 'flex';
+        if (emptyTitle) emptyTitle.textContent = 'No Models Configured';
+        if (emptyDesc) emptyDesc.textContent = 'This provider has no models yet. Click "Fetch Models" or "Add Custom Model" to configure.';
+        if (emptyResetBtn) emptyResetBtn.style.display = 'none';
+        if (headEl) headEl.style.display = 'none';
+        if (bodyEl) bodyEl.style.display = 'none';
+      } else if (visibleCount === 0) {
+        emptyState.style.display = 'flex';
+        if (emptyTitle) emptyTitle.textContent = 'No Matching Models Found';
+        if (emptyDesc) emptyDesc.textContent = 'No models match your current filter or search keyword.';
+        if (emptyResetBtn) emptyResetBtn.style.display = 'inline-flex';
+        if (headEl) headEl.style.display = 'none';
+        if (bodyEl) bodyEl.style.display = 'none';
+      } else {
+        emptyState.style.display = 'none';
+        if (headEl) headEl.style.display = 'grid';
+        if (bodyEl) bodyEl.style.display = 'block';
+      }
+    }
   }, delay);
 };
 
@@ -4660,7 +4889,7 @@ window.filterModelsStatus = function(status, delay = 150) {
     }
   });
   
-  const container = document.querySelector('#provider-tab-models .providers-table-wrapper');
+  const container = document.getElementById('mgr-models-tbody');
   if (container) {
     container.scrollTop = 0;
   }
@@ -4778,7 +5007,13 @@ window.setupTranslationEventListeners = function() {
   const addCustomModelBtn = document.getElementById('mgr-btn-add-custom-model');
   if (addCustomModelBtn) {
     addCustomModelBtn.addEventListener('click', () => {
+      const searchInput = document.getElementById('mgr-models-search');
+      if (searchInput && searchInput.value) {
+        window.clearModelsSearch();
+      }
       window.addManualModelRow("", 200000, "None", false, true);
+      const container = document.getElementById('mgr-models-tbody');
+      if (container) container.scrollTop = 0;
     });
   }
 };

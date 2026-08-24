@@ -3427,6 +3427,7 @@ select.select-control {
 
 .providers-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-family: var(--font-sans);
   font-size: 0.85rem;
@@ -3682,26 +3683,223 @@ select.select-control {
   background: rgba(239, 68, 68, 0.1) !important;
 }
 
-.provider-grid-two-search {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 16px;
-  margin-bottom: 12px;
+/* Models Tab Modern Toolbar & Search */
+.models-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.models-search-wrapper {
+  position: relative;
+  flex: 1 1 260px;
+  min-width: 200px;
+  display: flex;
   align-items: center;
 }
 
-.provider-actions-row {
-  display: flex;
-  gap: 8px;
+.models-search-icon {
+  position: absolute;
+  left: 12px;
+  width: 16px;
+  height: 16px;
+  color: var(--color-text-dim);
+  pointer-events: none;
+  transition: color 0.2s ease;
 }
 
-.provider-filter-bar {
+.models-search-wrapper:focus-within .models-search-icon {
+  color: var(--color-royal-blue);
+}
+
+.models-search-input {
+  padding-left: 38px !important;
+  padding-right: 36px !important;
+  width: 100% !important;
+  height: 40px !important;
+  background: var(--bg-input) !important;
+  border: 1px solid var(--border-glass) !important;
+  border-radius: 8px !important;
+  font-size: 0.85rem !important;
+  color: #fff !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.models-search-input:focus {
+  border-color: var(--color-royal-blue) !important;
+  box-shadow: 0 0 12px rgba(45, 127, 255, 0.2) !important;
+  outline: none !important;
+}
+
+.models-search-clear {
+  position: absolute;
+  right: 10px;
+  background: transparent;
+  border: none;
+  color: var(--color-text-dim);
+  cursor: pointer;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  padding: 0;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.models-search-clear svg {
+  width: 14px;
+  height: 14px;
+}
+
+.models-search-clear:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.models-actions-group {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.btn-model-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.84rem;
+  font-weight: 500;
+  padding: 9px 14px;
+  border-radius: 8px;
+  height: 40px;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-glass);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.btn-model-action:hover {
+  background: rgba(45, 127, 255, 0.1);
+  border-color: rgba(45, 127, 255, 0.35);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2), 0 0 8px rgba(45, 127, 255, 0.2);
+}
+
+.btn-model-action:active {
+  transform: translateY(0);
+}
+
+.btn-model-action svg.btn-action-icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  transition: transform 0.25s ease;
+}
+
+.btn-model-action:hover svg.btn-action-icon {
+  color: var(--color-royal-blue);
+  transform: scale(1.1);
+}
+
+/* Models Filter & Stats Header Bar */
+.models-header-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
   flex-wrap: wrap;
   gap: 12px;
+}
+
+.models-filter-pills {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.btn-filter {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 5px 14px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  outline: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-filter:hover {
+  border-color: rgba(45, 127, 255, 0.35);
+  color: #ffffff;
+  background: rgba(45, 127, 255, 0.08);
+}
+
+.btn-filter.active {
+  background: rgba(45, 127, 255, 0.15);
+  border-color: #2d7fff;
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(45, 127, 255, 0.25);
+  font-weight: 600;
+}
+
+.filter-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-text-muted);
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.btn-filter.active .filter-badge {
+  background: rgba(45, 127, 255, 0.35);
+  color: #ffffff;
+}
+
+.filter-dot-free {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--color-green);
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+  display: inline-block;
+}
+
+.filter-dot-reasoning {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #a855f7;
+  box-shadow: 0 0 6px rgba(168, 85, 247, 0.6);
+  display: inline-block;
+}
+
+.models-stats-info {
+  font-size: 0.8rem;
+  color: var(--color-text-dim);
+  font-weight: 500;
+  letter-spacing: 0.02em;
 }
 
 .provider-field span {
@@ -4013,14 +4211,6 @@ select.select-control {
   transform: scale(1);
 }
 
-.active-model-row {
-  background: rgba(45, 127, 255, 0.03) !important;
-}
-
-.active-model-row td {
-  border-bottom-color: rgba(45, 127, 255, 0.12) !important;
-}
-
 /* Active Model status Banner */
 .active-model-banner {
   background: linear-gradient(90deg, rgba(45, 127, 255, 0.07) 0%, rgba(0, 87, 219, 0.02) 100%);
@@ -4127,6 +4317,11 @@ select.select-control {
   }
 }
 
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 /* Unify Input Heights, Paddings, and Roundness in General Config Card */
 .provider-manager-card .text-input,
 .provider-manager-card .select-control,
@@ -4145,57 +4340,231 @@ select.select-control {
   padding-right: 36px !important;
 }
 
-/* Modern Plain Text Inputs with Inline Editing (Hover/Focus reveal border) */
-.providers-table .model-row-input {
-  height: 28px !important;
-  padding: 4px 6px !important;
-  border-radius: 4px !important;
-  font-size: 0.83rem !important;
-  background-color: transparent !important;
-  border: 1px solid transparent !important;
-  box-shadow: none !important;
-  box-sizing: border-box !important;
-  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease !important;
+/* ==========================================================================
+   Modern CSS Grid Models Data Table (Strict Alignment & High Contrast)
+   ========================================================================== */
+
+.models-data-table {
+  border: 1px solid var(--border-glass);
+  border-radius: 10px;
+  background: rgba(9, 12, 24, 0.6);
+  backdrop-filter: blur(16px);
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-height: 480px;
+  display: flex;
+  flex-direction: column;
 }
 
-.providers-table .model-row-input:hover,
-.providers-table .model-row-input:focus {
-  background-color: var(--bg-input) !important;
-  border: 1px solid var(--border-glass) !important;
-  box-shadow: 0 0 8px rgba(45, 127, 255, 0.15) !important;
+.models-table-head {
+  display: grid;
+  grid-template-columns: 38px minmax(180px, 1fr) 130px 130px 38px;
+  column-gap: 14px;
+  align-items: center;
+  padding: 11px 16px;
+  background: #0d1021;
+  border-bottom: 1px solid var(--border-glass);
+  user-select: none;
+  flex-shrink: 0;
+  min-width: 520px;
 }
 
-/* Typography Hierarchy (Model ID: bright/bold, Context Window: muted/mono) */
-.providers-table .model-id-input {
+.models-table-head .th-cell {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.models-table-head .th-active,
+.models-table-head .th-ctx,
+.models-table-head .th-action {
+  text-align: center;
+}
+
+.models-table-body {
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-width: 520px;
+}
+
+.model-data-row {
+  display: grid;
+  grid-template-columns: 38px minmax(180px, 1fr) 130px 130px 38px;
+  column-gap: 14px;
+  align-items: center;
+  padding: 7px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  transition: background-color 0.15s ease;
+}
+
+.model-data-row.row-anim-enter {
+  animation: modelRowEnter 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes modelRowEnter {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.model-data-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.model-data-row.active-model-row {
+  background: linear-gradient(90deg, rgba(45, 127, 255, 0.1) 0%, rgba(45, 127, 255, 0.02) 100%);
+  border-left: 3px solid #2d7fff;
+  padding-left: 13px; /* compensate for 3px left border */
+}
+
+/* Cell Layouts */
+.td-cell {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.td-active {
+  justify-content: center;
+}
+
+.td-action {
+  justify-content: center;
+}
+
+.td-id {
+  gap: 8px;
+  min-width: 0;
+}
+
+.td-ctx {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.td-reasoning {
+  display: flex;
+  align-items: center;
+}
+
+/* High-Contrast, Clean Typography & Inline Inputs (No Clunky Boxes by Default) */
+.model-cell-input {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #ffffff;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 6px 8px;
+  width: 100%;
+  box-sizing: border-box;
+  outline: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  min-width: 0;
+}
+
+.model-data-row:hover .model-cell-input {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.model-cell-input:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.model-cell-input:focus {
+  background: rgba(14, 18, 38, 0.95);
+  border-color: var(--color-royal-blue);
+  box-shadow: 0 0 0 2px rgba(45, 127, 255, 0.25);
+  color: #ffffff;
+}
+
+.model-id-input {
   color: #ffffff !important;
-  font-weight: 500 !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
-.providers-table .model-ctx-input {
-  color: rgba(255, 255, 255, 0.45) !important;
+.model-ctx-input {
+  color: #ffffff !important;
   font-family: var(--font-mono) !important;
-  font-size: 0.8rem !important;
+  font-size: 0.85rem !important;
+  text-align: center !important;
 }
 
-/* Reasoning Dropdown custom-select styling */
-.providers-table select.model-reasoning-select {
-  display: none;
+/* Free Tag */
+.model-tag-free {
+  font-size: 0.66rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #10b981;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+  user-select: none;
 }
 
-.providers-table .model-reasoning-select.reasoning-none .custom-select-trigger {
-  color: rgba(255, 255, 255, 0.35) !important;
+/* Reasoning Dropdown */
+.td-reasoning .custom-select-container {
+  width: 100%;
 }
 
-.providers-table .model-reasoning-select.reasoning-active .custom-select-trigger {
-  color: var(--color-cyan) !important;
+.td-reasoning .custom-select-trigger {
+  height: 32px !important;
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 6px !important;
+  padding: 0 10px !important;
+  font-size: 0.82rem !important;
+  color: var(--color-text-muted) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  box-sizing: border-box !important;
+  transition: all 0.15s ease !important;
+}
+
+.td-reasoning .custom-select-trigger:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
+  color: #ffffff !important;
+}
+
+.td-reasoning .custom-select-container.open .custom-select-trigger,
+.td-reasoning .custom-select-trigger:focus-visible {
+  border-color: var(--color-royal-blue) !important;
+  box-shadow: 0 0 0 2px rgba(45, 127, 255, 0.25) !important;
+}
+
+.td-reasoning .model-reasoning-select.reasoning-active .custom-select-trigger {
+  color: #c084fc !important;
+  border-color: rgba(168, 85, 247, 0.35) !important;
+  background: rgba(168, 85, 247, 0.1) !important;
   font-weight: 600 !important;
 }
 
-/* Modern Delete Actions: muted gray in resting state, bright red on row hover */
+/* Trash Icon Button */
 .model-btn-trash {
   background: transparent;
-  border: 1px solid transparent;
-  color: rgba(255, 255, 255, 0.18);
+  border: none;
+  color: var(--color-text-dim);
   border-radius: 6px;
   width: 28px;
   height: 28px;
@@ -4204,17 +4573,91 @@ select.select-control {
   justify-content: center;
   cursor: pointer;
   padding: 0;
-  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  transition: color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
 }
 
-.providers-table tr:hover .model-btn-trash {
-  color: rgba(239, 68, 68, 0.5);
+.model-btn-trash svg {
+  width: 14px;
+  height: 14px;
+}
+
+.model-data-row:hover .model-btn-trash {
+  color: var(--color-text-muted);
 }
 
 .model-btn-trash:hover {
-  background: rgba(239, 68, 68, 0.15);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  color: #ef4444;
+  background: rgba(239, 68, 68, 0.15) !important;
+  color: #ef4444 !important;
+  transform: scale(1.1);
+}
+
+/* Models Empty State */
+.models-empty-state {
+  padding: 44px 20px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.models-empty-icon {
+  width: 44px;
+  height: 44px;
+  color: var(--color-text-dim);
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.models-empty-icon svg {
+  width: 36px;
+  height: 36px;
+  opacity: 0.7;
+}
+
+.models-empty-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+.models-empty-desc {
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  max-width: 340px;
+  line-height: 1.45;
+  margin-bottom: 6px;
+}
+
+/* Models Table Footer Tip */
+.models-table-footer {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.models-footer-tip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--color-text-dim);
+}
+
+.models-footer-tip svg {
+  width: 15px;
+  height: 15px;
+  color: var(--color-cyan);
+  flex-shrink: 0;
 }
 
 /* Custom Dropdown Styling */
@@ -4412,6 +4855,26 @@ select.select-control {
     flex-direction: column !important;
     align-items: flex-start !important;
     gap: 12px !important;
+  }
+  .models-toolbar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+  .models-search-wrapper {
+    width: 100% !important;
+  }
+  .models-actions-group {
+    width: 100% !important;
+  }
+  .models-actions-group .btn-model-action {
+    flex: 1 1 auto !important;
+    justify-content: center !important;
+  }
+  .models-header-bar {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
   }
 }
 
