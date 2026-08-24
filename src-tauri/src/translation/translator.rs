@@ -333,63 +333,74 @@ fn parse_translated_lines(
     map
 }
 
-/// Aligns translations to chunk entries. Only genuinely parsed lines are
-/// returned — missing entries stay missing so the caller can retry them and
-/// report them. Silently substituting the original text here masked every
-/// model failure and produced `.fa.srt` files that were never translated.
-///
-/// `allow_positional_fallback`: the 1-to-1 positional rescue for models that
-/// translate correctly but drop the numbering. GATED by the caller: it must
-/// only fire after at least one numbered-protocol round already failed,
-/// otherwise it masks protocol violations from round one — and its
 /// Strips reasoning/thought blocks emitted by reasoning models (e.g. DeepSeek-R1,
 /// QwQ, Claude thinking mode, etc.) so internal reasoning cannot be mistaken for
 /// subtitle dialogue lines or numbering.
 pub fn strip_reasoning_blocks(text: &str) -> String {
-    static THINK_RE: OnceLock<regex::Regex> = OnceLock::new();
-    let re = THINK_RE.get_or_init(|| {
-        regex::Regex::new(r"(?is)<\s*(?:think|thought|reasoning)\s*>.*?<\s*/\s*(?:think|thought|reasoning)\s*>")
+    static CLOSED_THINK_RE: OnceLock<regex::Regex> = OnceLock::new();
+    let re = CLOSED_THINK_RE.get_or_init(|| {
+        regex::Regex::new(r"(?is)<\s*(?:think|thought|reasoning)\b(?:\s+[^>]*)?>.*?</\s*(?:think|thought|reasoning)\s*>")
             .expect("valid regex")
     });
 
     let cleaned = re.replace_all(text, "");
 
-    static UNCLOSED_THINK_RE: OnceLock<regex::Regex> = OnceLock::new();
-    let unclosed = UNCLOSED_THINK_RE.get_or_init(|| {
-        regex::Regex::new(r"(?is)<\s*(?:think|thought|reasoning)\s*>.*$").expect("valid regex")
+    // Unclosed reasoning tag at the beginning of the text
+    static UNCLOSED_START_RE: OnceLock<regex::Regex> = OnceLock::new();
+    let unclosed_start = UNCLOSED_START_RE.get_or_init(|| {
+        regex::Regex::new(r"(?is)^\s*<\s*(?:think|thought|reasoning)\b(?:\s+[^>]*)?>.*$")
+            .expect("valid regex")
     });
 
-    unclosed.replace_all(&cleaned, "").to_string()
+    if unclosed_start.is_match(&cleaned) {
+        return String::new();
+    }
+
+    // Line-anchored unclosed thought tag on a dedicated line
+    static UNCLOSED_LINE_RE: OnceLock<regex::Regex> = OnceLock::new();
+    let unclosed_line = UNCLOSED_LINE_RE.get_or_init(|| {
+        regex::Regex::new(r"(?is)(?:\r?\n)\s*<\s*(?:think|thought|reasoning)\b(?:\s+[^>]*)?>.*$")
+            .expect("valid regex")
+    });
+
+    unclosed_line.replace_all(&cleaned, "").to_string()
 }
 
 pub fn is_unsupported_parameter_error(err_msg: &str, param: &str) -> bool {
+    let err = err_msg.to_lowercase();
     let p = param.to_lowercase();
-    let err = err_msg.to_lowercase();
-    if !err.contains(&p) {
-        return false;
-    }
-    err.contains("unsupported parameter")
-        || err.contains("unsupported_parameter")
-        || err.contains("not supported")
-        || err.contains("does not support")
-        || err.contains("unknown parameter")
-        || err.contains("unrecognized request argument")
-        || err.contains("unrecognized parameter")
-        || err.contains("invalid parameter")
-        || err.contains("extra inputs are not permitted")
-        || err.contains("extra fields not permitted")
-}
-
-pub fn is_unsupported_system_role_error(err_msg: &str) -> bool {
-    let err = err_msg.to_lowercase();
-    (err.contains("system") || err.contains("developer"))
-        && (err.contains("role") || err.contains("message") || err.contains("instruction"))
+    err.contains(&p)
         && (err.contains("not supported")
             || err.contains("unsupported")
             || err.contains("invalid")
             || err.contains("not allowed")
-            || err.contains("not enabled")
-            || err.contains("only user"))
+            || err.contains("not recognized")
+            || err.contains("unknown parameter")
+            || err.contains("unexpected parameter")
+            || err.contains("unrecognized request argument")
+            || err.contains("unrecognized parameter")
+            || err.contains("extra inputs are not permitted")
+            || err.contains("extra fields not permitted")
+            || err.contains("not permitted")
+            || err.contains("does not support"))
+}
+
+pub fn is_unsupported_system_role_error(err_msg: &str) -> bool {
+    let err = err_msg.to_lowercase();
+    let mentions_role = (err.contains("system") || err.contains("developer"))
+        && (err.contains("role") || err.contains("message") || err.contains("instruction") || err.contains("prompt"));
+
+    let mentions_unsupported = err.contains("not supported")
+        || err.contains("unsupported")
+        || err.contains("not allowed")
+        || err.contains("not enabled")
+        || err.contains("only user")
+        || err.contains("is not permitted")
+        || err.contains("does not support")
+        || err.contains("invalid")
+        || err.contains("not recognized");
+
+    mentions_role && mentions_unsupported
 }
 
 pub fn negotiate_parameter_error(
@@ -1230,7 +1241,7 @@ pub async fn translate_files(
                 // so a sloppy model gets its fair retry first and the
                 // order-preserving fallback never masks round-one violations.
                 stall_rounds >= 1,
-                logs.as_ref(),
+                &logs,
             )
             .await?;
 
@@ -1238,14 +1249,13 @@ pub async fn translate_files(
                 ChunkOutcome::ContextLimitExceeded(parsed_exact) => {
                     // Prefer the exact limit reported by the API; fall back
                     // to halving. Then let the outer loop re-chunk.
-                    let new_limit = match parsed_exact {
-                        Some(limit) if limit < context_window => limit,
-                        _ => context_window / 2,
-                    };
+                    let new_limit = parsed_exact
+                        .filter(|&limit| limit < context_window)
+                        .unwrap_or(context_window / 2);
                     if new_limit < 1024 {
                         return Err(format!(
                             "Model context window ({}) is too small to translate even a single dialogue line.",
-                            context_window
+                            new_limit
                         ));
                     }
                     context_window = new_limit;
@@ -1261,19 +1271,24 @@ pub async fn translate_files(
                     // Anthropic rejected max_tokens as too large. Use the
                     // exact cap when the error named it, otherwise halve —
                     // then persist so future runs start correct.
-                    let new_cap = match exact_cap {
-                        Some(cap) if cap < max_output_override.unwrap_or(u32::MAX) => cap,
-                        _ => {
-                            let current = max_output_override.unwrap_or_else(|| {
-                                estimate_max_output_tokens(0, None)
-                            });
-                            (current / 2).max(MIN_OUTPUT_TOKENS)
-                        }
-                    };
-                    if new_cap <= MIN_OUTPUT_TOKENS && exact_cap.is_none() {
+                    let current = max_output_override.unwrap_or_else(|| {
+                        estimate_max_output_tokens(0, None)
+                    });
+                    if current <= MIN_OUTPUT_TOKENS && exact_cap.is_none() {
                         return Err(format!(
                             "Model rejected every output cap down to {} tokens; its max_tokens limit could not be satisfied.",
                             MIN_OUTPUT_TOKENS
+                        ));
+                    }
+                    let new_cap = exact_cap
+                        .filter(|&cap| cap < max_output_override.unwrap_or(u32::MAX))
+                        .unwrap_or_else(|| {
+                            (current / 2).max(MIN_OUTPUT_TOKENS)
+                        });
+                    if new_cap < MIN_OUTPUT_TOKENS {
+                        return Err(format!(
+                            "Model output cap ({} tokens) is too small to translate dialogue lines.",
+                            new_cap
                         ));
                     }
                     max_output_override = Some(new_cap);

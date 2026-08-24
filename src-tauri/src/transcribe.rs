@@ -373,13 +373,11 @@ pub async fn run_transcription(
                     true
                 };
                 
-                if should_copy {
-                    if std::fs::copy(&bin_path, &cached_bin).is_ok() {
-                        if let Ok(meta) = std::fs::metadata(&cached_bin) {
-                            let mut perms = meta.permissions();
-                            perms.set_mode(perms.mode() | 0o111);
-                            let _ = std::fs::set_permissions(&cached_bin, perms);
-                        }
+                if should_copy && std::fs::copy(&bin_path, &cached_bin).is_ok() {
+                    if let Ok(meta) = std::fs::metadata(&cached_bin) {
+                        let mut perms = meta.permissions();
+                        perms.set_mode(perms.mode() | 0o111);
+                        let _ = std::fs::set_permissions(&cached_bin, perms);
                     }
                 }
                 
@@ -639,7 +637,7 @@ pub async fn run_transcription(
                                 
                                 let curr_time_secs = h * 3600.0 + m * 60.0 + s;
                                 if duration_sec > 0.0 {
-                                    let progress = (curr_time_secs / duration_sec).min(1.0).max(0.0);
+                                    let progress = (curr_time_secs / duration_sec).clamp(0.0, 1.0);
                                     let _ = app.emit("transcribe-status", TranscribeProgress {
                                         progress,
                                         message: format!("Transcribing: {:.0}%", progress * 100.0),

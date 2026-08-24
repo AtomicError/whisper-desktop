@@ -129,12 +129,14 @@ pub fn resolve_binary_for_execution(app: Option<&tauri::AppHandle>, binary_name:
     // 1. Check in-memory cache first for zero-overhead O(1) repeated lookups
     if let Ok(lock) = CACHED_BINARIES.read() {
         if let Some(ref cache) = *lock {
-            if binary_name == "ffmpeg" {
-                if let Some(ref p) = cache.ffmpeg_exec_path {
-                    return Ok(p.clone());
-                }
-            } else if binary_name == "ffprobe" {
-                if let Some(ref p) = cache.ffprobe_exec_path {
+            let cached_path = match binary_name {
+                "ffmpeg" => cache.ffmpeg_exec_path.as_ref(),
+                "ffprobe" => cache.ffprobe_exec_path.as_ref(),
+                _ => None,
+            };
+            if let Some(p) = cached_path {
+                // Verify that cached path is either a system command or still exists on disk
+                if p.components().count() == 1 || p.exists() {
                     return Ok(p.clone());
                 }
             }

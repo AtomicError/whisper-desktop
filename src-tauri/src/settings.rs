@@ -308,6 +308,40 @@ pub fn load_settings_from_path(path: &Path) -> WhisperSettings {
     default
 }
 
+pub fn atomic_replace_file(from: &Path, to: &Path) -> std::io::Result<()> {
+    #[cfg(not(windows))]
+    {
+        fs::rename(from, to)
+    }
+    #[cfg(windows)]
+    {
+        if fs::rename(from, to).is_ok() {
+            return Ok(());
+        }
+        let backup_path = to.with_extension(format!("bak.{}", std::process::id()));
+        let _ = fs::remove_file(&backup_path);
+
+        let mut backoff = std::time::Duration::from_millis(15);
+        for _ in 0..5 {
+            if fs::rename(to, &backup_path).is_ok() {
+                let move_res = fs::rename(from, to);
+                if move_res.is_err() {
+                    let _ = fs::rename(&backup_path, to);
+                    return move_res;
+                }
+                let _ = fs::remove_file(&backup_path);
+                return Ok(());
+            }
+            std::thread::sleep(backoff);
+            backoff *= 2;
+        }
+        // Fallback if renaming is blocked by AV / file locks
+        fs::copy(from, to)?;
+        let _ = fs::remove_file(from);
+        Ok(())
+    }
+}
+
 pub fn save_settings_to_path(path: &Path, settings: &WhisperSettings) -> Result<(), String> {
     let _guard = SETTINGS_LOCK.write().unwrap_or_else(|e| e.into_inner());
 
@@ -334,7 +368,7 @@ pub fn save_settings_to_path(path: &Path, settings: &WhisperSettings) -> Result<
     // so a crash mid-write can never leave a truncated settings file behind.
     let tmp_path = path.with_file_name({
         let mut name = path.file_name().unwrap_or_default().to_os_string();
-        name.push(".tmp");
+        name.push(format!(".tmp.{}", std::process::id()));
         name
     });
 
@@ -346,7 +380,7 @@ pub fn save_settings_to_path(path: &Path, settings: &WhisperSettings) -> Result<
         )
     })?;
 
-    match fs::rename(&tmp_path, path) {
+    match atomic_replace_file(&tmp_path, path) {
         Ok(()) => Ok(()),
         Err(e) => {
             let _ = fs::remove_file(&tmp_path);

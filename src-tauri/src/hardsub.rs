@@ -144,10 +144,10 @@ pub fn get_system_fonts(_app: AppHandle) -> Vec<FontItem> {
                         if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
                             if ext.eq_ignore_ascii_case("ttf") || ext.eq_ignore_ascii_case("otf") {
                                 if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-                                    let clean_name = stem.replace('-', " ").replace('_', " ");
-                                    if !fonts.iter().any(|f| f.name.eq_ignore_ascii_case(&clean_name)) {
+                                    let clean_name = stem.trim();
+                                    if !clean_name.is_empty() && !fonts.iter().any(|f| f.name.eq_ignore_ascii_case(clean_name)) {
                                         fonts.push(FontItem {
-                                            name: clean_name,
+                                            name: clean_name.to_string(),
                                             source: "system".to_string(),
                                         });
                                     }
@@ -1113,7 +1113,7 @@ pub async fn run_hardsub_task(
     logs.log(&app, "Hardsub", &format!("Starting hardsub task for: {} (Output: {})", video_name, settings.output_path));
 
     // Trigger OS notification
-    let _ = app.notification().builder().title("Hardsub Video Started").body(&format!("Encoding {}...", video_name)).show();
+    let _ = app.notification().builder().title("Hardsub Video Started").body(format!("Encoding {}...", video_name)).show();
 
     let _ = app.emit("hardsub-status", TranscribeProgress {
         progress: 0.0,
@@ -1223,10 +1223,20 @@ pub async fn run_hardsub_task(
     let ref_width = ((ref_height as f64) * aspect).round().max(1.0) as u32;
 
     // Construct Subtitle Style (force_style parameters)
-    let mut safe_font_name = settings.font_name.replace(',', "").replace('\'', "").replace('"', "");
-    if safe_font_name == "Inter" {
-        safe_font_name = "Inter 24pt".to_string();
-    }
+    let raw_safe_font = settings
+        .font_name
+        .chars()
+        .filter(|&c| !matches!(c, ',' | '\'' | '"' | ':' | '\\' | '=' | ';' | '\n' | '\r' | '{' | '}' | '%' | '[' | ']'))
+        .collect::<String>()
+        .trim()
+        .to_string();
+    let safe_font_name = if raw_safe_font.is_empty() {
+        "Sans".to_string()
+    } else if raw_safe_font.eq_ignore_ascii_case("Inter") {
+        "Inter 24pt".to_string()
+    } else {
+        raw_safe_font
+    };
 
     let font_metrics = get_font_render_scale(app.clone(), settings.font_name.clone(), settings.bold, settings.italic);
     let compensated_font_size = ((settings.font_size as f64) / font_metrics.scale).round() as u32;
@@ -1507,14 +1517,12 @@ pub async fn run_hardsub_task(
                                 "fps" => {
                                     current_fps = v.to_string();
                                 }
-                                "progress" => {
-                                    if v == "end" {
-                                        let _ = app.emit("hardsub-status", TranscribeProgress {
-                                            progress: 0.99,
-                                            message: "Finalizing video export...".to_string(),
-                                            active: true,
-                                        });
-                                    }
+                                "progress" if v == "end" => {
+                                    let _ = app.emit("hardsub-status", TranscribeProgress {
+                                        progress: 0.99,
+                                        message: "Finalizing video export...".to_string(),
+                                        active: true,
+                                    });
                                 }
                                 _ => {}
                             }
@@ -1587,7 +1595,7 @@ pub async fn run_hardsub_task(
     });
 
     // Notify OS
-    let _ = app.notification().builder().title("Hardsub Completed").body(&format!("Video saved to {}", settings.output_path)).show();
+    let _ = app.notification().builder().title("Hardsub Completed").body(format!("Video saved to {}", settings.output_path)).show();
 
     Ok(HardsubResult {
         duration_ms,

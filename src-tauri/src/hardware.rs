@@ -158,25 +158,24 @@ impl HardwareMonitor {
                 if let Ok(fd_entries) = fs::read_dir(fdinfo_dir) {
                     for fd_entry in fd_entries.flatten() {
                         if let Ok(content) = fs::read_to_string(fd_entry.path()) {
+                            if !content.contains("drm-") {
+                                continue;
+                            }
                             let mut client_id = None;
                             let mut active_rcs = 0u64;
                             let mut total_rcs = 0u64;
                             let mut engine_render_ns = 0u64;
 
                             for line in content.lines() {
-                                if line.starts_with("drm-client-id:") {
-                                    client_id = line.split(':').nth(1).map(|s| s.trim().to_string());
-                                } else if line.starts_with("drm-cycles-rcs:") {
-                                    active_rcs = line.split(':').nth(1).and_then(|s| s.trim().parse().ok()).unwrap_or(0);
-                                } else if line.starts_with("drm-total-cycles-rcs:") {
-                                    total_rcs = line.split(':').nth(1).and_then(|s| s.trim().parse().ok()).unwrap_or(0);
+                                if let Some(stripped) = line.strip_prefix("drm-client-id:") {
+                                    client_id = Some(stripped.trim().to_string());
+                                } else if let Some(stripped) = line.strip_prefix("drm-cycles-rcs:") {
+                                    active_rcs = stripped.trim().parse().unwrap_or(0);
+                                } else if let Some(stripped) = line.strip_prefix("drm-total-cycles-rcs:") {
+                                    total_rcs = stripped.trim().parse().unwrap_or(0);
                                 } else if line.starts_with("drm-engine-") {
-                                    if let Some(ns_part) = line.split(':').nth(1) {
-                                        if let Some(ns_str) = ns_part.trim().split_whitespace().next() {
-                                            if let Ok(ns) = ns_str.parse::<u64>() {
-                                                engine_render_ns += ns;
-                                            }
-                                        }
+                                    if let Some(ns) = line.split(':').nth(1).and_then(|part| part.split_whitespace().next()?.parse::<u64>().ok()) {
+                                        engine_render_ns += ns;
                                     }
                                 }
                             }
@@ -204,19 +203,27 @@ impl HardwareMonitor {
                 if let Some((last_act, last_tot)) = self.last_drm_clients.get(cid) {
                     let d_act = cur_act.saturating_sub(*last_act) as f64;
                     let d_tot = cur_tot.saturating_sub(*last_tot) as f64;
-                    if d_tot > 0.0 {
-                        total_usage += (d_act / d_tot) * 100.0;
-                        has_data = true;
+                    if d_tot > 0.0 && d_tot.is_finite() && d_act.is_finite() {
+                        let ratio = (d_act / d_tot) * 100.0;
+                        if ratio.is_finite() {
+                            total_usage += ratio;
+                            has_data = true;
+                        }
                     }
                 }
             }
-        } else if !cur_engines.is_empty() && elapsed_ns > 0.0 {
+        } else if !cur_engines.is_empty() && elapsed_ns > 0.0 && elapsed_ns.is_finite() {
             // Method 2: i915 / AMD render engine ns
             for (cid, cur_ns) in &cur_engines {
                 if let Some(last_ns) = self.last_drm_engines.get(cid) {
                     let d_ns = cur_ns.saturating_sub(*last_ns) as f64;
-                    total_usage += (d_ns / elapsed_ns) * 100.0;
-                    has_data = true;
+                    if d_ns.is_finite() {
+                        let ratio = (d_ns / elapsed_ns) * 100.0;
+                        if ratio.is_finite() {
+                            total_usage += ratio;
+                            has_data = true;
+                        }
+                    }
                 }
             }
         }
@@ -225,7 +232,7 @@ impl HardwareMonitor {
         self.last_drm_engines = cur_engines;
         self.last_poll_time = Some(now);
 
-        if has_data {
+        if has_data && total_usage.is_finite() {
             Some(total_usage.clamp(0.0, 100.0))
         } else {
             None
@@ -233,7 +240,7 @@ impl HardwareMonitor {
     }
 
     fn get_intel_gpu_stats(&mut self) -> String {
-        // Query clock frequency
+        // Query clock frequency and normalize to MHz
         let mut cur_freq = 0;
         for card in ["card0", "card1", "card2"] {
             let cur_freq_paths = [
@@ -242,7 +249,12 @@ impl HardwareMonitor {
                 format!("/sys/class/drm/{}/gt/gt0/rps_act_freq_mhz", card),
                 format!("/sys/class/drm/{}/gt_cur_freq_mhz", card),
             ];
-            cur_freq = cur_freq_paths.iter().map(get_file_as_int).find(|&f| f > 0).unwrap_or(0);
+            cur_freq = cur_freq_paths
+                .iter()
+                .map(|p| (p.as_str(), get_file_as_int(p)))
+                .map(|(p, raw)| normalize_frequency_mhz(p, raw))
+                .find(|&f| f > 0)
+                .unwrap_or(0);
             if cur_freq > 0 {
                 break;
             }
@@ -263,6 +275,26 @@ impl HardwareMonitor {
         }
 
         "Intel: N/A".to_string()
+    }
+}
+
+fn normalize_frequency_mhz(path_str: &str, raw: u64) -> u64 {
+    if raw == 0 {
+        return 0;
+    }
+    // If the sysfs node explicitly denotes MHz in its filename, trust it directly.
+    if path_str.ends_with("_mhz") {
+        return raw;
+    }
+    if raw > 1_000_000_000 {
+        // Reported in Hz (e.g. 1,400,000,000 Hz = 1400 MHz)
+        raw / 1_000_000
+    } else if path_str.ends_with("_khz") || path_str.contains("scaling_cur_freq") || raw > 100_000 {
+        // Reported in KHz (e.g. 1,400,000 KHz = 1400 MHz)
+        raw / 1_000
+    } else {
+        // Already in MHz (e.g. 100..3500 MHz)
+        raw
     }
 }
 
@@ -316,11 +348,9 @@ fn detect_gpu_type() -> String {
 }
 
 
-fn get_file_as_int<P: AsRef<Path>>(path: P) -> i32 {
-    if let Ok(content) = fs::read_to_string(path) {
-        if let Ok(val) = content.trim().parse::<i32>() {
-            return val;
-        }
-    }
-    0
+fn get_file_as_int<P: AsRef<Path>>(path: P) -> u64 {
+    fs::read_to_string(path)
+        .ok()
+        .and_then(|content| content.trim().parse::<u64>().ok())
+        .unwrap_or(0)
 }

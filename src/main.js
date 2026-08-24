@@ -3966,6 +3966,12 @@ window.onProviderChanged = function(keepCurrentTab = false, skipTableRender = fa
   const mgrCard = document.getElementById('provider-manager-card');
   if (!providerSelect || !modelSelect || !mgrCard) return;
   
+  if (modelSaveDebounceTimer) {
+    clearTimeout(modelSaveDebounceTimer);
+    modelSaveDebounceTimer = null;
+    saveActiveProviderModels(true, true, settingsState.translateAiProvider);
+  }
+
   const providerName = providerSelect.value;
   settingsState.translateAiProvider = providerName;
   
@@ -4369,23 +4375,48 @@ window.parseTokensInput = function(val) {
   }
   if (!val) return 200000;
   const str = toEnglishDigits(String(val).trim().toUpperCase());
-  if (str.endsWith('M')) {
-    const num = parseFloat(str.slice(0, -1));
-    return isNaN(num) || num <= 0 ? 1000000 : Math.round(num * 1000000);
+  
+  // Check for M/Million suffix (e.g., "1M", "1.5M", "2 million", "1m tokens")
+  const matchM = str.match(/^(\d+(?:\.\d+)?)\s*(?:M|MILLION)(?:\s*TOKENS?)?$/);
+  if (matchM) {
+    const num = parseFloat(matchM[1]);
+    return !isNaN(num) && num > 0 ? Math.round(num * 1000000) : 200000;
   }
-  if (str.endsWith('K')) {
-    const num = parseFloat(str.slice(0, -1));
-    return isNaN(num) || num <= 0 ? 128000 : Math.round(num * 1000);
+
+  // Check for K/Thousand suffix (e.g., "128K", "200k tokens", "64 k")
+  const matchK = str.match(/^(\d+(?:\.\d+)?)\s*(?:K|THOUSAND)(?:\s*TOKENS?)?$/);
+  if (matchK) {
+    const num = parseFloat(matchK[1]);
+    return !isNaN(num) && num > 0 ? Math.round(num * 1000) : 200000;
   }
-  const num = parseInt(str.replace(/[^0-9]/g, ''), 10);
-  return isNaN(num) || num <= 0 ? 200000 : num;
+
+  // Check for pure integer / comma-separated digits (e.g., "128,000", "200000", "200000 tokens")
+  const matchNum = str.match(/^([\d,]+)(?:\s*TOKENS?)?$/);
+  if (matchNum) {
+    const cleaned = matchNum[1].replace(/,/g, '');
+    const num = parseInt(cleaned, 10);
+    return !isNaN(num) && num > 0 ? num : 200000;
+  }
+
+  // Non-numeric strings or arbitrary text fallback safely to 200,000
+  return 200000;
 };
 
 function destroyModelRowCustomSelects(parentEl) {
   if (!parentEl) return;
   const selects = parentEl.querySelectorAll('select.model-reasoning-select');
   selects.forEach(sel => {
-    const inst = window.customSelectsMap ? (window.customSelectsMap.get(sel.id) || window.customSelectsMap.get(sel)) : null;
+    let inst = null;
+    if (window.customSelectsMap) {
+      if (sel.id) {
+        inst = window.customSelectsMap.get(sel.id);
+        window.customSelectsMap.delete(sel.id);
+      }
+      if (!inst) {
+        inst = window.customSelectsMap.get(sel);
+      }
+      window.customSelectsMap.delete(sel);
+    }
     if (inst && typeof inst.destroy === 'function') {
       inst.destroy();
     }
@@ -4527,9 +4558,12 @@ window.addManualModelRow = function(modelId = "", contextWindow = 200000, reason
   
   const updateStatsAndSave = () => {
     updateFilterCountsFromDOM();
+    const currentProvider = settingsState.translateAiProvider;
     clearTimeout(modelSaveDebounceTimer);
     modelSaveDebounceTimer = setTimeout(() => {
-      saveActiveProviderModels(true, true);
+      if (settingsState.translateAiProvider === currentProvider) {
+        saveActiveProviderModels(true, true, currentProvider);
+      }
     }, 150);
   };
   
@@ -4710,11 +4744,8 @@ window.fetchActiveProviderModels = async function() {
   }
 };
 
-window.saveActiveProviderModels = async function(keepCurrentTab = false, skipTableRender = false) {
-  const providerSelect = document.getElementById('opt-translateAiProvider');
-  if (!providerSelect) return;
-  const providerName = providerSelect.value;
-  
+window.saveActiveProviderModels = async function(keepCurrentTab = false, skipTableRender = false, targetProviderName = null) {
+  const providerName = targetProviderName || settingsState.translateAiProvider;
   let providers = [];
   try {
     providers = JSON.parse(settingsState.translateAiProviders || '[]');
@@ -4727,8 +4758,10 @@ window.saveActiveProviderModels = async function(keepCurrentTab = false, skipTab
   
   const provider = providers[providerIdx];
   const models = [];
+  const seenIds = new Set();
   const rows = document.querySelectorAll('#mgr-models-tbody .model-data-row');
   let activeModelId = '';
+  let checkedModelId = '';
   
   rows.forEach(row => {
     const idInput = row.querySelector('.model-id-input');
@@ -4738,57 +4771,69 @@ window.saveActiveProviderModels = async function(keepCurrentTab = false, skipTab
     if (!idInput) return;
     
     const modelId = idInput.value.trim();
-    const contextWindow = window.parseTokensInput(ctxInput.dataset.rawTokens || ctxInput.value);
-    const reasoning = reasoningSelect.value;
-    
-    if (modelId) {
+    if (!modelId) return;
+
+    if (activeRadio && activeRadio.checked) {
+      checkedModelId = modelId;
+    }
+
+    if (!seenIds.has(modelId)) {
+      seenIds.add(modelId);
+      const contextWindow = window.parseTokensInput(ctxInput ? (ctxInput.dataset.rawTokens || ctxInput.value) : 200000);
+      const reasoning = reasoningSelect ? reasoningSelect.value : 'None';
       models.push({ id: modelId, contextWindow, reasoning, enabled: true });
-      if (activeRadio && activeRadio.checked) {
-        activeModelId = modelId;
-      }
     }
   });
   
-  if (!activeModelId && models.length > 0) activeModelId = models[0].id;
+  if (checkedModelId && models.some(m => m.id === checkedModelId)) {
+    activeModelId = checkedModelId;
+  } else if (models.length > 0) {
+    activeModelId = models[0].id;
+  }
   
-  settingsState.translateAiModel = activeModelId;
   provider.models = models;
   providers[providerIdx] = provider;
   settingsState.translateAiProviders = JSON.stringify(providers);
-  
-  const selectDOM = document.getElementById('opt-translateAiModel');
-  if (selectDOM) {
-    selectDOM.innerHTML = '';
-    models.forEach(m => {
-      const opt = document.createElement('option');
-      opt.value = m.id;
-      opt.textContent = m.id;
-      selectDOM.appendChild(opt);
-    });
-    selectDOM.value = activeModelId;
-  }
-  
-  const bannerEl = document.getElementById('active-model-banner');
-  const bannerVal = document.getElementById('active-model-banner-value');
-  if (bannerEl && bannerVal) {
-    if (activeModelId) {
-      bannerVal.innerHTML = `
-        <div class="active-model-chip-group">
-          <span class="active-model-chip-provider">${escapeHTML(providerName)}</span>
-          <span class="active-model-chip-model">${escapeHTML(activeModelId)}</span>
-        </div>
-      `;
-      bannerEl.style.display = 'flex';
-    } else {
-      bannerEl.style.display = 'none';
+
+  const isCurrentActiveProvider = providerName === settingsState.translateAiProvider;
+  if (isCurrentActiveProvider) {
+    settingsState.translateAiModel = activeModelId;
+    
+    const selectDOM = document.getElementById('opt-translateAiModel');
+    if (selectDOM) {
+      selectDOM.innerHTML = '';
+      models.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = m.id;
+        selectDOM.appendChild(opt);
+      });
+      selectDOM.value = activeModelId;
+    }
+    
+    const bannerEl = document.getElementById('active-model-banner');
+    const bannerVal = document.getElementById('active-model-banner-value');
+    if (bannerEl && bannerVal) {
+      if (activeModelId) {
+        bannerVal.innerHTML = `
+          <div class="active-model-chip-group">
+            <span class="active-model-chip-provider">${escapeHTML(providerName)}</span>
+            <span class="active-model-chip-model">${escapeHTML(activeModelId)}</span>
+          </div>
+        `;
+        bannerEl.style.display = 'flex';
+      } else {
+        bannerEl.style.display = 'none';
+      }
     }
   }
   
   await saveCurrentSettings();
-  updateTranscribeUIConfigs();
-  
-  if (!skipTableRender) {
-    renderModelsRegistryTable(provider);
+  if (isCurrentActiveProvider) {
+    updateTranscribeUIConfigs();
+    if (!skipTableRender) {
+      renderModelsRegistryTable(provider);
+    }
   }
 };
 

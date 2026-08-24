@@ -87,18 +87,36 @@ impl TranslationCheckpoint {
 }
 
 /// Deterministic, compiler-independent SHA-256 content fingerprint.
-/// Normalizes CRLF to LF so that cross-platform line ending changes do not
-/// invalidate valid checkpoints.
+/// Normalizes CRLF/CR to LF and strips UTF-8 BOM so cross-platform line ending
+/// or encoding differences do not invalidate valid checkpoints without heap allocations.
 fn fingerprint(content: &str) -> String {
     let mut hasher = Sha256::new();
-    let normalized = content.replace("\r\n", "\n");
-    hasher.update(normalized.as_bytes());
+    let trimmed_bom = content.strip_prefix('\u{feff}').unwrap_or(content);
+    let bytes = trimmed_bom.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'\r' {
+            hasher.update(b"\n");
+            if i + 1 < bytes.len() && bytes[i + 1] == b'\n' {
+                i += 2;
+            } else {
+                i += 1;
+            }
+        } else {
+            let start = i;
+            while i < bytes.len() && bytes[i] != b'\r' {
+                i += 1;
+            }
+            hasher.update(&bytes[start..i]);
+        }
+    }
     format!("{:x}", hasher.finalize())
 }
 
 /// Loads a valid checkpoint for this exact (source, lang, format, provider, model, content)
 /// combination. Any mismatch, corruption, or legacy file yields `None` and
 /// the stale file is left on disk (it gets overwritten by the first save).
+#[allow(clippy::too_many_arguments)]
 pub fn load(
     parent_dir: &Path,
     output_file_name: &str,
@@ -149,7 +167,7 @@ pub fn save(
         .map_err(|e| format!("Failed to serialize checkpoint: {e}"))?;
     fs::write(&tmp_path, serialized)
         .map_err(|e| format!("Failed to write checkpoint {}: {e}", tmp_path.display()))?;
-    fs::rename(&tmp_path, &final_path).map_err(|e| {
+    crate::settings::atomic_replace_file(&tmp_path, &final_path).map_err(|e| {
         let _ = fs::remove_file(&tmp_path);
         format!("Failed to commit checkpoint {}: {e}", final_path.display())
     })
