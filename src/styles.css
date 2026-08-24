@@ -5062,6 +5062,18 @@ select.select-control {
   box-shadow: 0 0 10px rgba(45, 127, 255, 0.4);
 }
 
+.align-v-btn,
+.align-h-btn {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.align-v-btn.active,
+.align-h-btn.active {
+  background: linear-gradient(135deg, rgba(45, 127, 255, 0.95), rgba(28, 90, 210, 0.95)) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(45, 127, 255, 0.35) !important;
+}
+
 .range-slider {
   -webkit-appearance: none;
   appearance: none;
