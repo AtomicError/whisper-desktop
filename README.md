@@ -5,13 +5,13 @@
 <h1 align="center">Whisper Desktop</h1>
 
 <p align="center">
-  <strong>A premium, high-performance native desktop GUI for local speech-to-text powered by Whisper.cpp and Rust.</strong>
+  <strong>A premium, high-performance native desktop GUI for local speech-to-text, subtitle styling, and video hardsubbing powered by Whisper.cpp, FFmpeg, and Rust.</strong>
 </p>
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square&color=2d7fff" alt="License MIT"></a>
   <img src="https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-orange?style=flat-square&color=0057d9" alt="Platform Cross-Platform">
-  <img src="https://img.shields.io/badge/Arch-x86__64%20%7C%20ARM64-green?style=flat-square&color=10b981" alt="Arch x86_64 & ARM64">
+  <img src="https://img.shields.io/badge/Arch-x86__64%20%7C%20ARM64%20%7C%20Universal-green?style=flat-square&color=10b981" alt="Arch x86_64, ARM64 & Universal">
   <img src="https://img.shields.io/badge/Built%20With-Rust%20%26%20Tauri-red?style=flat-square&logo=tauri&logoColor=white&color=8b5cf6" alt="Built With Rust & Tauri">
 </p>
 
@@ -19,18 +19,19 @@
 
 ## 💡 What is Whisper Desktop?
 
-**Whisper Desktop** is a modern, lightweight, and privacy-focused desktop application designed to bring the incredible power of OpenAI's **Whisper** speech recognition model directly to your personal computer.
+**Whisper Desktop** is a modern, lightweight, and privacy-focused desktop application designed to bring the power of OpenAI's **Whisper** speech recognition model directly to your personal computer—now featuring a dedicated **Studio Hardsub** video burn-in engine.
 
-Running AI models locally often requires navigating command-line interfaces, installing complex Python environments, or exposing sensitive audio files to paid cloud services. **Whisper Desktop** eliminates all of that by pairing a blazing-fast **Rust & Tauri** backend with native `whisper.cpp` binaries and a gorgeous glassmorphic GUI.
+Running AI models and video processing pipelines locally often requires complex CLI scripts, extensive Python environments, or exposing sensitive media to paid cloud providers. **Whisper Desktop** eliminates those friction points by pairing a blazing-fast **Rust & Tauri** core with native `whisper.cpp` binaries, static/system `FFmpeg` engines, and an elegant glassmorphic GUI.
 
 ### 🎯 Core Goals & Key Highlights
 
-* **🔒 100% Local & Private:** Speech recognition and audio conversion run entirely on your local machine. No data is sent to external servers.
-* **⚡ Multi-Backend Acceleration:** Switch seamlessly between **CPU**, **Vulkan**, **CUDA**, or **OpenVINO** directly from the interface for near-instant transcription.
-* **🎞️ Direct Smart Media Import:** Drop any video or audio file directly into the app—no manual audio conversion or pre-extraction required.
-* **🎛️ Complete Engine Orchestration:** Fine-tune decoding parameters, Silero VAD silence filtering, beam sizes, and thread concurrency.
-* **🤖 Multi-Provider AI Translation:** Post-process and translate subtitles into 120+ languages using OpenAI, Anthropic, Gemini, or local LLMs (LM Studio/Ollama) with secure system keyring storage.
-* **✨ Glassmorphic UI & Real-Time Telemetry:** Dark-mode interface featuring dynamic hardware metrics (CPU/RAM/GPU), drag-and-drop file queue, and live transcript highlighting.
+* **🔒 100% Local & Private:** Speech recognition, audio processing, and video hardsubbing run entirely on your local machine. No data is sent to external servers unless you opt into AI translation.
+* **⚡ Multi-Backend Hardware Acceleration:** Seamlessly switch between **CPU**, **Vulkan**, **CUDA**, **OpenVINO**, or **Metal/CoreML** directly from the interface for near-instant transcription.
+* **🎬 Studio Hardsub 2.0 & Video Burn-in:** Burn styled subtitles directly into videos with full GPU acceleration (NVENC, Intel QSV / Xe KMD, AMD AMF, Apple VideoToolbox, VAAPI), offline bundled fonts, and real-time sub-pixel Canvas preview.
+* **🎞️ Direct Smart Media Processing:** Drop any video or audio file directly into the app—no manual pre-conversion or audio extraction required.
+* **🤖 Multi-Provider AI Translation:** Post-process and translate subtitles into 121+ languages using OpenAI, Anthropic (Claude), Google Gemini, DeepSeek, or local LLMs (Ollama/LM Studio) with secure OS keychain storage.
+* **📊 Sidebar Real-Time Telemetry HUD:** Live hardware monitoring (CPU, RAM, VRAM, and GPU utilization via Linux DRM `fdinfo` with `nvtop` parity, Intel Xe KMD, AMD, and NVIDIA).
+* **📦 Universal Cross-Platform Support:** Ready-to-use binaries and packages for **Linux** (AppImage x86_64/ARM64, Deb, Rpm, AUR), **Windows** (x86_64, ARM64 / Windows on ARM), and **macOS** (Apple Silicon & Intel Universal).
 
 ---
 
@@ -49,30 +50,49 @@ Running AI models locally often requires navigating command-line interfaces, ins
 ## ✨ Features Breakdown
 
 ### 🎙️ Speech-to-Text Engine & Audio Pipeline
-* **⚡ Multi-Acceleration Backends:** Choose between **CPU**, **Vulkan**, **OpenVINO**, or **CUDA** directly from the UI. Precompiled binaries are bundled so no local SDK setup is required.
-* **🎞️ Direct Smart Media Processing:** Drop any video or audio format (MP4, MKV, AVI, MOV, FLV, WEBM, MP3, WAV, FLAC, M4A, etc.) directly into the app—zero manual pre-conversion or audio extraction needed. The built-in FFmpeg pipeline transparently converts media into an optimized 16kHz mono WAV stream on the fly. Smart path redirection automatically routes outputs to `~/Documents/WhisperOutputs/` when working outside your home folder.
-* **📥 Integrated Model Downloader:** Browse, download, pause, resume, and manage GGML models (Tiny, Base, Small, Medium, Large, Q4/Q5/Q8) with live speed, progress, and ETA tracking.
-* **📂 Batch Processing Queue:** Import multiple audio/video files via **Drag & Drop**, reorder queue items, inspect metadata/duration, and transcribe sequentially.
-* **⚙️ Complete Decoding Controls:** Adjust threads, processors, temperature, beam size, best-of, initial prompts, carry-over prompts, diarization, and word-level timestamps (DTW).
-* **📄 Flexible Export Formats:** Export transcripts as **SRT, VTT, LRC, TXT, CSV, JSON**, and full word-level timestamp files.
-* **★ Hardware-Guided Recommendations:** Recommends optimal model sizes and quantization formats based on detected RAM, CPU cores, and GPU type.
+* **Multi-Acceleration Backends:** Choose between **CPU**, **Vulkan**, **OpenVINO**, or **CUDA** directly from the UI. Precompiled binaries are bundled—no local AI toolchain or SDK setup required.
+* **Direct Smart Media Processing:** Drop any video or audio format (`MP4`, `MKV`, `AVI`, `MOV`, `FLV`, `WEBM`, `MP3`, `WAV`, `FLAC`, `M4A`, `AAC`, `OGG`, `OPUS`, etc.)—the built-in FFmpeg pipeline transparently extracts and normalizes media into a 16kHz mono WAV stream on the fly. Smart path redirection automatically routes outputs to `~/Documents/WhisperOutputs/` when working outside your home folder.
+* **Native Rust Streaming Downloader:** Browse, download, pause, resume, and manage GGML models (Tiny, Base, Small, Medium, Large-v1/v2/v3, Q4/Q5/Q8) with live speed, byte progress, and ETA calculation powered by a native streaming pipeline.
+* **Batch Processing Queue:** Import multiple media files via Drag & Drop, reorder queue items, inspect duration metadata, and transcribe sequentially with automatic background processing.
+* **Granular Decoding Controls:** Fine-tune threads, processors, temperature fallback, beam size, best-of, initial prompts, carry-over prompts, diarization, and word-level timestamps (DTW).
+* **Silero VAD Silence Filtering:** Configure VAD threshold, minimum speech duration, minimum silence duration, speech padding, and segment overlap.
+* **Flexible Export Formats:** Export transcripts as **SRT, VTT, LRC, TXT, CSV, JSON**, and word-level timestamp files.
+* **Hardware-Guided Recommendations:** Recommends optimal model sizes and quantization formats based on detected RAM, CPU cores, and GPU hardware.
 
-### 🎛️ Advanced Engine Orchestration & VAD Tuning
-* **Complete Parameter Control:** Granular control over VAD thresholds, minimum speech/silence duration, beam search size, temperature fallbacks, diarization, and word-level DTW timestamps.
-* **Granular Controls:** Configurable VAD threshold, minimum speech duration, minimum silence duration, speech padding, and segment overlap.
+---
+
+### 🎬 Studio Hardsub 2.0 & Video Subtitle Styler
+* **GPU-Accelerated Hardsubbing:** Burn subtitles directly into video frames utilizing hardware encoders:
+  * **NVIDIA:** `h264_nvenc`, `hevc_nvenc`, `av1_nvenc`
+  * **Intel:** `h264_qsv`, `hevc_qsv`, `av1_qsv` (with Linux Intel Xe KMD & i915 support)
+  * **AMD:** `h264_amf`, `hevc_amf`, `av1_amf`
+  * **Apple:** `h264_videotoolbox`, `hevc_videotoolbox`
+  * **Linux VAAPI & Software:** `h264_vaapi`, `hevc_vaapi`, `libx264`, `libx265`
+* **Real Video Frame Preview:** Seamless local media server providing instant frame preview and freeze-frame seeking without file permission or sandbox restrictions.
+* **Canvas-Based Subtitle Renderer:** Sub-pixel preview renderer accurately matching `libass` output—including rounded-corner background boxes, text baselines, dynamic font scaling, outline strokes, and video rotation handling.
+* **RTL & Persian/Arabic Typography:** Native Right-to-Left (RTL) layout support with correct punctuation placement for Persian, Arabic, and Hebrew subtitles.
+* **Offline Bundled Fonts:** Embedded typography packages (including *Inter*, *Vazirmatn*, *JetBrains Mono*, *Roboto*, etc.) ensuring identical rendering across different operating systems.
+* **Dual-Pane Studio Layout:** Collapsible wizard accordion, smart dropzones, block subtitle editor, and synchronized cue cards.
+* **Configurable FFmpeg Engine:** Select between bundled static FFmpeg binaries or system-installed FFmpeg with automatic capability detection and fallback.
+
+---
 
 ### 🤖 AI Subtitle Translation Pipeline
-* **Multi-Provider API Manager:** Add and manage API configurations for **OpenAI**, **Anthropic (Claude)**, **Google Gemini**, or **OpenAI-Compatible** endpoints (e.g., LM Studio, Ollama).
-* **🔐 Secure System Keyring:** Stores API keys safely in your native OS keychain (`secret-service` / `kwallet` / `keyring`) instead of plain text files.
-* **Formatting Preservation:** Uses token-aware chunking with overlap to keep SRT/VTT/LRC subtitle timestamps and index numbers perfectly aligned during translation.
-* **Model & Reasoning Control:** Supports model selection, reasoning intensity levels (None/Low/Medium/High), custom translation prompts, and live line-by-line preview.
-* **Auto-Recovery:** Automatic token-limit error handling dynamically reduces chunk size and retries without failing the entire file.
+* **Multi-Provider API Manager:** Connect to **OpenAI**, **Anthropic (Claude)**, **Google Gemini**, **DeepSeek**, or **OpenAI-Compatible** endpoints (e.g., LM Studio, Ollama, vLLM).
+* **121+ Languages Supported:** Translate and localize subtitles across a comprehensive matrix of world languages.
+* **🔐 Secure System Keyring:** Store API keys safely in your native OS keychain (`Secret Service` / `KWallet` / `Windows Credential Manager` / `macOS Keychain`) instead of plain text configuration files.
+* **Context-Aware Timestamp Preservation:** Token-aware chunking with overlap keeps SRT/VTT/LRC subtitle indices and millisecond timestamps aligned.
+* **Adaptive Error Recovery:** Automatic token-limit detection dynamically splits chunks and retries failed segments without halting the batch.
 
-### 📊 User Experience, Telemetry & Logs
-* **📝 Live Transcript Viewer:** Real-time line streaming with active word highlighting, search/filter capabilities, and inline editing.
-* **📊 Live Telemetry HUD:** Real-time monitoring of CPU usage, RAM utilization, and active GPU metrics during transcription.
-* **🗂️ Unified Activity Logs:** Centralized log panel with category filtering (FFmpeg, Whisper, AI Translation, Build, System) and export options.
-* **🔔 Native OS Notifications:** Receive system desktop notifications (`notify-send`) when background transcription jobs complete or fail.
+---
+
+### 📊 Sidebar Hardware Telemetry, UX & Logs
+* **Live Transcript Viewer:** Real-time line streaming with active word highlighting, search/filter capabilities, and inline editing.
+* **Linux DRM `fdinfo` Engine Utilization:** High-fidelity GPU engine monitoring on Linux with `nvtop` parity for Intel, AMD, and NVIDIA hardware.
+* **Non-Blocking Telemetry Worker:** Hardware statistics polling (CPU load, RAM consumption, GPU VRAM) offloaded to dedicated background threads to prevent UI stutter.
+* **Unified Activity Logs:** Centralized log panel with category filtering (FFmpeg, Whisper, AI Translation, Build, System) and export options.
+* **Native OS Desktop Notifications:** System-level alerts when long-running transcription or hardsub export tasks finish.
+* **Clipboard Manager Integration:** Native clipboard integration with multi-tier fallback for instant transcript copying.
 
 ---
 
@@ -80,41 +100,57 @@ Running AI models locally often requires navigating command-line interfaces, ins
 
 ```mermaid
 graph TD
-    A[Glassmorphic UI - HTML/CSS/JS] -->|Tauri IPC Bridge| B(Tauri Core - Rust)
-    B -->|Spawn Process| C[whisper.cpp Native Engine]
-    B -->|Spawn Process| G[FFmpeg Audio Converter]
-    C -->|Hardware Acceleration| E[Vulkan / CUDA / OpenVINO]
+    A[Glassmorphic UI - HTML/CSS/TS] -->|Tauri IPC Bridge| B(Tauri Core - Rust)
+    B -->|Process Orchestration| C[whisper.cpp Native Engine]
+    B -->|Engine Resolver & Audio Extract| G[FFmpeg Pipeline]
+    B -->|Hardsub Video Engine| H[GPU Hardsub Encoder NVENC / QSV / AMF / VAAPI]
+    B -->|Local Media Server| K[Video Preview Streaming]
+    C -->|Hardware Acceleration| E[Vulkan / CUDA / OpenVINO / Metal]
     C -->|Thread Allocation| D[CPU Execution]
     F[(Local GGML Models)] -.->|Loads Model| C
-    H[(System Keyring)] -.->|Secure Keys| B
-    I[OpenAI / Anthropic / Gemini API] -.->|AI Translation| B
+    I[(System Keyring)] -.->|Secure Key Storage| B
+    J[OpenAI / Claude / Gemini / Ollama] -.->|AI Translation 121+ Langs| B
+    L[Telemetry Engine] -->|DRM fdinfo / Sysinfo| B
 ```
 
 ---
 
 ## 🚀 Installation & Packaging
 
-### 📦 Arch Linux (AUR)
+### 🐧 Linux
+
+#### Arch Linux (AUR)
 ```bash
 paru -S whisper-desktop-bin
+# or
+yay -S whisper-desktop-bin
 ```
 
-### 🐧 Debian / Ubuntu (`.deb`)
+#### Debian / Ubuntu (`.deb`)
 ```bash
-sudo dpkg -i Whisper.Desktop_*_amd64.deb
-sudo apt-get install -f
+sudo apt install ./WhisperDesktop_*_amd64.deb
 ```
 
-### 🎩 RedHat / Fedora (`.rpm`)
+#### RedHat / Fedora (`.rpm`)
 ```bash
-sudo dnf install Whisper.Desktop-*.rpm
+sudo dnf install ./WhisperDesktop-*.rpm
 ```
 
-### 🐳 AppImage
+#### AppImage (x86_64 & ARM64)
 ```bash
-chmod +x Whisper.Desktop_*.AppImage
-./Whisper.Desktop_*.AppImage
+chmod +x WhisperDesktop_*.AppImage
+./WhisperDesktop_*.AppImage
 ```
+
+---
+
+### 🪟 Windows (x86_64 & ARM64)
+Download the `.exe` setup installer or `.msi` package from the [Releases](https://github.com/AtomicError/whisper-desktop/releases) page. Fully compatible with Windows 10/11 and Windows on ARM devices.
+
+---
+
+### 🍏 macOS (Apple Silicon & Intel)
+Download the Universal `.dmg` from the [Releases](https://github.com/AtomicError/whisper-desktop/releases) page, open the disk image, and drag **Whisper Desktop** into your `Applications` folder.
 
 ---
 
@@ -123,7 +159,7 @@ chmod +x Whisper.Desktop_*.AppImage
 ### Prerequisites
 * **Node.js** (v18+) & **npm**
 * **Rust** toolchain (latest stable)
-* **System Libraries:** `gtk3`, `webkit2gtk-4.1`, `ffmpeg`
+* **System Libraries (Linux):** `gtk3`, `webkit2gtk-4.1`, `ffmpeg`
 
 ### 1. Clone Repository
 ```bash
@@ -153,21 +189,27 @@ Production packages will be generated in `src-tauri/target/release/bundle/`.
 
 ```
 whisper-desktop/
-├── src/                          # Frontend (Vanilla JS & Modern Glassmorphic CSS)
-│   ├── index.html                # Main UI layout & view panels
-│   ├── styles.css                # Glassmorphic design system
-│   └── main.js                   # State management & IPC bridge logic
+├── src/                          # Frontend UI & Studio Logic
+│   ├── index.html                # Main UI layout & studio views
+│   ├── styles.css                # Glassmorphic design system & UI tokens
+│   ├── main.js                   # Application state & IPC bridge
+│   ├── hardsub.ts                # Studio Hardsub 2.0 Canvas engine & controller
+│   └── fonts/                    # Bundled offline fonts (Inter, Vazirmatn, etc.)
 ├── src-tauri/                    # Tauri / Rust Backend
 │   ├── src/
-│   │   ├── main.rs               # Entry point & Tauri command handlers
-│   │   ├── settings.rs           # Profile & setting management
-│   │   ├── transcribe.rs         # FFmpeg & whisper-cli process orchestration
-│   │   ├── downloader.rs         # Model downloading with resume support
-│   │   ├── hardware.rs           # System stats & hardware polling
-│   │   ├── logger.rs             # Application logging ring-buffer
-│   │   └── translation/          # AI Translation pipeline
-│   ├── resources/                # Precompiled binaries (whisper-cli)
-│   └── tauri.conf.json           # Tauri app configuration
+│   │   ├── main.rs               # App entrypoint & Tauri command handlers
+│   │   ├── hardsub.rs            # GPU-accelerated video hardsubbing pipeline
+│   │   ├── video_server.rs       # Local HTTP video streaming server
+│   │   ├── ffmpeg_resolver.rs    # Static vs. System FFmpeg detection & fallback
+│   │   ├── transcribe.rs         # FFmpeg audio extract & whisper-cli orchestration
+│   │   ├── downloader.rs         # Native Rust HTTP streaming model downloader
+│   │   ├── settings.rs           # Flat atomic settings persistence & auto-migration
+│   │   ├── hardware.rs           # DRM fdinfo GPU metrics & sysinfo telemetry
+│   │   ├── logger.rs             # In-memory ring buffer logging
+│   │   ├── builder.rs            # Build pipeline & environment validation
+│   │   └── translation/          # AI Subtitle Translation engine (121+ languages)
+│   ├── resources/                # Precompiled binaries (whisper-cli & static ffmpeg)
+│   └── tauri.conf.json           # Tauri bundle & cross-platform configuration
 └── README.md
 ```
 
@@ -175,7 +217,7 @@ whisper-desktop/
 
 ## 🔒 Privacy Guarantee
 
-All speech transcription, audio conversion, and model execution run **100% locally** on your computer. Your audio files and transcripts never leave your machine unless you explicitly enable the optional AI Translation feature to communicate with your chosen API provider.
+All speech transcription, audio processing, model downloads, and video hardsubbing run **100% locally** on your computer. Your media files and transcripts never leave your device unless you explicitly enable the optional AI Translation feature with your own API credentials.
 
 ---
 

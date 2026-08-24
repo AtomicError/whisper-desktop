@@ -237,10 +237,10 @@
               <div class="glass-card intro-welcome">
                 <h2>Welcome to Whisper Desktop</h2>
                 <p>
-                  A modern, high-performance desktop application designed to orchestrate Whisper.cpp AI speech recognition and multi-language translation on Linux.
+                  A modern, high-performance desktop application designed to orchestrate Whisper.cpp AI speech recognition, 121+ language AI translation, and GPU-accelerated video hardsubbing across Linux, Windows, and macOS.
                 </p>
                 <p>
-                  Features out-of-the-box pre-compiled GPU acceleration backends, an integrated HuggingFace model downloader, advanced Whisper engine orchestration, 120+ language AI translations, and real-time subtitle generation.
+                  Features out-of-the-box hardware acceleration backends, an integrated official model downloader, advanced Whisper engine orchestration, Studio Hardsub 2.0 with real-time Canvas preview, and multi-provider AI translations.
                 </p>
                 <div class="features-list">
                   <div class="feature-item">
@@ -248,6 +248,13 @@
                     <div>
                       <div class="feature-title">Pre-Compiled Hardware Acceleration</div>
                       <div class="feature-desc">Pre-compiled Standard CPU, Vulkan GPU, OpenVINO, and CUDA backends ready out of the box with instant 1-click switching and zero setup.</div>
+                    </div>
+                  </div>
+                  <div class="feature-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                    <div>
+                      <div class="feature-title">Studio Hardsub 2.0 & Video Burn-in</div>
+                      <div class="feature-desc">Burn styled subtitles directly into video with full GPU hardware acceleration (NVENC, QSV, AMF, VideoToolbox, VAAPI), offline bundled fonts, and real-time Canvas preview.</div>
                     </div>
                   </div>
                   <div class="feature-item">
@@ -260,8 +267,8 @@
                   <div class="feature-item">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
                     <div>
-                      <div class="feature-title">120+ Languages AI Translation & Subtitles</div>
-                      <div class="feature-desc">Translate speech into 120+ world languages and export SRT, VTT, TXT, LRC, CSV, JSON, and word-level Karaoke timing formats.</div>
+                      <div class="feature-title">121+ Languages AI Translation & Subtitles</div>
+                      <div class="feature-desc">Translate speech into 121+ world languages using OpenAI, Claude, Gemini, DeepSeek, or local LLMs with secure OS keyring storage and token auto-recovery.</div>
                     </div>
                   </div>
                   <div class="feature-item">
@@ -316,6 +323,18 @@
                     <div style="flex-grow:1; text-align:left;">
                       <div style="font-weight:600">Download AI Models</div>
                       <div style="font-size:0.75rem; color:var(--color-text-muted)">Get Official GGML & Turbo weights</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="shortcut-btn-card" onclick="switchView('hardsub')" style="cursor:pointer;">
+                  <div class="shortcut-main-row" style="margin-bottom:0; display:flex; align-items:center; gap:12px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                    </svg>
+                    <div style="flex-grow:1; text-align:left;">
+                      <div style="font-weight:600">Studio Hardsub 2.0</div>
+                      <div style="font-size:0.75rem; color:var(--color-text-muted)">Style & burn subtitles with GPU acceleration</div>
                     </div>
                   </div>
                 </div>
