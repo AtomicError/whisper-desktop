@@ -1086,7 +1086,7 @@ export class HardsubController {
           this.isSubtitlesModified = true;
           if (this.activeCueId === cue.id) {
             this.currentSubtitleText = cue.text;
-            this.renderSubtitleOnCanvas();
+            this.renderSubtitleOnCanvas(true);
           }
         }
       }
@@ -1977,18 +1977,45 @@ export class HardsubController {
     });
   }
 
+  private syncPlayPauseUI(forcedState?: boolean) {
+    if (!this.videoElement) return;
+    const isPlaying = forcedState !== undefined ? forcedState : (!this.videoElement.paused && !this.videoElement.ended);
+    if (this.videoIconPlay) this.videoIconPlay.style.display = isPlaying ? 'none' : 'block';
+    if (this.videoIconPause) this.videoIconPause.style.display = isPlaying ? 'block' : 'none';
+    if (this.videoStatusBadge) {
+      if (isPlaying) {
+        this.videoStatusBadge.textContent = 'Playing Live';
+        this.videoStatusBadge.style.background = 'rgba(16, 185, 129, 0.2)';
+        this.videoStatusBadge.style.color = '#10B981';
+      } else {
+        this.videoStatusBadge.textContent = 'Paused';
+        this.videoStatusBadge.style.background = 'rgba(45, 127, 255, 0.15)';
+        this.videoStatusBadge.style.color = 'var(--color-royal-blue)';
+      }
+    }
+  }
+
   private setupVideoPlayerEvents() {
     if (!this.videoElement) return;
 
     // Play / Pause Toggle
     this.videoPlayBtn?.addEventListener('click', () => {
-      if (this.videoElement?.paused) {
+      if (!this.videoElement) return;
+      if (this.videoElement.paused || this.videoElement.ended) {
+        if (this.videoElement.ended) {
+          this.videoElement.currentTime = 0;
+        }
         const p = this.videoElement.play();
+        this.syncPlayPauseUI(true);
         if (p !== undefined) {
-          p.catch((err) => console.warn('Video playback notice:', err));
+          p.catch((err) => {
+            console.warn('Video playback notice:', err);
+            this.syncPlayPauseUI(false);
+          });
         }
       } else {
-        this.videoElement?.pause();
+        this.videoElement.pause();
+        this.syncPlayPauseUI(false);
       }
     });
 
@@ -2048,31 +2075,29 @@ export class HardsubController {
       if (!this.isSeekingVideo && this.pendingSeekTime === null) {
         this.scheduleDismissFreezeFrame();
       }
-      if (this.videoStatusBadge && this.videoElement?.paused) {
-        this.videoStatusBadge.textContent = 'Video Loaded';
-        this.videoStatusBadge.style.background = 'rgba(45, 127, 255, 0.15)';
-        this.videoStatusBadge.style.color = 'var(--color-royal-blue)';
+      if (this.videoElement?.paused) {
+        this.syncPlayPauseUI(false);
       }
+    });
+
+    this.videoElement.addEventListener('play', () => {
+      this.syncPlayPauseUI(true);
     });
 
     this.videoElement.addEventListener('playing', () => {
       this.scheduleDismissFreezeFrame();
-      if (this.videoIconPlay) this.videoIconPlay.style.display = 'none';
-      if (this.videoIconPause) this.videoIconPause.style.display = 'block';
-      if (this.videoStatusBadge) {
-        this.videoStatusBadge.textContent = 'Playing Live';
-        this.videoStatusBadge.style.background = 'rgba(16, 185, 129, 0.2)';
-        this.videoStatusBadge.style.color = '#10B981';
-      }
+      this.syncPlayPauseUI(true);
     });
 
     this.videoElement.addEventListener('pause', () => {
-      if (this.videoIconPlay) this.videoIconPlay.style.display = 'block';
-      if (this.videoIconPause) this.videoIconPause.style.display = 'none';
-      if (this.videoStatusBadge) {
-        this.videoStatusBadge.textContent = 'Paused';
-        this.videoStatusBadge.style.background = 'rgba(45, 127, 255, 0.15)';
-        this.videoStatusBadge.style.color = 'var(--color-royal-blue)';
+      this.syncPlayPauseUI(false);
+    });
+
+    this.videoElement.addEventListener('ended', () => {
+      this.syncPlayPauseUI(false);
+      if (this.videoSeekSlider) {
+        this.videoSeekSlider.value = '100';
+        this.updateSeekSliderProgress(100);
       }
     });
 
@@ -2091,6 +2116,7 @@ export class HardsubController {
         this.videoTimeDisplay.textContent = `${formatSecondsToDisplay(cur)} / ${formatSecondsToDisplay(dur)}`;
       }
 
+      this.syncPlayPauseUI();
       this.syncActiveSubtitleWithTime(cur * 1000);
     });
 
@@ -2471,13 +2497,18 @@ export class HardsubController {
       this.videoDisplayHeight = containerHeight;
       this.videoDisplayLeft = 0;
       this.videoDisplayTop = 0;
-      this.subtitleCanvas.width = containerWidth;
-      this.subtitleCanvas.height = containerHeight;
+      if (this.subtitleCanvas.width !== containerWidth || this.subtitleCanvas.height !== containerHeight) {
+        this.subtitleCanvas.width = containerWidth;
+        this.subtitleCanvas.height = containerHeight;
+        this._lastRenderKey = '';
+      }
       this.subtitleCanvas.style.left = '0px';
       this.subtitleCanvas.style.top = '0px';
       if (this.freezeCanvas) {
-        this.freezeCanvas.width = containerWidth;
-        this.freezeCanvas.height = containerHeight;
+        if (this.freezeCanvas.width !== containerWidth || this.freezeCanvas.height !== containerHeight) {
+          this.freezeCanvas.width = containerWidth;
+          this.freezeCanvas.height = containerHeight;
+        }
         this.freezeCanvas.style.left = '0px';
         this.freezeCanvas.style.top = '0px';
       }
@@ -2513,20 +2544,26 @@ export class HardsubController {
     const leftPx = `${Math.round(left)}px`;
     const topPx = `${Math.round(top)}px`;
 
-    this.subtitleCanvas.width = roundedW;
-    this.subtitleCanvas.height = roundedH;
+    const dimsChanged = this.subtitleCanvas.width !== roundedW || this.subtitleCanvas.height !== roundedH;
+    if (dimsChanged) {
+      this.subtitleCanvas.width = roundedW;
+      this.subtitleCanvas.height = roundedH;
+      this._lastRenderKey = '';
+    }
     this.subtitleCanvas.style.left = leftPx;
     this.subtitleCanvas.style.top = topPx;
 
     if (this.freezeCanvas) {
-      this.freezeCanvas.width = roundedW;
-      this.freezeCanvas.height = roundedH;
+      if (this.freezeCanvas.width !== roundedW || this.freezeCanvas.height !== roundedH) {
+        this.freezeCanvas.width = roundedW;
+        this.freezeCanvas.height = roundedH;
+      }
       this.freezeCanvas.style.left = leftPx;
       this.freezeCanvas.style.top = topPx;
     }
 
     // Redraw subtitle on resized canvas
-    this.renderSubtitleOnCanvas();
+    this.renderSubtitleOnCanvas(true);
   }
 
   private captureFreezeFrame(force = false) {
@@ -2741,6 +2778,7 @@ export class HardsubController {
         this.videoStatusBadge.style.background = 'rgba(45, 127, 255, 0.15)';
         this.videoStatusBadge.style.color = 'var(--color-royal-blue)';
       }
+      this.syncPlayPauseUI(false);
       this.updateVideoDropzoneUI(videoPath);
       this.updateVideoPreviewOverlayBounds();
     } catch (e) {
@@ -2756,6 +2794,7 @@ export class HardsubController {
       const ext = lastDot > 0 ? subPath.substring(lastDot + 1).toLowerCase() : 'srt';
       this.subtitleCues = parseSubtitleContent(content, ext);
       this.isSubtitlesModified = false;
+      this._lastRenderKey = '';
       this.updateSubDropzoneUI(subPath, this.subtitleCues.length);
       this.renderSubtitleCards();
       if (this.videoElement) {
@@ -2923,10 +2962,10 @@ export class HardsubController {
     // Ensure font is loaded before rendering on canvas
     const fontSpec = `16px '${this.state.fontName}'`;
     document.fonts.load(fontSpec).then(() => {
-      this.renderSubtitleOnCanvas();
+      this.renderSubtitleOnCanvas(true);
     }).catch(() => {
       // Fallback: render with whatever font is available
-      this.renderSubtitleOnCanvas();
+      this.renderSubtitleOnCanvas(true);
     });
   }
 
@@ -2935,7 +2974,7 @@ export class HardsubController {
    * Uses the same PlayResY=288 reference height and scaling logic as FFmpeg's
    * subtitles filter with original_size parameter.
    */
-  private renderSubtitleOnCanvas() {
+  private renderSubtitleOnCanvas(force: boolean = false) {
     this.updateUIControlsState();
     this.updateColorSwatches();
 
@@ -2955,7 +2994,7 @@ export class HardsubController {
       JSON.stringify(this.state),
       JSON.stringify(this.fontMetrics),
     ].join('|');
-    if (this._lastRenderKey === renderKey) return;
+    if (!force && this._lastRenderKey === renderKey) return;
     this._lastRenderKey = renderKey;
 
     // Clear entire canvas
