@@ -1,6 +1,6 @@
-/// System prompt definitions and generator.
+//! System prompt definitions and generator.
 
-pub const DEFAULT_SYSTEM_PROMPT: &str = 
+pub const DEFAULT_SYSTEM_PROMPT: &str =
     "You are a professional translator. Respond only with the content, either translated or rewritten. Do not add explanations, comments, or any extra text.";
 
 pub fn build_system_prompt(custom_prompt: &str, target_lang: &str, polish: bool) -> String {

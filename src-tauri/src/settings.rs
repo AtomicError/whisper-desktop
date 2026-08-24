@@ -363,8 +363,41 @@ pub fn load_settings_file() -> WhisperSettings {
     load_settings_from_path(&get_settings_path())
 }
 
+/// Serializes every settings WRITE in this process. Two independent writers
+/// exist: the frontend `save_settings` command and the translation module's
+/// reactive limit-persistence. Without mutual exclusion their
+/// load-modify-save cycles interleave and silently drop the other side's
+/// update (e.g. a freshly learned model context window).
+static SETTINGS_WRITE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+pub(crate) fn with_settings_write_lock<T>(f: impl FnOnce() -> T) -> T {
+    let guard = SETTINGS_WRITE_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let out = f();
+    drop(guard);
+    out
+}
+
 pub fn save_settings_file(settings: &WhisperSettings) -> Result<(), String> {
-    save_settings_to_path(&get_settings_path(), settings)
+    with_settings_write_lock(|| save_settings_to_path(&get_settings_path(), settings))
+}
+
+/// Load-modify-save under one lock, for callers that must not lose
+/// concurrent frontend writes between reading and writing.
+/// Only persists to disk if the `mutate` closure returns `Ok(_)`.
+pub(crate) fn update_settings_locked<T, E>(
+    mutate: impl FnOnce(&mut WhisperSettings) -> Result<T, E>,
+) -> Result<T, String>
+where
+    E: std::fmt::Display,
+{
+    with_settings_write_lock(|| {
+        let mut settings = load_settings_from_path(&get_settings_path());
+        let out = mutate(&mut settings).map_err(|e| e.to_string())?;
+        save_settings_to_path(&get_settings_path(), &settings)?;
+        Ok(out)
+    })
 }
 
 /// Strip api_key from providers that use keyring before persisting to disk
@@ -595,5 +628,14 @@ mod tests {
         assert_eq!(loaded.beam_size, 5);
 
         let _ = fs::remove_file(&temp_path);
+    }
+
+    #[test]
+    fn update_settings_locked_aborts_write_on_err() {
+        let result = update_settings_locked(|_settings| {
+            Err::<(), &str>("simulated error during mutation")
+        });
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("simulated error"));
     }
 }

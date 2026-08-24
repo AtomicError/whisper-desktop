@@ -1,12 +1,13 @@
-pub mod provider;
+pub mod checkpoint;
 pub mod chunker;
-pub mod prompts;
 pub mod formatter;
+pub mod prompts;
+pub mod provider;
 pub mod translator;
 
 use crate::settings::WhisperSettings;
-use tauri::AppHandle;
 use serde_json::Value;
+use tauri::AppHandle;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -21,12 +22,24 @@ pub async fn fetch_provider_models(
     api_key: String,
     api_format: String,
 ) -> Result<Vec<FetchedModel>, String> {
-    let client = reqwest::Client::new();
-    
+    // Single parse point for the wire protocol — unknown values are a loud
+    // configuration error, never a silent fallback to another format.
+    let fmt = crate::translation::provider::ApiFormat::parse(&api_format)?;
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(
+            translator::REQUEST_TIMEOUT_SECS,
+        ))
+        .connect_timeout(std::time::Duration::from_secs(
+            translator::CONNECT_TIMEOUT_SECS,
+        ))
+        .build()
+        .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
+
     // Construct models endpoint URL based on base_url and format
     let mut url = base_url.clone();
-    
-    if api_format == "Responses" {
+
+    if fmt == crate::translation::provider::ApiFormat::GeminiResponses {
         // Gemini: GET https://generativelanguage.googleapis.com/v1beta/models?key={api_key}
         if !url.contains("/models") {
             let clean_base = url.trim_end_matches('/');
@@ -36,8 +49,11 @@ pub async fn fetch_provider_models(
                 url = format!("{}/v1beta/models", clean_base);
             }
         }
+        // Key travels in the query string (Gemini convention). Percent-encode
+        // it and respect pre-existing query params — same rules as
+        // `build_request_url`, so the two paths cannot drift apart.
         if !api_key.is_empty() {
-            url = format!("{}?key={}", url, api_key);
+            url = translator::append_query_param(&url, "key", &api_key);
         }
     } else {
         // OpenAI-compatible / Anthropic models list
@@ -50,56 +66,70 @@ pub async fn fetch_provider_models(
             }
         }
     }
-    
+
     let mut req = client.get(&url);
-    if api_format == "Anthropic messages" {
-        if !api_key.is_empty() {
-            req = req.header("x-api-key", &api_key);
+    use crate::translation::provider::ApiFormat as Fmt;
+    match fmt {
+        Fmt::AnthropicMessages => {
+            if !api_key.is_empty() {
+                req = req.header("x-api-key", &api_key);
+            }
+            req = req.header("anthropic-version", crate::translation::provider::ANTHROPIC_VERSION);
         }
-        req = req.header("anthropic-version", "2023-06-01");
-    } else if api_format == "Responses" {
-        // Gemini key is in URL query param
-    } else {
-        // OpenAI compatible
-        if !api_key.is_empty() {
-            req = req.bearer_auth(&api_key);
+        Fmt::GeminiResponses => {
+            // Gemini key is in URL query param
+        }
+        Fmt::OpenAiCompatible => {
+            if !api_key.is_empty() {
+                req = req.bearer_auth(&api_key);
+            }
         }
     }
-    
-    let res = req.send().await
+
+    let res = req
+        .send()
+        .await
         .map_err(|e| format!("Failed to connect to API models endpoint: {}", e))?;
-        
+
     if !res.status().is_success() {
         return Err(format!("API returned error status: {}", res.status()));
     }
-    
-    let json: Value = res.json().await
+
+    let json: Value = res
+        .json()
+        .await
         .map_err(|e| format!("Failed to parse JSON response: {}", e))?;
-        
+
     let mut models = Vec::new();
-    
+
+    // Context-window extraction deliberately excludes `max_tokens`: that field
+    // is an OUTPUT cap, not a context window — using it as a proxy produced
+    // wrongly small chunk budgets.
+    fn context_window_of(item: &Value) -> Option<usize> {
+        item.get("max_model_len")
+            .or_else(|| item.get("context_length"))
+            .and_then(|v| v.as_u64())
+            .map(|v| v as usize)
+    }
+
     if let Some(arr) = json.get("data").and_then(|v| v.as_array()) {
         // OpenAI format: { "data": [ { "id": "gpt-4o" }, ... ] }
         for item in arr {
             if let Some(id) = item.get("id").and_then(|v| v.as_str()) {
-                let context_window = item.get("max_model_len")
-                    .or_else(|| item.get("context_length"))
-                    .or_else(|| item.get("max_tokens"))
-                    .and_then(|v| v.as_u64())
-                    .map(|v| v as usize);
-                models.push(FetchedModel { id: id.to_string(), context_window });
+                models.push(FetchedModel {
+                    id: id.to_string(),
+                    context_window: context_window_of(item),
+                });
             }
         }
     } else if let Some(arr) = json.as_array() {
         // Direct array response
         for item in arr {
             if let Some(id) = item.get("id").and_then(|v| v.as_str()) {
-                let context_window = item.get("max_model_len")
-                    .or_else(|| item.get("context_length"))
-                    .or_else(|| item.get("max_tokens"))
-                    .and_then(|v| v.as_u64())
-                    .map(|v| v as usize);
-                models.push(FetchedModel { id: id.to_string(), context_window });
+                models.push(FetchedModel {
+                    id: id.to_string(),
+                    context_window: context_window_of(item),
+                });
             }
         }
     } else if let Some(arr) = json.get("models").and_then(|v| v.as_array()) {
@@ -108,37 +138,38 @@ pub async fn fetch_provider_models(
             if let Some(name) = item.get("name").and_then(|v| v.as_str()) {
                 // Strip models/ prefix if present
                 let clean_name = name.strip_prefix("models/").unwrap_or(name);
-                let context_window = item.get("max_model_len")
-                    .or_else(|| item.get("context_length"))
-                    .or_else(|| item.get("max_tokens"))
-                    .and_then(|v| v.as_u64())
-                    .map(|v| v as usize)
-                    .or_else(|| {
-                        let n_lower = clean_name.to_lowercase();
-                        if n_lower.contains("gemini-1.5") || n_lower.contains("gemini-2.0") {
-                            Some(1_000_000)
-                        } else if n_lower.contains("gemini-1.0") {
-                            Some(32_768)
-                        } else {
-                            None
-                        }
-                    });
-                models.push(FetchedModel { id: clean_name.to_string(), context_window });
+                let context_window = context_window_of(item).or_else(|| {
+                    let n_lower = clean_name.to_lowercase();
+                    if n_lower.contains("gemini-1.5") || n_lower.contains("gemini-2.0") {
+                        Some(1_000_000)
+                    } else if n_lower.contains("gemini-1.0") {
+                        Some(32_768)
+                    } else {
+                        None
+                    }
+                });
+                models.push(FetchedModel {
+                    id: clean_name.to_string(),
+                    context_window,
+                });
             }
         }
     }
-    
+
     if models.is_empty() {
-        // Anthropic fallback since it doesn't support public listing in some configurations
-        if api_format == "Anthropic messages" {
-            models.push(FetchedModel { id: "claude-3-5-sonnet-latest".to_string(), context_window: Some(200_000) });
-            models.push(FetchedModel { id: "claude-3-5-haiku-latest".to_string(), context_window: Some(200_000) });
-            models.push(FetchedModel { id: "claude-3-opus-latest".to_string(), context_window: Some(200_000) });
+        // Honest failure: fabricating hardcoded model IDs here masked broken
+        // configurations (wrong key, restrictive proxy) as a fake success and
+        // pushed users toward selecting models their account doesn't have.
+        // Anthropic's listing endpoint may be unavailable in some setups —
+        // in that case models can be added manually in the provider editor.
+        let hint = if api_format == "Anthropic messages" {
+            " (Anthropic does not support model listing on all setups — add the model ID manually in the provider editor)"
         } else {
-            return Err("No models found in the API response.".to_string());
-        }
+            ""
+        };
+        return Err(format!("No models found in the API response.{}", hint));
     }
-    
+
     models.sort_by(|a, b| a.id.cmp(&b.id));
     Ok(models)
 }
@@ -147,19 +178,30 @@ pub async fn fetch_provider_models(
 pub async fn translate_transcription_files(
     app: AppHandle,
     session_state: tauri::State<'_, crate::TranscriptionState>,
+    log_state: tauri::State<'_, crate::LogState>,
     settings: WhisperSettings,
     generated_files: Vec<String>,
     parent_dir: String,
 ) -> Result<Vec<String>, String> {
-    translator::translate_files(app, session_state.0.clone(), settings, generated_files, parent_dir).await
+    translator::translate_files(
+        app,
+        session_state.0.clone(),
+        log_state.0.clone(),
+        settings,
+        generated_files,
+        parent_dir,
+    )
+    .await
 }
 
 #[tauri::command]
 pub async fn preview_translate_first_lines(
+    app: AppHandle,
+    log_state: tauri::State<'_, crate::LogState>,
     settings: WhisperSettings,
     file_content: String,
 ) -> Result<String, String> {
-    translator::preview_translate(settings, file_content).await
+    translator::preview_translate(app, log_state.0.clone(), settings, file_content).await
 }
 
 #[tauri::command]

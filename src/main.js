@@ -3069,6 +3069,9 @@ window.runBatchExtraction = async function() {
         try {
           item.status = 'translating';
           renderBatchQueueTable();
+          // Message only — the percentage bar is driven by per-chunk
+          // 'translation-status' events from the backend, so it keeps
+          // moving instead of freezing at the batch-item fraction.
           if (msgEl) msgEl.textContent = `[${i + 1}/${totalCount}] Translating: '${item.name}'...`;
           
           const parentDir = item.path.substring(0, item.path.lastIndexOf('/'));

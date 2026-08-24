@@ -5714,6 +5714,7 @@ name = "whisper-desktop"
 version = "2.3.0"
 dependencies = [
  "chrono",
+ "encoding_rs",
  "futures-util",
  "keyring",
  "regex",
