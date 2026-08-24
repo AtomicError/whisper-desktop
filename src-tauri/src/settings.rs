@@ -100,8 +100,8 @@ impl Default for WhisperSettings {
 
 impl WhisperSettings {
     pub fn default_settings() -> Self {
-        let home = std::env::var("HOME").unwrap_or_else(|_| "/home/user".to_string());
-        let default_models = format!("{}/whisper.cpp", home);
+        let home = get_user_home_dir();
+        let default_models = home.join("whisper.cpp").to_string_lossy().to_string();
 
         WhisperSettings {
             selected_backend: "Standard".to_string(),
@@ -219,8 +219,8 @@ impl WhisperSettings {
 
         // Models dir fallback
         if self.models_dir.trim().is_empty() {
-            let home = std::env::var("HOME").unwrap_or_else(|_| "/home/user".to_string());
-            self.models_dir = format!("{}/whisper.cpp", home);
+            let home = get_user_home_dir();
+            self.models_dir = home.join("whisper.cpp").to_string_lossy().to_string();
         }
 
         // FFmpeg source fallback
@@ -238,13 +238,84 @@ struct LegacyAppSettings {
     professional: Option<WhisperSettings>,
 }
 
+/// Resolve the current user's home directory cross-platform
+pub fn get_user_home_dir() -> PathBuf {
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(profile) = std::env::var("USERPROFILE") {
+            if !profile.trim().is_empty() {
+                return PathBuf::from(profile);
+            }
+        }
+        if let (Ok(drive), Ok(path)) = (std::env::var("HOMEDRIVE"), std::env::var("HOMEPATH")) {
+            let combined = format!("{}{}", drive, path);
+            if !combined.trim().is_empty() {
+                return PathBuf::from(combined);
+            }
+        }
+    }
+
+    if let Ok(home) = std::env::var("HOME") {
+        if !home.trim().is_empty() {
+            return PathBuf::from(home);
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        PathBuf::from("C:\\")
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        PathBuf::from("/home/user")
+    }
+}
+
 pub fn get_settings_path() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_else(|_| "/home/user".to_string());
-    let mut path = PathBuf::from(home);
-    path.push(".config");
-    path.push("whisper-manager-desktop");
-    path.push("settings.json");
-    path
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(app_data) = std::env::var("APPDATA") {
+            if !app_data.trim().is_empty() {
+                let mut path = PathBuf::from(app_data);
+                path.push("whisper-desktop");
+                path.push("settings.json");
+                return path;
+            }
+        }
+        let mut path = get_user_home_dir();
+        path.push("AppData");
+        path.push("Roaming");
+        path.push("whisper-desktop");
+        path.push("settings.json");
+        return path;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let mut path = get_user_home_dir();
+        path.push("Library");
+        path.push("Application Support");
+        path.push("whisper-desktop");
+        path.push("settings.json");
+        return path;
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        if let Ok(xdg_config) = std::env::var("XDG_CONFIG_HOME") {
+            if !xdg_config.trim().is_empty() {
+                let mut path = PathBuf::from(xdg_config);
+                path.push("whisper-desktop");
+                path.push("settings.json");
+                return path;
+            }
+        }
+        let mut path = get_user_home_dir();
+        path.push(".config");
+        path.push("whisper-desktop");
+        path.push("settings.json");
+        path
+    }
 }
 
 pub fn load_settings_from_path(path: &Path) -> WhisperSettings {
@@ -677,5 +748,17 @@ mod tests {
         });
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("simulated error"));
+    }
+
+    #[test]
+    fn settings_path_ends_with_whisper_desktop_settings_json() {
+        let path = get_settings_path();
+        let path_str = path.to_string_lossy();
+        assert!(path_str.ends_with("settings.json"));
+        assert!(path_str.contains("whisper-desktop"));
+        assert!(!path_str.contains("whisper-manager-desktop"));
+
+        let home = get_user_home_dir();
+        assert!(!home.as_os_str().is_empty());
     }
 }
