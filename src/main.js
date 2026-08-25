@@ -2162,12 +2162,21 @@ async function scanAndPopulateModels() {
 
 window.toggleOutputDirCustomField = function() {
   const modeEl = document.getElementById('opt-outputDirMode');
+  const cardEl = document.getElementById('output-dir-custom-card');
   const wrapEl = document.getElementById('output-dir-custom-wrap');
-  if (!modeEl || !wrapEl) return;
-  if (modeEl.value === 'custom') {
-    wrapEl.style.display = 'flex';
-  } else {
-    wrapEl.style.display = 'none';
+  if (cardEl) {
+    if (modeEl && modeEl.value === 'custom') {
+      cardEl.style.display = 'flex';
+    } else {
+      cardEl.style.display = 'none';
+    }
+  }
+  if (wrapEl) {
+    if (modeEl && modeEl.value === 'custom') {
+      wrapEl.style.display = 'flex';
+    } else {
+      wrapEl.style.display = 'none';
+    }
   }
 };
 

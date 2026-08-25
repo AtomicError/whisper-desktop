@@ -974,25 +974,38 @@
                     </div>
                   </div>
 
-                  <div class="setting-card" style="margin-top:12px;">
+                  <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title">Output Directory Mode</span>
-                        <span class="setting-flag">Destination</span>
                       </div>
                       <div class="setting-desc">Choose where transcribed subtitle and text files are saved on your computer.</div>
                     </div>
-                    <div class="setting-control" style="width:320px; display:flex; flex-direction:column; gap:8px;">
-                      <div class="select-wrapper">
-                        <select class="custom-select" id="opt-outputDirMode" onchange="toggleOutputDirCustomField()">
+                    <div class="setting-control" style="width:300px;">
+                      <div class="select-wrapper" style="width:100%;">
+                        <select class="select-control" id="opt-outputDirMode" onchange="toggleOutputDirCustomField()">
                           <option value="input_dir">Same as Input File Directory (Default)</option>
                           <option value="custom">Custom Directory...</option>
                         </select>
                       </div>
-                      <div id="output-dir-custom-wrap" style="display:none; gap:8px;">
-                        <input class="text-input" type="text" id="opt-outputDirPath" placeholder="/path/to/custom/output" />
-                        <button class="btn-secondary" style="padding: 10px 14px; font-size:0.8rem;" onclick="browseOutputDir()">Browse</button>
+                    </div>
+                  </div>
+
+                  <div class="setting-card" id="output-dir-custom-card" style="display:none;">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title">Custom Output Path</span>
                       </div>
+                      <div class="setting-desc">Specify a dedicated folder on your disk where all transcriptions will be saved.</div>
+                    </div>
+                    <div class="setting-control setting-control-path">
+                      <div class="readonly-path-field" onclick="browseOutputDir()" title="Click to browse custom output directory">
+                        <svg class="path-folder-icon" viewBox="0 0 24 24" width="16" height="16">
+                          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        <input class="readonly-path-input" type="text" id="opt-outputDirPath" readonly tabindex="-1" placeholder="Select output folder..." />
+                      </div>
+                      <button class="btn-secondary path-browse-btn" onclick="browseOutputDir()" type="button">Browse</button>
                     </div>
                   </div>
 

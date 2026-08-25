@@ -402,46 +402,13 @@ pub async fn run_transcription(
         }
     }
     
-    // Generate output file prefix (avoid overwriting existing ones by appending counters)
+    // Resolve output directory based on user settings, multi-disk support, and write-permission safety
     let input_path = Path::new(&settings.input_file);
     let base_name = input_path.file_stem().unwrap_or_default().to_string_lossy();
     let parent_dir = input_path.parent().unwrap_or_else(|| Path::new("."));
 
-    // Resolve output directory based on user settings and cross-platform home resolution
-    let out_dir = if settings.output_dir_mode == "custom" && !settings.output_dir_path.trim().is_empty() {
-        let custom = std::path::PathBuf::from(&settings.output_dir_path);
-        let _ = std::fs::create_dir_all(&custom);
-        if custom.exists() {
-            custom
-        } else {
-            parent_dir.to_path_buf()
-        }
-    } else {
-        let user_home = crate::settings::get_user_home_dir();
-        let home_str = user_home.to_string_lossy();
-        if !home_str.is_empty() && !parent_dir.starts_with(&user_home) {
-            let safe = user_home.join("Documents/WhisperOutputs");
-            let _ = std::fs::create_dir_all(&safe);
-            safe
-        } else {
-            parent_dir.to_path_buf()
-        }
-    };
-
-    let mut out_name = out_dir.join(base_name.to_string());
-    let mut counter = 1;
-    while {
-        let name_str = out_name.file_name()
-            .map(|f| f.to_string_lossy().into_owned())
-            .unwrap_or_default();
-
-        out_dir.join(format!("{}.srt", name_str)).exists()
-            || out_dir.join(format!("{}.txt", name_str)).exists()
-    } {
-        out_name = out_dir.join(format!("{}-{}", base_name, counter));
-        counter += 1;
-    }
-    
+    let out_dir = resolve_output_dir(&settings, parent_dir);
+    let out_name = resolve_non_colliding_output_name(&out_dir, &base_name);
     let out_name_str = out_name.to_str().ok_or("Invalid output name path")?.to_string();
     
     let model_full_path = root.join(&settings.model_path);
@@ -837,3 +804,130 @@ pub(crate) async fn next_line_lossy<R: AsyncBufRead + Unpin>(
         Err(_) => None,
     }
 }
+
+/// Tests whether a directory is writable by creating and immediately removing a test file.
+pub fn is_dir_writable(dir: &Path) -> bool {
+    if !dir.exists() || !dir.is_dir() {
+        return false;
+    }
+    let test_file = dir.join(format!(".whisper_write_test_{}_{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0)));
+    if std::fs::write(&test_file, b"ok").is_ok() {
+        let _ = std::fs::remove_file(&test_file);
+        true
+    } else {
+        false
+    }
+}
+
+/// Resolves the output directory for transcribed files based on user configuration.
+/// - If `custom` mode is selected and valid/writable, uses that custom directory.
+/// - If `input_dir` mode is selected (default), uses `input_parent` across any disk/mount (USB, external, secondary drives).
+/// - If `input_parent` is read-only (or unwritable), gracefully falls back to ~/Documents/WhisperOutputs or system temp.
+pub fn resolve_output_dir(settings: &WhisperSettings, input_parent: &Path) -> std::path::PathBuf {
+    if settings.output_dir_mode == "custom" && !settings.output_dir_path.trim().is_empty() {
+        let custom = std::path::PathBuf::from(&settings.output_dir_path);
+        let _ = std::fs::create_dir_all(&custom);
+        if is_dir_writable(&custom) {
+            return custom;
+        }
+    }
+
+    if is_dir_writable(input_parent) {
+        return input_parent.to_path_buf();
+    }
+
+    let user_home = crate::settings::get_user_home_dir();
+    let safe = user_home.join("Documents/WhisperOutputs");
+    let _ = std::fs::create_dir_all(&safe);
+    if is_dir_writable(&safe) {
+        safe
+    } else {
+        std::env::temp_dir()
+    }
+}
+
+/// Computes an output base path that avoids colliding with ANY enabled or standard Whisper output format on disk.
+pub fn resolve_non_colliding_output_name(out_dir: &Path, base_name: &str) -> std::path::PathBuf {
+    const CHECK_EXTENSIONS: &[&str] = &[
+        ".txt", ".srt", ".vtt", ".lrc", ".csv", ".json", ".wts", ".wts.sh",
+    ];
+
+    let mut out_name = out_dir.join(base_name);
+    let mut counter = 1;
+
+    while {
+        let name_str = out_name
+            .file_name()
+            .map(|f| f.to_string_lossy().into_owned())
+            .unwrap_or_default();
+
+        CHECK_EXTENSIONS.iter().any(|ext| {
+            out_dir.join(format!("{}{}", name_str, ext)).exists()
+        })
+    } {
+        out_name = out_dir.join(format!("{}-{}", base_name, counter));
+        counter += 1;
+    }
+
+    out_name
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_resolve_output_dir_input_dir_mode() {
+        let temp_dir = std::env::temp_dir().join(format!("whisper_test_dir_{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&temp_dir);
+
+        let mut settings = WhisperSettings::default_settings();
+        settings.output_dir_mode = "input_dir".to_string();
+
+        let resolved = resolve_output_dir(&settings, &temp_dir);
+        assert_eq!(resolved, temp_dir);
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_resolve_output_dir_custom_mode() {
+        let custom_dir = std::env::temp_dir().join(format!("whisper_custom_dir_{}", std::process::id()));
+        let input_dir = std::env::temp_dir().join(format!("whisper_in_dir_{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&input_dir);
+
+        let mut settings = WhisperSettings::default_settings();
+        settings.output_dir_mode = "custom".to_string();
+        settings.output_dir_path = custom_dir.to_string_lossy().to_string();
+
+        let resolved = resolve_output_dir(&settings, &input_dir);
+        assert_eq!(resolved, custom_dir);
+        assert!(custom_dir.exists());
+
+        let _ = std::fs::remove_dir_all(&custom_dir);
+        let _ = std::fs::remove_dir_all(&input_dir);
+    }
+
+    #[test]
+    fn test_resolve_non_colliding_output_name_all_formats() {
+        let temp_dir = std::env::temp_dir().join(format!("whisper_collide_dir_{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&temp_dir);
+
+        // Pre-create a .vtt file (without .srt or .txt)
+        let vtt_file = temp_dir.join("sample.vtt");
+        std::fs::write(&vtt_file, b"WEBVTT").unwrap();
+
+        let resolved = resolve_non_colliding_output_name(&temp_dir, "sample");
+        assert_eq!(resolved, temp_dir.join("sample-1"));
+
+        // Pre-create sample-1.json
+        let json_file = temp_dir.join("sample-1.json");
+        std::fs::write(&json_file, b"{}").unwrap();
+
+        let resolved_2 = resolve_non_colliding_output_name(&temp_dir, "sample");
+        assert_eq!(resolved_2, temp_dir.join("sample-2"));
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+}
+

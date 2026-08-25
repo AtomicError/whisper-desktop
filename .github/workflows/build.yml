@@ -1,14 +1,10 @@
-name: Build Cross-Platform App
+name: Release & Build Cross-Platform
 
 on:
   push:
-    branches:
-      - main
     tags:
       - 'v*'
-  pull_request:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
   build-tauri:
@@ -57,14 +53,210 @@ jobs:
         with:
           workspaces: './src-tauri -> target'
 
-      - name: Install dependencies (Ubuntu only)
-        if: startsWith(matrix.platform, 'ubuntu')
+      - name: Install Linux dependencies (Ubuntu x86_64)
+        if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev rpm libglib2.0-dev pkg-config xdg-utils file
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev \
+            rpm \
+            libglib2.0-dev \
+            pkg-config \
+            xdg-utils \
+            file \
+            build-essential \
+            cmake \
+            libvulkan-dev \
+            libshaderc-dev \
+            glslang-tools \
+            spirv-headers
+
+      - name: Setup Vulkan SDK
+        if: matrix.platform == 'ubuntu-22.04' || matrix.platform == 'windows-latest'
+        uses: herleb/setup-vulkan-sdk@v1.2
+        with:
+          vulkan-query-version: 'latest'
+          vulkan-components: 'Shaderc'
+          vulkan-use-cache: true
+
+      - name: Install CUDA Toolkit (Ubuntu x86_64)
+        if: matrix.platform == 'ubuntu-22.04'
+        uses: Jimver/cuda-toolkit@v0.2.35
+        id: cuda-toolkit
+        with:
+          cuda: '12.5.0'
+          method: 'network'
+
+      - name: Add Intel APT Repository for OpenVINO (Ubuntu x86_64)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          wget -q https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
+          sudo gpg --dearmor -o /usr/share/keyrings/intel-openvino.gpg GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
+          echo "deb [signed-by=/usr/share/keyrings/intel-openvino.gpg] https://apt.repos.intel.com/openvino ubuntu22 main" | sudo tee /etc/apt/sources.list.d/intel-openvino.list
+          sudo apt-get update
+          sudo apt-get install -y libopenvino-dev-2024.2.0
+
+      - name: Install Linux dependencies (Ubuntu ARM64)
+        if: matrix.platform == 'ubuntu-24.04-arm'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev \
+            rpm \
+            libglib2.0-dev \
+            pkg-config \
+            xdg-utils \
+            file \
+            build-essential \
+            cmake \
+            libvulkan-dev \
+            libshaderc-dev \
+            glslang-tools
 
       - name: Install frontend dependencies
         run: npm ci
+
+      # --- WHISPER.CPP BINARIES COMPILATION & CACHING ---
+
+      - name: Detect Latest whisper.cpp Tag
+        id: whisper_tag
+        shell: bash
+        run: |
+          LATEST_TAG=$(git ls-remote --tags --refs https://github.com/ggml-org/whisper.cpp.git | awk -F/ '{print $3}' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)
+          if [ -z "$LATEST_TAG" ]; then
+            LATEST_TAG="v1.7.4"
+          fi
+          echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+          echo "Detected whisper.cpp tag: $LATEST_TAG"
+
+      - name: Cache Whisper Binaries
+        id: whisper-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            src-tauri/resources/whisper-cli-*
+          key: whisper-bin-${{ matrix.platform }}-${{ matrix.arch }}-${{ steps.whisper_tag.outputs.tag }}-v1
+
+      - name: Clone whisper.cpp
+        if: steps.whisper-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          mkdir -p src-tauri/resources
+          git clone --depth 1 --branch "${{ steps.whisper_tag.outputs.tag }}" https://github.com/ggml-org/whisper.cpp.git whisper.cpp-src
+
+      - name: Compile Whisper CLI (Linux x86_64)
+        if: matrix.platform == 'ubuntu-22.04' && steps.whisper-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p src-tauri/resources
+
+          # 1. Standard CPU Backend
+          echo "Building Standard CPU backend..."
+          cmake -B whisper.cpp-src/build-standard -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DBUILD_SHARED_LIBS=OFF
+          cmake --build whisper.cpp-src/build-standard -j$(nproc) --config Release --target whisper-cli
+          cp whisper.cpp-src/build-standard/bin/whisper-cli src-tauri/resources/whisper-cli-standard
+
+          # 2. Vulkan Backend
+          echo "Building Vulkan backend..."
+          cmake -B whisper.cpp-src/build-vulkan -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DGGML_VULKAN=ON -DBUILD_SHARED_LIBS=OFF
+          cmake --build whisper.cpp-src/build-vulkan -j$(nproc) --config Release --target whisper-cli
+          cp whisper.cpp-src/build-vulkan/bin/whisper-cli src-tauri/resources/whisper-cli-vulkan
+
+          # 3. OpenVINO Backend
+          echo "Building OpenVINO backend..."
+          cmake -B whisper.cpp-src/build-openvino -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DWHISPER_OPENVINO=1 -DBUILD_SHARED_LIBS=OFF
+          cmake --build whisper.cpp-src/build-openvino -j$(nproc) --config Release --target whisper-cli
+          cp whisper.cpp-src/build-openvino/bin/whisper-cli src-tauri/resources/whisper-cli-openvino
+
+          # 4. CUDA Backend
+          echo "Building CUDA backend..."
+          cmake -B whisper.cpp-src/build-cuda -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DGGML_CUDA=ON -DBUILD_SHARED_LIBS=OFF
+          cmake --build whisper.cpp-src/build-cuda -j$(nproc) --config Release --target whisper-cli
+          cp whisper.cpp-src/build-cuda/bin/whisper-cli src-tauri/resources/whisper-cli-cuda
+
+          chmod +x src-tauri/resources/whisper-cli-*
+
+      - name: Compile Whisper CLI (Linux ARM64)
+        if: matrix.platform == 'ubuntu-24.04-arm' && steps.whisper-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p src-tauri/resources
+
+          # 1. Standard CPU Backend (NEON Accelerated)
+          echo "Building Standard ARM64 CPU backend..."
+          cmake -B whisper.cpp-src/build-standard -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DBUILD_SHARED_LIBS=OFF
+          cmake --build whisper.cpp-src/build-standard -j$(nproc) --config Release --target whisper-cli
+          cp whisper.cpp-src/build-standard/bin/whisper-cli src-tauri/resources/whisper-cli-standard
+
+          # 2. Vulkan Backend
+          echo "Building Vulkan ARM64 backend..."
+          cmake -B whisper.cpp-src/build-vulkan -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DGGML_VULKAN=ON -DBUILD_SHARED_LIBS=OFF
+          cmake --build whisper.cpp-src/build-vulkan -j$(nproc) --config Release --target whisper-cli
+          cp whisper.cpp-src/build-vulkan/bin/whisper-cli src-tauri/resources/whisper-cli-vulkan
+
+          # Fallbacks for OpenVINO/CUDA
+          cp src-tauri/resources/whisper-cli-standard src-tauri/resources/whisper-cli-openvino
+          cp src-tauri/resources/whisper-cli-standard src-tauri/resources/whisper-cli-cuda
+
+          chmod +x src-tauri/resources/whisper-cli-*
+
+      - name: Compile Whisper CLI (Windows x64)
+        if: matrix.platform == 'windows-latest' && steps.whisper-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path src-tauri/resources
+
+          # 1. Standard CPU Backend (MSVC + AVX2 / OpenMP)
+          Write-Host "Building Standard CPU backend for Windows..."
+          cmake -B whisper.cpp-src/build-standard -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DBUILD_SHARED_LIBS=OFF
+          cmake --build whisper.cpp-src/build-standard --config Release --target whisper-cli
+          Copy-Item whisper.cpp-src/build-standard/bin/Release/whisper-cli.exe src-tauri/resources/whisper-cli-standard.exe
+
+          # 2. Vulkan Backend
+          Write-Host "Building Vulkan backend for Windows..."
+          cmake -B whisper.cpp-src/build-vulkan -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_VULKAN=ON -DBUILD_SHARED_LIBS=OFF
+          cmake --build whisper.cpp-src/build-vulkan --config Release --target whisper-cli
+          Copy-Item whisper.cpp-src/build-vulkan/bin/Release/whisper-cli.exe src-tauri/resources/whisper-cli-vulkan.exe
+
+          # Copy fallbacks
+          Copy-Item src-tauri/resources/whisper-cli-standard.exe src-tauri/resources/whisper-cli-openvino.exe
+          Copy-Item src-tauri/resources/whisper-cli-vulkan.exe src-tauri/resources/whisper-cli-cuda.exe
+
+      - name: Compile Whisper CLI (macOS Universal Native + Metal)
+        if: matrix.platform == 'macos-latest' && steps.whisper-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p src-tauri/resources
+
+          # 1. x86_64 Intel Build (Metal disabled on Intel cross)
+          echo "Building x86_64 Intel binary..."
+          cmake -B whisper.cpp-src/build-x64 -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64" -DGGML_METAL=OFF -DBUILD_SHARED_LIBS=OFF
+          cmake --build whisper.cpp-src/build-x64 -j$(sysctl -n hw.ncpu) --config Release --target whisper-cli
+
+          # 2. ARM64 Apple Silicon Build (Metal Accelerated for M1-M4)
+          echo "Building ARM64 Apple Silicon binary with Metal..."
+          cmake -B whisper.cpp-src/build-arm64 -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64" -DGGML_METAL=ON -DBUILD_SHARED_LIBS=OFF
+          cmake --build whisper.cpp-src/build-arm64 -j$(sysctl -n hw.ncpu) --config Release --target whisper-cli
+
+          # 3. Combine into Universal Mach-O Fat Binary
+          echo "Creating Universal Mach-O binary..."
+          lipo -create whisper.cpp-src/build-x64/bin/whisper-cli whisper.cpp-src/build-arm64/bin/whisper-cli -output src-tauri/resources/whisper-cli-standard
+
+          cp src-tauri/resources/whisper-cli-standard src-tauri/resources/whisper-cli-vulkan
+          cp src-tauri/resources/whisper-cli-standard src-tauri/resources/whisper-cli-openvino
+          cp src-tauri/resources/whisper-cli-standard src-tauri/resources/whisper-cli-cuda
+
+          chmod +x src-tauri/resources/whisper-cli-*
+          codesign --force --sign - src-tauri/resources/whisper-cli-*
+
+      # --- FFMPEG & FFPROBE BINARIES CACHING & DOWNLOAD ---
 
       - name: Cache FFmpeg Binaries
         id: ffmpeg-cache
@@ -130,6 +322,8 @@ jobs:
           codesign --force --sign - src-tauri/resources/ffmpeg
           codesign --force --sign - src-tauri/resources/ffprobe
 
+      # --- TAURI APPLICATION BUNDLING & RELEASE ---
+
       - name: Extract App Version
         id: app_version
         shell: bash
@@ -138,13 +332,60 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Build Tauri Application
-        uses: tauri-apps/tauri-action@v0
+        run: npm run tauri build -- ${{ matrix.args }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NO_STRIP: true
+
+      - name: Fix AppImage Graphics Libraries (Linux x86_64)
+        if: matrix.platform == 'ubuntu-22.04'
+        shell: bash
+        run: |
+          # 1. Download appimagetool from the official continuous release
+          wget -q -O appimagetool https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool
+
+          # 2. Extract appimagetool to bypass FUSE requirement on the runner
+          ./appimagetool --appimage-extract
+          mv squashfs-root appimagetool-temp
+
+          # 3. Find the generated AppImage
+          APPIMAGE_PATH=$(find src-tauri/target/release/bundle/appimage/ -name "*.AppImage" | head -n 1)
+          echo "Found AppImage at: $APPIMAGE_PATH"
+
+          # 4. Extract the app's AppImage
+          chmod +x "$APPIMAGE_PATH"
+          "$APPIMAGE_PATH" --appimage-extract
+          
+          # 5. Remove the conflicting graphics libraries from the extracted squashfs-root
+          echo "Removing conflicting graphics libraries..."
+          rm -f squashfs-root/usr/lib/libEGL.so*
+          rm -f squashfs-root/usr/lib/libGL.so*
+          rm -f squashfs-root/usr/lib/libgbm.so*
+          rm -f squashfs-root/usr/lib/libglapi.so*
+          rm -f squashfs-root/usr/lib/libwayland-client.so*
+          
+          rm -f squashfs-root/usr/lib/x86_64-linux-gnu/libEGL.so*
+          rm -f squashfs-root/usr/lib/x86_64-linux-gnu/libGL.so*
+          rm -f squashfs-root/usr/lib/x86_64-linux-gnu/libgbm.so*
+          rm -f squashfs-root/usr/lib/x86_64-linux-gnu/libglapi.so*
+          rm -f squashfs-root/usr/lib/x86_64-linux-gnu/libwayland-client.so*
+
+          # 6. Remove the old AppImage file
+          rm -f "$APPIMAGE_PATH"
+
+          # 7. Re-package the AppImage using the extracted appimagetool
+          echo "Re-packaging AppImage..."
+          export ARCH=x86_64
+          ./appimagetool-temp/AppRun squashfs-root "$APPIMAGE_PATH"
+
+      - name: Create Release and Upload Assets
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'Whisper Desktop ${{ github.ref_name }}'
-          releaseBody: |
+          tag_name: ${{ github.ref_name }}
+          name: 'Whisper Desktop ${{ github.ref_name }}'
+          body: |
             ## Whisper Desktop ${{ github.ref_name }} 🎙️
 
             A high-performance, private, and offline speech-to-text desktop application powered by `whisper.cpp` and `Tauri`.
@@ -166,6 +407,14 @@ jobs:
             ---
             > 💡 **Windows on ARM:** Windows 11 ARM64 devices (Snapdragon X Elite, Surface Pro, etc.) run the `x64-setup.exe` installer with near-native performance via Microsoft Prism emulation.
             > 💡 **macOS Universal:** The DMG package contains a Universal binary natively optimized for both Apple Silicon (M1/M2/M3/M4) and Intel Macs.
-          releaseDraft: true
+          draft: true
           prerelease: false
-          args: ${{ matrix.args }}
+          files: |
+            src-tauri/target/release/bundle/appimage/*.AppImage
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/rpm/*.rpm
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/dmg/*.dmg
+            src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+

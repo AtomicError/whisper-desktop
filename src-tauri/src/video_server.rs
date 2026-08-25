@@ -10,6 +10,9 @@ static SERVER_PORT: Mutex<Option<u16>> = Mutex::new(None);
 /// processes / web pages from using the server as an arbitrary file reader.
 static SERVER_TOKEN: Mutex<Option<String>> = Mutex::new(None);
 
+/// Async initialization mutex to ensure only one listener is bound on concurrent calls.
+static INIT_MUTEX: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 fn percent_decode(s: &str) -> String {
   let mut bytes = Vec::new();
   let mut i = 0;
@@ -64,6 +67,19 @@ fn random_token() -> String {
 }
 
 pub async fn ensure_media_server_started() -> Result<u16, String> {
+  // Fast path: already initialized
+  {
+    let guard = SERVER_PORT.lock().unwrap_or_else(|e| e.into_inner());
+    let token_guard = SERVER_TOKEN.lock().unwrap_or_else(|e| e.into_inner());
+    if let (Some(port), Some(_)) = (*guard, &*token_guard) {
+      return Ok(port);
+    }
+  }
+
+  // Acquire async initialization lock so only one task binds and starts the server
+  let _init_guard = INIT_MUTEX.lock().await;
+
+  // Double check after acquiring the lock
   {
     let guard = SERVER_PORT.lock().unwrap_or_else(|e| e.into_inner());
     let token_guard = SERVER_TOKEN.lock().unwrap_or_else(|e| e.into_inner());
@@ -80,15 +96,14 @@ pub async fn ensure_media_server_started() -> Result<u16, String> {
     .map_err(|e| format!("Failed to start local media server: {e}"))?
     .port();
 
+  let token = random_token();
   {
     let mut guard = SERVER_PORT.lock().unwrap_or_else(|e| e.into_inner());
     *guard = Some(port);
   }
   {
     let mut guard = SERVER_TOKEN.lock().unwrap_or_else(|e| e.into_inner());
-    if guard.is_none() {
-      *guard = Some(random_token());
-    }
+    *guard = Some(token);
   }
 
   tokio::spawn(async move {
@@ -418,3 +433,29 @@ fn urlencoding_simple(s: &str) -> String {
   }
   result
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn test_url_encoding_and_decoding() {
+    let test_path = "/home/user/my test & media file (1).mp4";
+    let encoded = urlencoding_simple(test_path);
+    assert!(!encoded.contains(' '));
+    assert!(!encoded.contains('&'));
+
+    let decoded = percent_decode(&encoded);
+    assert_eq!(decoded, test_path);
+  }
+
+  #[test]
+  fn test_random_token_uniqueness() {
+    let t1 = random_token();
+    let t2 = random_token();
+    assert!(!t1.is_empty());
+    assert!(!t2.is_empty());
+    assert_ne!(t1, t2);
+  }
+}
+
