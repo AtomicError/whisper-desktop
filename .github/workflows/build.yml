@@ -76,13 +76,12 @@ jobs:
             glslang-tools \
             spirv-headers
 
-      - name: Setup Vulkan SDK
-        if: matrix.platform == 'ubuntu-22.04' || matrix.platform == 'windows-latest'
-        uses: herleb/setup-vulkan-sdk@v1.2
+      - name: Install Vulkan SDK (Windows)
+        if: matrix.platform == 'windows-latest'
+        uses: humbletim/install-vulkan-sdk@v1.2
         with:
-          vulkan-query-version: 'latest'
-          vulkan-components: 'Shaderc'
-          vulkan-use-cache: true
+          version: latest
+          cache: true
 
       - name: Install CUDA Toolkit (Ubuntu x86_64)
         if: matrix.platform == 'ubuntu-22.04'
