@@ -2493,19 +2493,19 @@ select.select-control {
   border-radius: 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   font-size: 0.85rem;
   width: 100%;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
-.compact-analytics-grid {
+.analytics-top-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
+  gap: 12px;
   width: 100%;
+  flex-wrap: wrap;
 }
 
 .analytics-metrics-col {
@@ -2519,31 +2519,38 @@ select.select-control {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  height: 28px;
+  box-sizing: border-box;
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.07);
-  padding: 4px 10px;
+  padding: 0 10px;
   border-radius: 7px;
   font-size: 0.78rem;
+  line-height: 1;
 }
 
 .analytic-chip .chip-label {
   color: var(--color-text-dim);
   font-weight: 500;
+  line-height: 1;
 }
 
 .analytic-chip .chip-val {
   font-weight: 600;
   color: var(--color-text-main);
   font-family: var(--font-mono);
+  line-height: 1;
 }
 
-.analytics-files-col {
+.analytics-files-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex: 1;
-  min-width: 160px;
-  flex-wrap: wrap;
+  gap: 10px;
+  width: 100%;
+  padding-top: 10px;
+  margin-top: 2px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  min-width: 0;
 }
 
 .analytics-files-label {
@@ -2553,44 +2560,88 @@ select.select-control {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1;
 }
 
 .compact-outputs {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 8px;
   margin: 0 !important;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  padding: 3px 4px;
+}
+
+.compact-outputs::after {
+  content: '';
+  flex: 0 0 6px;
+  height: 1px;
+  display: block;
+}
+
+.compact-outputs::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
 }
 
 .output-badge.royal-badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 12px;
+  height: 28px;
+  box-sizing: border-box;
+  padding: 0 10px;
   font-size: 0.78rem;
-  font-family: var(--font-mono);
+  line-height: 1;
+  font-family: var(--font-sans);
   font-weight: 500;
   border-radius: 7px;
   background: rgba(45, 127, 255, 0.12);
-  border: 1px solid rgba(45, 127, 255, 0.35);
-  color: #93c5fd;
+  border: 1px solid rgba(45, 127, 255, 0.32);
+  color: #bfdbfe;
   cursor: pointer;
   outline: none;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   user-select: none;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  direction: ltr;
+}
+
+.output-badge.royal-badge .badge-name {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  color: #bfdbfe;
+  letter-spacing: 0.2px;
+  line-height: 1;
+  direction: ltr;
+  unicode-bidi: plaintext;
 }
 
 .output-badge.royal-badge:hover {
-  background: rgba(45, 127, 255, 0.25);
-  border-color: rgba(45, 127, 255, 0.7);
+  background: rgba(45, 127, 255, 0.24);
+  border-color: rgba(45, 127, 255, 0.65);
   color: #ffffff;
-  box-shadow: 0 0 14px rgba(45, 127, 255, 0.4);
-  transform: translateY(-1px);
+  box-shadow: 0 0 14px rgba(45, 127, 255, 0.35);
+}
+
+.output-badge.royal-badge:hover .badge-name {
+  color: #ffffff;
 }
 
 .output-badge.royal-badge:active {
-  transform: translateY(0);
+  background: rgba(45, 127, 255, 0.35);
 }
 
 .output-badge.royal-badge .badge-icon-file {
@@ -2600,14 +2651,14 @@ select.select-control {
 
 .output-badge.royal-badge .badge-icon-open {
   color: #93c5fd;
-  opacity: 0.5;
+  opacity: 0.55;
   transition: opacity 0.2s ease, transform 0.2s ease;
   flex-shrink: 0;
 }
 
 .output-badge.royal-badge:hover .badge-icon-open {
   opacity: 1;
-  transform: scale(1.15);
+  transform: translate(1px, -1px);
 }
 
 .analytics-actions-col {
@@ -2617,22 +2668,36 @@ select.select-control {
 }
 
 .compact-copy-btn {
-  font-size: 0.8rem !important;
-  padding: 6px 14px !important;
+  font-size: 0.78rem !important;
+  height: 28px !important;
+  box-sizing: border-box !important;
+  padding: 0 12px !important;
+  line-height: 1 !important;
   white-space: nowrap;
   display: inline-flex !important;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   border-radius: 7px !important;
-  background: linear-gradient(135deg, var(--color-royal-blue), #1d4ed8) !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
-  box-shadow: 0 2px 10px rgba(45, 127, 255, 0.3) !important;
-  transition: all 0.2s ease !important;
+  background: rgba(45, 127, 255, 0.08) !important;
+  border: 1px solid rgba(45, 127, 255, 0.28) !important;
+  color: #93c5fd !important;
+  box-shadow: none !important;
+  font-weight: 500 !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  cursor: pointer;
+}
+
+.compact-copy-btn svg {
+  color: #60a5fa;
+  transition: color 0.2s ease;
 }
 
 .compact-copy-btn:hover {
-  box-shadow: 0 0 16px rgba(45, 127, 255, 0.5) !important;
-  transform: translateY(-1px);
+  background: rgba(45, 127, 255, 0.2) !important;
+  border-color: rgba(45, 127, 255, 0.6) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 12px rgba(45, 127, 255, 0.3) !important;
 }
 
 .telemetry-hud {

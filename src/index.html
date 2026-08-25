@@ -1865,9 +1865,9 @@
                         </div>
                       </div>
                       
-                      <!-- Results Analytics details (Royal Blue Cyber-Glass Horizontal Layout) -->
+                      <!-- Results Analytics details (Royal Blue Cyber-Glass Structured Layout) -->
                       <div class="analytics-box compact-analytics" id="analytics-box" style="display:none; width:100%;">
-                        <div class="compact-analytics-grid">
+                        <div class="analytics-top-row">
                           <div class="analytics-metrics-col">
                             <div class="analytic-chip" title="Total processing time">
                               <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--color-cyan);"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -1881,17 +1881,17 @@
                             </div>
                           </div>
                           
-                          <div class="analytics-files-col">
-                            <span class="analytics-files-label">Files:</span>
-                            <div class="outputs-row compact-outputs" id="badge-outputs-row"></div>
-                          </div>
-                          
                           <div class="analytics-actions-col">
-                            <button class="btn-primary compact-copy-btn" id="btn-copy-main-transcript" onclick="copyMainTranscriptToClipboard()" aria-label="Copy main transcript file to clipboard">
-                              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:5px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                              Copy Transcript
+                            <button class="btn-primary compact-copy-btn" id="btn-open-output-folder" onclick="openOutputFolder()" aria-label="Open output folder in file manager">
+                              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:5px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                              Open Folder
                             </button>
                           </div>
+                        </div>
+
+                        <div class="analytics-files-row">
+                          <span class="analytics-files-label">Files:</span>
+                          <div class="outputs-row compact-outputs" id="badge-outputs-row"></div>
                         </div>
                       </div>
                     </div>

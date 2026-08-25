@@ -471,6 +471,40 @@ window.openFileInEditor = async function(filePath) {
   }
 };
 
+window.splitFileNameAndExt = function(filename) {
+  if (!filename) return { base: '', ext: '' };
+  const match = filename.match(/^(.+?)(\.[a-zA-Z]{2,5}\.[a-zA-Z0-9]{2,4}|\.[a-zA-Z0-9]{2,5})$/);
+  if (match) {
+    return { base: match[1], ext: match[2] };
+  }
+  const lastDot = filename.lastIndexOf('.');
+  if (lastDot > 0) {
+    return { base: filename.substring(0, lastDot), ext: filename.substring(lastDot) };
+  }
+  return { base: filename, ext: '' };
+};
+
+window.formatFileNameMiddleTruncate = function(filename, maxLength = 26) {
+  if (!filename || typeof filename !== 'string') return '';
+  if (filename.length <= maxLength) return filename;
+
+  const { base, ext } = window.splitFileNameAndExt(filename);
+  
+  if (ext && ext.length > 0 && ext.length <= 10) {
+    const availableForBase = maxLength - ext.length - 1; // 1 char for ellipsis '…'
+    if (availableForBase >= 4 && base.length > availableForBase) {
+      const frontChars = Math.ceil(availableForBase * 0.6);
+      const backChars = availableForBase - frontChars;
+      return `${base.slice(0, frontChars)}…${base.slice(base.length - backChars)}${ext}`;
+    }
+  }
+
+  const available = maxLength - 1;
+  const frontChars = Math.ceil(available / 2);
+  const backChars = available - frontChars;
+  return `${filename.slice(0, frontChars)}…${filename.slice(filename.length - backChars)}`;
+};
+
 // Global States
 let activeView = 'intro';
 let activeSettingsCat = 'general';
@@ -1001,7 +1035,7 @@ function setupHorizontalTabScroll() {
     }
   };
 
-  const containers = document.querySelectorAll('.settings-categories, .trans-cfg-status-bar');
+  const containers = document.querySelectorAll('.settings-categories, .trans-cfg-status-bar, .compact-outputs');
   containers.forEach(el => {
     el.addEventListener('wheel', scrollWheel, { passive: false });
   });
@@ -2560,6 +2594,7 @@ window.runWhisperTranscription = async function() {
     const badgesRow = document.getElementById('badge-outputs-row');
     badgesRow.innerHTML = '';
     const outputDir = result.outputDir || getParentDir(settingsState.inputFile);
+    window.lastTranscribedOutputDir = outputDir;
     const sep = outputDir.includes('\\') && !outputDir.includes('/') ? '\\' : '/';
 
     const createRoyalBadge = (filename) => {
@@ -2568,9 +2603,10 @@ window.runWhisperTranscription = async function() {
       badge.type = 'button';
       badge.className = 'output-badge royal-badge';
       badge.title = `Click to open "${filename}" in default text editor`;
+      const displayName = window.formatFileNameMiddleTruncate(filename, 26);
       badge.innerHTML = `
         <svg class="badge-icon-file" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-        <span class="badge-name">${escapeHTML(filename)}</span>
+        <span class="badge-name">${escapeHTML(displayName)}</span>
         <svg class="badge-icon-open" viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
       `;
       badge.onclick = (e) => {
@@ -2718,6 +2754,20 @@ window.copyMainTranscriptToClipboard = async function() {
       const msg = (e && (e.message || e.toString())) || String(e);
       showNotification("Failed to copy transcript: " + msg, "error");
     }
+  }
+};
+
+window.openOutputFolder = async function() {
+  const dir = window.lastTranscribedOutputDir || (settingsState && settingsState.inputFile ? getParentDir(settingsState.inputFile) : (selectedMediaFile ? getParentDir(selectedMediaFile) : null));
+  if (dir) {
+    try {
+      await window.openFileInEditor(dir);
+    } catch (e) {
+      const msg = (e && (e.message || e.toString())) || String(e);
+      showNotification("Failed to open output folder: " + msg, "error");
+    }
+  } else {
+    showNotification("No output directory found.", "info");
   }
 };
 
