@@ -2402,6 +2402,15 @@ async function probeSelectedFile() {
   }
 }
 
+window.toggleTelemetryHudCollapse = function() {
+  const card = document.getElementById('telemetry-hud-card');
+  const btn = document.getElementById('hud-collapse-btn');
+  if (card && btn) {
+    const isCollapsed = card.classList.toggle('collapsed');
+    btn.classList.toggle('collapsed', isCollapsed);
+  }
+};
+
 function updateTranscribeUIConfigs() {
   if (!settingsState) return;
   

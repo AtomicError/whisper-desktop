@@ -88,7 +88,7 @@ jobs:
         uses: Jimver/cuda-toolkit@v0.2.35
         id: cuda-toolkit-windows
         with:
-          cuda: '12.4.1'
+          cuda: '12.8.0'
           method: 'network'
           sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "visual_studio_integration"]'
 
@@ -268,7 +268,7 @@ jobs:
             }
           }
 
-          cmake -B whisper.cpp-src/build-cuda -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=ON -DGGML_OPENMP=ON -DCUDAToolkit_ROOT="$env:CUDA_PATH" -DBUILD_SHARED_LIBS=OFF
+          cmake -B whisper.cpp-src/build-cuda -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=ON -DGGML_OPENMP=ON -DCUDAToolkit_ROOT="$env:CUDA_PATH" -DCMAKE_CUDA_FLAGS="-allow-unsupported-compiler" -DBUILD_SHARED_LIBS=OFF
           cmake --build whisper.cpp-src/build-cuda --config Release --target whisper-cli
           Copy-Item whisper.cpp-src/build-cuda/bin/Release/whisper-cli.exe src-tauri/resources/whisper-cli-cuda.exe
 

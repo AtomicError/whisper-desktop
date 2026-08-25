@@ -1833,46 +1833,66 @@
 
               <!-- Cyber-Neon Progress & Telemetry HUD (Right Panel wrapper) -->
               <div class="transcribe-right-panel">
-                <div class="glass-card telemetry-hud" style="margin-bottom: 0;">
-                  <h3 style="font-weight:600; text-align:center; font-size:1.1rem; margin-bottom:16px; border-bottom:1px solid var(--border-glass); padding-bottom:12px;">Live Extraction Status</h3>
-                  
-                  <div class="progress-linear-wrapper">
-                    <div class="hud-stats-row">
-                      <span class="hud-stat-label">COMPLETION</span>
-                      <span class="radial-pct" id="lbl-radial-pct">0%</span>
+                <div class="glass-card telemetry-hud" id="telemetry-hud-card" style="margin-bottom: 0;">
+                  <div class="hud-header-row" onclick="toggleTelemetryHudCollapse()" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; user-select:none; margin-bottom:12px; border-bottom:1px solid var(--border-glass); padding-bottom:10px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <h3 style="font-weight:600; font-size:0.95rem; margin:0;">Live Extraction Status</h3>
+                      <span id="hud-status-badge" class="hud-status-badge" style="font-size:0.75rem; padding:2px 8px; border-radius:12px; background:rgba(6,182,212,0.1); color:var(--color-cyan); display:none;">Standing By</span>
                     </div>
-                    
-                    <div class="progress-linear-track">
-                      <div class="progress-linear-fill" id="progress-linear-fill" style="width: 0%;">
-                        <div class="progress-linear-glow"></div>
-                        <div class="progress-linear-scanner"></div>
-                      </div>
-                    </div>
-                    
-                    <div class="hud-status-subtitle">
-                      <div class="hud-pulse-dot" id="hud-pulse-dot"></div>
-                      <span class="radial-msg" id="lbl-radial-msg">Standing By</span>
-                    </div>
+                    <button type="button" class="hud-collapse-btn" id="hud-collapse-btn" aria-label="Toggle telemetry collapse" style="background:none; border:none; color:var(--color-text-dim); cursor:pointer; padding:4px; display:flex; align-items:center; transition:transform 0.25s ease;">
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
                   </div>
                   
-                  <!-- Results Analytics details -->
-                  <div class="analytics-box" id="analytics-box" style="display:none; width:100%; margin-top: 16px;">
-                    <h4 style="border-bottom: 1px solid var(--border-glass); padding-bottom:8px; margin-bottom:8px; font-weight:600;">Transcription Completed</h4>
-                    <div class="analytic-row">
-                      <span class="analytic-label">Processing Time:</span>
-                      <span class="analytic-val" id="analytic-time">0s</span>
+                  <div class="hud-body-wrapper" id="telemetry-hud-body">
+                    <div class="hud-body-content">
+                      <div class="progress-linear-wrapper" id="progress-linear-wrapper">
+                        <div class="hud-stats-row">
+                          <span class="hud-stat-label">COMPLETION</span>
+                          <span class="radial-pct" id="lbl-radial-pct">0%</span>
+                        </div>
+                        
+                        <div class="progress-linear-track">
+                          <div class="progress-linear-fill" id="progress-linear-fill" style="width: 0%;">
+                            <div class="progress-linear-glow"></div>
+                            <div class="progress-linear-scanner"></div>
+                          </div>
+                        </div>
+                        
+                        <div class="hud-status-subtitle">
+                          <div class="hud-pulse-dot" id="hud-pulse-dot"></div>
+                          <span class="radial-msg" id="lbl-radial-msg">Standing By</span>
+                        </div>
+                      </div>
+                      
+                      <!-- Results Analytics details (Compact Horizontal Layout) -->
+                      <div class="analytics-box compact-analytics" id="analytics-box" style="display:none; width:100%;">
+                        <div class="compact-analytics-grid">
+                          <div class="analytics-metrics-col">
+                            <div class="analytic-mini-row">
+                              <span class="analytic-label">Time:</span>
+                              <span class="analytic-val" id="analytic-time">0s</span>
+                            </div>
+                            <div class="analytic-mini-row">
+                              <span class="analytic-label">Speed:</span>
+                              <span class="analytic-val" style="color:var(--color-green);" id="analytic-speed">0.0x</span>
+                            </div>
+                          </div>
+                          
+                          <div class="analytics-files-col">
+                            <span class="analytic-label" style="font-size:0.75rem; margin-right:4px;">Files:</span>
+                            <div class="outputs-row compact-outputs" id="badge-outputs-row"></div>
+                          </div>
+                          
+                          <div class="analytics-actions-col">
+                            <button class="btn-primary compact-copy-btn" id="btn-copy-main-transcript" onclick="copyMainTranscriptToClipboard()" aria-label="Copy main transcript file to clipboard">
+                              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:5px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                              Copy Transcript
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div class="analytic-row">
-                      <span class="analytic-label">Speed Factor:</span>
-                      <span class="analytic-val" style="color:var(--color-green);" id="analytic-speed">0.0x Real-time</span>
-                    </div>
-                    <div class="analytic-row" style="flex-direction:column; gap:4px; margin-top:4px;">
-                      <span class="analytic-label">Generated Files:</span>
-                      <div class="outputs-row" id="badge-outputs-row"></div>
-                    </div>
-                    <button class="btn-primary" id="btn-copy-main-transcript" style="margin-top:12px; font-size:0.85rem; padding:10px;" onclick="copyMainTranscriptToClipboard()" aria-label="Copy main transcript file to clipboard">
-                      Copy Main Transcript
-                    </button>
                   </div>
                 </div>
 
@@ -1904,9 +1924,10 @@
               <div class="logs-controls">
                 <div class="log-filters">
                   <button class="filter-btn active" id="log-filter-All" onclick="filterLogs('All')">All</button>
-                  <button class="filter-btn" id="log-filter-Build" onclick="filterLogs('Build')">Build</button>
-                  <button class="filter-btn" id="log-filter-FFmpeg" onclick="filterLogs('FFmpeg')">FFmpeg</button>
+                  <button class="filter-btn" id="log-filter-Translate" onclick="filterLogs('Translate')">Translate</button>
                   <button class="filter-btn" id="log-filter-Whisper" onclick="filterLogs('Whisper')">Whisper</button>
+                  <button class="filter-btn" id="log-filter-FFmpeg" onclick="filterLogs('FFmpeg')">FFmpeg</button>
+                  <button class="filter-btn" id="log-filter-Hardsub" onclick="filterLogs('Hardsub')">Hardsub</button>
                 </div>
                 
                 <div class="log-search-container">
