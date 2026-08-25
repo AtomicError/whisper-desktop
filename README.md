@@ -118,7 +118,7 @@ graph TD
 ## 🚀 Installation & Packaging
 
 ### 🐧 Linux (x86_64 & ARM64)
-Download either the lightweight **Universal** package (`CPU` + `Vulkan` + `OpenVINO` ~80 MB) or the dedicated **NVIDIA CUDA** edition (~550 MB) from the [Releases](https://github.com/AtomicError/whisper-desktop/releases) page:
+Download either the lightweight **Universal** package (`CPU` + `Vulkan` + `OpenVINO`) or the dedicated **NVIDIA CUDA** edition from the [Releases](https://github.com/AtomicError/whisper-desktop/releases) page:
 
 #### Debian / Ubuntu (`.deb`)
 ```bash
@@ -148,14 +148,14 @@ chmod +x WhisperDesktop_*.AppImage
 
 ### 🪟 Windows (x86_64 & ARM64)
 Choose your preferred installer from the [Releases](https://github.com/AtomicError/whisper-desktop/releases) page:
-* **Universal Edition (`x64-setup.exe` / `.msi` ~100 MB):** Includes Standard CPU + Vulkan + Intel OpenVINO. Recommended for AMD, Intel CPU/GPU/Arc, and standard PCs.
-* **NVIDIA CUDA Edition (`x64-cuda-setup.exe` / `.msi` ~600 MB):** Dedicated CUDA & cuBLAS hardware acceleration for NVIDIA GPUs.
+* **Universal Edition (`x64-setup.exe` / `.msi`):** Includes Standard CPU + Vulkan + Intel OpenVINO. Recommended for AMD, Intel CPU/GPU/Arc, and standard PCs.
+* **NVIDIA CUDA Edition (`x64-cuda-setup.exe` / `.msi`):** Dedicated CUDA & cuBLAS hardware acceleration for NVIDIA GPUs.
 * Compatible with Windows 10/11 and Windows 11 ARM64 (Snapdragon X Elite / Surface) via Prism.
 
 ---
 
 ### 🍏 macOS (Apple Silicon & Intel)
-Download the Universal `.dmg` (~65 MB) from the [Releases](https://github.com/AtomicError/whisper-desktop/releases) page, open the disk image, and drag **Whisper Desktop** into your `Applications` folder. Features native Apple Silicon Metal GPU acceleration and Intel support.
+Download the Universal `.dmg` from the [Releases](https://github.com/AtomicError/whisper-desktop/releases) page, open the disk image, and drag **Whisper Desktop** into your `Applications` folder. Features native Apple Silicon Metal GPU acceleration and Intel support.
 
 ---
 
