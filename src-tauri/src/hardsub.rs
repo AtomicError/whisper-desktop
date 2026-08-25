@@ -304,8 +304,18 @@ fn resolve_font_file<R: tauri::Runtime>(font_name: &str, bold: bool, italic: boo
         }
     }
 
-    let mut resolved_dir = app.path().resolve("resources/fonts", tauri::path::BaseDirectory::Resource).ok();
-    if resolved_dir.is_none() || !resolved_dir.as_ref().unwrap().exists() {
+    let mut resolved_dir = app.path().resolve("resources/fonts", tauri::path::BaseDirectory::Resource).ok().filter(|p| p.exists());
+    if resolved_dir.is_none() {
+        if let Ok(exe_path) = std::env::current_exe() {
+            if let Some(parent) = exe_path.parent() {
+                let portable_fonts = parent.join("resources").join("fonts");
+                if portable_fonts.exists() {
+                    resolved_dir = Some(portable_fonts);
+                }
+            }
+        }
+    }
+    if resolved_dir.is_none() {
         if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
             let dev_path = std::path::Path::new(&manifest_dir).join("resources/fonts");
             if dev_path.exists() {
@@ -1274,8 +1284,18 @@ pub async fn run_hardsub_task(
         margin_lr
     );
 
-    let mut resolved_fonts_dir = app.path().resolve("resources/fonts", tauri::path::BaseDirectory::Resource).ok();
-    if resolved_fonts_dir.is_none() || !resolved_fonts_dir.as_ref().unwrap().exists() {
+    let mut resolved_fonts_dir = app.path().resolve("resources/fonts", tauri::path::BaseDirectory::Resource).ok().filter(|p| p.exists());
+    if resolved_fonts_dir.is_none() {
+        if let Ok(exe_path) = std::env::current_exe() {
+            if let Some(parent) = exe_path.parent() {
+                let portable_fonts = parent.join("resources").join("fonts");
+                if portable_fonts.exists() {
+                    resolved_fonts_dir = Some(portable_fonts);
+                }
+            }
+        }
+    }
+    if resolved_fonts_dir.is_none() {
         if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
             let dev_path = std::path::Path::new(&manifest_dir).join("resources/fonts");
             if dev_path.exists() {

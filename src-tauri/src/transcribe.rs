@@ -319,27 +319,62 @@ pub async fn run_transcription(
 
     
     use tauri::Manager;
-    let bin_path = match app.path().resolve(format!("resources/{}", bin_name), tauri::path::BaseDirectory::Resource) {
-        Ok(path) => {
-            if path.exists() {
-                path
-            } else {
-                let dev_path = std::env::current_dir()
-                    .unwrap_or_default()
-                    .join("src-tauri")
-                    .join("resources")
-                    .join(&bin_name);
-                if dev_path.exists() {
-                    dev_path
+    let mut resolved_bin: Option<std::path::PathBuf> = None;
+
+    // 1. Tauri BaseDirectory::Resource
+    if let Ok(p) = app.path().resolve(format!("resources/{}", bin_name), tauri::path::BaseDirectory::Resource) {
+        if p.exists() {
+            resolved_bin = Some(p);
+        }
+    }
+    if resolved_bin.is_none() {
+        if let Ok(p) = app.path().resolve(&bin_name, tauri::path::BaseDirectory::Resource) {
+            if p.exists() {
+                resolved_bin = Some(p);
+            }
+        }
+    }
+
+    // 2. Next to running executable (Portable / Standalone mode)
+    if resolved_bin.is_none() {
+        if let Ok(exe_path) = std::env::current_exe() {
+            if let Some(parent) = exe_path.parent() {
+                let res_sub = parent.join("resources").join(&bin_name);
+                if res_sub.exists() {
+                    resolved_bin = Some(res_sub);
                 } else {
-                    return Err(format!(
-                        "Whisper CLI binary ('{}') not found. Please place the compiled binary into 'src-tauri/resources/'.",
-                        bin_name
-                    ));
+                    let next_to_exe = parent.join(&bin_name);
+                    if next_to_exe.exists() {
+                        resolved_bin = Some(next_to_exe);
+                    }
                 }
             }
         }
-        Err(e) => return Err(format!("Failed to resolve resource path for Whisper binary: {}", e)),
+    }
+
+    // 3. Dev environment paths
+    if resolved_bin.is_none() {
+        if let Ok(cwd) = std::env::current_dir() {
+            let dev_sub = cwd.join("src-tauri").join("resources").join(&bin_name);
+            if dev_sub.exists() {
+                resolved_bin = Some(dev_sub);
+            } else {
+                let dev_direct = cwd.join("resources").join(&bin_name);
+                if dev_direct.exists() {
+                    resolved_bin = Some(dev_direct);
+                }
+            }
+        }
+    }
+
+    let bin_path = match resolved_bin {
+        Some(path) => path,
+        None => {
+            return Err(format!(
+                "Whisper CLI binary ('{}') not found. Please ensure the compiled binary is placed into 'resources/' or 'src-tauri/resources/'.",
+                bin_name
+            ));
+        }
     };
 
     // Check if the binary is a placeholder text file instead of a real compiled binary

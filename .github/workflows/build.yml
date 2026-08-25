@@ -516,8 +516,25 @@ jobs:
 
           New-Item -ItemType Directory -Force -Path staging-universal/nsis
           New-Item -ItemType Directory -Force -Path staging-universal/msi
+          New-Item -ItemType Directory -Force -Path staging-universal/zip
           Copy-Item "src-tauri/target/release/bundle/nsis/*" "staging-universal/nsis/" -Force
           Copy-Item "src-tauri/target/release/bundle/msi/*" "staging-universal/msi/" -Force
+
+          # Create Universal Portable ZIP Archive
+          Write-Host "Packaging Windows Universal Portable Archive..."
+          $universalPortableDir = "WhisperDesktop_${{ steps.app_version.outputs.version }}_x64-portable"
+          New-Item -ItemType Directory -Force -Path $universalPortableDir
+          $mainExe = Get-ChildItem -Path "src-tauri/target/release/*.exe" | Where-Object { $_.Name -match "^(whisper[-_]desktop|WhisperDesktop)\.exe$" } | Select-Object -First 1
+          if ($mainExe) {
+            Copy-Item $mainExe.FullName "$universalPortableDir/whisper-desktop.exe" -Force
+          } else {
+            Copy-Item "src-tauri/target/release/whisper-desktop.exe" "$universalPortableDir/whisper-desktop.exe" -Force -ErrorAction SilentlyContinue
+          }
+          Copy-Item "src-tauri/resources" "$universalPortableDir/resources" -Recurse -Force
+          New-Item -ItemType Directory -Force -Path src-tauri/target/release/bundle/zip
+          7z a -tzip "src-tauri/target/release/bundle/zip/WhisperDesktop_${{ steps.app_version.outputs.version }}_x64-portable.zip" "./$universalPortableDir/*"
+          Copy-Item "src-tauri/target/release/bundle/zip/WhisperDesktop_${{ steps.app_version.outputs.version }}_x64-portable.zip" "staging-universal/zip/" -Force
+          Remove-Item -Path $universalPortableDir -Recurse -Force
 
           # 2. Build NVIDIA CUDA Edition (Standard CPU + Vulkan + CUDA)
           Write-Host "=== 2/2: Building Windows NVIDIA CUDA Edition (CPU + Vulkan + CUDA) ==="
@@ -549,9 +566,24 @@ jobs:
             Rename-Item -Path $_.FullName -NewName $newName
           }
 
+          # Create NVIDIA CUDA Portable ZIP Archive
+          Write-Host "Packaging Windows NVIDIA CUDA Portable Archive..."
+          $cudaPortableDir = "WhisperDesktop_${{ steps.app_version.outputs.version }}_x64-cuda-portable"
+          New-Item -ItemType Directory -Force -Path $cudaPortableDir
+          $cudaMainExe = Get-ChildItem -Path "src-tauri/target/release/*.exe" | Where-Object { $_.Name -match "^(whisper[-_]desktop|WhisperDesktop)\.exe$" } | Select-Object -First 1
+          if ($cudaMainExe) {
+            Copy-Item $cudaMainExe.FullName "$cudaPortableDir/whisper-desktop.exe" -Force
+          } else {
+            Copy-Item "src-tauri/target/release/whisper-desktop.exe" "$cudaPortableDir/whisper-desktop.exe" -Force -ErrorAction SilentlyContinue
+          }
+          Copy-Item "src-tauri/resources" "$cudaPortableDir/resources" -Recurse -Force
+          7z a -tzip "src-tauri/target/release/bundle/zip/WhisperDesktop_${{ steps.app_version.outputs.version }}_x64-cuda-portable.zip" "./$cudaPortableDir/*"
+          Remove-Item -Path $cudaPortableDir -Recurse -Force
+
           # Merge Universal bundles back into release bundle directory
           Copy-Item "staging-universal/nsis/*" "src-tauri/target/release/bundle/nsis/" -Force
           Copy-Item "staging-universal/msi/*" "src-tauri/target/release/bundle/msi/" -Force
+          Copy-Item "staging-universal/zip/*" "src-tauri/target/release/bundle/zip/" -Force
           Remove-Item -Path "staging-universal" -Recurse -Force
 
       # --- BUILD TAURI (LINUX ARM64 & MACOS) ---
@@ -587,6 +619,8 @@ jobs:
             | :--- | :--- | :---: |
             | 🪟 **Windows** | Setup Installer (Universal) | [![Download](https://img.shields.io/badge/Download-x64__setup.exe-0057d9?style=flat-square&logo=windows11&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_x64-setup.exe) |
             | 🪟 **Windows** | Setup Installer (NVIDIA CUDA) | [![Download](https://img.shields.io/badge/Download-x64__cuda--setup.exe-15803d?style=flat-square&logo=nvidia&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_x64-cuda-setup.exe) |
+            | 🪟 **Windows** | Portable ZIP (Universal) | [![Download](https://img.shields.io/badge/Download-x64__portable.zip-0057d9?style=flat-square&logo=windows11&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_x64-portable.zip) |
+            | 🪟 **Windows** | Portable ZIP (NVIDIA CUDA) | [![Download](https://img.shields.io/badge/Download-x64__cuda--portable.zip-15803d?style=flat-square&logo=nvidia&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_x64-cuda-portable.zip) |
             | 🪟 **Windows** | MSI Package (Universal) | [![Download](https://img.shields.io/badge/Download-x64__en--US.msi-0057d9?style=flat-square&logo=windows11&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_x64_en-US.msi) |
             | 🪟 **Windows** | MSI Package (NVIDIA CUDA) | [![Download](https://img.shields.io/badge/Download-x64__cuda__en--US.msi-15803d?style=flat-square&logo=nvidia&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_x64-cuda_en-US.msi) |
             | 🍎 **macOS** | Universal DMG | [![Download](https://img.shields.io/badge/Download-universal.dmg-0057d9?style=flat-square&logo=apple&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_universal.dmg) |
@@ -616,6 +650,7 @@ jobs:
             src-tauri/target/release/bundle/rpm/*.rpm
             src-tauri/target/release/bundle/msi/*.msi
             src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/zip/*.zip
             src-tauri/target/release/bundle/dmg/*.dmg
             src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
 

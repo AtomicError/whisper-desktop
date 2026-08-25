@@ -147,9 +147,10 @@ chmod +x WhisperDesktop_*.AppImage
 ---
 
 ### 🪟 Windows (x86_64 & ARM64)
-Choose your preferred installer from the [Releases](https://github.com/AtomicError/whisper-desktop/releases) page:
-* **Universal Edition (`x64-setup.exe` / `.msi`):** Includes Standard CPU + Vulkan + Intel OpenVINO. Recommended for AMD, Intel CPU/GPU/Arc, and standard PCs.
-* **NVIDIA CUDA Edition (`x64-cuda-setup.exe` / `.msi`):** Dedicated CUDA & cuBLAS hardware acceleration for NVIDIA GPUs.
+Choose your preferred installer or portable package from the [Releases](https://github.com/AtomicError/whisper-desktop/releases) page:
+* **Universal Edition (`x64-setup.exe` / `.msi` / `x64-portable.zip`):** Includes Standard CPU + Vulkan + Intel OpenVINO. Recommended for AMD, Intel CPU/GPU/Arc, and standard PCs.
+* **NVIDIA CUDA Edition (`x64-cuda-setup.exe` / `.msi` / `x64-cuda-portable.zip`):** Dedicated CUDA & cuBLAS hardware acceleration for NVIDIA GPUs.
+* **Standalone Portable Archive:** Extract the `.zip` archive to any directory or USB flash drive and run `whisper-desktop.exe` directly—no installation or admin privileges required.
 * Compatible with Windows 10/11 and Windows 11 ARM64 (Snapdragon X Elite / Surface) via Prism.
 
 ---
