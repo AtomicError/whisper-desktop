@@ -90,7 +90,7 @@ jobs:
         with:
           cuda: '12.4.1'
           method: 'network'
-          sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev"]'
+          sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "visual_studio_integration"]'
 
       - name: Install CUDA Toolkit (Ubuntu x86_64)
         if: matrix.platform == 'ubuntu-22.04'
@@ -255,7 +255,20 @@ jobs:
 
           # 4. CUDA Backend (NVIDIA GPU Acceleration)
           Write-Host "Building CUDA backend for Windows..."
-          cmake -B whisper.cpp-src/build-cuda -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=ON -DGGML_OPENMP=ON -DBUILD_SHARED_LIBS=OFF
+          $env:CUDACXX = "$env:CUDA_PATH\bin\nvcc.exe"
+          $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (Test-Path $vsWhere) {
+            $vsPath = & $vsWhere -latest -property installationPath
+            $msbuildDirs = Get-ChildItem -Path "$vsPath\MSBuild\Microsoft\VC" -Directory -Recurse -Filter "BuildCustomizations" -ErrorAction SilentlyContinue
+            $cudaMsbuild = "$env:CUDA_PATH\extras\visual_studio_integration\MSBuildExtensions"
+            if (Test-Path $cudaMsbuild) {
+              foreach ($dir in $msbuildDirs) {
+                Copy-Item -Path "$cudaMsbuild\*" -Destination $dir.FullName -Force -ErrorAction SilentlyContinue
+              }
+            }
+          }
+
+          cmake -B whisper.cpp-src/build-cuda -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=ON -DGGML_OPENMP=ON -DCUDAToolkit_ROOT="$env:CUDA_PATH" -DBUILD_SHARED_LIBS=OFF
           cmake --build whisper.cpp-src/build-cuda --config Release --target whisper-cli
           Copy-Item whisper.cpp-src/build-cuda/bin/Release/whisper-cli.exe src-tauri/resources/whisper-cli-cuda.exe
 
