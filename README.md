@@ -19,7 +19,7 @@
 
 ## 💡 What is Whisper Desktop?
 
-**Whisper Desktop** is a modern, lightweight, and privacy-focused desktop application designed to bring the power of OpenAI's **Whisper** speech recognition model directly to your personal computer—now featuring a dedicated **Studio Hardsub** video burn-in engine.
+**Whisper Desktop** is a modern, lightweight, and privacy-focused desktop application designed to bring the power of native **whisper.cpp** speech recognition directly to your personal computer—now featuring a dedicated **Studio Hardsub** video burn-in engine.
 
 Running AI models and video processing pipelines locally often requires complex CLI scripts, extensive Python environments, or exposing sensitive media to paid cloud providers. **Whisper Desktop** eliminates those friction points by pairing a blazing-fast **Rust & Tauri** core with native `whisper.cpp` binaries, static/system `FFmpeg` engines, and an elegant glassmorphic GUI.
 

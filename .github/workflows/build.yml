@@ -8,6 +8,7 @@ on:
 
 jobs:
   build-tauri:
+    name: build-tauri (${{ matrix.platform }}, ${{ matrix.arch }})
     permissions:
       contents: write
     strategy:
@@ -79,8 +80,17 @@ jobs:
         if: matrix.platform == 'windows-latest'
         uses: jakoch/install-vulkan-sdk-action@v1
         with:
-          version: latest
+          vulkan_version: latest
           cache: true
+
+      - name: Install CUDA Toolkit (Windows)
+        if: matrix.platform == 'windows-latest'
+        uses: Jimver/cuda-toolkit@v0.2.35
+        id: cuda-toolkit-windows
+        with:
+          cuda: '12.4.1'
+          method: 'network'
+          sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev"]'
 
       - name: Install CUDA Toolkit (Ubuntu x86_64)
         if: matrix.platform == 'ubuntu-22.04'
@@ -144,7 +154,8 @@ jobs:
         with:
           path: |
             src-tauri/resources/whisper-cli-*
-          key: whisper-bin-${{ matrix.platform }}-${{ matrix.arch }}-${{ steps.whisper_tag.outputs.tag }}-v1
+            src-tauri/resources/*.dll
+          key: whisper-bin-${{ matrix.platform }}-${{ matrix.arch }}-${{ steps.whisper_tag.outputs.tag }}-v2
 
       - name: Clone whisper.cpp
         if: steps.whisper-cache.outputs.cache-hit != 'true'
@@ -219,15 +230,41 @@ jobs:
           cmake --build whisper.cpp-src/build-standard --config Release --target whisper-cli
           Copy-Item whisper.cpp-src/build-standard/bin/Release/whisper-cli.exe src-tauri/resources/whisper-cli-standard.exe
 
-          # 2. Vulkan Backend
+          # 2. Vulkan Backend (MSVC + Vulkan SDK)
           Write-Host "Building Vulkan backend for Windows..."
           cmake -B whisper.cpp-src/build-vulkan -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_VULKAN=ON -DBUILD_SHARED_LIBS=OFF
           cmake --build whisper.cpp-src/build-vulkan --config Release --target whisper-cli
           Copy-Item whisper.cpp-src/build-vulkan/bin/Release/whisper-cli.exe src-tauri/resources/whisper-cli-vulkan.exe
 
-          # Copy fallbacks
-          Copy-Item src-tauri/resources/whisper-cli-standard.exe src-tauri/resources/whisper-cli-openvino.exe
-          Copy-Item src-tauri/resources/whisper-cli-vulkan.exe src-tauri/resources/whisper-cli-cuda.exe
+          # 3. OpenVINO Backend (Intel CPU / iGPU Acceleration)
+          Write-Host "Setting up OpenVINO 2024 for Windows..."
+          $openvinoUrl = "https://storage.openvinotoolkit.org/repositories/openvino/packages/2024.2/windows/w_openvino_toolkit_windows_2024.2.0.15519.5c0f38f83f6_x86_64.zip"
+          Invoke-WebRequest -Uri $openvinoUrl -OutFile "openvino.zip"
+          7z x openvino.zip -oopenvino-extracted -y
+          $openvinoDir = Get-ChildItem -Path "openvino-extracted" -Directory | Select-Object -First 1
+
+          Write-Host "Building OpenVINO backend for Windows..."
+          cmake -B whisper.cpp-src/build-openvino -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DWHISPER_OPENVINO=1 -DOpenVINO_DIR="$($openvinoDir.FullName)/runtime/cmake" -DBUILD_SHARED_LIBS=OFF
+          cmake --build whisper.cpp-src/build-openvino --config Release --target whisper-cli
+          Copy-Item whisper.cpp-src/build-openvino/bin/Release/whisper-cli.exe src-tauri/resources/whisper-cli-openvino.exe
+
+          # Copy OpenVINO & TBB runtime DLLs to resources
+          Get-ChildItem -Path "$($openvinoDir.FullName)/runtime/bin/intel64/Release/*.dll" | Copy-Item -Destination src-tauri/resources/
+          Get-ChildItem -Path "$($openvinoDir.FullName)/runtime/3rdparty/tbb/bin/*.dll" -ErrorAction SilentlyContinue | Copy-Item -Destination src-tauri/resources/
+          Remove-Item -Recurse -Force "openvino.zip", "openvino-extracted"
+
+          # 4. CUDA Backend (NVIDIA GPU Acceleration)
+          Write-Host "Building CUDA backend for Windows..."
+          cmake -B whisper.cpp-src/build-cuda -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=ON -DGGML_OPENMP=ON -DBUILD_SHARED_LIBS=OFF
+          cmake --build whisper.cpp-src/build-cuda --config Release --target whisper-cli
+          Copy-Item whisper.cpp-src/build-cuda/bin/Release/whisper-cli.exe src-tauri/resources/whisper-cli-cuda.exe
+
+          # Copy CUDA runtime DLLs to resources so end-users don't need CUDA Toolkit installed
+          if ($env:CUDA_PATH) {
+            Copy-Item "$env:CUDA_PATH\bin\cublas64_*.dll" src-tauri/resources/ -ErrorAction SilentlyContinue
+            Copy-Item "$env:CUDA_PATH\bin\cublasLt64_*.dll" src-tauri/resources/ -ErrorAction SilentlyContinue
+            Copy-Item "$env:CUDA_PATH\bin\cudart64_*.dll" src-tauri/resources/ -ErrorAction SilentlyContinue
+          }
 
       - name: Compile Whisper CLI (macOS Universal Native + Metal)
         if: matrix.platform == 'macos-latest' && steps.whisper-cache.outputs.cache-hit != 'true'
