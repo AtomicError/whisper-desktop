@@ -1041,6 +1041,83 @@ function setupHorizontalTabScroll() {
   });
 }
 
+// ----------------- UI Scaling & Zoom Engine -----------------
+let currentUiZoom = 1.0;
+let zoomSaveTimeout = null;
+
+function applyUiZoom(scale, persist = true, showToast = false) {
+  let numScale = typeof scale === 'number' ? scale : parseFloat(scale);
+  if (isNaN(numScale) || numScale <= 0) {
+    numScale = 1.0;
+  }
+  // Clamp scale between 70% and 160% and round to 2 decimal places
+  numScale = Math.round(Math.min(Math.max(numScale, 0.70), 1.60) * 100) / 100;
+  currentUiZoom = numScale;
+
+  // Apply CSS zoom to document.body (seamlessly supported by WebKitGTK and modern WebViews)
+  document.body.style.zoom = numScale;
+
+  // Update Settings UI Badge if present
+  const badge = document.getElementById('ui-scale-badge');
+  if (badge) {
+    badge.textContent = `${Math.round(numScale * 100)}%`;
+  }
+
+  // Update select dropdown if present
+  const selectEl = document.getElementById('opt-uiScale');
+  if (selectEl) {
+    const match = Array.from(selectEl.options).find(opt => Math.abs(parseFloat(opt.value) - numScale) < 0.01);
+    if (match) {
+      selectEl.value = match.value;
+    } else {
+      selectEl.value = numScale.toString();
+    }
+    if (window.syncCustomSelects) {
+      window.syncCustomSelects();
+    }
+  }
+
+  if (showToast && typeof showNotification === 'function') {
+    showNotification(`UI Scale: ${Math.round(numScale * 100)}%`, "info");
+  }
+
+  if (persist && settingsState) {
+    settingsState.uiScale = numScale;
+    if (zoomSaveTimeout) {
+      clearTimeout(zoomSaveTimeout);
+    }
+    zoomSaveTimeout = setTimeout(() => {
+      saveCurrentSettings();
+    }, 400);
+  }
+}
+
+window.adjustUiZoom = function(delta) {
+  const newScale = Math.round((currentUiZoom + delta) * 100) / 100;
+  applyUiZoom(newScale, true, true);
+};
+
+window.setUiZoom = function(scale) {
+  applyUiZoom(scale, true, true);
+};
+
+function setupZoomKeyboardShortcuts() {
+  window.addEventListener('keydown', (e) => {
+    if (e.ctrlKey || e.metaKey) {
+      if (e.key === '=' || e.key === '+' || e.code === 'NumpadAdd' || e.code === 'Equal') {
+        e.preventDefault();
+        window.adjustUiZoom(0.05);
+      } else if (e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract' || e.code === 'Minus') {
+        e.preventDefault();
+        window.adjustUiZoom(-0.05);
+      } else if (e.key === '0' || e.code === 'Numpad0' || e.code === 'Digit0') {
+        e.preventDefault();
+        window.setUiZoom(1.0);
+      }
+    }
+  }, { passive: false });
+}
+
 // ----------------- HUD Statistics Poll & Telemetry Popover -----------------
 
 // Centralized SVG templates for HUD metrics
@@ -1461,6 +1538,9 @@ async function initApp() {
   
   // Setup rich floating HUD telemetry popover
   initHudTelemetryPopover();
+  
+  // Setup Zoom Keyboard Shortcuts (Ctrl + + / - / 0)
+  setupZoomKeyboardShortcuts();
   
   // Setup vertical tablist keyboard navigation (WAI-ARIA Roving Tabindex, automatic activation)
   const navItems = Array.from(document.querySelectorAll('.nav-item'));
@@ -2007,6 +2087,11 @@ async function refreshSettings() {
   try {
     settingsState = await invoke('load_settings');
     
+    // Apply UI scale from loaded settings
+    if (settingsState && typeof settingsState.uiScale === 'number') {
+      applyUiZoom(settingsState.uiScale, false, false);
+    }
+    
     // Set models dir input
     const inputEl = document.getElementById('opt-modelsDir');
     if (inputEl) {
@@ -2066,6 +2151,12 @@ function bindSettingsToDOM() {
               el.value = 1;
             }
           }
+          if (key === 'uiScale') {
+            const numVal = parseFloat(val) || 1.0;
+            applyUiZoom(numVal, true, false);
+            return;
+          }
+
           settingsState[key] = val;
           saveCurrentSettings();
           

@@ -94,6 +94,29 @@ pub struct WhisperSettings {
     pub output_dir_mode: String, // "input_dir" or "custom"
     #[serde(default)]
     pub output_dir_path: String,
+    #[serde(default = "default_ui_scale", deserialize_with = "deserialize_f64_lenient")]
+    pub ui_scale: f64,
+}
+
+fn deserialize_f64_lenient<'de, D>(deserializer: D) -> Result<f64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum FloatOrString {
+        Float(f64),
+        String(String),
+    }
+
+    match FloatOrString::deserialize(deserializer)? {
+        FloatOrString::Float(f) => Ok(f),
+        FloatOrString::String(s) => s.trim().parse::<f64>().map_err(serde::de::Error::custom),
+    }
+}
+
+fn default_ui_scale() -> f64 {
+    1.0
 }
 
 fn default_output_dir_mode() -> String {
@@ -181,11 +204,18 @@ impl WhisperSettings {
             ffmpeg_source: "bundled".to_string(),
             output_dir_mode: "input_dir".to_string(),
             output_dir_path: "".to_string(),
+            ui_scale: 1.0,
         }
     }
 
     /// Symmetric validation and sanitization executed on BOTH load and save
     pub fn sanitize_and_validate(&mut self) {
+        if self.ui_scale <= 0.0 || self.ui_scale.is_nan() {
+            self.ui_scale = 1.0;
+        }
+        self.ui_scale = (self.ui_scale * 100.0).round() / 100.0;
+        self.ui_scale = self.ui_scale.clamp(0.70, 1.60);
+
         self.threads = self.threads.max(1);
         self.processors = self.processors.max(1);
 
@@ -770,5 +800,41 @@ mod tests {
 
         let home = get_user_home_dir();
         assert!(!home.as_os_str().is_empty());
+    }
+
+    #[test]
+    fn test_ui_scale_sanitization_and_persistence() {
+        let mut settings = WhisperSettings::default_settings();
+        assert_eq!(settings.ui_scale, 1.0);
+
+        // Test low boundary clamping
+        settings.ui_scale = 0.2;
+        settings.sanitize_and_validate();
+        assert_eq!(settings.ui_scale, 0.70);
+
+        // Test high boundary clamping
+        settings.ui_scale = 2.5;
+        settings.sanitize_and_validate();
+        assert_eq!(settings.ui_scale, 1.60);
+
+        // Test NaN / negative fallback
+        settings.ui_scale = f64::NAN;
+        settings.sanitize_and_validate();
+        assert_eq!(settings.ui_scale, 1.0);
+
+        // Test persistence roundtrip
+        let temp_path = temp_test_file("ui_scale_test");
+        settings.ui_scale = 1.15;
+        save_settings_to_path(&temp_path, &settings).unwrap();
+
+        let loaded = load_settings_from_path(&temp_path);
+        assert!((loaded.ui_scale - 1.15).abs() < 1e-6);
+
+        let _ = fs::remove_file(&temp_path);
+
+        // Test lenient deserialization from string format (e.g. "1.25")
+        let json_str = r#"{"uiScale": "1.25"}"#;
+        let parsed: WhisperSettings = serde_json::from_str(json_str).unwrap();
+        assert_eq!(parsed.ui_scale, 1.25);
     }
 }

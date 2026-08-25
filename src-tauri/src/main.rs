@@ -572,17 +572,26 @@ fn open_file_in_editor(app: AppHandle, file_path: String) -> Result<(), String> 
 }
 
 fn main() {
-    // Resolve WebKit subprocess ICU dependency loading crashes inside the AppImage environment.
-    if std::env::var("APPIMAGE").is_ok() {
-        std::env::set_var("WEBKIT_DISABLE_SANDBOX", "1");
-        
-        if let Ok(appdir) = std::env::var("APPDIR") {
-            let shared_lib_path = format!("{}/shared/lib", appdir);
-            let usr_lib_path = format!("{}/usr/lib/x86_64-linux-gnu", appdir);
-            if let Ok(existing_paths) = std::env::var("LD_LIBRARY_PATH") {
-                std::env::set_var("LD_LIBRARY_PATH", format!("{}:{}:{}", shared_lib_path, usr_lib_path, existing_paths));
-            } else {
-                std::env::set_var("LD_LIBRARY_PATH", format!("{}:{}", shared_lib_path, usr_lib_path));
+    #[cfg(target_os = "linux")]
+    {
+        // Resolve WebKit subprocess ICU dependency loading crashes inside the AppImage environment.
+        if std::env::var("APPIMAGE").is_ok() {
+            std::env::set_var("WEBKIT_DISABLE_SANDBOX", "1");
+            
+            // Prevent WebKitGTK double-DPI scaling on modern Linux distributions (e.g. Arch/Wayland)
+            // when GDK_SCALE is not explicitly configured by the user.
+            if std::env::var("GDK_SCALE").is_err() {
+                std::env::set_var("GDK_DPI_SCALE", "1.0");
+            }
+            
+            if let Ok(appdir) = std::env::var("APPDIR") {
+                let shared_lib_path = format!("{}/shared/lib", appdir);
+                let usr_lib_path = format!("{}/usr/lib/x86_64-linux-gnu", appdir);
+                if let Ok(existing_paths) = std::env::var("LD_LIBRARY_PATH") {
+                    std::env::set_var("LD_LIBRARY_PATH", format!("{}:{}:{}", shared_lib_path, usr_lib_path, existing_paths));
+                } else {
+                    std::env::set_var("LD_LIBRARY_PATH", format!("{}:{}", shared_lib_path, usr_lib_path));
+                }
             }
         }
     }
@@ -621,6 +630,7 @@ fn main() {
                             req.allow();
                             true
                         });
+                        webview.set_zoom_level(1.0);
                     });
                 }
             }
