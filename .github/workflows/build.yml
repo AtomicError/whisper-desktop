@@ -72,13 +72,13 @@ jobs:
             build-essential \
             cmake \
             libvulkan-dev \
-            libshaderc-dev \
+            glslc \
             glslang-tools \
             spirv-headers
 
       - name: Install Vulkan SDK (Windows)
         if: matrix.platform == 'windows-latest'
-        uses: humbletim/install-vulkan-sdk@v1.2
+        uses: jakoch/install-vulkan-sdk-action@v1
         with:
           version: latest
           cache: true
@@ -119,8 +119,9 @@ jobs:
             build-essential \
             cmake \
             libvulkan-dev \
-            libshaderc-dev \
-            glslang-tools
+            glslc \
+            glslang-tools \
+            spirv-headers
 
       - name: Install frontend dependencies
         run: npm ci
