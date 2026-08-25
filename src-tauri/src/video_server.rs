@@ -29,12 +29,38 @@ fn percent_decode(s: &str) -> String {
 }
 
 fn random_token() -> String {
+  use std::collections::hash_map::RandomState;
+  use std::hash::{BuildHasher, Hasher};
   use std::time::{SystemTime, UNIX_EPOCH};
+
+  #[cfg(unix)]
+  {
+    if let Ok(mut f) = std::fs::File::open("/dev/urandom") {
+      use std::io::Read;
+      let mut buf = [0u8; 32];
+      if f.read_exact(&mut buf).is_ok() {
+        return buf.iter().map(|b| format!("{:02x}", b)).collect();
+      }
+    }
+  }
+
+  let mut hasher1 = RandomState::new().build_hasher();
+  let mut hasher2 = RandomState::new().build_hasher();
+  let mut hasher3 = RandomState::new().build_hasher();
+  let mut hasher4 = RandomState::new().build_hasher();
+
   let nanos = SystemTime::now()
     .duration_since(UNIX_EPOCH)
     .map(|d| d.as_nanos())
     .unwrap_or(0);
-  format!("{:x}-{:x}", nanos, std::process::id())
+
+  hasher1.write_u128(nanos);
+  hasher1.write_u32(std::process::id());
+  hasher2.write_u64(hasher1.finish());
+  hasher3.write_u64(hasher2.finish());
+  hasher4.write_u64(hasher3.finish());
+
+  format!("{:016x}{:016x}{:016x}{:016x}", hasher1.finish(), hasher2.finish(), hasher3.finish(), hasher4.finish())
 }
 
 pub async fn ensure_media_server_started() -> Result<u16, String> {
@@ -149,6 +175,25 @@ Connection: keep-alive\r\n\r\n";
             }
 
             let file_path = std::path::PathBuf::from(&path_param);
+
+            // Security hardening: verify file exists, is a regular file, and matches allowed media extension
+            let ext = file_path
+              .extension()
+              .and_then(|e| e.to_str())
+              .unwrap_or("")
+              .to_lowercase();
+
+            const ALLOWED_MEDIA_EXTS: &[&str] = &[
+              "mp4", "m4v", "mkv", "webm", "mov", "avi", "ts", "mts", "m2ts", "flv", "f4v", "wmv", "ogv", "3gp", "3g2",
+              "mp3", "wav", "ogg", "oga", "opus", "flac", "aac", "m4a",
+            ];
+
+            if !ALLOWED_MEDIA_EXTS.contains(&ext.as_str()) || !file_path.is_file() {
+              let forbidden = "HTTP/1.1 403 Forbidden\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n";
+              let _ = stream.write_all(forbidden.as_bytes()).await;
+              break;
+            }
+
             let mut file = match File::open(&file_path).await {
               Ok(f) => f,
               Err(_) => {

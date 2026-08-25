@@ -1958,6 +1958,11 @@ function bindSettingsToDOM() {
               onProviderChanged();
             }
           }
+          if (key === 'outputDirMode') {
+            if (typeof toggleOutputDirCustomField === 'function') {
+              toggleOutputDirCustomField();
+            }
+          }
         };
       }
     }
@@ -1968,6 +1973,11 @@ function bindSettingsToDOM() {
   
   // Update FFmpeg engine status badge (passive initial check)
   refreshFFmpegStatus(settingsState.ffmpegSource, false);
+
+  // Sync output directory custom field visibility
+  if (typeof toggleOutputDirCustomField === 'function') {
+    toggleOutputDirCustomField();
+  }
 
   // Sync custom dropdown views
   if (window.syncCustomSelects) {
@@ -2149,6 +2159,29 @@ async function scanAndPopulateModels() {
     console.error("Failed to scan models directory:", e);
   }
 }
+
+window.toggleOutputDirCustomField = function() {
+  const modeEl = document.getElementById('opt-outputDirMode');
+  const wrapEl = document.getElementById('output-dir-custom-wrap');
+  if (!modeEl || !wrapEl) return;
+  if (modeEl.value === 'custom') {
+    wrapEl.style.display = 'flex';
+  } else {
+    wrapEl.style.display = 'none';
+  }
+};
+
+window.browseOutputDir = async function() {
+  const dir = await invoke('select_directory');
+  if (dir) {
+    const inputEl = document.getElementById('opt-outputDirPath');
+    if (inputEl) inputEl.value = dir;
+    if (settingsState) {
+      settingsState.outputDirPath = dir;
+      saveCurrentSettings();
+    }
+  }
+};
 
 window.browseFontFile = async function() {
   const file = await invoke('select_file');

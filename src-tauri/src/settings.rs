@@ -90,6 +90,14 @@ pub struct WhisperSettings {
     pub translate_ai_custom_prompt: String,
     pub translate_ai_polish: bool,
     pub ffmpeg_source: String, // "bundled" or "system"
+    #[serde(default = "default_output_dir_mode")]
+    pub output_dir_mode: String, // "input_dir" or "custom"
+    #[serde(default)]
+    pub output_dir_path: String,
+}
+
+fn default_output_dir_mode() -> String {
+    "input_dir".to_string()
 }
 
 impl Default for WhisperSettings {
@@ -171,6 +179,8 @@ impl WhisperSettings {
             translate_ai_custom_prompt: "".to_string(),
             translate_ai_polish: false,
             ffmpeg_source: "bundled".to_string(),
+            output_dir_mode: "input_dir".to_string(),
+            output_dir_path: "".to_string(),
         }
     }
 

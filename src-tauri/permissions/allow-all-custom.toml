@@ -12,6 +12,7 @@ allow = [
   "convert_media_file",
   "start_transcription_task",
   "cancel_transcription",
+  "cancel_hardsub_task",
   "get_logs",
   "clear_logs",
   "scan_models",

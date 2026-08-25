@@ -47,6 +47,13 @@ pub struct TranscriptionSession {
 }
 pub struct TranscriptionState(pub Arc<Mutex<TranscriptionSession>>);
 
+pub struct HardsubSession {
+    pub child_pid: Option<u32>,
+    pub is_running: bool,
+    pub cancel_requested: bool,
+}
+pub struct HardsubState(pub Arc<Mutex<HardsubSession>>);
+
 #[tauri::command]
 async fn get_system_stats(state: State<'_, HardwareState>) -> Result<SystemStats, String> {
     // Clone the Arc out and drop the State borrow immediately so we don't hold
@@ -89,12 +96,7 @@ fn check_build(app: AppHandle, backend: String) -> bool {
 
 #[tauri::command]
 async fn probe_media_file(app: AppHandle, file_path: String) -> Result<FileMetadata, String> {
-    let app = app.clone();
-    let file_path = file_path.clone();
-    // ffprobe can hang indefinitely on network mounts / stalled devices; bound it.
-    tokio::task::spawn_blocking(move || probe_file_metadata(Some(&app), &file_path))
-        .await
-        .map_err(|e| format!("Metadata probe failed: {e}"))
+    Ok(probe_file_metadata(Some(&app), &file_path).await)
 }
 
 #[derive(serde::Serialize)]
@@ -242,6 +244,41 @@ async fn cancel_transcription(session_state: State<'_, TranscriptionState>) -> R
 }
 
 #[tauri::command]
+async fn cancel_hardsub_task(
+    state: State<'_, HardsubState>,
+    log_state: State<'_, LogState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    let pid_to_kill = {
+        let mut session = state.0.lock().map_err(|e| format!("Lock error: {}", e))?;
+        if !session.is_running {
+            return Ok(());
+        }
+        session.cancel_requested = true;
+        session.child_pid
+    };
+
+    if let Some(pid) = pid_to_kill {
+        log_state.0.log(&app, "Hardsub", &format!("Cancellation requested for hardsub task (PID: {})", pid));
+        #[cfg(unix)]
+        {
+            let _ = tokio::process::Command::new("kill")
+                .args(["-TERM", "--", &format!("-{}", pid), &pid.to_string()])
+                .status()
+                .await;
+        }
+        #[cfg(windows)]
+        {
+            let _ = tokio::process::Command::new("taskkill")
+                .args(["/F", "/T", "/PID", &pid.to_string()])
+                .status()
+                .await;
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
 fn get_logs(state: State<'_, LogState>) -> String {
     state.0.get_all()
 }
@@ -265,11 +302,18 @@ fn walk_models_dir(
     root: &Path,
     backend: &str,
     depth: usize,
+    visited: &mut std::collections::HashSet<std::path::PathBuf>,
     trans_models: &mut Vec<String>,
     vad_models: &mut Vec<String>,
 ) {
     if depth > MAX_SCAN_DEPTH {
         return;
+    }
+
+    if let Ok(canonical) = dir.canonicalize() {
+        if !visited.insert(canonical) {
+            return; // Symlink loop or already visited directory
+        }
     }
 
     if let Ok(entries) = std::fs::read_dir(dir) {
@@ -280,14 +324,17 @@ fn walk_models_dir(
                 Err(_) => continue,
             };
 
-            // Avoid recursing into directory symlinks to prevent infinite recursion loops
-            if file_type.is_dir() && !file_type.is_symlink() {
+            let is_dir = file_type.is_dir() || (file_type.is_symlink() && path.is_dir());
+            let is_file = file_type.is_file() || (file_type.is_symlink() && path.is_file());
+
+            // Recurse into directories (symlinks checked via canonical visited set)
+            if is_dir {
                 let dir_name = path.file_name().unwrap_or_default().to_string_lossy();
                 // Avoid recursing into hidden directories or huge dependency/build directories
                 if !dir_name.starts_with('.') && dir_name != "node_modules" && dir_name != "target" && dir_name != "build" {
-                    walk_models_dir(&path, root, backend, depth + 1, trans_models, vad_models);
+                    walk_models_dir(&path, root, backend, depth + 1, visited, trans_models, vad_models);
                 }
-            } else if file_type.is_file() || (file_type.is_symlink() && path.is_file()) {
+            } else if is_file {
                 let filename = path.file_name().unwrap_or_default().to_string_lossy();
                 if filename.ends_with(".bin") && (filename.contains("ggml-") || filename.contains("silero")) {
                     let rel_path = path.strip_prefix(root)
@@ -323,12 +370,13 @@ async fn scan_models(models_dir: String, backend: String) -> Result<ModelScanRes
     tokio::task::spawn_blocking(move || {
         let mut trans_models = Vec::new();
         let mut vad_models = Vec::new();
+        let mut visited = std::collections::HashSet::new();
 
         let root = Path::new(&models_dir);
         let models_dir_path = root;
 
         if models_dir_path.exists() && models_dir_path.is_dir() {
-            walk_models_dir(models_dir_path, root, &backend, 0, &mut trans_models, &mut vad_models);
+            walk_models_dir(models_dir_path, root, &backend, 0, &mut visited, &mut trans_models, &mut vad_models);
         }
 
         trans_models.sort();
@@ -530,6 +578,11 @@ fn main() {
         phase: SessionPhase::Idle,
         cancel_requested: false,
     }));
+    let hardsub_session = Arc::new(Mutex::new(HardsubSession {
+        child_pid: None,
+        is_running: false,
+        cancel_requested: false,
+    }));
     let download_session = Arc::new(Mutex::new(DownloadSession::new()));
     let app_logs_for_sink = app_logs.clone();
 
@@ -564,6 +617,7 @@ fn main() {
         .manage(HardwareState(hardware_monitor))
         .manage(LogState(app_logs))
         .manage(TranscriptionState(transcription_session))
+        .manage(HardsubState(hardsub_session))
         .manage(DownloadState(download_session))
         .invoke_handler(tauri::generate_handler![
             get_system_stats,
@@ -574,6 +628,7 @@ fn main() {
             convert_media_file,
             start_transcription_task,
             cancel_transcription,
+            cancel_hardsub_task,
             get_logs,
             clear_logs,
             scan_models,

@@ -1008,11 +1008,11 @@ mod tests {
 pub async fn start_hardsub_task(
     app: AppHandle,
     log_state: tauri::State<'_, crate::LogState>,
-    session_state: tauri::State<'_, crate::TranscriptionState>,
+    hardsub_state: tauri::State<'_, crate::HardsubState>,
     settings: HardsubSettings,
 ) -> Result<HardsubResult, String> {
     let logs = log_state.0.clone();
-    let session = session_state.0.clone();
+    let session = hardsub_state.0.clone();
     run_hardsub_task(app, logs, session, settings).await
 }
 
@@ -1045,7 +1045,7 @@ fn resolve_unique_output_path(target_path: &str) -> String {
 pub async fn run_hardsub_task(
     app: AppHandle,
     logs: Arc<AppLogs>,
-    session: Arc<std::sync::Mutex<crate::TranscriptionSession>>,
+    session: Arc<std::sync::Mutex<crate::HardsubSession>>,
     mut settings: HardsubSettings,
 ) -> Result<HardsubResult, String> {
     struct TempAssCleanupGuard<'a> {
@@ -1067,14 +1067,14 @@ pub async fn run_hardsub_task(
     }
 
     struct HardsubSessionGuard {
-        session: Arc<std::sync::Mutex<crate::TranscriptionSession>>,
+        session: Arc<std::sync::Mutex<crate::HardsubSession>>,
     }
 
     impl Drop for HardsubSessionGuard {
         fn drop(&mut self) {
             if let Ok(mut lock) = self.session.lock() {
                 lock.child_pid = None;
-                lock.phase = crate::SessionPhase::Idle;
+                lock.is_running = false;
                 lock.cancel_requested = false;
             }
         }
@@ -1083,10 +1083,10 @@ pub async fn run_hardsub_task(
     // Register pid and set phase
     {
         let mut lock = session.lock().map_err(|e| format!("Session lock failed: {}", e))?;
-        if lock.phase != crate::SessionPhase::Idle {
-            return Err("Another transcription, translation, or encoding task is already running.".to_string());
+        if lock.is_running {
+            return Err("Another video hardsubbing task is already running.".to_string());
         }
-        lock.phase = crate::SessionPhase::Transcribing;
+        lock.is_running = true;
         lock.cancel_requested = false;
         lock.child_pid = None;
     }
@@ -1392,11 +1392,17 @@ pub async fn run_hardsub_task(
 
     logs.log(&app, "FFmpeg", &format!("Executing command: {} {}", ffmpeg_bin.display(), ffmpeg_args.join(" ")));
 
-    let mut child = Command::new(&ffmpeg_bin)
-        .args(&ffmpeg_args)
+    let mut cmd = Command::new(&ffmpeg_bin);
+    cmd.args(&ffmpeg_args)
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
+        .stderr(Stdio::piped());
+
+    #[cfg(unix)]
+    {
+        cmd.process_group(0);
+    }
+
+    let mut child = cmd.spawn()
         .map_err(|e| format!("Failed to spawn ffmpeg ({}): {}", ffmpeg_bin.display(), e))?;
 
     let child_pid = child.id();
@@ -1548,7 +1554,7 @@ pub async fn run_hardsub_task(
     let was_cancelled = if let Ok(mut lock) = session.lock() {
         let cancelled = lock.cancel_requested;
         lock.child_pid = None;
-        lock.phase = crate::SessionPhase::Idle;
+        lock.is_running = false;
         cancelled
     } else {
         false

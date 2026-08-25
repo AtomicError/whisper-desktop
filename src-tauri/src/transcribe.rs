@@ -51,7 +51,7 @@ pub struct TranscriptionResult {
     pub output_dir: String,
 }
 
-pub fn probe_file_metadata(app: Option<&AppHandle>, file_path: &str) -> FileMetadata {
+pub async fn probe_file_metadata(app: Option<&AppHandle>, file_path: &str) -> FileMetadata {
     let path = Path::new(file_path);
     let mut meta = FileMetadata {
         name: path.file_name().unwrap_or_default().to_string_lossy().to_string(),
@@ -85,23 +85,30 @@ pub fn probe_file_metadata(app: Option<&AppHandle>, file_path: &str) -> FileMeta
         meta.format = "📁 File".to_string();
     }
     
-    // ffprobe for duration
+    // ffprobe for duration with 30s timeout
     let probe_path = if file_path.starts_with('-') {
         format!("./{}", file_path)
     } else {
         file_path.to_string()
     };
     let ffprobe_bin = crate::ffmpeg_resolver::get_ffprobe_path(app);
-    let output = std::process::Command::new(&ffprobe_bin)
+    let mut probe_cmd = tokio::process::Command::new(&ffprobe_bin);
+    probe_cmd
         .args([
             "-v", "error",
             "-show_entries", "format=duration",
             "-of", "default=noprint_wrappers=1:nokey=1",
             &probe_path,
         ])
-        .output();
+        .kill_on_drop(true);
+
+    let probe_res = tokio::time::timeout(
+        std::time::Duration::from_secs(30),
+        probe_cmd.output(),
+    )
+    .await;
     
-    if let Ok(out) = output {
+    if let Ok(Ok(out)) = probe_res {
         let out_str = String::from_utf8_lossy(&out.stdout).trim().to_string();
         if let Ok(secs) = out_str.parse::<f64>() {
             meta.duration_sec = secs;
@@ -179,18 +186,24 @@ pub async fn convert_to_wav(
         return Err("WAV conversion was cancelled by the user.".to_string());
     }
 
-    let mut child = Command::new(&ffmpeg_bin)
-        .args([
-            "-y",
-            "-i", &safe_input,
-            "-ar", "16000",
-            "-ac", "1",
-            "-c:a", "pcm_s16le",
-            &tmp_wav_str,
-        ])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
+    let mut cmd = Command::new(&ffmpeg_bin);
+    cmd.args([
+        "-y",
+        "-i", &safe_input,
+        "-ar", "16000",
+        "-ac", "1",
+        "-c:a", "pcm_s16le",
+        &tmp_wav_str,
+    ])
+    .stdout(Stdio::piped())
+    .stderr(Stdio::piped());
+
+    #[cfg(unix)]
+    {
+        cmd.process_group(0);
+    }
+
+    let mut child = cmd.spawn()
         .map_err(|e| format!("Failed to execute FFmpeg ({}): {}", ffmpeg_bin.display(), e))?;
         
     let pid = child.id();
@@ -394,14 +407,25 @@ pub async fn run_transcription(
     let base_name = input_path.file_stem().unwrap_or_default().to_string_lossy();
     let parent_dir = input_path.parent().unwrap_or_else(|| Path::new("."));
 
-    // If the input is outside the user's home directory, redirect output to a safe default
-    let user_home = std::env::var("HOME").unwrap_or_default();
-    let out_dir = if !user_home.is_empty() && !parent_dir.starts_with(&user_home) {
-        let safe = Path::new(&user_home).join("Documents/WhisperOutputs");
-        let _ = std::fs::create_dir_all(&safe);
-        safe
+    // Resolve output directory based on user settings and cross-platform home resolution
+    let out_dir = if settings.output_dir_mode == "custom" && !settings.output_dir_path.trim().is_empty() {
+        let custom = std::path::PathBuf::from(&settings.output_dir_path);
+        let _ = std::fs::create_dir_all(&custom);
+        if custom.exists() {
+            custom
+        } else {
+            parent_dir.to_path_buf()
+        }
     } else {
-        parent_dir.to_path_buf()
+        let user_home = crate::settings::get_user_home_dir();
+        let home_str = user_home.to_string_lossy();
+        if !home_str.is_empty() && !parent_dir.starts_with(&user_home) {
+            let safe = user_home.join("Documents/WhisperOutputs");
+            let _ = std::fs::create_dir_all(&safe);
+            safe
+        } else {
+            parent_dir.to_path_buf()
+        }
     };
 
     let mut out_name = out_dir.join(base_name.to_string());
@@ -569,11 +593,17 @@ pub async fn run_transcription(
         active: true,
     });
     
-    let mut child = Command::new(&bin_path)
-        .args(&args)
+    let mut cmd = Command::new(&bin_path);
+    cmd.args(&args)
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
+        .stderr(Stdio::piped());
+
+    #[cfg(unix)]
+    {
+        cmd.process_group(0);
+    }
+
+    let mut child = cmd.spawn()
         .map_err(|e| {
             let err_str = e.to_string();
             if err_str.contains("Exec format error") || e.raw_os_error() == Some(8) {

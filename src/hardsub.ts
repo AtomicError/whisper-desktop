@@ -1356,7 +1356,7 @@ export class HardsubController {
     // Cancel Hardsub Button
     this.cancelBtn?.addEventListener('click', async () => {
       try {
-        await invoke('cancel_transcription');
+        await invoke('cancel_hardsub_task');
         this.updateEncodingUIState(false);
       } catch (e) {
         console.warn('Cancel hardsub error:', e);

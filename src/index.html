@@ -977,6 +977,28 @@
                   <div class="setting-card" style="margin-top:12px;">
                     <div class="setting-info">
                       <div class="setting-label-row">
+                        <span class="setting-title">Output Directory Mode</span>
+                        <span class="setting-flag">Destination</span>
+                      </div>
+                      <div class="setting-desc">Choose where transcribed subtitle and text files are saved on your computer.</div>
+                    </div>
+                    <div class="setting-control" style="width:320px; display:flex; flex-direction:column; gap:8px;">
+                      <div class="select-wrapper">
+                        <select class="custom-select" id="opt-outputDirMode" onchange="toggleOutputDirCustomField()">
+                          <option value="input_dir">Same as Input File Directory (Default)</option>
+                          <option value="custom">Custom Directory...</option>
+                        </select>
+                      </div>
+                      <div id="output-dir-custom-wrap" style="display:none; gap:8px;">
+                        <input class="text-input" type="text" id="opt-outputDirPath" placeholder="/path/to/custom/output" />
+                        <button class="btn-secondary" style="padding: 10px 14px; font-size:0.8rem;" onclick="browseOutputDir()">Browse</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
                         <span class="setting-title">Karaoke Font Path</span>
                         <span class="setting-flag">-fp</span>
                       </div>
