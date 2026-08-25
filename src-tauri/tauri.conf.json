@@ -20,7 +20,7 @@
         "height": 768,
         "maximized": true,
         "decorations": false,
-        "transparent": true
+        "transparent": false
       }
     ],
     "security": {
