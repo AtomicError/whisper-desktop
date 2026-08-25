@@ -688,6 +688,24 @@ pub async fn run_transcription(
                         settings.model_path
                     )
                 }
+                Some(code) if code == -1073741515 || code as u32 == 0xC0000135 => {
+                    format!(
+                        "Whisper CLI failed to start due to a missing Windows dynamic library (STATUS_DLL_NOT_FOUND, 0xC0000135, exit code {}). Please verify that required runtime DLLs (whisper.dll, ggml.dll, ggml-cpu.dll, or Visual C++ Redistributable) are present in the application's resources directory.",
+                        code
+                    )
+                }
+                Some(code) if code == -1073741819 || code as u32 == 0xC0000005 => {
+                    format!(
+                        "Whisper CLI process encountered a memory access violation (STATUS_ACCESS_VIOLATION, 0xC0000005, exit code {}). The model weights or input buffer could not be accessed.",
+                        code
+                    )
+                }
+                Some(code) if code == -1073741795 || code as u32 == 0xC000001D => {
+                    format!(
+                        "Whisper CLI process encountered an illegal CPU instruction (STATUS_ILLEGAL_INSTRUCTION, 0xC000001D, exit code {}). Your CPU may not support AVX/AVX2 instructions required by this binary.",
+                        code
+                    )
+                }
                 Some(code) => format!("Whisper CLI process failed with exit code: {}", code),
                 None => "Whisper CLI process was terminated unexpectedly by system signal.".to_string(),
             };

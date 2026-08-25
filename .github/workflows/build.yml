@@ -156,7 +156,7 @@ jobs:
             whisper-bins/**
             openvino-dlls/**
             cuda-dlls/**
-          key: whisper-bin-${{ matrix.platform }}-${{ matrix.arch }}-${{ steps.whisper_tag.outputs.tag }}-v3
+          key: whisper-bin-${{ matrix.platform }}-${{ matrix.arch }}-${{ steps.whisper_tag.outputs.tag }}-v4
 
       - name: Clone whisper.cpp
         if: steps.whisper-cache.outputs.cache-hit != 'true'
@@ -231,12 +231,14 @@ jobs:
           cmake -G "Visual Studio 17 2022" -A x64 -B whisper.cpp-src/build-standard -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DBUILD_SHARED_LIBS=OFF
           cmake --build whisper.cpp-src/build-standard --config Release --target whisper-cli
           Copy-Item whisper.cpp-src/build-standard/bin/Release/whisper-cli.exe whisper-bins/whisper-cli-standard.exe
+          Get-ChildItem -Path "whisper.cpp-src/build-standard/bin/Release/*.dll" -ErrorAction SilentlyContinue | Copy-Item -Destination whisper-bins/ -Force
 
           # 2. Vulkan Backend (MSVC + Vulkan SDK)
           Write-Host "Building Vulkan backend for Windows..."
           cmake -G "Visual Studio 17 2022" -A x64 -B whisper.cpp-src/build-vulkan -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_VULKAN=ON -DBUILD_SHARED_LIBS=OFF
           cmake --build whisper.cpp-src/build-vulkan --config Release --target whisper-cli
           Copy-Item whisper.cpp-src/build-vulkan/bin/Release/whisper-cli.exe whisper-bins/whisper-cli-vulkan.exe
+          Get-ChildItem -Path "whisper.cpp-src/build-vulkan/bin/Release/*.dll" -ErrorAction SilentlyContinue | Copy-Item -Destination whisper-bins/ -Force
 
           # 3. OpenVINO Backend (Intel CPU / iGPU Acceleration)
           Write-Host "Setting up OpenVINO 2024 for Windows..."
@@ -249,10 +251,11 @@ jobs:
           cmake -G "Visual Studio 17 2022" -A x64 -B whisper.cpp-src/build-openvino -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DWHISPER_OPENVINO=1 -DOpenVINO_DIR="$($openvinoDir.FullName)/runtime/cmake" -DBUILD_SHARED_LIBS=OFF
           cmake --build whisper.cpp-src/build-openvino --config Release --target whisper-cli
           Copy-Item whisper.cpp-src/build-openvino/bin/Release/whisper-cli.exe whisper-bins/whisper-cli-openvino.exe
+          Get-ChildItem -Path "whisper.cpp-src/build-openvino/bin/Release/*.dll" -ErrorAction SilentlyContinue | Copy-Item -Destination whisper-bins/ -Force
 
           # Copy OpenVINO & TBB runtime DLLs to dedicated cache folder
-          Get-ChildItem -Path "$($openvinoDir.FullName)/runtime/bin/intel64/Release/*.dll" | Copy-Item -Destination openvino-dlls/
-          Get-ChildItem -Path "$($openvinoDir.FullName)/runtime/3rdparty/tbb/bin/*.dll" -ErrorAction SilentlyContinue | Copy-Item -Destination openvino-dlls/
+          Get-ChildItem -Path "$($openvinoDir.FullName)/runtime/bin/intel64/Release/*.dll" | Copy-Item -Destination openvino-dlls/ -Force
+          Get-ChildItem -Path "$($openvinoDir.FullName)/runtime/3rdparty/tbb/bin/*.dll" -ErrorAction SilentlyContinue | Copy-Item -Destination openvino-dlls/ -Force
           Remove-Item -Recurse -Force "openvino.zip", "openvino-extracted"
 
           # 4. CUDA Backend (NVIDIA GPU Acceleration)
@@ -276,12 +279,22 @@ jobs:
           cmake -G "Visual Studio 17 2022" -A x64 -B whisper.cpp-src/build-cuda -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=ON -DGGML_OPENMP=ON -DCUDAToolkit_ROOT="$env:CUDA_PATH" -DCMAKE_CUDA_FLAGS="-allow-unsupported-compiler" -DBUILD_SHARED_LIBS=OFF
           cmake --build whisper.cpp-src/build-cuda --config Release --target whisper-cli
           Copy-Item whisper.cpp-src/build-cuda/bin/Release/whisper-cli.exe whisper-bins/whisper-cli-cuda.exe
+          Get-ChildItem -Path "whisper.cpp-src/build-cuda/bin/Release/*.dll" -ErrorAction SilentlyContinue | Copy-Item -Destination cuda-dlls/ -Force
 
-          # Copy CUDA runtime DLLs to dedicated cache folder
+          # Copy OpenMP runtime (vcomp140.dll) and Visual C++ CRT DLLs if available
+          $vcompDll = Get-ChildItem -Path "$env:ProgramFiles/Microsoft Visual Studio" -Filter "vcomp140.dll" -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match "x64" } | Select-Object -First 1
+          if ($vcompDll) {
+            Copy-Item -Path $vcompDll.FullName -Destination whisper-bins/ -Force
+          }
+
+          # Copy any additional DLLs in ggml build output subdirectories
+          Get-ChildItem -Path "whisper.cpp-src/build-*/bin/Release/*.dll" -Recurse -ErrorAction SilentlyContinue | Copy-Item -Destination whisper-bins/ -Force
+
+          # 5. CUDA runtime DLLs
           if ($env:CUDA_PATH) {
-            Copy-Item "$env:CUDA_PATH\bin\cublas64_*.dll" cuda-dlls/ -ErrorAction SilentlyContinue
-            Copy-Item "$env:CUDA_PATH\bin\cublasLt64_*.dll" cuda-dlls/ -ErrorAction SilentlyContinue
-            Copy-Item "$env:CUDA_PATH\bin\cudart64_*.dll" cuda-dlls/ -ErrorAction SilentlyContinue
+            Copy-Item "$env:CUDA_PATH\bin\cublas64_*.dll" cuda-dlls/ -ErrorAction SilentlyContinue -Force
+            Copy-Item "$env:CUDA_PATH\bin\cublasLt64_*.dll" cuda-dlls/ -ErrorAction SilentlyContinue -Force
+            Copy-Item "$env:CUDA_PATH\bin\cudart64_*.dll" cuda-dlls/ -ErrorAction SilentlyContinue -Force
           }
 
       - name: Compile Whisper CLI (macOS Universal Native + Metal)
@@ -493,7 +506,8 @@ jobs:
           Copy-Item "whisper-bins/whisper-cli-standard.exe" "src-tauri/resources/"
           Copy-Item "whisper-bins/whisper-cli-vulkan.exe" "src-tauri/resources/"
           Copy-Item "whisper-bins/whisper-cli-openvino.exe" "src-tauri/resources/"
-          Copy-Item "openvino-dlls/*.dll" "src-tauri/resources/"
+          Copy-Item "whisper-bins/*.dll" "src-tauri/resources/" -ErrorAction SilentlyContinue -Force
+          Copy-Item "openvino-dlls/*.dll" "src-tauri/resources/" -ErrorAction SilentlyContinue -Force
           Copy-Item "ffmpeg-bins/ffmpeg.exe" "src-tauri/resources/"
           Copy-Item "ffmpeg-bins/ffprobe.exe" "src-tauri/resources/"
           Copy-Item "src/fonts/*" "src-tauri/resources/fonts/" -ErrorAction SilentlyContinue
@@ -512,7 +526,8 @@ jobs:
           Copy-Item "whisper-bins/whisper-cli-standard.exe" "src-tauri/resources/"
           Copy-Item "whisper-bins/whisper-cli-vulkan.exe" "src-tauri/resources/"
           Copy-Item "whisper-bins/whisper-cli-cuda.exe" "src-tauri/resources/"
-          Copy-Item "cuda-dlls/*.dll" "src-tauri/resources/"
+          Copy-Item "whisper-bins/*.dll" "src-tauri/resources/" -ErrorAction SilentlyContinue -Force
+          Copy-Item "cuda-dlls/*.dll" "src-tauri/resources/" -ErrorAction SilentlyContinue -Force
           Copy-Item "ffmpeg-bins/ffmpeg.exe" "src-tauri/resources/"
           Copy-Item "ffmpeg-bins/ffprobe.exe" "src-tauri/resources/"
           Copy-Item "src/fonts/*" "src-tauri/resources/fonts/" -ErrorAction SilentlyContinue
