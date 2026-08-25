@@ -117,26 +117,28 @@ graph TD
 
 ## 🚀 Installation & Packaging
 
-### 🐧 Linux
-
-#### Arch Linux (AUR)
-```bash
-paru -S whisper-desktop-bin
-# or
-yay -S whisper-desktop-bin
-```
+### 🐧 Linux (x86_64 & ARM64)
+Download either the lightweight **Universal** package (`CPU` + `Vulkan` + `OpenVINO` ~80 MB) or the dedicated **NVIDIA CUDA** edition (~550 MB) from the [Releases](https://github.com/AtomicError/whisper-desktop/releases) page:
 
 #### Debian / Ubuntu (`.deb`)
 ```bash
+# Universal (AMD / Intel / Standard GPU)
 sudo apt install ./WhisperDesktop_*_amd64.deb
+
+# NVIDIA CUDA Edition
+sudo apt install ./WhisperDesktop_*_amd64-cuda.deb
 ```
 
 #### RedHat / Fedora (`.rpm`)
 ```bash
-sudo dnf install ./WhisperDesktop-*.rpm
+# Universal
+sudo dnf install ./WhisperDesktop-*-1.x86_64.rpm
+
+# NVIDIA CUDA Edition
+sudo dnf install ./WhisperDesktop-*-1.x86_64-cuda.rpm
 ```
 
-#### AppImage (x86_64 & ARM64)
+#### Portable AppImage (x86_64 & ARM64)
 ```bash
 chmod +x WhisperDesktop_*.AppImage
 ./WhisperDesktop_*.AppImage
@@ -145,12 +147,15 @@ chmod +x WhisperDesktop_*.AppImage
 ---
 
 ### 🪟 Windows (x86_64 & ARM64)
-Download the `.exe` setup installer or `.msi` package from the [Releases](https://github.com/AtomicError/whisper-desktop/releases) page. Fully compatible with Windows 10/11 and Windows on ARM devices.
+Choose your preferred installer from the [Releases](https://github.com/AtomicError/whisper-desktop/releases) page:
+* **Universal Edition (`x64-setup.exe` / `.msi` ~100 MB):** Includes Standard CPU + Vulkan + Intel OpenVINO. Recommended for AMD, Intel CPU/GPU/Arc, and standard PCs.
+* **NVIDIA CUDA Edition (`x64-cuda-setup.exe` / `.msi` ~600 MB):** Dedicated CUDA & cuBLAS hardware acceleration for NVIDIA GPUs.
+* Compatible with Windows 10/11 and Windows 11 ARM64 (Snapdragon X Elite / Surface) via Prism.
 
 ---
 
 ### 🍏 macOS (Apple Silicon & Intel)
-Download the Universal `.dmg` from the [Releases](https://github.com/AtomicError/whisper-desktop/releases) page, open the disk image, and drag **Whisper Desktop** into your `Applications` folder.
+Download the Universal `.dmg` (~65 MB) from the [Releases](https://github.com/AtomicError/whisper-desktop/releases) page, open the disk image, and drag **Whisper Desktop** into your `Applications` folder. Features native Apple Silicon Metal GPU acceleration and Intel support.
 
 ---
 

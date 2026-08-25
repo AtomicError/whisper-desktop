@@ -1818,9 +1818,12 @@ function updateDashboardBackendTiles() {
     if (tile) {
       tile.classList.remove('compiled', 'active-backend');
       
-      const isCompiled = compiledBackends[b];
+      const isCompiled = Boolean(compiledBackends[b]);
       if (isCompiled) {
         tile.classList.add('compiled');
+        tile.style.display = '';
+      } else {
+        tile.style.display = 'none';
       }
       
       if (active === b) {
@@ -1853,6 +1856,7 @@ window.dashboardSelectBackend = function(backend) {
   }
   
   updateDashboardBackendTiles();
+  updateTranscribeUIConfigs();
   showNotification(`Active backend switched to ${backend === 'Standard' ? 'CPU' : backend} successfully!`, "success");
 };
 
@@ -1863,19 +1867,76 @@ window.selectBackend = function(backend, isInitialSelection = false) {
     scanAndPopulateModels();
   }
   updateDashboardBackendTiles();
+  updateTranscribeUIConfigs();
 };
 
 async function refreshBuildStatuses() {
-  const backends = ['Standard', 'Vulkan', 'OpenVINO', 'CUDA'];
-  for (const b of backends) {
+  const allBackends = [
+    { key: 'Standard', label: 'Standard CPU' },
+    { key: 'Vulkan', label: 'Vulkan GPU' },
+    { key: 'OpenVINO', label: 'OpenVINO Intel' },
+    { key: 'CUDA', label: 'NVIDIA CUDA' }
+  ];
+
+  const availableBackends = [];
+  for (const b of allBackends) {
     let isCompiled = false;
     try {
-      isCompiled = await invoke('check_build', { backend: b });
+      isCompiled = await invoke('check_build', { backend: b.key });
     } catch (e) {
-      console.error(`Failed to check build for ${b}:`, e);
+      console.error(`Failed to check build for ${b.key}:`, e);
     }
-    compiledBackends[b] = isCompiled;
+    compiledBackends[b.key] = isCompiled;
+    if (isCompiled) {
+      availableBackends.push(b);
+    }
   }
+
+  // Fallback to Standard CPU if no binaries reported compiled (defensive)
+  if (availableBackends.length === 0) {
+    compiledBackends['Standard'] = true;
+    availableBackends.push(allBackends[0]);
+  }
+
+  // Dynamically populate the Active Backend dropdown with ONLY compiled backends
+  const dropdown = document.getElementById('opt-selectedBackend');
+  if (dropdown) {
+    const currentSelected = settingsState ? settingsState.selectedBackend : dropdown.value;
+    
+    // Check if options changed to prevent redundant DOM replacements
+    const currentOptKeys = Array.from(dropdown.options).map(o => o.value);
+    const newOptKeys = availableBackends.map(b => b.key);
+    const optionsChanged = currentOptKeys.length !== newOptKeys.length || !currentOptKeys.every((k, i) => k === newOptKeys[i]);
+
+    if (optionsChanged) {
+      dropdown.innerHTML = '';
+      availableBackends.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b.key;
+        opt.textContent = b.label;
+        dropdown.appendChild(opt);
+      });
+    }
+
+    // Auto-fallback: if current selected backend is not available, choose the best available
+    const isCurrentValid = availableBackends.some(b => b.key === currentSelected);
+    if (!isCurrentValid) {
+      const fallbackBackend = availableBackends.find(b => b.key === 'Vulkan')?.key || availableBackends[0].key;
+      if (settingsState) {
+        settingsState.selectedBackend = fallbackBackend;
+        saveCurrentSettings();
+        scanAndPopulateModels();
+      }
+      dropdown.value = fallbackBackend;
+    } else {
+      dropdown.value = currentSelected;
+    }
+
+    if (window.syncCustomSelects) {
+      window.syncCustomSelects();
+    }
+  }
+
   updateTranscribeUIConfigs();
   updateDashboardBackendTiles();
 }

@@ -153,88 +153,90 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            src-tauri/resources/whisper-cli-*
-            src-tauri/resources/*.dll
-          key: whisper-bin-${{ matrix.platform }}-${{ matrix.arch }}-${{ steps.whisper_tag.outputs.tag }}-v2
+            whisper-bins/**
+            openvino-dlls/**
+            cuda-dlls/**
+          key: whisper-bin-${{ matrix.platform }}-${{ matrix.arch }}-${{ steps.whisper_tag.outputs.tag }}-v3
 
       - name: Clone whisper.cpp
         if: steps.whisper-cache.outputs.cache-hit != 'true'
         shell: bash
         run: |
-          mkdir -p src-tauri/resources
           git clone --depth 1 --branch "${{ steps.whisper_tag.outputs.tag }}" https://github.com/ggml-org/whisper.cpp.git whisper.cpp-src
 
       - name: Compile Whisper CLI (Linux x86_64)
         if: matrix.platform == 'ubuntu-22.04' && steps.whisper-cache.outputs.cache-hit != 'true'
         run: |
-          mkdir -p src-tauri/resources
+          mkdir -p whisper-bins
 
           # 1. Standard CPU Backend
           echo "Building Standard CPU backend..."
           cmake -B whisper.cpp-src/build-standard -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DBUILD_SHARED_LIBS=OFF
           cmake --build whisper.cpp-src/build-standard -j$(nproc) --config Release --target whisper-cli
-          cp whisper.cpp-src/build-standard/bin/whisper-cli src-tauri/resources/whisper-cli-standard
+          cp whisper.cpp-src/build-standard/bin/whisper-cli whisper-bins/whisper-cli-standard
 
           # 2. Vulkan Backend
           echo "Building Vulkan backend..."
           cmake -B whisper.cpp-src/build-vulkan -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DGGML_VULKAN=ON -DBUILD_SHARED_LIBS=OFF
           cmake --build whisper.cpp-src/build-vulkan -j$(nproc) --config Release --target whisper-cli
-          cp whisper.cpp-src/build-vulkan/bin/whisper-cli src-tauri/resources/whisper-cli-vulkan
+          cp whisper.cpp-src/build-vulkan/bin/whisper-cli whisper-bins/whisper-cli-vulkan
 
           # 3. OpenVINO Backend
           echo "Building OpenVINO backend..."
           cmake -B whisper.cpp-src/build-openvino -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DWHISPER_OPENVINO=1 -DBUILD_SHARED_LIBS=OFF
           cmake --build whisper.cpp-src/build-openvino -j$(nproc) --config Release --target whisper-cli
-          cp whisper.cpp-src/build-openvino/bin/whisper-cli src-tauri/resources/whisper-cli-openvino
+          cp whisper.cpp-src/build-openvino/bin/whisper-cli whisper-bins/whisper-cli-openvino
 
           # 4. CUDA Backend
           echo "Building CUDA backend..."
           cmake -B whisper.cpp-src/build-cuda -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DGGML_CUDA=ON -DBUILD_SHARED_LIBS=OFF
           cmake --build whisper.cpp-src/build-cuda -j$(nproc) --config Release --target whisper-cli
-          cp whisper.cpp-src/build-cuda/bin/whisper-cli src-tauri/resources/whisper-cli-cuda
+          cp whisper.cpp-src/build-cuda/bin/whisper-cli whisper-bins/whisper-cli-cuda
 
-          chmod +x src-tauri/resources/whisper-cli-*
+          chmod +x whisper-bins/whisper-cli-*
 
       - name: Compile Whisper CLI (Linux ARM64)
         if: matrix.platform == 'ubuntu-24.04-arm' && steps.whisper-cache.outputs.cache-hit != 'true'
         run: |
-          mkdir -p src-tauri/resources
+          mkdir -p whisper-bins
 
           # 1. Standard CPU Backend (NEON Accelerated)
           echo "Building Standard ARM64 CPU backend..."
           cmake -B whisper.cpp-src/build-standard -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DBUILD_SHARED_LIBS=OFF
           cmake --build whisper.cpp-src/build-standard -j$(nproc) --config Release --target whisper-cli
-          cp whisper.cpp-src/build-standard/bin/whisper-cli src-tauri/resources/whisper-cli-standard
+          cp whisper.cpp-src/build-standard/bin/whisper-cli whisper-bins/whisper-cli-standard
 
           # 2. Vulkan Backend
           echo "Building Vulkan ARM64 backend..."
           cmake -B whisper.cpp-src/build-vulkan -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DGGML_VULKAN=ON -DBUILD_SHARED_LIBS=OFF
           cmake --build whisper.cpp-src/build-vulkan -j$(nproc) --config Release --target whisper-cli
-          cp whisper.cpp-src/build-vulkan/bin/whisper-cli src-tauri/resources/whisper-cli-vulkan
+          cp whisper.cpp-src/build-vulkan/bin/whisper-cli whisper-bins/whisper-cli-vulkan
 
           # Fallbacks for OpenVINO/CUDA
-          cp src-tauri/resources/whisper-cli-standard src-tauri/resources/whisper-cli-openvino
-          cp src-tauri/resources/whisper-cli-standard src-tauri/resources/whisper-cli-cuda
+          cp whisper-bins/whisper-cli-standard whisper-bins/whisper-cli-openvino
+          cp whisper-bins/whisper-cli-standard whisper-bins/whisper-cli-cuda
 
-          chmod +x src-tauri/resources/whisper-cli-*
+          chmod +x whisper-bins/whisper-cli-*
 
       - name: Compile Whisper CLI (Windows x64)
         if: matrix.platform == 'windows-2022' && steps.whisper-cache.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path src-tauri/resources
+          New-Item -ItemType Directory -Force -Path whisper-bins
+          New-Item -ItemType Directory -Force -Path openvino-dlls
+          New-Item -ItemType Directory -Force -Path cuda-dlls
 
           # 1. Standard CPU Backend (MSVC + AVX2 / OpenMP)
           Write-Host "Building Standard CPU backend for Windows..."
           cmake -G "Visual Studio 17 2022" -A x64 -B whisper.cpp-src/build-standard -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DBUILD_SHARED_LIBS=OFF
           cmake --build whisper.cpp-src/build-standard --config Release --target whisper-cli
-          Copy-Item whisper.cpp-src/build-standard/bin/Release/whisper-cli.exe src-tauri/resources/whisper-cli-standard.exe
+          Copy-Item whisper.cpp-src/build-standard/bin/Release/whisper-cli.exe whisper-bins/whisper-cli-standard.exe
 
           # 2. Vulkan Backend (MSVC + Vulkan SDK)
           Write-Host "Building Vulkan backend for Windows..."
           cmake -G "Visual Studio 17 2022" -A x64 -B whisper.cpp-src/build-vulkan -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_VULKAN=ON -DBUILD_SHARED_LIBS=OFF
           cmake --build whisper.cpp-src/build-vulkan --config Release --target whisper-cli
-          Copy-Item whisper.cpp-src/build-vulkan/bin/Release/whisper-cli.exe src-tauri/resources/whisper-cli-vulkan.exe
+          Copy-Item whisper.cpp-src/build-vulkan/bin/Release/whisper-cli.exe whisper-bins/whisper-cli-vulkan.exe
 
           # 3. OpenVINO Backend (Intel CPU / iGPU Acceleration)
           Write-Host "Setting up OpenVINO 2024 for Windows..."
@@ -246,11 +248,11 @@ jobs:
           Write-Host "Building OpenVINO backend for Windows..."
           cmake -G "Visual Studio 17 2022" -A x64 -B whisper.cpp-src/build-openvino -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DWHISPER_OPENVINO=1 -DOpenVINO_DIR="$($openvinoDir.FullName)/runtime/cmake" -DBUILD_SHARED_LIBS=OFF
           cmake --build whisper.cpp-src/build-openvino --config Release --target whisper-cli
-          Copy-Item whisper.cpp-src/build-openvino/bin/Release/whisper-cli.exe src-tauri/resources/whisper-cli-openvino.exe
+          Copy-Item whisper.cpp-src/build-openvino/bin/Release/whisper-cli.exe whisper-bins/whisper-cli-openvino.exe
 
-          # Copy OpenVINO & TBB runtime DLLs to resources
-          Get-ChildItem -Path "$($openvinoDir.FullName)/runtime/bin/intel64/Release/*.dll" | Copy-Item -Destination src-tauri/resources/
-          Get-ChildItem -Path "$($openvinoDir.FullName)/runtime/3rdparty/tbb/bin/*.dll" -ErrorAction SilentlyContinue | Copy-Item -Destination src-tauri/resources/
+          # Copy OpenVINO & TBB runtime DLLs to dedicated cache folder
+          Get-ChildItem -Path "$($openvinoDir.FullName)/runtime/bin/intel64/Release/*.dll" | Copy-Item -Destination openvino-dlls/
+          Get-ChildItem -Path "$($openvinoDir.FullName)/runtime/3rdparty/tbb/bin/*.dll" -ErrorAction SilentlyContinue | Copy-Item -Destination openvino-dlls/
           Remove-Item -Recurse -Force "openvino.zip", "openvino-extracted"
 
           # 4. CUDA Backend (NVIDIA GPU Acceleration)
@@ -273,19 +275,19 @@ jobs:
 
           cmake -G "Visual Studio 17 2022" -A x64 -B whisper.cpp-src/build-cuda -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=ON -DGGML_OPENMP=ON -DCUDAToolkit_ROOT="$env:CUDA_PATH" -DCMAKE_CUDA_FLAGS="-allow-unsupported-compiler" -DBUILD_SHARED_LIBS=OFF
           cmake --build whisper.cpp-src/build-cuda --config Release --target whisper-cli
-          Copy-Item whisper.cpp-src/build-cuda/bin/Release/whisper-cli.exe src-tauri/resources/whisper-cli-cuda.exe
+          Copy-Item whisper.cpp-src/build-cuda/bin/Release/whisper-cli.exe whisper-bins/whisper-cli-cuda.exe
 
-          # Copy CUDA runtime DLLs to resources so end-users don't need CUDA Toolkit installed
+          # Copy CUDA runtime DLLs to dedicated cache folder
           if ($env:CUDA_PATH) {
-            Copy-Item "$env:CUDA_PATH\bin\cublas64_*.dll" src-tauri/resources/ -ErrorAction SilentlyContinue
-            Copy-Item "$env:CUDA_PATH\bin\cublasLt64_*.dll" src-tauri/resources/ -ErrorAction SilentlyContinue
-            Copy-Item "$env:CUDA_PATH\bin\cudart64_*.dll" src-tauri/resources/ -ErrorAction SilentlyContinue
+            Copy-Item "$env:CUDA_PATH\bin\cublas64_*.dll" cuda-dlls/ -ErrorAction SilentlyContinue
+            Copy-Item "$env:CUDA_PATH\bin\cublasLt64_*.dll" cuda-dlls/ -ErrorAction SilentlyContinue
+            Copy-Item "$env:CUDA_PATH\bin\cudart64_*.dll" cuda-dlls/ -ErrorAction SilentlyContinue
           }
 
       - name: Compile Whisper CLI (macOS Universal Native + Metal)
         if: matrix.platform == 'macos-latest' && steps.whisper-cache.outputs.cache-hit != 'true'
         run: |
-          mkdir -p src-tauri/resources
+          mkdir -p whisper-bins
 
           # 1. x86_64 Intel Build (Metal disabled on Intel cross)
           echo "Building x86_64 Intel binary..."
@@ -299,14 +301,14 @@ jobs:
 
           # 3. Combine into Universal Mach-O Fat Binary
           echo "Creating Universal Mach-O binary..."
-          lipo -create whisper.cpp-src/build-x64/bin/whisper-cli whisper.cpp-src/build-arm64/bin/whisper-cli -output src-tauri/resources/whisper-cli-standard
+          lipo -create whisper.cpp-src/build-x64/bin/whisper-cli whisper.cpp-src/build-arm64/bin/whisper-cli -output whisper-bins/whisper-cli-standard
 
-          cp src-tauri/resources/whisper-cli-standard src-tauri/resources/whisper-cli-vulkan
-          cp src-tauri/resources/whisper-cli-standard src-tauri/resources/whisper-cli-openvino
-          cp src-tauri/resources/whisper-cli-standard src-tauri/resources/whisper-cli-cuda
+          cp whisper-bins/whisper-cli-standard whisper-bins/whisper-cli-vulkan
+          cp whisper-bins/whisper-cli-standard whisper-bins/whisper-cli-openvino
+          cp whisper-bins/whisper-cli-standard whisper-bins/whisper-cli-cuda
 
-          chmod +x src-tauri/resources/whisper-cli-*
-          codesign --force --sign - src-tauri/resources/whisper-cli-*
+          chmod +x whisper-bins/whisper-cli-*
+          codesign --force --sign - whisper-bins/whisper-cli-*
 
       # --- FFMPEG & FFPROBE BINARIES CACHING & DOWNLOAD ---
 
@@ -315,50 +317,49 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            src-tauri/resources/ffmpeg*
-            src-tauri/resources/ffprobe*
-          key: ffmpeg-${{ matrix.platform }}-${{ matrix.arch }}-v2
+            ffmpeg-bins/**
+          key: ffmpeg-${{ matrix.platform }}-${{ matrix.arch }}-v3
 
       - name: Download Static FFmpeg (Linux x86_64)
         if: matrix.platform == 'ubuntu-22.04' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
         run: |
-          mkdir -p src-tauri/resources
+          mkdir -p ffmpeg-bins
           wget -q https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
-          tar -xJf ffmpeg-release-amd64-static.tar.xz --wildcards --strip-components=1 -C src-tauri/resources/ "ffmpeg-*-amd64-static/ffmpeg" "ffmpeg-*-amd64-static/ffprobe"
+          tar -xJf ffmpeg-release-amd64-static.tar.xz --wildcards --strip-components=1 -C ffmpeg-bins/ "ffmpeg-*-amd64-static/ffmpeg" "ffmpeg-*-amd64-static/ffprobe"
           rm -f ffmpeg-release-amd64-static.tar.xz
-          chmod +x src-tauri/resources/ffmpeg src-tauri/resources/ffprobe
+          chmod +x ffmpeg-bins/ffmpeg ffmpeg-bins/ffprobe
 
       - name: Download Static FFmpeg (Linux arm64)
         if: matrix.platform == 'ubuntu-24.04-arm' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
         run: |
-          mkdir -p src-tauri/resources
+          mkdir -p ffmpeg-bins
           wget -q https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-arm64-static.tar.xz
-          tar -xJf ffmpeg-release-arm64-static.tar.xz --wildcards --strip-components=1 -C src-tauri/resources/ "ffmpeg-*-arm64-static/ffmpeg" "ffmpeg-*-arm64-static/ffprobe"
+          tar -xJf ffmpeg-release-arm64-static.tar.xz --wildcards --strip-components=1 -C ffmpeg-bins/ "ffmpeg-*-arm64-static/ffmpeg" "ffmpeg-*-arm64-static/ffprobe"
           rm -f ffmpeg-release-arm64-static.tar.xz
-          chmod +x src-tauri/resources/ffmpeg src-tauri/resources/ffprobe
+          chmod +x ffmpeg-bins/ffmpeg ffmpeg-bins/ffprobe
 
       - name: Download Static FFmpeg (Windows x64 - Full Build)
         if: matrix.platform == 'windows-2022' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path src-tauri/resources
+          New-Item -ItemType Directory -Force -Path ffmpeg-bins
           Invoke-WebRequest -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.7z" -OutFile "ffmpeg.7z"
           7z x ffmpeg.7z -offmpeg-extracted -y
           $binFolder = Get-ChildItem -Path "ffmpeg-extracted" -Recurse -Directory -Filter "bin" | Select-Object -First 1
-          Copy-Item -Path "$($binFolder.FullName)\ffmpeg.exe" -Destination "src-tauri/resources/ffmpeg.exe"
-          Copy-Item -Path "$($binFolder.FullName)\ffprobe.exe" -Destination "src-tauri/resources/ffprobe.exe"
+          Copy-Item -Path "$($binFolder.FullName)\ffmpeg.exe" -Destination "ffmpeg-bins/ffmpeg.exe"
+          Copy-Item -Path "$($binFolder.FullName)\ffprobe.exe" -Destination "ffmpeg-bins/ffprobe.exe"
           Remove-Item -Recurse -Force "ffmpeg.7z", "ffmpeg-extracted"
 
       - name: Download Static FFmpeg & FFprobe (macOS Universal Native)
         if: matrix.platform == 'macos-latest' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
         run: |
-          mkdir -p src-tauri/resources
+          mkdir -p ffmpeg-bins
           # 1. FFmpeg Universal Mach-O binary (ARM64 with SVT-AV1 + x86_64)
           curl -L -o ffmpeg-arm64.zip "https://ffmpeg.martin-riedl.de/download/macos/arm64/1785863997_9.0/ffmpeg.zip"
           unzip -q -o ffmpeg-arm64.zip -d ./ffmpeg-arm64-dir
           curl -L -o ffmpeg-x64.zip "https://evermeet.cx/ffmpeg/getrelease/zip"
           unzip -q -o ffmpeg-x64.zip -d ./ffmpeg-x64-dir
-          lipo -create ./ffmpeg-arm64-dir/ffmpeg ./ffmpeg-x64-dir/ffmpeg -output src-tauri/resources/ffmpeg
+          lipo -create ./ffmpeg-arm64-dir/ffmpeg ./ffmpeg-x64-dir/ffmpeg -output ffmpeg-bins/ffmpeg
           rm -rf ffmpeg-arm64.zip ffmpeg-x64.zip ./ffmpeg-arm64-dir ./ffmpeg-x64-dir
 
           # 2. FFprobe Universal Mach-O binary (ARM64 + x86_64)
@@ -366,13 +367,13 @@ jobs:
           unzip -q -o ffprobe-arm64.zip -d ./ffprobe-arm64-dir
           curl -L -o ffprobe-x64.zip "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip"
           unzip -q -o ffprobe-x64.zip -d ./ffprobe-x64-dir
-          lipo -create ./ffprobe-arm64-dir/ffprobe ./ffprobe-x64-dir/ffprobe -output src-tauri/resources/ffprobe
+          lipo -create ./ffprobe-arm64-dir/ffprobe ./ffprobe-x64-dir/ffprobe -output ffmpeg-bins/ffprobe
           rm -rf ffprobe-arm64.zip ffprobe-x64.zip ./ffprobe-arm64-dir ./ffprobe-x64-dir
 
           # 3. Fix permissions and ad-hoc code sign for Apple Silicon Gatekeeper
-          chmod +x src-tauri/resources/ffmpeg src-tauri/resources/ffprobe
-          codesign --force --sign - src-tauri/resources/ffmpeg
-          codesign --force --sign - src-tauri/resources/ffprobe
+          chmod +x ffmpeg-bins/ffmpeg ffmpeg-bins/ffprobe
+          codesign --force --sign - ffmpeg-bins/ffmpeg
+          codesign --force --sign - ffmpeg-bins/ffprobe
 
       # --- TAURI APPLICATION BUNDLING & RELEASE ---
 
@@ -383,53 +384,176 @@ jobs:
           VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Build Tauri Application
-        run: npm run tauri build -- ${{ matrix.args }}
+      # --- BUILD TAURI (LINUX X86_64: UNIVERSAL + NVIDIA CUDA EDITIONS) ---
+      - name: Build Tauri Application (Linux x86_64)
+        if: matrix.platform == 'ubuntu-22.04'
+        shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NO_STRIP: true
-
-      - name: Fix AppImage Graphics Libraries (Linux x86_64)
-        if: matrix.platform == 'ubuntu-22.04'
-        shell: bash
         run: |
-          # 1. Download appimagetool from the official continuous release
+          # 0. Prepare appimagetool
           wget -q -O appimagetool https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
           chmod +x appimagetool
-
-          # 2. Extract appimagetool to bypass FUSE requirement on the runner
           ./appimagetool --appimage-extract
           mv squashfs-root appimagetool-temp
 
-          # 3. Find the generated AppImage
-          APPIMAGE_PATH=$(find src-tauri/target/release/bundle/appimage/ -name "*.AppImage" | head -n 1)
-          echo "Found AppImage at: $APPIMAGE_PATH"
+          fix_appimage_graphics() {
+            local target_img="$1"
+            if [ -f "$target_img" ]; then
+              echo "Patching graphics libs in AppImage: $target_img"
+              chmod +x "$target_img"
+              "$target_img" --appimage-extract
+              rm -f squashfs-root/usr/lib/libEGL.so* squashfs-root/usr/lib/libGL.so* squashfs-root/usr/lib/libgbm.so* squashfs-root/usr/lib/libglapi.so* squashfs-root/usr/lib/libwayland-client.so*
+              rm -f squashfs-root/usr/lib/x86_64-linux-gnu/libEGL.so* squashfs-root/usr/lib/x86_64-linux-gnu/libGL.so* squashfs-root/usr/lib/x86_64-linux-gnu/libgbm.so* squashfs-root/usr/lib/x86_64-linux-gnu/libglapi.so* squashfs-root/usr/lib/x86_64-linux-gnu/libwayland-client.so*
+              rm -f "$target_img"
+              export ARCH=x86_64
+              ./appimagetool-temp/AppRun squashfs-root "$target_img"
+              rm -rf squashfs-root
+            fi
+          }
 
-          # 4. Extract the app's AppImage
-          chmod +x "$APPIMAGE_PATH"
-          "$APPIMAGE_PATH" --appimage-extract
-          
-          # 5. Remove the conflicting graphics libraries from the extracted squashfs-root
-          echo "Removing conflicting graphics libraries..."
-          rm -f squashfs-root/usr/lib/libEGL.so*
-          rm -f squashfs-root/usr/lib/libGL.so*
-          rm -f squashfs-root/usr/lib/libgbm.so*
-          rm -f squashfs-root/usr/lib/libglapi.so*
-          rm -f squashfs-root/usr/lib/libwayland-client.so*
-          
-          rm -f squashfs-root/usr/lib/x86_64-linux-gnu/libEGL.so*
-          rm -f squashfs-root/usr/lib/x86_64-linux-gnu/libGL.so*
-          rm -f squashfs-root/usr/lib/x86_64-linux-gnu/libgbm.so*
-          rm -f squashfs-root/usr/lib/x86_64-linux-gnu/libglapi.so*
-          rm -f squashfs-root/usr/lib/x86_64-linux-gnu/libwayland-client.so*
+          # 1. Build Universal Edition (Standard CPU + Vulkan + OpenVINO)
+          echo "=== 1/2: Building Linux Universal Edition (CPU + Vulkan + OpenVINO) ==="
+          rm -rf src-tauri/resources/*
+          mkdir -p src-tauri/resources/fonts
+          cp whisper-bins/whisper-cli-standard src-tauri/resources/
+          cp whisper-bins/whisper-cli-vulkan src-tauri/resources/
+          cp whisper-bins/whisper-cli-openvino src-tauri/resources/
+          cp ffmpeg-bins/ffmpeg src-tauri/resources/
+          cp ffmpeg-bins/ffprobe src-tauri/resources/
+          cp src/fonts/* src-tauri/resources/fonts/ || true
+          chmod +x src-tauri/resources/whisper-cli-* src-tauri/resources/ffmpeg src-tauri/resources/ffprobe
 
-          # 6. Remove the old AppImage file
-          rm -f "$APPIMAGE_PATH"
+          npm run tauri build
 
-          # 7. Re-package the AppImage using the extracted appimagetool
-          echo "Re-packaging AppImage..."
-          export ARCH=x86_64
-          ./appimagetool-temp/AppRun squashfs-root "$APPIMAGE_PATH"
+          UNIVERSAL_APPIMAGE=$(find src-tauri/target/release/bundle/appimage/ -name "*.AppImage" | head -n 1)
+          fix_appimage_graphics "$UNIVERSAL_APPIMAGE"
+
+          mkdir -p staging-universal/appimage staging-universal/deb staging-universal/rpm
+          cp -r src-tauri/target/release/bundle/appimage/* staging-universal/appimage/ || true
+          cp -r src-tauri/target/release/bundle/deb/* staging-universal/deb/ || true
+          cp -r src-tauri/target/release/bundle/rpm/* staging-universal/rpm/ || true
+
+          # 2. Build NVIDIA CUDA Edition (Standard CPU + Vulkan + CUDA)
+          echo "=== 2/2: Building Linux NVIDIA CUDA Edition (CPU + Vulkan + CUDA) ==="
+          rm -rf src-tauri/resources/*
+          mkdir -p src-tauri/resources/fonts
+          cp whisper-bins/whisper-cli-standard src-tauri/resources/
+          cp whisper-bins/whisper-cli-vulkan src-tauri/resources/
+          cp whisper-bins/whisper-cli-cuda src-tauri/resources/
+          cp ffmpeg-bins/ffmpeg src-tauri/resources/
+          cp ffmpeg-bins/ffprobe src-tauri/resources/
+          cp src/fonts/* src-tauri/resources/fonts/ || true
+          chmod +x src-tauri/resources/whisper-cli-* src-tauri/resources/ffmpeg src-tauri/resources/ffprobe
+
+          # Clean previous build artifacts before second pass
+          rm -rf src-tauri/target/release/bundle/appimage/* src-tauri/target/release/bundle/deb/* src-tauri/target/release/bundle/rpm/*
+
+          npm run tauri build
+
+          CUDA_APPIMAGE=$(find src-tauri/target/release/bundle/appimage/ -name "*.AppImage" | head -n 1)
+          fix_appimage_graphics "$CUDA_APPIMAGE"
+
+          # Rename CUDA bundles with -cuda suffix
+          for f in src-tauri/target/release/bundle/appimage/*.AppImage; do
+            if [ -f "$f" ] && [[ "$f" != *"-cuda.AppImage" ]]; then
+              mv "$f" "${f%.AppImage}-cuda.AppImage"
+            fi
+          done
+          for f in src-tauri/target/release/bundle/deb/*.deb; do
+            if [ -f "$f" ] && [[ "$f" != *"-cuda.deb" ]]; then
+              mv "$f" "${f%.deb}-cuda.deb"
+            fi
+          done
+          for f in src-tauri/target/release/bundle/rpm/*.rpm; do
+            if [ -f "$f" ] && [[ "$f" != *"-cuda.rpm" ]]; then
+              mv "$f" "${f%.rpm}-cuda.rpm"
+            fi
+          done
+
+          # Merge Universal bundles back into release bundle directory
+          cp -r staging-universal/appimage/* src-tauri/target/release/bundle/appimage/
+          cp -r staging-universal/deb/* src-tauri/target/release/bundle/deb/
+          cp -r staging-universal/rpm/* src-tauri/target/release/bundle/rpm/
+          rm -rf staging-universal appimagetool-temp appimagetool
+
+      # --- BUILD TAURI (WINDOWS X64: UNIVERSAL + NVIDIA CUDA EDITIONS) ---
+      - name: Build Tauri Application (Windows x64)
+        if: matrix.platform == 'windows-2022'
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NO_STRIP: true
+        run: |
+          # 1. Build Universal Edition (Standard CPU + Vulkan + OpenVINO)
+          Write-Host "=== 1/2: Building Windows Universal Edition (CPU + Vulkan + OpenVINO) ==="
+          Remove-Item -Path "src-tauri/resources/*" -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path src-tauri/resources/fonts
+          Copy-Item "whisper-bins/whisper-cli-standard.exe" "src-tauri/resources/"
+          Copy-Item "whisper-bins/whisper-cli-vulkan.exe" "src-tauri/resources/"
+          Copy-Item "whisper-bins/whisper-cli-openvino.exe" "src-tauri/resources/"
+          Copy-Item "openvino-dlls/*.dll" "src-tauri/resources/"
+          Copy-Item "ffmpeg-bins/ffmpeg.exe" "src-tauri/resources/"
+          Copy-Item "ffmpeg-bins/ffprobe.exe" "src-tauri/resources/"
+          Copy-Item "src/fonts/*" "src-tauri/resources/fonts/" -ErrorAction SilentlyContinue
+
+          npm run tauri build
+
+          New-Item -ItemType Directory -Force -Path staging-universal/nsis
+          New-Item -ItemType Directory -Force -Path staging-universal/msi
+          Copy-Item "src-tauri/target/release/bundle/nsis/*" "staging-universal/nsis/" -Force
+          Copy-Item "src-tauri/target/release/bundle/msi/*" "staging-universal/msi/" -Force
+
+          # 2. Build NVIDIA CUDA Edition (Standard CPU + Vulkan + CUDA)
+          Write-Host "=== 2/2: Building Windows NVIDIA CUDA Edition (CPU + Vulkan + CUDA) ==="
+          Remove-Item -Path "src-tauri/resources/*" -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path src-tauri/resources/fonts
+          Copy-Item "whisper-bins/whisper-cli-standard.exe" "src-tauri/resources/"
+          Copy-Item "whisper-bins/whisper-cli-vulkan.exe" "src-tauri/resources/"
+          Copy-Item "whisper-bins/whisper-cli-cuda.exe" "src-tauri/resources/"
+          Copy-Item "cuda-dlls/*.dll" "src-tauri/resources/"
+          Copy-Item "ffmpeg-bins/ffmpeg.exe" "src-tauri/resources/"
+          Copy-Item "ffmpeg-bins/ffprobe.exe" "src-tauri/resources/"
+          Copy-Item "src/fonts/*" "src-tauri/resources/fonts/" -ErrorAction SilentlyContinue
+
+          Remove-Item -Path "src-tauri/target/release/bundle/nsis/*" -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item -Path "src-tauri/target/release/bundle/msi/*" -Recurse -Force -ErrorAction SilentlyContinue
+
+          npm run tauri build
+
+          # Rename CUDA bundles with -cuda suffix
+          Get-ChildItem -Path "src-tauri/target/release/bundle/nsis/*.exe" | ForEach-Object {
+            $newName = $_.Name -replace "-setup\.exe$", "-cuda-setup.exe"
+            if ($newName -eq $_.Name) { $newName = $_.Name -replace "\.exe$", "-cuda.exe" }
+            Rename-Item -Path $_.FullName -NewName $newName
+          }
+          Get-ChildItem -Path "src-tauri/target/release/bundle/msi/*.msi" | ForEach-Object {
+            $newName = $_.Name -replace "_en-US\.msi$", "_cuda_en-US.msi"
+            if ($newName -eq $_.Name) { $newName = $_.Name -replace "\.msi$", "-cuda.msi" }
+            Rename-Item -Path $_.FullName -NewName $newName
+          }
+
+          # Merge Universal bundles back into release bundle directory
+          Copy-Item "staging-universal/nsis/*" "src-tauri/target/release/bundle/nsis/" -Force
+          Copy-Item "staging-universal/msi/*" "src-tauri/target/release/bundle/msi/" -Force
+          Remove-Item -Path "staging-universal" -Recurse -Force
+
+      # --- BUILD TAURI (LINUX ARM64 & MACOS) ---
+      - name: Build Tauri Application (macOS / Linux ARM64)
+        if: matrix.platform == 'macos-latest' || matrix.platform == 'ubuntu-24.04-arm'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NO_STRIP: true
+        run: |
+          mkdir -p src-tauri/resources/fonts
+          cp whisper-bins/whisper-cli-* src-tauri/resources/
+          cp ffmpeg-bins/ffmpeg src-tauri/resources/
+          cp ffmpeg-bins/ffprobe src-tauri/resources/
+          cp src/fonts/* src-tauri/resources/fonts/ || true
+          chmod +x src-tauri/resources/whisper-cli-* src-tauri/resources/ffmpeg src-tauri/resources/ffprobe
+          npm run tauri build -- ${{ matrix.args }}
 
       - name: Create Release and Upload Assets
         uses: softprops/action-gh-release@v2
@@ -444,21 +568,26 @@ jobs:
 
             ### 📦 Download & Package Guide
 
-            | Platform | Architecture / Format | Download | Notes |
+            | Platform | Architecture / Format | Download | Description & Hardware Support |
             | :--- | :--- | :---: | :--- |
-            | 🪟 **Windows** | Setup Installer (x64) | [![Download](https://img.shields.io/badge/Download-x64__setup.exe-0057d9?style=flat-square&logo=windows&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_x64-setup.exe) | Compatible with Intel/AMD & Windows on ARM |
-            | 🪟 **Windows** | MSI Package (x64) | [![Download](https://img.shields.io/badge/Download-x64__en--US.msi-0057d9?style=flat-square&logo=windows&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_x64_en-US.msi) | Enterprise & System-wide deployment |
-            | 🍎 **macOS** | Universal DMG | [![Download](https://img.shields.io/badge/Download-universal.dmg-0057d9?style=flat-square&logo=apple&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_universal.dmg) | Native on Apple Silicon (M1-M4) & Intel |
-            | 🐧 **Linux** | Portable AppImage (x86_64) | [![Download](https://img.shields.io/badge/Download-amd64.AppImage-0057d9?style=flat-square&logo=linux&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_amd64.AppImage) | Standalone executable for Intel/AMD |
-            | 🐧 **Linux** | Portable AppImage (ARM64) | [![Download](https://img.shields.io/badge/Download-aarch64.AppImage-0057d9?style=flat-square&logo=linux&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_aarch64.AppImage) | Standalone executable for ARM64 |
-            | 🐧 **Linux (Debian/Ubuntu)** | DEB Package (Intel/AMD) | [![Download](https://img.shields.io/badge/Download-amd64.deb-0057d9?style=flat-square&logo=debian&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_amd64.deb) | Standard package for Ubuntu/Debian |
-            | 🐧 **Linux (Debian/Ubuntu)** | DEB Package (ARM64) | [![Download](https://img.shields.io/badge/Download-arm64.deb-0057d9?style=flat-square&logo=debian&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_arm64.deb) | Standard package for ARM64 |
-            | 🐧 **Linux (Fedora/RHEL)** | RPM Package (x86_64) | [![Download](https://img.shields.io/badge/Download-x86__64.rpm-0057d9?style=flat-square&logo=redhat&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop-${{ steps.app_version.outputs.version }}-1.x86_64.rpm) | Red Hat / Fedora / openSUSE |
-            | 🐧 **Linux (Fedora/RHEL)** | RPM Package (ARM64) | [![Download](https://img.shields.io/badge/Download-aarch64.rpm-0057d9?style=flat-square&logo=redhat&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop-${{ steps.app_version.outputs.version }}-1.aarch64.rpm) | Red Hat / Fedora on ARM64 |
+            | 🪟 **Windows** | Setup Installer (Universal) | [![Download](https://img.shields.io/badge/Download-x64__setup.exe-0057d9?style=flat-square&logo=windows&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_x64-setup.exe) | Standard CPU + Vulkan + OpenVINO (~100 MB) |
+            | 🪟 **Windows** | Setup Installer (NVIDIA CUDA) | [![Download](https://img.shields.io/badge/Download-x64__cuda--setup.exe-76b900?style=flat-square&logo=nvidia&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_x64-cuda-setup.exe) | Dedicated NVIDIA CUDA & cuBLAS Acceleration (~600 MB) |
+            | 🪟 **Windows** | MSI Package (Universal) | [![Download](https://img.shields.io/badge/Download-x64__en--US.msi-0057d9?style=flat-square&logo=windows&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_x64_en-US.msi) | MSI Enterprise Deployment (Universal) |
+            | 🪟 **Windows** | MSI Package (NVIDIA CUDA) | [![Download](https://img.shields.io/badge/Download-x64__cuda__en--US.msi-76b900?style=flat-square&logo=nvidia&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_x64-cuda_en-US.msi) | MSI Enterprise Deployment (NVIDIA CUDA) |
+            | 🍎 **macOS** | Universal DMG | [![Download](https://img.shields.io/badge/Download-universal.dmg-0057d9?style=flat-square&logo=apple&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_universal.dmg) | Native Apple Silicon (Metal) & Intel Macs (~65 MB) |
+            | 🐧 **Linux** | Portable AppImage (Universal) | [![Download](https://img.shields.io/badge/Download-amd64.AppImage-0057d9?style=flat-square&logo=linux&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_amd64.AppImage) | Standard CPU + Vulkan + OpenVINO (~80 MB) |
+            | 🐧 **Linux** | Portable AppImage (NVIDIA CUDA) | [![Download](https://img.shields.io/badge/Download-amd64--cuda.AppImage-76b900?style=flat-square&logo=nvidia&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_amd64-cuda.AppImage) | Dedicated NVIDIA CUDA Acceleration (~550 MB) |
+            | 🐧 **Linux** | Portable AppImage (ARM64) | [![Download](https://img.shields.io/badge/Download-aarch64.AppImage-0057d9?style=flat-square&logo=linux&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_aarch64.AppImage) | Standalone executable for ARM64 (~70 MB) |
+            | 🐧 **Linux (Debian/Ubuntu)** | DEB Package (Universal) | [![Download](https://img.shields.io/badge/Download-amd64.deb-0057d9?style=flat-square&logo=debian&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_amd64.deb) | Ubuntu / Debian (Universal ~80 MB) |
+            | 🐧 **Linux (Debian/Ubuntu)** | DEB Package (NVIDIA CUDA) | [![Download](https://img.shields.io/badge/Download-amd64--cuda.deb-76b900?style=flat-square&logo=nvidia&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_amd64-cuda.deb) | Ubuntu / Debian (NVIDIA CUDA ~550 MB) |
+            | 🐧 **Linux (Debian/Ubuntu)** | DEB Package (ARM64) | [![Download](https://img.shields.io/badge/Download-arm64.deb-0057d9?style=flat-square&logo=debian&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_arm64.deb) | Ubuntu / Debian on ARM64 (~70 MB) |
+            | 🐧 **Linux (Fedora/RHEL)** | RPM Package (Universal) | [![Download](https://img.shields.io/badge/Download-x86__64.rpm-0057d9?style=flat-square&logo=redhat&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop-${{ steps.app_version.outputs.version }}-1.x86_64.rpm) | Fedora / RHEL / openSUSE (Universal ~80 MB) |
+            | 🐧 **Linux (Fedora/RHEL)** | RPM Package (NVIDIA CUDA) | [![Download](https://img.shields.io/badge/Download-x86__64--cuda.rpm-76b900?style=flat-square&logo=redhat&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop-${{ steps.app_version.outputs.version }}-1.x86_64-cuda.rpm) | Fedora / RHEL / openSUSE (NVIDIA CUDA ~550 MB) |
+            | 🐧 **Linux (Fedora/RHEL)** | RPM Package (ARM64) | [![Download](https://img.shields.io/badge/Download-aarch64.rpm-0057d9?style=flat-square&logo=redhat&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop-${{ steps.app_version.outputs.version }}-1.aarch64.rpm) | Fedora / RHEL / openSUSE on ARM64 (~70 MB) |
 
             ---
-            > 💡 **Windows on ARM:** Windows 11 ARM64 devices (Snapdragon X Elite, Surface Pro, etc.) run the `x64-setup.exe` installer with near-native performance via Microsoft Prism emulation.
-            > 💡 **macOS Universal:** The DMG package contains a Universal binary natively optimized for both Apple Silicon (M1/M2/M3/M4) and Intel Macs.
+            > 💡 **Windows on ARM:** Windows 11 ARM64 devices run the `x64-setup.exe` installer with near-native performance via Microsoft Prism emulation.
+            > 💡 **macOS Universal:** The DMG package contains a Universal binary natively optimized for both Apple Silicon (M1-M4 Metal acceleration) and Intel Macs.
           draft: true
           prerelease: false
           files: |
@@ -469,4 +598,5 @@ jobs:
             src-tauri/target/release/bundle/nsis/*.exe
             src-tauri/target/release/bundle/dmg/*.dmg
             src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+
 
