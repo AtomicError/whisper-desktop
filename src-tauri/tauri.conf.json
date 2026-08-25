@@ -38,8 +38,7 @@
       "resources/whisper-cli-*",
       "resources/ffmpeg*",
       "resources/ffprobe*",
-      "resources/fonts/*",
-      "resources/*.dll"
+      "resources/fonts/*"
     ],
 
     "category": "Utility",
