@@ -39,6 +39,8 @@ allow = [
   "delete_keyring_credential",
   "write_text_file_content",
   "get_media_stream_url",
-  "get_ffmpeg_status"
+  "get_ffmpeg_status",
+  "copy_to_clipboard",
+  "open_file_in_editor"
 ]
 

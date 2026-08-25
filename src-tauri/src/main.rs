@@ -555,6 +555,22 @@ fn get_ffmpeg_status(app: AppHandle, source: Option<String>) -> crate::ffmpeg_re
     crate::ffmpeg_resolver::get_current_ffmpeg_status(Some(&app), source)
 }
 
+#[tauri::command]
+fn copy_to_clipboard(app: AppHandle, text: String) -> Result<(), String> {
+    use tauri_plugin_clipboard_manager::ClipboardExt;
+    app.clipboard()
+        .write_text(text)
+        .map_err(|e| format!("Failed to copy to clipboard: {}", e))
+}
+
+#[tauri::command]
+fn open_file_in_editor(app: AppHandle, file_path: String) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    app.opener()
+        .open_path(&file_path, None::<&str>)
+        .map_err(|e| format!("Failed to open file in editor: {}", e))
+}
+
 fn main() {
     // Resolve WebKit subprocess ICU dependency loading crashes inside the AppImage environment.
     if std::env::var("APPIMAGE").is_ok() {
@@ -654,6 +670,8 @@ fn main() {
             get_font_render_scale,
             start_hardsub_task,
             get_ffmpeg_status,
+            copy_to_clipboard,
+            open_file_in_editor,
             video_server::get_media_stream_url
         ])
         .run(tauri::generate_context!())

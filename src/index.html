@@ -1865,22 +1865,24 @@
                         </div>
                       </div>
                       
-                      <!-- Results Analytics details (Compact Horizontal Layout) -->
+                      <!-- Results Analytics details (Royal Blue Cyber-Glass Horizontal Layout) -->
                       <div class="analytics-box compact-analytics" id="analytics-box" style="display:none; width:100%;">
                         <div class="compact-analytics-grid">
                           <div class="analytics-metrics-col">
-                            <div class="analytic-mini-row">
-                              <span class="analytic-label">Time:</span>
-                              <span class="analytic-val" id="analytic-time">0s</span>
+                            <div class="analytic-chip" title="Total processing time">
+                              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--color-cyan);"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                              <span class="chip-label">Time:</span>
+                              <span class="chip-val" id="analytic-time">0s</span>
                             </div>
-                            <div class="analytic-mini-row">
-                              <span class="analytic-label">Speed:</span>
-                              <span class="analytic-val" style="color:var(--color-green);" id="analytic-speed">0.0x</span>
+                            <div class="analytic-chip" title="Speed factor relative to real-time audio">
+                              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--color-green);"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                              <span class="chip-label">Speed:</span>
+                              <span class="chip-val" style="color:var(--color-green);" id="analytic-speed">0.0x</span>
                             </div>
                           </div>
                           
                           <div class="analytics-files-col">
-                            <span class="analytic-label" style="font-size:0.75rem; margin-right:4px;">Files:</span>
+                            <span class="analytics-files-label">Files:</span>
                             <div class="outputs-row compact-outputs" id="badge-outputs-row"></div>
                           </div>
                           

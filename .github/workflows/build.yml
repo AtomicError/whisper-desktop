@@ -23,7 +23,7 @@ jobs:
             arch: 'arm64'
             args: ''
             rust-target: ''
-          - platform: 'windows-latest'
+          - platform: 'windows-2022'
             arch: 'x86_64'
             args: ''
             rust-target: ''
@@ -77,14 +77,14 @@ jobs:
             vulkan-sdk
 
       - name: Install Vulkan SDK (Windows)
-        if: matrix.platform == 'windows-latest'
+        if: matrix.platform == 'windows-2022'
         uses: jakoch/install-vulkan-sdk-action@v1
         with:
           vulkan_version: latest
           cache: true
 
       - name: Install CUDA Toolkit (Windows)
-        if: matrix.platform == 'windows-latest'
+        if: matrix.platform == 'windows-2022'
         uses: Jimver/cuda-toolkit@v0.2.35
         id: cuda-toolkit-windows
         with:
@@ -219,20 +219,20 @@ jobs:
           chmod +x src-tauri/resources/whisper-cli-*
 
       - name: Compile Whisper CLI (Windows x64)
-        if: matrix.platform == 'windows-latest' && steps.whisper-cache.outputs.cache-hit != 'true'
+        if: matrix.platform == 'windows-2022' && steps.whisper-cache.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path src-tauri/resources
 
           # 1. Standard CPU Backend (MSVC + AVX2 / OpenMP)
           Write-Host "Building Standard CPU backend for Windows..."
-          cmake -B whisper.cpp-src/build-standard -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DBUILD_SHARED_LIBS=OFF
+          cmake -G "Visual Studio 17 2022" -A x64 -B whisper.cpp-src/build-standard -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DBUILD_SHARED_LIBS=OFF
           cmake --build whisper.cpp-src/build-standard --config Release --target whisper-cli
           Copy-Item whisper.cpp-src/build-standard/bin/Release/whisper-cli.exe src-tauri/resources/whisper-cli-standard.exe
 
           # 2. Vulkan Backend (MSVC + Vulkan SDK)
           Write-Host "Building Vulkan backend for Windows..."
-          cmake -B whisper.cpp-src/build-vulkan -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_VULKAN=ON -DBUILD_SHARED_LIBS=OFF
+          cmake -G "Visual Studio 17 2022" -A x64 -B whisper.cpp-src/build-vulkan -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_VULKAN=ON -DBUILD_SHARED_LIBS=OFF
           cmake --build whisper.cpp-src/build-vulkan --config Release --target whisper-cli
           Copy-Item whisper.cpp-src/build-vulkan/bin/Release/whisper-cli.exe src-tauri/resources/whisper-cli-vulkan.exe
 
@@ -244,7 +244,7 @@ jobs:
           $openvinoDir = Get-ChildItem -Path "openvino-extracted" -Directory | Select-Object -First 1
 
           Write-Host "Building OpenVINO backend for Windows..."
-          cmake -B whisper.cpp-src/build-openvino -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DWHISPER_OPENVINO=1 -DOpenVINO_DIR="$($openvinoDir.FullName)/runtime/cmake" -DBUILD_SHARED_LIBS=OFF
+          cmake -G "Visual Studio 17 2022" -A x64 -B whisper.cpp-src/build-openvino -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DWHISPER_OPENVINO=1 -DOpenVINO_DIR="$($openvinoDir.FullName)/runtime/cmake" -DBUILD_SHARED_LIBS=OFF
           cmake --build whisper.cpp-src/build-openvino --config Release --target whisper-cli
           Copy-Item whisper.cpp-src/build-openvino/bin/Release/whisper-cli.exe src-tauri/resources/whisper-cli-openvino.exe
 
@@ -258,7 +258,10 @@ jobs:
           $env:CUDACXX = "$env:CUDA_PATH\bin\nvcc.exe"
           $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
           if (Test-Path $vsWhere) {
-            $vsPath = & $vsWhere -latest -property installationPath
+            $vsPath = & $vsWhere -latest -version "[17.0,18.0)" -property installationPath
+            if (-not $vsPath) {
+              $vsPath = & $vsWhere -latest -property installationPath
+            }
             $msbuildDirs = Get-ChildItem -Path "$vsPath\MSBuild\Microsoft\VC" -Directory -Recurse -Filter "BuildCustomizations" -ErrorAction SilentlyContinue
             $cudaMsbuild = "$env:CUDA_PATH\extras\visual_studio_integration\MSBuildExtensions"
             if (Test-Path $cudaMsbuild) {
@@ -268,7 +271,7 @@ jobs:
             }
           }
 
-          cmake -B whisper.cpp-src/build-cuda -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=ON -DGGML_OPENMP=ON -DCUDAToolkit_ROOT="$env:CUDA_PATH" -DCMAKE_CUDA_FLAGS="-allow-unsupported-compiler" -DBUILD_SHARED_LIBS=OFF
+          cmake -G "Visual Studio 17 2022" -A x64 -B whisper.cpp-src/build-cuda -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=ON -DGGML_OPENMP=ON -DCUDAToolkit_ROOT="$env:CUDA_PATH" -DCMAKE_CUDA_FLAGS="-allow-unsupported-compiler" -DBUILD_SHARED_LIBS=OFF
           cmake --build whisper.cpp-src/build-cuda --config Release --target whisper-cli
           Copy-Item whisper.cpp-src/build-cuda/bin/Release/whisper-cli.exe src-tauri/resources/whisper-cli-cuda.exe
 
@@ -335,7 +338,7 @@ jobs:
           chmod +x src-tauri/resources/ffmpeg src-tauri/resources/ffprobe
 
       - name: Download Static FFmpeg (Windows x64 - Full Build)
-        if: matrix.platform == 'windows-latest' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        if: matrix.platform == 'windows-2022' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path src-tauri/resources

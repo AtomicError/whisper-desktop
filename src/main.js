@@ -372,16 +372,28 @@ const listen = function(event, handler) {
 };
 
 // Native clipboard write via tauri-plugin-clipboard-manager with multi-tier fallback.
-// Tier 1: Direct Tauri IPC command invoke('plugin:clipboard-manager|write_text', { text })
-// Tier 2: window.__TAURI__.clipboardManager.writeText(text) (if plugin global JS bundle is present)
-// Tier 3: W3C Navigator Clipboard API (navigator.clipboard.writeText)
-// Tier 4: Document execCommand fallback (for non-secure/legacy webview execution contexts)
+// Tier 1: Direct Tauri native command invoke('copy_to_clipboard', { text })
+// Tier 2: Tauri Plugin command invoke('plugin:clipboard-manager|write_text', { text })
+// Tier 3: Global plugin object window.__TAURI__.clipboardManager
+// Tier 4: W3C Navigator Clipboard API (navigator.clipboard.writeText)
+// Tier 5: Document execCommand fallback
 const copyToClipboard = async function(text) {
   const cleanText = (text === null || text === undefined) ? '' : String(text);
 
   let lastError = null;
 
-  // 1. Preferred Native IPC via Tauri Plugin Clipboard Manager
+  // 1. Direct native Rust backend IPC (100% reliable on all OS platforms & webviews)
+  try {
+    if (typeof invoke === 'function') {
+      await invoke('copy_to_clipboard', { text: cleanText });
+      return;
+    }
+  } catch (err) {
+    lastError = err;
+    console.warn('[Clipboard] Native copy_to_clipboard command failed, trying plugin:', err);
+  }
+
+  // 2. Preferred Native IPC via Tauri Plugin Clipboard Manager
   try {
     if (typeof invoke === 'function') {
       await invoke('plugin:clipboard-manager|write_text', { text: cleanText });
@@ -392,7 +404,7 @@ const copyToClipboard = async function(text) {
     console.warn('[Clipboard] Tauri plugin IPC command failed, trying next provider:', err);
   }
 
-  // 2. Global Tauri Plugin Object (if JS bundle is mounted)
+  // 3. Global Tauri Plugin Object (if JS bundle is mounted)
   try {
     const tauriClipboard = (typeof window !== 'undefined' && window.__TAURI__ && window.__TAURI__.clipboardManager) || null;
     if (tauriClipboard && typeof tauriClipboard.writeText === 'function') {
@@ -404,7 +416,7 @@ const copyToClipboard = async function(text) {
     console.warn('[Clipboard] window.__TAURI__.clipboardManager failed:', err);
   }
 
-  // 3. Web Navigator Clipboard API
+  // 4. Web Navigator Clipboard API
   try {
     if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
       await navigator.clipboard.writeText(cleanText);
@@ -415,7 +427,7 @@ const copyToClipboard = async function(text) {
     console.warn('[Clipboard] navigator.clipboard.writeText failed:', err);
   }
 
-  // 4. Fallback: Hidden Textarea with document.execCommand('copy') for webview transient activation failures
+  // 5. Fallback: Hidden Textarea with document.execCommand('copy') for webview transient activation failures
   try {
     if (typeof document !== 'undefined' && document.body) {
       const textarea = document.createElement('textarea');
@@ -443,6 +455,21 @@ const copyToClipboard = async function(text) {
 
 // Expose globally for console testing and window access
 window.copyToClipboard = copyToClipboard;
+
+window.openFileInEditor = async function(filePath) {
+  if (!filePath) return;
+  try {
+    await invoke('open_file_in_editor', { filePath });
+  } catch (err) {
+    console.warn("open_file_in_editor fallback to opener plugin:", err);
+    try {
+      await invoke('plugin:opener|open_path', { path: filePath });
+    } catch (e2) {
+      const msg = (err && (err.message || err.toString())) || String(err);
+      showNotification("Could not open file in editor: " + msg, "error");
+    }
+  }
+};
 
 // Global States
 let activeView = 'intro';
@@ -2532,11 +2559,30 @@ window.runWhisperTranscription = async function() {
 
     const badgesRow = document.getElementById('badge-outputs-row');
     badgesRow.innerHTML = '';
+    const outputDir = result.outputDir || getParentDir(settingsState.inputFile);
+    const sep = outputDir.includes('\\') && !outputDir.includes('/') ? '\\' : '/';
+
+    const createRoyalBadge = (filename) => {
+      const fullPath = `${outputDir}${sep}${filename}`;
+      const badge = document.createElement('button');
+      badge.type = 'button';
+      badge.className = 'output-badge royal-badge';
+      badge.title = `Click to open "${filename}" in default text editor`;
+      badge.innerHTML = `
+        <svg class="badge-icon-file" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        <span class="badge-name">${escapeHTML(filename)}</span>
+        <svg class="badge-icon-open" viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+      `;
+      badge.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.openFileInEditor(fullPath);
+      };
+      return badge;
+    };
+
     result.generatedFiles.forEach(f => {
-      const badge = document.createElement('span');
-      badge.className = 'output-badge';
-      badge.textContent = f;
-      badgesRow.appendChild(badge);
+      badgesRow.appendChild(createRoyalBadge(f));
     });
 
     // Mark Step 3 as completed and notify user immediately when transcription succeeds
@@ -2546,7 +2592,6 @@ window.runWhisperTranscription = async function() {
     // Run AI Translation if enabled
     if (settingsState.translateAiEnabled && result.generatedFiles && result.generatedFiles.length > 0) {
       try {
-        const outputDir = result.outputDir || getParentDir(settingsState.inputFile);
         btn.textContent = 'AI Translating...';
         showNotification("Starting AI translation of generated files...", "info");
 
@@ -2557,10 +2602,7 @@ window.runWhisperTranscription = async function() {
         });
 
         translatedFiles.forEach(f => {
-          const badge = document.createElement('span');
-          badge.className = 'output-badge';
-          badge.textContent = f;
-          badgesRow.appendChild(badge);
+          badgesRow.appendChild(createRoyalBadge(f));
         });
 
         showNotification("AI translation completed successfully!", "success");
@@ -2623,6 +2665,27 @@ window.abortTranscription = async function() {
 };
 
 window.copyMainTranscriptToClipboard = async function() {
+  const copyBtn = document.getElementById('btn-copy-main-transcript');
+
+  const triggerFeedback = () => {
+    if (copyBtn) {
+      if (!copyBtn._origHtml) {
+        copyBtn._origHtml = copyBtn.innerHTML;
+      }
+      copyBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:5px; color:#4ade80;"><polyline points="20 6 9 17 4 12"/></svg>
+        Copied!
+      `;
+      clearTimeout(copyBtn._copyFeedbackTimer);
+      copyBtn._copyFeedbackTimer = setTimeout(() => {
+        if (copyBtn && copyBtn._origHtml) {
+          copyBtn.innerHTML = copyBtn._origHtml;
+          copyBtn._origHtml = null;
+        }
+      }, 2000);
+    }
+  };
+
   if (!selectedMediaFile) {
     showNotification("No media file selected or transcribed yet.", "info");
     return;
@@ -2634,6 +2697,7 @@ window.copyMainTranscriptToClipboard = async function() {
   try {
     const content = await invoke('read_text_file_content', { filePath: txtFile });
     await copyToClipboard(content);
+    triggerFeedback();
     showNotification("Transcription text copied to clipboard successfully!", "success");
   } catch (e) {
     // Fallback: copy Whisper logs
@@ -2644,6 +2708,7 @@ window.copyMainTranscriptToClipboard = async function() {
     if (fallback) {
       try {
         await copyToClipboard(fallback);
+        triggerFeedback();
         showNotification("Transcript file not found; copied log output instead.", "info");
       } catch (e2) {
         const msg = (e2 && (e2.message || e2.toString())) || String(e2);
@@ -3865,6 +3930,23 @@ window.loadTranscriptFromFile = async function(fullPath) {
 };
 
 window.copyLiveTranscriptToClipboard = async function() {
+  const btn = document.getElementById('btn-copy-transcript');
+  const triggerBtnFeedback = () => {
+    if (btn) {
+      if (!btn._origText) {
+        btn._origText = btn.textContent;
+      }
+      btn.textContent = 'Copied!';
+      clearTimeout(btn._copyFeedbackTimer);
+      btn._copyFeedbackTimer = setTimeout(() => {
+        if (btn && btn._origText) {
+          btn.textContent = btn._origText;
+          btn._origText = null;
+        }
+      }, 2000);
+    }
+  };
+
   if (transcriptLines && transcriptLines.length > 0) {
     const textToCopy = transcriptLines
       .map(l => l.text)
@@ -3872,6 +3954,7 @@ window.copyLiveTranscriptToClipboard = async function() {
       
     try {
       await copyToClipboard(textToCopy);
+      triggerBtnFeedback();
       showNotification("Live transcript copied to clipboard!", "success");
       return;
     } catch (err) {
@@ -3888,6 +3971,7 @@ window.copyLiveTranscriptToClipboard = async function() {
     if (rawPreview.length > 0) {
       try {
         await copyToClipboard(rawPreview);
+        triggerBtnFeedback();
         showNotification("Transcript preview copied to clipboard!", "success");
         return;
       } catch (err) {
