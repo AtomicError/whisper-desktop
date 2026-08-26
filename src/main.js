@@ -499,7 +499,7 @@ window.formatFileNameMiddleTruncate = function(filename, maxLength = 26) {
 };
 
 // Global States
-let activeView = 'intro';
+let activeView = 'transcribe';
 let activeSettingsCat = 'general';
 let activeLogCategory = 'All';
 let logSearchQuery = '';
@@ -1181,8 +1181,8 @@ async function initApp() {
   }
   await refreshBuildStatuses();
   
-  // Setup Dashboard drag & drop
-  setupDashboardDragAndDrop();
+  // Setup Transcribe drag & drop
+  setupTranscribeDragAndDrop();
   
   // Setup responsive menu fade-in on window re-expand
   setupResponsiveMenuFadeIn();
@@ -1228,8 +1228,8 @@ async function initApp() {
     });
   });
 
-  // Switch to default intro view
-  switchView('intro');
+  // Switch to default transcribe view
+  switchView('transcribe');
 }
 
 // Avoid DOMContentLoaded race condition
@@ -1271,11 +1271,10 @@ window.switchView = function(viewName) {
   
   // Update Title
   const titleMap = {
-    'intro': 'Dashboard',
-    'settings': 'Configuration Grid',
-    'models': 'Model Hub',
     'transcribe': 'Transcribe File',
     'hardsub': 'Hardsub Video Studio',
+    'models': 'Model Hub',
+    'settings': 'Configuration Grid',
     'logs': 'Central Logging Center'
   };
   document.getElementById('current-view-title').textContent = titleMap[viewName] || 'Whisper Manager';
@@ -1534,70 +1533,12 @@ function escapeHTML(str) {
   );
 }
 
-// ----------------- System Build Panel -----------------
-function updateDashboardBackendTiles() {
-  const backends = ['Standard', 'Vulkan', 'OpenVINO', 'CUDA'];
-  const active = settingsState ? settingsState.selectedBackend : 'Standard';
-  
-  const statusEl = document.getElementById('shortcut-backend-status');
-  if (statusEl) {
-    statusEl.textContent = `Active Backend: ${active === 'Standard' ? 'CPU' : active}`;
-  }
-  
-  backends.forEach(b => {
-    const tile = document.getElementById(`tile-${b}`);
-    if (tile) {
-      tile.classList.remove('compiled', 'active-backend');
-      
-      const isCompiled = Boolean(compiledBackends[b]);
-      if (isCompiled) {
-        tile.classList.add('compiled');
-        tile.style.display = '';
-      } else {
-        tile.style.display = 'none';
-      }
-      
-      if (active === b) {
-        tile.classList.add('active-backend');
-      }
-    }
-  });
-}
-
-window.dashboardSelectBackend = function(backend) {
-  const isCompiled = compiledBackends[backend];
-  if (!isCompiled) {
-    showNotification(`The selected backend (${backend === 'Standard' ? 'CPU' : backend}) precompiled binary was not found in resources.`, "error");
-    return;
-  }
-  
-  if (settingsState) {
-    settingsState.selectedBackend = backend;
-    saveCurrentSettings();
-    scanAndPopulateModels();
-    
-    // Sync dropdown in settings page
-    const dropdown = document.getElementById('opt-selectedBackend');
-    if (dropdown) {
-      dropdown.value = backend;
-      if (window.syncCustomSelects) {
-        window.syncCustomSelects();
-      }
-    }
-  }
-  
-  updateDashboardBackendTiles();
-  updateTranscribeUIConfigs();
-  showNotification(`Active backend switched to ${backend === 'Standard' ? 'CPU' : backend} successfully!`, "success");
-};
-
 window.selectBackend = function(backend, isInitialSelection = false) {
   if (!isInitialSelection && settingsState) {
     settingsState.selectedBackend = backend;
     saveCurrentSettings();
     scanAndPopulateModels();
   }
-  updateDashboardBackendTiles();
   updateTranscribeUIConfigs();
 };
 
@@ -1669,7 +1610,6 @@ async function refreshBuildStatuses() {
   }
 
   updateTranscribeUIConfigs();
-  updateDashboardBackendTiles();
 }
 
 window.browseModelsDirectory = async function() {
@@ -3152,52 +3092,33 @@ window.abortBatchExtraction = async function() {
   }
 };
 
-// ----------------- Dashboard Interactive Drag & Drop HUD -----------------
-function setupDashboardDragAndDrop() {
-  const dashZone = document.getElementById('dashboard-drag-zone');
+// ----------------- Transcribe Interactive Drag & Drop -----------------
+function setupTranscribeDragAndDrop() {
   const transZone = document.getElementById('transcribe-drop-zone');
+  if (!transZone) return;
+
+  // HTML5 Standard drag-drop events
+  transZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    transZone.classList.add('drag-over');
+  });
   
-  const zones = [
-    { el: dashZone, labelId: 'dashboard-drag-status-text', defaultLabel: "Drag & Drop Audio/Video files here to transcribe instantly!", hoverLabel: "Drop now to transcribe!" },
-    { el: transZone, labelId: null, defaultLabel: null, hoverLabel: null }
-  ];
+  transZone.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    transZone.classList.remove('drag-over');
+  });
   
-  zones.forEach(zone => {
-    const el = zone.el;
-    if (!el) return;
+  transZone.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    transZone.classList.remove('drag-over');
     
-    // HTML5 Standard drag-drop events
-    el.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      el.classList.add('drag-over');
-      if (zone.labelId) {
-        document.getElementById(zone.labelId).textContent = zone.hoverLabel;
-      }
-    });
-    
-    el.addEventListener('dragleave', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      el.classList.remove('drag-over');
-      if (zone.labelId) {
-        document.getElementById(zone.labelId).textContent = zone.defaultLabel;
-      }
-    });
-    
-    el.addEventListener('drop', async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      el.classList.remove('drag-over');
-      if (zone.labelId) {
-        document.getElementById(zone.labelId).textContent = zone.defaultLabel;
-      }
-      
-      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-        const files = Array.from(e.dataTransfer.files).map(f => f.path || f.name);
-        await handleDashboardDroppedFiles(files);
-      }
-    });
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const files = Array.from(e.dataTransfer.files).map(f => f.path || f.name);
+      await handleDroppedFiles(files);
+    }
   });
 
   // Native Tauri drag-drop events
@@ -3208,34 +3129,16 @@ function setupDashboardDragAndDrop() {
         const x = event.payload.position.x / ratio;
         const y = event.payload.position.y / ratio;
         
-        zones.forEach(zone => {
-          const el = zone.el;
-          if (!el) return;
-          
-          const rect = el.getBoundingClientRect();
-          if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
-            el.classList.add('drag-over');
-            if (zone.labelId) {
-              document.getElementById(zone.labelId).textContent = zone.hoverLabel;
-            }
-          } else {
-            el.classList.remove('drag-over');
-            if (zone.labelId) {
-              document.getElementById(zone.labelId).textContent = zone.defaultLabel;
-            }
-          }
-        });
+        const rect = transZone.getBoundingClientRect();
+        if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+          transZone.classList.add('drag-over');
+        } else {
+          transZone.classList.remove('drag-over');
+        }
       });
 
       listen('tauri://drag-leave', () => {
-        zones.forEach(zone => {
-          const el = zone.el;
-          if (!el) return;
-          el.classList.remove('drag-over');
-          if (zone.labelId) {
-            document.getElementById(zone.labelId).textContent = zone.defaultLabel;
-          }
-        });
+        transZone.classList.remove('drag-over');
       });
 
       listen('tauri://drag-drop', async (event) => {
@@ -3243,23 +3146,15 @@ function setupDashboardDragAndDrop() {
         const x = event.payload.position.x / ratio;
         const y = event.payload.position.y / ratio;
         
-        zones.forEach(async (zone) => {
-          const el = zone.el;
-          if (!el) return;
-          
-          el.classList.remove('drag-over');
-          if (zone.labelId) {
-            document.getElementById(zone.labelId).textContent = zone.defaultLabel;
+        transZone.classList.remove('drag-over');
+        
+        const rect = transZone.getBoundingClientRect();
+        if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+          const files = event.payload.paths;
+          if (files && files.length > 0) {
+            await handleDroppedFiles(files);
           }
-          
-          const rect = el.getBoundingClientRect();
-          if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
-            const files = event.payload.paths;
-            if (files && files.length > 0) {
-              await handleDashboardDroppedFiles(files);
-            }
-          }
-        });
+        }
       });
     } catch (err) {
       console.error("Failed to setup native Tauri drag-drop listeners:", err);
@@ -3267,7 +3162,7 @@ function setupDashboardDragAndDrop() {
   }
 }
 
-async function handleDashboardDroppedFiles(files) {
+async function handleDroppedFiles(files) {
   const startBtn = document.getElementById('btn-run-batch');
   if (startBtn && startBtn.disabled) {
     showNotification("Cannot load dropped files while batch extraction is active.", "info");
