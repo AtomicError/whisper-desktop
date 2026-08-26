@@ -600,6 +600,21 @@ pub async fn run_transcription(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
+    if let Some(bin_dir) = bin_path.parent() {
+        cmd.current_dir(bin_dir);
+
+        #[cfg(target_os = "windows")]
+        {
+            if let Some(old_path) = std::env::var_os("PATH") {
+                let mut paths = std::env::split_paths(&old_path).collect::<Vec<_>>();
+                paths.insert(0, bin_dir.to_path_buf());
+                if let Ok(new_path) = std::env::join_paths(paths) {
+                    cmd.env("PATH", new_path);
+                }
+            }
+        }
+    }
+
     #[cfg(unix)]
     {
         cmd.process_group(0);
@@ -716,34 +731,12 @@ pub async fn run_transcription(
             let _ = app.emit("transcribe-status", TranscribeProgress { progress: 0.0, message: "Task Failed".to_string(), active: false });
             send_notification(&app, "Transcription Failed", &format!("Whisper process terminated for {}!", file_name));
 
-            let detailed_err = match status.code() {
-                Some(10) => {
-                    format!(
-                        "Whisper process failed with exit code 10 (Model or GPU initialization error). Check if the model file '{}' is corrupt or if your GPU/Vulkan/CUDA driver is working properly.",
-                        settings.model_path
-                    )
-                }
-                Some(code) if code == -1073741515 || code as u32 == 0xC0000135 => {
-                    format!(
-                        "Whisper CLI failed to start due to a missing Windows dynamic library (STATUS_DLL_NOT_FOUND, 0xC0000135, exit code {}). Please verify that required runtime DLLs (whisper.dll, ggml.dll, ggml-cpu.dll, or Visual C++ Redistributable) are present in the application's resources directory.",
-                        code
-                    )
-                }
-                Some(code) if code == -1073741819 || code as u32 == 0xC0000005 => {
-                    format!(
-                        "Whisper CLI process encountered a memory access violation (STATUS_ACCESS_VIOLATION, 0xC0000005, exit code {}). The model weights or input buffer could not be accessed.",
-                        code
-                    )
-                }
-                Some(code) if code == -1073741795 || code as u32 == 0xC000001D => {
-                    format!(
-                        "Whisper CLI process encountered an illegal CPU instruction (STATUS_ILLEGAL_INSTRUCTION, 0xC000001D, exit code {}). Your CPU may not support AVX/AVX2 instructions required by this binary.",
-                        code
-                    )
-                }
-                Some(code) => format!("Whisper CLI process failed with exit code: {}", code),
-                None => "Whisper CLI process was terminated unexpectedly by system signal.".to_string(),
-            };
+            let detailed_err = format_cli_exit_error(
+                &settings.selected_backend,
+                &bin_name,
+                &settings.model_path,
+                status.code(),
+            );
             return Err(detailed_err);
         }
     }
@@ -925,9 +918,101 @@ pub fn resolve_non_colliding_output_name(out_dir: &Path, base_name: &str) -> std
     out_name
 }
 
+/// Formats exit error diagnostics into concise, backend-aware, and actionable messages.
+pub fn format_cli_exit_error(
+    selected_backend: &str,
+    bin_name: &str,
+    model_path: &str,
+    exit_code: Option<i32>,
+) -> String {
+    let backend_display = match selected_backend {
+        "Standard" => "Standard CPU",
+        "Vulkan" => "Vulkan GPU",
+        "OpenVINO" => "Intel OpenVINO",
+        "CUDA" => "NVIDIA CUDA",
+        other => other,
+    };
+    let backend_lower = selected_backend.to_lowercase();
+
+    match exit_code {
+        Some(10) => {
+            format!(
+                "{} engine failed to initialize (exit code 10). Model file '{}' may be corrupt or GPU driver is incompatible.",
+                backend_display, model_path
+            )
+        }
+        Some(code) if code == -1073741515 || code as u32 == 0xC0000135 => {
+            if backend_lower == "vulkan" {
+                format!(
+                    "Vulkan Runtime Missing: 'vulkan-1.dll' was not found for '{}'. Please ensure your GPU drivers are installed or switch engine in settings.",
+                    bin_name
+                )
+            } else if backend_lower == "openvino" {
+                format!(
+                    "OpenVINO Runtime Missing: Required OpenVINO/TBB DLLs were not found for '{}' in resources.",
+                    bin_name
+                )
+            } else if backend_lower == "cuda" {
+                format!(
+                    "CUDA Runtime Missing: Required NVIDIA CUDA/cuBLAS DLLs were not found for '{}'.",
+                    bin_name
+                )
+            } else {
+                format!(
+                    "{} failed to start due to a missing Windows dynamic library (STATUS_DLL_NOT_FOUND, 0xC0000135).",
+                    bin_name
+                )
+            }
+        }
+        Some(code) if code == -1073741819 || code as u32 == 0xC0000005 => {
+            format!(
+                "Memory access violation in {} (STATUS_ACCESS_VIOLATION, 0xC0000005).",
+                bin_name
+            )
+        }
+        Some(code) if code == -1073741795 || code as u32 == 0xC000001D => {
+            format!(
+                "CPU Instruction Incompatibility: '{}' requires CPU vector extensions (AVX2/FMA) unsupported by your processor. Switch to OpenVINO or a compatible CPU build.",
+                bin_name
+            )
+        }
+        Some(code) => format!("{} ({}) process failed with exit code: {}", backend_display, bin_name, code),
+        None => format!("{} ({}) was terminated unexpectedly by a system signal.", backend_display, bin_name),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_format_cli_exit_error_all_cases() {
+        // Vulkan missing DLL
+        let err_vulkan_dll = format_cli_exit_error("Vulkan", "whisper-cli-vulkan.exe", "ggml-base.bin", Some(-1073741515));
+        assert!(err_vulkan_dll.contains("Vulkan Runtime Missing"));
+        assert!(err_vulkan_dll.contains("vulkan-1.dll"));
+
+        // OpenVINO missing DLL
+        let err_ov_dll = format_cli_exit_error("OpenVINO", "whisper-cli-openvino.exe", "ggml-base.bin", Some(-1073741515));
+        assert!(err_ov_dll.contains("OpenVINO Runtime Missing"));
+
+        // CUDA missing DLL
+        let err_cuda_dll = format_cli_exit_error("CUDA", "whisper-cli-cuda.exe", "ggml-base.bin", Some(-1073741515));
+        assert!(err_cuda_dll.contains("CUDA Runtime Missing"));
+
+        // CPU illegal instruction (AVX2 incompatibility)
+        let err_cpu_illegal = format_cli_exit_error("Standard", "whisper-cli-standard.exe", "ggml-base.bin", Some(-1073741795));
+        assert!(err_cpu_illegal.contains("CPU Instruction Incompatibility"));
+        assert!(err_cpu_illegal.contains("AVX2/FMA"));
+
+        // Model / GPU init error (exit code 10)
+        let err_code_10 = format_cli_exit_error("Vulkan", "whisper-cli-vulkan.exe", "ggml-base.bin", Some(10));
+        assert!(err_code_10.contains("exit code 10"));
+
+        // Access violation
+        let err_access_viol = format_cli_exit_error("Standard", "whisper-cli-standard.exe", "ggml-base.bin", Some(-1073741819));
+        assert!(err_access_viol.contains("STATUS_ACCESS_VIOLATION"));
+    }
 
     #[test]
     fn test_resolve_output_dir_input_dir_mode() {

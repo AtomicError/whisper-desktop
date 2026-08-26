@@ -6,7 +6,13 @@
       "resources/ffmpeg*",
       "resources/ffprobe*",
       "resources/fonts/*",
-      "resources/*.dll"
-    ]
+      "resources/*.dll",
+      "resources/vc_redist*.exe"
+    ],
+    "windows": {
+      "nsis": {
+        "installerHooks": "windows/hooks.nsh"
+      }
+    }
   }
 }

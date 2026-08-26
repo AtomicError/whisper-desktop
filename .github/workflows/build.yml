@@ -156,7 +156,7 @@ jobs:
             whisper-bins/**
             openvino-dlls/**
             cuda-dlls/**
-          key: whisper-bin-${{ matrix.platform }}-${{ matrix.arch }}-${{ steps.whisper_tag.outputs.tag }}-v4
+          key: whisper-bin-${{ matrix.platform }}-${{ matrix.arch }}-${{ steps.whisper_tag.outputs.tag }}-v5
 
       - name: Clone whisper.cpp
         if: steps.whisper-cache.outputs.cache-hit != 'true'
@@ -239,6 +239,15 @@ jobs:
           cmake --build whisper.cpp-src/build-vulkan --config Release --target whisper-cli
           Copy-Item whisper.cpp-src/build-vulkan/bin/Release/whisper-cli.exe whisper-bins/whisper-cli-vulkan.exe
           Get-ChildItem -Path "whisper.cpp-src/build-vulkan/bin/Release/*.dll" -ErrorAction SilentlyContinue | Copy-Item -Destination whisper-bins/ -Force
+
+          # Copy Vulkan Runtime Loader DLL
+          if ($env:VULKAN_SDK -and (Test-Path "$env:VULKAN_SDK\Bin\vulkan-1.dll")) {
+            Copy-Item "$env:VULKAN_SDK\Bin\vulkan-1.dll" whisper-bins/ -Force
+            Write-Host "vulkan-1.dll bundled from Vulkan SDK."
+          } elseif (Test-Path "C:\Windows\System32\vulkan-1.dll") {
+            Copy-Item "C:\Windows\System32\vulkan-1.dll" whisper-bins/ -Force
+            Write-Host "vulkan-1.dll bundled from System32."
+          }
 
           # 3. OpenVINO Backend (Intel CPU / iGPU Acceleration)
           Write-Host "Setting up OpenVINO 2024 for Windows..."
@@ -499,6 +508,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NO_STRIP: true
         run: |
+          # Pre-download official Microsoft Visual C++ 2015-2022 Redistributable installer
+          Write-Host "Fetching Microsoft Visual C++ 2015-2022 Redistributable (x64)..."
+          Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vc_redist.x64.exe" -OutFile "vc_redist.x64.exe"
+
           # 1. Build Universal Edition (Standard CPU + Vulkan + OpenVINO)
           Write-Host "=== 1/2: Building Windows Universal Edition (CPU + Vulkan + OpenVINO) ==="
           Remove-Item -Path "src-tauri/resources/*" -Recurse -Force -ErrorAction SilentlyContinue
@@ -510,6 +523,7 @@ jobs:
           Copy-Item "openvino-dlls/*.dll" "src-tauri/resources/" -ErrorAction SilentlyContinue -Force
           Copy-Item "ffmpeg-bins/ffmpeg.exe" "src-tauri/resources/"
           Copy-Item "ffmpeg-bins/ffprobe.exe" "src-tauri/resources/"
+          Copy-Item "vc_redist.x64.exe" "src-tauri/resources/" -Force
           Copy-Item "src/fonts/*" "src-tauri/resources/fonts/" -ErrorAction SilentlyContinue
 
           npm run tauri build
@@ -547,6 +561,7 @@ jobs:
           Copy-Item "cuda-dlls/*.dll" "src-tauri/resources/" -ErrorAction SilentlyContinue -Force
           Copy-Item "ffmpeg-bins/ffmpeg.exe" "src-tauri/resources/"
           Copy-Item "ffmpeg-bins/ffprobe.exe" "src-tauri/resources/"
+          Copy-Item "vc_redist.x64.exe" "src-tauri/resources/" -Force
           Copy-Item "src/fonts/*" "src-tauri/resources/fonts/" -ErrorAction SilentlyContinue
 
           Remove-Item -Path "src-tauri/target/release/bundle/nsis/*" -Recurse -Force -ErrorAction SilentlyContinue
