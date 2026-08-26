@@ -1962,15 +1962,7 @@ export class HardsubController {
 
       const updateView = (el: HTMLElement | null, isActive: boolean) => {
         if (!el) return;
-        if (isActive) {
-          el.style.display = 'flex';
-          el.classList.remove('slide-from-right', 'slide-from-left', 'fade-enter');
-          void el.offsetHeight; // force DOM reflow
-          el.classList.add(isForward ? 'slide-from-right' : 'slide-from-left');
-        } else {
-          el.style.display = 'none';
-          el.classList.remove('slide-from-right', 'slide-from-left', 'fade-enter');
-        }
+        el.style.display = isActive ? 'flex' : 'none';
       };
 
       updateView(this.tabViewEditor, tab === 'editor');

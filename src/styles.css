@@ -726,7 +726,6 @@ header {
   padding: 32px;
   overflow-y: auto;
   display: none;
-  animation: fadeIn 0.4s ease-out;
 }
 
 .view-panel.active {
@@ -744,11 +743,6 @@ header {
 
 .view-panel.fixed-layout-panel.active {
   display: flex;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: none; }
 }
 
 .glass-card {
@@ -956,13 +950,7 @@ header {
   padding: 24px;
   box-shadow: var(--shadow-glass);
   transition: var(--transition-smooth);
-  animation: fadeInSettingCard 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
-
-#backend-Standard { animation-delay: 0.04s; }
-#backend-Vulkan { animation-delay: 0.08s; }
-#backend-OpenVINO { animation-delay: 0.12s; }
-#backend-CUDA { animation-delay: 0.16s; }
 
 .backend-card:hover {
   background: rgba(18, 25, 46, 0.65);
@@ -1130,25 +1118,7 @@ header {
   overflow: hidden;
   display: inline-flex;
   align-items: center;
-  animation: slideInNav 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-
-.settings-categories .settings-cat-btn:nth-child(1) { animation-delay: 0.03s; }
-.settings-categories .settings-cat-btn:nth-child(2) { animation-delay: 0.06s; }
-.settings-categories .settings-cat-btn:nth-child(3) { animation-delay: 0.09s; }
-.settings-categories .settings-cat-btn:nth-child(4) { animation-delay: 0.12s; }
-.settings-categories .settings-cat-btn:nth-child(5) { animation-delay: 0.15s; }
-.settings-categories .settings-cat-btn:nth-child(6) { animation-delay: 0.18s; }
-.settings-categories .settings-cat-btn:nth-child(7) { animation-delay: 0.21s; }
-
-#model-categories-sidebar .settings-cat-btn:nth-child(1) { animation-delay: 0.03s; }
-#model-categories-sidebar .settings-cat-btn:nth-child(2) { animation-delay: 0.06s; }
-#model-categories-sidebar .settings-cat-btn:nth-child(3) { animation-delay: 0.09s; }
-#model-categories-sidebar .settings-cat-btn:nth-child(4) { animation-delay: 0.12s; }
-#model-categories-sidebar .settings-cat-btn:nth-child(5) { animation-delay: 0.15s; }
-#model-categories-sidebar .settings-cat-btn:nth-child(6) { animation-delay: 0.18s; }
-#model-categories-sidebar .settings-cat-btn:nth-child(7) { animation-delay: 0.21s; }
-#model-categories-sidebar .settings-cat-btn:nth-child(8) { animation-delay: 0.24s; }
 
 .settings-cat-btn::before {
   content: "";
@@ -1224,7 +1194,6 @@ header {
   background: rgba(255, 255, 255, 0.01);
   border: 1px solid var(--border-glass);
   border-radius: 10px;
-  animation: fadeInSettingCard 0.35s cubic-bezier(0.4, 0, 0.2, 1) both;
   transition: var(--transition-smooth);
   position: relative;
   overflow: hidden;
@@ -1234,26 +1203,6 @@ header {
 .setting-card .btn-secondary:hover:not(:disabled) {
   background: rgba(45, 127, 255, 0.08);
   border-color: rgba(45, 127, 255, 0.25);
-}
-
-.setting-card:nth-child(1) { animation-delay: 0.02s; }
-.setting-card:nth-child(2) { animation-delay: 0.04s; }
-.setting-card:nth-child(3) { animation-delay: 0.06s; }
-.setting-card:nth-child(4) { animation-delay: 0.08s; }
-.setting-card:nth-child(5) { animation-delay: 0.10s; }
-.setting-card:nth-child(6) { animation-delay: 0.12s; }
-.setting-card:nth-child(7) { animation-delay: 0.14s; }
-.setting-card:nth-child(8) { animation-delay: 0.16s; }
-.setting-card:nth-child(n+9) { animation-delay: 0.18s; }
-@keyframes fadeInSettingCard {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 .setting-info {
@@ -4074,22 +4023,9 @@ select.select-control {
   display: block;
 }
 
-/* Tab Switching Scale-Fade-Blur Animations */
+/* Provider Tab Content */
 .provider-tab-content {
-  animation: tabFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-@keyframes tabFadeIn {
-  0% {
-    opacity: 0;
-    transform: scale(0.97) translateY(8px);
-    filter: blur(3px);
-  }
-  100% {
-    opacity: 1;
-    transform: none;
-    filter: none;
-  }
+  display: block;
 }
 
 @keyframes spin {
@@ -4177,21 +4113,6 @@ select.select-control {
   padding: 7px 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   transition: background-color 0.15s ease;
-}
-
-.model-data-row.row-anim-enter {
-  animation: modelRowEnter 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-@keyframes modelRowEnter {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 .model-data-row:hover {
@@ -5304,68 +5225,10 @@ select.select-control {
   outline-offset: 2px;
 }
 
-/* Directional Fluid Tab View Transitions */
+/* Hardsub Studio Tab Views */
 .hardsub-tab-view {
   flex: 1 1 0%;
   min-height: 0;
-  will-change: transform, opacity, filter;
-}
-
-.hardsub-tab-view.slide-from-right {
-  animation: hardsubSlideFromRight 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-.hardsub-tab-view.slide-from-left {
-  animation: hardsubSlideFromLeft 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-.hardsub-tab-view.fade-enter {
-  animation: hardsubTabFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-@keyframes hardsubSlideFromRight {
-  0% {
-    opacity: 0;
-    transform: translateX(18px) scale(0.992);
-    filter: blur(4px);
-  }
-  50% {
-    filter: blur(1px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateX(0) scale(1);
-    filter: blur(0px);
-  }
-}
-
-@keyframes hardsubSlideFromLeft {
-  0% {
-    opacity: 0;
-    transform: translateX(-18px) scale(0.992);
-    filter: blur(4px);
-  }
-  50% {
-    filter: blur(1px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateX(0) scale(1);
-    filter: blur(0px);
-  }
-}
-
-@keyframes hardsubTabFadeIn {
-  0% {
-    opacity: 0;
-    transform: translateY(10px) scale(0.99);
-    filter: blur(3px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    filter: blur(0px);
-  }
 }
 
 /* Quality Preset Buttons & Segmented Controls */
