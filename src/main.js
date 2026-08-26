@@ -1915,6 +1915,12 @@ async function scanAndPopulateModels() {
       return !name.startsWith('for-tests') && !name.startsWith('No trans');
     });
 
+    validModels.sort((a, b) => {
+      const nameA = getBasename(a);
+      const nameB = getBasename(b);
+      return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+    });
+
     if (validModels.length === 0) {
       if (transSelect) {
         const emptyOpt = document.createElement('option');
@@ -1986,6 +1992,11 @@ async function scanAndPopulateModels() {
     // 2. Populate VAD Selection
     const vadSelect = document.getElementById('opt-vadModel');
     const validVadModels = (res.vadModels || []).filter(m => m !== 'No VAD models found');
+    validVadModels.sort((a, b) => {
+      const nameA = getBasename(a);
+      const nameB = getBasename(b);
+      return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+    });
     localScannedVadModels = validVadModels;
     let vadMatched = false;
 
