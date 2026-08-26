@@ -512,6 +512,7 @@ let selectedMediaFile = null;
 let probedMetadata = null;
 let wavPathForTranscription = null;
 let localScannedTransModels = [];
+let localScannedVadModels = [];
 let lastAppendedCategory = null;
 
 // Batch Processing State variables
@@ -1183,6 +1184,9 @@ async function initApp() {
   
   // Setup Transcribe drag & drop
   setupTranscribeDragAndDrop();
+  
+  // Setup Quick Configuration Deck listeners
+  setupQuickConfigDeckEventListeners();
   
   // Setup responsive menu fade-in on window re-expand
   setupResponsiveMenuFadeIn();
@@ -1896,65 +1900,135 @@ async function scanAndPopulateModels() {
     
     localScannedTransModels = res.transModels || [];
     
-    // 1. Populate Model Selection
+    // 1. Populate Model Selection for both Settings & Quick Config Deck
     const transSelect = document.getElementById('opt-modelPath');
-    transSelect.innerHTML = '';
+    const quickSelect = document.getElementById('quick-opt-model');
+    
+    if (transSelect) transSelect.innerHTML = '';
+    if (quickSelect) quickSelect.innerHTML = '';
+    
     const seenModelNames = new Set();
     let modelMatched = false;
-    res.transModels.forEach(m => {
+    
+    const validModels = (res.transModels || []).filter(m => {
       const name = getBasename(m);
-      if (name.startsWith('for-tests') || name.startsWith('No trans')) return;
-      if (seenModelNames.has(name)) return;
-      seenModelNames.add(name);
-      const opt = document.createElement('option');
-      opt.value = m;
-      opt.textContent = name;
-      if (m === settingsState.modelPath) {
-        opt.selected = true;
-        modelMatched = true;
-      }
-      transSelect.appendChild(opt);
+      return !name.startsWith('for-tests') && !name.startsWith('No trans');
     });
-    if (!modelMatched && transSelect.options.length > 0) {
+
+    if (validModels.length === 0) {
+      if (transSelect) {
+        const emptyOpt = document.createElement('option');
+        emptyOpt.value = '';
+        emptyOpt.textContent = 'No models found';
+        transSelect.appendChild(emptyOpt);
+      }
+      if (quickSelect) {
+        const emptyOpt = document.createElement('option');
+        emptyOpt.value = '';
+        emptyOpt.textContent = 'No models found (Download in Model Hub)';
+        quickSelect.appendChild(emptyOpt);
+      }
+    } else {
+      validModels.forEach(m => {
+        const name = getBasename(m);
+        if (seenModelNames.has(name)) return;
+        seenModelNames.add(name);
+        
+        if (transSelect) {
+          const opt = document.createElement('option');
+          opt.value = m;
+          opt.textContent = name;
+          if (m === settingsState.modelPath) {
+            opt.selected = true;
+            modelMatched = true;
+          }
+          transSelect.appendChild(opt);
+        }
+
+        if (quickSelect) {
+          const quickOpt = document.createElement('option');
+          quickOpt.value = m;
+          quickOpt.textContent = name;
+          if (m === settingsState.modelPath) {
+            quickOpt.selected = true;
+          }
+          quickSelect.appendChild(quickOpt);
+        }
+      });
+    }
+
+    if (!modelMatched && transSelect && transSelect.options.length > 0 && transSelect.value) {
       transSelect.selectedIndex = 0;
       settingsState.modelPath = transSelect.value;
+      if (quickSelect) quickSelect.value = transSelect.value;
     }
-    transSelect.onchange = () => {
-      settingsState.modelPath = transSelect.value;
-      saveCurrentSettings();
-    };
+    
+    if (transSelect) {
+      transSelect.onchange = () => {
+        settingsState.modelPath = transSelect.value;
+        if (quickSelect) quickSelect.value = transSelect.value;
+        saveCurrentSettings();
+        updateTranscribeUIConfigs();
+      };
+    }
+
+    if (quickSelect) {
+      quickSelect.onchange = () => {
+        if (quickSelect.value) {
+          settingsState.modelPath = quickSelect.value;
+          if (transSelect) transSelect.value = quickSelect.value;
+          saveCurrentSettings();
+          updateTranscribeUIConfigs();
+        }
+      };
+    }
 
     // 2. Populate VAD Selection
     const vadSelect = document.getElementById('opt-vadModel');
-    vadSelect.innerHTML = '';
     const validVadModels = (res.vadModels || []).filter(m => m !== 'No VAD models found');
+    localScannedVadModels = validVadModels;
     let vadMatched = false;
-    validVadModels.forEach(m => {
-      const opt = document.createElement('option');
-      opt.value = m;
-      opt.textContent = getBasename(m);
-      if (m === settingsState.vadModel) {
-        opt.selected = true;
-        vadMatched = true;
+
+    if (vadSelect) {
+      vadSelect.innerHTML = '';
+      validVadModels.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = getBasename(m);
+        if (m === settingsState.vadModel) {
+          opt.selected = true;
+          vadMatched = true;
+        }
+        vadSelect.appendChild(opt);
+      });
+      if (!vadMatched && validVadModels.length > 0) {
+        vadSelect.selectedIndex = 0;
+        settingsState.vadModel = vadSelect.value;
+      } else if (validVadModels.length === 0) {
+        settingsState.vadModel = '';
       }
-      vadSelect.appendChild(opt);
-    });
-    if (!vadMatched && validVadModels.length > 0) {
-      vadSelect.selectedIndex = 0;
-      settingsState.vadModel = vadSelect.value;
-    } else if (validVadModels.length === 0) {
-      settingsState.vadModel = '';
+      vadSelect.onchange = () => {
+        settingsState.vadModel = vadSelect.value;
+        saveCurrentSettings();
+        updateTranscribeUIConfigs();
+      };
+    } else {
+      if (!vadMatched && validVadModels.length > 0) {
+        if (!settingsState.vadModel || !validVadModels.includes(settingsState.vadModel)) {
+          settingsState.vadModel = validVadModels[0];
+        }
+      } else if (validVadModels.length === 0) {
+        settingsState.vadModel = '';
+      }
     }
-    vadSelect.onchange = () => {
-      settingsState.vadModel = vadSelect.value;
-      saveCurrentSettings();
-    };
 
     // Save state if auto-selected
-    if ((!modelMatched && transSelect.options.length > 0) || (!vadMatched && validVadModels.length > 0)) {
+    if ((!modelMatched && transSelect && transSelect.options.length > 0 && transSelect.value) || (!vadMatched && validVadModels.length > 0)) {
       await saveCurrentSettings();
     }
     
+    updateTranscribeUIConfigs();
+
     // Sync custom dropdown views
     if (window.syncCustomSelects) {
       window.syncCustomSelects();
@@ -2225,19 +2299,95 @@ function updateTranscribeUIConfigs() {
     backendEl.title = backend;
   }
   
+  // 1. Sync Quick Engine / Backend Select (Show ONLY compiled/available backends)
+  const quickBackendSelect = document.getElementById('quick-opt-selectedBackend');
+  if (quickBackendSelect) {
+    const backendDefs = [
+      { key: 'Standard', label: 'CPU (Standard)' },
+      { key: 'Vulkan', label: 'Vulkan GPU' },
+      { key: 'CUDA', label: 'CUDA GPU' },
+      { key: 'OpenVINO', label: 'OpenVINO Intel' }
+    ];
+    
+    // Filter to only include compiled backends (Standard CPU is always present as fallback)
+    const availableBackends = backendDefs.filter(b => b.key === 'Standard' || Boolean(compiledBackends[b.key]));
+    
+    // Rebuild options if the list of available backends has changed
+    const currentKeys = Array.from(quickBackendSelect.options).map(o => o.value).join(',');
+    const targetKeys = availableBackends.map(b => b.key).join(',');
+    if (currentKeys !== targetKeys) {
+      quickBackendSelect.innerHTML = '';
+      availableBackends.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b.key;
+        opt.textContent = b.label;
+        if (b.key === backend) {
+          opt.selected = true;
+        }
+        quickBackendSelect.appendChild(opt);
+      });
+    }
+    quickBackendSelect.value = backend;
+  }
+  
   const model = getBasename(settingsState.modelPath) || 'None';
   const modelEl = document.getElementById('trans-cfg-model');
   if (modelEl) {
     modelEl.textContent = model;
     modelEl.title = model;
   }
+
+  // 2. Sync Quick Model Select
+  const quickModelSelect = document.getElementById('quick-opt-model');
+  if (quickModelSelect && settingsState.modelPath) {
+    quickModelSelect.value = settingsState.modelPath;
+  }
+
+  // 3. Sync Quick Language Select
+  const quickLangSelect = document.getElementById('quick-opt-language');
+  if (quickLangSelect) {
+    const currentLang = (settingsState.language || 'auto').trim();
+    const matchedOption = Array.from(quickLangSelect.options).find(o => o.value.toLowerCase() === currentLang.toLowerCase());
+    if (!matchedOption && currentLang) {
+      const customOpt = document.createElement('option');
+      customOpt.value = currentLang.toLowerCase();
+      customOpt.textContent = currentLang.toUpperCase();
+      quickLangSelect.appendChild(customOpt);
+      quickLangSelect.value = customOpt.value;
+    } else if (matchedOption) {
+      quickLangSelect.value = matchedOption.value;
+    }
+  }
   
-  const vad = settingsState.vad ? 'ON' : 'OFF';
+  // 4. Sync Quick VAD Button State & Tooltip
+  const hasVadModel = Boolean(localScannedVadModels && localScannedVadModels.length > 0 && settingsState.vadModel);
+  const vadActive = Boolean(settingsState.vad && hasVadModel);
+  const vadModelName = settingsState.vadModel ? getBasename(settingsState.vadModel) : 'Default';
+
   const vadEl = document.getElementById('trans-cfg-vad');
   if (vadEl) {
-    vadEl.textContent = vad;
-    vadEl.className = settingsState.vad ? 'val-gold' : 'val-muted';
-    vadEl.title = settingsState.vad ? `VAD Active (${settingsState.vadModel || 'Default'})` : 'VAD Disabled';
+    vadEl.textContent = vadActive ? 'ON' : 'OFF';
+    vadEl.className = vadActive ? 'val-gold' : 'val-muted';
+    vadEl.title = vadActive ? `VAD Active (${vadModelName})` : 'VAD Disabled';
+  }
+  
+  const quickVadBtn = document.getElementById('quick-toggle-vad');
+  const quickVadText = document.getElementById('quick-vad-status-text');
+  if (quickVadBtn && quickVadText) {
+    if (vadActive) {
+      quickVadBtn.classList.add('active');
+      quickVadText.textContent = 'VAD Active';
+      quickVadBtn.title = `Silero VAD Active (${vadModelName}) - Click to disable`;
+    } else {
+      quickVadBtn.classList.remove('active');
+      if (hasVadModel) {
+        quickVadText.textContent = 'VAD Disabled';
+        quickVadBtn.title = `Silero VAD Disabled (${vadModelName}) - Click to enable`;
+      } else {
+        quickVadText.textContent = 'VAD (No Model)';
+        quickVadBtn.title = 'No Silero VAD model found on system - Click for instructions';
+      }
+    }
   }
   
   const transCfgTranslation = document.getElementById('trans-cfg-translation');
@@ -2254,7 +2404,78 @@ function updateTranscribeUIConfigs() {
     transCfgTranslation.title = fullTitle;
     transCfgTranslation.className = translationEnabled ? 'val-green' : 'val-muted';
   }
+
+  // Sync custom dropdown visuals
+  if (window.syncCustomSelects) {
+    window.syncCustomSelects();
+  }
 }
+
+function setupQuickConfigDeckEventListeners() {
+  // 1. Quick Language Selection Listener
+  const quickLangSelect = document.getElementById('quick-opt-language');
+  if (quickLangSelect) {
+    quickLangSelect.addEventListener('change', () => {
+      if (settingsState) {
+        settingsState.language = quickLangSelect.value;
+        const cfgLangInput = document.getElementById('opt-language');
+        if (cfgLangInput) {
+          cfgLangInput.value = quickLangSelect.value;
+        }
+        saveCurrentSettings();
+        updateTranscribeUIConfigs();
+      }
+    });
+  }
+
+  // 2. Quick Engine / Backend Selection Listener
+  const quickBackendSelect = document.getElementById('quick-opt-selectedBackend');
+  if (quickBackendSelect) {
+    quickBackendSelect.addEventListener('change', async () => {
+      const backend = quickBackendSelect.value;
+      const isCompiled = backend === 'Standard' || Boolean(compiledBackends[backend]);
+      if (!isCompiled) {
+        showNotification(`The selected engine (${backend === 'Standard' ? 'CPU' : backend}) precompiled binary was not found in resources.`, "error");
+        if (settingsState) {
+          quickBackendSelect.value = settingsState.selectedBackend;
+          if (window.syncCustomSelects) window.syncCustomSelects();
+        }
+        return;
+      }
+      if (settingsState) {
+        selectBackend(backend, false);
+        const cfgBackendSelect = document.getElementById('opt-selectedBackend');
+        if (cfgBackendSelect) {
+          cfgBackendSelect.value = backend;
+        }
+        showNotification(`Active engine switched to ${backend === 'Standard' ? 'Standard CPU' : backend + ' GPU'} successfully!`, "success");
+      }
+    });
+  }
+}
+
+window.toggleQuickVad = function() {
+  if (!settingsState) return;
+  
+  const willEnable = !settingsState.vad;
+  if (willEnable) {
+    const hasVadModel = Boolean(localScannedVadModels && localScannedVadModels.length > 0 && settingsState.vadModel);
+    if (!hasVadModel) {
+      showNotification("No Silero VAD model found. Please download Silero VAD from the Model Hub first.", "warning");
+      return;
+    }
+  }
+
+  settingsState.vad = willEnable;
+  const cfgVadCheckbox = document.getElementById('opt-vad');
+  if (cfgVadCheckbox) {
+    cfgVadCheckbox.checked = settingsState.vad;
+  }
+  saveCurrentSettings();
+  updateTranscribeUIConfigs();
+  const vadModelName = settingsState.vadModel ? getBasename(settingsState.vadModel) : 'Silero VAD';
+  showNotification(settingsState.vad ? `Silero VAD voice filter enabled (${vadModelName})` : "Silero VAD voice filter disabled", "info");
+};
 
 window.runWhisperTranscription = async function() {
   const btn = document.getElementById('btn-run-transcribe');
