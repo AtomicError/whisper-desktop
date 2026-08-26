@@ -330,7 +330,7 @@ body {
 
 /* Sidebar Styling */
 sidebar {
-  width: 250px;
+  width: 262px;
   background: rgba(9, 11, 23, 0.96);
   border-right: 1px solid var(--border-glass);
   display: flex;
@@ -344,48 +344,41 @@ sidebar {
 
 sidebar.sidebar-collapsed {
   width: 72px;
-  padding: 20px 13px;
+  padding: 20px 12px;
   overflow: visible;
   z-index: 100;
 }
 
 sidebar.sidebar-collapsed .brand {
+  width: 48px;
+  height: 48px;
   padding: 0;
+  margin: 0 auto 24px auto;
   justify-content: center;
+  align-items: center;
   gap: 0;
 }
 
 sidebar.sidebar-collapsed .brand-name {
-  transform: translateX(-20px);
-  clip-path: inset(0 100% 0 0);
-  max-width: 0;
-  overflow: hidden;
-  margin: 0;
-  white-space: nowrap;
-  pointer-events: none;
+  display: none !important;
 }
 
 sidebar.sidebar-collapsed .nav-item {
-  width: 46px;
-  height: 46px;
+  width: 48px;
+  height: 48px;
   border-radius: 12px;
   padding: 0;
   justify-content: center;
+  align-items: center;
   margin: 0 auto;
 }
 
 sidebar.sidebar-collapsed .nav-item svg {
-  margin: 0;
+  margin: 0 auto;
 }
 
 sidebar.sidebar-collapsed .nav-item span {
-  max-width: 0px;
-  margin-left: 0px;
-  opacity: 0;
-  transform: translateX(-16px);
-  clip-path: inset(0 100% 0 0);
-  overflow: hidden;
-  pointer-events: none;
+  display: none !important;
 }
 
 sidebar.sidebar-collapsed .nav-item.active {
@@ -402,9 +395,8 @@ sidebar.sidebar-collapsed .nav-item.active:hover {
 
 
 sidebar.sidebar-collapsed .developer-credit {
-  width: 100%;
-  margin-top: auto;
-  margin-bottom: 8px;
+  width: 48px;
+  margin: auto auto 8px auto;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -414,7 +406,7 @@ sidebar.sidebar-collapsed .developer-credit {
 }
 
 sidebar.sidebar-collapsed .credit-divider {
-  width: 44px;
+  width: 40px;
   height: 1px;
   background: rgba(0, 0, 0, 0.42);
   margin: 0 auto 10px auto;
@@ -425,6 +417,8 @@ sidebar.sidebar-collapsed .credit-content {
   justify-content: center;
   align-items: center;
   width: 100%;
+  padding: 0;
+  margin: 0 auto;
 }
 
 sidebar.sidebar-collapsed .credit-github-icon {
@@ -434,16 +428,16 @@ sidebar.sidebar-collapsed .credit-github-icon {
 }
 
 sidebar.sidebar-collapsed .credit-content span {
-  display: none;
+  display: none !important;
 }
 
 .brand {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 28px;
-  padding: 0 6px;
-  height: 36px;
+  margin-bottom: 24px;
+  padding: 0 9px;
+  height: 46px;
   box-sizing: border-box;
 }
 
@@ -459,13 +453,14 @@ sidebar.sidebar-collapsed .credit-content span {
 }
 
 .brand-name {
-  font-size: 1.25rem;
+  font-size: 1.2rem;
   font-weight: 700;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
   background: linear-gradient(135deg, #fff 30%, #85b1ff 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  max-width: 200px;
+  max-width: 195px;
+  padding-right: 4px;
   transform: translateX(0);
   clip-path: inset(0 0 0 0);
   overflow: hidden;
@@ -552,7 +547,7 @@ sidebar.sidebar-collapsed .credit-content span {
 .nav-item span {
   font-size: 0.95rem;
   font-weight: 500;
-  max-width: 160px;
+  max-width: 175px;
   margin-left: 14px;
   transform: translateX(0);
   clip-path: inset(0 0 0 0);
@@ -714,9 +709,10 @@ header {
   font-size: 1.25rem;
   font-weight: 600;
   color: #fff;
+  transition: opacity 0.1s ease;
 }
 
-/* Base Panel Views */
+/* Base Panel Views with Zero-Movement Pure Micro-Fade */
 .view-panel {
   position: absolute;
   top: 0;
@@ -730,6 +726,7 @@ header {
 
 .view-panel.active {
   display: block;
+  animation: panelMicroFade 0.12s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Fixed Layout Panel Utility (No outer scrollbar, uses internal scrolling) */
@@ -743,6 +740,12 @@ header {
 
 .view-panel.fixed-layout-panel.active {
   display: flex;
+  animation: panelMicroFade 0.12s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes panelMicroFade {
+  from { opacity: 0.85; }
+  to { opacity: 1; }
 }
 
 .glass-card {
@@ -1183,6 +1186,7 @@ header {
 
 .settings-group.active {
   display: flex;
+  animation: panelMicroFade 0.12s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .setting-card {
@@ -4026,6 +4030,7 @@ select.select-control {
 /* Provider Tab Content */
 .provider-tab-content {
   display: block;
+  animation: panelMicroFade 0.12s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes spin {
@@ -5229,6 +5234,7 @@ select.select-control {
 .hardsub-tab-view {
   flex: 1 1 0%;
   min-height: 0;
+  animation: panelMicroFade 0.12s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Quality Preset Buttons & Segmented Controls */

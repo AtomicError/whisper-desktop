@@ -1281,7 +1281,14 @@ window.switchView = function(viewName) {
     'settings': 'Configuration Grid',
     'logs': 'Central Logging Center'
   };
-  document.getElementById('current-view-title').textContent = titleMap[viewName] || 'Whisper Manager';
+  const titleEl = document.getElementById('current-view-title');
+  if (titleEl) {
+    titleEl.style.opacity = '0.7';
+    titleEl.textContent = titleMap[viewName] || 'Whisper Manager';
+    requestAnimationFrame(() => {
+      titleEl.style.opacity = '1';
+    });
+  }
 
   if (viewName === 'models') {
     // Always reset to Recommended tab when entering the view
@@ -1292,32 +1299,7 @@ window.switchView = function(viewName) {
     if (recommendedBtn) recommendedBtn.classList.add('active');
     loadModelStatusesGrid();
   }
-
-  // Re-trigger slide-in animation for sidebar category buttons
-  // (elements were hidden via display:none parent panel, so CSS animation never fired)
-  if (viewName === 'settings') {
-    reanimateSlideIn('.settings-categories .settings-cat-btn', 0.03);
-  }
-  if (viewName === 'models') {
-    reanimateSlideIn('#model-categories-sidebar .settings-cat-btn', 0.03);
-  }
 };
-
-function reanimateSlideIn(selector, stagger = 0.03) {
-  const items = document.querySelectorAll(selector);
-  if (items.length === 0) return;
-  items.forEach(item => {
-    item.style.animation = 'none';
-  });
-  // Flush single layout recalculation on parent instead of every item
-  if (items[0].parentElement) {
-    void items[0].parentElement.offsetWidth;
-  }
-  items.forEach((item, index) => {
-    item.style.animation = '';
-    item.style.animationDelay = `${(index * stagger).toFixed(2)}s`;
-  });
-}
 
 
 // ----------------- Real-Time Listeners -----------------
