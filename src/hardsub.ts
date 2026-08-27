@@ -1725,13 +1725,13 @@ export class HardsubController {
       if (badgeNames[activePreset]) {
         this.qualityBadge.textContent = badgeNames[activePreset];
         this.qualityBadge.style.color = 'var(--color-royal-blue)';
-        this.qualityBadge.style.borderColor = 'rgba(59, 130, 246, 0.3)';
-        this.qualityBadge.style.background = 'rgba(59, 130, 246, 0.15)';
+        this.qualityBadge.style.borderColor = 'rgba(var(--color-royal-blue-rgb), 0.3)';
+        this.qualityBadge.style.background = 'rgba(var(--color-royal-blue-rgb), 0.15)';
       } else {
         this.qualityBadge.textContent = `Custom (${this.state.videoQualityValue})`;
         this.qualityBadge.style.color = 'var(--color-cyan)';
-        this.qualityBadge.style.borderColor = 'rgba(6, 182, 212, 0.3)';
-        this.qualityBadge.style.background = 'rgba(6, 182, 212, 0.15)';
+        this.qualityBadge.style.borderColor = 'rgba(var(--color-cyan-rgb), 0.3)';
+        this.qualityBadge.style.background = 'rgba(var(--color-cyan-rgb), 0.15)';
       }
     }
   }
@@ -2010,7 +2010,7 @@ export class HardsubController {
         this.videoStatusBadge.style.color = '#10B981';
       } else {
         this.videoStatusBadge.textContent = 'Paused';
-        this.videoStatusBadge.style.background = 'rgba(45, 127, 255, 0.15)';
+        this.videoStatusBadge.style.background = 'rgba(var(--color-royal-blue-rgb), 0.15)';
         this.videoStatusBadge.style.color = 'var(--color-royal-blue)';
       }
     }
@@ -2843,7 +2843,7 @@ export class HardsubController {
       if (this.subtitleCanvas) this.subtitleCanvas.style.display = 'block';
       if (this.videoStatusBadge) {
         this.videoStatusBadge.textContent = 'Video Loaded';
-        this.videoStatusBadge.style.background = 'rgba(45, 127, 255, 0.15)';
+        this.videoStatusBadge.style.background = 'rgba(var(--color-royal-blue-rgb), 0.15)';
         this.videoStatusBadge.style.color = 'var(--color-royal-blue)';
       }
       this.syncPlayPauseUI(false);

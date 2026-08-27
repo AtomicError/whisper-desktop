@@ -690,6 +690,12 @@ class CustomSelect {
     this.container.id = `custom-select-${this.instanceId}`;
     
     this.container.style.width = this.select.style.width || '100%';
+    if (this.select.style.minWidth) {
+      this.container.style.minWidth = this.select.style.minWidth;
+    }
+    if (this.select.style.maxWidth) {
+      this.container.style.maxWidth = this.select.style.maxWidth;
+    }
     this.container.style.height = this.select.style.height || 'auto';
     this.container.style.margin = this.select.style.margin || '0';
 
@@ -1142,8 +1148,14 @@ function applyUiZoom(scale, persist = true, showToast = false) {
   numScale = Math.round(Math.min(Math.max(numScale, 0.70), 1.60) * 100) / 100;
   currentUiZoom = numScale;
 
-  // Apply CSS zoom to document.body (seamlessly supported by WebKitGTK and modern WebViews)
-  document.body.style.zoom = numScale;
+  // Apply CSS zoom to document.documentElement (root scaling across WebKitGTK and modern WebViews)
+  document.documentElement.style.zoom = numScale;
+  document.body.style.zoom = '';
+
+  // Update localStorage cache to prevent layout jump on next startup
+  try {
+    localStorage.setItem('whisper_ui_scale_cache', numScale.toString());
+  } catch (_) {}
 
   // Update Settings UI Badge if present
   const badge = document.getElementById('ui-scale-badge');
@@ -1187,6 +1199,105 @@ window.adjustUiZoom = function(delta) {
 
 window.setUiZoom = function(scale) {
   applyUiZoom(scale, true, true);
+};
+
+// ----------------- Multi-Theme Engine & Registry -----------------
+const THEME_REGISTRY = {
+  'royal-blue': {
+    id: 'royal-blue',
+    label: 'Royal Blue',
+    dataTheme: 'royal-blue',
+    metaColor: '#070913',
+    toastName: 'Royal Blue (Default)',
+    iconSvg: `
+      <svg class="theme-btn-icon icon-royal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+      </svg>
+    `
+  },
+  'fire-orange': {
+    id: 'fire-orange',
+    label: 'Fiery Orange',
+    dataTheme: 'fire-orange',
+    metaColor: '#0c0a09',
+    toastName: 'Fiery Orange (Fire)',
+    iconSvg: `
+      <svg class="theme-btn-icon icon-fire" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>
+      </svg>
+    `
+  }
+};
+
+function resolveThemeConfig(themeName) {
+  if (themeName === 'fire' || themeName === 'fire-orange') {
+    return THEME_REGISTRY['fire-orange'];
+  }
+  if (themeName === 'cyber-blue' || themeName === 'royal-blue') {
+    return THEME_REGISTRY['royal-blue'];
+  }
+  return THEME_REGISTRY[themeName] || THEME_REGISTRY['royal-blue'];
+}
+
+function applyTheme(themeName) {
+  const root = document.documentElement;
+  const config = resolveThemeConfig(themeName);
+
+  if (config.id === 'royal-blue') {
+    root.removeAttribute('data-theme');
+  } else {
+    root.setAttribute('data-theme', config.dataTheme || config.id);
+  }
+
+  // Update localStorage cache to prevent FOUC on next startup
+  try {
+    localStorage.setItem('whisper_theme_cache', config.id);
+  } catch (_) {}
+
+  // Update theme meta color tag
+  const metaTheme = document.querySelector('meta[name="theme-color"]');
+  if (metaTheme && config.metaColor) {
+    metaTheme.setAttribute('content', config.metaColor);
+  }
+
+  // Update sidebar theme toggle button if present
+  const sidebarThemeBtn = document.getElementById('sidebar-theme-btn');
+  const sidebarThemeLabel = document.getElementById('theme-btn-label');
+  const sidebarThemeIconWrapper = document.getElementById('theme-btn-icon-wrapper');
+  if (sidebarThemeBtn) {
+    sidebarThemeBtn.setAttribute('title', `Active Theme: ${config.label} (Click to switch)`);
+  }
+  if (sidebarThemeLabel) {
+    sidebarThemeLabel.textContent = config.label;
+  }
+  if (sidebarThemeIconWrapper) {
+    sidebarThemeIconWrapper.innerHTML = config.iconSvg;
+  }
+
+  if (window.syncCustomSelects) {
+    window.syncCustomSelects();
+  }
+}
+
+window.toggleTheme = function() {
+  const currentThemeAttr = document.documentElement.getAttribute('data-theme') || 'royal-blue';
+  const availableThemeKeys = Object.keys(THEME_REGISTRY);
+  const currentIndex = availableThemeKeys.indexOf(currentThemeAttr === 'royal-blue' ? 'royal-blue' : currentThemeAttr);
+  const nextIndex = (currentIndex + 1) % availableThemeKeys.length;
+  const nextTheme = availableThemeKeys[nextIndex >= 0 ? nextIndex : 0];
+  window.switchTheme(nextTheme);
+};
+
+window.switchTheme = function(themeName) {
+  const config = resolveThemeConfig(themeName);
+
+  if (settingsState) {
+    settingsState.theme = config.id;
+    saveCurrentSettings();
+  }
+
+  applyTheme(config.id);
+  showNotification(`Color theme switched to ${config.toastName || config.label}`, 'info');
 };
 
 function setupZoomKeyboardShortcuts() {
@@ -1796,6 +1907,10 @@ async function refreshSettings() {
     if (settingsState && typeof settingsState.uiScale === 'number') {
       applyUiZoom(settingsState.uiScale, false, false);
     }
+
+    // Apply Color Theme from loaded settings
+    const currentTheme = (settingsState && settingsState.theme) ? settingsState.theme : 'royal-blue';
+    applyTheme(currentTheme);
     
     // Set models dir input
     const inputEl = document.getElementById('opt-modelsDir');
@@ -1859,6 +1974,10 @@ function bindSettingsToDOM() {
           if (key === 'uiScale') {
             const numVal = parseFloat(val) || 1.0;
             applyUiZoom(numVal, true, false);
+            return;
+          }
+          if (key === 'theme') {
+            switchTheme(val);
             return;
           }
 

@@ -96,6 +96,8 @@ pub struct WhisperSettings {
     pub output_dir_path: String,
     #[serde(default = "default_ui_scale", deserialize_with = "deserialize_f64_lenient")]
     pub ui_scale: f64,
+    #[serde(default = "default_theme")]
+    pub theme: String,
     #[serde(default)]
     pub close_to_tray: bool,
 }
@@ -115,6 +117,10 @@ where
         FloatOrString::Float(f) => Ok(f),
         FloatOrString::String(s) => s.trim().parse::<f64>().map_err(serde::de::Error::custom),
     }
+}
+
+fn default_theme() -> String {
+    "royal-blue".to_string()
 }
 
 fn default_ui_scale() -> f64 {
@@ -207,12 +213,19 @@ impl WhisperSettings {
             output_dir_mode: "input_dir".to_string(),
             output_dir_path: "".to_string(),
             ui_scale: 1.0,
+            theme: "royal-blue".to_string(),
             close_to_tray: false,
         }
     }
 
     /// Symmetric validation and sanitization executed on BOTH load and save
     pub fn sanitize_and_validate(&mut self) {
+        self.theme = match self.theme.as_str() {
+            "fire-orange" | "fire" => "fire-orange".to_string(),
+            "cyber-blue" | "royal-blue" => "royal-blue".to_string(),
+            _ => "royal-blue".to_string(),
+        };
+
         if self.ui_scale <= 0.0 || self.ui_scale.is_nan() {
             self.ui_scale = 1.0;
         }
@@ -839,5 +852,40 @@ mod tests {
         let json_str = r#"{"uiScale": "1.25"}"#;
         let parsed: WhisperSettings = serde_json::from_str(json_str).unwrap();
         assert_eq!(parsed.ui_scale, 1.25);
+    }
+
+    #[test]
+    fn test_theme_sanitization_and_persistence() {
+        let mut settings = WhisperSettings::default_settings();
+        assert_eq!(settings.theme, "royal-blue");
+
+        // Invalid theme value fallback
+        settings.theme = "invalid-neon-theme".to_string();
+        settings.sanitize_and_validate();
+        assert_eq!(settings.theme, "royal-blue");
+
+        // Legacy cyber-blue theme migration
+        settings.theme = "cyber-blue".to_string();
+        settings.sanitize_and_validate();
+        assert_eq!(settings.theme, "royal-blue");
+
+        // Valid fire-orange theme
+        settings.theme = "fire-orange".to_string();
+        settings.sanitize_and_validate();
+        assert_eq!(settings.theme, "fire-orange");
+
+        // Legacy fire theme migration
+        settings.theme = "fire".to_string();
+        settings.sanitize_and_validate();
+        assert_eq!(settings.theme, "fire-orange");
+
+        // Test persistence roundtrip
+        let temp_path = temp_test_file("theme_test");
+        save_settings_to_path(&temp_path, &settings).unwrap();
+
+        let loaded = load_settings_from_path(&temp_path);
+        assert_eq!(loaded.theme, "fire-orange");
+
+        let _ = fs::remove_file(&temp_path);
     }
 }
