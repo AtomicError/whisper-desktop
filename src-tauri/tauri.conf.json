@@ -20,7 +20,9 @@
         "height": 768,
         "maximized": true,
         "decorations": false,
-        "transparent": false
+        "transparent": false,
+        "theme": "Dark",
+        "backgroundColor": [7, 9, 19, 255]
       }
     ],
     "security": {

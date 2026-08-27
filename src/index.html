@@ -1,14 +1,26 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" style="background-color: #070913; color: #f3f4f6; color-scheme: dark;">
   <head>
     <meta charset="UTF-8" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#070913" />
+    <style>
+      :root, html, body {
+        background-color: #070913 !important;
+        background: #070913 !important;
+        color: #f3f4f6 !important;
+        color-scheme: dark !important;
+        margin: 0;
+        padding: 0;
+      }
+    </style>
     <link rel="stylesheet" href="styles.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Whisper Manager Desktop</title>
     <script type="module" src="main.js" defer></script>
   </head>
 
-  <body style="display:flex; flex-direction:column; height:100vh; overflow:hidden;">
+  <body style="display:flex; flex-direction:column; height:100vh; overflow:hidden; background-color: #070913; background: #070913; color-scheme: dark;">
     <!-- Premium GNOME-Style CSD Headerbar -->
     <div data-tauri-drag-region class="titlebar">
       <div class="titlebar-brand" data-tauri-drag-region>
