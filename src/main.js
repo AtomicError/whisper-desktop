@@ -523,7 +523,50 @@ let batchCancelActive = false;
 let _unlistenFns = [];
 let _modelActionsInProgress = new Set();
 
-// Premium GNOME-Style Titlebar Window Controls Binding
+// Native OS Taskbar Progress Bar & Background Job Tracking
+window.isTranscriptionRunning = false;
+window.isTranslationRunning = false;
+window.isHardsubRunning = false;
+window.isDownloadingModelRunning = false;
+
+window.hasActiveBackgroundJob = function() {
+  return !!(
+    window.isTranscriptionRunning ||
+    window.isTranslationRunning ||
+    window.isHardsubRunning ||
+    window.isDownloadingModelRunning
+  );
+};
+
+window.updateTaskbarProgress = function(progressFraction, active, statusType = 'normal') {
+  if (window.__TAURI__ && window.__TAURI__.window) {
+    try {
+      const { getCurrentWindow } = window.__TAURI__.window;
+      const appWin = getCurrentWindow();
+      if (!appWin || typeof appWin.setProgressBar !== 'function') return;
+
+      if (statusType === 'error') {
+        appWin.setProgressBar({ status: 'error', progress: 100 }).catch(() => {});
+        setTimeout(() => {
+          appWin.setProgressBar({ status: 'none' }).catch(() => {});
+        }, 4000);
+      } else if (active) {
+        const pct = Math.min(100, Math.max(0, Math.round((progressFraction || 0) * 100)));
+        if (pct <= 0) {
+          appWin.setProgressBar({ status: 'indeterminate' }).catch(() => {});
+        } else {
+          appWin.setProgressBar({ status: 'normal', progress: pct }).catch(() => {});
+        }
+      } else {
+        appWin.setProgressBar({ status: 'none' }).catch(() => {});
+      }
+    } catch (e) {
+      console.warn("Taskbar progress update failed:", e);
+    }
+  }
+};
+
+// Premium GNOME-Style Titlebar Window Controls Binding with Exit Guard & Double-Click Maximize
 function setupTitlebar() {
   const minimizeBtn = document.getElementById('titlebar-minimize');
   const maximizeBtn = document.getElementById('titlebar-maximize');
@@ -544,9 +587,60 @@ function setupTitlebar() {
         appWindow.toggleMaximize().catch(err => console.error("Failed to toggle maximize window:", err));
       });
 
-      closeBtn.addEventListener('click', () => {
-        appWindow.close().catch(err => console.error("Failed to close window:", err));
+      // Double-click titlebar to toggle maximize
+      const titlebar = document.querySelector('.titlebar');
+      if (titlebar) {
+        titlebar.addEventListener('dblclick', (e) => {
+          if (!e.target.closest('button')) {
+            appWindow.toggleMaximize().catch(err => console.error("Failed to toggle maximize window:", err));
+          }
+        });
+      }
+
+      const requestSafeExit = async () => {
+        // If closeToTray is enabled, minimize to system tray instead of exiting
+        if (settingsState && settingsState.closeToTray) {
+          try {
+            await invoke('hide_to_tray');
+          } catch {
+            appWindow.hide().catch(err => console.error("Failed to hide window to tray:", err));
+          }
+          return;
+        }
+
+        if (window.hasActiveBackgroundJob()) {
+          const confirmed = await window.showConfirmModal(
+            'Active Process Running',
+            'A transcription, translation, or rendering task is currently in progress. Closing the application will abort the process. Are you sure you want to exit?',
+            'Exit & Abort'
+          );
+          if (confirmed) {
+            try {
+              await invoke('exit_app');
+            } catch {
+              appWindow.destroy().catch(() => appWindow.close());
+            }
+          }
+        } else {
+          try {
+            await invoke('exit_app');
+          } catch {
+            appWindow.close().catch(err => console.error("Failed to close window:", err));
+          }
+        }
+      };
+
+      closeBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        requestSafeExit();
       });
+
+      if (typeof appWindow.onCloseRequested === 'function') {
+        appWindow.onCloseRequested(async (event) => {
+          event.preventDefault();
+          requestSafeExit();
+        });
+      }
     } catch (e) {
       console.error("Failed to setup native Tauri window controls:", e);
     }
@@ -1097,6 +1191,21 @@ window.setUiZoom = function(scale) {
 
 function setupZoomKeyboardShortcuts() {
   window.addEventListener('keydown', (e) => {
+    // ESC key closes active modals and dropdowns
+    if (e.key === 'Escape') {
+      const overlay = document.getElementById('app-modal-overlay');
+      if (overlay && (overlay.classList.contains('show') || overlay.style.display === 'flex')) {
+        if (window._confirmModalResolve) {
+          window.resolveAppConfirm(false);
+        } else {
+          window.closeAppModal();
+        }
+      }
+      document.querySelectorAll('.custom-select-options.open').forEach(el => {
+        el.classList.remove('open');
+      });
+    }
+
     if (e.ctrlKey || e.metaKey) {
       if (e.key === '=' || e.key === '+' || e.code === 'NumpadAdd' || e.code === 'Equal') {
         e.preventDefault();
@@ -1321,6 +1430,10 @@ function setupTauriListeners() {
   // Transcription progress
   on('transcribe-status', (event) => {
     const payload = event.payload;
+    window.isTranscriptionRunning = !!payload.active;
+    if (typeof window.updateTaskbarProgress === 'function') {
+      window.updateTaskbarProgress(payload.progress, payload.active);
+    }
     
     const fillBar = document.getElementById('progress-linear-fill');
     const pctEl = document.getElementById('lbl-radial-pct');
@@ -1344,6 +1457,11 @@ function setupTauriListeners() {
 
   on('translation-status', (event) => {
     const payload = event.payload;
+    window.isTranslationRunning = !!payload.active;
+    if (typeof window.updateTaskbarProgress === 'function') {
+      window.updateTaskbarProgress(payload.progress, payload.active);
+    }
+
     const fillBar = document.getElementById('progress-linear-fill');
     const pctEl = document.getElementById('lbl-radial-pct');
     const msgEl = document.getElementById('lbl-radial-msg');
@@ -1371,6 +1489,11 @@ function setupTauriListeners() {
     if (!payload || !payload.modelName) return;
 
     if (payload.phase === 'starting' || payload.phase === 'downloading') {
+      window.isDownloadingModelRunning = true;
+      if (typeof window.updateTaskbarProgress === 'function') {
+        window.updateTaskbarProgress(payload.progress, true);
+      }
+
       // CSS.escape prevents selector breakage from quotes/brackets in names
       const card = document.querySelector(`[data-model="${CSS.escape(payload.modelName)}"]`);
       if (!card) return;
@@ -1425,6 +1548,11 @@ function setupTauriListeners() {
       }
       // If card is NOT in current view/tab, do NOTHING to prevent tab re-rendering!
     } else {
+      window.isDownloadingModelRunning = false;
+      if (typeof window.updateTaskbarProgress === 'function') {
+        window.updateTaskbarProgress(0, false, payload.phase === 'failed' ? 'error' : 'normal');
+      }
+
       // paused / completed / failed -> Reload grid state once
       loadModelStatusesGrid(true);
       if (payload.phase === 'failed') {

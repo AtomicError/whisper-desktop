@@ -96,6 +96,8 @@ pub struct WhisperSettings {
     pub output_dir_path: String,
     #[serde(default = "default_ui_scale", deserialize_with = "deserialize_f64_lenient")]
     pub ui_scale: f64,
+    #[serde(default)]
+    pub close_to_tray: bool,
 }
 
 fn deserialize_f64_lenient<'de, D>(deserializer: D) -> Result<f64, D::Error>
@@ -205,6 +207,7 @@ impl WhisperSettings {
             output_dir_mode: "input_dir".to_string(),
             output_dir_path: "".to_string(),
             ui_scale: 1.0,
+            close_to_tray: false,
         }
     }
 

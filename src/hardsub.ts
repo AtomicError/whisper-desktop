@@ -3304,6 +3304,11 @@ export class HardsubController {
       const data = event.payload;
       const pct = Math.round(data.progress * 100);
 
+      (window as any).isHardsubRunning = !!data.active;
+      if (typeof (window as any).updateTaskbarProgress === 'function') {
+        (window as any).updateTaskbarProgress(data.progress, data.active);
+      }
+
       if (this.progressFill) {
         this.progressFill.style.width = `${pct}%`;
       }

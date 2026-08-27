@@ -14,7 +14,7 @@ pub mod ffmpeg_resolver;
 
 use std::sync::{Arc, Mutex};
 use std::path::Path;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 
 use settings::{WhisperSettings, load_settings_file, save_settings_file};
 use hardware::{HardwareMonitor, SystemStats};
@@ -574,18 +574,32 @@ fn open_file_in_editor(app: AppHandle, file_path: String) -> Result<(), String> 
         .map_err(|e| format!("Failed to open file in editor: {}", e))
 }
 
+#[tauri::command]
+fn exit_app(app: AppHandle) {
+    app.exit(0);
+}
+
+#[tauri::command]
+fn hide_to_tray(app: AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("main") {
+        window.hide().map_err(|e| format!("Failed to hide window: {}", e))
+    } else {
+        Ok(())
+    }
+}
+
 fn main() {
     #[cfg(target_os = "linux")]
     {
+        // Prevent WebKitGTK double-DPI scaling on modern Linux distributions (e.g. Arch/Wayland)
+        // when GDK_SCALE is not explicitly configured by the user.
+        if std::env::var("GDK_SCALE").is_err() && std::env::var("GDK_DPI_SCALE").is_err() {
+            std::env::set_var("GDK_DPI_SCALE", "1.0");
+        }
+
         // Resolve WebKit subprocess ICU dependency loading crashes inside the AppImage environment.
         if std::env::var("APPIMAGE").is_ok() {
             std::env::set_var("WEBKIT_DISABLE_SANDBOX", "1");
-            
-            // Prevent WebKitGTK double-DPI scaling on modern Linux distributions (e.g. Arch/Wayland)
-            // when GDK_SCALE is not explicitly configured by the user.
-            if std::env::var("GDK_SCALE").is_err() {
-                std::env::set_var("GDK_DPI_SCALE", "1.0");
-            }
             
             if let Ok(appdir) = std::env::var("APPDIR") {
                 let shared_lib_path = format!("{}/shared/lib", appdir);
@@ -622,9 +636,60 @@ fn main() {
                 logs_for_sink.log(&handle_for_sink, "Settings", message);
             }));
 
+            // Setup System Tray Icon and Context Menu
+            use tauri::{
+                menu::{Menu, MenuItem},
+                tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+                Manager,
+            };
+
+            let show_item = MenuItem::with_id(_app, "show", "Open Whisper Desktop", true, None::<&str>)?;
+            let quit_item = MenuItem::with_id(_app, "quit", "Quit Application", true, None::<&str>)?;
+            let tray_menu = Menu::with_items(_app, &[&show_item, &quit_item])?;
+
+            if let Some(icon) = _app.default_window_icon() {
+                let _tray = TrayIconBuilder::new()
+                    .icon(icon.clone())
+                    .tooltip("Whisper Desktop")
+                    .menu(&tray_menu)
+                    .show_menu_on_left_click(false)
+                    .on_menu_event(|app, event| match event.id.as_ref() {
+                        "show" => {
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.unminimize();
+                                let _ = window.set_focus();
+                            }
+                        }
+                        "quit" => {
+                            app.exit(0);
+                        }
+                        _ => {}
+                    })
+                    .on_tray_icon_event(|tray, event| {
+                        if let TrayIconEvent::Click {
+                            button: MouseButton::Left,
+                            button_state: MouseButtonState::Up,
+                            ..
+                        } = event
+                        {
+                            let app = tray.app_handle();
+                            if let Some(window) = app.get_webview_window("main") {
+                                if window.is_visible().unwrap_or(false) {
+                                    let _ = window.set_focus();
+                                } else {
+                                    let _ = window.show();
+                                    let _ = window.unminimize();
+                                    let _ = window.set_focus();
+                                }
+                            }
+                        }
+                    })
+                    .build(_app)?;
+            }
+
             #[cfg(target_os = "linux")]
             {
-                use tauri::Manager;
                 use webkit2gtk::{WebViewExt, PermissionRequestExt};
                 if let Some(window) = _app.get_webview_window("main") {
                     let _ = window.with_webview(|webview| {
@@ -685,6 +750,8 @@ fn main() {
             get_ffmpeg_status,
             copy_to_clipboard,
             open_file_in_editor,
+            exit_app,
+            hide_to_tray,
             video_server::get_media_stream_url
         ])
         .run(tauri::generate_context!())

@@ -41,6 +41,8 @@ allow = [
   "get_media_stream_url",
   "get_ffmpeg_status",
   "copy_to_clipboard",
-  "open_file_in_editor"
+  "open_file_in_editor",
+  "exit_app",
+  "hide_to_tray"
 ]
 

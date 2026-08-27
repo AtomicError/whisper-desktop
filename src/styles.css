@@ -592,6 +592,17 @@ sidebar.sidebar-collapsed .credit-content span {
   outline-offset: 2px;
 }
 
+/* Mouse Focus Elimination (Clean desktop UX: outlines only appear on Keyboard Tab navigation) */
+button:focus:not(:focus-visible),
+a:focus:not(:focus-visible),
+.nav-item:focus:not(:focus-visible),
+.settings-cat-btn:focus:not(:focus-visible),
+.quality-preset-btn:focus:not(:focus-visible),
+.hardsub-tab-pill:focus:not(:focus-visible),
+.custom-select-trigger:focus:not(:focus-visible) {
+  outline: none !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .nav-item,
   .nav-item::before,
