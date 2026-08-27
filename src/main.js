@@ -1288,7 +1288,7 @@ window.toggleTheme = function() {
   window.switchTheme(nextTheme);
 };
 
-window.switchTheme = function(themeName) {
+window.switchTheme = function(themeName, animated = true) {
   const config = resolveThemeConfig(themeName);
 
   if (settingsState) {
@@ -1296,7 +1296,26 @@ window.switchTheme = function(themeName) {
     saveCurrentSettings();
   }
 
-  applyTheme(config.id);
+  const shouldAnimate = animated &&
+    !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (shouldAnimate && typeof document.startViewTransition === 'function') {
+    document.startViewTransition(() => {
+      applyTheme(config.id);
+    });
+  } else if (shouldAnimate) {
+    const root = document.documentElement;
+    root.classList.add('theme-transitioning');
+    requestAnimationFrame(() => {
+      applyTheme(config.id);
+      setTimeout(() => {
+        root.classList.remove('theme-transitioning');
+      }, 280);
+    });
+  } else {
+    applyTheme(config.id);
+  }
+
   showNotification(`Color theme switched to ${config.toastName || config.label}`, 'info');
 };
 

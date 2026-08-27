@@ -66,6 +66,72 @@ html {
   }
 }
 
+@property --color-accent {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #2d7fff;
+}
+
+@property --color-royal-blue {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #2d7fff;
+}
+
+@property --color-royal-blue-dark {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #0057d9;
+}
+
+@property --color-cyan {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #06b6d4;
+}
+
+@property --color-sky {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #38bdf8;
+}
+
+@property --bg-space {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #070913;
+}
+
+@property --bg-deep {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #0b0e1b;
+}
+
+@property --bg-titlebar {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: rgba(9, 11, 23, 0.98);
+}
+
+@property --bg-card {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: rgba(15, 20, 38, 0.55);
+}
+
+@property --bg-card-hover {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: rgba(22, 29, 54, 0.75);
+}
+
+@property --border-glass-active {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: rgba(45, 127, 255, 0.4);
+}
+
 :root,
 :root[data-theme="royal-blue"],
 :root[data-theme="cyber-blue"] {
@@ -195,7 +261,66 @@ html {
   --nav-active-shadow: 0 4px 16px rgba(255, 107, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.15), inset 0 0 12px rgba(255, 107, 0, 0.12);
   --nav-active-hover-bg: linear-gradient(135deg, rgba(255, 107, 0, 0.25) 0%, rgba(255, 107, 0, 0.1) 100%);
   --nav-active-hover-border: rgba(255, 107, 0, 0.65);
-  --nav-active-hover-shadow: 0 6px 20px rgba(255, 107, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2), inset 0 0 16px rgba(255, 107, 0, 0.18);
+}
+
+/* ==========================================================================
+   SMOOTH DESKTOP THEME TRANSITIONS (GPU ACCELERATED VIEW TRANSITIONS)
+   ========================================================================== */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 260ms;
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+
+::view-transition-old(root) {
+  animation-name: theme-crossfade-out;
+}
+
+::view-transition-new(root) {
+  animation-name: theme-crossfade-in;
+}
+
+@keyframes theme-crossfade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes theme-crossfade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Fallback for environments without View Transitions API */
+html.theme-transitioning,
+html.theme-transitioning body,
+html.theme-transitioning .titlebar,
+html.theme-transitioning sidebar,
+html.theme-transitioning header,
+html.theme-transitioning .main-view,
+html.theme-transitioning .nav-item,
+html.theme-transitioning .backend-card,
+html.theme-transitioning .setting-card,
+html.theme-transitioning .wizard-step,
+html.theme-transitioning .sidebar-theme-btn,
+html.theme-transitioning .btn-primary,
+html.theme-transitioning .btn-secondary,
+html.theme-transitioning .output-badge,
+html.theme-transitioning .analytics-box,
+html.theme-transitioning .telemetry-hud,
+html.theme-transitioning .batch-queue-panel {
+  transition: background-color 260ms cubic-bezier(0.2, 0, 0, 1),
+              border-color 260ms cubic-bezier(0.2, 0, 0, 1),
+              box-shadow 260ms cubic-bezier(0.2, 0, 0, 1),
+              color 260ms cubic-bezier(0.2, 0, 0, 1) !important;
+  transition-delay: 0s !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
 }
 
 * {
@@ -809,6 +934,12 @@ a:focus:not(:focus-visible),
 .theme-btn-icon-wrapper svg {
   width: 16px;
   height: 16px;
+  animation: theme-icon-pop 0.38s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes theme-icon-pop {
+  0% { transform: scale(0.3) rotate(-140deg); opacity: 0; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
 }
 
 .theme-btn-label {
