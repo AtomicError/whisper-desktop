@@ -492,19 +492,11 @@ pub async fn run_transcription(
     if settings.output_vtt { args.push("-ovtt".to_string()); }
     if settings.output_srt { args.push("-osrt".to_string()); }
     if settings.output_lrc { args.push("-olrc".to_string()); }
-    if settings.output_words {
-        args.push("-owts".to_string());
-        if !settings.font_path.is_empty() {
-            args.push("-fp".to_string());
-            args.push(settings.font_path.clone());
-        }
-    }
     if settings.output_csv { args.push("-ocsv".to_string()); }
     if settings.output_json { args.push("-oj".to_string()); }
     if settings.output_json_full { args.push("-ojf".to_string()); }
     
     if settings.offset_t > 0 { args.push("-ot".to_string()); args.push(settings.offset_t.to_string()); }
-    if settings.offset_n > 0 { args.push("-on".to_string()); args.push(settings.offset_n.to_string()); }
     if settings.duration > 0 { args.push("-d".to_string()); args.push(settings.duration.to_string()); }
     if settings.max_context != -1 { args.push("-mc".to_string()); args.push(settings.max_context.to_string()); }
     if settings.max_len > 0 { args.push("-ml".to_string()); args.push(settings.max_len.to_string()); }
@@ -527,12 +519,11 @@ pub async fn run_transcription(
     if settings.no_fallback { args.push("-nf".to_string()); }
     
     if settings.no_prints { args.push("-np".to_string()); }
-    if settings.print_special { args.push("-ps".to_string()); }
     if settings.print_colors { args.push("-pc".to_string()); }
-    if settings.print_confidence { args.push("--print-confidence".to_string()); }
+    if settings.print_confidence && (settings.output_json || settings.output_json_full) {
+        args.push("--print-confidence".to_string());
+    }
     if settings.print_progress { args.push("-pp".to_string()); }
-    if settings.no_timestamps { args.push("-nt".to_string()); }
-    if settings.detect_language { args.push("-dl".to_string()); }
     if settings.carry_prompt { args.push("--carry-initial-prompt".to_string()); }
     if settings.log_score { args.push("-ls".to_string()); }
     
@@ -546,7 +537,7 @@ pub async fn run_transcription(
         args.push("-nfa".to_string());
     }
     
-    if settings.no_gpu || settings.selected_backend == "Standard" { args.push("-ng".to_string()); }
+    if settings.selected_backend == "Standard" { args.push("-ng".to_string()); }
     if settings.device_id != 0 { args.push("-dev".to_string()); args.push(settings.device_id.to_string()); }
     
     if settings.selected_backend == "OpenVINO" && !settings.ov_device.is_empty() {

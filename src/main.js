@@ -278,7 +278,6 @@ const invoke = async function(cmd, args = {}) {
       threads: 4,
       processors: 1,
       offsetT: 0,
-      offsetN: 0,
       duration: 0,
       maxContext: -1,
       maxLen: 0,
@@ -302,19 +301,14 @@ const invoke = async function(cmd, args = {}) {
       outputVtt: false,
       outputSrt: true,
       outputLrc: false,
-      outputWords: false,
-      fontPath: "",
       outputCsv: false,
       outputJson: false,
       outputJsonFull: false,
       noPrints: false,
-      printSpecial: false,
       printColors: false,
       printConfidence: false,
       printProgress: false,
-      noTimestamps: false,
       language: "auto",
-      detectLanguage: false,
       prompt: "",
       carryPrompt: false,
       modelPath: "ggml-base.en.bin",
@@ -322,7 +316,6 @@ const invoke = async function(cmd, args = {}) {
       ovDevice: "CPU",
       dtwEnabled: false,
       logScore: false,
-      noGPU: false,
       deviceID: 0,
       vad: false,
       vadModel: "",
@@ -1872,10 +1865,15 @@ window.browseModelsDirectory = async function() {
   }
 };
 
-// ----------------- Settings Configuration Panel -----------------
 window.switchSettingsCategory = function(catName) {
   activeSettingsCat = catName;
   
+  // Reset scroll position to top when switching categories
+  const scrollContainer = document.querySelector('.settings-scroll-container');
+  if (scrollContainer) {
+    scrollContainer.scrollTop = 0;
+  }
+
   // Toggle active category tabs
   const tabs = document.querySelectorAll('.settings-cat-btn');
   tabs.forEach(tab => {
@@ -1973,6 +1971,9 @@ function bindSettingsToDOM() {
           if (key === 'translateAiEnabled' && typeof toggleTranslationSubSettingsVisibility === 'function') {
             toggleTranslationSubSettingsVisibility();
           }
+          if (key === 'outputJson' || key === 'outputJsonFull') {
+            syncJsonConfidenceDependency();
+          }
         };
       } else if (el.tagName === 'SELECT' || el.type === 'text' || el.type === 'number') {
         el.value = settingsState[key];
@@ -2024,6 +2025,9 @@ function bindSettingsToDOM() {
     }
   });
   
+  // Sync JSON confidence option dependency
+  syncJsonConfidenceDependency();
+
   // Update build selection card highlight based on settings backend
   selectBackend(settingsState.selectedBackend, true);
   
@@ -2038,6 +2042,38 @@ function bindSettingsToDOM() {
   // Sync custom dropdown views
   if (window.syncCustomSelects) {
     window.syncCustomSelects();
+  }
+}
+
+function syncJsonConfidenceDependency() {
+  const jsonOpt = document.getElementById('opt-outputJson');
+  const jsonFullOpt = document.getElementById('opt-outputJsonFull');
+  const confCard = document.getElementById('card-printConfidence');
+  const confInput = document.getElementById('opt-printConfidence');
+
+  const isJsonActive = Boolean((jsonOpt && jsonOpt.checked) || (jsonFullOpt && jsonFullOpt.checked));
+  
+  if (confCard) {
+    if (isJsonActive) {
+      confCard.style.opacity = '1';
+      confCard.style.cursor = 'default';
+      confCard.style.pointerEvents = 'auto';
+      if (confInput) confInput.disabled = false;
+      confCard.removeAttribute('title');
+    } else {
+      confCard.style.opacity = '0.45';
+      confCard.style.cursor = 'not-allowed';
+      confCard.style.pointerEvents = 'auto';
+      if (confInput) {
+        confInput.disabled = true;
+        confInput.checked = false;
+      }
+      if (settingsState && settingsState.printConfidence) {
+        settingsState.printConfidence = false;
+        saveCurrentSettings();
+      }
+      confCard.title = 'Requires JSON Formatted (.json) or Full Detailed JSON (-ojf) to be enabled';
+    }
   }
 }
 
@@ -2329,16 +2365,7 @@ window.browseOutputDir = async function() {
   }
 };
 
-window.browseFontFile = async function() {
-  const file = await invoke('select_file');
-  if (file) {
-    document.getElementById('opt-fontPath').value = file;
-    if (settingsState) {
-      settingsState.fontPath = file;
-      saveCurrentSettings();
-    }
-  }
-};
+
 
 // ----------------- Transcribe Panel & Accordion Wizard -----------------
 window.toggleWizardAccordion = function(stepNum) {
@@ -3762,6 +3789,11 @@ window.switchModelCategory = function(category) {
   const activeBtn = document.getElementById(`model-cat-${category}`);
   if (activeBtn) {
     activeBtn.classList.add('active');
+  }
+
+  const gridScroll = document.getElementById('models-list-scroll');
+  if (gridScroll) {
+    gridScroll.scrollTop = 0;
   }
   
   loadModelStatusesGrid();
