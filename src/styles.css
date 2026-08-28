@@ -3011,9 +3011,11 @@ select.select-control {
   pointer-events: auto;
   min-width: 320px;
   max-width: 460px;
-  background: var(--bg-card);
+  background: var(--bg-dropdown);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border-glass-active);
-  box-shadow: var(--shadow-neon-royal-blue), 0 10px 32px rgba(0, 0, 0, 0.6);
+  box-shadow: var(--shadow-neon-royal-blue), 0 12px 36px rgba(0, 0, 0, 0.75);
   border-radius: 12px;
   padding: 14px 20px;
   color: #fff;
