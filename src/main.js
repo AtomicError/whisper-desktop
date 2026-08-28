@@ -1743,7 +1743,8 @@ function setupTauriListeners() {
       }
 
       // paused / completed / failed -> Reload grid state once
-      loadModelStatusesGrid(true);
+      _cachedModelStatuses = null;
+      loadModelStatusesGrid(true, true);
       if (payload.phase === 'failed') {
         showNotification(`Model download failed: ${payload.error || 'unknown error'}`, "error");
       } else if (payload.phase === 'completed') {
@@ -1789,6 +1790,7 @@ function appendLogToViewport(payload) {
   }
   
   const viewport = document.getElementById('log-viewport');
+  if (!viewport) return;
   const logLine = document.createElement('div');
   logLine.className = 'log-line';
   
@@ -3334,42 +3336,28 @@ window.filterLogs = function(category) {
     }
   });
   
-  // Toggle visibility instead of rebuilding DOM
-  const logLines = document.querySelectorAll('#log-viewport .log-line');
-  logLines.forEach(el => {
-    if (activeLogCategory === 'All' || (el.dataset.category && el.dataset.category === activeLogCategory)) {
-      el.style.display = '';
-    } else {
-      el.style.display = 'none';
-    }
-  });
+  redrawLogsViewport();
 };
 
 window.handleLogSearch = function() {
-  logSearchQuery = document.getElementById('log-search').value.toLowerCase();
-  
-  // Toggle visibility instead of rebuilding DOM
-  const logLines = document.querySelectorAll('#log-viewport .log-line');
-  logLines.forEach(el => {
-    const msgEl = el.querySelector('.log-msg');
-    if (activeLogCategory !== 'All' && el.dataset.category !== activeLogCategory) {
-      el.style.display = 'none';
-      return;
-    }
-    if (logSearchQuery === '' || (msgEl && msgEl.textContent.toLowerCase().includes(logSearchQuery))) {
-      el.style.display = '';
-    } else {
-      el.style.display = 'none';
-    }
-  });
+  if (window.handleLogSearch._timer) clearTimeout(window.handleLogSearch._timer);
+  window.handleLogSearch._timer = setTimeout(() => {
+    window.handleLogSearch._timer = null;
+    const searchInput = document.getElementById('log-search');
+    logSearchQuery = searchInput ? searchInput.value.toLowerCase().trim() : '';
+    redrawLogsViewport();
+  }, 120);
 };
 
 function redrawLogsViewport() {
   lastAppendedCategory = null;
   const viewport = document.getElementById('log-viewport');
+  if (!viewport) return;
   viewport.innerHTML = '';
   
-  allLogsArray.forEach(payload => {
+  // Render the last 1500 logs to ensure responsive DOM performance
+  const logsToRender = allLogsArray.slice(-1500);
+  logsToRender.forEach(payload => {
     appendLogToViewport(payload);
   });
 }
@@ -3926,7 +3914,12 @@ function setupTranscribeDragAndDrop() {
   // Native Tauri drag-drop events
   if (window.__TAURI__) {
     try {
+      let _lastDragOverTime = 0;
       listen('tauri://drag-over', (event) => {
+        const now = performance.now();
+        if (now - _lastDragOverTime < 35) return;
+        _lastDragOverTime = now;
+
         const ratio = window.devicePixelRatio || 1;
         const x = event.payload.position.x / ratio;
         const y = event.payload.position.y / ratio;
@@ -4246,7 +4239,11 @@ window.clearModelSearch = function() {
   loadModelStatusesGrid();
 };
 
-window.loadModelStatusesGrid = async function(isSilent = false) {
+let _cachedModelStatuses = null;
+let _cachedModelStatusesTime = 0;
+const MODEL_STATUS_CACHE_TTL = 3500;
+
+window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = false) {
   if (!settingsState) {
     try {
       settingsState = await invoke('load_settings');
@@ -4284,7 +4281,13 @@ window.loadModelStatusesGrid = async function(isSilent = false) {
   }
   
   try {
-    const statuses = await invoke('get_all_models_status', { modelsDir: settingsState.modelsDir });
+    const now = Date.now();
+    let statuses = _cachedModelStatuses;
+    if (forceRefresh || !statuses || (now - _cachedModelStatusesTime > MODEL_STATUS_CACHE_TTL)) {
+      statuses = await invoke('get_all_models_status', { modelsDir: settingsState.modelsDir });
+      _cachedModelStatuses = statuses;
+      _cachedModelStatusesTime = now;
+    }
 
     const grid = document.getElementById('models-list-scroll');
     if (!grid) return;
@@ -4479,6 +4482,9 @@ window.downloadModelClick = async function(name) {
   try {
     showNotification(`Downloading ggml-${name}.bin...`, "info");
     
+    // Invalidate model status cache so any tab switch/search filter re-fetches latest downloading status
+    _cachedModelStatuses = null;
+
     // Immediate in-place button swap to Pause
     const card = document.querySelector(`[data-model="${name}"]`);
     if (card) {
@@ -4494,7 +4500,8 @@ window.downloadModelClick = async function(name) {
     });
   } catch (err) {
     showNotification("Failed to start download: " + err, "error");
-    await loadModelStatusesGrid();
+    _cachedModelStatuses = null;
+    await loadModelStatusesGrid(false, true);
   } finally {
     _modelActionsInProgress.delete(name);
   }
@@ -4506,7 +4513,8 @@ window.pauseModelClick = async function(name) {
   try {
     await invoke('pause_download_model', { modelName: name });
     showNotification(`Paused ggml-${name}.bin download`, "info");
-    await loadModelStatusesGrid();
+    _cachedModelStatuses = null;
+    await loadModelStatusesGrid(false, true);
   } catch (err) {
     showNotification("Failed to pause download: " + err, "error");
   } finally {
@@ -4528,7 +4536,8 @@ window.deleteModelClick = async function(name) {
       modelName: name
     });
     showNotification(`Deleted ggml-${name}.bin`, "success");
-    await loadModelStatusesGrid();
+    _cachedModelStatuses = null;
+    await loadModelStatusesGrid(false, true);
     // Scan configuration dropdown to sync options
     await scanAndPopulateModels();
   } catch (err) {
