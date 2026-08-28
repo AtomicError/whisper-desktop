@@ -1257,7 +1257,8 @@ const THEME_REGISTRY = {
     toastName: 'Royal Blue (Default)',
     iconSvg: `
       <svg class="theme-btn-icon icon-royal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+        <path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.735H5.81a1 1 0 0 1-.957-.735L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/>
+        <path d="M5 21h14"/>
       </svg>
     `
   },
@@ -1306,18 +1307,22 @@ function applyTheme(themeName) {
     metaTheme.setAttribute('content', config.metaColor);
   }
 
-  // Update sidebar theme toggle button if present
-  const sidebarThemeBtn = document.getElementById('sidebar-theme-btn');
-  const sidebarThemeLabel = document.getElementById('theme-btn-label');
-  const sidebarThemeIconWrapper = document.getElementById('theme-btn-icon-wrapper');
-  if (sidebarThemeBtn) {
-    sidebarThemeBtn.setAttribute('title', `Active Theme: ${config.label} (Click to switch)`);
-  }
-  if (sidebarThemeLabel) {
-    sidebarThemeLabel.textContent = config.label;
-  }
-  if (sidebarThemeIconWrapper) {
-    sidebarThemeIconWrapper.innerHTML = config.iconSvg;
+  // Update segmented theme switcher buttons
+  const isFire = (config.id === 'fire-orange' || config.id === 'fire');
+  const royalBtn = document.getElementById('theme-seg-royal');
+  const fireBtn = document.getElementById('theme-seg-fire');
+  if (royalBtn && fireBtn) {
+    if (isFire) {
+      royalBtn.classList.remove('active');
+      royalBtn.setAttribute('aria-checked', 'false');
+      fireBtn.classList.add('active');
+      fireBtn.setAttribute('aria-checked', 'true');
+    } else {
+      fireBtn.classList.remove('active');
+      fireBtn.setAttribute('aria-checked', 'false');
+      royalBtn.classList.add('active');
+      royalBtn.setAttribute('aria-checked', 'true');
+    }
   }
 
   if (window.syncCustomSelects) {
@@ -1327,11 +1332,17 @@ function applyTheme(themeName) {
 
 window.toggleTheme = function() {
   const currentThemeAttr = document.documentElement.getAttribute('data-theme') || 'royal-blue';
-  const availableThemeKeys = Object.keys(THEME_REGISTRY);
-  const currentIndex = availableThemeKeys.indexOf(currentThemeAttr === 'royal-blue' ? 'royal-blue' : currentThemeAttr);
-  const nextIndex = (currentIndex + 1) % availableThemeKeys.length;
-  const nextTheme = availableThemeKeys[nextIndex >= 0 ? nextIndex : 0];
+  const nextTheme = (currentThemeAttr === 'fire-orange' || currentThemeAttr === 'fire') ? 'royal-blue' : 'fire-orange';
   window.switchTheme(nextTheme);
+};
+
+window.handleThemeSegmentClick = function(targetTheme) {
+  const sidebar = document.querySelector('sidebar');
+  if (sidebar && sidebar.classList.contains('sidebar-collapsed')) {
+    window.toggleTheme();
+  } else {
+    window.switchTheme(targetTheme);
+  }
 };
 
 window.switchTheme = function(themeName, animated = true) {
@@ -1345,19 +1356,13 @@ window.switchTheme = function(themeName, animated = true) {
   const shouldAnimate = animated &&
     !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  if (shouldAnimate && typeof document.startViewTransition === 'function') {
-    document.startViewTransition(() => {
-      applyTheme(config.id);
-    });
-  } else if (shouldAnimate) {
+  if (shouldAnimate) {
     const root = document.documentElement;
     root.classList.add('theme-transitioning');
-    requestAnimationFrame(() => {
-      applyTheme(config.id);
-      setTimeout(() => {
-        root.classList.remove('theme-transitioning');
-      }, 280);
-    });
+    applyTheme(config.id);
+    setTimeout(() => {
+      root.classList.remove('theme-transitioning');
+    }, 280);
   } else {
     applyTheme(config.id);
   }

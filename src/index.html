@@ -13,14 +13,14 @@
             const meta = document.querySelector('meta[name="theme-color"]');
             if (meta) meta.setAttribute('content', '#0c0a09');
             document.addEventListener('DOMContentLoaded', function() {
-              const label = document.getElementById('theme-btn-label');
-              if (label) label.textContent = 'Fiery Orange';
-              const iconWrapper = document.getElementById('theme-btn-icon-wrapper');
-              if (iconWrapper) {
-                iconWrapper.innerHTML = '<svg class="theme-btn-icon icon-fire" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>';
+              const royalBtn = document.getElementById('theme-seg-royal');
+              const fireBtn = document.getElementById('theme-seg-fire');
+              if (royalBtn && fireBtn) {
+                royalBtn.classList.remove('active');
+                royalBtn.setAttribute('aria-checked', 'false');
+                fireBtn.classList.add('active');
+                fireBtn.setAttribute('aria-checked', 'true');
               }
-              const btn = document.getElementById('sidebar-theme-btn');
-              if (btn) btn.setAttribute('title', 'Active Theme: Fiery Orange (Click to switch)');
             });
           }
           const cachedZoom = localStorage.getItem('whisper_ui_scale_cache');
@@ -140,14 +140,22 @@
         </nav>
         
         <div class="sidebar-theme-wrapper">
-          <button class="sidebar-theme-btn" id="sidebar-theme-btn" type="button" onclick="toggleTheme()" title="Toggle Color Theme (Royal Blue / Fiery Orange)" aria-label="Toggle Color Theme">
-            <div class="theme-btn-icon-wrapper" id="theme-btn-icon-wrapper">
-              <svg class="theme-btn-icon icon-royal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+          <div class="theme-segmented-switch" id="sidebar-theme-segmented" role="radiogroup" aria-label="Color Theme Switcher">
+            <div class="theme-segment-indicator" aria-hidden="true"></div>
+            <button class="theme-segment-btn active" id="theme-seg-royal" type="button" role="radio" aria-checked="true" onclick="handleThemeSegmentClick('royal-blue')" title="Royal Blue Theme">
+              <svg class="theme-seg-icon icon-royal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.735H5.81a1 1 0 0 1-.957-.735L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/>
+                <path d="M5 21h14"/>
               </svg>
-            </div>
-            <span class="theme-btn-label" id="theme-btn-label">Royal Blue</span>
-          </button>
+              <span class="theme-seg-label">Royal</span>
+            </button>
+            <button class="theme-segment-btn" id="theme-seg-fire" type="button" role="radio" aria-checked="false" onclick="handleThemeSegmentClick('fire-orange')" title="Fiery Orange Theme">
+              <svg class="theme-seg-icon icon-fire" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>
+              </svg>
+              <span class="theme-seg-label">Fire</span>
+            </button>
+          </div>
         </div>
 
         <div class="developer-credit" onclick="openUrl('https://github.com/AtomicError/whisper-desktop')" title="Developed by TheMrAhmad (GitHub)">
