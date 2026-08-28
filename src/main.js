@@ -40,6 +40,28 @@ window.showNotification = function(message, type = 'info', customDuration = null
     document.body.appendChild(container);
   }
   
+  // Extended durations: 10s for errors, 6s for info/success
+  let defaultDuration = 6000;
+  if (type === 'error') {
+    defaultDuration = 10000;
+  }
+  const duration = (customDuration !== null) ? customDuration : defaultDuration;
+
+  // Smart Deduplication: if an active toast with the identical message is already visible, refresh its lifetime and progress bar
+  const existingToasts = container.querySelectorAll('.toast-notification');
+  for (const existing of existingToasts) {
+    const msgEl = existing.querySelector('.toast-message');
+    if (msgEl && msgEl.textContent.trim() === String(message).trim() && !existing.classList.contains('hide')) {
+      existing.style.animation = 'none';
+      void existing.offsetWidth; // trigger reflow
+      existing.style.animation = '';
+      if (typeof existing._restartTimer === 'function') {
+        existing._restartTimer(duration);
+      }
+      return;
+    }
+  }
+
   const toast = document.createElement('div');
   toast.className = `toast-notification toast-${type}`;
   
@@ -54,13 +76,6 @@ window.showNotification = function(message, type = 'info', customDuration = null
   }
   
   const closeSvg = `<svg class="toast-close-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
-
-  // Extended durations: 10s for errors, 6s for info/success
-  let defaultDuration = 6000;
-  if (type === 'error') {
-    defaultDuration = 10000;
-  }
-  const duration = (customDuration !== null) ? customDuration : defaultDuration;
 
   toast.innerHTML = `
     ${iconSvg}
@@ -96,11 +111,18 @@ window.showNotification = function(message, type = 'info', customDuration = null
     }, 400);
   };
   
-  const startTimer = () => {
-    if (duration <= 0 || duration === Infinity) return;
+  const startTimer = (dur = remainingTime) => {
+    if (dur <= 0 || dur === Infinity) return;
     startTime = Date.now();
+    remainingTime = dur;
+    isPaused = false;
+    progressBar.style.transition = 'none';
+    progressBar.style.width = '100%';
+    void progressBar.offsetWidth; // trigger reflow
+    progressBar.style.transition = `width ${dur}ms linear`;
     progressBar.style.width = '0%';
-    timerId = setTimeout(closeToast, remainingTime);
+    if (timerId) clearTimeout(timerId);
+    timerId = setTimeout(closeToast, dur);
   };
   
   const pauseTimer = () => {
@@ -125,6 +147,10 @@ window.showNotification = function(message, type = 'info', customDuration = null
     } else {
       closeToast();
     }
+  };
+
+  toast._restartTimer = (newDuration) => {
+    startTimer(newDuration);
   };
 
   toast.addEventListener('mouseenter', pauseTimer);
@@ -286,11 +312,11 @@ const invoke = async function(cmd, args = {}) {
       beamSize: 5,
       audioCtx: 0,
       wordThold: 0.01,
-      entropyThold: 2.40,
-      logprobThold: -1.00,
-      noSpeechThold: 0.60,
-      temperature: 0.00,
-      temperatureInc: 0.20,
+      entropyThold: 2.4,
+      logprobThold: -1.0,
+      noSpeechThold: 0.6,
+      temperature: 0.0,
+      temperatureInc: 0.2,
       debugMode: false,
       translate: false,
       diarize: false,
@@ -1373,6 +1399,9 @@ async function initApp() {
   // Initialize Custom Select components
   initializeCustomSelects();
   
+  // Initialize Number Stepper Controls for keyboard and wheel input
+  setupNumberInputControls();
+  
   // Setup Tauri Listeners
   setupTauriListeners();
   
@@ -1386,6 +1415,7 @@ async function initApp() {
   
   // Initial load
   await refreshSettings();
+  setupNumberInputControls();
   // Load existing logs
   try {
     const logs = await invoke('get_logs');
@@ -1979,17 +2009,16 @@ function bindSettingsToDOM() {
         el.value = settingsState[key];
         el.onchange = () => {
           let val = el.value;
-          if (el.type === 'number') {
+          if (INT_SETTING_KEYS.has(key)) {
+            val = parseInt(el.value);
+            if (isNaN(val)) val = 0;
+            if (key === 'bestOf' || key === 'beamSize') {
+              val = Math.max(1, Math.min(8, val));
+              el.value = val;
+            }
+          } else if (FLOAT_SETTING_KEYS.has(key)) {
             val = parseFloat(el.value);
-            if ((key === 'bestOf' || key === 'beamSize') && val > 8) {
-              val = 8;
-              el.value = 8;
-              showNotification("Whisper limits decoding decoders to a maximum of 8 to prevent allocation crashes.", "info");
-            }
-            if ((key === 'bestOf' || key === 'beamSize') && val < 1) {
-              val = 1;
-              el.value = 1;
-            }
+            if (isNaN(val)) val = 0.0;
           }
           if (key === 'uiScale') {
             const numVal = parseFloat(val) || 1.0;
@@ -2002,7 +2031,7 @@ function bindSettingsToDOM() {
           }
 
           settingsState[key] = val;
-          saveCurrentSettings();
+          saveCurrentSettings(true);
           
           if (key === 'selectedBackend') {
             refreshBuildStatuses();
@@ -2042,6 +2071,11 @@ function bindSettingsToDOM() {
   // Sync custom dropdown views
   if (window.syncCustomSelects) {
     window.syncCustomSelects();
+  }
+
+  // Update disabled states on stepper buttons
+  if (typeof updateAllStepperButtons === 'function') {
+    updateAllStepperButtons();
   }
 }
 
@@ -2119,59 +2153,284 @@ async function refreshFFmpegStatus(sourceOverride, userInitiated = false) {
   }
 }
 
-async function saveCurrentSettings() {
+const INT_SETTING_KEYS = new Set([
+  'threads', 'processors', 'offsetT', 'duration', 'maxContext', 'maxLen',
+  'bestOf', 'beamSize', 'audioCtx', 'deviceId', 'vadMinSpeech', 'vadMinSil', 'vadSpeechPad'
+]);
+
+const FLOAT_SETTING_KEYS = new Set([
+  'wordThold', 'entropyThold', 'logprobThold', 'noSpeechThold',
+  'temperature', 'temperatureInc', 'vadThold', 'vadMaxSpeech', 'vadOverlap', 'uiScale'
+]);
+
+function sanitizeSettingsPayload(state) {
+  if (!state) return state;
+  const clean = { ...state };
+  for (const key of Object.keys(clean)) {
+    if (INT_SETTING_KEYS.has(key)) {
+      const parsed = parseInt(clean[key]);
+      clean[key] = isNaN(parsed) ? 0 : parsed;
+    } else if (FLOAT_SETTING_KEYS.has(key)) {
+      const parsed = parseFloat(clean[key]);
+      clean[key] = isNaN(parsed) ? 0.0 : parsed;
+    }
+  }
+  return clean;
+}
+
+let saveSettingsDebounceTimer = null;
+
+async function saveCurrentSettings(immediate = false) {
   if (!settingsState) return;
-  try {
-    await invoke('save_settings', { settings: settingsState });
-    updateTranscribeUIConfigs();
-  } catch (e) {
-    showNotification("Failed to save settings. Check disk space and file permissions.", "error");
+  
+  // Ensure local state numeric values are strictly typed
+  for (const key of Object.keys(settingsState)) {
+    if (INT_SETTING_KEYS.has(key) && typeof settingsState[key] === 'string') {
+      settingsState[key] = parseInt(settingsState[key]) || 0;
+    } else if (FLOAT_SETTING_KEYS.has(key) && typeof settingsState[key] === 'string') {
+      settingsState[key] = parseFloat(settingsState[key]) || 0.0;
+    }
+  }
+
+  updateTranscribeUIConfigs();
+
+  const doSave = async () => {
+    try {
+      const cleanPayload = sanitizeSettingsPayload(settingsState);
+      await invoke('save_settings', { settings: cleanPayload });
+    } catch (e) {
+      console.error("Failed to save settings:", e);
+      showNotification("Failed to save settings. Check disk space and file permissions.", "error");
+    }
+  };
+
+  if (immediate) {
+    if (saveSettingsDebounceTimer) {
+      clearTimeout(saveSettingsDebounceTimer);
+      saveSettingsDebounceTimer = null;
+    }
+    await doSave();
+  } else {
+    if (saveSettingsDebounceTimer) {
+      clearTimeout(saveSettingsDebounceTimer);
+    }
+    saveSettingsDebounceTimer = setTimeout(doSave, 250);
   }
 }
 
-window.incrementNumber = function(inputId, step) {
+window.addEventListener('beforeunload', () => {
+  if (saveSettingsDebounceTimer && settingsState) {
+    clearTimeout(saveSettingsDebounceTimer);
+    saveSettingsDebounceTimer = null;
+    try {
+      const cleanPayload = sanitizeSettingsPayload(settingsState);
+      invoke('save_settings', { settings: cleanPayload });
+    } catch (_) {}
+  }
+});
+
+window.addEventListener('pagehide', () => {
+  if (saveSettingsDebounceTimer && settingsState) {
+    clearTimeout(saveSettingsDebounceTimer);
+    saveSettingsDebounceTimer = null;
+    try {
+      const cleanPayload = sanitizeSettingsPayload(settingsState);
+      invoke('save_settings', { settings: cleanPayload });
+    } catch (_) {}
+  }
+});
+
+function getStepperBounds(inputId) {
+  let min = -Infinity;
+  let max = Infinity;
+
+  if (inputId === 'opt-threads' || inputId === 'opt-processors') {
+    min = 1;
+  } else if (inputId === 'opt-deviceId' || inputId === 'opt-maxLen') {
+    min = 0;
+  } else if (inputId === 'opt-maxContext') {
+    min = -1;
+  } else if (inputId === 'opt-bestOf' || inputId === 'opt-beamSize') {
+    min = 1;
+    max = 8;
+  }
+  return { min, max };
+}
+
+function updateStepperButtonStates(inputOrId) {
+  const input = typeof inputOrId === 'string' ? document.getElementById(inputOrId) : inputOrId;
+  if (!input) return;
+  const ctrl = input.closest('.number-input-control');
+  if (!ctrl) return;
+
+  const decBtn = ctrl.querySelector('button:first-child');
+  const incBtn = ctrl.querySelector('button:last-child');
+  const val = parseInt(input.value);
+  const { min, max } = getStepperBounds(input.id);
+
+  if (decBtn) {
+    decBtn.disabled = !isNaN(val) && val <= min;
+  }
+  if (incBtn) {
+    incBtn.disabled = !isNaN(val) && val >= max;
+  }
+}
+
+function updateAllStepperButtons() {
+  document.querySelectorAll('.number-input-control input').forEach(input => {
+    updateStepperButtonStates(input);
+  });
+}
+
+function clampNumberSetting(inputId, val) {
+  let num = parseInt(val);
+  if (isNaN(num)) num = 0;
+  
+  const { min, max } = getStepperBounds(inputId);
+  if (num < min) num = min;
+  if (num > max) num = max;
+  return num;
+}
+
+window.incrementNumber = function(inputId, step = 1, immediate = false) {
   const el = document.getElementById(inputId);
   if (el) {
-    let val = parseInt(el.value) || 0;
-    val += step;
-    
-    // Clamp constraints
-    if ((inputId === 'opt-bestOf' || inputId === 'opt-beamSize') && val > 8) {
-      val = 8;
-      showNotification("Whisper limits decoding decoders to a maximum of 8 to prevent allocation crashes.", "info");
-    }
-    
-    el.value = val;
+    let currentVal = parseInt(el.value);
+    if (isNaN(currentVal)) currentVal = 0;
+    const nextVal = clampNumberSetting(inputId, currentVal + step);
+    el.value = nextVal;
+    updateStepperButtonStates(el);
     
     const key = inputId.replace('opt-', '');
     if (settingsState && key in settingsState) {
-      settingsState[key] = val;
-      saveCurrentSettings();
+      settingsState[key] = nextVal;
+      saveCurrentSettings(immediate);
     }
   }
 };
 
-window.decrementNumber = function(inputId, step) {
+window.decrementNumber = function(inputId, step = 1, immediate = false) {
   const el = document.getElementById(inputId);
   if (el) {
-    let val = parseInt(el.value) || 0;
-    val -= step;
-    
-    // Clamp constraints
-    if (inputId === 'opt-threads' && val < 1) val = 1;
-    if (inputId === 'opt-processors' && val < 1) val = 1;
-    if (inputId === 'opt-deviceId' && val < 0) val = 0;
-    if ((inputId === 'opt-bestOf' || inputId === 'opt-beamSize') && val < 1) val = 1;
-    
-    el.value = val;
+    let currentVal = parseInt(el.value);
+    if (isNaN(currentVal)) currentVal = 0;
+    const nextVal = clampNumberSetting(inputId, currentVal - step);
+    el.value = nextVal;
+    updateStepperButtonStates(el);
     
     const key = inputId.replace('opt-', '');
     if (settingsState && key in settingsState) {
-      settingsState[key] = val;
-      saveCurrentSettings();
+      settingsState[key] = nextVal;
+      saveCurrentSettings(immediate);
     }
   }
 };
+
+function setupNumberInputControls() {
+  document.querySelectorAll('.number-input-control').forEach(ctrl => {
+    const input = ctrl.querySelector('input');
+    if (!input || ctrl._stepperInitialized) {
+      if (input) updateStepperButtonStates(input);
+      return;
+    }
+    ctrl._stepperInitialized = true;
+
+    // Detect step from button onclick
+    const incBtn = ctrl.querySelector('button:last-child');
+    let step = 1;
+    if (incBtn) {
+      const match = incBtn.getAttribute('onclick')?.match(/,\s*([0-9.]+)\)/);
+      if (match) step = parseFloat(match[1]) || 1;
+    }
+
+    const commitValue = (immediate = true) => {
+      const clamped = clampNumberSetting(input.id, input.value);
+      input.value = clamped;
+      updateStepperButtonStates(input);
+      const key = input.id.replace('opt-', '');
+      if (settingsState && key in settingsState) {
+        settingsState[key] = clamped;
+        saveCurrentSettings(immediate);
+      }
+    };
+
+    // Keyboard navigation (ArrowUp, ArrowDown, PageUp, PageDown, Enter, Escape)
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        window.incrementNumber(input.id, step, false);
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        window.decrementNumber(input.id, step, false);
+      } else if (e.key === 'PageUp') {
+        e.preventDefault();
+        window.incrementNumber(input.id, step * 5, false);
+      } else if (e.key === 'PageDown') {
+        e.preventDefault();
+        window.decrementNumber(input.id, step * 5, false);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        commitValue(true);
+        input.blur();
+      } else if (e.key === 'Escape') {
+        const key = input.id.replace('opt-', '');
+        if (settingsState && key in settingsState) {
+          input.value = settingsState[key];
+        }
+        updateStepperButtonStates(input);
+        input.blur();
+      }
+    });
+
+    // Auto-select entire text on focus for effortless replacement
+    input.addEventListener('focus', () => {
+      setTimeout(() => input.select(), 10);
+    });
+
+    // Filter non-numeric characters live while typing
+    input.addEventListener('input', () => {
+      let cleaned = input.value.replace(/[^0-9\-]/g, '');
+      if (cleaned.lastIndexOf('-') > 0) {
+        cleaned = cleaned.charAt(0) === '-' ? '-' + cleaned.replace(/\-/g, '') : cleaned.replace(/\-/g, '');
+      }
+      input.value = cleaned;
+      updateStepperButtonStates(input);
+      const key = input.id.replace('opt-', '');
+      if (cleaned !== '' && cleaned !== '-' && settingsState && key in settingsState) {
+        const num = clampNumberSetting(input.id, cleaned);
+        settingsState[key] = num;
+        saveCurrentSettings(false);
+      }
+    });
+
+    // Validate and persist immediately on blur / change
+    input.addEventListener('blur', () => commitValue(true));
+    input.addEventListener('change', () => commitValue(true));
+
+    // Smooth notch-based mouse wheel support (active ONLY when focused to prevent scroll-trapping)
+    ctrl._wheelAccumulator = 0;
+    ctrl.addEventListener('wheel', (e) => {
+      if (document.activeElement !== input) {
+        return; // Allow page to scroll naturally when not focused
+      }
+      e.preventDefault();
+      ctrl._wheelAccumulator = (ctrl._wheelAccumulator || 0) + e.deltaY;
+      const NOTCH_THRESHOLD = 50;
+      if (Math.abs(ctrl._wheelAccumulator) >= NOTCH_THRESHOLD) {
+        const ticks = Math.trunc(ctrl._wheelAccumulator / NOTCH_THRESHOLD);
+        ctrl._wheelAccumulator -= ticks * NOTCH_THRESHOLD;
+        if (ticks < 0) {
+          window.incrementNumber(input.id, step * Math.abs(ticks), false);
+        } else if (ticks > 0) {
+          window.decrementNumber(input.id, step * ticks, false);
+        }
+      }
+    }, { passive: false });
+
+    // Initial button state
+    updateStepperButtonStates(input);
+  });
+}
 
 async function scanAndPopulateModels() {
   if (!settingsState) return;

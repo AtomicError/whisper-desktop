@@ -25,21 +25,36 @@ pub struct WhisperSettings {
     pub selected_backend: String, // "Standard", "Vulkan", "OpenVINO", "CUDA"
     #[serde(rename = "modelsDir", alias = "cloneDir")]
     pub models_dir: String,
+    #[serde(deserialize_with = "deserialize_i32_lenient")]
     pub threads: i32,
+    #[serde(deserialize_with = "deserialize_i32_lenient")]
     pub processors: i32,
+    #[serde(deserialize_with = "deserialize_i32_lenient")]
     pub offset_t: i32,
+    #[serde(deserialize_with = "deserialize_i32_lenient")]
     pub duration: i32,
+    #[serde(deserialize_with = "deserialize_i32_lenient")]
     pub max_context: i32,
+    #[serde(deserialize_with = "deserialize_i32_lenient")]
     pub max_len: i32,
     pub split_word: bool,
+    #[serde(deserialize_with = "deserialize_i32_lenient")]
     pub best_of: i32,
+    #[serde(deserialize_with = "deserialize_i32_lenient")]
     pub beam_size: i32,
+    #[serde(deserialize_with = "deserialize_i32_lenient")]
     pub audio_ctx: i32,
+    #[serde(deserialize_with = "deserialize_f64_lenient")]
     pub word_thold: f64,
+    #[serde(deserialize_with = "deserialize_f64_lenient")]
     pub entropy_thold: f64,
+    #[serde(deserialize_with = "deserialize_f64_lenient")]
     pub logprob_thold: f64,
+    #[serde(deserialize_with = "deserialize_f64_lenient")]
     pub no_speech_thold: f64,
+    #[serde(deserialize_with = "deserialize_f64_lenient")]
     pub temperature: f64,
+    #[serde(deserialize_with = "deserialize_f64_lenient")]
     pub temperature_inc: f64,
     pub debug_mode: bool,
     pub translate: bool,
@@ -66,14 +81,21 @@ pub struct WhisperSettings {
     pub ov_device: String,
     pub dtw_enabled: bool,
     pub log_score: bool,
+    #[serde(deserialize_with = "deserialize_i32_lenient")]
     pub device_id: i32,
     pub vad: bool,
     pub vad_model: String,
+    #[serde(deserialize_with = "deserialize_f64_lenient")]
     pub vad_thold: f64,
+    #[serde(deserialize_with = "deserialize_i32_lenient")]
     pub vad_min_speech: i32,
+    #[serde(deserialize_with = "deserialize_i32_lenient")]
     pub vad_min_sil: i32,
+    #[serde(deserialize_with = "deserialize_f64_lenient")]
     pub vad_max_speech: f64,
+    #[serde(deserialize_with = "deserialize_i32_lenient")]
     pub vad_speech_pad: i32,
+    #[serde(deserialize_with = "deserialize_f64_lenient")]
     pub vad_overlap: f64,
     pub translate_ai_enabled: bool,
     pub translate_ai_provider: String,
@@ -95,6 +117,31 @@ pub struct WhisperSettings {
     pub close_to_tray: bool,
 }
 
+fn deserialize_i32_lenient<'de, D>(deserializer: D) -> Result<i32, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum IntOrString {
+        Int(i32),
+        Float(f64),
+        String(String),
+    }
+
+    match IntOrString::deserialize(deserializer)? {
+        IntOrString::Int(i) => Ok(i),
+        IntOrString::Float(f) => Ok(f as i32),
+        IntOrString::String(s) => {
+            let trimmed = s.trim();
+            if trimmed.is_empty() {
+                return Ok(0);
+            }
+            trimmed.parse::<i32>().or_else(|_| trimmed.parse::<f64>().map(|f| f as i32)).map_err(serde::de::Error::custom)
+        }
+    }
+}
+
 fn deserialize_f64_lenient<'de, D>(deserializer: D) -> Result<f64, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -108,7 +155,13 @@ where
 
     match FloatOrString::deserialize(deserializer)? {
         FloatOrString::Float(f) => Ok(f),
-        FloatOrString::String(s) => s.trim().parse::<f64>().map_err(serde::de::Error::custom),
+        FloatOrString::String(s) => {
+            let trimmed = s.trim();
+            if trimmed.is_empty() {
+                return Ok(0.0);
+            }
+            trimmed.parse::<f64>().map_err(serde::de::Error::custom)
+        }
     }
 }
 

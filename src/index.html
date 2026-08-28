@@ -201,7 +201,14 @@
                       <div class="setting-label-row">
                         <span class="setting-title">Active Backend</span>
                       </div>
-                      <div class="setting-desc">Choose the computation backend (CPU or GPU acceleration).</div>
+                      <div class="setting-desc">Execution backend for Whisper model inference.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Standard:</strong> Universal CPU-only compatibility</span>
+                          <span class="setting-desc-point">&bull; <strong>Vulkan:</strong> Universal GPU acceleration (AMD / Intel / NVIDIA)</span>
+                          <span class="setting-desc-point">&bull; <strong>CUDA:</strong> Dedicated NVIDIA GPUs</span>
+                          <span class="setting-desc-point">&bull; <strong>OpenVINO:</strong> Intel CPUs &amp; Arc / iGPUs</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
                       <select class="select-control" id="opt-selectedBackend">
@@ -218,7 +225,11 @@
                       <div class="setting-label-row">
                         <span class="setting-title">Models Storage Directory</span>
                       </div>
-                      <div class="setting-desc">The folder where GGML models are stored. Default is ~/whisper.cpp.</div>
+                      <div class="setting-desc">Local disk directory where GGML model files (<code>.bin</code>) are stored and scanned.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>~/whisper.cpp</code></span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control setting-control-path">
                       <div class="readonly-path-field" onclick="browseModelsDirectory()" title="Click to browse models directory">
@@ -237,7 +248,12 @@
                         <span class="setting-title">Model Selection</span>
                         <span class="setting-flag">-m</span>
                       </div>
-                      <div class="setting-desc">The GGML model file to use for transcription (searched inside selected folder).</div>
+                      <div class="setting-desc">Active Whisper GGML speech recognition model.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Fast / Low RAM:</strong> <code>tiny</code>, <code>base</code>, <code>small</code></span>
+                          <span class="setting-desc-point">&bull; <strong>High Accuracy:</strong> <code>medium</code>, <code>large-v3</code></span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
                       <select class="select-control" id="opt-modelPath"></select>
@@ -250,7 +266,12 @@
                         <span class="setting-title">FFmpeg Engine</span>
                         <span id="ffmpeg-status-badge" class="setting-status-pill checking"><span class="ffmpeg-status-dot blue"></span> Checking...</span>
                       </div>
-                      <div class="setting-desc">Choose between the internal standalone FFmpeg (Recommended) or the system installation.</div>
+                      <div class="setting-desc">Audio extractor engine used to decode input media files into 16kHz mono audio.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Internal:</strong> Standalone bundled binary (recommended, zero-config)</span>
+                          <span class="setting-desc-point">&bull; <strong>System:</strong> Uses OS-installed FFmpeg binary</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
                       <select class="select-control" id="opt-ffmpegSource">
@@ -265,7 +286,11 @@
                       <div class="setting-label-row">
                         <span class="setting-title">Minimize to System Tray on Close</span>
                       </div>
-                      <div class="setting-desc">Keep Whisper Desktop running in the background system tray when the window is closed.</div>
+                      <div class="setting-desc">Keeps Whisper Desktop active in the background system tray when the main window is closed.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Default:</strong> Disabled (exits on window close)</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
                       <label class="switch">
@@ -281,10 +306,15 @@
                         <span class="setting-title">UI Scale & Zoom</span>
                         <span id="ui-scale-badge" class="setting-status-pill checking">100%</span>
                       </div>
-                      <div class="setting-desc">Adjust the application interface scaling. Shortcuts: <kbd class="kbd-shortcut">Ctrl</kbd>+<kbd class="kbd-shortcut">+</kbd> (Zoom In) &middot; <kbd class="kbd-shortcut">Ctrl</kbd>+<kbd class="kbd-shortcut">&minus;</kbd> (Zoom Out) &middot; <kbd class="kbd-shortcut">Ctrl</kbd>+<kbd class="kbd-shortcut">0</kbd> (Reset).</div>
+                      <div class="setting-desc">Adjust the interface scaling to fit high-DPI displays.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Shortcuts:</strong> <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">+</kbd> (In) &middot; <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">&minus;</kbd> (Out) &middot; <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">0</kbd> (Reset)</span>
+                          <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>100%</code></span>
+                        </div>
+                      </div>
                     </div>
-                    <div class="setting-control" style="display:flex; align-items:center; gap:8px;">
-                      <button class="btn-secondary" type="button" onclick="adjustUiZoom(-0.05)" title="Zoom Out (Ctrl+-)" aria-label="Zoom Out (Ctrl+-)" style="padding:6px 12px; font-weight:bold; font-size:1.1rem; line-height:1;">−</button>
+                    <div class="setting-control ui-scale-control-group">
+                      <button class="btn-secondary ui-scale-btn ui-scale-btn-icon" type="button" onclick="adjustUiZoom(-0.05)" title="Zoom Out (Ctrl+-)" aria-label="Zoom Out (Ctrl+-)">−</button>
                       <select class="select-control" id="opt-uiScale" style="min-width:155px; width:155px;" onchange="setUiZoom(parseFloat(this.value))" aria-label="Select UI Scale">
                         <option value="0.7">70%</option>
                         <option value="0.75">75%</option>
@@ -306,8 +336,8 @@
                         <option value="1.55">155%</option>
                         <option value="1.6">160%</option>
                       </select>
-                      <button class="btn-secondary" type="button" onclick="adjustUiZoom(0.05)" title="Zoom In (Ctrl++)" aria-label="Zoom In (Ctrl++)" style="padding:6px 12px; font-weight:bold; font-size:1.1rem; line-height:1;">+</button>
-                      <button class="btn-secondary" type="button" onclick="setUiZoom(1.0)" title="Reset to 100% (Ctrl+0)" aria-label="Reset UI Scale to 100% (Ctrl+0)" style="padding:6px 12px;">Reset</button>
+                      <button class="btn-secondary ui-scale-btn ui-scale-btn-icon" type="button" onclick="adjustUiZoom(0.05)" title="Zoom In (Ctrl++)" aria-label="Zoom In (Ctrl++)">+</button>
+                      <button class="btn-secondary ui-scale-btn ui-scale-btn-text" type="button" onclick="setUiZoom(1.0)" title="Reset to 100% (Ctrl+0)" aria-label="Reset UI Scale to 100% (Ctrl+0)">Reset</button>
                     </div>
                   </div>
 
@@ -317,7 +347,12 @@
                         <span class="setting-title">Language Spoken</span>
                         <span class="setting-flag">-l</span>
                       </div>
-                      <div class="setting-desc">Spoken language in the audio. Set "auto" to automatically detect language.</div>
+                      <div class="setting-desc">Primary spoken language code in the audio (e.g. <code>fa</code>, <code>en</code>, <code>es</code>).
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>auto</code> (automatic detection)</span>
+                          <span class="setting-desc-point">&bull; <strong>Tip:</strong> Explicitly setting the language skips detection and speeds up transcription.</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
                       <input class="text-input" type="text" id="opt-language" />
@@ -330,7 +365,12 @@
                         <span class="setting-title">Initial Prompt</span>
                         <span class="setting-flag">--prompt</span>
                       </div>
-                      <div class="setting-desc">Initial prompt text to guide the model's vocabulary and spelling style.</div>
+                      <div class="setting-desc">Contextual prompt to guide model spelling, domain terms, and acronyms.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Examples:</strong> <em>"Dr. John, COVID-19, PyTorch, iPhone 16"</em></span>
+                          <span class="setting-desc-point">&bull; <strong>Tip:</strong> Also steers punctuation and capitalization preferences.</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
                       <input class="text-input" type="text" id="opt-prompt" />
@@ -343,7 +383,11 @@
                         <span class="setting-title">Carry Initial Prompt</span>
                         <span class="setting-flag">--carry-initial-prompt</span>
                       </div>
-                      <div class="setting-desc">Always prepend the initial prompt to all contexts.</div>
+                      <div class="setting-desc">Maintains the initial prompt across all 30-second audio chunks instead of only the first chunk.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Recommended:</strong> Enabled for long audio with recurring names or technical terms.</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
                       <label class="switch">
@@ -353,15 +397,17 @@
                     </div>
                   </div>
 
-
-
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title">Translate to English</span>
                         <span class="setting-flag">-tr</span>
                       </div>
-                      <div class="setting-desc">Translate transcribed audio from its source language to English in real-time.</div>
+                      <div class="setting-desc">Directly translates non-English speech into English text output during transcription without requiring an external translation service.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Output:</strong> English transcripts &amp; subtitles directly from foreign speech.</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
                       <label class="switch">
@@ -377,7 +423,12 @@
                         <span class="setting-title">DTW Timestamps</span>
                         <span class="setting-flag">--dtw</span>
                       </div>
-                      <div class="setting-desc">Enable token-level timestamps via Dynamic Time Warping. Automatically matches the DTW model to your selected model. Disables Flash Attention.</div>
+                      <div class="setting-desc">Enables exact word-level timestamp alignment using Dynamic Time Warping (DTW).
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Use case:</strong> Millimeter subtitle sync for karaoke and precise video captioning.</span>
+                          <span class="setting-desc-point">&bull; <strong>Note:</strong> Automatically disables Flash Attention.</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
                       <label class="switch">
@@ -395,13 +446,18 @@
                         <span class="setting-title">Threads Count</span>
                         <span class="setting-flag">-t</span>
                       </div>
-                      <div class="setting-desc">Number of processor threads to allocate for standard decoding.</div>
+                      <div class="setting-desc">Number of CPU worker threads allocated for decoding.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>4</code></span>
+                          <span class="setting-desc-point">&bull; <strong>Recommended:</strong> Match your physical core count (e.g. <code>4–8</code>) for maximum speed.</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
                       <div class="number-input-control">
-                        <button onclick="decrementNumber('opt-threads', 1)">-</button>
-                        <input type="text" id="opt-threads" value="4" readonly />
-                        <button onclick="incrementNumber('opt-threads', 1)">+</button>
+                        <button onclick="decrementNumber('opt-threads', 1)" type="button" aria-label="Decrease Threads">-</button>
+                        <input type="text" id="opt-threads" value="4" inputmode="numeric" autocomplete="off" aria-label="Threads Count" />
+                        <button onclick="incrementNumber('opt-threads', 1)" type="button" aria-label="Increase Threads">+</button>
                       </div>
                     </div>
                   </div>
@@ -412,13 +468,18 @@
                         <span class="setting-title">Processors Count</span>
                         <span class="setting-flag">-p</span>
                       </div>
-                      <div class="setting-desc">Number of parallel processors to use (useful for multi-stream transcription).</div>
+                      <div class="setting-desc">Number of parallel audio decoder instances.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>1</code> (standard single-file mode)</span>
+                          <span class="setting-desc-point">&bull; <strong>Recommended:</strong> Increase (<code>2–4</code>) only when batch-transcribing multiple files.</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
                       <div class="number-input-control">
-                        <button onclick="decrementNumber('opt-processors', 1)">-</button>
-                        <input type="text" id="opt-processors" value="1" readonly />
-                        <button onclick="incrementNumber('opt-processors', 1)">+</button>
+                        <button onclick="decrementNumber('opt-processors', 1)" type="button" aria-label="Decrease Processors">-</button>
+                        <input type="text" id="opt-processors" value="1" inputmode="numeric" autocomplete="off" aria-label="Processors Count" />
+                        <button onclick="incrementNumber('opt-processors', 1)" type="button" aria-label="Increase Processors">+</button>
                       </div>
                     </div>
                   </div>
@@ -429,13 +490,18 @@
                         <span class="setting-title">Max Token Context</span>
                         <span class="setting-flag">-mc</span>
                       </div>
-                      <div class="setting-desc">Maximum context size in tokens. Set -1 to auto-manage contexts.</div>
+                      <div class="setting-desc">Maximum preceding token history passed to the decoder.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>-1</code> (automatic context window)</span>
+                          <span class="setting-desc-point">&bull; <strong>When to change:</strong> Lower to <code>64–128</code> if the model loops or repeats the same sentence.</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
                       <div class="number-input-control">
-                        <button onclick="decrementNumber('opt-maxContext', 1)">-</button>
-                        <input type="text" id="opt-maxContext" value="-1" readonly />
-                        <button onclick="incrementNumber('opt-maxContext', 1)">+</button>
+                        <button onclick="decrementNumber('opt-maxContext', 1)" type="button" aria-label="Decrease Max Context">-</button>
+                        <input type="text" id="opt-maxContext" value="-1" inputmode="numeric" autocomplete="off" aria-label="Max Token Context" />
+                        <button onclick="incrementNumber('opt-maxContext', 1)" type="button" aria-label="Increase Max Context">+</button>
                       </div>
                     </div>
                   </div>
@@ -446,13 +512,18 @@
                         <span class="setting-title">Max Segment Length</span>
                         <span class="setting-flag">-ml</span>
                       </div>
-                      <div class="setting-desc">Maximum segment length in characters (0 for unlimited).</div>
+                      <div class="setting-desc">Maximum character count allowed per subtitle line.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>0</code> (unlimited natural sentence pauses)</span>
+                          <span class="setting-desc-point">&bull; <strong>Recommended for Video / Reels:</strong> <code>35–45</code> characters for readable subtitles.</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
                       <div class="number-input-control">
-                        <button onclick="decrementNumber('opt-maxLen', 5)">-</button>
-                        <input type="text" id="opt-maxLen" value="0" readonly />
-                        <button onclick="incrementNumber('opt-maxLen', 5)">+</button>
+                        <button onclick="decrementNumber('opt-maxLen', 5)" type="button" aria-label="Decrease Max Length">-</button>
+                        <input type="text" id="opt-maxLen" value="0" inputmode="numeric" autocomplete="off" aria-label="Max Segment Length" />
+                        <button onclick="incrementNumber('opt-maxLen', 5)" type="button" aria-label="Increase Max Length">+</button>
                       </div>
                     </div>
                   </div>
@@ -463,14 +534,17 @@
                         <span class="setting-title">Time Offset (ms)</span>
                         <span class="setting-flag">-ot</span>
                       </div>
-                      <div class="setting-desc">Process audio from this timestamp offset in milliseconds.</div>
+                      <div class="setting-desc">Skip audio from the beginning up to this timestamp in milliseconds.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>0</code> ms</span>
+                          <span class="setting-desc-point">&bull; <strong>Example:</strong> Set to <code>30000</code> to skip a 30-second intro or podcast sponsor.</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" style="width:100px; text-align:center;" type="number" id="opt-offsetT" />
+                      <input class="text-input" type="number" id="opt-offsetT" />
                     </div>
                   </div>
-
-
 
                   <div class="setting-card">
                     <div class="setting-info">
@@ -478,10 +552,15 @@
                         <span class="setting-title">Process Duration (ms)</span>
                         <span class="setting-flag">-d</span>
                       </div>
-                      <div class="setting-desc">Limit audio duration to process in milliseconds (0 for entire file).</div>
+                      <div class="setting-desc">Process only a slice of audio in milliseconds starting from offset.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>0</code> ms (processes full file)</span>
+                          <span class="setting-desc-point">&bull; <strong>Example:</strong> Set to <code>60000</code> to quickly preview a 1-minute clip.</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" style="width:100px; text-align:center;" type="number" id="opt-duration" />
+                      <input class="text-input" type="number" id="opt-duration" />
                     </div>
                   </div>
 
@@ -491,7 +570,11 @@
                         <span class="setting-title">Split on Word</span>
                         <span class="setting-flag">-sow</span>
                       </div>
-                      <div class="setting-desc">Force split segments strictly on word boundaries rather than token bounds.</div>
+                      <div class="setting-desc">Forces subtitle line breaks strictly between full words rather than splitting in the middle of words.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Recommended:</strong> Enabled for clean, professional subtitles.</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
                       <label class="switch">
@@ -507,7 +590,12 @@
                         <span class="setting-title">Speaker Diarization</span>
                         <span class="setting-flag">-di</span>
                       </div>
-                      <div class="setting-desc">Enable speaker diarization for stereo audio — distinguish who spoke when.</div>
+                      <div class="setting-desc">Separates and labels speakers across stereo audio channels (Left vs Right channel).
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Output tags:</strong> <code>[SPEAKER 0]</code> and <code>[SPEAKER 1]</code></span>
+                          <span class="setting-desc-point">&bull; <strong>Requirement:</strong> Requires 2-channel stereo audio.</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
                       <label class="switch">
@@ -523,7 +611,11 @@
                         <span class="setting-title">Tiny Diarization</span>
                         <span class="setting-flag">-tdrz</span>
                       </div>
-                      <div class="setting-desc">Lightweight on-device speaker change detection (requires a tdrz model).</div>
+                      <div class="setting-desc">Detects speaker turn transitions within a single mono channel using specialized models.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Requirement:</strong> Requires <code>tdrz</code>-enabled models (e.g. <code>small.en-tdrz</code>).</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
                       <label class="switch">
@@ -541,13 +633,18 @@
                         <span class="setting-title">Best Candidates Count</span>
                         <span class="setting-flag">-bo</span>
                       </div>
-                      <div class="setting-desc">Number of best candidates to maintain during standard greedy sampling.</div>
+                      <div class="setting-desc">Number of candidate sequences sampled during decoding.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>5</code></span>
+                          <span class="setting-desc-point">&bull; <strong>Recommendation:</strong> Higher (<code>6–8</code>) boosts accuracy; lower (<code>1–2</code>) runs faster.</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
                       <div class="number-input-control">
-                        <button onclick="decrementNumber('opt-bestOf', 1)">-</button>
-                        <input type="text" id="opt-bestOf" value="5" readonly />
-                        <button onclick="incrementNumber('opt-bestOf', 1)">+</button>
+                        <button onclick="decrementNumber('opt-bestOf', 1)" type="button" aria-label="Decrease Best Candidates">-</button>
+                        <input type="text" id="opt-bestOf" value="5" inputmode="numeric" autocomplete="off" aria-label="Best Candidates Count" />
+                        <button onclick="incrementNumber('opt-bestOf', 1)" type="button" aria-label="Increase Best Candidates">+</button>
                       </div>
                     </div>
                   </div>
@@ -558,13 +655,18 @@
                         <span class="setting-title">Beam Search Size</span>
                         <span class="setting-flag">-bs</span>
                       </div>
-                      <div class="setting-desc">Beam size used for Beam Search decoding (increases accuracy at speed cost).</div>
+                      <div class="setting-desc">Exploration beam width for finding optimal word sequences.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>5</code></span>
+                          <span class="setting-desc-point">&bull; <strong>Trade-off:</strong> Higher values reduce word errors and hallucinations, but increase transcription time.</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
                       <div class="number-input-control">
-                        <button onclick="decrementNumber('opt-beamSize', 1)">-</button>
-                        <input type="text" id="opt-beamSize" value="5" readonly />
-                        <button onclick="incrementNumber('opt-beamSize', 1)">+</button>
+                        <button onclick="decrementNumber('opt-beamSize', 1)" type="button" aria-label="Decrease Beam Size">-</button>
+                        <input type="text" id="opt-beamSize" value="5" inputmode="numeric" autocomplete="off" aria-label="Beam Search Size" />
+                        <button onclick="incrementNumber('opt-beamSize', 1)" type="button" aria-label="Increase Beam Size">+</button>
                       </div>
                     </div>
                   </div>
@@ -575,10 +677,15 @@
                         <span class="setting-title">Audio Context Size</span>
                         <span class="setting-flag">-ac</span>
                       </div>
-                      <div class="setting-desc">Override audio context size (0 to use defaults).</div>
+                      <div class="setting-desc">Audio frame context length in samples.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>0</code> (uses model default 30-second context window)</span>
+                          <span class="setting-desc-point">&bull; <strong>Advanced:</strong> Restricts attention window for custom streaming workflows.</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" style="width:100px; text-align:center;" type="number" id="opt-audioCtx" />
+                      <input class="text-input" type="number" id="opt-audioCtx" />
                     </div>
                   </div>
 
@@ -588,10 +695,15 @@
                         <span class="setting-title">Word Timestamp Threshold</span>
                         <span class="setting-flag">-wt</span>
                       </div>
-                      <div class="setting-desc">Word timestamp probability threshold.</div>
+                      <div class="setting-desc">Acoustic probability cutoff for locking individual word timestamps.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>0.01</code></span>
+                          <span class="setting-desc-point">&bull; <strong>When to change:</strong> Increase (<code>0.05–0.1</code>) if word timings drift during silent parts.</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" style="width:100px; text-align:center;" type="number" step="0.01" id="opt-wordThold" />
+                      <input class="text-input" type="number" step="0.01" id="opt-wordThold" />
                     </div>
                   </div>
 
@@ -601,10 +713,15 @@
                         <span class="setting-title">Entropy Threshold</span>
                         <span class="setting-flag">-et</span>
                       </div>
-                      <div class="setting-desc">Entropy threshold for automatic temperature fallback.</div>
+                      <div class="setting-desc">Decoder uncertainty cutoff for triggering temperature fallback retry.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>2.4</code></span>
+                          <span class="setting-desc-point">&bull; <strong>When to change:</strong> Lower to <code>2.2</code> if model produces repetitive gibberish.</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" style="width:100px; text-align:center;" type="number" step="0.1" id="opt-entropyThold" />
+                      <input class="text-input" type="number" step="0.1" id="opt-entropyThold" />
                     </div>
                   </div>
 
@@ -614,10 +731,15 @@
                         <span class="setting-title">Log Probability Threshold</span>
                         <span class="setting-flag">-lpt</span>
                       </div>
-                      <div class="setting-desc">Average log probability threshold for fallback logic.</div>
+                      <div class="setting-desc">Average token confidence threshold before fallback decoding is triggered.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>-1</code></span>
+                          <span class="setting-desc-point">&bull; <strong>When to change:</strong> Lower to <code>-1.5</code> for noisy or accented speech to prevent unnecessary retries.</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" style="width:100px; text-align:center;" type="number" step="0.1" id="opt-logprobThold" />
+                      <input class="text-input" type="number" step="0.1" id="opt-logprobThold" />
                     </div>
                   </div>
 
@@ -627,10 +749,15 @@
                         <span class="setting-title">No Speech Threshold</span>
                         <span class="setting-flag">-nth</span>
                       </div>
-                      <div class="setting-desc">Threshold to identify and ignore silent chunks automatically.</div>
+                      <div class="setting-desc">Silence detection probability cutoff to suppress hallucinated words.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>0.6</code></span>
+                          <span class="setting-desc-point">&bull; <strong>When to change:</strong> Increase to <code>0.7–0.8</code> if Whisper hallucinates words during music or background noise.</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" style="width:100px; text-align:center;" type="number" step="0.05" id="opt-noSpeechThold" />
+                      <input class="text-input" type="number" step="0.05" id="opt-noSpeechThold" />
                     </div>
                   </div>
 
@@ -640,10 +767,15 @@
                         <span class="setting-title">Sampling Temperature</span>
                         <span class="setting-flag">-tp</span>
                       </div>
-                      <div class="setting-desc">Initial decoding temperature (lower values are highly deterministic).</div>
+                      <div class="setting-desc">Controls decoding randomness and exploration.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>0</code> (deterministic greedy decoding &mdash; highest precision)</span>
+                          <span class="setting-desc-point">&bull; <strong>When to change:</strong> Set to <code>0.2–0.4</code> only if the model gets stuck in repetition loops.</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" style="width:100px; text-align:center;" type="number" step="0.05" id="opt-temperature" />
+                      <input class="text-input" type="number" step="0.05" id="opt-temperature" />
                     </div>
                   </div>
 
@@ -653,10 +785,15 @@
                         <span class="setting-title">Temperature Increment</span>
                         <span class="setting-flag">-tpi</span>
                       </div>
-                      <div class="setting-desc">Temperature increment step value on fallback runs.</div>
+                      <div class="setting-desc">Step size to increase temperature on each fallback retry.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>0.2</code></span>
+                          <span class="setting-desc-point">&bull; <strong>Retry sequence:</strong> Automatically retries at <code>0.2</code>, <code>0.4</code>, <code>0.6</code>, up to <code>1.0</code>.</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" style="width:100px; text-align:center;" type="number" step="0.05" id="opt-temperatureInc" />
+                      <input class="text-input" type="number" step="0.05" id="opt-temperatureInc" />
                     </div>
                   </div>
 
@@ -667,7 +804,12 @@
                         <span class="setting-title">Disable Temperature Fallback</span>
                         <span class="setting-flag">-nf</span>
                       </div>
-                      <div class="setting-desc">Prevent automatic temperature fallback during decoding (forces initial temperature).</div>
+                      <div class="setting-desc">Skips retry passes with higher temperatures and accepts the first greedy pass.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Benefit:</strong> 30–50% faster processing on difficult or noisy files.</span>
+                          <span class="setting-desc-point">&bull; <strong>Trade-off:</strong> Skips error recovery if speech is unclear.</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
                       <label class="switch">
@@ -683,7 +825,11 @@
                         <span class="setting-title">Log Decoder Scores</span>
                         <span class="setting-flag">-ls</span>
                       </div>
-                      <div class="setting-desc">Log best decoder scores for each token to assist with debugging and analysis.</div>
+                      <div class="setting-desc">Prints raw confidence and probability scores for each decoded token into the activity log stream.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Use case:</strong> Debugging model confidence, timestamp boundaries, and acoustic quality.</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
                       <label class="switch">
@@ -807,7 +953,12 @@
                       <div class="setting-label-row">
                         <span class="setting-title">Output Directory Mode</span>
                       </div>
-                      <div class="setting-desc">Choose where transcribed subtitle and text files are saved on your computer.</div>
+                      <div class="setting-desc">Destination folder strategy for generated subtitles, transcripts, and export files.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Same as Input:</strong> Saves output files right next to original media file</span>
+                          <span class="setting-desc-point">&bull; <strong>Custom Directory:</strong> Centralizes all outputs into a single designated folder</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control" style="width:300px;">
                       <div class="select-wrapper" style="width:100%;">
@@ -824,7 +975,11 @@
                       <div class="setting-label-row">
                         <span class="setting-title">Custom Output Path</span>
                       </div>
-                      <div class="setting-desc">Specify a dedicated folder on your disk where all transcriptions will be saved.</div>
+                      <div class="setting-desc">Dedicated folder path on disk where all transcripts and subtitles are saved.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Active when:</strong> Mode is set to <em>Custom Directory</em></span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control setting-control-path">
                       <div class="readonly-path-field" onclick="browseOutputDir()" title="Click to browse custom output directory">
@@ -846,13 +1001,18 @@
                         <span class="setting-title">GPU Device Index</span>
                         <span class="setting-flag">-dev</span>
                       </div>
-                      <div class="setting-desc">Hardware ID of the graphics card to run calculations on (e.g. 0).</div>
+                      <div class="setting-desc">Target graphics card index on multi-GPU systems.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>0</code> (primary graphics card)</span>
+                          <span class="setting-desc-point">&bull; <strong>Multi-GPU:</strong> Set to <code>1</code> or <code>2</code> to target secondary GPUs.</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
                       <div class="number-input-control">
-                        <button onclick="decrementNumber('opt-deviceId', 1)">-</button>
-                        <input type="text" id="opt-deviceId" value="0" readonly />
-                        <button onclick="incrementNumber('opt-deviceId', 1)">+</button>
+                        <button onclick="decrementNumber('opt-deviceId', 1)" type="button" aria-label="Decrease Device ID">-</button>
+                        <input type="text" id="opt-deviceId" value="0" inputmode="numeric" autocomplete="off" aria-label="GPU Device ID" />
+                        <button onclick="incrementNumber('opt-deviceId', 1)" type="button" aria-label="Increase Device ID">+</button>
                       </div>
                     </div>
                   </div>
@@ -863,10 +1023,15 @@
                         <span class="setting-title">OpenVINO Hardware Device</span>
                         <span class="setting-flag">-oved</span>
                       </div>
-                      <div class="setting-desc">Intel OpenVINO target execution hardware device. CPU or GPU.</div>
+                      <div class="setting-desc">Target execution device for Intel OpenVINO acceleration.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>GPU:</strong> Intel Arc dedicated GPU or integrated graphics (iGPU)</span>
+                          <span class="setting-desc-point">&bull; <strong>CPU:</strong> AVX-optimized Intel CPU inference</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
-                      <select class="select-control" style="width:100px;" id="opt-ovDevice">
+                      <select class="select-control" id="opt-ovDevice">
                         <option value="CPU">CPU</option>
                         <option value="GPU">GPU</option>
                       </select>
@@ -881,7 +1046,12 @@
                         <span class="setting-title">Enable Voice Activity Detection</span>
                         <span class="setting-flag">--vad</span>
                       </div>
-                      <div class="setting-desc">Filters silences to optimize speed and mitigate repetition loops.</div>
+                      <div class="setting-desc">Pre-filters audio using Silero VAD to detect and remove silent and non-speech sections before Whisper decoding.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Benefits:</strong> Speeds up processing up to 3x and prevents silence hallucinations.</span>
+                          <span class="setting-desc-point">&bull; <strong>Recommended:</strong> Keep enabled for podcasts, interviews, and long videos with pauses.</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
                       <label class="switch">
@@ -897,7 +1067,11 @@
                         <span class="setting-title">VAD Model</span>
                         <span class="setting-flag">-vm</span>
                       </div>
-                      <div class="setting-desc">The Silero VAD bin model file. Loaded inside models/.</div>
+                      <div class="setting-desc">Active Silero VAD model binary.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>ggml-silero-v6.2.0.bin</code> (auto-loaded from models directory)</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
                       <select class="select-control" id="opt-vadModel"></select>
@@ -910,10 +1084,16 @@
                         <span class="setting-title">VAD Threshold</span>
                         <span class="setting-flag">-vt</span>
                       </div>
-                      <div class="setting-desc">VAD probability threshold for speech detection (0.0 to 1.0).</div>
+                      <div class="setting-desc">Speech probability cutoff for triggering voice activity detection.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>0.5</code></span>
+                          <span class="setting-desc-point">&bull; <strong>Noisy / Heavy Breathing:</strong> Set to <code>0.65–0.75</code> (stricter filter)</span>
+                          <span class="setting-desc-point">&bull; <strong>Soft Whispers / Distant Mic:</strong> Set to <code>0.35–0.45</code> (more sensitive)</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" style="width:100px; text-align:center;" type="number" step="0.05" id="opt-vadThold" />
+                      <input class="text-input" type="number" step="0.05" id="opt-vadThold" />
                     </div>
                   </div>
 
@@ -923,10 +1103,15 @@
                         <span class="setting-title">VAD Min Speech (ms)</span>
                         <span class="setting-flag">-vspd</span>
                       </div>
-                      <div class="setting-desc">Minimum duration of speech in milliseconds to trigger transcription.</div>
+                      <div class="setting-desc">Minimum continuous voice duration required to trigger transcription.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>250</code> ms</span>
+                          <span class="setting-desc-point">&bull; <strong>Purpose:</strong> Ignores brief clicks, coughs, and keystrokes shorter than this duration.</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" style="width:100px; text-align:center;" type="number" id="opt-vadMinSpeech" />
+                      <input class="text-input" type="number" id="opt-vadMinSpeech" />
                     </div>
                   </div>
 
@@ -936,10 +1121,15 @@
                         <span class="setting-title">VAD Min Silence (ms)</span>
                         <span class="setting-flag">-vsd</span>
                       </div>
-                      <div class="setting-desc">Silence duration threshold in milliseconds to finalize speech segment.</div>
+                      <div class="setting-desc">Minimum silence duration required to split speech into a new subtitle segment.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>100</code> ms</span>
+                          <span class="setting-desc-point">&bull; <strong>Recommended for Subtitles:</strong> Increase to <code>300–500</code> ms for natural conversational pauses.</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" style="width:100px; text-align:center;" type="number" id="opt-vadMinSil" />
+                      <input class="text-input" type="number" id="opt-vadMinSil" />
                     </div>
                   </div>
 
@@ -949,10 +1139,15 @@
                         <span class="setting-title">VAD Max Speech (ms)</span>
                         <span class="setting-flag">-vmsd</span>
                       </div>
-                      <div class="setting-desc">Max duration of a speech segment in milliseconds to process at once.</div>
+                      <div class="setting-desc">Maximum continuous speech segment duration sent to Whisper in one chunk.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>30,000</code> ms (30s)</span>
+                          <span class="setting-desc-point">&bull; <strong>Purpose:</strong> Matches Whisper's acoustic window to prevent memory overflow.</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" style="width:100px; text-align:center;" type="number" id="opt-vadMaxSpeech" />
+                      <input class="text-input" type="number" id="opt-vadMaxSpeech" />
                     </div>
                   </div>
 
@@ -962,10 +1157,15 @@
                         <span class="setting-title">VAD Speech Padding (ms)</span>
                         <span class="setting-flag">-vp</span>
                       </div>
-                      <div class="setting-desc">Extra padding in milliseconds attached to start and end of detected speech.</div>
+                      <div class="setting-desc">Audio buffer added before and after each detected speech segment.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>30</code> ms</span>
+                          <span class="setting-desc-point">&bull; <strong>Purpose:</strong> Prevents clipping starting consonants or trailing syllables.</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" style="width:100px; text-align:center;" type="number" id="opt-vadSpeechPad" />
+                      <input class="text-input" type="number" id="opt-vadSpeechPad" />
                     </div>
                   </div>
 
@@ -975,10 +1175,15 @@
                         <span class="setting-title">VAD Segment Overlap</span>
                         <span class="setting-flag">-vo</span>
                       </div>
-                      <div class="setting-desc">Ratio of segment overlap to ensure contextual continuity (e.g. 0.10).</div>
+                      <div class="setting-desc">Contextual overlap ratio between consecutive speech segments.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>0.1</code> (10%)</span>
+                          <span class="setting-desc-point">&bull; <strong>Purpose:</strong> Preserves grammatical continuity across segment boundaries.</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" style="width:100px; text-align:center;" type="number" step="0.05" id="opt-vadOverlap" />
+                      <input class="text-input" type="number" step="0.05" id="opt-vadOverlap" />
                     </div>
                   </div>
                 </div>
@@ -990,7 +1195,11 @@
                       <div class="setting-label-row">
                         <span class="setting-title">Enable AI Translation</span>
                       </div>
-                      <div class="setting-desc">Translates your transcription output files using external AI APIs.</div>
+                      <div class="setting-desc">Automatically translates transcribed subtitles into your target language using cloud or local LLM APIs.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Supported:</strong> OpenAI, Claude, Gemini, Groq, Ollama, DeepSeek</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
                       <label class="switch">
@@ -1004,7 +1213,11 @@
                       <div class="setting-label-row">
                         <span class="setting-title">Target Language</span>
                       </div>
-                      <div class="setting-desc">The language to translate the subtitles/text into.</div>
+                      <div class="setting-desc">Destination language for AI subtitle translation.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Supported:</strong> 100+ global languages with native script rendering</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
                       <select class="select-control" id="opt-translateAiTargetLang" onchange="saveCurrentSettings()">
@@ -1093,7 +1306,7 @@
                         <option value="Punjabi">Punjabi (ਪੰਜਾਬੀ)</option>
                         <option value="Malayalam">Malayalam (മലയാളം)</option>
                         <option value="Bhojpuri">Bhojpuri (भोजपुरी)</option>
-                        <option value="Maithili">Maithili (मैथिلی)</option>
+                        <option value="Maithili">Maithili (मैथिली)</option>
                         <option value="Nepali">Nepali (नेपाली)</option>
                         <option value="Sinhala">Sinhala (සිංහල)</option>
                         <option value="Assamese">Assamese (অসমীয়া)</option>
@@ -1139,7 +1352,11 @@
                       <div class="setting-label-row">
                         <span class="setting-title">Enable Polish Pass</span>
                       </div>
-                      <div class="setting-desc">Instructs the AI to rewrite translation for natural flow as subtitles.</div>
+                      <div class="setting-desc">Refines translated subtitles for natural conversational rhythm and reading speed.
+                        <div class="setting-desc-points">
+                          <span class="setting-desc-point">&bull; <strong>Recommended:</strong> Enabled for natural subtitle flow, avoiding rigid word-for-word machine translations.</span>
+                        </div>
+                      </div>
                     </div>
                     <div class="setting-control">
                       <label class="switch">
@@ -1219,7 +1436,7 @@
 
                         <div class="provider-field" style="margin-bottom: 16px;">
                           <label>Provider Custom System Prompt</label>
-                          <span>Instructs the AI for translation style overrides (e.g. vocab, tone). Leave blank for system defaults.</span>
+                          <span>Custom instructions to guide translation tone, domain vocabulary, or formatting conventions. Leave blank for system defaults.</span>
                           <textarea class="textarea-control" id="mgr-provider-prompt" rows="3" placeholder="You are a professional translator..."></textarea>
                         </div>
 
@@ -2354,143 +2571,142 @@
 
               </div>
             </div>
-          </div></div>
-            </div>
           </div>
         </main>
       </div>
     </div>
-  </body>
-  <!-- Centered Premium Glassmorphic Modal Overlay (for compilation errors or general diagnostics) -->
-  <div class="modal-overlay" id="app-modal-overlay" style="display: none;">
-    <div class="glass-card modal-card">
-      <div class="modal-header">
-        <div class="modal-title-row">
-          <svg class="modal-icon error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="12" y1="8" x2="12" y2="12"/>
-            <line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
-          <h3 id="app-modal-title">Compilation Error</h3>
+
+    <!-- Centered Premium Glassmorphic Modal Overlay (for compilation errors or general diagnostics) -->
+    <div class="modal-overlay" id="app-modal-overlay" style="display: none;">
+      <div class="glass-card modal-card">
+        <div class="modal-header">
+          <div class="modal-title-row">
+            <svg class="modal-icon error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <h3 id="app-modal-title">Compilation Error</h3>
+          </div>
         </div>
-      </div>
-      <div class="modal-body">
-        <p id="app-modal-message">An error occurred during execution.</p>
-        <pre class="modal-details-box" id="app-modal-details"></pre>
-      </div>
-      <div class="modal-footer" id="app-modal-ok-footer">
-        <button class="btn-primary" id="app-modal-close-btn" onclick="closeAppModal()" style="width: 100%; justify-content: center;">OK</button>
-      </div>
-      <div class="modal-footer" id="app-modal-confirm-footer" style="display: none; gap: 12px; width: 100%; justify-content: flex-start;">
-        <button class="btn-secondary" id="app-modal-cancel-btn" onclick="resolveAppConfirm(false)" style="padding: 8px 20px; flex-shrink: 0; justify-content: center;">Cancel</button>
-        <button class="btn-primary" id="app-modal-delete-btn" onclick="resolveAppConfirm(true)" style="flex: 1; justify-content: center; background: linear-gradient(135deg, #b91c1c, #991b1b); border-color: #b91c1c; padding: 8px 20px;">Delete</button>
+        <div class="modal-body">
+          <p id="app-modal-message">An error occurred during execution.</p>
+          <pre class="modal-details-box" id="app-modal-details"></pre>
+        </div>
+        <div class="modal-footer" id="app-modal-ok-footer">
+          <button class="btn-primary" id="app-modal-close-btn" onclick="closeAppModal()" style="width: 100%; justify-content: center;">OK</button>
+        </div>
+        <div class="modal-footer" id="app-modal-confirm-footer" style="display: none; gap: 12px; width: 100%; justify-content: flex-start;">
+          <button class="btn-secondary" id="app-modal-cancel-btn" onclick="resolveAppConfirm(false)" style="padding: 8px 20px; flex-shrink: 0; justify-content: center;">Cancel</button>
+          <button class="btn-primary" id="app-modal-delete-btn" onclick="resolveAppConfirm(true)" style="flex: 1; justify-content: center; background: linear-gradient(135deg, #b91c1c, #991b1b); border-color: #b91c1c; padding: 8px 20px;">Delete</button>
+        </div>
       </div>
     </div>
-  </div>
 
-  <!-- Translation Provider Configuration Modal -->
-  <div class="modal-overlay" id="translation-provider-modal" style="display: none;">
-    <div class="glass-card modal-card" style="max-width: 480px;">
-      <div class="modal-header">
-        <div class="modal-title-row">
-          <svg class="modal-icon" viewBox="0 0 24 24" fill="none" stroke="var(--color-cyan)" stroke-width="2" style="width: 24px; height: 24px;">
-            <path d="M12 2a10 10 0 0 1 10 10c0 5.523-4.477 10-10 10S2 17.523 2 12s4.477-10 10-10zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16z"/>
-            <path d="M7 12h10M12 7l5 5-5 5"/>
-          </svg>
-          <h3 id="provider-modal-title" style="color: var(--color-cyan);">Add API Provider</h3>
+    <!-- Translation Provider Configuration Modal -->
+    <div class="modal-overlay" id="translation-provider-modal" style="display: none;">
+      <div class="glass-card modal-card" style="max-width: 480px;">
+        <div class="modal-header">
+          <div class="modal-title-row">
+            <svg class="modal-icon" viewBox="0 0 24 24" fill="none" stroke="var(--color-cyan)" stroke-width="2" style="width: 24px; height: 24px;">
+              <path d="M12 2a10 10 0 0 1 10 10c0 5.523-4.477 10-10 10S2 17.523 2 12s4.477-10 10-10zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16z"/>
+              <path d="M7 12h10M12 7l5 5-5 5"/>
+            </svg>
+            <h3 id="provider-modal-title" style="color: var(--color-cyan);">Add API Provider</h3>
+          </div>
         </div>
-      </div>
-      <div class="modal-body" style="max-height: 480px; overflow-y: auto; padding-right: 8px;">
-        <div style="display: flex; flex-direction: column; gap: 14px; margin-bottom: 16px;">
-          <div style="display: flex; flex-direction: column; gap: 6px;">
-            <label style="font-size: 0.85rem; color: var(--color-text-muted);">Provider Name</label>
-            <input class="text-input" id="provider-name" type="text" placeholder="e.g. OpenRouter" style="width: 100%;" />
+        <div class="modal-body" style="max-height: 480px; overflow-y: auto; padding-right: 8px;">
+          <div style="display: flex; flex-direction: column; gap: 14px; margin-bottom: 16px;">
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <label style="font-size: 0.85rem; color: var(--color-text-muted);">Provider Name</label>
+              <input class="text-input" id="provider-name" type="text" placeholder="e.g. OpenRouter" style="width: 100%;" />
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <label style="font-size: 0.85rem; color: var(--color-text-muted);">API Format</label>
+              <select class="select-control" id="provider-format" style="width: 100%;">
+                <option value="Chat completions">Chat completions (/chat/completions)</option>
+                <option value="Anthropic messages">Anthropic messages (/v1/messages)</option>
+                <option value="Responses">Responses (Gemini)</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px;">
+            <label style="font-size: 0.85rem; color: var(--color-text-muted);">Base URL</label>
+            <input class="text-input" id="provider-url" type="text" placeholder="https://openrouter.ai/api/v1" style="width: 100%;" />
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px;">
+            <label style="font-size: 0.85rem; color: var(--color-text-muted);">API Key</label>
+            <input class="text-input" id="provider-key" type="password" placeholder="sk-..." style="width: 100%;" />
           </div>
           
-          <div style="display: flex; flex-direction: column; gap: 6px;">
-            <label style="font-size: 0.85rem; color: var(--color-text-muted);">API Format</label>
-            <select class="select-control" id="provider-format" style="width: 100%;">
-              <option value="Chat completions">Chat completions (/chat/completions)</option>
-              <option value="Anthropic messages">Anthropic messages (/v1/messages)</option>
-              <option value="Responses">Responses (Gemini)</option>
-            </select>
+          <div style="margin-bottom: 16px; padding-left: 8px;">
+            <label class="checkbox-container">
+              <input type="checkbox" id="provider-use-keyring" checked />
+              <span class="custom-checkmark"></span>
+              <span>Store API Key securely in system keyring</span>
+            </label>
           </div>
         </div>
-
-        <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px;">
-          <label style="font-size: 0.85rem; color: var(--color-text-muted);">Base URL</label>
-          <input class="text-input" id="provider-url" type="text" placeholder="https://openrouter.ai/api/v1" style="width: 100%;" />
+        <div class="modal-footer" style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 16px;">
+          <button class="btn-secondary" onclick="closeProviderModal()" style="padding: 10px 20px; font-size: 0.9rem;">Cancel</button>
+          <button class="btn-primary" onclick="saveProviderConfig()" style="padding: 10px 20px; font-size: 0.9rem;">Save Provider</button>
         </div>
-
-        <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px;">
-          <label style="font-size: 0.85rem; color: var(--color-text-muted);">API Key</label>
-          <input class="text-input" id="provider-key" type="password" placeholder="sk-..." style="width: 100%;" />
-        </div>
-        
-        <div style="margin-bottom: 16px; padding-left: 8px;">
-          <label class="checkbox-container">
-            <input type="checkbox" id="provider-use-keyring" checked />
-            <span class="custom-checkmark"></span>
-            <span>Store API Key securely in system keyring</span>
-          </label>
-        </div>
-      </div>
-      <div class="modal-footer" style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 16px;">
-        <button class="btn-secondary" onclick="closeProviderModal()" style="padding: 10px 20px; font-size: 0.9rem;">Cancel</button>
-        <button class="btn-primary" onclick="saveProviderConfig()" style="padding: 10px 20px; font-size: 0.9rem;">Save Provider</button>
       </div>
     </div>
-  </div>
 
 
-  <!-- Batch Translation Error Dialog -->
-  <div class="modal-overlay" id="batch-error-modal" style="display: none;">
-    <div class="glass-card modal-card" style="max-width: 500px;">
-      <div class="modal-header">
-        <div class="modal-title-row">
-          <svg class="modal-icon error-icon" viewBox="0 0 24 24" fill="none" stroke="var(--color-red)" stroke-width="2" style="width: 24px; height: 24px;">
-            <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/>
-            <line x1="12" y1="8" x2="12" y2="12"/>
-            <line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
-          <h3 id="batch-error-title" style="color: var(--color-red);">Translation Error</h3>
+    <!-- Batch Translation Error Dialog -->
+    <div class="modal-overlay" id="batch-error-modal" style="display: none;">
+      <div class="glass-card modal-card" style="max-width: 500px;">
+        <div class="modal-header">
+          <div class="modal-title-row">
+            <svg class="modal-icon error-icon" viewBox="0 0 24 24" fill="none" stroke="var(--color-red)" stroke-width="2" style="width: 24px; height: 24px;">
+              <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <h3 id="batch-error-title" style="color: var(--color-red);">Translation Error</h3>
+          </div>
         </div>
-      </div>
-      <div class="modal-body">
-        <p id="batch-error-message" style="font-size: 0.95rem; margin-bottom: 12px; line-height: 1.4;"></p>
-        <p style="font-size: 0.85rem; color: var(--color-text-muted);">An error occurred during translation of this batch item. Select how you would like to proceed:</p>
-      </div>
-      <div class="modal-footer" style="display: flex; gap: 8px; flex-direction: column; width: 100%; margin-top: 16px;">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%;">
-          <button class="btn-primary" onclick="resolveBatchError('retry')" style="justify-content: center; font-size: 0.9rem;">Retry Translation</button>
-          <button class="btn-secondary" onclick="resolveBatchError('skip')" style="justify-content: center; font-size: 0.9rem;">Skip Item</button>
+        <div class="modal-body">
+          <p id="batch-error-message" style="font-size: 0.95rem; margin-bottom: 12px; line-height: 1.4;"></p>
+          <p style="font-size: 0.85rem; color: var(--color-text-muted);">An error occurred during translation of this batch item. Select how you would like to proceed:</p>
         </div>
-        <button class="btn-secondary" onclick="resolveBatchError('abort')" style="width: 100%; justify-content: center; border-color: var(--color-red); color: var(--color-red); font-size: 0.9rem;">Abort Batch Job</button>
+        <div class="modal-footer" style="display: flex; gap: 8px; flex-direction: column; width: 100%; margin-top: 16px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%;">
+            <button class="btn-primary" onclick="resolveBatchError('retry')" style="justify-content: center; font-size: 0.9rem;">Retry Translation</button>
+            <button class="btn-secondary" onclick="resolveBatchError('skip')" style="justify-content: center; font-size: 0.9rem;">Skip Item</button>
+          </div>
+          <button class="btn-secondary" onclick="resolveBatchError('abort')" style="width: 100%; justify-content: center; border-color: var(--color-red); color: var(--color-red); font-size: 0.9rem;">Abort Batch Job</button>
+        </div>
       </div>
     </div>
-  </div>
 
-  <!-- Test Connection Modal -->
-  <div class="modal-overlay" id="translation-test-modal" style="display: none;">
-    <div class="glass-card modal-card" style="max-width: 480px;">
-      <div class="modal-header">
-        <div class="modal-title-row">
-          <svg class="modal-icon" viewBox="0 0 24 24" fill="none" stroke="var(--color-cyan)" stroke-width="2" style="width: 24px; height: 24px;">
-            <circle cx="12" cy="12" r="10"/>
-            <polyline points="12 6 12 12 16 14"/>
-          </svg>
-          <h3 style="color: var(--color-cyan);">Connection Test Results</h3>
+    <!-- Test Connection Modal -->
+    <div class="modal-overlay" id="translation-test-modal" style="display: none;">
+      <div class="glass-card modal-card" style="max-width: 480px;">
+        <div class="modal-header">
+          <div class="modal-title-row">
+            <svg class="modal-icon" viewBox="0 0 24 24" fill="none" stroke="var(--color-cyan)" stroke-width="2" style="width: 24px; height: 24px;">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+            <h3 style="color: var(--color-cyan);">Connection Test Results</h3>
+          </div>
         </div>
-      </div>
-      <div class="modal-body" style="padding-top: 10px;">
-        <div id="test-modal-status" style="font-weight: 600; margin-bottom: 12px; font-size: 1rem;">Testing...</div>
-        <div class="textarea-control" id="test-modal-result" style="width: 100%; height: 160px; overflow-y: auto; white-space: pre-wrap; font-family: monospace; font-size: 0.85rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 10px; box-sizing: border-box; color: var(--color-text); width: 100%;">
-          Waiting for response...
+        <div class="modal-body" style="padding-top: 10px;">
+          <div id="test-modal-status" style="font-weight: 600; margin-bottom: 12px; font-size: 1rem;">Testing...</div>
+          <div class="textarea-control" id="test-modal-result" style="width: 100%; height: 160px; overflow-y: auto; white-space: pre-wrap; font-family: monospace; font-size: 0.85rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 10px; box-sizing: border-box; color: var(--color-text); width: 100%;">
+            Waiting for response...
+          </div>
         </div>
-      </div>
-      <div class="modal-footer" style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 16px;">
-        <button class="btn-primary" onclick="closeTestModal()" style="padding: 10px 20px; font-size: 0.9rem; width: 100%; justify-content: center;">OK</button>
+        <div class="modal-footer" style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 16px;">
+          <button class="btn-primary" onclick="closeTestModal()" style="padding: 10px 20px; font-size: 0.9rem; width: 100%; justify-content: center;">OK</button>
+        </div>
       </div>
     </div>
-  </div>
+  </body>
 </html>
