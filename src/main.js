@@ -1541,6 +1541,15 @@ if (document.readyState === 'loading') {
 window.switchView = function(viewName) {
   activeView = viewName;
   
+  // Close any open custom dropdowns cleanly via their lifecycle method
+  if (window.customSelectsMap) {
+    window.customSelectsMap.forEach(cs => {
+      if (cs && cs.isOpen && typeof cs.close === 'function') {
+        cs.close();
+      }
+    });
+  }
+
   // Update nav link active states and accessibility
   const navItems = document.querySelectorAll('.nav-item');
   navItems.forEach(item => {
@@ -1960,21 +1969,6 @@ window.switchSettingsCategory = function(catName) {
   const targetGroup = document.getElementById(`group-${catName}`);
   if (targetGroup) {
     targetGroup.classList.add('active');
-
-    // Replay the staggered cascade animation for the now-visible cards.
-    // The base .setting-card animation only runs once at load (and is skipped
-    // for cards inside a display:none group at that time), so we re-trigger it
-    // per category to keep the nice intro without leaving any card stuck at
-    // opacity:0.
-    const cards = targetGroup.querySelectorAll('.setting-card');
-    if (cards.length > 0) {
-      cards.forEach(card => card.classList.remove('setting-card-anim'));
-      void targetGroup.offsetWidth; // single layout flush on targetGroup
-      cards.forEach((card, idx) => {
-        card.classList.add('setting-card-anim');
-        card.style.animationDelay = `${(idx * 0.03).toFixed(2)}s`;
-      });
-    }
 
     // Re-sync any custom dropdowns living inside this group so they recompute
     // their size/position now that the group is visible.

@@ -611,6 +611,41 @@ fn main() {
                 }
             }
         }
+
+        // Configure GStreamer plugin search paths on Linux / AppImage to ensure WebKitGTK
+        // can resolve audio/video sinks (autoaudiosink, pulsesink, pipewiresink) and avoid
+        // NULL pointer crashes in WebKitWebProcess when loading HTML5 video elements.
+        let default_gst_plugin_dirs = [
+            "/usr/lib/x86_64-linux-gnu/gstreamer-1.0",
+            "/usr/lib64/gstreamer-1.0",
+            "/usr/lib/gstreamer-1.0",
+            "/usr/local/lib/gstreamer-1.0",
+            "/usr/lib/i386-linux-gnu/gstreamer-1.0",
+            "/usr/lib/aarch64-linux-gnu/gstreamer-1.0",
+        ];
+        let existing_gst_dirs: Vec<String> = default_gst_plugin_dirs
+            .iter()
+            .filter(|p| std::path::Path::new(p).exists())
+            .map(|s| s.to_string())
+            .collect();
+
+        if !existing_gst_dirs.is_empty() {
+            let joined = existing_gst_dirs.join(":");
+            if let Ok(existing_sys) = std::env::var("GST_PLUGIN_SYSTEM_PATH_1_0") {
+                if !existing_sys.contains(&joined) {
+                    std::env::set_var("GST_PLUGIN_SYSTEM_PATH_1_0", format!("{}:{}", existing_sys, joined));
+                }
+            } else {
+                std::env::set_var("GST_PLUGIN_SYSTEM_PATH_1_0", &joined);
+            }
+            if let Ok(existing_path) = std::env::var("GST_PLUGIN_PATH_1_0") {
+                if !existing_path.contains(&joined) {
+                    std::env::set_var("GST_PLUGIN_PATH_1_0", format!("{}:{}", existing_path, joined));
+                }
+            } else {
+                std::env::set_var("GST_PLUGIN_PATH_1_0", &joined);
+            }
+        }
     }
 
     let hardware_monitor = Arc::new(Mutex::new(HardwareMonitor::new()));

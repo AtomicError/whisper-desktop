@@ -825,6 +825,30 @@ mod tests {
     use std::path::Path;
 
     #[test]
+    fn test_escape_ffmpeg_filter_path() {
+        // Windows standard path
+        assert_eq!(
+            escape_ffmpeg_filter_path(r"C:\Users\ahmad\Desktop\vid.srt"),
+            "C\\:/Users/ahmad/Desktop/vid.srt"
+        );
+        // Windows verbatim UNC path (\\?\)
+        assert_eq!(
+            escape_ffmpeg_filter_path(r"\\?\C:\Users\ahmad\AppData\Local\WhisperDesktop\resources\fonts"),
+            "C\\:/Users/ahmad/AppData/Local/WhisperDesktop/resources/fonts"
+        );
+        // Windows verbatim network share path (\\?\UNC\)
+        assert_eq!(
+            escape_ffmpeg_filter_path(r"\\?\UNC\192.168.1.10\share\sub.srt"),
+            "//192.168.1.10/share/sub.srt"
+        );
+        // Path with special characters
+        assert_eq!(
+            escape_ffmpeg_filter_path(r"C:\My [Videos] & Movies, Part 1\sub's.srt"),
+            "C\\:/My \\[Videos\\] & Movies\\, Part 1/sub'\\''s.srt"
+        );
+    }
+
+    #[test]
     fn converts_opacity_to_ass_transparency() {
         assert_eq!(opacity_percent_to_ass_alpha(0), 255);
         assert_eq!(opacity_percent_to_ass_alpha(50), 127);
@@ -1024,6 +1048,28 @@ pub async fn start_hardsub_task(
     let logs = log_state.0.clone();
     let session = hardsub_state.0.clone();
     run_hardsub_task(app, logs, session, settings).await
+}
+
+/// Escapes special characters in file paths for FFmpeg filtergraphs (-vf subtitles=...).
+/// Handles Windows verbatim local paths (\\?\C:\) and extended network paths (\\?\UNC\server\share).
+fn escape_ffmpeg_filter_path(path: &str) -> String {
+    let clean = if let Some(unc_suffix) = path.strip_prefix(r"\\?\UNC\").or_else(|| path.strip_prefix("//?/UNC/")) {
+        format!("//{}", unc_suffix.trim_start_matches('\\').trim_start_matches('/'))
+    } else {
+        path.strip_prefix(r"\\?\")
+            .or_else(|| path.strip_prefix("//?/"))
+            .unwrap_or(path)
+            .to_string()
+    };
+
+    clean
+        .replace('\\', "/")
+        .replace(':', "\\:")
+        .replace('\'', "'\\''")
+        .replace('[', "\\[")
+        .replace(']', "\\]")
+        .replace(',', "\\,")
+        .replace(';', "\\;")
 }
 
 /// Resolves a unique output path by appending (1), (2), etc. if the file already exists on disk
@@ -1305,18 +1351,13 @@ pub async fn run_hardsub_task(
     }
 
     let fonts_dir_opt = if let Some(path) = resolved_fonts_dir {
-        format!(":fontsdir='{}'", path.to_string_lossy().replace('\\', "/").replace('\'', "'\\''"))
+        let escaped_fonts_dir = escape_ffmpeg_filter_path(&path.to_string_lossy());
+        format!(":fontsdir='{}'", escaped_fonts_dir)
     } else {
         "".to_string()
     };
 
-    let escaped_sub_path = settings.subtitle_path
-        .replace('\\', "/")
-        .replace(':', "\\:")
-        .replace('\'', "'\\''")
-        .replace('[', "\\[")
-        .replace(']', "\\]")
-        .replace(',', "\\,");
+    let escaped_sub_path = escape_ffmpeg_filter_path(&settings.subtitle_path);
 
     // Choose subtitles filter mode based on extension (.ass -> subtitles filter preserving native formatting; .srt -> force_style with dynamic reference resolution)
     let is_ass_file = settings.subtitle_path.to_lowercase().ends_with(".ass");
