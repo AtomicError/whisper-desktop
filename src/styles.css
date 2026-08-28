@@ -172,6 +172,16 @@ html {
   --color-text: #f3f4f6;
   --color-text-muted: #9ca3af;
   --color-text-dim: #6b7280;
+
+  /* Model Family Palette Accents */
+  --color-model-large: #2d7fff;
+  --color-model-large-rgb: 45, 127, 255;
+  --color-model-medium: #06b6d4;
+  --color-model-medium-rgb: 6, 182, 212;
+  --color-model-small: #10b981;
+  --color-model-small-rgb: 16, 185, 129;
+  --color-model-base: #f59e0b;
+  --color-model-base-rgb: 245, 158, 11;
   
   --shadow-neon-cyan: 0 0 15px rgba(6, 182, 212, 0.15);
   --shadow-neon-royal-blue: 0 0 20px rgba(45, 127, 255, 0.25);
@@ -233,12 +243,21 @@ html {
   --color-royal-blue-dark-rgb: 217, 72, 0;
   --color-gold: #fbbf24;
   --color-gold-rgb: 251, 191, 36;
-  --color-warm: #f97316;
   --color-green: #10b981;
   --color-green-rgb: 16, 185, 129;
   --color-red: #ef4444;
   --color-red-rgb: 239, 68, 68;
   --color-hot: #f43f5e;
+
+  /* Model Family Palette Accents (Option 1: Natural Thermal Spectrum) */
+  --color-model-large: #ef4444;
+  --color-model-large-rgb: 239, 68, 68;
+  --color-model-medium: #ff6b00;
+  --color-model-medium-rgb: 255, 107, 0;
+  --color-model-small: #f59e0b;
+  --color-model-small-rgb: 245, 158, 11;
+  --color-model-base: #fde047;
+  --color-model-base-rgb: 253, 224, 71;
   
   --shadow-neon-cyan: 0 0 15px rgba(255, 152, 0, 0.2);
   --shadow-neon-royal-blue: 0 0 20px rgba(255, 107, 0, 0.3);
@@ -3370,20 +3389,172 @@ select.select-control {
   padding: 0 4px;
 }
 
-/* Models Page Styles */
-.model-badge {
-  font-size: 0.7rem;
+/* Model Architecture & Selection Guide Component */
+.model-guide-container {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: panelMicroFade 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.guide-hero-card {
+  background: linear-gradient(135deg, rgba(var(--color-royal-blue-rgb), 0.12) 0%, rgba(var(--color-cyan-rgb), 0.05) 100%);
+  border: 1px solid rgba(var(--color-royal-blue-rgb), 0.25);
+  border-radius: 12px;
+  padding: 18px 22px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.guide-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.guide-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-glass);
+  border-radius: 10px;
+  padding: 16px;
+  transition: var(--transition-smooth);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.guide-card:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(var(--color-royal-blue-rgb), 0.35);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.guide-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.guide-card-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Model Guide Palette Accents (Theme-Harmonized) */
+.guide-card-large .guide-card-icon {
+  background: rgba(var(--color-model-large-rgb), 0.15);
+  color: var(--color-model-large);
+}
+.guide-card-large .guide-card-subtitle {
+  color: var(--color-model-large);
+}
+
+.guide-card-medium .guide-card-icon {
+  background: rgba(var(--color-model-medium-rgb), 0.15);
+  color: var(--color-model-medium);
+}
+.guide-card-medium .guide-card-subtitle {
+  color: var(--color-model-medium);
+}
+
+.guide-card-small .guide-card-icon {
+  background: rgba(var(--color-model-small-rgb), 0.15);
+  color: var(--color-model-small);
+}
+.guide-card-small .guide-card-subtitle {
+  color: var(--color-model-small);
+}
+
+.guide-card-base .guide-card-icon {
+  background: rgba(var(--color-model-base-rgb), 0.15);
+  color: var(--color-model-base);
+}
+.guide-card-base .guide-card-subtitle {
+  color: var(--color-model-base);
+}
+
+.guide-card-title {
+  font-size: 0.95rem;
   font-weight: 600;
-  padding: 4px 8px;
-  border-radius: 6px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  color: #fff;
+}
+
+.guide-card-body {
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+  flex-grow: 1;
+}
+
+.guide-concept-card {
+  background: rgba(255, 255, 255, 0.015);
+  border: 1px solid var(--border-glass);
+  border-radius: 10px;
+  padding: 14px 18px;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.guide-card:focus-visible,
+.guide-concept-card:focus-visible {
+  outline: 2px solid var(--color-royal-blue);
+  outline-offset: 2px;
+}
+
+/* Models Page Styles - Matching .setting-flag aesthetic */
+.model-badge {
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: none;
+  box-shadow: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  line-height: 1.2;
+  white-space: nowrap;
+  box-sizing: border-box;
+  user-select: none;
+  transition: var(--transition-smooth);
+}
+
+.model-badge svg {
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+.model-badge-recommended {
+  background: rgba(var(--color-royal-blue-rgb), 0.08);
+  color: var(--color-royal-blue);
+}
+
+.model-badge-vad {
+  background: rgba(16, 185, 129, 0.08);
+  color: #34d399;
+}
+
+.badge-installed {
+  background: rgba(var(--color-royal-blue-rgb), 0.08);
+  color: var(--color-royal-blue);
+  border: none;
+  font-family: var(--font-mono);
+  font-weight: 500;
 }
 
 .badge-downloading {
   background: rgba(var(--color-cyan-rgb), 0.1);
   color: var(--color-cyan);
-  border: 1px solid rgba(var(--color-cyan-rgb), 0.3);
+  border: 1px solid rgba(var(--color-cyan-rgb), 0.35);
   box-shadow: 0 0 10px rgba(var(--color-cyan-rgb), 0.15);
   animation: badge-pulse-glow 1.5s infinite alternate;
 }
@@ -3391,12 +3562,125 @@ select.select-control {
 .badge-paused {
   background: rgba(245, 158, 11, 0.1);
   color: var(--color-gold);
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  border: 1px solid rgba(245, 158, 11, 0.35);
 }
 
 @keyframes badge-pulse-glow {
   from { box-shadow: 0 0 5px rgba(var(--color-cyan-rgb), 0.1); }
   to { box-shadow: 0 0 15px rgba(var(--color-cyan-rgb), 0.3); }
+}
+
+/* Model Row Action Buttons (Modern Tonal Glass with Vibrant Hover) */
+.model-action-btn {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 16px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  cursor: pointer;
+  white-space: nowrap;
+  box-sizing: border-box;
+  transition: var(--transition-smooth);
+  border: 1px solid transparent;
+  margin: 0;
+}
+
+.model-action-btn svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.model-action-btn:focus-visible,
+.model-btn-download:focus-visible {
+  outline: 2px solid var(--color-royal-blue);
+  outline-offset: 2px;
+}
+
+/* Download Action Button (Unified Royal-Blue Tonal Glass) */
+.model-btn-download {
+  background: rgba(var(--color-royal-blue-rgb), 0.1);
+  border-color: rgba(var(--color-royal-blue-rgb), 0.35);
+  color: var(--color-royal-blue);
+}
+
+.model-btn-download:hover:not(:disabled) {
+  background: rgba(var(--color-royal-blue-rgb), 0.25);
+  border-color: var(--color-royal-blue);
+  color: #fff;
+  box-shadow: 0 3px 12px rgba(var(--color-royal-blue-rgb), 0.35);
+  transform: translateY(-1px);
+}
+
+.model-btn-download:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/* Delete / Discard Action Button */
+.model-btn-delete {
+  background: rgba(var(--color-red-rgb), 0.08);
+  border-color: rgba(var(--color-red-rgb), 0.3);
+  color: var(--color-red);
+}
+
+.model-btn-delete:hover:not(:disabled) {
+  background: rgba(var(--color-red-rgb), 0.2);
+  border-color: var(--color-red);
+  color: #fff;
+  box-shadow: 0 3px 12px rgba(var(--color-red-rgb), 0.3);
+  transform: translateY(-1px);
+}
+
+.model-btn-delete:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/* Pause Action Button */
+.model-btn-pause {
+  background: rgba(var(--color-gold-rgb), 0.08);
+  border-color: rgba(var(--color-gold-rgb), 0.3);
+  color: var(--color-gold);
+}
+
+.model-btn-pause:hover:not(:disabled) {
+  background: rgba(var(--color-gold-rgb), 0.2);
+  border-color: var(--color-gold);
+  color: #fff;
+  box-shadow: 0 3px 12px rgba(var(--color-gold-rgb), 0.3);
+  transform: translateY(-1px);
+}
+
+/* Resume Action Button */
+.model-btn-resume {
+  background: rgba(var(--color-cyan-rgb), 0.1);
+  border-color: rgba(var(--color-cyan-rgb), 0.35);
+  color: var(--color-cyan);
+}
+
+.model-btn-resume:hover:not(:disabled) {
+  background: rgba(var(--color-cyan-rgb), 0.25);
+  border-color: var(--color-cyan);
+  color: #fff;
+  box-shadow: 0 3px 12px rgba(var(--color-cyan-rgb), 0.3);
+  transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .badge-downloading {
+    animation: none;
+  }
+  .model-action-btn,
+  .model-action-btn svg {
+    transition: none !important;
+    animation: none !important;
+    transform: none !important;
+  }
 }
 
 /* Custom Styled Cyber-Neon Checkbox Nodes */

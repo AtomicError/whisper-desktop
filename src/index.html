@@ -1571,40 +1571,48 @@
                 <h3 style="font-size: 1.25rem; margin-bottom: 4px;">Whisper Model Hub</h3>
                 <p id="model-specs-subtitle" style="font-size: 0.85rem; color: var(--color-text-muted);">Download, configure, and manage GGML models inside the models directory.</p>
               </div>
-              <div>
-                <input class="text-input" type="text" id="model-search" placeholder="Search models..." oninput="filterModelsGrid()" style="margin: 0; padding: 8px 16px; font-size: 0.85rem; width: 250px;" />
+              <div class="models-search-wrapper" style="flex: 0 0 260px; min-width: 240px;">
+                <svg class="models-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input class="text-input models-search-input" type="text" id="model-search" placeholder="Search models..." oninput="filterModelsGrid()" />
               </div>
             </div>
 
             <div class="settings-layout">
               <div class="settings-categories" id="model-categories-sidebar">
-                <div class="settings-cat-btn active" id="model-cat-recommended" onclick="switchModelCategory('recommended')">
-                  <svg class="settings-cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; margin-right:8px;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                  Recommended
+                <div class="settings-cat-btn active" id="model-cat-guide" onclick="switchModelCategory('guide')">
+                  <svg class="settings-cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; margin-right:8px;"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                  Model Guide
+                </div>
+                <div class="settings-cat-btn" id="model-cat-tiny" onclick="switchModelCategory('tiny')">
+                  <svg class="settings-cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; margin-right:8px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                  Tiny Family
+                </div>
+                <div class="settings-cat-btn" id="model-cat-base" onclick="switchModelCategory('base')">
+                  <svg class="settings-cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; margin-right:8px;"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="15" x2="23" y2="15"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="15" x2="4" y2="15"/></svg>
+                  Base Family
+                </div>
+                <div class="settings-cat-btn" id="model-cat-small" onclick="switchModelCategory('small')">
+                  <svg class="settings-cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; margin-right:8px;"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                  Small Family
+                </div>
+                <div class="settings-cat-btn" id="model-cat-medium" onclick="switchModelCategory('medium')">
+                  <svg class="settings-cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; margin-right:8px;"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+                  Medium Family
+                </div>
+                <div class="settings-cat-btn" id="model-cat-large" onclick="switchModelCategory('large')">
+                  <svg class="settings-cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; margin-right:8px;"><path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14v2H5z"/></svg>
+                  Large Family
+                </div>
+                <div class="settings-cat-btn" id="model-cat-vad" onclick="switchModelCategory('vad')">
+                  <svg class="settings-cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; margin-right:8px;"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                  Silero VAD
                 </div>
                 <div class="settings-cat-btn" id="model-cat-local" onclick="switchModelCategory('local')">
                   <svg class="settings-cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; margin-right:8px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                   Downloaded Models
-                </div>
-                <div class="settings-cat-btn" id="model-cat-tiny" onclick="switchModelCategory('tiny')">
-                  <svg class="settings-cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; margin-right:8px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                  Tiny Family (75M)
-                </div>
-                <div class="settings-cat-btn" id="model-cat-base" onclick="switchModelCategory('base')">
-                  <svg class="settings-cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; margin-right:8px;"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="15" x2="23" y2="15"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="15" x2="4" y2="15"/></svg>
-                  Base Family (145M)
-                </div>
-                <div class="settings-cat-btn" id="model-cat-small" onclick="switchModelCategory('small')">
-                  <svg class="settings-cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; margin-right:8px;"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
-                  Small Family (468M)
-                </div>
-                <div class="settings-cat-btn" id="model-cat-medium" onclick="switchModelCategory('medium')">
-                  <svg class="settings-cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; margin-right:8px;"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.44 2.5 2.5 0 0 1 0-3.12 3 3 0 0 1 0-3.88 2.5 2.5 0 0 1 0-3.12A2.5 2.5 0 0 1 9.5 2zM14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.44 2.5 2.5 0 0 0 0-3.12 3 3 0 0 0 0-3.88 2.5 2.5 0 0 0 0-3.12A2.5 2.5 0 0 0 14.5 2z"/></svg>
-                  Medium Family (769M)
-                </div>
-                <div class="settings-cat-btn" id="model-cat-large" onclick="switchModelCategory('large')">
-                  <svg class="settings-cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; margin-right:8px;"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.45 1-1 1H4v2h16v-2h-5c-.55 0-1-.45-1-1v-2.34M12 2a4 4 0 0 0-4 4v6h8V6a4 4 0 0 0-4-4z"/></svg>
-                  Large Family (1550M)
                 </div>
                 <div class="settings-cat-btn" id="model-cat-all" onclick="switchModelCategory('all')">
                   <svg class="settings-cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; margin-right:8px;"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
@@ -2596,9 +2604,9 @@
         <div class="modal-footer" id="app-modal-ok-footer">
           <button class="btn-primary" id="app-modal-close-btn" onclick="closeAppModal()" style="width: 100%; justify-content: center;">OK</button>
         </div>
-        <div class="modal-footer" id="app-modal-confirm-footer" style="display: none; gap: 12px; width: 100%; justify-content: flex-start;">
-          <button class="btn-secondary" id="app-modal-cancel-btn" onclick="resolveAppConfirm(false)" style="padding: 8px 20px; flex-shrink: 0; justify-content: center;">Cancel</button>
+        <div class="modal-footer" id="app-modal-confirm-footer" style="display: none; gap: 12px; width: 100%;">
           <button class="btn-primary" id="app-modal-delete-btn" onclick="resolveAppConfirm(true)" style="flex: 1; justify-content: center; background: linear-gradient(135deg, #b91c1c, #991b1b); border-color: #b91c1c; padding: 8px 20px;">Delete</button>
+          <button class="btn-secondary" id="app-modal-cancel-btn" onclick="resolveAppConfirm(false)" style="flex: 1; justify-content: center; padding: 8px 20px;">Cancel</button>
         </div>
       </div>
     </div>

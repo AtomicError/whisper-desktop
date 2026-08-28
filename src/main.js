@@ -542,6 +542,33 @@ let batchCancelActive = false;
 let _unlistenFns = [];
 let _modelActionsInProgress = new Set();
 
+// Model Hub Action Icons (Accessible & Reusable SVGs)
+const MODEL_ICON_DOWNLOAD = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+const MODEL_ICON_DELETE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`;
+const MODEL_ICON_PAUSE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
+const MODEL_ICON_RESUME = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+
+function getModelMetaInfo(modelName) {
+  const isVad = modelName.startsWith('silero-');
+  let precisionText = isVad ? '' : '16-bit Full Precision';
+  if (!isVad) {
+    if (modelName.includes('-q8_0')) {
+      precisionText = '8-bit Quantized';
+    } else if (modelName.includes('-q5_0') || modelName.includes('-q5_1')) {
+      precisionText = '5-bit Quantized';
+    }
+  }
+
+  let langText = 'Multilingual (100+ Languages)';
+  if (modelName.includes('.en')) {
+    langText = 'English Only';
+  } else if (isVad) {
+    langText = 'Voice Activity Detection (VAD)';
+  }
+
+  return { precisionText, langText, isVad };
+}
+
 // Native OS Taskbar Progress Bar & Background Job Tracking
 window.isTranscriptionRunning = false;
 window.isTranslationRunning = false;
@@ -1553,12 +1580,14 @@ window.switchView = function(viewName) {
   }
 
   if (viewName === 'models') {
-    // Always reset to Recommended tab when entering the view
-    currentCategoryFilter = 'recommended';
+    // Always reset search input and default to Model Guide tab when entering the view
+    const searchInput = document.getElementById('model-search');
+    if (searchInput) searchInput.value = '';
+    currentCategoryFilter = 'guide';
     const buttons = document.querySelectorAll('#model-categories-sidebar .settings-cat-btn');
     buttons.forEach(btn => btn.classList.remove('active'));
-    const recommendedBtn = document.getElementById('model-cat-recommended');
-    if (recommendedBtn) recommendedBtn.classList.add('active');
+    const guideBtn = document.getElementById('model-cat-guide');
+    if (guideBtn) guideBtn.classList.add('active');
     loadModelStatusesGrid();
   }
 };
@@ -1680,15 +1709,17 @@ function setupTauriListeners() {
       // 2. Description text inline without DOM recreation
       const descEl = card.querySelector('.setting-desc');
       if (descEl) {
-        const isQuant = payload.modelName.includes("-q");
+        const meta = getModelMetaInfo(payload.modelName);
         descEl.innerHTML = `
           <span class="model-badge badge-downloading">Downloading</span>
           <span style="color: rgba(255,255,255,0.1);">|</span>
           <span>Expected Size: ${totalMB} MB</span>
+          ${meta.precisionText ? `
+            <span style="color: rgba(255,255,255,0.1);">|</span>
+            <span>${meta.precisionText}</span>
+          ` : ''}
           <span style="color: rgba(255,255,255,0.1);">|</span>
-          <span style="color: ${isQuant ? 'var(--color-cyan)' : 'var(--color-royal-blue)'}; font-weight: 500;">
-            ${isQuant ? 'Quantized Optimized (5-bit/8-bit)' : 'Full Precision (16-bit)'}
-          </span>
+          <span>${meta.langText}</span>
           <span style="color: rgba(255,255,255,0.1);">|</span>
           <span style="color: var(--color-cyan);">${dlMB} MB${totalKnown ? ` (${pct}%)` : ''} • Speed: ${speedText}</span>
         `;
@@ -1697,7 +1728,7 @@ function setupTauriListeners() {
       // 3. Ensure button is "Pause" in-place
       const ctrlEl = card.querySelector('.setting-control');
       if (ctrlEl && !ctrlEl.querySelector('[data-action="pause"]')) {
-        ctrlEl.innerHTML = `<button class="btn-secondary" style="border-color: var(--color-gold); color: var(--color-gold); margin: 0; padding: 6px 14px; font-size: 0.8rem;" data-action="pause">Pause</button>`;
+        ctrlEl.innerHTML = `<button class="model-action-btn model-btn-pause" data-action="pause" aria-label="Pause downloading ggml-${escapeHTML(payload.modelName)}.bin">${MODEL_ICON_PAUSE}<span>Pause</span></button>`;
       }
       // If card is NOT in current view/tab, do NOTHING to prevent tab re-rendering!
     } else {
@@ -4021,7 +4052,7 @@ async function handleDroppedFiles(files) {
 
 
 // ----------------- Models Logic -----------------
-let currentCategoryFilter = 'recommended';
+let currentCategoryFilter = 'guide';
 
 function formatRemainingTime(seconds) {
   if (seconds <= 0 || !isFinite(seconds)) return "Unknown";
@@ -4037,9 +4068,152 @@ function formatRemainingTime(seconds) {
   return `${h}h ${m}m ${s}s`;
 }
 
-window.switchModelCategory = function(category) {
+function renderModelGuide(grid) {
+  grid.innerHTML = `
+    <div class="model-guide-container">
+      <!-- 1. Hero Overview Card -->
+      <div class="guide-hero-card">
+        <div style="display: flex; align-items: center; gap: 14px;">
+          <div style="width: 36px; height: 36px; border-radius: 9px; background: rgba(var(--color-royal-blue-rgb), 0.2); display: flex; align-items: center; justify-content: center; color: var(--color-royal-blue); flex-shrink: 0;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width: 20px; height: 20px;"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          </div>
+          <div>
+            <h3 style="font-size: 1.15rem; font-weight: 700; color: #fff; margin: 0;">Whisper Model Architecture & Selection Guide</h3>
+            <p style="font-size: 0.84rem; color: var(--color-text-muted); margin: 3px 0 0 0;">Compare model accuracy, speed, memory requirements, and specialized features to choose the exact model for your workflow.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Model Families Comparison Grid -->
+      <div class="guide-grid">
+        <div class="guide-card guide-card-large" onclick="switchModelCategory('large')" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchModelCategory('large');}" aria-label="Explore Large Family Models" style="cursor: pointer;">
+          <div class="guide-card-header">
+            <div class="guide-card-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;"><path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14v2H5z"/></svg>
+            </div>
+            <div>
+              <div class="guide-card-title">Large Family</div>
+              <div class="guide-card-subtitle" style="font-size: 0.74rem; font-weight: 500;">Maximum Accuracy • 100+ Languages</div>
+            </div>
+          </div>
+          <div class="guide-card-body">
+            State-of-the-art recognition for challenging accents, background noise, and specialized terminology. <strong>large-v3-turbo</strong> features an 8-layer decoder running 4x faster with full Large precision.
+          </div>
+          <div style="margin-top: 10px; font-size: 0.76rem; color: var(--color-text-dim);">
+            RAM: ~1.5 - 3.0 GB • Ideal for Dedicated GPU / 8+ Cores
+          </div>
+        </div>
+
+        <div class="guide-card guide-card-medium" onclick="switchModelCategory('medium')" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchModelCategory('medium');}" aria-label="Explore Medium Family Models" style="cursor: pointer;">
+          <div class="guide-card-header">
+            <div class="guide-card-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+            </div>
+            <div>
+              <div class="guide-card-title">Medium Family</div>
+              <div class="guide-card-subtitle" style="font-size: 0.74rem; font-weight: 500;">High Precision • Pro Transcriptions</div>
+            </div>
+          </div>
+          <div class="guide-card-body">
+            High precision multilingual model for podcasts, lectures, and professional interviews with low compute overhead.
+          </div>
+          <div style="margin-top: 10px; font-size: 0.76rem; color: var(--color-text-dim);">
+            RAM: ~1.5 GB • Recommended for 8+ GB RAM systems
+          </div>
+        </div>
+
+        <div class="guide-card guide-card-small" onclick="switchModelCategory('small')" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchModelCategory('small');}" aria-label="Explore Small Family Models" style="cursor: pointer;">
+          <div class="guide-card-header">
+            <div class="guide-card-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+            </div>
+            <div>
+              <div class="guide-card-title">Small Family</div>
+              <div class="guide-card-subtitle" style="font-size: 0.74rem; font-weight: 500;">Balanced • Universal Daily Driver</div>
+            </div>
+          </div>
+          <div class="guide-card-body">
+            The optimal standard for daily transcription tasks. Delivers reliable multilingual accuracy with fast CPU execution and compact 465 MB weight.
+          </div>
+          <div style="margin-top: 10px; font-size: 0.76rem; color: var(--color-text-dim);">
+            RAM: ~500 MB • Perfect for general-purpose CPU use
+          </div>
+        </div>
+
+        <div class="guide-card guide-card-base" onclick="switchModelCategory('base')" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchModelCategory('base');}" aria-label="Explore Base and Tiny Family Models" style="cursor: pointer;">
+          <div class="guide-card-header">
+            <div class="guide-card-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            </div>
+            <div>
+              <div class="guide-card-title">Base & Tiny</div>
+              <div class="guide-card-subtitle" style="font-size: 0.74rem; font-weight: 500;">Ultra-Fast • Low Resource</div>
+            </div>
+          </div>
+          <div class="guide-card-body">
+            Instant transcription with minimal memory consumption. Ideal for real-time dictation, quick drafts, and battery-friendly laptop use.
+          </div>
+          <div style="margin-top: 10px; font-size: 0.76rem; color: var(--color-text-dim);">
+            RAM: ~100 - 200 MB • Runs effortlessly on any CPU
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Key Concepts to Know -->
+      <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 2px;">
+        <div class="guide-concept-card">
+          <span style="font-size: 1.25rem;">🇬🇧</span>
+          <div>
+            <div style="font-weight: 600; color: #fff; font-size: 0.88rem; margin-bottom: 2px;">English-Only Models (<code>.en</code>) vs Multilingual</div>
+            <div style="font-size: 0.82rem; color: var(--color-text-muted); line-height: 1.45;">
+              Models with the <code>.en</code> suffix (such as <code>small.en</code> or <code>base.en</code>) dedicate their full vocabulary exclusively to English. For English audio, they provide <strong>10% to 15% higher accuracy</strong> and faster inference than multilingual models of identical size.
+            </div>
+          </div>
+        </div>
+
+        <div class="guide-concept-card">
+          <span style="font-size: 1.25rem;">🗜️</span>
+          <div>
+            <div style="font-weight: 600; color: #fff; font-size: 0.88rem; margin-bottom: 2px;">Quantization (<code>-q5_0</code>, <code>-q8_0</code>)</div>
+            <div style="font-size: 0.82rem; color: var(--color-text-muted); line-height: 1.45;">
+              Quantized models compress 16-bit weights into 5-bit or 8-bit integers, reducing file size and RAM usage by <strong>40% to 60%</strong> with negligible recognition loss, enabling Large models to run smoothly on standard laptops.
+            </div>
+          </div>
+        </div>
+
+        <div class="guide-concept-card" onclick="switchModelCategory('vad')" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchModelCategory('vad');}" aria-label="Explore Silero Voice Activity Detection Models" style="cursor: pointer; transition: var(--transition-smooth);" onmouseenter="this.style.borderColor='rgba(var(--color-royal-blue-rgb), 0.4)'" onmouseleave="this.style.borderColor='var(--border-glass)'">
+          <span style="font-size: 1.25rem;">🎙️</span>
+          <div style="flex-grow: 1;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+              <div style="font-weight: 600; color: #fff; font-size: 0.88rem;">Silero Voice Activity Detection (VAD)</div>
+              <span style="font-size: 0.75rem; color: var(--color-royal-blue); font-weight: 500;">Click to view VAD models →</span>
+            </div>
+            <div style="font-size: 0.82rem; color: var(--color-text-muted); line-height: 1.45;">
+              Silero VAD (885 KB) is an ultra-fast speech-detection preprocessor. It removes silent intervals and non-speech noise before sending audio to Whisper, drastically accelerating processing and preventing hallucinations during pauses.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. Footer Category Switchers -->
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px; flex-wrap: wrap;">
+        <button class="btn-secondary" onclick="switchModelCategory('small')" style="margin: 0; padding: 8px 16px; font-size: 0.84rem;">Explore Small Family</button>
+        <button class="btn-secondary" onclick="switchModelCategory('large')" style="margin: 0; padding: 8px 16px; font-size: 0.84rem;">Explore Large Family</button>
+        <button class="btn-secondary" onclick="switchModelCategory('vad')" style="margin: 0; padding: 8px 16px; font-size: 0.84rem;">Silero VAD</button>
+        <button class="btn-primary" onclick="switchModelCategory('all')" style="margin: 0; padding: 8px 18px; font-size: 0.84rem;">Browse All Models</button>
+      </div>
+    </div>
+  `;
+}
+
+window.switchModelCategory = function(category, clearSearch = true) {
   currentCategoryFilter = category;
   
+  if (clearSearch) {
+    const searchInput = document.getElementById('model-search');
+    if (searchInput) searchInput.value = '';
+  }
+
   const buttons = document.querySelectorAll('#model-categories-sidebar .settings-cat-btn');
   buttons.forEach(btn => {
     btn.classList.remove('active');
@@ -4055,6 +4229,15 @@ window.switchModelCategory = function(category) {
     gridScroll.scrollTop = 0;
   }
   
+  loadModelStatusesGrid();
+};
+
+window.clearModelSearch = function() {
+  const searchInput = document.getElementById('model-search');
+  if (searchInput) {
+    searchInput.value = '';
+    searchInput.focus();
+  }
   loadModelStatusesGrid();
 };
 
@@ -4091,8 +4274,7 @@ window.loadModelStatusesGrid = async function(isSilent = false) {
     specsSubtitle.innerHTML = `
       System detected: <strong style="color: var(--color-cyan);">${systemSpecs.total_ram_gb.toFixed(1)} GB RAM</strong>, 
       <strong style="color: var(--color-cyan);">${systemSpecs.cpu_cores} CPU Cores</strong>, 
-      <strong style="color: var(--color-cyan);">${gpuName}</strong>. 
-      Recommended models optimized for your hardware are highlighted below.
+      <strong style="color: var(--color-cyan);">${gpuName}</strong>.
     `;
   }
   
@@ -4103,8 +4285,14 @@ window.loadModelStatusesGrid = async function(isSilent = false) {
     if (!grid) return;
     
     const searchInput = document.getElementById('model-search');
-    const query = searchInput ? searchInput.value.toLowerCase() : '';
+    const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
     
+    // Model Guide Overview Display
+    if (currentCategoryFilter === 'guide' && !query) {
+      renderModelGuide(grid);
+      return;
+    }
+
     grid.innerHTML = '';
     if (!grid._modelDelegate) {
       grid.addEventListener('click', function(e) {
@@ -4122,26 +4310,8 @@ window.loadModelStatusesGrid = async function(isSilent = false) {
       grid._modelDelegate = true;
     }
     
-    // Determine dynamic list of recommended models based on specs and GPU
-    let recList = ["tiny", "tiny.en", "base", "base.en"];
-    const hasGpuAcceleration = systemSpecs.gpu_type === 'nvidia' || systemSpecs.gpu_type === 'amd' || systemSpecs.gpu_type === 'intel';
-    
-    if (hasGpuAcceleration) {
-      if (systemSpecs.total_ram_gb >= 16.0) {
-        recList = ["base", "base.en", "small", "small.en", "medium", "medium.en", "large-v3-turbo", "small-q8_0"];
-      } else if (systemSpecs.total_ram_gb >= 8.0) {
-        recList = ["tiny", "tiny.en", "base", "base.en", "small", "small.en", "large-v3-turbo", "small-q8_0"];
-      } else {
-        recList = ["tiny", "tiny.en", "base", "base.en", "base-q8_0"];
-      }
-    } else {
-      if (systemSpecs.total_ram_gb >= 16.0) {
-        recList = ["base", "base.en", "small", "small.en", "base-q8_0", "small-q8_0"];
-      } else if (systemSpecs.total_ram_gb >= 8.0) {
-        recList = ["tiny", "tiny.en", "base", "base.en", "base-q8_0", "small-q8_0"];
-      }
-    }
-    
+    let renderedCount = 0;
+
     statuses.forEach(m => {
       if (query) {
         const fullName = `ggml-${m.name}.bin`;
@@ -4151,28 +4321,24 @@ window.loadModelStatusesGrid = async function(isSilent = false) {
         }
       }
 
-      // EXCLUSIVE SEPARATION:
-      // Downloaded models should only show in the "local" tab, and not anywhere else!
+      // Category Filter Logic:
+      // - "local" tab is a dedicated quick-filter showing ONLY downloaded models on disk
+      // - All family category tabs (tiny, base, small, medium, large, vad, all) show all models (downloadable & downloaded)
       if (currentCategoryFilter === 'local') {
         if (m.status !== 'Downloaded') return;
-      } else {
-        if (m.status === 'Downloaded') return;
-
-        // When a search query is active, bypass category tabs and show all matches
-        if (!query) {
-          if (currentCategoryFilter === 'recommended') {
-            if (!recList.includes(m.name)) return;
-          } else if (currentCategoryFilter === 'tiny') {
-            if (!m.name.startsWith("tiny")) return;
-          } else if (currentCategoryFilter === 'base') {
-            if (!m.name.startsWith("base")) return;
-          } else if (currentCategoryFilter === 'small') {
-            if (!m.name.startsWith("small")) return;
-          } else if (currentCategoryFilter === 'medium') {
-            if (!m.name.startsWith("medium")) return;
-          } else if (currentCategoryFilter === 'large') {
-            if (!m.name.startsWith("large")) return;
-          }
+      } else if (!query) {
+        if (currentCategoryFilter === 'tiny') {
+          if (!m.name.startsWith("tiny")) return;
+        } else if (currentCategoryFilter === 'base') {
+          if (!m.name.startsWith("base")) return;
+        } else if (currentCategoryFilter === 'small') {
+          if (!m.name.startsWith("small")) return;
+        } else if (currentCategoryFilter === 'medium') {
+          if (!m.name.startsWith("medium")) return;
+        } else if (currentCategoryFilter === 'large') {
+          if (!m.name.startsWith("large")) return;
+        } else if (currentCategoryFilter === 'vad') {
+          if (!m.name.startsWith("silero-")) return;
         }
       }
       
@@ -4181,68 +4347,64 @@ window.loadModelStatusesGrid = async function(isSilent = false) {
       card.dataset.name = m.name;
       card.setAttribute('data-model', m.name);
       
-      let badgeHtml = '';
-      if (m.status === 'Downloading') {
-        badgeHtml = `<span class="model-badge badge-downloading">${m.status}</span>`;
-      } else if (m.status === 'Paused') {
-        badgeHtml = `<span class="model-badge badge-paused">${m.status}</span>`;
-      }
-      
-      let isRecommended = recList.includes(m.name);
       const sizeMB = (m.sizeBytes / 1024 / 1024).toFixed(0);
       const dlMB = (m.downloadedBytes / 1024 / 1024).toFixed(0);
       const pct = Math.round((m.progress || 0) * 100);
+      const safeName = escapeHTML(m.name);
+      const meta = getModelMetaInfo(m.name);
+
       let actionButtons = '';
       if (m.status === 'Downloaded') {
         actionButtons = `
-          <button class="btn-secondary" style="border-color: var(--color-red); color: var(--color-red); margin: 0; padding: 6px 14px; font-size: 0.8rem;" data-action="delete">Delete</button>
+          <button class="model-action-btn model-btn-delete" data-action="delete" aria-label="Delete model ggml-${safeName}.bin">${MODEL_ICON_DELETE}<span>Delete</span></button>
         `;
       } else if (m.status === 'Downloading') {
         actionButtons = `
-          <button class="btn-secondary" style="border-color: var(--color-gold); color: var(--color-gold); margin: 0; padding: 6px 14px; font-size: 0.8rem;" data-action="pause">Pause</button>
+          <button class="model-action-btn model-btn-pause" data-action="pause" aria-label="Pause downloading ggml-${safeName}.bin">${MODEL_ICON_PAUSE}<span>Pause</span></button>
         `;
       } else if (m.status === 'Paused') {
         actionButtons = `
-          <button class="btn-primary" style="margin: 0; padding: 6px 14px; font-size: 0.8rem; justify-content: center;" data-action="download">Resume</button>
-          <button class="btn-secondary" style="border-color: var(--color-red); color: var(--color-red); margin: 0; padding: 6px 14px; font-size: 0.8rem;" data-action="delete">Discard</button>
+          <button class="model-action-btn model-btn-resume" data-action="download" aria-label="Resume downloading ggml-${safeName}.bin">${MODEL_ICON_RESUME}<span>Resume</span></button>
+          <button class="model-action-btn model-btn-delete" data-action="delete" aria-label="Discard partial download of ggml-${safeName}.bin">${MODEL_ICON_DELETE}<span>Discard</span></button>
         `;
       } else {
         actionButtons = `
-          <button class="btn-primary" style="margin: 0; padding: 6px 14px; font-size: 0.8rem; min-width: 100px; justify-content: center;" data-action="download">Download</button>
+          <button class="model-action-btn model-btn-download" data-action="download" aria-label="Download model ggml-${safeName}.bin">${MODEL_ICON_DOWNLOAD}<span>Download</span></button>
         `;
       }
       
       const showProgressBlock = m.status === 'Downloading' || m.status === 'Paused' ? 'block' : 'none';
-      const isQuant = m.name.includes("-q");
       
-      let recommendedBadge = '';
-      if (isRecommended) {
-        let reason = "Recommended";
-        if (hasGpuAcceleration && (m.name.includes("small") || m.name.includes("medium") || m.name.includes("turbo"))) {
-          reason = `${systemSpecs.gpu_type.toUpperCase()} GPU Recommended`;
-        } else if (m.name.includes("-q")) {
-          reason = "Fast CPU Quantized";
-        } else if (m.name.startsWith("tiny") || m.name.startsWith("base")) {
-          reason = "Lightweight & Fast";
-        }
-        recommendedBadge = `<span class="model-badge" style="background: rgba(6, 182, 212, 0.08); color: var(--color-cyan); border: 1px solid rgba(6, 182, 212, 0.25); margin-right: 6px;" title="${reason}">★ ${reason}</span>`;
+      let badgeHtml = '';
+      if (m.name.startsWith('silero-')) {
+        badgeHtml = `<span class="model-badge model-badge-vad" title="Voice Activity Detection (Silero)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg><span>Silero VAD</span></span>`;
       }
-      
-      const safeName = escapeHTML(m.name);
+
+      let statusBadge = '';
+      if (m.status === 'Downloaded') {
+        statusBadge = `<span class="model-badge badge-installed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span>Installed</span></span>`;
+      } else if (m.status === 'Downloading') {
+        statusBadge = `<span class="model-badge badge-downloading">Downloading</span>`;
+      } else if (m.status === 'Paused') {
+        statusBadge = `<span class="model-badge badge-paused">Paused</span>`;
+      }
+
       card.innerHTML = `
         <div class="setting-info" style="flex-grow: 1; padding-right: 20px;">
           <div class="setting-label-row" style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
             <span class="setting-title" style="font-size: 1.05rem; font-weight: 600; color: #fff;">ggml-${safeName}.bin</span>
-            ${recommendedBadge}
+            ${badgeHtml}
           </div>
           <div class="setting-desc" style="font-size: 0.82rem; color: var(--color-text-muted); line-height: 1.4; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-            ${badgeHtml}
-            ${badgeHtml ? '<span style="color: rgba(255,255,255,0.1);">|</span>' : ''}
+            ${statusBadge}
+            ${statusBadge ? '<span style="color: rgba(255,255,255,0.1);">|</span>' : ''}
             <span>Expected Size: ${sizeMB} MB</span>
+            ${meta.precisionText ? `
+              <span style="color: rgba(255,255,255,0.1);">|</span>
+              <span>${meta.precisionText}</span>
+            ` : ''}
             <span style="color: rgba(255,255,255,0.1);">|</span>
-            <span style="color: ${isQuant ? 'var(--color-cyan)' : 'var(--color-royal-blue)'}; font-weight: 500;">
-              ${isQuant ? 'Quantized Optimized (5-bit/8-bit)' : 'Full Precision (16-bit)'}
-            </span>
+            <span>${meta.langText}</span>
             ${m.status === 'Downloading' ? `
               <span style="color: rgba(255,255,255,0.1);">|</span>
               <span style="color: var(--color-cyan);">${dlMB} MB (${pct}%) • In progress</span>
@@ -4261,7 +4423,25 @@ window.loadModelStatusesGrid = async function(isSilent = false) {
         </div>
       `;
       grid.appendChild(card);
+      renderedCount++;
     });
+
+    if (renderedCount === 0) {
+      grid.innerHTML = `
+        <div class="models-empty-state" style="padding: 48px 20px;">
+          <div class="models-empty-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              <line x1="8" y1="11" x2="14" y2="11"></line>
+            </svg>
+          </div>
+          <div class="models-empty-title">No Matching Models Found</div>
+          <div class="models-empty-desc">${query ? `No models match your search keyword <code>${escapeHTML(query)}</code>.` : 'No models available under this category.'}</div>
+          ${query ? `<button type="button" class="btn-secondary btn-sm" onclick="clearModelSearch()" style="margin-top: 8px;">Clear Search</button>` : ''}
+        </div>
+      `;
+    }
     
   } catch (err) {
     console.error("Failed to load model statuses:", err);
@@ -4274,6 +4454,16 @@ window.filterModelsGrid = function() {
   if (filterModelsGrid._timer) clearTimeout(filterModelsGrid._timer);
   filterModelsGrid._timer = setTimeout(() => {
     filterModelsGrid._timer = null;
+    const searchInput = document.getElementById('model-search');
+    const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+    // If typing a search while currently on Guide tab, automatically switch to 'all' category
+    if (query && currentCategoryFilter === 'guide') {
+      currentCategoryFilter = 'all';
+      const buttons = document.querySelectorAll('#model-categories-sidebar .settings-cat-btn');
+      buttons.forEach(btn => btn.classList.remove('active'));
+      const allBtn = document.getElementById('model-cat-all');
+      if (allBtn) allBtn.classList.add('active');
+    }
     loadModelStatusesGrid();
   }, 250);
 };
@@ -4289,7 +4479,7 @@ window.downloadModelClick = async function(name) {
     if (card) {
       const ctrlEl = card.querySelector('.setting-control');
       if (ctrlEl) {
-        ctrlEl.innerHTML = `<button class="btn-secondary" style="border-color: var(--color-gold); color: var(--color-gold); margin: 0; padding: 6px 14px; font-size: 0.8rem;" data-action="pause">Pause</button>`;
+        ctrlEl.innerHTML = `<button class="model-action-btn model-btn-pause" data-action="pause" aria-label="Pause downloading ggml-${escapeHTML(name)}.bin">${MODEL_ICON_PAUSE}<span>Pause</span></button>`;
       }
     }
 
