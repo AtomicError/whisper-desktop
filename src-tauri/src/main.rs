@@ -597,53 +597,133 @@ fn main() {
             std::env::set_var("GDK_DPI_SCALE", "1.0");
         }
 
-        // Resolve WebKit subprocess ICU dependency loading crashes inside the AppImage environment.
-        if std::env::var("APPIMAGE").is_ok() {
-            std::env::set_var("WEBKIT_DISABLE_SANDBOX", "1");
-            
-            if let Ok(appdir) = std::env::var("APPDIR") {
-                let shared_lib_path = format!("{}/shared/lib", appdir);
-                let usr_lib_path = format!("{}/usr/lib/x86_64-linux-gnu", appdir);
-                if let Ok(existing_paths) = std::env::var("LD_LIBRARY_PATH") {
-                    std::env::set_var("LD_LIBRARY_PATH", format!("{}:{}:{}", shared_lib_path, usr_lib_path, existing_paths));
-                } else {
-                    std::env::set_var("LD_LIBRARY_PATH", format!("{}:{}", shared_lib_path, usr_lib_path));
-                }
-            }
+        // Prevent WebKitGTK DMA-BUF renderer compositing glitches and texture ghosting on Linux / VMs
+        if std::env::var("WEBKIT_DISABLE_DMABUF_RENDERER").is_err() {
+            std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
         }
 
-        // Configure GStreamer plugin search paths on Linux / AppImage to ensure WebKitGTK
-        // can resolve audio/video sinks (autoaudiosink, pulsesink, pipewiresink) and avoid
-        // NULL pointer crashes in WebKitWebProcess when loading HTML5 video elements.
-        let default_gst_plugin_dirs = [
-            "/usr/lib/x86_64-linux-gnu/gstreamer-1.0",
-            "/usr/lib64/gstreamer-1.0",
-            "/usr/lib/gstreamer-1.0",
-            "/usr/local/lib/gstreamer-1.0",
-            "/usr/lib/i386-linux-gnu/gstreamer-1.0",
-            "/usr/lib/aarch64-linux-gnu/gstreamer-1.0",
-        ];
-        let existing_gst_dirs: Vec<String> = default_gst_plugin_dirs
-            .iter()
-            .filter(|p| std::path::Path::new(p).exists())
-            .map(|s| s.to_string())
-            .collect();
-
-        if !existing_gst_dirs.is_empty() {
-            let joined = existing_gst_dirs.join(":");
-            if let Ok(existing_sys) = std::env::var("GST_PLUGIN_SYSTEM_PATH_1_0") {
-                if !existing_sys.contains(&joined) {
-                    std::env::set_var("GST_PLUGIN_SYSTEM_PATH_1_0", format!("{}:{}", existing_sys, joined));
-                }
-            } else {
-                std::env::set_var("GST_PLUGIN_SYSTEM_PATH_1_0", &joined);
+        // Resolve WebKit subprocess and GStreamer dependencies inside AppImage environment.
+        if let Ok(appdir) = std::env::var("APPDIR") {
+            if std::env::var("WEBKIT_DISABLE_SANDBOX").is_err() {
+                std::env::set_var("WEBKIT_DISABLE_SANDBOX", "1");
             }
-            if let Ok(existing_path) = std::env::var("GST_PLUGIN_PATH_1_0") {
-                if !existing_path.contains(&joined) {
-                    std::env::set_var("GST_PLUGIN_PATH_1_0", format!("{}:{}", existing_path, joined));
+
+            let mut ld_paths = vec![format!("{}/shared/lib", appdir)];
+            let usr_lib_x86 = format!("{}/usr/lib/x86_64-linux-gnu", appdir);
+            let usr_lib_arm = format!("{}/usr/lib/aarch64-linux-gnu", appdir);
+            let usr_lib_generic = format!("{}/usr/lib", appdir);
+
+            if std::path::Path::new(&usr_lib_x86).is_dir() {
+                ld_paths.push(usr_lib_x86);
+            }
+            if std::path::Path::new(&usr_lib_arm).is_dir() {
+                ld_paths.push(usr_lib_arm);
+            }
+            if std::path::Path::new(&usr_lib_generic).is_dir() {
+                ld_paths.push(usr_lib_generic);
+            }
+
+            let joined_ld = ld_paths.join(":");
+            if let Ok(existing_paths) = std::env::var("LD_LIBRARY_PATH") {
+                std::env::set_var("LD_LIBRARY_PATH", format!("{}:{}", joined_ld, existing_paths));
+            } else {
+                std::env::set_var("LD_LIBRARY_PATH", joined_ld);
+            }
+
+            // Configure bundled GStreamer plugins inside the AppImage to isolate strictly from host plugins
+            let bundled_gst_dirs = [
+                format!("{}/usr/lib/gstreamer-1.0", appdir),
+                format!("{}/usr/lib/x86_64-linux-gnu/gstreamer-1.0", appdir),
+                format!("{}/usr/lib/aarch64-linux-gnu/gstreamer-1.0", appdir),
+            ];
+            let existing_bundled_gst: Vec<String> = bundled_gst_dirs
+                .into_iter()
+                .filter(|p| std::path::Path::new(p).is_dir())
+                .collect();
+
+            if !existing_bundled_gst.is_empty() {
+                let joined_bundled = existing_bundled_gst.join(":");
+                std::env::set_var("GST_PLUGIN_SYSTEM_PATH_1_0", &joined_bundled);
+                std::env::set_var("GST_PLUGIN_PATH_1_0", &joined_bundled);
+
+                // Clean up only stale registry files whose PID is no longer alive in /proc
+                let temp_dir = std::env::temp_dir();
+                if let Ok(entries) = std::fs::read_dir(&temp_dir) {
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                            if let Some(pid_str) = name.strip_prefix("whisper_appimage_gst_registry_").and_then(|s| s.strip_suffix(".bin")) {
+                                if let Ok(pid) = pid_str.parse::<i32>() {
+                                    let proc_path = format!("/proc/{}", pid);
+                                    if !std::path::Path::new(&proc_path).exists() {
+                                        let _ = std::fs::remove_file(path);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Set a clean isolated registry in standard temp directory
+                let mut registry_path = temp_dir;
+                registry_path.push(format!("whisper_appimage_gst_registry_{}.bin", std::process::id()));
+                std::env::set_var("GST_REGISTRY_1_0", registry_path.to_string_lossy().as_ref());
+
+                // Look for bundled gst-plugin-scanner (supports both x86_64 and aarch64)
+                let scanner_candidates = [
+                    format!("{}/usr/lib/gstreamer1.0/gstreamer-1.0/gst-plugin-scanner", appdir),
+                    format!("{}/usr/lib/x86_64-linux-gnu/gstreamer1.0/gstreamer-1.0/gst-plugin-scanner", appdir),
+                    format!("{}/usr/lib/x86_64-linux-gnu/gstreamer-1.0/gst-plugin-scanner", appdir),
+                    format!("{}/usr/lib/aarch64-linux-gnu/gstreamer1.0/gstreamer-1.0/gst-plugin-scanner", appdir),
+                    format!("{}/usr/lib/aarch64-linux-gnu/gstreamer-1.0/gst-plugin-scanner", appdir),
+                    format!("{}/usr/libexec/gstreamer-1.0/gst-plugin-scanner", appdir),
+                    format!("{}/usr/lib/gstreamer-1.0/gst-plugin-scanner", appdir),
+                ];
+                for scanner in &scanner_candidates {
+                    if std::path::Path::new(scanner).is_file() {
+                        std::env::set_var("GST_PLUGIN_SCANNER_1_0", scanner);
+                        std::env::set_var("GST_PLUGIN_SCANNER", scanner);
+                        break;
+                    }
                 }
             } else {
-                std::env::set_var("GST_PLUGIN_PATH_1_0", &joined);
+                // If AppImage has no bundled media plugins, empty the system path to prevent symbol clashes with host
+                std::env::set_var("GST_PLUGIN_SYSTEM_PATH_1_0", "");
+            }
+        } else {
+            // Native host execution (dev mode, deb, rpm):
+            // Configure GStreamer plugin search paths on host Linux to ensure WebKitGTK
+            // can resolve audio/video sinks (autoaudiosink, pulsesink, pipewiresink)
+            let default_gst_plugin_dirs = [
+                "/usr/lib/x86_64-linux-gnu/gstreamer-1.0",
+                "/usr/lib64/gstreamer-1.0",
+                "/usr/lib/gstreamer-1.0",
+                "/usr/local/lib/gstreamer-1.0",
+                "/usr/lib/i386-linux-gnu/gstreamer-1.0",
+                "/usr/lib/aarch64-linux-gnu/gstreamer-1.0",
+            ];
+            let existing_gst_dirs: Vec<String> = default_gst_plugin_dirs
+                .iter()
+                .filter(|p| std::path::Path::new(p).is_dir())
+                .map(|s| s.to_string())
+                .collect();
+
+            if !existing_gst_dirs.is_empty() {
+                let joined = existing_gst_dirs.join(":");
+                if let Ok(existing_sys) = std::env::var("GST_PLUGIN_SYSTEM_PATH_1_0") {
+                    if !existing_sys.contains(&joined) {
+                        std::env::set_var("GST_PLUGIN_SYSTEM_PATH_1_0", format!("{}:{}", existing_sys, joined));
+                    }
+                } else {
+                    std::env::set_var("GST_PLUGIN_SYSTEM_PATH_1_0", &joined);
+                }
+                if let Ok(existing_path) = std::env::var("GST_PLUGIN_PATH_1_0") {
+                    if !existing_path.contains(&joined) {
+                        std::env::set_var("GST_PLUGIN_PATH_1_0", format!("{}:{}", existing_path, joined));
+                    }
+                } else {
+                    std::env::set_var("GST_PLUGIN_PATH_1_0", &joined);
+                }
             }
         }
     }

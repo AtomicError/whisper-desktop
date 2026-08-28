@@ -1091,7 +1091,6 @@ a:focus:not(:focus-visible),
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  contain: layout;
 }
 
 /* Header */
@@ -1113,7 +1112,7 @@ header {
   transition: opacity 0.1s ease;
 }
 
-/* Base Panel Views with Clean Instant Switching & Hardware Containment */
+/* Base Panel Views with Clean Instant Switching & Proper Stacking Context */
 .view-panel {
   position: absolute;
   top: 0;
@@ -1123,11 +1122,12 @@ header {
   padding: 32px;
   overflow-y: auto;
   display: none;
-  contain: layout style;
+  z-index: 1;
 }
 
 .view-panel.active {
   display: block;
+  z-index: 2;
 }
 
 /* Fixed Layout Panel Utility (No outer scrollbar, uses internal scrolling) */
@@ -1137,11 +1137,12 @@ header {
   flex-direction: column;
   height: 100%;
   box-sizing: border-box;
-  contain: layout style;
+  z-index: 1;
 }
 
 .view-panel.fixed-layout-panel.active {
   display: flex;
+  z-index: 2;
 }
 
 .glass-card {

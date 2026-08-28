@@ -64,7 +64,7 @@
         "desktopTemplate": "./desktop.desktop"
       },
       "appimage": {
-        "bundleMediaFramework": false
+        "bundleMediaFramework": true
       }
     }
   }
