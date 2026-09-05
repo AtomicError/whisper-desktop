@@ -115,6 +115,8 @@ pub struct WhisperSettings {
     pub theme: String,
     #[serde(default)]
     pub close_to_tray: bool,
+    #[serde(default = "default_ui_language")]
+    pub ui_language: String,
 }
 
 fn deserialize_i32_lenient<'de, D>(deserializer: D) -> Result<i32, D::Error>
@@ -175,6 +177,10 @@ fn default_ui_scale() -> f64 {
 
 fn default_output_dir_mode() -> String {
     "input_dir".to_string()
+}
+
+fn default_ui_language() -> String {
+    "en".to_string()
 }
 
 impl Default for WhisperSettings {
@@ -254,6 +260,7 @@ impl WhisperSettings {
             ui_scale: 1.0,
             theme: "royal-blue".to_string(),
             close_to_tray: false,
+            ui_language: "en".to_string(),
         }
     }
 
@@ -263,6 +270,11 @@ impl WhisperSettings {
             "fire-orange" | "fire" => "fire-orange".to_string(),
             "cyber-blue" | "royal-blue" => "royal-blue".to_string(),
             _ => "royal-blue".to_string(),
+        };
+
+        self.ui_language = match self.ui_language.as_str() {
+            "fa" => "fa".to_string(),
+            _ => "en".to_string(),
         };
 
         if self.ui_scale <= 0.0 || self.ui_scale.is_nan() {
@@ -923,6 +935,31 @@ mod tests {
 
         let loaded = load_settings_from_path(&temp_path);
         assert_eq!(loaded.theme, "fire-orange");
+
+        let _ = fs::remove_file(&temp_path);
+    }
+
+    #[test]
+    fn test_ui_language_sanitization_and_persistence() {
+        let mut settings = WhisperSettings::default_settings();
+        assert_eq!(settings.ui_language, "en");
+
+        // Invalid language fallback
+        settings.ui_language = "fr".to_string();
+        settings.sanitize_and_validate();
+        assert_eq!(settings.ui_language, "en");
+
+        // Valid Persian language
+        settings.ui_language = "fa".to_string();
+        settings.sanitize_and_validate();
+        assert_eq!(settings.ui_language, "fa");
+
+        // Test persistence roundtrip
+        let temp_path = temp_test_file("ui_language_test");
+        save_settings_to_path(&temp_path, &settings).unwrap();
+
+        let loaded = load_settings_from_path(&temp_path);
+        assert_eq!(loaded.ui_language, "fa");
 
         let _ = fs::remove_file(&temp_path);
     }

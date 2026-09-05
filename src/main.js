@@ -1,4 +1,5 @@
 import { hardsubController } from './hardsub.ts';
+import { initI18n, t, setLanguage, getLanguage, translateDOM } from './i18n/index.ts';
 
 // Global error catcher for visual debugging in frontend
 window.onerror = function(message, source, lineno, colno, error) {
@@ -1125,6 +1126,7 @@ window.initializeCustomSelects = function() {
 window.syncCustomSelects = function() {
   if (window.customSelectsMap) {
     window.customSelectsMap.forEach(cs => {
+      cs.updateOptions();
       cs.syncSelectedValue();
     });
   }
@@ -1405,6 +1407,9 @@ function setupZoomKeyboardShortcuts() {
 async function initApp() {
   console.log("Whisper Manager Desktop UI Initialized!");
   
+  // Initialize internationalization (i18n) and translate DOM
+  initI18n();
+  
   // Disable default webview context menu globally to make it feel like a native desktop app
   document.addEventListener('contextmenu', e => {
     // Allow right-click default context menu ONLY on inputs and textareas (for copy/cut/paste)
@@ -1526,6 +1531,15 @@ async function initApp() {
     });
   });
 
+  // Listen for language change events to re-render active dynamic components
+  window.addEventListener('whisper:languageChanged', () => {
+    if (activeView === 'models' && typeof loadModelStatusesGrid === 'function') {
+      loadModelStatusesGrid(true, true);
+    }
+  });
+
+  window.saveCurrentSettings = saveCurrentSettings;
+
   // Switch to default transcribe view
   switchView('transcribe');
 }
@@ -1577,17 +1591,10 @@ window.switchView = function(viewName) {
   }
   
   // Update Title
-  const titleMap = {
-    'transcribe': 'Transcribe File',
-    'hardsub': 'Hardsub Video Studio',
-    'models': 'Model Hub',
-    'settings': 'Configuration Grid',
-    'logs': 'Central Logging Center'
-  };
   const titleEl = document.getElementById('current-view-title');
   if (titleEl) {
     titleEl.style.opacity = '0.7';
-    titleEl.textContent = titleMap[viewName] || 'Whisper Manager';
+    titleEl.textContent = t(`nav.${viewName}`) || 'Whisper Manager';
     requestAnimationFrame(() => {
       titleEl.style.opacity = '1';
     });
@@ -1981,6 +1988,7 @@ window.switchSettingsCategory = function(catName) {
 async function refreshSettings() {
   try {
     settingsState = await invoke('load_settings');
+    window.settingsState = settingsState;
     
     // Apply UI scale from loaded settings
     if (settingsState && typeof settingsState.uiScale === 'number') {
@@ -1990,6 +1998,13 @@ async function refreshSettings() {
     // Apply Color Theme from loaded settings
     const currentTheme = (settingsState && settingsState.theme) ? settingsState.theme : 'royal-blue';
     applyTheme(currentTheme);
+
+    // Apply UI Language from loaded settings if specified (disk config is authoritative)
+    if (settingsState && settingsState.uiLanguage) {
+      if (settingsState.uiLanguage !== getLanguage()) {
+        setLanguage(settingsState.uiLanguage, false);
+      }
+    }
     
     // Set models dir input
     const inputEl = document.getElementById('opt-modelsDir');
@@ -2059,6 +2074,10 @@ function bindSettingsToDOM() {
           }
           if (key === 'theme') {
             switchTheme(val);
+            return;
+          }
+          if (key === 'uiLanguage') {
+            setLanguage(val);
             return;
           }
 
@@ -2215,6 +2234,9 @@ let saveSettingsDebounceTimer = null;
 async function saveCurrentSettings(immediate = false) {
   if (!settingsState) return;
   
+  // Ensure uiLanguage is synced
+  settingsState.uiLanguage = getLanguage();
+
   // Ensure local state numeric values are strictly typed
   for (const key of Object.keys(settingsState)) {
     if (INT_SETTING_KEYS.has(key) && typeof settingsState[key] === 'string') {
