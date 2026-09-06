@@ -1821,6 +1821,11 @@ header {
   align-items: center;
 }
 
+.setting-card:has(#opt-translateAiTargetLang) .setting-control,
+.setting-control.setting-control-wide {
+  width: 260px;
+}
+
 .outputs-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
