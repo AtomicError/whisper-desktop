@@ -3155,6 +3155,20 @@ select.select-control {
   filter: drop-shadow(0 0 4px rgba(var(--color-royal-blue-rgb), 0.5));
 }
 
+.toast-warning {
+  border-color: rgba(var(--color-gold-rgb), 0.35);
+  box-shadow: 0 0 20px rgba(var(--color-gold-rgb), 0.15), 0 10px 32px rgba(0, 0, 0, 0.6);
+}
+
+.toast-warning .toast-icon {
+  color: var(--color-gold);
+  filter: drop-shadow(0 0 4px rgba(var(--color-gold-rgb), 0.5));
+}
+
+.toast-warning .toast-progress-bar {
+  background: var(--color-gold);
+}
+
 /* Premium Unified Batch Queue Panel Styling */
 .batch-queue-panel {
   width: 100%;

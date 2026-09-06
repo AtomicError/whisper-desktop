@@ -234,9 +234,9 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">Active Backend</span>
+                        <span class="setting-title" data-i18n="settings.backendTitle">Active Backend</span>
                       </div>
-                      <div class="setting-desc">Execution backend for Whisper model inference.
+                      <div class="setting-desc"><span data-i18n="settings.backendDesc">Execution backend for Whisper model inference.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Standard:</strong> Universal CPU-only compatibility</span>
                           <span class="setting-desc-point">&bull; <strong>Vulkan:</strong> Universal GPU acceleration (AMD / Intel / NVIDIA)</span>
@@ -258,9 +258,9 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">Models Storage Directory</span>
+                        <span class="setting-title" data-i18n="settings.modelsDirTitle">Models Storage Directory</span>
                       </div>
-                      <div class="setting-desc">Local disk directory where GGML model files (<code>.bin</code>) are stored and scanned.
+                      <div class="setting-desc"><span data-i18n="settings.modelsDirDesc">Local disk directory where GGML model files (<code>.bin</code>) are stored and scanned.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>~/whisper.cpp</code></span>
                         </div>
@@ -273,17 +273,17 @@
                         </svg>
                         <input class="readonly-path-input" type="text" id="opt-modelsDir" readonly tabindex="-1" />
                       </div>
-                      <button class="btn-secondary path-browse-btn" onclick="browseModelsDirectory()" type="button">Browse</button>
+                      <button class="btn-secondary path-browse-btn" onclick="browseModelsDirectory()" type="button" data-i18n="common.browse">Browse</button>
                     </div>
                   </div>
 
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">Model Selection</span>
+                        <span class="setting-title" data-i18n="settings.modelSelectTitle">Model Selection</span>
                         <span class="setting-flag">-m</span>
                       </div>
-                      <div class="setting-desc">Active Whisper GGML speech recognition model.
+                      <div class="setting-desc"><span data-i18n="settings.modelSelectDesc">Active Whisper GGML speech recognition model.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Fast / Low RAM:</strong> <code>tiny</code>, <code>base</code>, <code>small</code></span>
                           <span class="setting-desc-point">&bull; <strong>High Accuracy:</strong> <code>medium</code>, <code>large-v3</code></span>
@@ -298,10 +298,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">FFmpeg Engine</span>
+                        <span class="setting-title" data-i18n="settings.ffmpegTitle">FFmpeg Engine</span>
                         <span id="ffmpeg-status-badge" class="setting-status-pill checking"><span class="ffmpeg-status-dot blue"></span> Checking...</span>
                       </div>
-                      <div class="setting-desc">Audio extractor engine used to decode input media files into 16kHz mono audio.
+                      <div class="setting-desc"><span data-i18n="settings.ffmpegDesc">Audio extractor engine used to decode input media files into 16kHz mono audio.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Internal:</strong> Standalone bundled binary (recommended, zero-config)</span>
                           <span class="setting-desc-point">&bull; <strong>System:</strong> Uses OS-installed FFmpeg binary</span>
@@ -310,8 +310,8 @@
                     </div>
                     <div class="setting-control">
                       <select class="select-control" id="opt-ffmpegSource">
-                        <option value="bundled">Internal</option>
-                        <option value="system">System</option>
+                        <option value="bundled" data-i18n="settings.ffmpegInternal">Internal</option>
+                        <option value="system" data-i18n="settings.ffmpegSystem">System</option>
                       </select>
                     </div>
                   </div>
@@ -319,9 +319,9 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">Minimize to System Tray on Close</span>
+                        <span class="setting-title" data-i18n="settings.trayTitle">Minimize to System Tray on Close</span>
                       </div>
-                      <div class="setting-desc">Keeps Whisper Desktop active in the background system tray when the main window is closed.
+                      <div class="setting-desc"><span data-i18n="settings.trayDesc">Keeps Whisper Desktop active in the background system tray when the main window is closed.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> Disabled (exits on window close)</span>
                         </div>
@@ -338,10 +338,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">UI Scale & Zoom</span>
+                        <span class="setting-title" data-i18n="settings.uiScaleTitle">UI Scale & Zoom</span>
                         <span id="ui-scale-badge" class="setting-status-pill checking">100%</span>
                       </div>
-                      <div class="setting-desc">Adjust the interface scaling to fit high-DPI displays.
+                      <div class="setting-desc"><span data-i18n="settings.uiScaleDesc">Adjust the interface scaling to fit high-DPI displays.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Shortcuts:</strong> <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">+</kbd> (In) &middot; <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">&minus;</kbd> (Out) &middot; <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">0</kbd> (Reset)</span>
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>100%</code></span>
@@ -372,17 +372,17 @@
                         <option value="1.6">160%</option>
                       </select>
                       <button class="btn-secondary ui-scale-btn ui-scale-btn-icon" type="button" onclick="adjustUiZoom(0.05)" title="Zoom In (Ctrl++)" aria-label="Zoom In (Ctrl++)">+</button>
-                      <button class="btn-secondary ui-scale-btn ui-scale-btn-text" type="button" onclick="setUiZoom(1.0)" title="Reset to 100% (Ctrl+0)" aria-label="Reset UI Scale to 100% (Ctrl+0)">Reset</button>
+                      <button class="btn-secondary ui-scale-btn ui-scale-btn-text" type="button" onclick="setUiZoom(1.0)" title="Reset to 100% (Ctrl+0)" aria-label="Reset UI Scale to 100% (Ctrl+0)" data-i18n="settings.uiScaleReset">Reset</button>
                     </div>
                   </div>
 
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">Language Spoken</span>
+                        <span class="setting-title" data-i18n="settings.langSpokenTitle">Language Spoken</span>
                         <span class="setting-flag">-l</span>
                       </div>
-                      <div class="setting-desc">Primary spoken language code in the audio (e.g. <code>fa</code>, <code>en</code>, <code>es</code>).
+                      <div class="setting-desc"><span data-i18n="settings.langSpokenDesc">Primary spoken language code in the audio (e.g. <code>fa</code>, <code>en</code>, <code>es</code>).</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>auto</code> (automatic detection)</span>
                           <span class="setting-desc-point">&bull; <strong>Tip:</strong> Explicitly setting the language skips detection and speeds up transcription.</span>
@@ -397,10 +397,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">Initial Prompt</span>
+                        <span class="setting-title" data-i18n="settings.initialPromptTitle">Initial Prompt</span>
                         <span class="setting-flag">--prompt</span>
                       </div>
-                      <div class="setting-desc">Contextual prompt to guide model spelling, domain terms, and acronyms.
+                      <div class="setting-desc"><span data-i18n="settings.initialPromptDesc">Contextual prompt to guide model spelling, domain terms, and acronyms.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Examples:</strong> <em>"Dr. John, COVID-19, PyTorch, iPhone 16"</em></span>
                           <span class="setting-desc-point">&bull; <strong>Tip:</strong> Also steers punctuation and capitalization preferences.</span>
@@ -415,10 +415,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">Carry Initial Prompt</span>
+                        <span class="setting-title" data-i18n="settings.carryPromptTitle">Carry Initial Prompt</span>
                         <span class="setting-flag">--carry-initial-prompt</span>
                       </div>
-                      <div class="setting-desc">Maintains the initial prompt across all 30-second audio chunks instead of only the first chunk.
+                      <div class="setting-desc"><span data-i18n="settings.carryPromptDesc">Maintains the initial prompt across all 30-second audio chunks instead of only the first chunk.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Recommended:</strong> Enabled for long audio with recurring names or technical terms.</span>
                         </div>
@@ -435,10 +435,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">Translate to English</span>
+                        <span class="setting-title" data-i18n="settings.translateTitle">Translate to English</span>
                         <span class="setting-flag">-tr</span>
                       </div>
-                      <div class="setting-desc">Directly translates non-English speech into English text output during transcription without requiring an external translation service.
+                      <div class="setting-desc"><span data-i18n="settings.translateDesc">Directly translates non-English speech into English text output during transcription without requiring an external translation service.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Output:</strong> English transcripts &amp; subtitles directly from foreign speech.</span>
                         </div>
@@ -455,10 +455,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">DTW Timestamps</span>
+                        <span class="setting-title" data-i18n="settings.dtwTitle">DTW Timestamps</span>
                         <span class="setting-flag">--dtw</span>
                       </div>
-                      <div class="setting-desc">Enables exact word-level timestamp alignment using Dynamic Time Warping (DTW).
+                      <div class="setting-desc"><span data-i18n="settings.dtwDesc">Enables exact word-level timestamp alignment using Dynamic Time Warping (DTW).</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Use case:</strong> Millimeter subtitle sync for karaoke and precise video captioning.</span>
                           <span class="setting-desc-point">&bull; <strong>Note:</strong> Automatically disables Flash Attention.</span>
@@ -478,10 +478,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">Threads Count</span>
+                        <span class="setting-title" data-i18n="settings.threadsTitle">Threads Count</span>
                         <span class="setting-flag">-t</span>
                       </div>
-                      <div class="setting-desc">Number of CPU worker threads allocated for decoding.
+                      <div class="setting-desc"><span data-i18n="settings.threadsDesc">Number of CPU worker threads allocated for decoding.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>4</code></span>
                           <span class="setting-desc-point">&bull; <strong>Recommended:</strong> Match your physical core count (e.g. <code>4–8</code>) for maximum speed.</span>
@@ -500,10 +500,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">Processors Count</span>
+                        <span class="setting-title" data-i18n="settings.processorsTitle">Processors Count</span>
                         <span class="setting-flag">-p</span>
                       </div>
-                      <div class="setting-desc">Number of parallel audio decoder instances.
+                      <div class="setting-desc"><span data-i18n="settings.processorsDesc">Number of parallel audio decoder instances.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>1</code> (standard single-file mode)</span>
                           <span class="setting-desc-point">&bull; <strong>Recommended:</strong> Increase (<code>2–4</code>) only when batch-transcribing multiple files.</span>
@@ -522,10 +522,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">Max Token Context</span>
+                        <span class="setting-title" data-i18n="settings.maxContextTitle">Max Token Context</span>
                         <span class="setting-flag">-mc</span>
                       </div>
-                      <div class="setting-desc">Maximum preceding token history passed to the decoder.
+                      <div class="setting-desc"><span data-i18n="settings.maxContextDesc">Maximum preceding token history passed to the decoder.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>-1</code> (automatic context window)</span>
                           <span class="setting-desc-point">&bull; <strong>When to change:</strong> Lower to <code>64–128</code> if the model loops or repeats the same sentence.</span>
@@ -544,10 +544,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">Max Segment Length</span>
+                        <span class="setting-title" data-i18n="settings.maxLenTitle">Max Segment Length</span>
                         <span class="setting-flag">-ml</span>
                       </div>
-                      <div class="setting-desc">Maximum character count allowed per subtitle line.
+                      <div class="setting-desc"><span data-i18n="settings.maxLenDesc">Maximum character count allowed per subtitle line.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>0</code> (unlimited natural sentence pauses)</span>
                           <span class="setting-desc-point">&bull; <strong>Recommended for Video / Reels:</strong> <code>35–45</code> characters for readable subtitles.</span>
@@ -566,10 +566,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">Time Offset (ms)</span>
+                        <span class="setting-title" data-i18n="settings.offsetTTitle">Time Offset (ms)</span>
                         <span class="setting-flag">-ot</span>
                       </div>
-                      <div class="setting-desc">Skip audio from the beginning up to this timestamp in milliseconds.
+                      <div class="setting-desc"><span data-i18n="settings.offsetTDesc">Skip audio from the beginning up to this timestamp in milliseconds.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>0</code> ms</span>
                           <span class="setting-desc-point">&bull; <strong>Example:</strong> Set to <code>30000</code> to skip a 30-second intro or podcast sponsor.</span>
@@ -584,10 +584,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">Process Duration (ms)</span>
+                        <span class="setting-title" data-i18n="settings.durationTitle">Process Duration (ms)</span>
                         <span class="setting-flag">-d</span>
                       </div>
-                      <div class="setting-desc">Process only a slice of audio in milliseconds starting from offset.
+                      <div class="setting-desc"><span data-i18n="settings.durationDesc">Process only a slice of audio in milliseconds starting from offset.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>0</code> ms (processes full file)</span>
                           <span class="setting-desc-point">&bull; <strong>Example:</strong> Set to <code>60000</code> to quickly preview a 1-minute clip.</span>
@@ -602,10 +602,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">Split on Word</span>
+                        <span class="setting-title" data-i18n="settings.splitOnWordTitle">Split on Word</span>
                         <span class="setting-flag">-sow</span>
                       </div>
-                      <div class="setting-desc">Forces subtitle line breaks strictly between full words rather than splitting in the middle of words.
+                      <div class="setting-desc"><span data-i18n="settings.splitOnWordDesc">Forces subtitle line breaks strictly between full words rather than splitting in the middle of words.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Recommended:</strong> Enabled for clean, professional subtitles.</span>
                         </div>
@@ -622,10 +622,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">Speaker Diarization</span>
+                        <span class="setting-title" data-i18n="settings.diarizeTitle">Speaker Diarization</span>
                         <span class="setting-flag">-di</span>
                       </div>
-                      <div class="setting-desc">Separates and labels speakers across stereo audio channels (Left vs Right channel).
+                      <div class="setting-desc"><span data-i18n="settings.diarizeDesc">Separates and labels speakers across stereo audio channels (Left vs Right channel).</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Output tags:</strong> <code>[SPEAKER 0]</code> and <code>[SPEAKER 1]</code></span>
                           <span class="setting-desc-point">&bull; <strong>Requirement:</strong> Requires 2-channel stereo audio.</span>
@@ -643,10 +643,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">Tiny Diarization</span>
+                        <span class="setting-title" data-i18n="settings.tinyDiarizeTitle">Tiny Diarization</span>
                         <span class="setting-flag">-tdrz</span>
                       </div>
-                      <div class="setting-desc">Detects speaker turn transitions within a single mono channel using specialized models.
+                      <div class="setting-desc"><span data-i18n="settings.tinyDiarizeDesc">Detects speaker turn transitions within a single mono channel using specialized models.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Requirement:</strong> Requires <code>tdrz</code>-enabled models (e.g. <code>small.en-tdrz</code>).</span>
                         </div>
@@ -665,10 +665,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">Best Candidates Count</span>
+                        <span class="setting-title" data-i18n="settings.bestOfTitle">Best Candidates Count</span>
                         <span class="setting-flag">-bo</span>
                       </div>
-                      <div class="setting-desc">Number of candidate sequences sampled during decoding.
+                      <div class="setting-desc"><span data-i18n="settings.bestOfDesc">Number of candidate sequences sampled during decoding.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>5</code></span>
                           <span class="setting-desc-point">&bull; <strong>Recommendation:</strong> Higher (<code>6–8</code>) boosts accuracy; lower (<code>1–2</code>) runs faster.</span>
@@ -687,10 +687,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">Beam Search Size</span>
+                        <span class="setting-title" data-i18n="settings.beamSizeTitle">Beam Search Size</span>
                         <span class="setting-flag">-bs</span>
                       </div>
-                      <div class="setting-desc">Exploration beam width for finding optimal word sequences.
+                      <div class="setting-desc"><span data-i18n="settings.beamSizeDesc">Exploration beam width for finding optimal word sequences.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>5</code></span>
                           <span class="setting-desc-point">&bull; <strong>Trade-off:</strong> Higher values reduce word errors and hallucinations, but increase transcription time.</span>
@@ -709,10 +709,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">Audio Context Size</span>
+                        <span class="setting-title" data-i18n="settings.audioCtxTitle">Audio Context Size</span>
                         <span class="setting-flag">-ac</span>
                       </div>
-                      <div class="setting-desc">Audio frame context length in samples.
+                      <div class="setting-desc"><span data-i18n="settings.audioCtxDesc">Audio frame context length in samples.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>0</code> (uses model default 30-second context window)</span>
                           <span class="setting-desc-point">&bull; <strong>Advanced:</strong> Restricts attention window for custom streaming workflows.</span>
@@ -727,10 +727,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">Word Timestamp Threshold</span>
+                        <span class="setting-title" data-i18n="settings.wordTholdTitle">Word Timestamp Threshold</span>
                         <span class="setting-flag">-wt</span>
                       </div>
-                      <div class="setting-desc">Acoustic probability cutoff for locking individual word timestamps.
+                      <div class="setting-desc"><span data-i18n="settings.wordTholdDesc">Acoustic probability cutoff for locking individual word timestamps.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>0.01</code></span>
                           <span class="setting-desc-point">&bull; <strong>When to change:</strong> Increase (<code>0.05–0.1</code>) if word timings drift during silent parts.</span>
@@ -745,10 +745,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">Entropy Threshold</span>
+                        <span class="setting-title" data-i18n="settings.entropyTholdTitle">Entropy Threshold</span>
                         <span class="setting-flag">-et</span>
                       </div>
-                      <div class="setting-desc">Decoder uncertainty cutoff for triggering temperature fallback retry.
+                      <div class="setting-desc"><span data-i18n="settings.entropyTholdDesc">Decoder uncertainty cutoff for triggering temperature fallback retry.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>2.4</code></span>
                           <span class="setting-desc-point">&bull; <strong>When to change:</strong> Lower to <code>2.2</code> if model produces repetitive gibberish.</span>
@@ -763,10 +763,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">Log Probability Threshold</span>
+                        <span class="setting-title" data-i18n="settings.logprobTholdTitle">Log Probability Threshold</span>
                         <span class="setting-flag">-lpt</span>
                       </div>
-                      <div class="setting-desc">Average token confidence threshold before fallback decoding is triggered.
+                      <div class="setting-desc"><span data-i18n="settings.logprobTholdDesc">Average token confidence threshold before fallback decoding is triggered.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>-1</code></span>
                           <span class="setting-desc-point">&bull; <strong>When to change:</strong> Lower to <code>-1.5</code> for noisy or accented speech to prevent unnecessary retries.</span>
@@ -781,10 +781,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">No Speech Threshold</span>
+                        <span class="setting-title" data-i18n="settings.noSpeechTholdTitle">No Speech Threshold</span>
                         <span class="setting-flag">-nth</span>
                       </div>
-                      <div class="setting-desc">Silence detection probability cutoff to suppress hallucinated words.
+                      <div class="setting-desc"><span data-i18n="settings.noSpeechTholdDesc">Silence detection probability cutoff to suppress hallucinated words.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>0.6</code></span>
                           <span class="setting-desc-point">&bull; <strong>When to change:</strong> Increase to <code>0.7–0.8</code> if Whisper hallucinates words during music or background noise.</span>
@@ -799,10 +799,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">Sampling Temperature</span>
+                        <span class="setting-title" data-i18n="settings.temperatureTitle">Sampling Temperature</span>
                         <span class="setting-flag">-tp</span>
                       </div>
-                      <div class="setting-desc">Controls decoding randomness and exploration.
+                      <div class="setting-desc"><span data-i18n="settings.temperatureDesc">Controls decoding randomness and exploration.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>0</code> (deterministic greedy decoding &mdash; highest precision)</span>
                           <span class="setting-desc-point">&bull; <strong>When to change:</strong> Set to <code>0.2–0.4</code> only if the model gets stuck in repetition loops.</span>
@@ -817,10 +817,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">Temperature Increment</span>
+                        <span class="setting-title" data-i18n="settings.tempIncTitle">Temperature Increment</span>
                         <span class="setting-flag">-tpi</span>
                       </div>
-                      <div class="setting-desc">Step size to increase temperature on each fallback retry.
+                      <div class="setting-desc"><span data-i18n="settings.tempIncDesc">Step size to increase temperature on each fallback retry.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>0.2</code></span>
                           <span class="setting-desc-point">&bull; <strong>Retry sequence:</strong> Automatically retries at <code>0.2</code>, <code>0.4</code>, <code>0.6</code>, up to <code>1.0</code>.</span>
@@ -836,10 +836,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">Disable Temperature Fallback</span>
+                        <span class="setting-title" data-i18n="settings.noFallbackTitle">Disable Temperature Fallback</span>
                         <span class="setting-flag">-nf</span>
                       </div>
-                      <div class="setting-desc">Skips retry passes with higher temperatures and accepts the first greedy pass.
+                      <div class="setting-desc"><span data-i18n="settings.noFallbackDesc">Skips retry passes with higher temperatures and accepts the first greedy pass.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Benefit:</strong> 30–50% faster processing on difficult or noisy files.</span>
                           <span class="setting-desc-point">&bull; <strong>Trade-off:</strong> Skips error recovery if speech is unclear.</span>
@@ -857,10 +857,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">Log Decoder Scores</span>
+                        <span class="setting-title" data-i18n="settings.logScoreTitle">Log Decoder Scores</span>
                         <span class="setting-flag">-ls</span>
                       </div>
-                      <div class="setting-desc">Prints raw confidence and probability scores for each decoded token into the activity log stream.
+                      <div class="setting-desc"><span data-i18n="settings.logScoreDesc">Prints raw confidence and probability scores for each decoded token into the activity log stream.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Use case:</strong> Debugging model confidence, timestamp boundaries, and acoustic quality.</span>
                         </div>
@@ -880,7 +880,7 @@
                   <div class="outputs-grid">
                     <div class="setting-card">
                       <div class="setting-info">
-                        <span class="setting-title">Text Transcript (.txt)</span>
+                        <span class="setting-title" data-i18n="settings.txtFormatTitle">Text Transcript (.txt)</span>
                         <span class="setting-flag">-otxt</span>
                       </div>
                       <div class="setting-control">
@@ -893,7 +893,7 @@
 
                     <div class="setting-card">
                       <div class="setting-info">
-                        <span class="setting-title">SRT Subtitles (.srt)</span>
+                        <span class="setting-title" data-i18n="settings.srtFormatTitle">SRT Subtitles (.srt)</span>
                         <span class="setting-flag">-osrt</span>
                       </div>
                       <div class="setting-control">
@@ -906,7 +906,7 @@
 
                     <div class="setting-card">
                       <div class="setting-info">
-                        <span class="setting-title">WebVTT Subtitles (.vtt)</span>
+                        <span class="setting-title" data-i18n="settings.vttFormatTitle">WebVTT Subtitles (.vtt)</span>
                         <span class="setting-flag">-ovtt</span>
                       </div>
                       <div class="setting-control">
@@ -919,7 +919,7 @@
 
                     <div class="setting-card">
                       <div class="setting-info">
-                        <span class="setting-title">LRC Lyrics (.lrc)</span>
+                        <span class="setting-title" data-i18n="settings.lrcFormatTitle">LRC Lyrics (.lrc)</span>
                         <span class="setting-flag">-olrc</span>
                       </div>
                       <div class="setting-control">
@@ -932,7 +932,7 @@
 
                     <div class="setting-card">
                       <div class="setting-info">
-                        <span class="setting-title">CSV Dataset (.csv)</span>
+                        <span class="setting-title" data-i18n="settings.csvFormatTitle">CSV Dataset (.csv)</span>
                         <span class="setting-flag">-ocsv</span>
                       </div>
                       <div class="setting-control">
@@ -945,7 +945,7 @@
 
                     <div class="setting-card">
                       <div class="setting-info">
-                        <span class="setting-title">JSON Formatted (.json)</span>
+                        <span class="setting-title" data-i18n="settings.jsonFormatTitle">JSON Formatted (.json)</span>
                         <span class="setting-flag">-oj</span>
                       </div>
                       <div class="setting-control">
@@ -958,7 +958,7 @@
 
                     <div class="setting-card">
                       <div class="setting-info">
-                        <span class="setting-title">Full Detailed JSON</span>
+                        <span class="setting-title" data-i18n="settings.jsonFullFormatTitle">Full Detailed JSON</span>
                         <span class="setting-flag">-ojf</span>
                       </div>
                       <div class="setting-control">
@@ -971,7 +971,7 @@
 
                     <div class="setting-card" id="card-printConfidence">
                       <div class="setting-info">
-                        <span class="setting-title">Word Confidence <span style="font-size:0.75rem; color:var(--color-text-muted); font-weight:normal;">(in JSON)</span></span>
+                        <span class="setting-title"><span data-i18n="settings.printConfidenceTitle">Word Confidence</span> <span style="font-size:0.75rem; color:var(--color-text-muted); font-weight:normal;">(in JSON)</span></span>
                         <span class="setting-flag">--print-confidence</span>
                       </div>
                       <div class="setting-control">
@@ -986,9 +986,9 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">Output Directory Mode</span>
+                        <span class="setting-title" data-i18n="settings.outputDirModeTitle">Output Directory Mode</span>
                       </div>
-                      <div class="setting-desc">Destination folder strategy for generated subtitles, transcripts, and export files.
+                      <div class="setting-desc"><span data-i18n="settings.outputDirModeDesc">Destination folder strategy for generated subtitles, transcripts, and export files.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Same as Input:</strong> Saves output files right next to original media file</span>
                           <span class="setting-desc-point">&bull; <strong>Custom Directory:</strong> Centralizes all outputs into a single designated folder</span>
@@ -998,8 +998,8 @@
                     <div class="setting-control" style="width:300px;">
                       <div class="select-wrapper" style="width:100%;">
                         <select class="select-control" id="opt-outputDirMode" onchange="toggleOutputDirCustomField()">
-                          <option value="input_dir">Same as Input File Directory (Default)</option>
-                          <option value="custom">Custom Directory...</option>
+                          <option value="input_dir" data-i18n="settings.outputDirSameAsInput">Same as Input File Directory (Default)</option>
+                          <option value="custom" data-i18n="settings.outputDirCustom">Custom Directory...</option>
                         </select>
                       </div>
                     </div>
@@ -1008,9 +1008,9 @@
                   <div class="setting-card" id="output-dir-custom-card" style="display:none;">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">Custom Output Path</span>
+                        <span class="setting-title" data-i18n="settings.outputDirCustomTitle">Custom Output Path</span>
                       </div>
-                      <div class="setting-desc">Dedicated folder path on disk where all transcripts and subtitles are saved.
+                      <div class="setting-desc"><span data-i18n="settings.outputDirCustomDesc">Dedicated folder path on disk where all transcripts and subtitles are saved.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Active when:</strong> Mode is set to <em>Custom Directory</em></span>
                         </div>
@@ -1021,9 +1021,9 @@
                         <svg class="path-folder-icon" viewBox="0 0 24 24" width="16" height="16">
                           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
                         </svg>
-                        <input class="readonly-path-input" type="text" id="opt-outputDirPath" readonly tabindex="-1" placeholder="Select output folder..." />
+                        <input class="readonly-path-input" type="text" id="opt-outputDirPath" readonly tabindex="-1" placeholder="Select output folder..." data-i18n-placeholder="settings.outputDirSelectPlaceholder" />
                       </div>
-                      <button class="btn-secondary path-browse-btn" onclick="browseOutputDir()" type="button">Browse</button>
+                      <button class="btn-secondary path-browse-btn" onclick="browseOutputDir()" type="button" data-i18n="common.browse">Browse</button>
                     </div>
                   </div>
                 </div>
@@ -1033,10 +1033,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">GPU Device Index</span>
+                        <span class="setting-title" data-i18n="settings.gpuDeviceTitle">GPU Device Index</span>
                         <span class="setting-flag">-dev</span>
                       </div>
-                      <div class="setting-desc">Target graphics card index on multi-GPU systems.
+                      <div class="setting-desc"><span data-i18n="settings.gpuDeviceDesc">Target graphics card index on multi-GPU systems.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>0</code> (primary graphics card)</span>
                           <span class="setting-desc-point">&bull; <strong>Multi-GPU:</strong> Set to <code>1</code> or <code>2</code> to target secondary GPUs.</span>
@@ -1055,10 +1055,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">OpenVINO Hardware Device</span>
+                        <span class="setting-title" data-i18n="settings.openvinoDeviceTitle">OpenVINO Hardware Device</span>
                         <span class="setting-flag">-oved</span>
                       </div>
-                      <div class="setting-desc">Target execution device for Intel OpenVINO acceleration.
+                      <div class="setting-desc"><span data-i18n="settings.openvinoDeviceDesc">Target execution device for Intel OpenVINO acceleration.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>GPU:</strong> Intel Arc dedicated GPU or integrated graphics (iGPU)</span>
                           <span class="setting-desc-point">&bull; <strong>CPU:</strong> AVX-optimized Intel CPU inference</span>
@@ -1078,10 +1078,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">Enable Voice Activity Detection</span>
+                        <span class="setting-title" data-i18n="settings.vadEnableTitle">Enable Voice Activity Detection</span>
                         <span class="setting-flag">--vad</span>
                       </div>
-                      <div class="setting-desc">Pre-filters audio using Silero VAD to detect and remove silent and non-speech sections before Whisper decoding.
+                      <div class="setting-desc"><span data-i18n="settings.vadEnableDesc">Pre-filters audio using Silero VAD to detect and remove silent and non-speech sections before Whisper decoding.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Benefits:</strong> Speeds up processing up to 3x and prevents silence hallucinations.</span>
                           <span class="setting-desc-point">&bull; <strong>Recommended:</strong> Keep enabled for podcasts, interviews, and long videos with pauses.</span>
@@ -1099,10 +1099,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">VAD Model</span>
+                        <span class="setting-title" data-i18n="settings.vadModelTitle">VAD Model</span>
                         <span class="setting-flag">-vm</span>
                       </div>
-                      <div class="setting-desc">Active Silero VAD model binary.
+                      <div class="setting-desc"><span data-i18n="settings.vadModelDesc">Active Silero VAD model binary.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>ggml-silero-v6.2.0.bin</code> (auto-loaded from models directory)</span>
                         </div>
@@ -1116,10 +1116,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">VAD Threshold</span>
+                        <span class="setting-title" data-i18n="settings.vadThresholdTitle">VAD Threshold</span>
                         <span class="setting-flag">-vt</span>
                       </div>
-                      <div class="setting-desc">Speech probability cutoff for triggering voice activity detection.
+                      <div class="setting-desc"><span data-i18n="settings.vadThresholdDesc">Speech probability cutoff for triggering voice activity detection.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>0.5</code></span>
                           <span class="setting-desc-point">&bull; <strong>Noisy / Heavy Breathing:</strong> Set to <code>0.65–0.75</code> (stricter filter)</span>
@@ -1135,10 +1135,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">VAD Min Speech (ms)</span>
+                        <span class="setting-title" data-i18n="settings.vadMinSpeechTitle">VAD Min Speech (ms)</span>
                         <span class="setting-flag">-vspd</span>
                       </div>
-                      <div class="setting-desc">Minimum continuous voice duration required to trigger transcription.
+                      <div class="setting-desc"><span data-i18n="settings.vadMinSpeechDesc">Minimum continuous voice duration required to trigger transcription.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>250</code> ms</span>
                           <span class="setting-desc-point">&bull; <strong>Purpose:</strong> Ignores brief clicks, coughs, and keystrokes shorter than this duration.</span>
@@ -1153,10 +1153,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">VAD Min Silence (ms)</span>
+                        <span class="setting-title" data-i18n="settings.vadMinSilenceTitle">VAD Min Silence (ms)</span>
                         <span class="setting-flag">-vsd</span>
                       </div>
-                      <div class="setting-desc">Minimum silence duration required to split speech into a new subtitle segment.
+                      <div class="setting-desc"><span data-i18n="settings.vadMinSilenceDesc">Minimum silence duration required to split speech into a new subtitle segment.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>100</code> ms</span>
                           <span class="setting-desc-point">&bull; <strong>Recommended for Subtitles:</strong> Increase to <code>300–500</code> ms for natural conversational pauses.</span>
@@ -1171,10 +1171,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">VAD Max Speech (ms)</span>
+                        <span class="setting-title" data-i18n="settings.vadMaxSpeechTitle">VAD Max Speech (ms)</span>
                         <span class="setting-flag">-vmsd</span>
                       </div>
-                      <div class="setting-desc">Maximum continuous speech segment duration sent to Whisper in one chunk.
+                      <div class="setting-desc"><span data-i18n="settings.vadMaxSpeechDesc">Maximum continuous speech segment duration sent to Whisper in one chunk.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>30,000</code> ms (30s)</span>
                           <span class="setting-desc-point">&bull; <strong>Purpose:</strong> Matches Whisper's acoustic window to prevent memory overflow.</span>
@@ -1189,10 +1189,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">VAD Speech Padding (ms)</span>
+                        <span class="setting-title" data-i18n="settings.vadSpeechPadTitle">VAD Speech Padding (ms)</span>
                         <span class="setting-flag">-vp</span>
                       </div>
-                      <div class="setting-desc">Audio buffer added before and after each detected speech segment.
+                      <div class="setting-desc"><span data-i18n="settings.vadSpeechPadDesc">Audio buffer added before and after each detected speech segment.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>30</code> ms</span>
                           <span class="setting-desc-point">&bull; <strong>Purpose:</strong> Prevents clipping starting consonants or trailing syllables.</span>
@@ -1207,10 +1207,10 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">VAD Segment Overlap</span>
+                        <span class="setting-title" data-i18n="settings.vadOverlapTitle">VAD Segment Overlap</span>
                         <span class="setting-flag">-vo</span>
                       </div>
-                      <div class="setting-desc">Contextual overlap ratio between consecutive speech segments.
+                      <div class="setting-desc"><span data-i18n="settings.vadOverlapDesc">Contextual overlap ratio between consecutive speech segments.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>0.1</code> (10%)</span>
                           <span class="setting-desc-point">&bull; <strong>Purpose:</strong> Preserves grammatical continuity across segment boundaries.</span>
@@ -1228,9 +1228,9 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">Enable AI Translation</span>
+                        <span class="setting-title" data-i18n="settings.aiTranslateTitle">Enable AI Translation</span>
                       </div>
-                      <div class="setting-desc">Automatically translates transcribed subtitles into your target language using cloud or local LLM APIs.
+                      <div class="setting-desc"><span data-i18n="settings.aiTranslateDesc">Automatically translates transcribed subtitles into your target language using cloud or local LLM APIs.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Supported:</strong> OpenAI, Claude, Gemini, Groq, Ollama, DeepSeek</span>
                         </div>
@@ -1246,9 +1246,9 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">Target Language</span>
+                        <span class="setting-title" data-i18n="settings.targetLangTitle">Target Language</span>
                       </div>
-                      <div class="setting-desc">Destination language for AI subtitle translation.
+                      <div class="setting-desc"><span data-i18n="settings.targetLangDesc">Destination language for AI subtitle translation.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Supported:</strong> 100+ global languages with native script rendering</span>
                         </div>
@@ -1385,9 +1385,9 @@
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title">Enable Polish Pass</span>
+                        <span class="setting-title" data-i18n="settings.polishTitle">Enable Polish Pass</span>
                       </div>
-                      <div class="setting-desc">Refines translated subtitles for natural conversational rhythm and reading speed.
+                      <div class="setting-desc"><span data-i18n="settings.polishDesc">Refines translated subtitles for natural conversational rhythm and reading speed.</span>
                         <div class="setting-desc-points">
                           <span class="setting-desc-point">&bull; <strong>Recommended:</strong> Enabled for natural subtitle flow, avoiding rigid word-for-word machine translations.</span>
                         </div>
@@ -1407,15 +1407,15 @@
                     <div class="active-model-banner" id="active-model-banner" style="display: none;">
                       <div class="active-model-banner-info">
                         <span class="active-model-banner-dot"></span>
-                        <span class="active-model-banner-label">Active Translation Model:</span>
+                        <span class="active-model-banner-label" data-i18n="settings.activeModelLabel">Active Translation Model:</span>
                         <strong class="active-model-banner-value" id="active-model-banner-value">None</strong>
                       </div>
                     </div>
                     <!-- Tab buttons -->
                     <div class="provider-tabs">
-                      <button class="provider-tab-btn active" onclick="switchProviderTab('providers')" id="tab-btn-providers">API Providers</button>
-                      <button class="provider-tab-btn" onclick="switchProviderTab('general')" id="tab-btn-general">General Configuration</button>
-                      <button class="provider-tab-btn" onclick="switchProviderTab('models')" id="tab-btn-models">Models (<span id="provider-models-count">0</span>)</button>
+                      <button class="provider-tab-btn active" onclick="switchProviderTab('providers')" id="tab-btn-providers" data-i18n="settings.tabProviders">API Providers</button>
+                      <button class="provider-tab-btn" onclick="switchProviderTab('general')" id="tab-btn-general" data-i18n="settings.tabGeneral">General Configuration</button>
+                      <button class="provider-tab-btn" onclick="switchProviderTab('models')" id="tab-btn-models"><span data-i18n="settings.tabModels">Models</span> (<span id="provider-models-count">0</span>)</button>
                     </div>
 
                     <!-- Tab 0 Content: Providers Card Grid -->
@@ -1437,17 +1437,17 @@
                           <line x1="12" y1="8" x2="12" y2="16"/>
                           <line x1="8" y1="12" x2="16" y2="12"/>
                         </svg>
-                        <div class="provider-placeholder-text">Please add or select an API Provider in the <strong>API Providers</strong> tab to configure its settings.</div>
+                        <div class="provider-placeholder-text" data-i18n="settings.providerSelectPrompt">Please add or select an API Provider in the <strong>API Providers</strong> tab to configure its settings.</div>
                       </div>
 
                       <div id="general-config-fields" style="display: none;">
                         <div class="provider-grid-two">
                           <div class="provider-field">
-                            <label>Base URL</label>
+                            <label data-i18n="settings.baseUrl">Base URL</label>
                             <input class="text-input" id="mgr-provider-url" type="text" placeholder="https://..." />
                           </div>
                           <div class="provider-field">
-                            <label>API Format</label>
+                            <label data-i18n="settings.apiFormat">API Format</label>
                             <select class="select-control" id="mgr-provider-format">
                               <option value="Chat completions">Chat completions (/chat/completions)</option>
                               <option value="Anthropic messages">Anthropic messages (/v1/messages)</option>
@@ -1457,7 +1457,7 @@
                         </div>
 
                         <div class="provider-field" style="margin-bottom: 20px;">
-                          <label>API Key (Update)</label>
+                          <label data-i18n="settings.apiKeyUpdate">API Key (Update)</label>
                           <div class="password-input-wrapper">
                             <input class="text-input" id="mgr-provider-key" type="password" placeholder="••••••••••••••••" />
                             <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('mgr-provider-key', this)">
@@ -1470,14 +1470,14 @@
                         </div>
 
                         <div class="provider-field" style="margin-bottom: 16px;">
-                          <label>Provider Custom System Prompt</label>
-                          <span>Custom instructions to guide translation tone, domain vocabulary, or formatting conventions. Leave blank for system defaults.</span>
+                          <label data-i18n="settings.providerCustomPrompt">Provider Custom System Prompt</label>
+                          <span data-i18n="settings.providerCustomPromptDesc">Custom instructions to guide translation tone, domain vocabulary, or formatting conventions. Leave blank for system defaults.</span>
                           <textarea class="textarea-control" id="mgr-provider-prompt" rows="3" placeholder="You are a professional translator..."></textarea>
                         </div>
 
                         <div class="provider-actions">
-                          <button class="btn-secondary btn-delete" onclick="deleteActiveProvider()">Delete Provider</button>
-                          <button class="btn-primary" id="mgr-btn-test-connection" onclick="testTranslationConnection()">Test Connection</button>
+                          <button class="btn-secondary btn-delete" onclick="deleteActiveProvider()" data-i18n="settings.deleteProvider">Delete Provider</button>
+                          <button class="btn-primary" id="mgr-btn-test-connection" onclick="testTranslationConnection()" data-i18n="settings.testConnBtn">Test Connection</button>
                         </div>
                       </div>
                     </div>
@@ -1491,7 +1491,7 @@
                           <line x1="12" y1="8" x2="12" y2="16"/>
                           <line x1="8" y1="12" x2="16" y2="12"/>
                         </svg>
-                        <div class="provider-placeholder-text">Please add or select an API Provider in the <strong>API Providers</strong> tab to configure its models catalog.</div>
+                        <div class="provider-placeholder-text" data-i18n="settings.modelsSelectPrompt">Please add or select an API Provider in the <strong>API Providers</strong> tab to configure its models catalog.</div>
                       </div>
 
                       <div id="models-catalog-fields" style="display: none;">
@@ -1502,7 +1502,7 @@
                               <circle cx="11" cy="11" r="8"></circle>
                               <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                             </svg>
-                            <input class="text-input models-search-input" id="mgr-models-search" type="text" placeholder="Search models by identifier..." oninput="filterModelsTable()" />
+                            <input class="text-input models-search-input" id="mgr-models-search" type="text" placeholder="Search models by identifier..." data-i18n-placeholder="settings.searchModelsPlaceholder" oninput="filterModelsTable()" />
                             <button type="button" class="models-search-clear" id="mgr-models-search-clear" onclick="clearModelsSearch()" style="display: none;" title="Clear Search">
                               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -1515,14 +1515,14 @@
                               <svg class="btn-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
                               </svg>
-                              <span>Fetch Models</span>
+                              <span data-i18n="settings.fetchModels">Fetch Models</span>
                             </button>
                             <button class="btn-secondary btn-model-action" id="mgr-btn-add-custom-model">
                               <svg class="btn-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <line x1="12" y1="5" x2="12" y2="19"></line>
                                 <line x1="5" y1="12" x2="19" y2="12"></line>
                               </svg>
-                              <span>Add Custom Model</span>
+                              <span data-i18n="settings.addCustomModel">Add Custom Model</span>
                             </button>
                           </div>
                         </div>
@@ -1531,17 +1531,17 @@
                         <div class="models-header-bar">
                           <div class="models-filter-pills">
                             <button class="btn-filter active" onclick="filterModelsStatus('all')" id="filter-models-all">
-                              <span>All Models</span>
+                              <span data-i18n="settings.allModels">All Models</span>
                               <span class="filter-badge" id="filter-count-all">0</span>
                             </button>
                             <button class="btn-filter" onclick="filterModelsStatus('free')" id="filter-models-free">
                               <span class="filter-dot-free"></span>
-                              <span>Free Tier</span>
+                              <span data-i18n="settings.freeTier">Free Tier</span>
                               <span class="filter-badge badge-free" id="filter-count-free">0</span>
                             </button>
                             <button class="btn-filter" onclick="filterModelsStatus('reasoning')" id="filter-models-reasoning">
                               <span class="filter-dot-reasoning"></span>
-                              <span>Reasoning</span>
+                              <span data-i18n="settings.reasoning">Reasoning</span>
                               <span class="filter-badge badge-reasoning" id="filter-count-reasoning">0</span>
                             </button>
                           </div>
@@ -1553,11 +1553,11 @@
                         <!-- Models Data Table (CSS Grid with Absolute Column Alignment) -->
                         <div class="models-data-table" id="mgr-models-table-wrapper">
                           <div class="models-table-head">
-                            <div class="th-cell th-active">Active</div>
-                            <div class="th-cell th-id">Model Identifier</div>
-                            <div class="th-cell th-ctx">Context Window</div>
-                            <div class="th-cell th-reasoning">Reasoning</div>
-                            <div class="th-cell th-action">Action</div>
+                            <div class="th-cell th-active" data-i18n="settings.thActive">Active</div>
+                            <div class="th-cell th-id" data-i18n="settings.thModelId">Model Identifier</div>
+                            <div class="th-cell th-ctx" data-i18n="settings.thContextWindow">Context Window</div>
+                            <div class="th-cell th-reasoning" data-i18n="settings.thReasoning">Reasoning</div>
+                            <div class="th-cell th-action" data-i18n="settings.thAction">Action</div>
                           </div>
                           <div class="models-table-body" id="mgr-models-tbody">
                             <!-- Populated dynamically via JS -->
@@ -1572,9 +1572,9 @@
                                 <line x1="8" y1="11" x2="14" y2="11"></line>
                               </svg>
                             </div>
-                            <div class="models-empty-title">No Matching Models Found</div>
-                            <div class="models-empty-desc">No models match your current filter or search keyword.</div>
-                            <button type="button" class="btn-secondary btn-sm" id="mgr-models-empty-reset-btn" onclick="clearModelsSearch()">Reset Filter & Search</button>
+                            <div class="models-empty-title" data-i18n="settings.noMatchingModels">No Matching Models Found</div>
+                            <div class="models-empty-desc" data-i18n="settings.noMatchingModelsDesc">No models match your current filter or search keyword.</div>
+                            <button type="button" class="btn-secondary btn-sm" id="mgr-models-empty-reset-btn" onclick="clearModelsSearch()" data-i18n="settings.resetFilterSearch">Reset Filter & Search</button>
                           </div>
                         </div>
 
@@ -1586,7 +1586,7 @@
                               <line x1="12" y1="16" x2="12" y2="12"></line>
                               <line x1="12" y1="8" x2="12.01" y2="8"></line>
                             </svg>
-                            <span>Model edits auto-save in real time. Choose an active radio to set your default translation model.</span>
+                            <span data-i18n="settings.modelsTip">Model edits auto-save in real time. Choose an active radio to set your default translation model.</span>
                           </div>
                         </div>
                       </div>
@@ -1671,7 +1671,7 @@
                   <div class="wizard-step-header" onclick="toggleWizardAccordion(1)">
                     <div style="display:flex; align-items:center; gap:12px;">
                       <div class="wizard-step-icon" id="wizard-icon-1">1</div>
-                      <div class="wizard-step-title">Select Media Resource</div>
+                      <div class="wizard-step-title" data-i18n="transcribe.wizardStep1">Select Media Resource</div>
                     </div>
                     <span class="wizard-chevron" id="wizard-chevron-1">▼</span>
                   </div>
@@ -1691,7 +1691,7 @@
                         <p style="font-weight:600; margin-bottom:4px;" id="lbl-file-name">No Media File Loaded</p>
                         <p style="font-size:0.8rem; color:var(--color-text-muted);" id="lbl-file-path">Select audio or video file</p>
                       </div>
-                      <button class="btn-secondary" onclick="browseMediaFile()">Browse System</button>
+                      <button class="btn-secondary" onclick="browseMediaFile()" data-i18n="transcribe.browseSystem">Browse System</button>
                     </div>
                     <!-- Batch Queue Panel (hidden by default) -->
                     <div id="batch-queue-container" class="batch-queue-panel" style="display:none;">
@@ -1705,23 +1705,23 @@
                             <line x1="3" y1="12" x2="3.01" y2="12"></line>
                             <line x1="3" y1="18" x2="3.01" y2="18"></line>
                           </svg>
-                          <span>Queue Files</span>
+                          <span data-i18n="transcribe.queueFiles">Queue Files</span>
                           <span class="batch-count-chip" id="lbl-batch-count">0</span>
                         </div>
                         <div class="batch-queue-actions">
                           <select id="batch-sort-select" class="select-control batch-sort-control" onchange="sortBatchQueue(this.value)">
-                            <option value="" disabled selected>Sort Queue...</option>
-                            <option value="name-asc">Alphabetical (A-Z)</option>
-                            <option value="name-desc">Alphabetical (Z-A)</option>
-                            <option value="duration-asc">Duration (Shortest first)</option>
-                            <option value="duration-desc">Duration (Longest first)</option>
+                            <option value="" disabled selected data-i18n="transcribe.sortQueue">Sort Queue...</option>
+                            <option value="name-asc" data-i18n="transcribe.sortNameAsc">Alphabetical (A-Z)</option>
+                            <option value="name-desc" data-i18n="transcribe.sortNameDesc">Alphabetical (Z-A)</option>
+                            <option value="duration-asc" data-i18n="transcribe.sortDurationAsc">Duration (Shortest first)</option>
+                            <option value="duration-desc" data-i18n="transcribe.sortDurationDesc">Duration (Longest first)</option>
                           </select>
                           <button class="btn-secondary btn-clear-queue" id="btn-clear-batch" onclick="clearBatchQueue()" type="button">
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                               <polyline points="3 6 5 6 21 6"></polyline>
                               <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                             </svg>
-                            <span>Clear Queue</span>
+                            <span data-i18n="transcribe.clearQueue">Clear Queue</span>
                           </button>
                         </div>
                       </div>
@@ -1729,10 +1729,10 @@
                         <table class="batch-table">
                           <thead>
                             <tr>
-                              <th>File Name</th>
-                              <th>Duration</th>
-                              <th>Status</th>
-                              <th style="width: 100px; text-align: center;">Action</th>
+                              <th data-i18n="transcribe.batchColFile">File Name</th>
+                              <th data-i18n="transcribe.batchColDuration">Duration</th>
+                              <th data-i18n="transcribe.batchColStatus">Status</th>
+                              <th style="width: 100px; text-align: center;" data-i18n="transcribe.batchColActions">Action</th>
                             </tr>
                           </thead>
                           <tbody id="batch-queue-body">
@@ -1749,30 +1749,30 @@
                   <div class="wizard-step-header" onclick="toggleWizardAccordion(2)">
                     <div style="display:flex; align-items:center; gap:12px;">
                       <div class="wizard-step-icon" id="wizard-icon-2">2</div>
-                      <div class="wizard-step-title">Media Specifications</div>
+                      <div class="wizard-step-title" data-i18n="transcribe.wizardStep2">Media Specifications</div>
                     </div>
                     <span class="wizard-chevron" id="wizard-chevron-2">▼</span>
                   </div>
                   <div class="wizard-step-body" id="wizard-body-2">
                     <div class="media-metadata-box" id="media-meta-box">
                       <div class="meta-item">
-                        <div class="meta-label">File Type</div>
+                        <div class="meta-label" data-i18n="transcribe.fileType">File Type</div>
                         <div class="meta-value" id="meta-type">-</div>
                       </div>
                       <div class="meta-item">
-                        <div class="meta-label">File Size</div>
+                        <div class="meta-label" data-i18n="transcribe.fileSize">File Size</div>
                         <div class="meta-value" id="meta-size">-</div>
                       </div>
                       <div class="meta-item">
-                        <div class="meta-label">Duration</div>
+                        <div class="meta-label" data-i18n="transcribe.duration">Duration</div>
                         <div class="meta-value" id="meta-duration" style="color:var(--color-gold);">-</div>
                       </div>
                       <div class="meta-item">
-                        <div class="meta-label">Target Format</div>
-                        <div class="meta-value" style="color:var(--color-cyan);">16kHz Mono Target</div>
+                        <div class="meta-label" data-i18n="transcribe.targetFormat">Target Format</div>
+                        <div class="meta-value" style="color:var(--color-cyan);" data-i18n="transcribe.targetFormatVal">16kHz Mono Target</div>
                       </div>
                       <div class="meta-item" style="grid-column: span 2;">
-                        <div class="meta-label">Active Extraction Engine</div>
+                        <div class="meta-label" data-i18n="transcribe.activeExtractor">Active Extraction Engine</div>
                         <div class="meta-value" id="meta-recommendation" style="font-size:0.8rem; line-height:1.4; color:var(--color-royal-blue);">-</div>
                       </div>
                     </div>
@@ -1780,12 +1780,12 @@
                     <div class="glass-card" id="batch-specs-box" style="display:none; padding:16px; margin-bottom:16px; border:1px solid var(--border-glass);">
                       <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px;color:var(--color-cyan);"><path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2" ry="2"/></svg>
-                        <span style="font-weight:600; font-size:0.9rem; color:var(--color-cyan);">Batch Extraction Mode Active</span>
+                        <span style="font-weight:600; font-size:0.9rem; color:var(--color-cyan);" data-i18n="transcribe.batchModeActive">Batch Extraction Mode Active</span>
                       </div>
                       <div style="font-size:0.85rem; color:var(--color-text-muted); line-height:1.6;">
-                        <p style="margin-bottom:6px;"><strong style="color:#fff;" id="batch-files-count">0</strong> media files are loaded in the queue.</p>
-                        <p style="margin-bottom:12px;">Total Duration: <strong style="color:var(--color-gold);" id="batch-total-duration">--:--:--</strong></p>
-                        <p>Global configurations selected in the settings panel will be applied **globally** to all files in the batch. Processing runs sequentially to ensure stability.</p>
+                        <p style="margin-bottom:6px;"><strong style="color:#fff;" id="batch-files-count">0</strong> <span data-i18n="transcribe.batchLoadedDesc">media files are loaded in the queue.</span></p>
+                        <p style="margin-bottom:12px;"><span data-i18n="transcribe.batchTotalDuration">Total Duration:</span> <strong style="color:var(--color-gold);" id="batch-total-duration">--:--:--</strong></p>
+                        <p data-i18n="transcribe.batchGlobalNote">Global configurations selected in the settings panel will be applied **globally** to all files in the batch. Processing runs sequentially to ensure stability.</p>
                       </div>
                     </div>
                     <button class="btn-primary wizard-next-btn" id="btn-next-step-2" onclick="openWizardStep(3)">
@@ -1799,7 +1799,7 @@
                   <div class="wizard-step-header" onclick="toggleWizardAccordion(3)">
                     <div style="display:flex; align-items:center; gap:12px;">
                       <div class="wizard-step-icon" id="wizard-icon-3">3</div>
-                      <div class="wizard-step-title">Execute Whisper Transcription</div>
+                      <div class="wizard-step-title" data-i18n="transcribe.wizardStep3">Execute Whisper Transcription</div>
                     </div>
                     <span class="wizard-chevron" id="wizard-chevron-3">▼</span>
                   </div>
@@ -1811,7 +1811,7 @@
                           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
                           </svg>
-                          <span>AI Model</span>
+                          <span data-i18n="transcribe.aiModel">AI Model</span>
                         </div>
                         <select class="select-control quick-select" id="quick-opt-model" aria-label="Quick Select Model">
                           <!-- Dynamically populated from scanned models -->
@@ -1823,7 +1823,7 @@
                           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-royal-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
                           </svg>
-                          <span>Spoken Language</span>
+                          <span data-i18n="transcribe.spokenLang">Spoken Language</span>
                         </div>
                         <select class="select-control quick-select" id="quick-opt-language" aria-label="Quick Select Language">
                           <option value="auto">Auto Detect</option>
@@ -1855,7 +1855,7 @@
                           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>
                           </svg>
-                          <span>Engine</span>
+                          <span data-i18n="transcribe.engine">Engine</span>
                         </div>
                         <select class="select-control quick-select" id="quick-opt-selectedBackend" aria-label="Quick Select Engine">
                           <option value="Standard">CPU (Standard)</option>
@@ -1867,7 +1867,7 @@
                           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" x2="12" y1="19" y2="22"/>
                           </svg>
-                          <span>Silero VAD</span>
+                          <span data-i18n="transcribe.sileroVad">Silero VAD</span>
                         </div>
                         <button type="button" class="quick-vad-toggle-btn" id="quick-toggle-vad" onclick="toggleQuickVad()" title="Toggle Silero Voice Activity Detection">
                           <span class="quick-vad-dot"></span>
@@ -1879,24 +1879,24 @@
                     <div style="display:flex; gap:12px;">
                       <button class="btn-primary" id="btn-run-transcribe" style="flex:2;" onclick="runWhisperTranscription()">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:18px;height:18px;margin-right:8px;"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
-                        Start AI Extraction
+                        <span data-i18n="transcribe.startAiExtraction">Start AI Extraction</span>
                       </button>
                       <button class="btn-secondary" id="btn-cancel-transcribe" style="display:none; flex:1; border-color:var(--color-red); color:var(--color-red); font-weight:600; text-align:center; justify-content:center;" onclick="abortTranscription()">
-                        Cancel
+                        <span data-i18n="common.cancel">Cancel</span>
                       </button>
                     </div>
                     <!-- Batch Control Panel (hidden by default) -->
                     <div id="batch-controls-box" style="display:none; width:100%; margin-top: 16px;">
                       <div class="step-details-row" style="margin-bottom: 16px;">
-                        <span>Automated Pipeline</span> | <span>FFmpeg Convert & Whisper Extraction Sequentially</span>
+                        <span data-i18n="transcribe.automatedPipeline">Automated Pipeline</span> | <span data-i18n="transcribe.pipelineDesc">FFmpeg Convert & Whisper Extraction Sequentially</span>
                       </div>
                       <div style="display:flex; gap:12px;">
                         <button class="btn-primary" id="btn-run-batch" style="flex:2;" onclick="runBatchExtraction()">
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:18px;height:18px;margin-right:8px;"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
-                          Start Batch AI Extraction
+                          <span data-i18n="transcribe.startBatchAiExtraction">Start Batch AI Extraction</span>
                         </button>
                         <button class="btn-secondary" id="btn-cancel-batch" style="display:none; flex:1; border-color:var(--color-red); color:var(--color-red); font-weight:600; text-align:center; justify-content:center;" onclick="abortBatchExtraction()">
-                          Cancel
+                          <span data-i18n="common.cancel">Cancel</span>
                         </button>
                       </div>
                     </div>
@@ -1909,8 +1909,8 @@
                 <div class="glass-card telemetry-hud" id="telemetry-hud-card" style="margin-bottom: 0;">
                   <div class="hud-header-row" onclick="toggleTelemetryHudCollapse()" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; user-select:none; margin-bottom:12px; border-bottom:1px solid var(--border-glass); padding-bottom:10px;">
                     <div style="display:flex; align-items:center; gap:8px;">
-                      <h3 style="font-weight:600; font-size:0.95rem; margin:0;">Live Extraction Status</h3>
-                      <span id="hud-status-badge" class="hud-status-badge" style="font-size:0.75rem; padding:2px 8px; border-radius:12px; background:rgba(6,182,212,0.1); color:var(--color-cyan); display:none;">Standing By</span>
+                      <h3 style="font-weight:600; font-size:0.95rem; margin:0;" data-i18n="transcribe.liveStatusTitle">Live Extraction Status</h3>
+                      <span id="hud-status-badge" class="hud-status-badge" style="font-size:0.75rem; padding:2px 8px; border-radius:12px; background:rgba(6,182,212,0.1); color:var(--color-cyan); display:none;" data-i18n="transcribe.standingBy">Standing By</span>
                     </div>
                     <button type="button" class="hud-collapse-btn" id="hud-collapse-btn" aria-label="Toggle telemetry collapse" style="background:none; border:none; color:var(--color-text-dim); cursor:pointer; padding:4px; display:flex; align-items:center; transition:transform 0.25s ease;">
                       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
@@ -1921,7 +1921,7 @@
                     <div class="hud-body-content">
                       <div class="progress-linear-wrapper" id="progress-linear-wrapper">
                         <div class="hud-stats-row">
-                          <span class="hud-stat-label">COMPLETION</span>
+                          <span class="hud-stat-label" data-i18n="transcribe.completion">COMPLETION</span>
                           <span class="radial-pct" id="lbl-radial-pct">0%</span>
                         </div>
                         
@@ -1957,13 +1957,13 @@
                           <div class="analytics-actions-col">
                             <button class="btn-primary compact-copy-btn" id="btn-open-output-folder" onclick="openOutputFolder()" aria-label="Open output folder in file manager">
                               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:5px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                              Open Folder
+                              <span data-i18n="transcribe.openFolder">Open Folder</span>
                             </button>
                           </div>
                         </div>
 
                         <div class="analytics-files-row">
-                          <span class="analytics-files-label">Files:</span>
+                          <span class="analytics-files-label" data-i18n="transcribe.filesLabel">Files:</span>
                           <div class="outputs-row compact-outputs" id="badge-outputs-row"></div>
                         </div>
                       </div>
@@ -1974,17 +1974,17 @@
                 <!-- Live Transcript Viewer -->
                 <div class="glass-card transcript-viewer-card" style="display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 20px; gap: 12px; overflow: hidden;">
                   <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: 10px;">
-                    <h3 style="font-weight: 600; font-size: 1rem; margin: 0;">Live Transcript Viewer</h3>
-                    <button class="btn-secondary" id="btn-copy-transcript" onclick="copyLiveTranscriptToClipboard()" aria-label="Copy live transcript preview to clipboard" style="padding: 4px 10px; font-size: 0.75rem; margin: 0;">Copy</button>
+                    <h3 style="font-weight: 600; font-size: 1rem; margin: 0;" data-i18n="transcribe.liveViewerTitle">Live Transcript Viewer</h3>
+                    <button class="btn-secondary" id="btn-copy-transcript" onclick="copyLiveTranscriptToClipboard()" aria-label="Copy live transcript preview to clipboard" style="padding: 4px 10px; font-size: 0.75rem; margin: 0;" data-i18n="transcribe.copyLiveTranscript">Copy</button>
                   </div>
                   
                   <div class="transcript-search-box" style="display: flex; gap: 8px; width: 100%;">
-                    <input class="text-input" type="text" id="transcript-search" placeholder="Search transcript..." oninput="filterTranscriptLines()" style="padding: 6px 12px; font-size: 0.8rem; margin: 0; width: 100%;" />
+                    <input class="text-input" type="text" id="transcript-search" placeholder="Search transcript..." data-i18n-placeholder="transcribe.searchTranscript" oninput="filterTranscriptLines()" style="padding: 6px 12px; font-size: 0.8rem; margin: 0; width: 100%;" />
                   </div>
                   
                   <!-- Real-time transcript display box -->
                   <div class="transcript-viewport" id="transcript-viewport" style="flex-grow: 1; min-height: 0; overflow-y: auto; font-family: var(--font-sans); font-size: 0.85rem; line-height: 1.6; padding: 12px; border-radius: 8px; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255,255,255,0.03); user-select: text;">
-                    <div style="color: var(--color-text-dim); text-align: center; margin-top: 40px;" id="transcript-placeholder">
+                    <div style="color: var(--color-text-dim); text-align: center; margin-top: 40px;" id="transcript-placeholder" data-i18n="transcribe.streamNotice">
                       Start transcription to stream live text preview.
                     </div>
                   </div>
@@ -2037,7 +2037,7 @@
                   <div class="wizard-step-header" id="hardsub-media-step-header">
                     <div style="display:flex; align-items:center; gap:12px;">
                       <div class="wizard-step-icon" id="hardsub-media-step-icon">1</div>
-                      <div class="wizard-step-title" id="hardsub-media-step-title">Select Media Resource</div>
+                      <div class="wizard-step-title" id="hardsub-media-step-title" data-i18n="hardsub.selectResource">Select Media Resource</div>
                     </div>
                     <div style="display: flex; align-items: center; gap: 10px;">
                       <span id="hardsub-media-summary-badge" style="font-size: 0.78rem; color: var(--color-royal-blue); background: rgba(var(--color-royal-blue-rgb), 0.12); padding: 2px 8px; border-radius: 6px; font-weight: 600; display: none; max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></span>
@@ -2061,10 +2061,10 @@
                           <line x1="17" y1="7" x2="22" y2="7"/>
                         </svg>
                         <div style="flex:1; overflow: hidden; max-width: 100%;">
-                          <p style="font-weight:600; margin-bottom:4px; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-video-name">No Video Loaded</p>
-                          <p style="font-size:0.75rem; color:var(--color-text-muted); margin:0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-video-path">Drag & drop video (.mp4, .mkv, .mov)</p>
+                          <p style="font-weight:600; margin-bottom:4px; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-video-name" data-i18n="hardsub.noVideoLoaded">No Video Loaded</p>
+                          <p style="font-size:0.75rem; color:var(--color-text-muted); margin:0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-video-path" data-i18n="hardsub.dropVideoPrompt">Drag & drop video (.mp4, .mkv, .mov)</p>
                         </div>
-                        <button class="btn-secondary" id="btn-browse-video" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap;">Browse Video</button>
+                        <button class="btn-secondary" id="btn-browse-video" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap;" data-i18n="hardsub.browseVideo">Browse Video</button>
                         <input type="hidden" id="hardsub-video-path" />
                       </div>
 
@@ -2076,10 +2076,10 @@
                           <line x1="7" y1="12" x2="14" y2="12"/>
                         </svg>
                         <div style="flex:1; overflow: hidden; max-width: 100%;">
-                          <p style="font-weight:600; margin-bottom:4px; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-sub-name">No Subtitle Loaded</p>
-                          <p style="font-size:0.75rem; color:var(--color-text-muted); margin:0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-sub-path">Drag & drop subtitle (.srt, .vtt, .ass)</p>
+                          <p style="font-weight:600; margin-bottom:4px; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-sub-name" data-i18n="hardsub.noSubLoaded">No Subtitle Loaded</p>
+                          <p style="font-size:0.75rem; color:var(--color-text-muted); margin:0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-sub-path" data-i18n="hardsub.dropSubPrompt">Drag & drop subtitle (.srt, .vtt, .ass)</p>
                         </div>
-                        <button class="btn-secondary" id="btn-browse-sub" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap;">Browse Subtitle</button>
+                        <button class="btn-secondary" id="btn-browse-sub" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap;" data-i18n="hardsub.browseSub">Browse Subtitle</button>
                         <input type="hidden" id="hardsub-sub-path" />
                       </div>
 
@@ -2092,9 +2092,9 @@
                   <div style="display: flex; justify-content: space-between; align-items: center;">
                     <h3 style="margin: 0; font-size: 1.05rem; color: var(--color-royal-blue); display: flex; align-items: center; gap: 8px;">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px; height:20px;"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-                      Real Video Frame Preview
+                      <span data-i18n="hardsub.framePreview">Real Video Frame Preview</span>
                     </h3>
-                    <span id="hardsub-video-status-badge" style="font-size: 0.75rem; background: rgba(var(--color-royal-blue-rgb), 0.15); color: var(--color-royal-blue); padding: 3px 8px; border-radius: 12px; font-weight: 500;">Standing By</span>
+                    <span id="hardsub-video-status-badge" style="font-size: 0.75rem; background: rgba(var(--color-royal-blue-rgb), 0.15); color: var(--color-royal-blue); padding: 3px 8px; border-radius: 12px; font-weight: 500;" data-i18n="transcribe.standingBy">Standing By</span>
                   </div>
 
                   <!-- Frame Viewport Outer Container -->
@@ -2122,7 +2122,7 @@
                           </defs>
                         </svg>
                       </div>
-                      <span style="font-size: 0.85rem; color: var(--color-text-muted); font-weight: 500; max-width: 240px; line-height: 1.4;">Select a video file above to enable real-frame live preview</span>
+                      <span style="font-size: 0.85rem; color: var(--color-text-muted); font-weight: 500; max-width: 240px; line-height: 1.4;" data-i18n="hardsub.selectVideoNotice">Select a video file above to enable real-frame live preview</span>
                     </div>
 
                     <!-- Video Frame Freeze Canvas (Seamless Double-Buffering during Seek) -->
@@ -2185,7 +2185,7 @@
                 <div class="glass-card telemetry-hud" style="margin-bottom: 0; padding: 20px; display: flex; flex-direction: column; gap: 16px;">
                   <div class="progress-linear-wrapper" style="margin: 0; width: 100%;">
                     <div class="hud-stats-row" style="margin-bottom: 8px;">
-                      <span class="hud-stat-label">HARDSUB ENCODING PROGRESS</span>
+                      <span class="hud-stat-label" data-i18n="hardsub.encodingProgress">HARDSUB ENCODING PROGRESS</span>
                       <span class="radial-pct" id="hardsub-pct-text">0%</span>
                     </div>
                     
@@ -2198,17 +2198,17 @@
                     
                     <div class="hud-status-subtitle" style="margin-top: 10px;">
                       <div class="hud-pulse-dot" id="hardsub-hud-pulse"></div>
-                      <span class="radial-msg" id="hardsub-status-text">Standing By</span>
+                      <span class="radial-msg" id="hardsub-status-text" data-i18n="transcribe.standingBy">Standing By</span>
                     </div>
                   </div>
 
                   <div style="display: flex; gap: 10px; margin-top: 4px;">
                     <button class="btn-primary" id="btn-start-hardsub" style="flex: 1; justify-content: center; padding: 12px 18px; font-size: 0.95rem; font-weight: 600; gap: 10px;">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width: 18px; height: 18px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                      <span>Export Hardsub Video</span>
+                      <span data-i18n="hardsub.exportHardsubVideo">Export Hardsub Video</span>
                     </button>
                     <button class="btn-secondary" id="btn-cancel-hardsub" style="display: none; padding: 12px 18px; border-color: rgba(239, 68, 68, 0.4); color: #ef4444; background: rgba(239, 68, 68, 0.1); font-weight: 600;">
-                      Cancel
+                      <span data-i18n="common.cancel">Cancel</span>
                     </button>
                   </div>
                 </div>
@@ -2222,15 +2222,15 @@
                 <div class="hardsub-tabs-container" role="tablist" aria-label="Hardsub Studio Tabs">
                   <button id="hardsub-tab-btn-editor" role="tab" aria-selected="true" aria-controls="hardsub-tab-view-editor" tabindex="0" class="pill-btn hardsub-tab-pill active" style="flex:1; padding: 10px; justify-content: center; border-radius: 8px; font-weight: 600; gap: 6px;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px;"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
-                    <span>Editor</span>
+                    <span data-i18n="hardsub.tabEditor">Editor</span>
                   </button>
                   <button id="hardsub-tab-btn-style" role="tab" aria-selected="false" aria-controls="hardsub-tab-view-style" tabindex="-1" class="pill-btn hardsub-tab-pill" style="flex:1; padding: 10px; justify-content: center; border-radius: 8px; font-weight: 600; gap: 6px;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px;"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
-                    <span>Style</span>
+                    <span data-i18n="hardsub.tabStyleShort">Style</span>
                   </button>
                   <button id="hardsub-tab-btn-export" role="tab" aria-selected="false" aria-controls="hardsub-tab-view-export" tabindex="-1" class="pill-btn hardsub-tab-pill" style="flex:1; padding: 10px; justify-content: center; border-radius: 8px; font-weight: 600; gap: 6px;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px;"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-                    <span>Export</span>
+                    <span data-i18n="hardsub.tabExportShort">Export</span>
                   </button>
                 </div>
 
@@ -2240,7 +2240,7 @@
                   <!-- Editor Top Bar: Search & Subtitle Counter -->
                   <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-shrink: 0;">
                     <div style="position: relative; flex: 1;">
-                      <input type="text" id="hardsub-search-input" class="text-input" placeholder="Search subtitle text..." style="width: 100%; padding-left: 32px; font-size: 0.85rem;" />
+                      <input type="text" id="hardsub-search-input" class="text-input" placeholder="Search subtitle text..." data-i18n-placeholder="hardsub.searchSubText" style="width: 100%; padding-left: 32px; font-size: 0.85rem;" />
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--color-text-muted);"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                     </div>
                     <span id="hardsub-subtitle-count" style="font-size: 0.95rem; font-weight: 600; font-family: monospace; background: rgba(var(--color-royal-blue-rgb), 0.05); padding: 8px 14px; border-radius: 8px; color: var(--color-royal-blue); white-space: nowrap; border: 1px solid rgba(var(--color-royal-blue-rgb), 0.2);">0 Cues</span>
@@ -2250,7 +2250,7 @@
                   <div id="hardsub-subtitle-list" style="flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-inline-end: 4px;">
                     <div id="hardsub-empty-cue-notice" style="text-align: center; padding: 40px 20px; color: var(--color-text-muted); display: flex; flex-direction: column; align-items: center; gap: 10px;">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width: 40px; height: 40px; opacity: 0.5;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                      <span style="font-size: 0.88rem;">No subtitle loaded.<br>Select a subtitle file above to edit block cues.</span>
+                      <span style="font-size: 0.88rem;" data-i18n-html="hardsub.noSubLoadedNotice">No subtitle loaded.<br>Select a subtitle file above to edit block cues.</span>
                     </div>
                   </div>
                 </div>
@@ -2262,21 +2262,21 @@
                   <div class="glass-card" style="padding: 18px;">
                     <h3 style="margin-top: 0; margin-bottom: 16px; font-size: 1.02rem; color: var(--color-royal-blue); display: flex; align-items: center; gap: 8px;">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px; height:18px;"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
-                      Typography & Text
+                      <span data-i18n="hardsub.typographyText">Typography & Text</span>
                     </h3>
 
                     <div style="display: flex; flex-direction: column; gap: 14px;">
                       <!-- Row 1: Font Family & Style Format (Bold / Italic) -->
                       <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 14px; align-items: end;">
                         <div>
-                          <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 5px;">Font Family</label>
+                          <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 5px;" data-i18n="hardsub.fontLabel">Font Family</label>
                           <select class="select-control" id="hardsub-font" style="width:100%; height:38px; box-sizing:border-box;">
                             <option value="Vazirmatn">★ Vazirmatn (Persian UI)</option>
                           </select>
                         </div>
 
                         <div>
-                          <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 5px;">Style Format</label>
+                          <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 5px;" data-i18n="hardsub.styleFormat">Style Format</label>
                           <div style="display: flex; gap: 6px; height: 38px;">
                             <button class="pill-btn active" id="hardsub-btn-bold" title="Toggle Bold Text" style="flex:1; font-weight:700; height:38px; box-sizing:border-box;">
                               <strong>B</strong>
@@ -2293,7 +2293,7 @@
                         <!-- Font Size Slider -->
                         <div>
                           <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--color-text-muted); margin-bottom: 6px;">
-                            <span>Font Size</span>
+                            <span data-i18n="hardsub.fontSize">Font Size</span>
                             <div style="display: flex; align-items: center; gap: 6px;">
                               <span id="hardsub-fontsize-val" style="color: var(--color-royal-blue); font-weight: 700; font-size: 0.88rem; background: rgba(var(--color-royal-blue-rgb), 0.12); padding: 1px 7px; border-radius: 6px; line-height: 1.2;">14px</span>
                               <button class="reset-link-btn" id="reset-fontsize" title="Reset font size to 14px" style="display: none; padding: 2px;">
@@ -2307,7 +2307,7 @@
                         <!-- Text Color -->
                         <div>
                           <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--color-text-muted); margin-bottom: 6px;">
-                            <span>Text Color</span>
+                            <span data-i18n="hardsub.primaryColor">Text Color</span>
                             <span id="hardsub-hex-text" style="font-family: monospace; font-size: 0.78rem; color: var(--color-royal-blue); font-weight: 600;">#FFFFFF</span>
                           </div>
                           <div style="display: flex; align-items: center; gap: 10px;">
@@ -2332,14 +2332,14 @@
                   <div class="glass-card" style="padding: 18px;">
                     <h3 style="margin-top: 0; margin-bottom: 16px; font-size: 1.02rem; color: var(--color-royal-blue); display: flex; align-items: center; gap: 8px;">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px; height:18px;"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/></svg>
-                      Outline & Background Box
+                      <span data-i18n="hardsub.outlineBgBox">Outline & Background Box</span>
                     </h3>
 
                     <div style="display: flex; flex-direction: column; gap: 16px;">
                       <!-- 1. Text Outline Section -->
                       <div style="background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 12px 14px;">
                         <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--color-text-muted); margin-bottom: 8px;">
-                          <span style="font-weight: 500; color: var(--color-text-main);">Text Outline Stroke</span>
+                          <span style="font-weight: 500; color: var(--color-text-main);" data-i18n="hardsub.textOutlineStroke">Text Outline Stroke</span>
                           <div style="display: flex; align-items: center; gap: 6px;">
                             <span id="hardsub-outline-val" style="color: var(--color-royal-blue); font-weight: 700; font-size: 0.88rem; background: rgba(var(--color-royal-blue-rgb), 0.12); padding: 1px 7px; border-radius: 6px; line-height: 1.2;">2px</span>
                             <button class="reset-link-btn" id="reset-outline" title="Reset outline size to 2px" style="display: none; padding: 2px;">
@@ -2363,7 +2363,7 @@
                           <label class="checkbox-container" style="margin:0; display: flex; align-items: center; gap: 8px; cursor: pointer;">
                             <input type="checkbox" id="hardsub-bgbox-toggle" />
                             <span class="custom-checkmark" style="flex-shrink: 0;"></span>
-                            <span style="font-weight: 600; font-size: 0.85rem; color: var(--color-text-main);">Enable Background Box</span>
+                            <span style="font-weight: 600; font-size: 0.85rem; color: var(--color-text-main);" data-i18n="hardsub.enableBgBox">Enable Background Box</span>
                           </label>
                           
                           <div id="hardsub-bg-controls" class="control-disabled" style="display: flex; align-items: center; gap: 10px;">
@@ -2385,14 +2385,14 @@
                         <div id="hardsub-bg-extra-controls" class="control-disabled" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.05);">
                           <div>
                             <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.78rem; color: var(--color-text-muted); margin-bottom: 6px;">
-                              <label for="hardsub-bgbox-opacity">Box Opacity</label>
+                              <label for="hardsub-bgbox-opacity" data-i18n="hardsub.boxOpacity">Box Opacity</label>
                               <span id="hardsub-bgbox-opacity-val" style="color: var(--color-royal-blue); font-weight: 700; font-size: 0.82rem; background: rgba(var(--color-royal-blue-rgb), 0.12); padding: 1px 6px; border-radius: 5px;">50%</span>
                             </div>
                             <input type="range" class="range-slider" id="hardsub-bgbox-opacity" min="0" max="100" value="50" style="width:100%;" />
                           </div>
                           <div>
                             <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.78rem; color: var(--color-text-muted); margin-bottom: 6px;">
-                              <label for="hardsub-bgbox-radius">Corner Radius</label>
+                              <label for="hardsub-bgbox-radius" data-i18n="hardsub.cornerRadius">Corner Radius</label>
                               <span id="hardsub-bgbox-radius-val" style="color: var(--color-royal-blue); font-weight: 700; font-size: 0.82rem; background: rgba(var(--color-royal-blue-rgb), 0.12); padding: 1px 6px; border-radius: 5px;">0px</span>
                             </div>
                             <input type="range" class="range-slider" id="hardsub-bgbox-radius" min="0" max="24" value="0" style="width:100%;" />
@@ -2407,7 +2407,7 @@
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                       <h3 style="margin: 0; font-size: 1.02rem; color: var(--color-royal-blue); display: flex; align-items: center; gap: 8px;">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px; height:18px;"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 12h10"/><path d="M12 7v10"/></svg>
-                        Position & Alignment
+                        <span data-i18n="hardsub.posTitle">Position & Alignment</span>
                       </h3>
                       <span id="hardsub-align-val" style="font-size: 0.76rem; color: var(--color-royal-blue); font-weight: 600; background: rgba(var(--color-royal-blue-rgb), 0.15); border: 1px solid rgba(var(--color-royal-blue-rgb), 0.3); padding: 3px 10px; border-radius: 20px;">Bottom Center</span>
                     </div>
@@ -2415,19 +2415,19 @@
                     <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 18px; align-items: center;">
                       <!-- Alignment Segmented Controls -->
                       <div>
-                        <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 6px;">Screen Alignment</label>
+                        <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 6px;" data-i18n="hardsub.screenAlign">Screen Alignment</label>
                         <div style="display: flex; flex-direction: column; gap: 6px;">
                           <!-- Vertical Segmented Control -->
                           <div style="display: flex; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 3px; gap: 3px;">
-                            <button class="pill-btn align-v-btn" data-v="top" style="flex:1; padding: 5px 0; font-size: 0.75rem; border:none; border-radius:6px; font-weight:500;">Top</button>
-                            <button class="pill-btn align-v-btn" data-v="middle" style="flex:1; padding: 5px 0; font-size: 0.75rem; border:none; border-radius:6px; font-weight:500;">Middle</button>
-                            <button class="pill-btn align-v-btn active" data-v="bottom" style="flex:1; padding: 5px 0; font-size: 0.75rem; border:none; border-radius:6px; font-weight:500;">Bottom</button>
+                            <button class="pill-btn align-v-btn" data-v="top" style="flex:1; padding: 5px 0; font-size: 0.75rem; border:none; border-radius:6px; font-weight:500;" data-i18n="hardsub.alignTop">Top</button>
+                            <button class="pill-btn align-v-btn" data-v="middle" style="flex:1; padding: 5px 0; font-size: 0.75rem; border:none; border-radius:6px; font-weight:500;" data-i18n="hardsub.alignMiddle">Middle</button>
+                            <button class="pill-btn align-v-btn active" data-v="bottom" style="flex:1; padding: 5px 0; font-size: 0.75rem; border:none; border-radius:6px; font-weight:500;" data-i18n="hardsub.alignBottom">Bottom</button>
                           </div>
                           <!-- Horizontal Segmented Control -->
                           <div style="display: flex; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 3px; gap: 3px;">
-                            <button class="pill-btn align-h-btn" data-h="left" style="flex:1; padding: 5px 0; font-size: 0.75rem; border:none; border-radius:6px; font-weight:500;">Left</button>
-                            <button class="pill-btn align-h-btn active" data-h="center" style="flex:1; padding: 5px 0; font-size: 0.75rem; border:none; border-radius:6px; font-weight:500;">Center</button>
-                            <button class="pill-btn align-h-btn" data-h="right" style="flex:1; padding: 5px 0; font-size: 0.75rem; border:none; border-radius:6px; font-weight:500;">Right</button>
+                            <button class="pill-btn align-h-btn" data-h="left" style="flex:1; padding: 5px 0; font-size: 0.75rem; border:none; border-radius:6px; font-weight:500;" data-i18n="hardsub.alignLeft">Left</button>
+                            <button class="pill-btn align-h-btn active" data-h="center" style="flex:1; padding: 5px 0; font-size: 0.75rem; border:none; border-radius:6px; font-weight:500;" data-i18n="hardsub.alignCenter">Center</button>
+                            <button class="pill-btn align-h-btn" data-h="right" style="flex:1; padding: 5px 0; font-size: 0.75rem; border:none; border-radius:6px; font-weight:500;" data-i18n="hardsub.alignRight">Right</button>
                           </div>
                         </div>
                       </div>
@@ -2456,12 +2456,12 @@
                   <div class="glass-card" style="padding: 18px;">
                     <h3 style="margin-top: 0; margin-bottom: 14px; font-size: 1.05rem; color: var(--color-royal-blue); display: flex; align-items: center; gap: 8px;">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px;"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-                      Format, Codec & Performance
+                      <span data-i18n="hardsub.exportSettingsTitle">Format, Codec & Performance</span>
                     </h3>
 
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
                       <div>
-                        <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Hardware Accelerator</label>
+                        <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;" data-i18n="hardsub.hwAccel">Hardware Accelerator</label>
                         <select class="select-control" id="hardsub-hw" style="width:100%;">
                           <option value="cpu">Standard CPU (Universal)</option>
                           <option value="videotoolbox">Apple VideoToolbox (macOS / Apple Silicon)</option>
@@ -2472,7 +2472,7 @@
                       </div>
 
                       <div>
-                        <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Video Codec</label>
+                        <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;" data-i18n="hardsub.videoCodec">Video Codec</label>
                         <select class="select-control" id="hardsub-codec" style="width:100%;">
                           <option value="h264">H.264 / AVC (Universal)</option>
                           <option value="h265">H.265 / HEVC (High Efficiency)</option>
@@ -2483,7 +2483,7 @@
                       </div>
 
                       <div>
-                        <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Output Container</label>
+                        <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;" data-i18n="hardsub.containerFormat">Output Container</label>
                         <select class="select-control" id="hardsub-format" style="width:100%;">
                           <option value="mp4">MP4 (.mp4)</option>
                           <option value="mkv">MKV (.mkv)</option>
@@ -2493,7 +2493,7 @@
                       </div>
 
                       <div>
-                        <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Resolution / Scale</label>
+                        <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;" data-i18n="hardsub.resolution">Resolution / Scale</label>
                         <select class="select-control" id="hardsub-resolution" style="width:100%;">
                           <option value="original">Original (Source Resolution)</option>
                           <option value="4k">4K UHD (3840×2160)</option>
@@ -2505,7 +2505,7 @@
                       </div>
 
                       <div style="grid-column: span 2;">
-                        <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Encoding Speed & Compression Effort</label>
+                        <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;" data-i18n="hardsub.speedPreset">Encoding Speed & Compression Effort</label>
                         <select class="select-control" id="hardsub-speed-preset" style="width: 100%;">
                           <option value="fast">Fast (Quick Export, Slightly Larger Size)</option>
                           <option value="medium" selected>Balanced / Medium (Recommended)</option>
@@ -2520,28 +2520,28 @@
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
                       <h3 style="margin: 0; font-size: 1.05rem; color: var(--color-royal-blue); display: flex; align-items: center; gap: 8px;">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                        Video Quality
+                        <span data-i18n="hardsub.qualityTitle">Video Quality</span>
                       </h3>
-                      <span id="hardsub-quality-badge" aria-live="polite" style="font-size: 0.75rem; background: rgba(var(--color-royal-blue-rgb), 0.15); color: var(--color-royal-blue); padding: 3px 10px; border-radius: 20px; border: 1px solid rgba(var(--color-royal-blue-rgb), 0.3); font-weight: 600;">Balanced</span>
+                      <span id="hardsub-quality-badge" aria-live="polite" data-i18n="hardsub.presetBalanced" style="font-size: 0.75rem; background: rgba(var(--color-royal-blue-rgb), 0.15); color: var(--color-royal-blue); padding: 3px 10px; border-radius: 20px; border: 1px solid rgba(var(--color-royal-blue-rgb), 0.3); font-weight: 600;">Balanced</span>
                     </div>
 
                     <!-- Quick Preset Buttons -->
                     <div id="hardsub-quality-presets-container" role="radiogroup" aria-label="Video Quality Presets">
                       <button type="button" class="quality-preset-btn" role="radio" aria-checked="false" data-preset="draft">
-                        <span class="preset-title">Draft</span>
-                        <span class="preset-subtitle">Fast / Compact</span>
+                        <span class="preset-title" data-i18n="hardsub.presetDraft">Draft</span>
+                        <span class="preset-subtitle" data-i18n="hardsub.presetDraftSub">Fast / Compact</span>
                       </button>
                       <button type="button" class="quality-preset-btn active" role="radio" aria-checked="true" data-preset="balanced">
-                        <span class="preset-title">Balanced</span>
-                        <span class="preset-subtitle">Recommended</span>
+                        <span class="preset-title" data-i18n="hardsub.presetBalanced">Balanced</span>
+                        <span class="preset-subtitle" data-i18n="hardsub.presetBalancedSub">Recommended</span>
                       </button>
                       <button type="button" class="quality-preset-btn" role="radio" aria-checked="false" data-preset="high">
-                        <span class="preset-title">High Quality</span>
-                        <span class="preset-subtitle">Crisp Detail</span>
+                        <span class="preset-title" data-i18n="hardsub.presetHigh">High Quality</span>
+                        <span class="preset-subtitle" data-i18n="hardsub.presetHighSub">Crisp Detail</span>
                       </button>
                       <button type="button" class="quality-preset-btn" role="radio" aria-checked="false" data-preset="lossless">
-                        <span class="preset-title">Ultra / Master</span>
-                        <span class="preset-subtitle">Max Fidelity</span>
+                        <span class="preset-title" data-i18n="hardsub.presetUltra">Ultra / Master</span>
+                        <span class="preset-subtitle" data-i18n="hardsub.presetUltraSub">Max Fidelity</span>
                       </button>
                     </div>
 
@@ -2554,7 +2554,7 @@
                       <input type="range" class="range-slider" id="hardsub-quality-slider" min="0" max="51" value="22" aria-labelledby="hardsub-quality-param-label" aria-describedby="hardsub-quality-hint" style="width: 100%;" />
                       <div id="hardsub-quality-hint" style="font-size: 0.72rem; color: var(--color-text-muted); margin-top: 6px; display: flex; align-items: center; gap: 4px;">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 13px; height: 13px; flex-shrink: 0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                        Lower value = Higher visual quality & larger file size
+                        <span data-i18n="hardsub.lowerValBetter">Lower value = Higher visual quality & larger file size</span>
                       </div>
                     </div>
 
@@ -2564,12 +2564,12 @@
                   <div class="glass-card" style="padding: 18px;">
                     <h3 style="margin-top: 0; margin-bottom: 14px; font-size: 1.05rem; color: var(--color-royal-blue); display: flex; align-items: center; gap: 8px;">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:20px; height:20px;"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-                      Audio Settings
+                      <span data-i18n="hardsub.audioSettingsTitle">Audio Settings</span>
                     </h3>
 
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
                       <div>
-                        <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Audio Codec</label>
+                        <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;" data-i18n="hardsub.audioCodec">Audio Codec</label>
                         <select class="select-control" id="hardsub-audio-codec" style="width:100%;">
                           <option value="copy">Pass-through Audio (Copy - Fast & Lossless)</option>
                           <option value="aac">AAC (Universal Compatibility)</option>
@@ -2580,7 +2580,7 @@
                       </div>
 
                       <div id="hardsub-audio-bitrate-container">
-                        <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Audio Bitrate</label>
+                        <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;" data-i18n="hardsub.audioBitrate">Audio Bitrate</label>
                         <select class="select-control" id="hardsub-audio-bitrate" style="width:100%;">
                           <option value="96k">96 kbps (Voice / Compact)</option>
                           <option value="128k">128 kbps (Standard Quality)</option>
@@ -2597,11 +2597,11 @@
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                       <h3 style="margin: 0; font-size: 0.95rem; color: var(--color-royal-blue); display: flex; align-items: center; gap: 8px;">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px;"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-                        FFmpeg Command Preview
+                        <span data-i18n="hardsub.ffmpegPreviewTitle">FFmpeg Command Preview</span>
                       </h3>
                       <button type="button" class="btn-secondary" id="btn-copy-ffmpeg-cmd" style="padding: 4px 12px; font-size: 0.75rem; display: flex; align-items: center; gap: 6px;">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px; height:13px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                        Copy Command
+                        <span data-i18n="hardsub.copyCommand">Copy Command</span>
                       </button>
                     </div>
                     
@@ -2629,25 +2629,25 @@
               <line x1="12" y1="8" x2="12" y2="12"/>
               <line x1="12" y1="16" x2="12.01" y2="16"/>
             </svg>
-            <h3 id="app-modal-title">Compilation Error</h3>
+            <h3 id="app-modal-title" data-i18n="modals.compilationErrorTitle">Compilation Error</h3>
           </div>
         </div>
         <div class="modal-body">
-          <p id="app-modal-message">An error occurred during execution.</p>
+          <p id="app-modal-message" data-i18n="modals.errorOccurred">An error occurred during execution.</p>
           <pre class="modal-details-box" id="app-modal-details"></pre>
         </div>
         <div class="modal-footer" id="app-modal-ok-footer">
-          <button class="btn-primary" id="app-modal-close-btn" onclick="closeAppModal()" style="width: 100%; justify-content: center;">OK</button>
+          <button class="btn-primary" id="app-modal-close-btn" onclick="closeAppModal()" style="width: 100%; justify-content: center;" data-i18n="modals.ok">OK</button>
         </div>
         <div class="modal-footer" id="app-modal-confirm-footer" style="display: none; gap: 12px; width: 100%;">
           <button class="btn-primary" id="app-modal-delete-btn" onclick="resolveAppConfirm(true)" style="flex: 1; justify-content: center; background: linear-gradient(135deg, #b91c1c, #991b1b); border-color: #b91c1c; padding: 8px 20px;">Delete</button>
-          <button class="btn-secondary" id="app-modal-cancel-btn" onclick="resolveAppConfirm(false)" style="flex: 1; justify-content: center; padding: 8px 20px;">Cancel</button>
+          <button class="btn-secondary" id="app-modal-cancel-btn" onclick="resolveAppConfirm(false)" style="flex: 1; justify-content: center; padding: 8px 20px;" data-i18n="modals.cancelBtn">Cancel</button>
         </div>
       </div>
     </div>
 
     <!-- Translation Provider Configuration Modal -->
-    <div class="modal-overlay" id="translation-provider-modal" style="display: none;">
+    <div class="modal-overlay" id="translation-provider-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="provider-modal-title">
       <div class="glass-card modal-card" style="max-width: 480px;">
         <div class="modal-header">
           <div class="modal-title-row">
@@ -2655,18 +2655,18 @@
               <path d="M12 2a10 10 0 0 1 10 10c0 5.523-4.477 10-10 10S2 17.523 2 12s4.477-10 10-10zm0 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16z"/>
               <path d="M7 12h10M12 7l5 5-5 5"/>
             </svg>
-            <h3 id="provider-modal-title" style="color: var(--color-cyan);">Add API Provider</h3>
+            <h3 id="provider-modal-title" style="color: var(--color-cyan);" data-i18n="modals.addProviderTitle">Add API Provider</h3>
           </div>
         </div>
         <div class="modal-body" style="max-height: 480px; overflow-y: auto; padding-right: 8px;">
           <div style="display: flex; flex-direction: column; gap: 14px; margin-bottom: 16px;">
             <div style="display: flex; flex-direction: column; gap: 6px;">
-              <label style="font-size: 0.85rem; color: var(--color-text-muted);">Provider Name</label>
+              <label for="provider-name" style="font-size: 0.85rem; color: var(--color-text-muted);" data-i18n="modals.providerName">Provider Name</label>
               <input class="text-input" id="provider-name" type="text" placeholder="e.g. OpenRouter" style="width: 100%;" />
             </div>
             
             <div style="display: flex; flex-direction: column; gap: 6px;">
-              <label style="font-size: 0.85rem; color: var(--color-text-muted);">API Format</label>
+              <label for="provider-format" style="font-size: 0.85rem; color: var(--color-text-muted);" data-i18n="modals.apiFormat">API Format</label>
               <select class="select-control" id="provider-format" style="width: 100%;">
                 <option value="Chat completions">Chat completions (/chat/completions)</option>
                 <option value="Anthropic messages">Anthropic messages (/v1/messages)</option>
@@ -2676,33 +2676,33 @@
           </div>
 
           <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px;">
-            <label style="font-size: 0.85rem; color: var(--color-text-muted);">Base URL</label>
-            <input class="text-input" id="provider-url" type="text" placeholder="https://openrouter.ai/api/v1" style="width: 100%;" />
+            <label for="provider-url" style="font-size: 0.85rem; color: var(--color-text-muted);" data-i18n="modals.baseUrl">Base URL</label>
+            <input class="text-input mono" id="provider-url" type="text" placeholder="https://openrouter.ai/api/v1" style="width: 100%;" />
           </div>
 
           <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px;">
-            <label style="font-size: 0.85rem; color: var(--color-text-muted);">API Key</label>
-            <input class="text-input" id="provider-key" type="password" placeholder="sk-..." style="width: 100%;" />
+            <label for="provider-key" style="font-size: 0.85rem; color: var(--color-text-muted);" data-i18n="modals.apiKey">API Key</label>
+            <input class="text-input mono" id="provider-key" type="password" placeholder="sk-..." style="width: 100%;" />
           </div>
           
-          <div style="margin-bottom: 16px; padding-left: 8px;">
+          <div style="margin-bottom: 16px; padding-inline-start: 8px;">
             <label class="checkbox-container">
               <input type="checkbox" id="provider-use-keyring" checked />
               <span class="custom-checkmark"></span>
-              <span>Store API Key securely in system keyring</span>
+              <span data-i18n="modals.storeKeyring">Store API Key securely in system keyring</span>
             </label>
           </div>
         </div>
         <div class="modal-footer" style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 16px;">
-          <button class="btn-secondary" onclick="closeProviderModal()" style="padding: 10px 20px; font-size: 0.9rem;">Cancel</button>
-          <button class="btn-primary" onclick="saveProviderConfig()" style="padding: 10px 20px; font-size: 0.9rem;">Save Provider</button>
+          <button class="btn-secondary" onclick="closeProviderModal()" style="padding: 10px 20px; font-size: 0.9rem;" data-i18n="modals.cancel">Cancel</button>
+          <button class="btn-primary" onclick="saveProviderConfig()" style="padding: 10px 20px; font-size: 0.9rem;" data-i18n="modals.saveProvider">Save Provider</button>
         </div>
       </div>
     </div>
 
 
     <!-- Batch Translation Error Dialog -->
-    <div class="modal-overlay" id="batch-error-modal" style="display: none;">
+    <div class="modal-overlay" id="batch-error-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="batch-error-title">
       <div class="glass-card modal-card" style="max-width: 500px;">
         <div class="modal-header">
           <div class="modal-title-row">
@@ -2711,25 +2711,25 @@
               <line x1="12" y1="8" x2="12" y2="12"/>
               <line x1="12" y1="16" x2="12.01" y2="16"/>
             </svg>
-            <h3 id="batch-error-title" style="color: var(--color-red);">Translation Error</h3>
+            <h3 id="batch-error-title" style="color: var(--color-red);" data-i18n="modals.batchErrorTitle">Translation Error</h3>
           </div>
         </div>
         <div class="modal-body">
           <p id="batch-error-message" style="font-size: 0.95rem; margin-bottom: 12px; line-height: 1.4;"></p>
-          <p style="font-size: 0.85rem; color: var(--color-text-muted);">An error occurred during translation of this batch item. Select how you would like to proceed:</p>
+          <p style="font-size: 0.85rem; color: var(--color-text-muted);" data-i18n="modals.batchErrorInstruction">An error occurred during translation of this batch item. Select how you would like to proceed:</p>
         </div>
         <div class="modal-footer" style="display: flex; gap: 8px; flex-direction: column; width: 100%; margin-top: 16px;">
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%;">
-            <button class="btn-primary" onclick="resolveBatchError('retry')" style="justify-content: center; font-size: 0.9rem;">Retry Translation</button>
-            <button class="btn-secondary" onclick="resolveBatchError('skip')" style="justify-content: center; font-size: 0.9rem;">Skip Item</button>
+            <button class="btn-primary" onclick="resolveBatchError('retry')" style="justify-content: center; font-size: 0.9rem;" data-i18n="modals.retryBtn">Retry Translation</button>
+            <button class="btn-secondary" onclick="resolveBatchError('skip')" style="justify-content: center; font-size: 0.9rem;" data-i18n="modals.skipBtn">Skip Item</button>
           </div>
-          <button class="btn-secondary" onclick="resolveBatchError('abort')" style="width: 100%; justify-content: center; border-color: var(--color-red); color: var(--color-red); font-size: 0.9rem;">Abort Batch Job</button>
+          <button class="btn-secondary" onclick="resolveBatchError('abort')" style="width: 100%; justify-content: center; border-color: var(--color-red); color: var(--color-red); font-size: 0.9rem;" data-i18n="modals.abortBtn">Abort Batch Job</button>
         </div>
       </div>
     </div>
 
     <!-- Test Connection Modal -->
-    <div class="modal-overlay" id="translation-test-modal" style="display: none;">
+    <div class="modal-overlay" id="translation-test-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="test-conn-title">
       <div class="glass-card modal-card" style="max-width: 480px;">
         <div class="modal-header">
           <div class="modal-title-row">
@@ -2737,17 +2737,17 @@
               <circle cx="12" cy="12" r="10"/>
               <polyline points="12 6 12 12 16 14"/>
             </svg>
-            <h3 style="color: var(--color-cyan);">Connection Test Results</h3>
+            <h3 id="test-conn-title" style="color: var(--color-cyan);" data-i18n="modals.testConnTitle">Connection Test Results</h3>
           </div>
         </div>
         <div class="modal-body" style="padding-top: 10px;">
-          <div id="test-modal-status" style="font-weight: 600; margin-bottom: 12px; font-size: 1rem;">Testing...</div>
-          <div class="textarea-control" id="test-modal-result" style="width: 100%; height: 160px; overflow-y: auto; white-space: pre-wrap; font-family: monospace; font-size: 0.85rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 10px; box-sizing: border-box; color: var(--color-text); width: 100%;">
+          <div id="test-modal-status" style="font-weight: 600; margin-bottom: 12px; font-size: 1rem;" data-i18n="modals.testing">Testing...</div>
+          <div class="textarea-control" id="test-modal-result" style="width: 100%; height: 160px; overflow-y: auto; white-space: pre-wrap; font-family: monospace; font-size: 0.85rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 10px; box-sizing: border-box; color: var(--color-text); width: 100%;" data-i18n="modals.waitingResponse">
             Waiting for response...
           </div>
         </div>
         <div class="modal-footer" style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 16px;">
-          <button class="btn-primary" onclick="closeTestModal()" style="padding: 10px 20px; font-size: 0.9rem; width: 100%; justify-content: center;">OK</button>
+          <button class="btn-primary" onclick="closeTestModal()" style="padding: 10px 20px; font-size: 0.9rem; width: 100%; justify-content: center;" data-i18n="modals.ok">OK</button>
         </div>
       </div>
     </div>

@@ -64,6 +64,19 @@ export function translateDOM(root: Document | Element = document): void {
     }
   }
 
+  // Translate rich HTML content with defensive sanitization
+  const htmlElements = root.querySelectorAll<HTMLElement>('[data-i18n-html]');
+  for (const el of htmlElements) {
+    const key = el.getAttribute('data-i18n-html');
+    if (key) {
+      const raw = t(key);
+      const clean = raw
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+        .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '');
+      el.innerHTML = clean;
+    }
+  }
+
   // Translate specific helper attributes
   const placeholderEls = root.querySelectorAll<HTMLElement>('[data-i18n-placeholder]');
   for (const el of placeholderEls) {

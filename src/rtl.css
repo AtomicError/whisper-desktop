@@ -205,3 +205,35 @@ html[dir="rtl"] .segment-item {
 html[dir="rtl"] .icon-flip-rtl {
   transform: scaleX(-1);
 }
+
+/* 10. Technical Inputs, Hardsub & Modal RTL Polish */
+html[dir="rtl"] #hardsub-ffmpeg-cmd-preview,
+html[dir="rtl"] #hardsub-cli-args-preview,
+html[dir="rtl"] #test-modal-result,
+html[dir="rtl"] #app-modal-details,
+html[dir="rtl"] #provider-url,
+html[dir="rtl"] #provider-key,
+html[dir="rtl"] #mgr-provider-url,
+html[dir="rtl"] #mgr-provider-key,
+html[dir="rtl"] input.mono,
+html[dir="rtl"] .text-input.mono {
+  direction: ltr !important;
+  text-align: left !important;
+  font-family: var(--font-mono) !important;
+}
+
+html[dir="rtl"] .modal-card {
+  direction: rtl;
+  text-align: right;
+}
+
+html[dir="rtl"] #batch-error-message {
+  direction: rtl;
+  text-align: right;
+  unicode-bidi: plaintext;
+}
+
+html[dir="rtl"] .modal-footer {
+  direction: rtl;
+}
+

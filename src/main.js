@@ -71,6 +71,8 @@ window.showNotification = function(message, type = 'info', customDuration = null
     iconSvg = `<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   } else if (type === 'error') {
     iconSvg = `<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`;
+  } else if (type === 'warning') {
+    iconSvg = `<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
   } else {
     // Info
     iconSvg = `<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`;
@@ -81,7 +83,7 @@ window.showNotification = function(message, type = 'info', customDuration = null
   toast.innerHTML = `
     ${iconSvg}
     <div class="toast-message"></div>
-    <button class="toast-close-btn" title="Close">${closeSvg}</button>
+    <button class="toast-close-btn" title="${t('common.close')}" aria-label="${t('common.close')}">${closeSvg}</button>
     <div class="toast-progress-bar"></div>
   `;
   toast.querySelector('.toast-message').textContent = message;
@@ -228,7 +230,7 @@ window.closeAppModal = function() {
 // Promise-based confirm dialog using the themed modal
 window._confirmModalResolve = null;
 
-window.showConfirmModal = function(title, message, confirmButtonText = 'Delete') {
+window.showConfirmModal = function(title, message, confirmButtonText = null) {
   if (window._confirmModalResolve) return Promise.resolve(false);
   return new Promise((resolve) => {
     const overlay = document.getElementById('app-modal-overlay');
@@ -248,7 +250,7 @@ window.showConfirmModal = function(title, message, confirmButtonText = 'Delete')
     msgEl.textContent = message;
     detailsEl.style.display = 'none';
     
-    deleteBtn.textContent = confirmButtonText;
+    deleteBtn.textContent = confirmButtonText || t('modals.deleteBtn') || 'Delete';
     
     okFooter.style.display = 'none';
     confirmFooter.style.display = 'flex';
@@ -479,7 +481,7 @@ window.openFileInEditor = async function(filePath) {
       await invoke('plugin:opener|open_path', { path: filePath });
     } catch (e2) {
       const msg = (err && (err.message || err.toString())) || String(err);
-      showNotification("Could not open file in editor: " + msg, "error");
+      showNotification(t('toasts.openFileError', { error: msg }), "error");
     }
   }
 };
@@ -657,9 +659,9 @@ function setupTitlebar() {
 
         if (window.hasActiveBackgroundJob()) {
           const confirmed = await window.showConfirmModal(
-            'Active Process Running',
-            'A transcription, translation, or rendering task is currently in progress. Closing the application will abort the process. Are you sure you want to exit?',
-            'Exit & Abort'
+            t('modals.confirmExitTitle'),
+            t('modals.confirmExitDesc'),
+            t('modals.confirmExitBtn')
           );
           if (confirmed) {
             try {
@@ -1226,7 +1228,7 @@ function applyUiZoom(scale, persist = true, showToast = false) {
   }
 
   if (showToast && typeof showNotification === 'function') {
-    showNotification(`UI Scale: ${Math.round(numScale * 100)}%`, "info");
+    showNotification(t('toasts.uiScaleToast', { scale: Math.round(numScale * 100) }), "info");
   }
 
   if (persist && settingsState) {
@@ -1369,7 +1371,7 @@ window.switchTheme = function(themeName, animated = true) {
     applyTheme(config.id);
   }
 
-  showNotification(`Color theme switched to ${config.toastName || config.label}`, 'info');
+  showNotification(t('toasts.themeSwitched', { theme: config.toastName || config.label }), 'info');
 };
 
 function setupZoomKeyboardShortcuts() {
@@ -1535,6 +1537,48 @@ async function initApp() {
   window.addEventListener('whisper:languageChanged', () => {
     if (activeView === 'models' && typeof loadModelStatusesGrid === 'function') {
       loadModelStatusesGrid(true, true);
+    }
+    
+    // Update transcribe dropzone and wizard step 2 buttons contextually
+    const fileNameEl = document.getElementById('lbl-file-name');
+    const filePathEl = document.getElementById('lbl-file-path');
+    if (fileNameEl && filePathEl) {
+      if (selectedMediaFile) {
+        fileNameEl.textContent = getBasename(selectedMediaFile);
+        filePathEl.textContent = selectedMediaFile;
+      } else if (!batchItems || batchItems.length === 0) {
+        fileNameEl.textContent = t('transcribe.noFileLoaded');
+        filePathEl.textContent = t('transcribe.selectFilePrompt');
+      }
+    }
+    
+    const nextStep2Btn = document.getElementById('btn-next-step-2');
+    if (nextStep2Btn) {
+      if (batchItems && batchItems.length > 0) {
+        nextStep2Btn.textContent = t('transcribe.continueToBatchSetup');
+      } else {
+        nextStep2Btn.textContent = t('transcribe.continueToTranscription');
+      }
+    }
+
+    // Keep batch queue table and specs translated without affecting data
+    if (batchItems && batchItems.length > 0) {
+      if (typeof renderBatchQueueTable === 'function') {
+        renderBatchQueueTable();
+      }
+      if (typeof updateBatchSpecs === 'function') {
+        updateBatchSpecs();
+      }
+    }
+
+    // Keep quick VAD button status translated without toggling state
+    if (typeof updateTranscribeUIConfigs === 'function') {
+      updateTranscribeUIConfigs();
+    }
+
+    // If in settings view, refresh models count display
+    if (activeView === 'settings' && typeof filterModelsTable === 'function') {
+      filterModelsTable(0);
     }
   });
 
@@ -1762,9 +1806,9 @@ function setupTauriListeners() {
       _cachedModelStatuses = null;
       loadModelStatusesGrid(true, true);
       if (payload.phase === 'failed') {
-        showNotification(`Model download failed: ${payload.error || 'unknown error'}`, "error");
+        showNotification(t('toasts.modelDownloadError', { name: payload.modelName || '', error: payload.error || 'unknown error' }), "error");
       } else if (payload.phase === 'completed') {
-        showNotification(`Finished downloading ggml-${payload.modelName}.bin successfully!`, "success");
+        showNotification(t('toasts.modelDownloadSuccess', { name: `ggml-${payload.modelName}.bin` }), "success");
         scanAndPopulateModels();
       }
     }
@@ -2018,7 +2062,7 @@ async function refreshSettings() {
     // Scan models path
     await scanAndPopulateModels();
   } catch (e) {
-    showNotification("Failed to load settings. Starting with default configuration.", "error");
+    showNotification(t('toasts.settingsLoadError'), "error");
   }
 }
 
@@ -2192,7 +2236,7 @@ async function refreshFFmpegStatus(sourceOverride, userInitiated = false) {
       badgeEl.innerHTML = `<span class="ffmpeg-status-dot red"></span> Not Found`;
       badgeEl.title = info.errorMessage || 'FFmpeg binary was not found';
       if (currentSource === 'system' && userInitiated) {
-        showNotification("Warning: System FFmpeg was not found in PATH. Media tasks will fail until FFmpeg is installed or switched to Internal mode.", "warning");
+        showNotification(t('toasts.ffmpegNotFound'), "warning");
       }
     }
   } catch (err) {
@@ -2254,7 +2298,7 @@ async function saveCurrentSettings(immediate = false) {
       await invoke('save_settings', { settings: cleanPayload });
     } catch (e) {
       console.error("Failed to save settings:", e);
-      showNotification("Failed to save settings. Check disk space and file permissions.", "error");
+      showNotification(t('toasts.settingsSaveError'), "error");
     }
   };
 
@@ -2522,13 +2566,13 @@ async function scanAndPopulateModels() {
       if (transSelect) {
         const emptyOpt = document.createElement('option');
         emptyOpt.value = '';
-        emptyOpt.textContent = 'No models found';
+        emptyOpt.textContent = t('transcribe.noModelsFound');
         transSelect.appendChild(emptyOpt);
       }
       if (quickSelect) {
         const emptyOpt = document.createElement('option');
         emptyOpt.value = '';
-        emptyOpt.textContent = 'No models found (Download in Model Hub)';
+        emptyOpt.textContent = t('transcribe.noModelsFoundDropdown');
         quickSelect.appendChild(emptyOpt);
       }
     } else {
@@ -2740,7 +2784,7 @@ function setWizardStepCompleted(stepNum, isCompleted) {
 window.browseMediaFile = async function() {
   const startBtn = document.getElementById('btn-run-batch');
   if (startBtn && startBtn.disabled) {
-    showNotification("Cannot select files while batch extraction is active.", "info");
+    showNotification(t('toasts.batchActiveSelectBlocked'), "info");
     return;
   }
   const files = await invoke('select_files');
@@ -2760,7 +2804,7 @@ window.browseMediaFile = async function() {
       
       document.getElementById('media-meta-box').style.display = 'grid';
       document.getElementById('batch-specs-box').style.display = 'none';
-      document.getElementById('btn-next-step-2').textContent = 'Continue to Transcription';
+      document.getElementById('btn-next-step-2').textContent = t('transcribe.continueToTranscription');
       
       
       document.getElementById('batch-controls-box').style.display = 'none';
@@ -2790,7 +2834,7 @@ window.browseMediaFile = async function() {
       batchItems = files.map(filePath => ({
         path: filePath,
         name: getBasename(filePath),
-        size: 'Pending...',
+        size: t('transcribe.statusPending') + '...',
         durationSec: null,
         status: 'pending',
         timeSec: 0,
@@ -2805,7 +2849,7 @@ window.browseMediaFile = async function() {
       document.getElementById('media-meta-box').style.display = 'none';
       document.getElementById('batch-specs-box').style.display = 'block';
       document.getElementById('batch-files-count').textContent = files.length;
-      document.getElementById('btn-next-step-2').textContent = 'Continue to Batch Setup';
+      document.getElementById('btn-next-step-2').textContent = t('transcribe.continueToBatchSetup');
       
       
       document.getElementById('batch-controls-box').style.display = 'block';
@@ -2866,16 +2910,16 @@ async function probeSelectedFile() {
       const fillBar = document.getElementById('progress-linear-fill');
       if (fillBar) fillBar.style.width = '0%';
       document.getElementById('lbl-radial-pct').textContent = '0%';
-      document.getElementById('lbl-radial-msg').textContent = 'Ready for Transcription';
+      document.getElementById('lbl-radial-msg').textContent = t('transcribe.readyForTranscription');
       
       setWizardStepCompleted(3, false);
       document.getElementById('analytics-box').style.display = 'none';
     } else {
-      showNotification("Selected file does not exist or cannot be probed!", "error");
+      showNotification(t('toasts.fileNotFoundOrInvalid'), "error");
     }
   } catch (e) {
     console.error("Probing failed:", e);
-    showNotification("Could not read media metadata. The file may be missing or in an unsupported format.", "error");
+    showNotification(t('toasts.metaReadError'), "error");
   }
 }
 
@@ -2975,15 +3019,15 @@ function updateTranscribeUIConfigs() {
   if (quickVadBtn && quickVadText) {
     if (vadActive) {
       quickVadBtn.classList.add('active');
-      quickVadText.textContent = 'VAD Active';
+      quickVadText.textContent = t('transcribe.vadActiveStatus');
       quickVadBtn.title = `Silero VAD Active (${vadModelName}) - Click to disable`;
     } else {
       quickVadBtn.classList.remove('active');
       if (hasVadModel) {
-        quickVadText.textContent = 'VAD Disabled';
+        quickVadText.textContent = t('transcribe.vadDisabledStatus');
         quickVadBtn.title = `Silero VAD Disabled (${vadModelName}) - Click to enable`;
       } else {
-        quickVadText.textContent = 'VAD (No Model)';
+        quickVadText.textContent = t('transcribe.vadNoModelStatus');
         quickVadBtn.title = 'No Silero VAD model found on system - Click for instructions';
       }
     }
@@ -3034,7 +3078,7 @@ function setupQuickConfigDeckEventListeners() {
       const backend = quickBackendSelect.value;
       const isCompiled = backend === 'Standard' || Boolean(compiledBackends[backend]);
       if (!isCompiled) {
-        showNotification(`The selected engine (${backend === 'Standard' ? 'CPU' : backend}) precompiled binary was not found in resources.`, "error");
+        showNotification(t('toasts.backendNotFound', { backend: backend === 'Standard' ? 'CPU' : backend }), "error");
         if (settingsState) {
           quickBackendSelect.value = settingsState.selectedBackend;
           if (window.syncCustomSelects) window.syncCustomSelects();
@@ -3047,7 +3091,7 @@ function setupQuickConfigDeckEventListeners() {
         if (cfgBackendSelect) {
           cfgBackendSelect.value = backend;
         }
-        showNotification(`Active engine switched to ${backend === 'Standard' ? 'Standard CPU' : backend + ' GPU'} successfully!`, "success");
+        showNotification(t('toasts.backendSwitched', { backend: backend === 'Standard' ? 'Standard CPU' : backend + ' GPU' }), "success");
       }
     });
   }
@@ -3060,7 +3104,7 @@ window.toggleQuickVad = function() {
   if (willEnable) {
     const hasVadModel = Boolean(localScannedVadModels && localScannedVadModels.length > 0 && settingsState.vadModel);
     if (!hasVadModel) {
-      showNotification("No Silero VAD model found. Please download Silero VAD from the Model Hub first.", "warning");
+      showNotification(t('toasts.noVadFound'), "warning");
       return;
     }
   }
@@ -3073,33 +3117,34 @@ window.toggleQuickVad = function() {
   saveCurrentSettings();
   updateTranscribeUIConfigs();
   const vadModelName = settingsState.vadModel ? getBasename(settingsState.vadModel) : 'Silero VAD';
-  showNotification(settingsState.vad ? `Silero VAD voice filter enabled (${vadModelName})` : "Silero VAD voice filter disabled", "info");
+  showNotification(settingsState.vad ? t('toasts.vadEnabled', { model: vadModelName }) : t('toasts.vadDisabled'), "info");
 };
 
 window.runWhisperTranscription = async function() {
   const btn = document.getElementById('btn-run-transcribe');
+  const btnSpan = btn?.querySelector('span');
   const cancelBtn = document.getElementById('btn-cancel-transcribe');
+  const cancelBtnSpan = cancelBtn?.querySelector('span');
   const fillBar = document.getElementById('progress-linear-fill');
   const pctEl = document.getElementById('lbl-radial-pct');
   const msgEl = document.getElementById('lbl-radial-msg');
   const pulseDot = document.getElementById('hud-pulse-dot');
 
   if (!selectedMediaFile && !wavPathForTranscription) {
-    showNotification("No media file selected!", "info");
+    showNotification(t('toasts.noFileSelected'), "info");
     return;
   }
 
   const isCompiled = compiledBackends[settingsState.selectedBackend];
   if (!isCompiled) {
-    showNotification(`The selected backend (${settingsState.selectedBackend}) precompiled binary was not found in resources! Please choose a different backend in the configuration.`, "error");
+    showNotification(t('toasts.backendNotFound', { backend: settingsState.selectedBackend }), "error");
     switchView('settings');
     return;
   }
 
   const modelExists = localScannedTransModels.includes(settingsState.modelPath);
   if (!modelExists) {
-    const modelName = getBasename(settingsState.modelPath) || 'selected model';
-    showNotification(`The selected model file '${modelName}' does not exist locally. Please select a valid model in General Configuration!`, "error");
+    showNotification(t('toasts.noModelFound'), "error");
     return;
   }
 
@@ -3110,29 +3155,29 @@ window.runWhisperTranscription = async function() {
   transcriptLines = [];
   const viewport = document.getElementById('transcript-viewport');
   if (viewport) {
-    viewport.innerHTML = '<div style="color: var(--color-cyan); text-align: center; margin-top: 40px; font-weight: 500;">AI model is initializing...</div>';
+    viewport.innerHTML = `<div style="color: var(--color-cyan); text-align: center; margin-top: 40px; font-weight: 500;">${t('transcribe.aiModelInitializing')}</div>`;
   }
 
   try {
     // Phase 1: Auto-convert to WAV if not already done
     if (!wavPathForTranscription) {
-      btn.textContent = 'Converting to WAV...';
-      if (msgEl) msgEl.textContent = 'Converting audio to 16kHz WAV...';
+      if (btnSpan) btnSpan.textContent = t('transcribe.convertingToWav'); else btn.textContent = t('transcribe.convertingToWav');
+      if (msgEl) msgEl.textContent = t('transcribe.convertingAudio16k');
       if (fillBar) {
         fillBar.style.width = '50%';
         fillBar.classList.add('indeterminate');
       }
-      if (pctEl) pctEl.textContent = 'Converting...';
+      if (pctEl) pctEl.textContent = t('transcribe.convertingProgress');
 
       wavPathForTranscription = await invoke('convert_media_file', { filePath: selectedMediaFile });
 
       if (fillBar) fillBar.classList.remove('indeterminate');
-      if (msgEl) msgEl.textContent = 'WAV Ready! Transcribing...';
+      if (msgEl) msgEl.textContent = t('transcribe.wavReadyTranscribing');
     }
 
     // Phase 2: Run Whisper transcription
     if (cancelBtn) cancelBtn.style.display = 'inline-flex';
-    btn.textContent = 'AI Transcribing...';
+    if (btnSpan) btnSpan.textContent = t('transcribe.aiTranscribingStatus'); else btn.textContent = t('transcribe.aiTranscribingStatus');
 
     const result = await invoke('start_transcription_task', {
       settings: settingsState,
@@ -3186,13 +3231,14 @@ window.runWhisperTranscription = async function() {
 
     // Mark Step 3 as completed and notify user immediately when transcription succeeds
     setWizardStepCompleted(3, true);
-    showNotification("Transcription completed successfully!", "success");
+    const elapsedSec = result.durationMs ? (result.durationMs / 1000) : 0;
+    showNotification(t('toasts.transcriptionComplete', { time: formatDuration(elapsedSec) }), "success");
 
     // Run AI Translation if enabled
     if (settingsState.translateAiEnabled && result.generatedFiles && result.generatedFiles.length > 0) {
       try {
-        btn.textContent = 'AI Translating...';
-        showNotification("Starting AI translation of generated files...", "info");
+        if (btnSpan) btnSpan.textContent = t('transcribe.aiTranslating'); else btn.textContent = t('transcribe.aiTranslating');
+        showNotification(t('toasts.aiTranslateStart'), "info");
 
         const translatedFiles = await invoke('translate_transcription_files', {
           settings: settingsState,
@@ -3204,7 +3250,7 @@ window.runWhisperTranscription = async function() {
           badgesRow.appendChild(createRoyalBadge(f));
         });
 
-        showNotification("AI translation completed successfully!", "success");
+        showNotification(t('toasts.aiTranslateComplete'), "success");
       } catch (err) {
         const errMsg = (typeof err === 'string') ? err : (err && err.toString ? err.toString() : '');
         if (errMsg.toLowerCase().includes('cancelled')) {
@@ -3212,7 +3258,7 @@ window.runWhisperTranscription = async function() {
           // and marks the step as incomplete.
           throw err;
         } else {
-          showNotification("AI translation failed: " + errMsg, "error");
+          showNotification(t('toasts.aiTranslateError', { error: errMsg }), "error");
         }
       }
     }
@@ -3220,23 +3266,23 @@ window.runWhisperTranscription = async function() {
     const errMsg = (typeof e === 'string') ? e : (e && e.toString ? e.toString() : '');
     setWizardStepCompleted(3, false);
     if (errMsg.toLowerCase().includes('cancelled by the user') || errMsg.toLowerCase().includes('was cancelled by the user')) {
-      showNotification("Transcription cancelled by the user.", "info");
-      if (msgEl) msgEl.textContent = 'Cancelled';
+      showNotification(t('toasts.transcriptionCancelled'), "info");
+      if (msgEl) msgEl.textContent = t('transcribe.cancelled');
     } else {
-      showNotification("Transcription failed: " + errMsg, "error");
-      if (msgEl) msgEl.textContent = 'Task Failed';
+      showNotification(t('toasts.transcriptionError', { error: errMsg }), "error");
+      if (msgEl) msgEl.textContent = t('transcribe.taskFailed');
     }
   } finally {
     // ALWAYS clear the temporary WAV state since it has been cleaned up by the backend
     wavPathForTranscription = null;
     btn.disabled = false;
-    btn.textContent = 'Start AI Extraction';
+    if (btnSpan) btnSpan.textContent = t('transcribe.startAiExtraction'); else btn.textContent = t('transcribe.startAiExtraction');
     if (fillBar) fillBar.classList.remove('indeterminate');
     // Guarantee the HUD pulse dot can never get stuck (success, error, or cancel).
     if (pulseDot) pulseDot.classList.remove('active');
     if (cancelBtn) {
       cancelBtn.disabled = false;
-      cancelBtn.textContent = 'Cancel';
+      if (cancelBtnSpan) cancelBtnSpan.textContent = t('common.cancel'); else cancelBtn.textContent = t('common.cancel');
       cancelBtn.style.display = 'none';
     }
   }
@@ -3244,9 +3290,10 @@ window.runWhisperTranscription = async function() {
 
 window.abortTranscription = async function() {
   const cancelBtn = document.getElementById('btn-cancel-transcribe');
+  const cancelBtnSpan = cancelBtn?.querySelector('span');
   if (cancelBtn) {
     cancelBtn.disabled = true;
-    cancelBtn.textContent = 'Cancelling...';
+    if (cancelBtnSpan) cancelBtnSpan.textContent = t('transcribe.cancelling'); else cancelBtn.textContent = t('transcribe.cancelling');
   }
   
   try {
@@ -3254,11 +3301,11 @@ window.abortTranscription = async function() {
   } catch (e) {
     const errMsg = (typeof e === 'string') ? e : (e && e.toString ? e.toString() : '');
     if (!errMsg.includes("No active transcription or translation session")) {
-      showNotification("Failed to cancel process: " + errMsg, "error");
+      showNotification(t('toasts.cancelProcessError', { error: errMsg }), "error");
     }
     if (cancelBtn) {
       cancelBtn.disabled = false;
-      cancelBtn.textContent = 'Cancel';
+      if (cancelBtnSpan) cancelBtnSpan.textContent = t('common.cancel'); else cancelBtn.textContent = t('common.cancel');
     }
   }
 };
@@ -3272,8 +3319,8 @@ window.copyMainTranscriptToClipboard = async function() {
         copyBtn._origHtml = copyBtn.innerHTML;
       }
       copyBtn.innerHTML = `
-        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:5px; color:#4ade80;"><polyline points="20 6 9 17 4 12"/></svg>
-        Copied!
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-inline-end:5px; color:#4ade80;"><polyline points="20 6 9 17 4 12"/></svg>
+        ${t('transcribe.copied')}
       `;
       clearTimeout(copyBtn._copyFeedbackTimer);
       copyBtn._copyFeedbackTimer = setTimeout(() => {
@@ -3286,7 +3333,7 @@ window.copyMainTranscriptToClipboard = async function() {
   };
 
   if (!selectedMediaFile) {
-    showNotification("No media file selected or transcribed yet.", "info");
+    showNotification(t('toasts.noMediaOrTranscribe'), "info");
     return;
   }
   
@@ -3297,7 +3344,7 @@ window.copyMainTranscriptToClipboard = async function() {
     const content = await invoke('read_text_file_content', { filePath: txtFile });
     await copyToClipboard(content);
     triggerFeedback();
-    showNotification("Transcription text copied to clipboard successfully!", "success");
+    showNotification(t('toasts.fileCopied'), "success");
   } catch (e) {
     // Fallback: copy Whisper logs
     const fallback = allLogsArray
@@ -3308,14 +3355,14 @@ window.copyMainTranscriptToClipboard = async function() {
       try {
         await copyToClipboard(fallback);
         triggerFeedback();
-        showNotification("Transcript file not found; copied log output instead.", "info");
+        showNotification(t('toasts.transcriptNotFoundFallback'), "info");
       } catch (e2) {
         const msg = (e2 && (e2.message || e2.toString())) || String(e2);
-        showNotification("Failed to copy transcript: " + msg, "error");
+        showNotification(t('toasts.copyTranscriptError', { error: msg }), "error");
       }
     } else {
       const msg = (e && (e.message || e.toString())) || String(e);
-      showNotification("Failed to copy transcript: " + msg, "error");
+      showNotification(t('toasts.copyTranscriptError', { error: msg }), "error");
     }
   }
 };
@@ -3327,10 +3374,10 @@ window.openOutputFolder = async function() {
       await window.openFileInEditor(dir);
     } catch (e) {
       const msg = (e && (e.message || e.toString())) || String(e);
-      showNotification("Failed to open output folder: " + msg, "error");
+      showNotification(t('toasts.openFolderError', { error: msg }), "error");
     }
   } else {
-    showNotification("No output directory found.", "info");
+    showNotification(t('toasts.noOutputDirFound'), "info");
   }
 };
 
@@ -3382,15 +3429,19 @@ window.copyAllLogs = async function() {
   const rawLogs = allLogsArray.map(l => `[${l.timestamp}] [${l.category}] ${l.message}`).join('\n');
   try {
     await copyToClipboard(rawLogs);
-    showNotification("All logs copied to clipboard!", "success");
+    showNotification(t('toasts.logsCopied'), "success");
   } catch (e) {
     const msg = (e && (e.message || e.toString())) || String(e);
-    showNotification("Failed to copy logs: " + msg, "error");
+    showNotification(t('toasts.logsCopyError', { error: msg }), "error");
   }
 };
 
 window.clearLogsHistory = async function() {
-  const confirmed = await showConfirmModal('Clear Log History', 'Are you sure you want to clear the entire log history?', 'Clear');
+  const confirmed = await showConfirmModal(
+    t('modals.confirmClearLogsTitle'),
+    t('modals.confirmClearLogsDesc'),
+    t('modals.confirmClearLogsBtn')
+  );
   if (!confirmed) return;
   allLogsArray = [];
   lastAppendedCategory = null;
@@ -3422,9 +3473,9 @@ function updateBatchSpecs() {
   const totalDurationEl = document.getElementById('batch-total-duration');
   if (totalDurationEl) {
     if (hasPending && totalDur === 0) {
-      totalDurationEl.textContent = 'Calculating...';
+      totalDurationEl.textContent = t('transcribe.calculating');
     } else {
-      totalDurationEl.textContent = formatDuration(totalDur) + (hasPending ? ' (calculating...)' : '');
+      totalDurationEl.textContent = formatDuration(totalDur) + (hasPending ? t('transcribe.calculatingSuffix') : '');
     }
   }
 }
@@ -3450,13 +3501,13 @@ window.clearBatchQueue = function() {
   // Revert UI to initial empty single-file state
   document.getElementById('lbl-file-name').style.display = 'block';
   document.getElementById('lbl-file-path').style.display = 'block';
-  document.getElementById('lbl-file-name').textContent = 'No Media File Loaded';
-  document.getElementById('lbl-file-path').textContent = 'Select audio or video file';
+  document.getElementById('lbl-file-name').textContent = t('transcribe.noFileLoaded');
+  document.getElementById('lbl-file-path').textContent = t('transcribe.selectFilePrompt');
   document.getElementById('batch-queue-container').style.display = 'none';
   
   document.getElementById('media-meta-box').style.display = 'grid';
   document.getElementById('batch-specs-box').style.display = 'none';
-  document.getElementById('btn-next-step-2').textContent = 'Continue to Transcription';
+  document.getElementById('btn-next-step-2').textContent = t('transcribe.continueToTranscription');
   
   
   document.getElementById('batch-controls-box').style.display = 'none';
@@ -3478,7 +3529,7 @@ window.clearBatchQueue = function() {
     saveCurrentSettings();
   }
   
-  showNotification("Batch queue cleared.", "info");
+  showNotification(t('toasts.queueCleared'), "info");
 };
 
 window.moveBatchItemUp = function(index) {
@@ -3545,7 +3596,7 @@ window.sortBatchQueue = function(criteria) {
   if (sortSelect) sortSelect.value = '';
 
   renderBatchQueueTable();
-  showNotification("Queue sorted successfully!", "success");
+  showNotification(t('toasts.queueSorted'), "success");
 };
 
 function renderBatchQueueTable() {
@@ -3577,25 +3628,25 @@ function renderBatchQueueTable() {
     
     if (item.status === 'pending') {
       badge.className = 'batch-status-badge badge-pending';
-      badge.textContent = 'Pending';
+      badge.textContent = t('transcribe.statusPending');
     } else if (item.status === 'converting') {
       badge.className = 'batch-status-badge badge-processing';
-      badge.textContent = 'Converting...';
+      badge.textContent = t('transcribe.statusConverting');
     } else if (item.status === 'transcribing') {
       badge.className = 'batch-status-badge badge-processing';
-      badge.textContent = 'Extracting...';
+      badge.textContent = t('transcribe.statusExtracting');
     } else if (item.status === 'translating') {
       badge.className = 'batch-status-badge badge-processing';
-      badge.textContent = 'Translating...';
+      badge.textContent = t('transcribe.statusTranslating');
     } else if (item.status === 'completed') {
       badge.className = 'batch-status-badge badge-completed';
-      badge.textContent = 'Completed';
+      badge.textContent = t('transcribe.statusCompleted');
     } else if (item.status === 'failed') {
       badge.className = 'batch-status-badge badge-failed';
-      badge.textContent = 'Failed';
+      badge.textContent = t('transcribe.statusFailed');
     } else if (item.status === 'aborted') {
       badge.className = 'batch-status-badge badge-failed';
-      badge.textContent = 'Aborted';
+      badge.textContent = t('transcribe.statusAborted');
     }
     
     statusTd.appendChild(badge);
@@ -3697,19 +3748,21 @@ window.runBatchExtraction = async function() {
   if (!isBatchMode || batchItems.length === 0) return;
   
   const startBtn = document.getElementById('btn-run-batch');
+  const startBtnSpan = startBtn?.querySelector('span');
   const cancelBtn = document.getElementById('btn-cancel-batch');
+  const cancelBtnSpan = cancelBtn?.querySelector('span');
   const sortSelect = document.getElementById('batch-sort-select');
   const clearBtn = document.getElementById('btn-clear-batch');
   
   startBtn.disabled = true;
-  startBtn.textContent = 'Batch Running...';
+  if (startBtnSpan) startBtnSpan.textContent = t('transcribe.batchRunning'); else startBtn.textContent = t('transcribe.batchRunning');
   if (sortSelect) sortSelect.disabled = true;
   if (clearBtn) clearBtn.disabled = true;
   
   if (cancelBtn) {
     cancelBtn.style.display = 'inline-flex';
     cancelBtn.disabled = false;
-    cancelBtn.textContent = 'Cancel Batch';
+    if (cancelBtnSpan) cancelBtnSpan.textContent = t('transcribe.cancelBatch'); else cancelBtn.textContent = t('transcribe.cancelBatch');
   }
   
   batchCancelActive = false;
@@ -3737,7 +3790,7 @@ window.runBatchExtraction = async function() {
     const globalPct = ((i / totalCount) * 100).toFixed(0);
     if (fillBar) fillBar.style.width = `${globalPct}%`;
     if (pctEl) pctEl.textContent = `${globalPct}%`;
-    if (msgEl) msgEl.textContent = `[${i + 1}/${totalCount}] Converting: '${item.name}'...`;
+    if (msgEl) msgEl.textContent = t('transcribe.batchConvertingProgress', { current: i + 1, total: totalCount, name: item.name });
     
     let currentWavPath = null;
 
@@ -3759,13 +3812,13 @@ window.runBatchExtraction = async function() {
           item.status = 'transcribing';
           renderBatchQueueTable();
 
-          if (msgEl) msgEl.textContent = `[${i + 1}/${totalCount}] Extracting: '${item.name}'...`;
+          if (msgEl) msgEl.textContent = t('transcribe.batchExtractingProgress', { current: i + 1, total: totalCount, name: item.name });
 
           // Clear transcript preview for this file
       transcriptLines = [];
       const viewport = document.getElementById('transcript-viewport');
       if (viewport) {
-        viewport.innerHTML = '<div style="color: var(--color-cyan); text-align: center; margin-top: 40px; font-weight: 500;">AI model is initializing...</div>';
+        viewport.innerHTML = `<div style="color: var(--color-cyan); text-align: center; margin-top: 40px; font-weight: 500;">${t('transcribe.aiModelInitializing')}</div>`;
       }
       
       const result = await invoke('start_transcription_task', {
@@ -3797,7 +3850,7 @@ window.runBatchExtraction = async function() {
           // Message only — the percentage bar is driven by per-chunk
           // 'translation-status' events from the backend, so it keeps
           // moving instead of freezing at the batch-item fraction.
-          if (msgEl) msgEl.textContent = `[${i + 1}/${totalCount}] Translating: '${item.name}'...`;
+          if (msgEl) msgEl.textContent = t('transcribe.batchTranslatingProgress', { current: i + 1, total: totalCount, name: item.name });
           
           const outputDir = result.outputDir || getParentDir(item.path);
           const translatedFiles = await invoke('translate_transcription_files', {
@@ -3844,7 +3897,7 @@ window.runBatchExtraction = async function() {
     } catch (err) {
       item.status = 'failed';
       renderBatchQueueTable();
-      showNotification(`Failed to process '${item.name}': ${err}`, "error");
+      showNotification(t('toasts.batchItemError', { name: item.name, error: String(err) }), "error");
     } finally {
       settingsState.inputFile = originalInputFile;
     }
@@ -3855,16 +3908,16 @@ window.runBatchExtraction = async function() {
   if (pctEl) pctEl.textContent = '100%';
   
   if (batchCancelActive) {
-    if (msgEl) msgEl.textContent = 'Batch extraction cancelled';
-    showNotification("Batch extraction cancelled by the user.", "info");
+    if (msgEl) msgEl.textContent = t('transcribe.batchExtractionCancelled');
+    showNotification(t('toasts.batchCancelled'), "info");
   } else {
-    if (msgEl) msgEl.textContent = `Completed! ${successCount}/${totalCount} files processed.`;
-    showNotification(`Batch extraction completed successfully! ${successCount}/${totalCount} files processed.`, "success");
+    if (msgEl) msgEl.textContent = t('transcribe.batchCompletedSummary', { success: successCount, total: totalCount });
+    showNotification(t('toasts.batchComplete', { success: successCount, total: totalCount }), "success");
   }
   
   // Reset buttons
   startBtn.disabled = false;
-  startBtn.textContent = 'Start Batch AI Extraction';
+  if (startBtnSpan) startBtnSpan.textContent = t('transcribe.startBatchAiExtraction'); else startBtn.textContent = t('transcribe.startBatchAiExtraction');
   if (cancelBtn) cancelBtn.style.display = 'none';
   if (sortSelect) sortSelect.disabled = false;
   if (clearBtn) clearBtn.disabled = false;
@@ -3876,9 +3929,10 @@ window.runBatchExtraction = async function() {
 
 window.abortBatchExtraction = async function() {
   const cancelBtn = document.getElementById('btn-cancel-batch');
+  const cancelBtnSpan = cancelBtn?.querySelector('span');
   if (cancelBtn) {
     cancelBtn.disabled = true;
-    cancelBtn.textContent = 'Aborting...';
+    if (cancelBtnSpan) cancelBtnSpan.textContent = t('transcribe.aborting'); else cancelBtn.textContent = t('transcribe.aborting');
   }
   
   batchCancelActive = true;
@@ -3886,7 +3940,7 @@ window.abortBatchExtraction = async function() {
   try {
     // Terminate active whisper process immediately
     await invoke('cancel_transcription');
-    showNotification("Cancelling active task...", "info");
+    showNotification(t('toasts.cancellingTask'), "info");
   } catch (err) {
     console.error("Failed to cancel active whisper process:", err);
   } finally {
@@ -3976,7 +4030,7 @@ function setupTranscribeDragAndDrop() {
 async function handleDroppedFiles(files) {
   const startBtn = document.getElementById('btn-run-batch');
   if (startBtn && startBtn.disabled) {
-    showNotification("Cannot load dropped files while batch extraction is active.", "info");
+    showNotification(t('toasts.batchActiveDropBlocked'), "info");
     return;
   }
   selectedMediaFiles = files;
@@ -3993,7 +4047,7 @@ async function handleDroppedFiles(files) {
     
     document.getElementById('media-meta-box').style.display = 'grid';
     document.getElementById('batch-specs-box').style.display = 'none';
-    document.getElementById('btn-next-step-2').textContent = 'Continue to Transcription';
+    document.getElementById('btn-next-step-2').textContent = t('transcribe.continueToTranscription');
     
     document.getElementById('batch-controls-box').style.display = 'none';
     document.getElementById('wizard-step-3').style.display = 'block';
@@ -4016,7 +4070,7 @@ async function handleDroppedFiles(files) {
     batchItems = files.map(filePath => ({
       path: filePath,
       name: getBasename(filePath),
-      size: 'Pending...',
+      size: t('transcribe.statusPending') + '...',
       durationSec: null,
       status: 'pending',
       timeSec: 0,
@@ -4030,7 +4084,7 @@ async function handleDroppedFiles(files) {
     document.getElementById('media-meta-box').style.display = 'none';
     document.getElementById('batch-specs-box').style.display = 'block';
     document.getElementById('batch-files-count').textContent = files.length;
-    document.getElementById('btn-next-step-2').textContent = 'Continue to Batch Setup';
+    document.getElementById('btn-next-step-2').textContent = t('transcribe.continueToBatchSetup');
     
     document.getElementById('batch-controls-box').style.display = 'block';
     document.getElementById('btn-run-transcribe').style.display = 'none';
@@ -4061,7 +4115,7 @@ async function handleDroppedFiles(files) {
   }
   
   switchView('transcribe');
-  showNotification(`Successfully loaded ${files.length} file(s) via Drag & Drop!`, "success");
+  showNotification(t('toasts.filesLoaded', { count: files.length }), "success");
 }
 
 
@@ -4496,7 +4550,7 @@ window.downloadModelClick = async function(name) {
   if (!settingsState || _modelActionsInProgress.has(name)) return;
   _modelActionsInProgress.add(name);
   try {
-    showNotification(`Downloading ggml-${name}.bin...`, "info");
+    showNotification(t('toasts.modelDownloadStarted', { name: `ggml-${name}.bin` }), "info");
     
     // Invalidate model status cache so any tab switch/search filter re-fetches latest downloading status
     _cachedModelStatuses = null;
@@ -4515,7 +4569,7 @@ window.downloadModelClick = async function(name) {
       modelName: name
     });
   } catch (err) {
-    showNotification("Failed to start download: " + err, "error");
+    showNotification(t('toasts.modelDownloadStartError', { error: String(err) }), "error");
     _cachedModelStatuses = null;
     await loadModelStatusesGrid(false, true);
   } finally {
@@ -4528,11 +4582,11 @@ window.pauseModelClick = async function(name) {
   _modelActionsInProgress.add(name);
   try {
     await invoke('pause_download_model', { modelName: name });
-    showNotification(`Paused ggml-${name}.bin download`, "info");
+    showNotification(t('toasts.modelDownloadPaused', { name: `ggml-${name}.bin` }), "info");
     _cachedModelStatuses = null;
     await loadModelStatusesGrid(false, true);
   } catch (err) {
-    showNotification("Failed to pause download: " + err, "error");
+    showNotification(t('toasts.modelDownloadPauseError', { error: String(err) }), "error");
   } finally {
     _modelActionsInProgress.delete(name);
   }
@@ -4541,8 +4595,9 @@ window.pauseModelClick = async function(name) {
 window.deleteModelClick = async function(name) {
   if (_modelActionsInProgress.has(name)) return;
   const confirmed = await showConfirmModal(
-    'Delete Model',
-    `Are you sure you want to delete / discard the model ggml-${name}.bin?`
+    t('modals.confirmDeleteModelTitle'),
+    t('modals.confirmDeleteModelDesc', { name }),
+    t('modals.deleteBtn')
   );
   if (!confirmed) return;
   _modelActionsInProgress.add(name);
@@ -4551,13 +4606,13 @@ window.deleteModelClick = async function(name) {
       modelsDir: settingsState.modelsDir,
       modelName: name
     });
-    showNotification(`Deleted ggml-${name}.bin`, "success");
+    showNotification(t('toasts.modelDeleted', { name: `ggml-${name}.bin` }), "success");
     _cachedModelStatuses = null;
     await loadModelStatusesGrid(false, true);
     // Scan configuration dropdown to sync options
     await scanAndPopulateModels();
   } catch (err) {
-    showNotification("Failed to delete model: " + err, "error");
+    showNotification(t('toasts.modelDeleteError', { error: String(err) }), "error");
   } finally {
     _modelActionsInProgress.delete(name);
   }
@@ -4675,7 +4730,7 @@ window.copyLiveTranscriptToClipboard = async function() {
       if (!btn._origText) {
         btn._origText = btn.textContent;
       }
-      btn.textContent = 'Copied!';
+      btn.textContent = t('transcribe.copied');
       clearTimeout(btn._copyFeedbackTimer);
       btn._copyFeedbackTimer = setTimeout(() => {
         if (btn && btn._origText) {
@@ -4694,11 +4749,11 @@ window.copyLiveTranscriptToClipboard = async function() {
     try {
       await copyToClipboard(textToCopy);
       triggerBtnFeedback();
-      showNotification("Live transcript copied to clipboard!", "success");
+      showNotification(t('toasts.liveTranscriptCopied'), "success");
       return;
     } catch (err) {
       const msg = (err && (err.message || err.toString())) || String(err);
-      showNotification("Failed to copy transcript: " + msg, "error");
+      showNotification(t('toasts.copyTranscriptError', { error: msg }), "error");
       return;
     }
   }
@@ -4711,11 +4766,11 @@ window.copyLiveTranscriptToClipboard = async function() {
       try {
         await copyToClipboard(rawPreview);
         triggerBtnFeedback();
-        showNotification("Transcript preview copied to clipboard!", "success");
+        showNotification(t('toasts.previewCopied'), "success");
         return;
       } catch (err) {
         const msg = (err && (err.message || err.toString())) || String(err);
-        showNotification("Failed to copy transcript: " + msg, "error");
+        showNotification(t('toasts.copyTranscriptError', { error: msg }), "error");
         return;
       }
     }
@@ -4725,7 +4780,7 @@ window.copyLiveTranscriptToClipboard = async function() {
   if (selectedMediaFile) {
     await window.copyMainTranscriptToClipboard();
   } else {
-    showNotification("No transcript text available to copy.", "info");
+    showNotification(t('toasts.noTranscriptToCopy'), "info");
   }
 };
 
@@ -5033,7 +5088,7 @@ window.togglePasswordVisibility = async function(inputId, btn) {
         input.value = realKey;
         input.dataset.isKeyring = 'false'; // Loaded
       } catch (e) {
-        showNotification("Failed to load secure API key: " + e, "error");
+        showNotification(t('toasts.keyringLoadError', { error: String(e) }), "error");
       } finally {
         btn.disabled = false;
       }
@@ -5121,7 +5176,7 @@ window.saveActiveProviderGeneral = async function(silent = false) {
   const customPrompt = document.getElementById('mgr-provider-prompt').value.trim();
   
   if (!baseUrl) {
-    if (!silent) showNotification("Base URL is required.", "info");
+    if (!silent) showNotification(t('toasts.baseUrlRequired'), "info");
     return;
   }
   
@@ -5170,14 +5225,18 @@ window.saveActiveProviderGeneral = async function(silent = false) {
   if (select) select.value = providerName;
   
   if (!silent) {
-    showNotification("Provider settings saved successfully!", "success");
+    showNotification(t('toasts.providerSettingsSaved'), "success");
   }
 };
 
 window.deleteProviderByName = async function(providerName) {
   if (!providerName) return;
   
-  const confirmed = await showConfirmModal('Delete Provider', `Are you sure you want to delete the provider '${providerName}'?`);
+  const confirmed = await showConfirmModal(
+    t('modals.confirmDeleteProviderTitle'),
+    t('modals.confirmDeleteProviderDesc', { name: providerName }),
+    t('modals.deleteBtn')
+  );
   if (!confirmed) return;
   
   let providers = [];
@@ -5208,7 +5267,7 @@ window.deleteProviderByName = async function(providerName) {
   populateProvidersDropdown();
   onProviderChanged(true);
   
-  showNotification("Provider deleted.", "info");
+  showNotification(t('toasts.providerDeleted'), "info");
 };
 
 window.deleteActiveProvider = async function() {
@@ -5557,7 +5616,7 @@ window.addManualModelRow = function(modelId = "", contextWindow = 200000, reason
   
   trashBtn.addEventListener('click', () => {
     if (activeRadio.checked) {
-      showNotification("The active model row cannot be deleted. Please set another model as active first.", "info");
+      showNotification(t('toasts.cannotDeleteActiveModel'), "info");
       return;
     }
     destroyModelRowCustomSelects(row);
@@ -5595,7 +5654,7 @@ window.fetchActiveProviderModels = async function() {
   let apiKey = document.getElementById('mgr-provider-key').value.trim();
   
   if (!baseUrl) {
-    showNotification("Please provide a Base URL to fetch models.", "info");
+    showNotification(t('toasts.baseUrlRequiredFetch'), "info");
     return;
   }
   
@@ -5606,7 +5665,7 @@ window.fetchActiveProviderModels = async function() {
     <svg class="btn-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation: spin 1s linear infinite;">
       <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
     </svg>
-    <span>Fetching...</span>
+    <span>${t('common.loading')}</span>
   `;
   
   if ((!apiKey || apiKey === '••••••••••••••••') && (provider.useKeyring || provider.apiKey === '__KEYRING__' || provider.api_key === '__KEYRING__')) {
@@ -5633,9 +5692,9 @@ window.fetchActiveProviderModels = async function() {
     });
     
     await saveActiveProviderModels(true, false);
-    showNotification(`Successfully fetched ${modelsList.length} models!`, "success");
+    showNotification(t('toasts.modelsFetchedSuccess', { count: modelsList.length }), "success");
   } catch (e) {
-    showNotification("Failed to fetch models: " + e, "error");
+    showNotification(t('toasts.modelsFetchError', { error: String(e) }), "error");
   } finally {
     btn.disabled = false;
     btn.innerHTML = originalHtml;
@@ -5778,11 +5837,11 @@ window.filterModelsTable = function(delay = 150) {
     const showingCountEl = document.getElementById('models-showing-count');
     if (showingCountEl) {
       if (totalRows === 0) {
-        showingCountEl.textContent = '0 models';
+        showingCountEl.textContent = t('settings.zeroModels');
       } else if (query || currentModelStatusFilter !== 'all') {
-        showingCountEl.textContent = `Showing ${visibleCount} of ${totalRows} models`;
+        showingCountEl.textContent = t('settings.showingModelsCount', { visible: visibleCount, total: totalRows });
       } else {
-        showingCountEl.textContent = `Showing all ${totalRows} models`;
+        showingCountEl.textContent = t('settings.showingAllModelsCount', { total: totalRows });
       }
     }
 
@@ -5796,15 +5855,15 @@ window.filterModelsTable = function(delay = 150) {
     if (emptyState) {
       if (totalRows === 0) {
         emptyState.style.display = 'flex';
-        if (emptyTitle) emptyTitle.textContent = 'No Models Configured';
-        if (emptyDesc) emptyDesc.textContent = 'This provider has no models yet. Click "Fetch Models" or "Add Custom Model" to configure.';
+        if (emptyTitle) emptyTitle.textContent = t('settings.noModelsConfiguredTitle');
+        if (emptyDesc) emptyDesc.textContent = t('settings.noModelsConfiguredDesc');
         if (emptyResetBtn) emptyResetBtn.style.display = 'none';
         if (headEl) headEl.style.display = 'none';
         if (bodyEl) bodyEl.style.display = 'none';
       } else if (visibleCount === 0) {
         emptyState.style.display = 'flex';
-        if (emptyTitle) emptyTitle.textContent = 'No Matching Models Found';
-        if (emptyDesc) emptyDesc.textContent = 'No models match your current filter or search keyword.';
+        if (emptyTitle) emptyTitle.textContent = t('settings.noMatchingModelsTitle');
+        if (emptyDesc) emptyDesc.textContent = t('settings.noMatchingModelsDesc');
         if (emptyResetBtn) emptyResetBtn.style.display = 'inline-flex';
         if (headEl) headEl.style.display = 'none';
         if (bodyEl) bodyEl.style.display = 'none';
@@ -5863,7 +5922,7 @@ window.saveProviderConfig = async function() {
   const key = document.getElementById('provider-key').value.trim();
   
   if (!name || !baseUrl) {
-    showNotification("Name and Base URL are required.", "info");
+    showNotification(t('toasts.nameAndUrlRequired'), "info");
     return;
   }
   
@@ -5890,7 +5949,7 @@ window.saveProviderConfig = async function() {
   }
   
   if (providers.some(p => p.name === name)) {
-    showNotification(`A provider named '${name}' already exists.`, "error");
+    showNotification(t('toasts.providerNameExists', { name }), "error");
     return;
   }
   
@@ -5913,13 +5972,13 @@ window.saveProviderConfig = async function() {
   onProviderChanged(false); // Load general tab for newly created provider
   closeProviderModal();
   
-  showNotification("Provider added successfully! Configure its models below.", "success");
+  showNotification(t('toasts.providerAddedSuccess'), "success");
 };
 
 window.showBatchErrorDialog = function(fileName, errorMsg) {
   return new Promise((resolve) => {
     const modal = document.getElementById('batch-error-modal');
-    document.getElementById('batch-error-message').textContent = `Failed to translate '${fileName}': ${errorMsg}`;
+    document.getElementById('batch-error-message').textContent = t('modals.batchErrorFormatted', { file: fileName, error: errorMsg });
     
     modal.style.display = 'flex';
     setTimeout(() => modal.classList.add('show'), 10);
@@ -5972,14 +6031,14 @@ window.testTranslationConnection = async function() {
   if (!providerSelect) return;
   const providerName = providerSelect.value;
   if (!providerName) {
-    showNotification("No active provider selected to test.", "info");
+    showNotification(t('toasts.noProviderToTest'), "info");
     return;
   }
   
   const testBtn = document.getElementById('mgr-btn-test-connection');
   const originalText = testBtn.textContent;
   testBtn.disabled = true;
-  testBtn.textContent = 'Testing...';
+  testBtn.textContent = t('modals.testingBtn');
   
   // Make sure general settings are saved silently first
   await saveActiveProviderGeneral(true);
@@ -5990,9 +6049,9 @@ window.testTranslationConnection = async function() {
   const statusEl = document.getElementById('test-modal-status');
   const resultEl = document.getElementById('test-modal-result');
   
-  statusEl.textContent = 'Testing connection...';
+  statusEl.textContent = t('modals.testingConnection');
   statusEl.style.color = 'var(--color-cyan)';
-  resultEl.textContent = 'Waiting for response from translation API...';
+  resultEl.textContent = t('modals.waitingApiResponse');
   
   testModal.style.display = 'flex';
   setTimeout(() => testModal.classList.add('show'), 10);
@@ -6003,11 +6062,11 @@ window.testTranslationConnection = async function() {
       fileContent: testSrt
     });
     
-    statusEl.textContent = 'Connection Successful!';
+    statusEl.textContent = t('modals.connectionSuccess');
     statusEl.style.color = 'var(--color-green)';
     resultEl.textContent = response;
   } catch (err) {
-    statusEl.textContent = 'Connection Failed!';
+    statusEl.textContent = t('modals.connectionFailed');
     statusEl.style.color = 'var(--color-red)';
     resultEl.textContent = err;
   } finally {

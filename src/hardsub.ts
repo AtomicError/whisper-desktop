@@ -1,3 +1,5 @@
+import { t } from './i18n/index';
+
 const invoke = async <T>(cmd: string, args: Record<string, any> = {}): Promise<T> => {
   const tauri = (window as any).__TAURI__;
   if (tauri && tauri.core && tauri.core.invoke) {
@@ -666,6 +668,8 @@ export class HardsubController {
   private qualityScaleMax = 51;
   private qualityScaleHigherIsBetter = false;
   private isEncoding: boolean = false;
+  private cachedHwStatus: HardwareStatus | null = null;
+  private updateAlignmentUI: () => void = () => {};
   private subtitleCues: SubtitleCue[] = [];
   private activeCueId: number | null = null;
   private searchFilterQuery: string = '';
@@ -899,72 +903,8 @@ export class HardsubController {
 
     try {
       const hwStatus = await invoke<HardwareStatus>('check_hardware_encoders');
-      if (this.hwSelect) {
-        this.hwSelect.innerHTML = '';
-
-        // Standard CPU is always available on all platforms
-        const cpuOpt = document.createElement('option');
-        cpuOpt.value = 'cpu';
-        cpuOpt.textContent = 'Standard CPU (Universal)';
-        this.hwSelect.appendChild(cpuOpt);
-
-        if (hwStatus.hasVideotoolbox) {
-          const vtOpt = document.createElement('option');
-          vtOpt.value = 'videotoolbox';
-          vtOpt.textContent = 'Apple VideoToolbox (Apple Silicon / Mac GPU)';
-          this.hwSelect.appendChild(vtOpt);
-        }
-
-        if (hwStatus.hasNvenc) {
-          const nvencOpt = document.createElement('option');
-          nvencOpt.value = 'nvenc';
-          nvencOpt.textContent = 'NVIDIA NVENC (GPU Acceleration)';
-          this.hwSelect.appendChild(nvencOpt);
-        }
-
-        if (hwStatus.hasQsv) {
-          const qsvOpt = document.createElement('option');
-          qsvOpt.value = 'qsv';
-          qsvOpt.textContent = 'Intel QSV (QuickSync HW)';
-          this.hwSelect.appendChild(qsvOpt);
-        }
-
-        if (hwStatus.hasVaapi) {
-          const vaapiOpt = document.createElement('option');
-          vaapiOpt.value = 'vaapi';
-          vaapiOpt.textContent = 'Linux VA-API (AMD/Intel)';
-          this.hwSelect.appendChild(vaapiOpt);
-        }
-
-        // Verify if currently selected hwAccel is supported on this device
-        const matchingOption = this.hwSelect.querySelector(`option[value="${this.state.hwAccel}"]`);
-        if (matchingOption) {
-          this.hwSelect.value = this.state.hwAccel;
-        } else {
-          const prevChoice = this.state.hwAccel;
-          // Prefer fastest available GPU accelerator or fallback to CPU
-          let fallback = 'cpu';
-          if (hwStatus.hasVideotoolbox) fallback = 'videotoolbox';
-          else if (hwStatus.hasNvenc) fallback = 'nvenc';
-          else if (hwStatus.hasVaapi) fallback = 'vaapi';
-          else if (hwStatus.hasQsv) fallback = 'qsv';
-
-          this.state.hwAccel = fallback;
-          this.hwSelect.value = fallback;
-
-          if (prevChoice && prevChoice !== 'cpu' && prevChoice !== fallback) {
-            const notifyFn = (window as any).showNotification;
-            const newLabel = this.hwSelect.options[this.hwSelect.selectedIndex]?.text || fallback;
-            if (typeof notifyFn === 'function') {
-              notifyFn(`Selected hardware accelerator '${prevChoice}' is not supported on this device. Switched to '${newLabel}'.`, 'info', 5000);
-            }
-          }
-        }
-        this.updateSupportedCodecs();
-        this.updateQualitySliderConfig();
-        this.updateQualityUI();
-        this.updateFfmpegCommandPreview();
-      }
+      this.cachedHwStatus = hwStatus;
+      this.populateHardwareDropdown(hwStatus);
     } catch (e) {
       console.warn('Failed to probe hardware encoders:', e);
       this.updateSupportedCodecs();
@@ -972,6 +912,74 @@ export class HardsubController {
       this.updateQualityUI();
       this.updateFfmpegCommandPreview();
     }
+  }
+
+  private populateHardwareDropdown(hwStatus: HardwareStatus) {
+    if (!this.hwSelect) return;
+    this.hwSelect.innerHTML = '';
+
+    // Standard CPU is always available on all platforms
+    const cpuOpt = document.createElement('option');
+    cpuOpt.value = 'cpu';
+    cpuOpt.textContent = t('hardsub.hwCpu');
+    this.hwSelect.appendChild(cpuOpt);
+
+    if (hwStatus.hasVideotoolbox) {
+      const vtOpt = document.createElement('option');
+      vtOpt.value = 'videotoolbox';
+      vtOpt.textContent = t('hardsub.hwVt');
+      this.hwSelect.appendChild(vtOpt);
+    }
+
+    if (hwStatus.hasNvenc) {
+      const nvencOpt = document.createElement('option');
+      nvencOpt.value = 'nvenc';
+      nvencOpt.textContent = t('hardsub.hwNvenc');
+      this.hwSelect.appendChild(nvencOpt);
+    }
+
+    if (hwStatus.hasQsv) {
+      const qsvOpt = document.createElement('option');
+      qsvOpt.value = 'qsv';
+      qsvOpt.textContent = t('hardsub.hwQsv');
+      this.hwSelect.appendChild(qsvOpt);
+    }
+
+    if (hwStatus.hasVaapi) {
+      const vaapiOpt = document.createElement('option');
+      vaapiOpt.value = 'vaapi';
+      vaapiOpt.textContent = t('hardsub.hwVaapi');
+      this.hwSelect.appendChild(vaapiOpt);
+    }
+
+    // Verify if currently selected hwAccel is supported on this device
+    const matchingOption = this.hwSelect.querySelector(`option[value="${this.state.hwAccel}"]`);
+    if (matchingOption) {
+      this.hwSelect.value = this.state.hwAccel;
+    } else {
+      const prevChoice = this.state.hwAccel;
+      // Prefer fastest available GPU accelerator or fallback to CPU
+      let fallback = 'cpu';
+      if (hwStatus.hasVideotoolbox) fallback = 'videotoolbox';
+      else if (hwStatus.hasNvenc) fallback = 'nvenc';
+      else if (hwStatus.hasVaapi) fallback = 'vaapi';
+      else if (hwStatus.hasQsv) fallback = 'qsv';
+
+      this.state.hwAccel = fallback;
+      this.hwSelect.value = fallback;
+
+      if (prevChoice && prevChoice !== 'cpu' && prevChoice !== fallback) {
+        const notifyFn = (window as any).showNotification;
+        const newLabel = this.hwSelect.options[this.hwSelect.selectedIndex]?.text || fallback;
+        if (typeof notifyFn === 'function') {
+          notifyFn(t('hardsub.hwNotSupportedSwitch', { prev: prevChoice, curr: newLabel }), 'info', 5000);
+        }
+      }
+    }
+    this.updateSupportedCodecs();
+    this.updateQualitySliderConfig();
+    this.updateQualityUI();
+    this.updateFfmpegCommandPreview();
   }
 
   private updateSupportedCodecs() {
@@ -1283,10 +1291,19 @@ export class HardsubController {
       'middle-left': 4, 'middle-center': 5, 'middle-right': 6,
       'bottom-left': 1, 'bottom-center': 2, 'bottom-right': 3
     };
-    const alignNames: Record<number, string> = {
-      7: 'Top Left', 8: 'Top Center', 9: 'Top Right',
-      4: 'Middle Left', 5: 'Middle Center', 6: 'Middle Right',
-      1: 'Bottom Left', 2: 'Bottom Center', 3: 'Bottom Right'
+    const getAlignName = (code: number): string => {
+      switch (code) {
+        case 7: return t('hardsub.alignTopLeft');
+        case 8: return t('hardsub.alignTopCenter');
+        case 9: return t('hardsub.alignTopRight');
+        case 4: return t('hardsub.alignMiddleLeft');
+        case 5: return t('hardsub.alignMiddleCenter');
+        case 6: return t('hardsub.alignMiddleRight');
+        case 1: return t('hardsub.alignBottomLeft');
+        case 2: return t('hardsub.alignBottomCenter');
+        case 3: return t('hardsub.alignBottomRight');
+        default: return t('hardsub.alignBottomCenter');
+      }
     };
 
     let currentV = 'bottom';
@@ -1297,7 +1314,7 @@ export class HardsubController {
       const code = alignMap[key] || 2;
       this.state.alignment = code;
       if (alignValLabel) {
-        alignValLabel.textContent = alignNames[code] || 'Bottom Center';
+        alignValLabel.textContent = getAlignName(code);
       }
 
       // Disable/gray out Vertical Offset when aligned to Middle (as MarginV has no effect in ASS for middle alignment)
@@ -1306,15 +1323,21 @@ export class HardsubController {
       if (posyWrapper) {
         if (currentV === 'middle') {
           posyWrapper.classList.add('control-disabled');
-          if (posyTitle) posyTitle.textContent = 'Vertical Offset (Middle Locked)';
+          if (posyTitle) posyTitle.textContent = t('hardsub.vOffsetMiddleLocked');
         } else {
           posyWrapper.classList.remove('control-disabled');
-          if (posyTitle) posyTitle.textContent = `Vertical Margin (${currentV === 'top' ? 'Top' : 'Bottom'})`;
+          if (posyTitle) posyTitle.textContent = currentV === 'top' ? t('hardsub.vMarginTop') : t('hardsub.vMarginBottom');
         }
       }
 
       this.updateLivePreview();
     };
+
+    this.updateAlignmentUI = updateAlignmentState;
+
+    window.addEventListener('whisper:languageChanged', () => {
+      this.refreshLocalization();
+    });
 
     document.querySelectorAll('.align-v-btn').forEach((btn) => {
       btn.addEventListener('click', (e) => {
@@ -1486,10 +1509,10 @@ export class HardsubController {
         } else {
           throw new Error('No clipboard provider available');
         }
-        notify('FFmpeg command copied to clipboard!', 'success');
+        notify(t('hardsub.ffmpegCmdCopied'), 'success');
       } catch (e) {
         console.warn('Failed to copy command to clipboard:', e);
-        notify('Failed to copy FFmpeg command.', 'error');
+        notify(t('hardsub.failedCopyCmd'), 'error');
       }
     });
   }
@@ -1503,61 +1526,61 @@ export class HardsubController {
     let max = 51;
 
     if (hw === 'videotoolbox' && codec !== 'prores') {
-      this.qualityParamLabel.textContent = 'Quality % (Apple VideoToolbox)';
+      this.qualityParamLabel.textContent = t('hardsub.labelQualityApple');
       min = 1;
       max = 100;
       if (this.qualityHint) {
-        this.qualityHint.textContent = 'Higher value = Higher visual quality & larger file size (1-100)';
+        this.qualityHint.textContent = t('hardsub.hintHigherQuality1100');
       }
     } else if (hw === 'nvenc') {
-      this.qualityParamLabel.textContent = 'CQ (NVIDIA Constant Quality)';
+      this.qualityParamLabel.textContent = t('hardsub.labelQualityNvenc');
       min = 1;
       max = 51;
       if (this.qualityHint) {
-        this.qualityHint.textContent = 'Lower value = Higher visual quality & larger file size (1-51)';
+        this.qualityHint.textContent = t('hardsub.hintLowerQuality151');
       }
     } else if (hw === 'qsv') {
-      this.qualityParamLabel.textContent = 'Global Quality (Intel QuickSync)';
+      this.qualityParamLabel.textContent = t('hardsub.labelQualityQsv');
       min = 1;
       max = 51;
       if (this.qualityHint) {
-        this.qualityHint.textContent = 'Lower value = Higher visual quality & larger file size (1-51)';
+        this.qualityHint.textContent = t('hardsub.hintLowerQuality151');
       }
     } else if (hw === 'vaapi') {
-      this.qualityParamLabel.textContent = 'QP (Linux VA-API Constant QP)';
+      this.qualityParamLabel.textContent = t('hardsub.labelQualityVaapi');
       min = 1;
       max = 51;
       if (this.qualityHint) {
-        this.qualityHint.textContent = 'Lower value = Higher visual quality & larger file size (1-51)';
+        this.qualityHint.textContent = t('hardsub.hintLowerQuality151');
       }
     } else if (codec === 'prores') {
-      this.qualityParamLabel.textContent = 'ProRes Profile (0=Proxy, 1=LT, 2=Std, 3=HQ, 4=4444)';
+      this.qualityParamLabel.textContent = t('hardsub.labelQualityProRes');
       min = 0;
       max = 5;
       if (this.qualityHint) {
-        this.qualityHint.textContent = 'Higher profile = Higher bit depth & lower compression';
+        this.qualityHint.textContent = t('hardsub.hintProRes');
       }
     } else if (codec === 'av1') {
-      this.qualityParamLabel.textContent = 'CRF (libsvtav1 Constant Rate Factor)';
+      this.qualityParamLabel.textContent = t('hardsub.labelQualityCrf', { encoder: 'libsvtav1' });
       min = 0;
       max = 63;
       if (this.qualityHint) {
-        this.qualityHint.textContent = 'Lower value = Higher visual quality & larger file size (0-63)';
+        this.qualityHint.textContent = t('hardsub.hintLowerQuality063');
       }
     } else if (codec === 'vp9') {
-      this.qualityParamLabel.textContent = 'CRF (libvpx-vp9 Constant Rate Factor)';
+      this.qualityParamLabel.textContent = t('hardsub.labelQualityCrf', { encoder: 'libvpx-vp9' });
       min = 0;
       max = 63;
       if (this.qualityHint) {
-        this.qualityHint.textContent = 'Lower value = Higher visual quality & larger file size (0-63)';
+        this.qualityHint.textContent = t('hardsub.hintLowerQuality063');
       }
     } else {
       const encoderName = codec === 'h265' ? 'libx265' : 'libx264';
-      this.qualityParamLabel.textContent = `CRF (${encoderName} Constant Rate Factor)`;
+      this.qualityParamLabel.textContent = t('hardsub.labelQualityCrf', { encoder: encoderName });
       min = 0;
       max = 51;
       if (this.qualityHint) {
-        this.qualityHint.textContent = 'Lower value = Higher visual quality & larger file size (0-51)';
+        this.qualityHint.textContent = t('hardsub.hintLowerQuality051');
       }
     }
 
@@ -1717,10 +1740,10 @@ export class HardsubController {
 
     if (this.qualityBadge) {
       const badgeNames: Record<string, string> = {
-        draft: 'Draft',
-        balanced: 'Balanced',
-        high: 'High Quality',
-        lossless: 'Ultra / Master',
+        draft: t('hardsub.presetDraft'),
+        balanced: t('hardsub.presetBalanced'),
+        high: t('hardsub.presetHigh'),
+        lossless: t('hardsub.presetUltra'),
       };
       if (badgeNames[activePreset]) {
         this.qualityBadge.textContent = badgeNames[activePreset];
@@ -1728,7 +1751,7 @@ export class HardsubController {
         this.qualityBadge.style.borderColor = 'rgba(var(--color-royal-blue-rgb), 0.3)';
         this.qualityBadge.style.background = 'rgba(var(--color-royal-blue-rgb), 0.15)';
       } else {
-        this.qualityBadge.textContent = `Custom (${this.state.videoQualityValue})`;
+        this.qualityBadge.textContent = t('hardsub.customQuality', { val: this.state.videoQualityValue });
         this.qualityBadge.style.color = 'var(--color-cyan)';
         this.qualityBadge.style.borderColor = 'rgba(var(--color-cyan-rgb), 0.3)';
         this.qualityBadge.style.background = 'rgba(var(--color-cyan-rgb), 0.15)';
@@ -1745,6 +1768,34 @@ export class HardsubController {
     if (this.audioBitrateSelect) {
       this.audioBitrateSelect.disabled = isCopyOrMute;
     }
+  }
+
+  public refreshLocalization() {
+    if (this.cachedHwStatus) {
+      this.populateHardwareDropdown(this.cachedHwStatus);
+    } else {
+      this.updateSupportedCodecs();
+      this.updateQualitySliderConfig();
+      this.updateQualityUI();
+      this.updateFfmpegCommandPreview();
+    }
+    this.updateAudioUI();
+    this.updateAlignmentUI();
+    this.updateVideoDropzoneUI(this.state.videoPath);
+    this.updateSubDropzoneUI(this.state.subtitlePath, this.subtitleCues.length);
+    this.renderSubtitleCards();
+    if (this.videoElement && this.videoElement.src && !this.videoElement.error) {
+      if (!this.videoElement.paused) {
+        if (this.videoStatusBadge) {
+          this.videoStatusBadge.textContent = t('hardsub.statusPlaying');
+        }
+      } else {
+        if (this.videoStatusBadge) {
+          this.videoStatusBadge.textContent = t('hardsub.statusPaused');
+        }
+      }
+    }
+    this.updateEncodingUIState(this.isEncoding);
   }
 
   private updateFfmpegCommandPreview() {
@@ -2005,11 +2056,11 @@ export class HardsubController {
     if (this.videoIconPause) this.videoIconPause.style.display = isPlaying ? 'block' : 'none';
     if (this.videoStatusBadge) {
       if (isPlaying) {
-        this.videoStatusBadge.textContent = 'Playing Live';
+        this.videoStatusBadge.textContent = t('hardsub.statusPlaying');
         this.videoStatusBadge.style.background = 'rgba(16, 185, 129, 0.2)';
         this.videoStatusBadge.style.color = '#10B981';
       } else {
-        this.videoStatusBadge.textContent = 'Paused';
+        this.videoStatusBadge.textContent = t('hardsub.statusPaused');
         this.videoStatusBadge.style.background = 'rgba(var(--color-royal-blue-rgb), 0.15)';
         this.videoStatusBadge.style.color = 'var(--color-royal-blue)';
       }
@@ -2048,7 +2099,7 @@ export class HardsubController {
       }
       console.warn('HTML5 Video Error:', err);
       if (this.videoStatusBadge) {
-        this.videoStatusBadge.textContent = 'Format Error';
+        this.videoStatusBadge.textContent = t('hardsub.statusFormatError');
         this.videoStatusBadge.style.background = 'rgba(239, 68, 68, 0.2)';
         this.videoStatusBadge.style.color = '#EF4444';
       }
@@ -2787,8 +2838,8 @@ export class HardsubController {
 
   private updateVideoDropzoneUI(videoPath: string) {
     if (!videoPath) {
-      if (this.lblVideoName) this.lblVideoName.textContent = 'No Video Loaded';
-      if (this.lblVideoPath) this.lblVideoPath.textContent = 'Drag & drop video (.mp4, .mkv, .mov)';
+      if (this.lblVideoName) this.lblVideoName.textContent = t('hardsub.noVideoLoaded');
+      if (this.lblVideoPath) this.lblVideoPath.textContent = t('hardsub.dropVideoPrompt');
       this.videoDropZone?.classList.remove('has-file');
       this.updateMediaAccordionSummary();
       return;
@@ -2805,8 +2856,8 @@ export class HardsubController {
 
   private updateSubDropzoneUI(subPath: string, cueCount?: number) {
     if (!subPath) {
-      if (this.lblSubName) this.lblSubName.textContent = 'No Subtitle Loaded';
-      if (this.lblSubPath) this.lblSubPath.textContent = 'Drag & drop subtitle (.srt, .vtt, .ass)';
+      if (this.lblSubName) this.lblSubName.textContent = t('hardsub.noSubLoaded');
+      if (this.lblSubPath) this.lblSubPath.textContent = t('hardsub.dropSubPrompt');
       this.subDropZone?.classList.remove('has-file');
       this.updateMediaAccordionSummary();
       return;
@@ -2814,7 +2865,7 @@ export class HardsubController {
 
     const lastSlash = Math.max(subPath.lastIndexOf('/'), subPath.lastIndexOf('\\'));
     const fileName = lastSlash >= 0 ? subPath.substring(lastSlash + 1) : subPath;
-    const countStr = typeof cueCount === 'number' ? ` (${cueCount} Cues)` : '';
+    const countStr = typeof cueCount === 'number' ? ` (${t('hardsub.cuesCount', { count: cueCount })})` : '';
 
     if (this.lblSubName) this.lblSubName.textContent = `✓ ${fileName}${countStr}`;
     if (this.lblSubPath) this.lblSubPath.textContent = subPath;
@@ -2842,7 +2893,7 @@ export class HardsubController {
       if (this.videoPlaceholder) this.videoPlaceholder.style.display = 'none';
       if (this.subtitleCanvas) this.subtitleCanvas.style.display = 'block';
       if (this.videoStatusBadge) {
-        this.videoStatusBadge.textContent = 'Video Loaded';
+        this.videoStatusBadge.textContent = t('hardsub.statusVideoLoaded');
         this.videoStatusBadge.style.background = 'rgba(var(--color-royal-blue-rgb), 0.15)';
         this.videoStatusBadge.style.color = 'var(--color-royal-blue)';
       }
@@ -2884,7 +2935,7 @@ export class HardsubController {
     if (this.subtitleCues.length === 0) {
       this.subtitleListContainer.innerHTML = '';
       if (this.emptyCueNotice) this.emptyCueNotice.style.display = 'flex';
-      if (this.subtitleCountBadge) this.subtitleCountBadge.textContent = '0 Cues';
+      if (this.subtitleCountBadge) this.subtitleCountBadge.textContent = t('hardsub.cuesCountZero');
       return;
     }
 
@@ -2896,7 +2947,7 @@ export class HardsubController {
     });
 
     if (this.subtitleCountBadge) {
-      this.subtitleCountBadge.textContent = `${filtered.length} Cues`;
+      this.subtitleCountBadge.textContent = t('hardsub.cuesCount', { count: filtered.length });
     }
 
     this.subtitleListContainer.innerHTML = '';
@@ -2913,10 +2964,10 @@ export class HardsubController {
         <div class="subtitle-cue-header">
           <div style="display:flex; align-items:center; gap:6px;">
             <span class="subtitle-cue-time">${cue.startTimeStr} → ${cue.endTimeStr}</span>
-            <span class="subtitle-cue-active-badge">ACTIVE</span>
+            <span class="subtitle-cue-active-badge">${t('hardsub.cueActive')}</span>
           </div>
-          <button class="pill-btn jump-cue-btn" style="padding: 2px 8px; font-size: 0.72rem; height: 22px;" title="Jump video to cue time">
-            ▶ Play
+          <button class="pill-btn jump-cue-btn" style="padding: 2px 8px; font-size: 0.72rem; height: 22px;" title="${t('hardsub.cuePlayTooltip')}">
+            ▶ ${t('hardsub.cuePlay')}
           </button>
         </div>
         <textarea class="subtitle-cue-textarea" dir="auto" data-cue-id="${cue.id}">${cue.text}</textarea>
@@ -3278,7 +3329,7 @@ export class HardsubController {
     if (startBtn) {
       startBtn.disabled = active;
       if (startBtnSpan) {
-        startBtnSpan.textContent = active ? 'Exporting Hardsub Video...' : 'Export Hardsub Video';
+        startBtnSpan.textContent = active ? t('hardsub.exportingVideo') : t('hardsub.exportHardsubVideo');
       }
       startBtn.style.opacity = active ? '0.7' : '1';
       startBtn.style.cursor = active ? 'not-allowed' : 'pointer';
@@ -3517,11 +3568,19 @@ ${events}`;
     this.state.subtitlePath = this.subtitlePathInput?.value.trim() || '';
 
     if (!this.state.videoPath) {
-      alert('Please select a video file first.');
+      if ((window as any).showNotification) {
+        (window as any).showNotification(t('hardsub.selectVideoFirst'), 'warning');
+      } else {
+        alert(t('hardsub.selectVideoFirst'));
+      }
       return;
     }
     if (!this.state.subtitlePath) {
-      alert('Please select a subtitle file first.');
+      if ((window as any).showNotification) {
+        (window as any).showNotification(t('hardsub.selectSubFirst'), 'warning');
+      } else {
+        alert(t('hardsub.selectSubFirst'));
+      }
       return;
     }
 
@@ -3608,7 +3667,7 @@ ${events}`;
         this.progressPctText.textContent = '0%';
       }
       if (this.progressStatusText) {
-        this.progressStatusText.textContent = 'Initializing FFmpeg Encoder...';
+        this.progressStatusText.textContent = t('hardsub.statusInitEncoder');
       }
 
       await invoke('start_hardsub_task', {
@@ -3619,16 +3678,16 @@ ${events}`;
       if (msg.includes('cancelled') || msg.includes('Cancelled')) {
         console.log('Hardsub task cancelled by user');
         if (this.progressStatusText) {
-          this.progressStatusText.textContent = 'Encoding cancelled.';
+          this.progressStatusText.textContent = t('hardsub.statusEncodingCancelled');
         }
       } else {
         if ((window as any).showNotification) {
-          (window as any).showNotification(`Hardsub encoding failed: ${e}`, "error");
+          (window as any).showNotification(t('hardsub.encodingFailed', { error: String(e) }), "error");
         } else {
-          alert(`Hardsub failed: ${e}`);
+          alert(t('hardsub.encodingFailed', { error: String(e) }));
         }
         if (this.progressStatusText) {
-          this.progressStatusText.textContent = `Error: ${e}`;
+          this.progressStatusText.textContent = t('hardsub.statusEncodingError', { error: String(e) });
         }
       }
     } finally {
