@@ -237,7 +237,7 @@
                         <span class="setting-title" data-i18n="settings.backendTitle">Active Backend</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.backendDesc">Execution backend for Whisper model inference.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.backendPoints">
                           <span class="setting-desc-point">&bull; <strong>Standard:</strong> Universal CPU-only compatibility</span>
                           <span class="setting-desc-point">&bull; <strong>Vulkan:</strong> Universal GPU acceleration (AMD / Intel / NVIDIA)</span>
                           <span class="setting-desc-point">&bull; <strong>CUDA:</strong> Dedicated NVIDIA GPUs</span>
@@ -261,7 +261,7 @@
                         <span class="setting-title" data-i18n="settings.modelsDirTitle">Models Storage Directory</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.modelsDirDesc">Local disk directory where GGML model files (<code>.bin</code>) are stored and scanned.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.modelsDirPoints">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>~/whisper.cpp</code></span>
                         </div>
                       </div>
@@ -284,7 +284,7 @@
                         <span class="setting-flag">-m</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.modelSelectDesc">Active Whisper GGML speech recognition model.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.modelSelectPoints">
                           <span class="setting-desc-point">&bull; <strong>Fast / Low RAM:</strong> <code>tiny</code>, <code>base</code>, <code>small</code></span>
                           <span class="setting-desc-point">&bull; <strong>High Accuracy:</strong> <code>medium</code>, <code>large-v3</code></span>
                         </div>
@@ -302,7 +302,7 @@
                         <span id="ffmpeg-status-badge" class="setting-status-pill checking"><span class="ffmpeg-status-dot blue"></span> Checking...</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.ffmpegDesc">Audio extractor engine used to decode input media files into 16kHz mono audio.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.ffmpegPoints">
                           <span class="setting-desc-point">&bull; <strong>Internal:</strong> Standalone bundled binary (recommended, zero-config)</span>
                           <span class="setting-desc-point">&bull; <strong>System:</strong> Uses OS-installed FFmpeg binary</span>
                         </div>
@@ -322,7 +322,7 @@
                         <span class="setting-title" data-i18n="settings.trayTitle">Minimize to System Tray on Close</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.trayDesc">Keeps Whisper Desktop active in the background system tray when the main window is closed.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.trayPoints">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> Disabled (exits on window close)</span>
                         </div>
                       </div>
@@ -342,7 +342,7 @@
                         <span id="ui-scale-badge" class="setting-status-pill checking">100%</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.uiScaleDesc">Adjust the interface scaling to fit high-DPI displays.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.uiScalePoints">
                           <span class="setting-desc-point">&bull; <strong>Shortcuts:</strong> <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">+</kbd> (In) &middot; <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">&minus;</kbd> (Out) &middot; <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">0</kbd> (Reset)</span>
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>100%</code></span>
                         </div>
@@ -383,7 +383,7 @@
                         <span class="setting-flag">-l</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.langSpokenDesc">Primary spoken language code in the audio (e.g. <code>fa</code>, <code>en</code>, <code>es</code>).</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.langSpokenPoints">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>auto</code> (automatic detection)</span>
                           <span class="setting-desc-point">&bull; <strong>Tip:</strong> Explicitly setting the language skips detection and speeds up transcription.</span>
                         </div>
@@ -401,7 +401,7 @@
                         <span class="setting-flag">--prompt</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.initialPromptDesc">Contextual prompt to guide model spelling, domain terms, and acronyms.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.initialPromptPoints">
                           <span class="setting-desc-point">&bull; <strong>Examples:</strong> <em>"Dr. John, COVID-19, PyTorch, iPhone 16"</em></span>
                           <span class="setting-desc-point">&bull; <strong>Tip:</strong> Also steers punctuation and capitalization preferences.</span>
                         </div>
@@ -419,7 +419,7 @@
                         <span class="setting-flag">--carry-initial-prompt</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.carryPromptDesc">Maintains the initial prompt across all 30-second audio chunks instead of only the first chunk.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.carryPromptPoints">
                           <span class="setting-desc-point">&bull; <strong>Recommended:</strong> Enabled for long audio with recurring names or technical terms.</span>
                         </div>
                       </div>
@@ -439,7 +439,7 @@
                         <span class="setting-flag">-tr</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.translateDesc">Directly translates non-English speech into English text output during transcription without requiring an external translation service.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.translatePoints">
                           <span class="setting-desc-point">&bull; <strong>Output:</strong> English transcripts &amp; subtitles directly from foreign speech.</span>
                         </div>
                       </div>
@@ -459,7 +459,7 @@
                         <span class="setting-flag">--dtw</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.dtwDesc">Enables exact word-level timestamp alignment using Dynamic Time Warping (DTW).</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.dtwPoints">
                           <span class="setting-desc-point">&bull; <strong>Use case:</strong> Millimeter subtitle sync for karaoke and precise video captioning.</span>
                           <span class="setting-desc-point">&bull; <strong>Note:</strong> Automatically disables Flash Attention.</span>
                         </div>
@@ -482,7 +482,7 @@
                         <span class="setting-flag">-t</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.threadsDesc">Number of CPU worker threads allocated for decoding.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.threadsPoints">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>4</code></span>
                           <span class="setting-desc-point">&bull; <strong>Recommended:</strong> Match your physical core count (e.g. <code>4–8</code>) for maximum speed.</span>
                         </div>
@@ -504,7 +504,7 @@
                         <span class="setting-flag">-p</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.processorsDesc">Number of parallel audio decoder instances.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.processorsPoints">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>1</code> (standard single-file mode)</span>
                           <span class="setting-desc-point">&bull; <strong>Recommended:</strong> Increase (<code>2–4</code>) only when batch-transcribing multiple files.</span>
                         </div>
@@ -526,7 +526,7 @@
                         <span class="setting-flag">-mc</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.maxContextDesc">Maximum preceding token history passed to the decoder.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.maxContextPoints">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>-1</code> (automatic context window)</span>
                           <span class="setting-desc-point">&bull; <strong>When to change:</strong> Lower to <code>64–128</code> if the model loops or repeats the same sentence.</span>
                         </div>
@@ -548,7 +548,7 @@
                         <span class="setting-flag">-ml</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.maxLenDesc">Maximum character count allowed per subtitle line.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.maxLenPoints">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>0</code> (unlimited natural sentence pauses)</span>
                           <span class="setting-desc-point">&bull; <strong>Recommended for Video / Reels:</strong> <code>35–45</code> characters for readable subtitles.</span>
                         </div>
@@ -570,7 +570,7 @@
                         <span class="setting-flag">-ot</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.offsetTDesc">Skip audio from the beginning up to this timestamp in milliseconds.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.offsetTPoints">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>0</code> ms</span>
                           <span class="setting-desc-point">&bull; <strong>Example:</strong> Set to <code>30000</code> to skip a 30-second intro or podcast sponsor.</span>
                         </div>
@@ -588,7 +588,7 @@
                         <span class="setting-flag">-d</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.durationDesc">Process only a slice of audio in milliseconds starting from offset.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.durationPoints">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>0</code> ms (processes full file)</span>
                           <span class="setting-desc-point">&bull; <strong>Example:</strong> Set to <code>60000</code> to quickly preview a 1-minute clip.</span>
                         </div>
@@ -606,7 +606,7 @@
                         <span class="setting-flag">-sow</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.splitOnWordDesc">Forces subtitle line breaks strictly between full words rather than splitting in the middle of words.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.splitOnWordPoints">
                           <span class="setting-desc-point">&bull; <strong>Recommended:</strong> Enabled for clean, professional subtitles.</span>
                         </div>
                       </div>
@@ -626,7 +626,7 @@
                         <span class="setting-flag">-di</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.diarizeDesc">Separates and labels speakers across stereo audio channels (Left vs Right channel).</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.diarizePoints">
                           <span class="setting-desc-point">&bull; <strong>Output tags:</strong> <code>[SPEAKER 0]</code> and <code>[SPEAKER 1]</code></span>
                           <span class="setting-desc-point">&bull; <strong>Requirement:</strong> Requires 2-channel stereo audio.</span>
                         </div>
@@ -647,7 +647,7 @@
                         <span class="setting-flag">-tdrz</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.tinyDiarizeDesc">Detects speaker turn transitions within a single mono channel using specialized models.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.tinyDiarizePoints">
                           <span class="setting-desc-point">&bull; <strong>Requirement:</strong> Requires <code>tdrz</code>-enabled models (e.g. <code>small.en-tdrz</code>).</span>
                         </div>
                       </div>
@@ -669,7 +669,7 @@
                         <span class="setting-flag">-bo</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.bestOfDesc">Number of candidate sequences sampled during decoding.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.bestOfPoints">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>5</code></span>
                           <span class="setting-desc-point">&bull; <strong>Recommendation:</strong> Higher (<code>6–8</code>) boosts accuracy; lower (<code>1–2</code>) runs faster.</span>
                         </div>
@@ -691,7 +691,7 @@
                         <span class="setting-flag">-bs</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.beamSizeDesc">Exploration beam width for finding optimal word sequences.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.beamSizePoints">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>5</code></span>
                           <span class="setting-desc-point">&bull; <strong>Trade-off:</strong> Higher values reduce word errors and hallucinations, but increase transcription time.</span>
                         </div>
@@ -713,7 +713,7 @@
                         <span class="setting-flag">-ac</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.audioCtxDesc">Audio frame context length in samples.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.audioCtxPoints">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>0</code> (uses model default 30-second context window)</span>
                           <span class="setting-desc-point">&bull; <strong>Advanced:</strong> Restricts attention window for custom streaming workflows.</span>
                         </div>
@@ -731,7 +731,7 @@
                         <span class="setting-flag">-wt</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.wordTholdDesc">Acoustic probability cutoff for locking individual word timestamps.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.wordTholdPoints">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>0.01</code></span>
                           <span class="setting-desc-point">&bull; <strong>When to change:</strong> Increase (<code>0.05–0.1</code>) if word timings drift during silent parts.</span>
                         </div>
@@ -749,7 +749,7 @@
                         <span class="setting-flag">-et</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.entropyTholdDesc">Decoder uncertainty cutoff for triggering temperature fallback retry.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.entropyTholdPoints">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>2.4</code></span>
                           <span class="setting-desc-point">&bull; <strong>When to change:</strong> Lower to <code>2.2</code> if model produces repetitive gibberish.</span>
                         </div>
@@ -767,7 +767,7 @@
                         <span class="setting-flag">-lpt</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.logprobTholdDesc">Average token confidence threshold before fallback decoding is triggered.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.logprobTholdPoints">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>-1</code></span>
                           <span class="setting-desc-point">&bull; <strong>When to change:</strong> Lower to <code>-1.5</code> for noisy or accented speech to prevent unnecessary retries.</span>
                         </div>
@@ -785,7 +785,7 @@
                         <span class="setting-flag">-nth</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.noSpeechTholdDesc">Silence detection probability cutoff to suppress hallucinated words.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.noSpeechTholdPoints">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>0.6</code></span>
                           <span class="setting-desc-point">&bull; <strong>When to change:</strong> Increase to <code>0.7–0.8</code> if Whisper hallucinates words during music or background noise.</span>
                         </div>
@@ -803,7 +803,7 @@
                         <span class="setting-flag">-tp</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.temperatureDesc">Controls decoding randomness and exploration.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.temperaturePoints">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>0</code> (deterministic greedy decoding &mdash; highest precision)</span>
                           <span class="setting-desc-point">&bull; <strong>When to change:</strong> Set to <code>0.2–0.4</code> only if the model gets stuck in repetition loops.</span>
                         </div>
@@ -821,7 +821,7 @@
                         <span class="setting-flag">-tpi</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.tempIncDesc">Step size to increase temperature on each fallback retry.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.tempIncPoints">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>0.2</code></span>
                           <span class="setting-desc-point">&bull; <strong>Retry sequence:</strong> Automatically retries at <code>0.2</code>, <code>0.4</code>, <code>0.6</code>, up to <code>1.0</code>.</span>
                         </div>
@@ -840,7 +840,7 @@
                         <span class="setting-flag">-nf</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.noFallbackDesc">Skips retry passes with higher temperatures and accepts the first greedy pass.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.noFallbackPoints">
                           <span class="setting-desc-point">&bull; <strong>Benefit:</strong> 30–50% faster processing on difficult or noisy files.</span>
                           <span class="setting-desc-point">&bull; <strong>Trade-off:</strong> Skips error recovery if speech is unclear.</span>
                         </div>
@@ -861,7 +861,7 @@
                         <span class="setting-flag">-ls</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.logScoreDesc">Prints raw confidence and probability scores for each decoded token into the activity log stream.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.logScorePoints">
                           <span class="setting-desc-point">&bull; <strong>Use case:</strong> Debugging model confidence, timestamp boundaries, and acoustic quality.</span>
                         </div>
                       </div>
@@ -989,7 +989,7 @@
                         <span class="setting-title" data-i18n="settings.outputDirModeTitle">Output Directory Mode</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.outputDirModeDesc">Destination folder strategy for generated subtitles, transcripts, and export files.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.outputDirModePoints">
                           <span class="setting-desc-point">&bull; <strong>Same as Input:</strong> Saves output files right next to original media file</span>
                           <span class="setting-desc-point">&bull; <strong>Custom Directory:</strong> Centralizes all outputs into a single designated folder</span>
                         </div>
@@ -1011,7 +1011,7 @@
                         <span class="setting-title" data-i18n="settings.outputDirCustomTitle">Custom Output Path</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.outputDirCustomDesc">Dedicated folder path on disk where all transcripts and subtitles are saved.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.outputDirCustomPoints">
                           <span class="setting-desc-point">&bull; <strong>Active when:</strong> Mode is set to <em>Custom Directory</em></span>
                         </div>
                       </div>
@@ -1037,7 +1037,7 @@
                         <span class="setting-flag">-dev</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.gpuDeviceDesc">Target graphics card index on multi-GPU systems.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.gpuDevicePoints">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>0</code> (primary graphics card)</span>
                           <span class="setting-desc-point">&bull; <strong>Multi-GPU:</strong> Set to <code>1</code> or <code>2</code> to target secondary GPUs.</span>
                         </div>
@@ -1059,7 +1059,7 @@
                         <span class="setting-flag">-oved</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.openvinoDeviceDesc">Target execution device for Intel OpenVINO acceleration.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.openvinoDevicePoints">
                           <span class="setting-desc-point">&bull; <strong>GPU:</strong> Intel Arc dedicated GPU or integrated graphics (iGPU)</span>
                           <span class="setting-desc-point">&bull; <strong>CPU:</strong> AVX-optimized Intel CPU inference</span>
                         </div>
@@ -1082,7 +1082,7 @@
                         <span class="setting-flag">--vad</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.vadEnableDesc">Pre-filters audio using Silero VAD to detect and remove silent and non-speech sections before Whisper decoding.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.vadEnablePoints">
                           <span class="setting-desc-point">&bull; <strong>Benefits:</strong> Speeds up processing up to 3x and prevents silence hallucinations.</span>
                           <span class="setting-desc-point">&bull; <strong>Recommended:</strong> Keep enabled for podcasts, interviews, and long videos with pauses.</span>
                         </div>
@@ -1103,7 +1103,7 @@
                         <span class="setting-flag">-vm</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.vadModelDesc">Active Silero VAD model binary.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.vadModelPoints">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>ggml-silero-v6.2.0.bin</code> (auto-loaded from models directory)</span>
                         </div>
                       </div>
@@ -1120,7 +1120,7 @@
                         <span class="setting-flag">-vt</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.vadThresholdDesc">Speech probability cutoff for triggering voice activity detection.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.vadThresholdPoints">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>0.5</code></span>
                           <span class="setting-desc-point">&bull; <strong>Noisy / Heavy Breathing:</strong> Set to <code>0.65–0.75</code> (stricter filter)</span>
                           <span class="setting-desc-point">&bull; <strong>Soft Whispers / Distant Mic:</strong> Set to <code>0.35–0.45</code> (more sensitive)</span>
@@ -1139,7 +1139,7 @@
                         <span class="setting-flag">-vspd</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.vadMinSpeechDesc">Minimum continuous voice duration required to trigger transcription.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.vadMinSpeechPoints">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>250</code> ms</span>
                           <span class="setting-desc-point">&bull; <strong>Purpose:</strong> Ignores brief clicks, coughs, and keystrokes shorter than this duration.</span>
                         </div>
@@ -1157,7 +1157,7 @@
                         <span class="setting-flag">-vsd</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.vadMinSilenceDesc">Minimum silence duration required to split speech into a new subtitle segment.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.vadMinSilencePoints">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>100</code> ms</span>
                           <span class="setting-desc-point">&bull; <strong>Recommended for Subtitles:</strong> Increase to <code>300–500</code> ms for natural conversational pauses.</span>
                         </div>
@@ -1175,7 +1175,7 @@
                         <span class="setting-flag">-vmsd</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.vadMaxSpeechDesc">Maximum continuous speech segment duration sent to Whisper in one chunk.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.vadMaxSpeechPoints">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>30,000</code> ms (30s)</span>
                           <span class="setting-desc-point">&bull; <strong>Purpose:</strong> Matches Whisper's acoustic window to prevent memory overflow.</span>
                         </div>
@@ -1193,7 +1193,7 @@
                         <span class="setting-flag">-vp</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.vadSpeechPadDesc">Audio buffer added before and after each detected speech segment.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.vadSpeechPadPoints">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>30</code> ms</span>
                           <span class="setting-desc-point">&bull; <strong>Purpose:</strong> Prevents clipping starting consonants or trailing syllables.</span>
                         </div>
@@ -1211,7 +1211,7 @@
                         <span class="setting-flag">-vo</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.vadOverlapDesc">Contextual overlap ratio between consecutive speech segments.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.vadOverlapPoints">
                           <span class="setting-desc-point">&bull; <strong>Default:</strong> <code>0.1</code> (10%)</span>
                           <span class="setting-desc-point">&bull; <strong>Purpose:</strong> Preserves grammatical continuity across segment boundaries.</span>
                         </div>
@@ -1231,7 +1231,7 @@
                         <span class="setting-title" data-i18n="settings.aiTranslateTitle">Enable AI Translation</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.aiTranslateDesc">Automatically translates transcribed subtitles into your target language using cloud or local LLM APIs.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.aiTranslatePoints">
                           <span class="setting-desc-point">&bull; <strong>Supported:</strong> OpenAI, Claude, Gemini, Groq, Ollama, DeepSeek</span>
                         </div>
                       </div>
@@ -1249,7 +1249,7 @@
                         <span class="setting-title" data-i18n="settings.targetLangTitle">Target Language</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.targetLangDesc">Destination language for AI subtitle translation.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.targetLangPoints">
                           <span class="setting-desc-point">&bull; <strong>Supported:</strong> 100+ global languages with native script rendering</span>
                         </div>
                       </div>
@@ -1388,7 +1388,7 @@
                         <span class="setting-title" data-i18n="settings.polishTitle">Enable Polish Pass</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.polishDesc">Refines translated subtitles for natural conversational rhythm and reading speed.</span>
-                        <div class="setting-desc-points">
+                        <div class="setting-desc-points" data-i18n-html="settings.polishPoints">
                           <span class="setting-desc-point">&bull; <strong>Recommended:</strong> Enabled for natural subtitle flow, avoiding rigid word-for-word machine translations.</span>
                         </div>
                       </div>
@@ -1998,11 +1998,11 @@
             <div class="logs-layout">
               <div class="logs-controls">
                 <div class="log-filters">
-                  <button class="filter-btn active" id="log-filter-All" onclick="filterLogs('All')">All</button>
-                  <button class="filter-btn" id="log-filter-Translate" onclick="filterLogs('Translate')">Translate</button>
-                  <button class="filter-btn" id="log-filter-Whisper" onclick="filterLogs('Whisper')">Whisper</button>
-                  <button class="filter-btn" id="log-filter-FFmpeg" onclick="filterLogs('FFmpeg')">FFmpeg</button>
-                  <button class="filter-btn" id="log-filter-Hardsub" onclick="filterLogs('Hardsub')">Hardsub</button>
+                  <button class="filter-btn active" id="log-filter-All" onclick="filterLogs('All')" data-i18n="logs.filterAll">All</button>
+                  <button class="filter-btn" id="log-filter-Translate" onclick="filterLogs('Translate')" data-i18n="logs.filterTranslate">Translate</button>
+                  <button class="filter-btn" id="log-filter-Whisper" onclick="filterLogs('Whisper')" data-i18n="logs.filterWhisper">Whisper</button>
+                  <button class="filter-btn" id="log-filter-FFmpeg" onclick="filterLogs('FFmpeg')" data-i18n="logs.filterFfmpeg">FFmpeg</button>
+                  <button class="filter-btn" id="log-filter-Hardsub" onclick="filterLogs('Hardsub')" data-i18n="logs.filterHardsub">Hardsub</button>
                 </div>
                 
                 <div class="log-search-container">

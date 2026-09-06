@@ -421,27 +421,19 @@ html.theme-transitioning .batch-queue-panel {
   border-radius: 9999px !important;
   border: 2px solid transparent !important;
   background-clip: padding-box !important;
-  opacity: 0.4 !important;
+  opacity: 0 !important;
   transition: opacity 0.3s ease, background 0.3s ease;
 }
 
-.options-for-hardsub-font:hover::-webkit-scrollbar-thumb,
-.options-for-opt-translateAiModel:hover::-webkit-scrollbar-thumb,
+.scrolling-active::-webkit-scrollbar-thumb,
 #custom-select-hardsub-font .custom-select-options:hover::-webkit-scrollbar-thumb,
 #custom-select-opt-translateAiModel .custom-select-options:hover::-webkit-scrollbar-thumb,
-#hardsub-font:hover::-webkit-scrollbar-thumb,
-#opt-translateAiModel:hover::-webkit-scrollbar-thumb,
-#models-list-scroll:hover::-webkit-scrollbar-thumb,
-.providers-table-wrapper:hover::-webkit-scrollbar-thumb,
-#provider-tab-models:hover::-webkit-scrollbar-thumb,
-#provider-tab-providers:hover::-webkit-scrollbar-thumb,
-.provider-grid:hover::-webkit-scrollbar-thumb,
-.custom-select-options:hover::-webkit-scrollbar-thumb,
-.scrolling-active::-webkit-scrollbar-thumb {
-  background: var(--color-sky) !important;
-  border: 1px solid transparent !important;
+.custom-select-options:hover::-webkit-scrollbar-thumb {
+  background: var(--color-royal-blue) !important;
+  border-radius: 9999px !important;
+  border: 2px solid transparent !important;
   background-clip: padding-box !important;
-  opacity: 0.85 !important;
+  opacity: 0.5 !important;
 }
 
 .options-for-hardsub-font::-webkit-scrollbar-thumb:hover,
@@ -456,10 +448,11 @@ html.theme-transitioning .batch-queue-panel {
 #provider-tab-providers::-webkit-scrollbar-thumb:hover,
 .provider-grid::-webkit-scrollbar-thumb:hover,
 .custom-select-options::-webkit-scrollbar-thumb:hover {
-  background: var(--color-sky) !important;
-  border: 0px solid transparent !important;
+  background: var(--color-royal-blue) !important;
+  border-radius: 9999px !important;
+  border: 2px solid transparent !important;
   background-clip: padding-box !important;
-  opacity: 1 !important;
+  opacity: 0.85 !important;
   box-shadow: 0 0 8px var(--shadow-neon-royal-blue) !important;
 }
 
@@ -3454,17 +3447,9 @@ select.select-control {
   border: 1px solid var(--border-glass);
   border-radius: 10px;
   padding: 16px;
-  transition: var(--transition-smooth);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-}
-
-.guide-card:hover {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(var(--color-royal-blue-rgb), 0.35);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
 }
 
 .guide-card-header {
@@ -3538,6 +3523,63 @@ select.select-control {
   display: flex;
   gap: 14px;
   align-items: flex-start;
+}
+
+.guide-concept-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: var(--transition-smooth);
+}
+
+.guide-concept-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* Guide Concept Themed Accents - Royal Blue (Default) */
+.guide-concept-lang .guide-concept-icon {
+  color: var(--color-royal-blue);
+  background: rgba(var(--color-royal-blue-rgb), 0.12);
+  border: 1px solid rgba(var(--color-royal-blue-rgb), 0.22);
+}
+
+.guide-concept-quant .guide-concept-icon {
+  color: var(--color-green);
+  background: rgba(var(--color-green-rgb), 0.12);
+  border: 1px solid rgba(var(--color-green-rgb), 0.22);
+}
+
+.guide-concept-vad .guide-concept-icon {
+  color: var(--color-cyan);
+  background: rgba(var(--color-cyan-rgb), 0.12);
+  border: 1px solid rgba(var(--color-cyan-rgb), 0.22);
+}
+
+/* Guide Concept Themed Accents - Fire Orange */
+:root[data-theme="fire-orange"] .guide-concept-lang .guide-concept-icon,
+:root[data-theme="fire"] .guide-concept-lang .guide-concept-icon {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.14);
+  border: 1px solid rgba(239, 68, 68, 0.28);
+}
+
+:root[data-theme="fire-orange"] .guide-concept-quant .guide-concept-icon,
+:root[data-theme="fire"] .guide-concept-quant .guide-concept-icon {
+  color: #ff6b00;
+  background: rgba(255, 107, 0, 0.14);
+  border: 1px solid rgba(255, 107, 0, 0.28);
+}
+
+:root[data-theme="fire-orange"] .guide-concept-vad .guide-concept-icon,
+:root[data-theme="fire"] .guide-concept-vad .guide-concept-icon {
+  color: #ff9800;
+  background: rgba(255, 152, 0, 0.14);
+  border: 1px solid rgba(255, 152, 0, 0.28);
 }
 
 .guide-card:focus-visible,

@@ -553,20 +553,20 @@ const MODEL_ICON_RESUME = `<svg viewBox="0 0 24 24" fill="none" stroke="currentC
 
 function getModelMetaInfo(modelName) {
   const isVad = modelName.startsWith('silero-');
-  let precisionText = isVad ? '' : '16-bit Full Precision';
+  let precisionText = isVad ? '' : t('models.prec16');
   if (!isVad) {
     if (modelName.includes('-q8_0')) {
-      precisionText = '8-bit Quantized';
+      precisionText = t('models.prec8');
     } else if (modelName.includes('-q5_0') || modelName.includes('-q5_1')) {
-      precisionText = '5-bit Quantized';
+      precisionText = t('models.prec5');
     }
   }
 
-  let langText = 'Multilingual (100+ Languages)';
+  let langText = t('models.langMulti');
   if (modelName.includes('.en')) {
-    langText = 'English Only';
+    langText = t('models.langEnOnly');
   } else if (isVad) {
-    langText = 'Voice Activity Detection (VAD)';
+    langText = t('models.langVad');
   }
 
   return { precisionText, langText, isVad };
@@ -1751,17 +1751,17 @@ function setupTauriListeners() {
       const totalKnown = payload.totalBytes > 0;
 
       // Backend speed is authoritative — no client-side delta math.
-      let speedText = payload.phase === 'starting' ? 'Connecting...' : '';
+      let speedText = payload.phase === 'starting' ? t('models.statusConnecting') : '';
       if (!speedText) {
         if (payload.speedBps > 0) {
           const speedMbps = ((payload.speedBps * 8) / 1e6).toFixed(1);
           speedText = `${speedMbps} Mbps`;
           if (totalKnown && payload.downloadedBytes <= payload.totalBytes) {
             const remainingSeconds = Math.round((payload.totalBytes - payload.downloadedBytes) / payload.speedBps);
-            speedText += ` • ETA: ${formatRemainingTime(remainingSeconds)}`;
+            speedText += ` • ${t('models.etaLabel', { time: formatRemainingTime(remainingSeconds) })}`;
           }
         } else {
-          speedText = (payload.downloadedBytes || 0) > 0 ? '...' : 'Starting...';
+          speedText = (payload.downloadedBytes || 0) > 0 ? '...' : t('models.statusStarting');
         }
       }
 
@@ -1775,10 +1775,17 @@ function setupTauriListeners() {
       const descEl = card.querySelector('.setting-desc');
       if (descEl) {
         const meta = getModelMetaInfo(payload.modelName);
+        const liveStatus = t('models.downloadLiveProgress', {
+          size: dlMB,
+          unit: t('models.unitMB'),
+          pct: totalKnown ? pct : '...',
+          speedLabel: t('models.speedLabel'),
+          speed: speedText
+        });
         descEl.innerHTML = `
-          <span class="model-badge badge-downloading">Downloading</span>
+          <span class="model-badge badge-downloading">${t('models.badgeDownloading')}</span>
           <span style="color: rgba(255,255,255,0.1);">|</span>
-          <span>Expected Size: ${totalMB} MB</span>
+          <span>${t('models.expectedSize', { size: totalMB })}</span>
           ${meta.precisionText ? `
             <span style="color: rgba(255,255,255,0.1);">|</span>
             <span>${meta.precisionText}</span>
@@ -1786,14 +1793,14 @@ function setupTauriListeners() {
           <span style="color: rgba(255,255,255,0.1);">|</span>
           <span>${meta.langText}</span>
           <span style="color: rgba(255,255,255,0.1);">|</span>
-          <span style="color: var(--color-cyan);">${dlMB} MB${totalKnown ? ` (${pct}%)` : ''} • Speed: ${speedText}</span>
+          <span style="color: var(--color-cyan);">${liveStatus}</span>
         `;
       }
 
       // 3. Ensure button is "Pause" in-place
       const ctrlEl = card.querySelector('.setting-control');
       if (ctrlEl && !ctrlEl.querySelector('[data-action="pause"]')) {
-        ctrlEl.innerHTML = `<button class="model-action-btn model-btn-pause" data-action="pause" aria-label="Pause downloading ggml-${escapeHTML(payload.modelName)}.bin">${MODEL_ICON_PAUSE}<span>Pause</span></button>`;
+        ctrlEl.innerHTML = `<button class="model-action-btn model-btn-pause" data-action="pause" aria-label="${t('models.ariaPauseDownload', { name: escapeHTML(payload.modelName) })}">${MODEL_ICON_PAUSE}<span>${t('models.actionPause')}</span></button>`;
       }
       // If card is NOT in current view/tab, do NOTHING to prevent tab re-rendering!
     } else {
@@ -4123,17 +4130,17 @@ async function handleDroppedFiles(files) {
 let currentCategoryFilter = 'guide';
 
 function formatRemainingTime(seconds) {
-  if (seconds <= 0 || !isFinite(seconds)) return "Unknown";
-  if (seconds < 60) return `${seconds}s`;
+  if (seconds <= 0 || !isFinite(seconds)) return t('models.timeUnknown');
+  if (seconds < 60) return t('models.timeSec', { s: seconds });
   if (seconds < 3600) {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
-    return `${m}m ${s}s`;
+    return t('models.timeMinSec', { m, s });
   }
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = seconds % 60;
-  return `${h}h ${m}m ${s}s`;
+  return t('models.timeHourMinSec', { h, m, s });
 }
 
 function renderModelGuide(grid) {
@@ -4146,129 +4153,138 @@ function renderModelGuide(grid) {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width: 20px; height: 20px;"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
           </div>
           <div>
-            <h3 style="font-size: 1.15rem; font-weight: 700; color: #fff; margin: 0;">Whisper Model Architecture & Selection Guide</h3>
-            <p style="font-size: 0.84rem; color: var(--color-text-muted); margin: 3px 0 0 0;">Compare model accuracy, speed, memory requirements, and specialized features to choose the exact model for your workflow.</p>
+            <h3 style="font-size: 1.15rem; font-weight: 700; color: #fff; margin: 0;">${t('models.guideHeroTitle')}</h3>
+            <p style="font-size: 0.84rem; color: var(--color-text-muted); margin: 3px 0 0 0;">${t('models.guideHeroSubtitle')}</p>
           </div>
         </div>
       </div>
 
       <!-- 2. Model Families Comparison Grid -->
       <div class="guide-grid">
-        <div class="guide-card guide-card-large" onclick="switchModelCategory('large')" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchModelCategory('large');}" aria-label="Explore Large Family Models" style="cursor: pointer;">
+        <div class="guide-card guide-card-large">
           <div class="guide-card-header">
             <div class="guide-card-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;"><path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14v2H5z"/></svg>
             </div>
             <div>
-              <div class="guide-card-title">Large Family</div>
-              <div class="guide-card-subtitle" style="font-size: 0.74rem; font-weight: 500;">Maximum Accuracy • 100+ Languages</div>
+              <div class="guide-card-title">${t('models.guideLargeTitle')}</div>
+              <div class="guide-card-subtitle" style="font-size: 0.74rem; font-weight: 500;">${t('models.guideLargeSubtitle')}</div>
             </div>
           </div>
           <div class="guide-card-body">
-            State-of-the-art recognition for challenging accents, background noise, and specialized terminology. <strong>large-v3-turbo</strong> features an 8-layer decoder running 4x faster with full Large precision.
+            ${t('models.guideLargeBody')}
           </div>
           <div style="margin-top: 10px; font-size: 0.76rem; color: var(--color-text-dim);">
-            RAM: ~1.5 - 3.0 GB • Ideal for Dedicated GPU / 8+ Cores
+            ${t('models.guideLargeSpecs')}
           </div>
         </div>
 
-        <div class="guide-card guide-card-medium" onclick="switchModelCategory('medium')" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchModelCategory('medium');}" aria-label="Explore Medium Family Models" style="cursor: pointer;">
+        <div class="guide-card guide-card-medium">
           <div class="guide-card-header">
             <div class="guide-card-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
             </div>
             <div>
-              <div class="guide-card-title">Medium Family</div>
-              <div class="guide-card-subtitle" style="font-size: 0.74rem; font-weight: 500;">High Precision • Pro Transcriptions</div>
+              <div class="guide-card-title">${t('models.guideMediumTitle')}</div>
+              <div class="guide-card-subtitle" style="font-size: 0.74rem; font-weight: 500;">${t('models.guideMediumSubtitle')}</div>
             </div>
           </div>
           <div class="guide-card-body">
-            High precision multilingual model for podcasts, lectures, and professional interviews with low compute overhead.
+            ${t('models.guideMediumBody')}
           </div>
           <div style="margin-top: 10px; font-size: 0.76rem; color: var(--color-text-dim);">
-            RAM: ~1.5 GB • Recommended for 8+ GB RAM systems
+            ${t('models.guideMediumSpecs')}
           </div>
         </div>
 
-        <div class="guide-card guide-card-small" onclick="switchModelCategory('small')" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchModelCategory('small');}" aria-label="Explore Small Family Models" style="cursor: pointer;">
+        <div class="guide-card guide-card-small">
           <div class="guide-card-header">
             <div class="guide-card-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
             </div>
             <div>
-              <div class="guide-card-title">Small Family</div>
-              <div class="guide-card-subtitle" style="font-size: 0.74rem; font-weight: 500;">Balanced • Universal Daily Driver</div>
+              <div class="guide-card-title">${t('models.guideSmallTitle')}</div>
+              <div class="guide-card-subtitle" style="font-size: 0.74rem; font-weight: 500;">${t('models.guideSmallSubtitle')}</div>
             </div>
           </div>
           <div class="guide-card-body">
-            The optimal standard for daily transcription tasks. Delivers reliable multilingual accuracy with fast CPU execution and compact 465 MB weight.
+            ${t('models.guideSmallBody')}
           </div>
           <div style="margin-top: 10px; font-size: 0.76rem; color: var(--color-text-dim);">
-            RAM: ~500 MB • Perfect for general-purpose CPU use
+            ${t('models.guideSmallSpecs')}
           </div>
         </div>
 
-        <div class="guide-card guide-card-base" onclick="switchModelCategory('base')" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchModelCategory('base');}" aria-label="Explore Base and Tiny Family Models" style="cursor: pointer;">
+        <div class="guide-card guide-card-base">
           <div class="guide-card-header">
             <div class="guide-card-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
             </div>
             <div>
-              <div class="guide-card-title">Base & Tiny</div>
-              <div class="guide-card-subtitle" style="font-size: 0.74rem; font-weight: 500;">Ultra-Fast • Low Resource</div>
+              <div class="guide-card-title">${t('models.guideBaseTinyTitle')}</div>
+              <div class="guide-card-subtitle" style="font-size: 0.74rem; font-weight: 500;">${t('models.guideBaseTinySubtitle')}</div>
             </div>
           </div>
           <div class="guide-card-body">
-            Instant transcription with minimal memory consumption. Ideal for real-time dictation, quick drafts, and battery-friendly laptop use.
+            ${t('models.guideBaseTinyBody')}
           </div>
           <div style="margin-top: 10px; font-size: 0.76rem; color: var(--color-text-dim);">
-            RAM: ~100 - 200 MB • Runs effortlessly on any CPU
+            ${t('models.guideBaseTinySpecs')}
           </div>
         </div>
       </div>
 
       <!-- 3. Key Concepts to Know -->
       <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 2px;">
-        <div class="guide-concept-card">
-          <span style="font-size: 1.25rem;">🇬🇧</span>
+        <div class="guide-concept-card guide-concept-lang">
+          <div class="guide-concept-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+            </svg>
+          </div>
           <div>
-            <div style="font-weight: 600; color: #fff; font-size: 0.88rem; margin-bottom: 2px;">English-Only Models (<code>.en</code>) vs Multilingual</div>
+            <div style="font-weight: 600; color: #fff; font-size: 0.88rem; margin-bottom: 2px;">${t('models.guideConceptEnTitle')}</div>
             <div style="font-size: 0.82rem; color: var(--color-text-muted); line-height: 1.45;">
-              Models with the <code>.en</code> suffix (such as <code>small.en</code> or <code>base.en</code>) dedicate their full vocabulary exclusively to English. For English audio, they provide <strong>10% to 15% higher accuracy</strong> and faster inference than multilingual models of identical size.
+              ${t('models.guideConceptEnBody')}
             </div>
           </div>
         </div>
 
-        <div class="guide-concept-card">
-          <span style="font-size: 1.25rem;">🗜️</span>
+        <div class="guide-concept-card guide-concept-quant">
+          <div class="guide-concept-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="4 14 10 14 10 20"></polyline>
+              <polyline points="20 10 14 10 14 4"></polyline>
+              <line x1="14" y1="10" x2="21" y2="3"></line>
+              <line x1="3" y1="21" x2="10" y2="14"></line>
+            </svg>
+          </div>
           <div>
-            <div style="font-weight: 600; color: #fff; font-size: 0.88rem; margin-bottom: 2px;">Quantization (<code>-q5_0</code>, <code>-q8_0</code>)</div>
+            <div style="font-weight: 600; color: #fff; font-size: 0.88rem; margin-bottom: 2px;">${t('models.guideConceptQuantTitle')}</div>
             <div style="font-size: 0.82rem; color: var(--color-text-muted); line-height: 1.45;">
-              Quantized models compress 16-bit weights into 5-bit or 8-bit integers, reducing file size and RAM usage by <strong>40% to 60%</strong> with negligible recognition loss, enabling Large models to run smoothly on standard laptops.
+              ${t('models.guideConceptQuantBody')}
             </div>
           </div>
         </div>
 
-        <div class="guide-concept-card" onclick="switchModelCategory('vad')" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();switchModelCategory('vad');}" aria-label="Explore Silero Voice Activity Detection Models" style="cursor: pointer; transition: var(--transition-smooth);" onmouseenter="this.style.borderColor='rgba(var(--color-royal-blue-rgb), 0.4)'" onmouseleave="this.style.borderColor='var(--border-glass)'">
-          <span style="font-size: 1.25rem;">🎙️</span>
-          <div style="flex-grow: 1;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
-              <div style="font-weight: 600; color: #fff; font-size: 0.88rem;">Silero Voice Activity Detection (VAD)</div>
-              <span style="font-size: 0.75rem; color: var(--color-royal-blue); font-weight: 500;">Click to view VAD models →</span>
-            </div>
+        <div class="guide-concept-card guide-concept-vad">
+          <div class="guide-concept-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+              <line x1="12" y1="19" x2="12" y2="23"></line>
+              <line x1="8" y1="23" x2="16" y2="23"></line>
+            </svg>
+          </div>
+          <div>
+            <div style="font-weight: 600; color: #fff; font-size: 0.88rem; margin-bottom: 2px;">${t('models.guideConceptVadTitle')}</div>
             <div style="font-size: 0.82rem; color: var(--color-text-muted); line-height: 1.45;">
-              Silero VAD (885 KB) is an ultra-fast speech-detection preprocessor. It removes silent intervals and non-speech noise before sending audio to Whisper, drastically accelerating processing and preventing hallucinations during pauses.
+              ${t('models.guideConceptVadBody')}
             </div>
           </div>
         </div>
-      </div>
-
-      <!-- 4. Footer Category Switchers -->
-      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px; flex-wrap: wrap;">
-        <button class="btn-secondary" onclick="switchModelCategory('small')" style="margin: 0; padding: 8px 16px; font-size: 0.84rem;">Explore Small Family</button>
-        <button class="btn-secondary" onclick="switchModelCategory('large')" style="margin: 0; padding: 8px 16px; font-size: 0.84rem;">Explore Large Family</button>
-        <button class="btn-secondary" onclick="switchModelCategory('vad')" style="margin: 0; padding: 8px 16px; font-size: 0.84rem;">Silero VAD</button>
-        <button class="btn-primary" onclick="switchModelCategory('all')" style="margin: 0; padding: 8px 18px; font-size: 0.84rem;">Browse All Models</button>
       </div>
     </div>
   `;
@@ -4337,17 +4353,17 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
   const specsSubtitle = document.getElementById('model-specs-subtitle');
   if (specsSubtitle && systemSpecs) {
     const gpuLabelMap = {
-      'nvidia': 'NVIDIA Dedicated GPU (CUDA Supported)',
-      'amd': 'AMD GPU (Vulkan Supported)',
-      'intel': 'Intel GPU (OpenVINO/Vulkan Supported)',
-      'unknown': 'CPU Only / Undetected GPU'
+      'nvidia': t('models.gpuNvidia'),
+      'amd': t('models.gpuAmd'),
+      'intel': t('models.gpuIntel'),
+      'unknown': t('models.gpuCpuOnly')
     };
-    const gpuName = gpuLabelMap[systemSpecs.gpu_type] || systemSpecs.gpu_type || 'Unknown GPU';
-    specsSubtitle.innerHTML = `
-      System detected: <strong style="color: var(--color-cyan);">${systemSpecs.total_ram_gb.toFixed(1)} GB RAM</strong>, 
-      <strong style="color: var(--color-cyan);">${systemSpecs.cpu_cores} CPU Cores</strong>, 
-      <strong style="color: var(--color-cyan);">${gpuName}</strong>.
-    `;
+    const gpuName = gpuLabelMap[systemSpecs.gpu_type] || systemSpecs.gpu_type || t('models.gpuUnknown');
+    specsSubtitle.innerHTML = t('models.systemSpecsDetected', {
+      ram: systemSpecs.total_ram_gb.toFixed(1),
+      cores: systemSpecs.cpu_cores,
+      gpu: gpuName
+    });
   }
   
   try {
@@ -4434,20 +4450,20 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
       let actionButtons = '';
       if (m.status === 'Downloaded') {
         actionButtons = `
-          <button class="model-action-btn model-btn-delete" data-action="delete" aria-label="Delete model ggml-${safeName}.bin">${MODEL_ICON_DELETE}<span>Delete</span></button>
+          <button class="model-action-btn model-btn-delete" data-action="delete" aria-label="${t('models.ariaDeleteModel', { name: safeName })}">${MODEL_ICON_DELETE}<span>${t('models.actionDelete')}</span></button>
         `;
       } else if (m.status === 'Downloading') {
         actionButtons = `
-          <button class="model-action-btn model-btn-pause" data-action="pause" aria-label="Pause downloading ggml-${safeName}.bin">${MODEL_ICON_PAUSE}<span>Pause</span></button>
+          <button class="model-action-btn model-btn-pause" data-action="pause" aria-label="${t('models.ariaPauseDownload', { name: safeName })}">${MODEL_ICON_PAUSE}<span>${t('models.actionPause')}</span></button>
         `;
       } else if (m.status === 'Paused') {
         actionButtons = `
-          <button class="model-action-btn model-btn-resume" data-action="download" aria-label="Resume downloading ggml-${safeName}.bin">${MODEL_ICON_RESUME}<span>Resume</span></button>
-          <button class="model-action-btn model-btn-delete" data-action="delete" aria-label="Discard partial download of ggml-${safeName}.bin">${MODEL_ICON_DELETE}<span>Discard</span></button>
+          <button class="model-action-btn model-btn-resume" data-action="download" aria-label="${t('models.ariaResumeDownload', { name: safeName })}">${MODEL_ICON_RESUME}<span>${t('models.actionResume')}</span></button>
+          <button class="model-action-btn model-btn-delete" data-action="delete" aria-label="${t('models.ariaDiscardDownload', { name: safeName })}">${MODEL_ICON_DELETE}<span>${t('models.actionDiscard')}</span></button>
         `;
       } else {
         actionButtons = `
-          <button class="model-action-btn model-btn-download" data-action="download" aria-label="Download model ggml-${safeName}.bin">${MODEL_ICON_DOWNLOAD}<span>Download</span></button>
+          <button class="model-action-btn model-btn-download" data-action="download" aria-label="${t('models.ariaDownloadModel', { name: safeName })}">${MODEL_ICON_DOWNLOAD}<span>${t('models.actionDownload')}</span></button>
         `;
       }
       
@@ -4455,20 +4471,20 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
       
       let badgeHtml = '';
       if (m.name.startsWith('silero-')) {
-        badgeHtml = `<span class="model-badge model-badge-vad" title="Voice Activity Detection (Silero)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg><span>Silero VAD</span></span>`;
+        badgeHtml = `<span class="model-badge model-badge-vad" title="${t('models.badgeVadTitle')}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg><span>${t('models.badgeVad')}</span></span>`;
       }
 
       let statusBadge = '';
       if (m.status === 'Downloaded') {
-        statusBadge = `<span class="model-badge badge-installed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span>Installed</span></span>`;
+        statusBadge = `<span class="model-badge badge-installed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span>${t('models.installedBadge')}</span></span>`;
       } else if (m.status === 'Downloading') {
-        statusBadge = `<span class="model-badge badge-downloading">Downloading</span>`;
+        statusBadge = `<span class="model-badge badge-downloading">${t('models.badgeDownloading')}</span>`;
       } else if (m.status === 'Paused') {
-        statusBadge = `<span class="model-badge badge-paused">Paused</span>`;
+        statusBadge = `<span class="model-badge badge-paused">${t('models.badgePaused')}</span>`;
       }
 
       card.innerHTML = `
-        <div class="setting-info" style="flex-grow: 1; padding-right: 20px;">
+        <div class="setting-info" style="flex-grow: 1; padding-inline-end: 20px;">
           <div class="setting-label-row" style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
             <span class="setting-title" style="font-size: 1.05rem; font-weight: 600; color: #fff;">ggml-${safeName}.bin</span>
             ${badgeHtml}
@@ -4476,7 +4492,7 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
           <div class="setting-desc" style="font-size: 0.82rem; color: var(--color-text-muted); line-height: 1.4; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
             ${statusBadge}
             ${statusBadge ? '<span style="color: rgba(255,255,255,0.1);">|</span>' : ''}
-            <span>Expected Size: ${sizeMB} MB</span>
+            <span>${t('models.expectedSize', { size: sizeMB })}</span>
             ${meta.precisionText ? `
               <span style="color: rgba(255,255,255,0.1);">|</span>
               <span>${meta.precisionText}</span>
@@ -4485,11 +4501,11 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
             <span>${meta.langText}</span>
             ${m.status === 'Downloading' ? `
               <span style="color: rgba(255,255,255,0.1);">|</span>
-              <span style="color: var(--color-cyan);">${dlMB} MB (${pct}%) • In progress</span>
+              <span style="color: var(--color-cyan);">${t('models.statusInProgress', { size: dlMB, pct })}</span>
             ` : ''}
             ${m.status === 'Paused' ? `
               <span style="color: rgba(255,255,255,0.1);">|</span>
-              <span style="color: var(--color-gold);">${dlMB} MB (${pct}%) • Paused</span>
+              <span style="color: var(--color-gold);">${t('models.statusPaused', { size: dlMB, pct })}</span>
             ` : ''}
           </div>
           <div class="progress-bar-container" style="display: ${showProgressBlock}; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.05); overflow: hidden; margin-top: 10px; border: 1px solid rgba(255,255,255,0.02); max-width: 500px;">
@@ -4514,9 +4530,9 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
               <line x1="8" y1="11" x2="14" y2="11"></line>
             </svg>
           </div>
-          <div class="models-empty-title">No Matching Models Found</div>
-          <div class="models-empty-desc">${query ? `No models match your search keyword <code>${escapeHTML(query)}</code>.` : 'No models available under this category.'}</div>
-          ${query ? `<button type="button" class="btn-secondary btn-sm" onclick="clearModelSearch()" style="margin-top: 8px;">Clear Search</button>` : ''}
+          <div class="models-empty-title">${t('models.emptyTitle')}</div>
+          <div class="models-empty-desc">${query ? t('models.emptyDescQuery', { query: escapeHTML(query) }) : t('models.emptyDescCategory')}</div>
+          ${query ? `<button type="button" class="btn-secondary btn-sm" onclick="clearModelSearch()" style="margin-top: 8px;">${t('models.emptyClearSearch')}</button>` : ''}
         </div>
       `;
     }
