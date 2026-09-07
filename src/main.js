@@ -981,6 +981,18 @@ class CustomSelect {
     });
 
     this.optionsContainer.appendChild(frag);
+
+    // Modern Web Guidance: Detect technical/English dropdowns (e.g. model filenames, hardware devices)
+    // and enforce strict LTR layout even in RTL mode so names like ggml-*.bin are left-aligned.
+    const hasRtlChar = options.some(opt => /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(opt.textContent || ''));
+    if (!hasRtlChar && options.length > 0) {
+      this.container.classList.add('custom-select-ltr');
+      this.optionsContainer.classList.add('custom-select-ltr');
+    } else {
+      this.container.classList.remove('custom-select-ltr');
+      this.optionsContainer.classList.remove('custom-select-ltr');
+    }
+
     this.syncSelectedValue();
   }
 
@@ -1008,10 +1020,26 @@ class CustomSelect {
     const spaceBelow = window.innerHeight - rect.bottom;
     const spaceAbove = rect.top;
 
+    // Intelligent width expansion: ensure popup never cuts off longer option text
     this.optionsContainer.style.position = 'fixed';
-    this.optionsContainer.style.width = `${rect.width}px`;
-    this.optionsContainer.style.left = `${rect.left}px`;
     this.optionsContainer.style.zIndex = '999999';
+
+    const contentWidth = this.optionsContainer.scrollWidth || rect.width;
+    const targetWidth = Math.max(rect.width, Math.min(contentWidth, 360));
+    this.optionsContainer.style.minWidth = `${rect.width}px`;
+    this.optionsContainer.style.maxWidth = `${Math.min(window.innerWidth - 24, Math.max(targetWidth, rect.width))}px`;
+    this.optionsContainer.style.width = 'max-content';
+
+    const isLtrDropdown = this.container.classList.contains('custom-select-ltr');
+    const isRtl = !isLtrDropdown && document.documentElement.getAttribute('dir') === 'rtl';
+    let leftPos = rect.left;
+    if (isRtl && targetWidth > rect.width) {
+      leftPos = rect.right - targetWidth;
+    }
+    // Clamp inside viewport
+    leftPos = Math.max(12, Math.min(leftPos, window.innerWidth - targetWidth - 12));
+    this.optionsContainer.style.left = `${leftPos}px`;
+    this.optionsContainer.style.right = 'auto';
 
     if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
       // Space below insufficient -> open upward
@@ -1133,6 +1161,30 @@ window.syncCustomSelects = function() {
     });
   }
 };
+
+/**
+ * Dynamically updates text direction (ltr vs rtl) of an input/textarea
+ * based on its text content, independent of the overall app UI language.
+ * Falls back cleanly to current app UI direction when empty.
+ */
+function applyDynamicDirection(el, defaultDir = null) {
+  if (!el) return;
+  const currentAppDir = (typeof getLanguage === 'function' && getLanguage() === 'fa') ? 'rtl' : 'ltr';
+  const effectiveDefaultDir = defaultDir || currentAppDir;
+  const val = el.value || '';
+  
+  const RTL_CHAR_REGEX = /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+  const STRONG_CHAR_REGEX = /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFFa-zA-Z\u00C0-\u024F]/;
+  
+  const firstStrongChar = val.match(STRONG_CHAR_REGEX);
+  if (firstStrongChar) {
+    const isRtl = RTL_CHAR_REGEX.test(firstStrongChar[0]);
+    el.setAttribute('dir', isRtl ? 'rtl' : 'ltr');
+  } else {
+    el.setAttribute('dir', effectiveDefaultDir);
+  }
+}
+window.applyDynamicDirection = applyDynamicDirection;
 
 // Initialize App
 // Handle responsive sidebar collapse via matchMedia + class toggle,
@@ -1576,11 +1628,97 @@ async function initApp() {
       updateTranscribeUIConfigs();
     }
 
+    // Maintain content-based direction on prompt input independent of UI language
+    const promptInput = document.getElementById('opt-prompt');
+    if (promptInput) {
+      applyDynamicDirection(promptInput);
+    }
+
+    // Update backend options labels on opt-selectedBackend in settings if present
+    const settingsBackendSelect = document.getElementById('opt-selectedBackend');
+    if (settingsBackendSelect) {
+      Array.from(settingsBackendSelect.options).forEach(opt => {
+        if (opt.value === 'Standard') opt.textContent = t('transcribe.backendCpu');
+        else if (opt.value === 'Vulkan') opt.textContent = t('transcribe.backendVulkan');
+        else if (opt.value === 'CUDA') opt.textContent = t('transcribe.backendCuda');
+        else if (opt.value === 'OpenVINO') opt.textContent = t('transcribe.backendOpenvino');
+      });
+      if (typeof syncCustomSelects === 'function') {
+        syncCustomSelects();
+      }
+    }
+
     // If in settings view, refresh models count display
     if (activeView === 'settings' && typeof filterModelsTable === 'function') {
       filterModelsTable(0);
     }
+
+    // If settings search is active, re-run search to update translated group headers and empty state
+    const settingsSearchInput = document.getElementById('settings-search-input');
+    if (settingsSearchInput && settingsSearchInput.value && typeof window.filterSettings === 'function') {
+      window.filterSettings(settingsSearchInput.value);
+    }
   });
+
+  // Wire up settings search keyboard shortcuts (Escape clears search)
+  const settingsSearchInput = document.getElementById('settings-search-input');
+  if (settingsSearchInput && !settingsSearchInput._hasSearchEscListener) {
+    settingsSearchInput._hasSearchEscListener = true;
+    settingsSearchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (typeof window.clearSettingsSearch === 'function') {
+          window.clearSettingsSearch();
+        }
+      }
+    });
+  }
+
+  const modelSearchInput = document.getElementById('model-search');
+  if (modelSearchInput && !modelSearchInput._hasSearchEscListener) {
+    modelSearchInput._hasSearchEscListener = true;
+    modelSearchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (typeof window.clearModelSearch === 'function') {
+          window.clearModelSearch();
+        }
+      }
+    });
+  }
+
+  // Wire up search focus shortcuts ('/' or Ctrl+F when not in an editable field)
+  document.addEventListener('keydown', (e) => {
+    const isEditing = e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable);
+    if ((e.key === '/' && !isEditing) || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f')) {
+      if (activeView === 'settings') {
+        const input = document.getElementById('settings-search-input');
+        if (input) {
+          e.preventDefault();
+          input.focus();
+          input.select();
+        }
+      } else if (activeView === 'models') {
+        const input = document.getElementById('model-search');
+        if (input) {
+          e.preventDefault();
+          input.focus();
+          input.select();
+        }
+      }
+    }
+  });
+
+  // Wire up dynamic content direction on prompt input
+  const promptInput = document.getElementById('opt-prompt');
+  if (promptInput) {
+    applyDynamicDirection(promptInput);
+    if (!promptInput._hasDynamicDirListener) {
+      promptInput._hasDynamicDirListener = true;
+      promptInput.addEventListener('input', () => applyDynamicDirection(promptInput));
+    }
+  }
+
+  // Trigger initial synchronization of dynamic components for startup language
+  window.dispatchEvent(new CustomEvent('whisper:languageChanged', { detail: { language: getLanguage(), isRtl: getLanguage() === 'fa' } }));
 
   window.saveCurrentSettings = saveCurrentSettings;
 
@@ -1916,10 +2054,10 @@ window.selectBackend = function(backend, isInitialSelection = false) {
 
 async function refreshBuildStatuses() {
   const allBackends = [
-    { key: 'Standard', label: 'Standard CPU' },
-    { key: 'Vulkan', label: 'Vulkan GPU' },
-    { key: 'OpenVINO', label: 'OpenVINO Intel' },
-    { key: 'CUDA', label: 'NVIDIA CUDA' }
+    { key: 'Standard', label: (typeof t === 'function' && t('transcribe.backendCpu')) || 'Standard CPU' },
+    { key: 'Vulkan', label: (typeof t === 'function' && t('transcribe.backendVulkan')) || 'Vulkan GPU' },
+    { key: 'OpenVINO', label: (typeof t === 'function' && t('transcribe.backendOpenvino')) || 'OpenVINO Intel' },
+    { key: 'CUDA', label: (typeof t === 'function' && t('transcribe.backendCuda')) || 'NVIDIA CUDA' }
   ];
 
   const availableBackends = [];
@@ -2001,6 +2139,23 @@ window.browseModelsDirectory = async function() {
 };
 
 window.switchSettingsCategory = function(catName) {
+  const searchInput = document.getElementById('settings-search-input');
+  const hasActiveSearch = Boolean(searchInput && searchInput.value.trim().length > 0);
+  
+  // If search is currently active and user clicks a category tab that has matching results,
+  // smoothly scroll directly to that category section in the search view.
+  if (hasActiveSearch) {
+    const targetGroup = document.getElementById(`group-${catName}`);
+    if (targetGroup && targetGroup.style.display !== 'none' && targetGroup.classList.contains('active')) {
+      targetGroup.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    // If the selected category had no matches, clear search to reveal the full category.
+    searchInput.value = '';
+    const clearBtn = document.getElementById('settings-search-clear');
+    if (clearBtn) clearBtn.style.display = 'none';
+  }
+
   activeSettingsCat = catName;
   
   // Reset scroll position to top when switching categories
@@ -2009,19 +2164,30 @@ window.switchSettingsCategory = function(catName) {
     scrollContainer.scrollTop = 0;
   }
 
-  // Toggle active category tabs
+  // Remove search headers and empty state if any
+  document.querySelectorAll('.settings-search-group-header').forEach(h => h.remove());
+  const emptyEl = document.getElementById('settings-search-empty');
+  if (emptyEl) emptyEl.style.display = 'none';
+
+  // Toggle active category tabs and clear search badges/dimming
   const tabs = document.querySelectorAll('.settings-cat-btn');
   tabs.forEach(tab => {
-    tab.classList.remove('active');
+    tab.classList.remove('active', 'search-dimmed');
+    const badge = tab.querySelector('.cat-match-badge');
+    if (badge) badge.remove();
     if (tab.id === `cat-btn-${catName}`) {
       tab.classList.add('active');
     }
   });
   
-  // Toggle active groups
+  // Toggle active groups and restore card visibility
   const groups = document.querySelectorAll('.settings-group');
   groups.forEach(group => {
     group.classList.remove('active');
+    group.style.display = '';
+    group.querySelectorAll('.setting-card').forEach(card => {
+      card.style.display = '';
+    });
   });
   
   const targetGroup = document.getElementById(`group-${catName}`);
@@ -2033,6 +2199,184 @@ window.switchSettingsCategory = function(catName) {
     if (window.syncCustomSelects) {
       window.syncCustomSelects();
     }
+  }
+
+  // Ensure conditional cards (e.g. Custom Output Path) respect their true state
+  if (typeof toggleOutputDirCustomField === 'function') {
+    toggleOutputDirCustomField();
+  }
+};
+
+window.clearSettingsSearch = function() {
+  const searchInput = document.getElementById('settings-search-input');
+  if (searchInput) {
+    searchInput.value = '';
+    window.filterSettings('', true);
+    searchInput.focus();
+  }
+};
+
+function executeFilterSettings(query) {
+  const q = (query || '').trim().toLowerCase();
+  const clearBtn = document.getElementById('settings-search-clear');
+  const emptyEl = document.getElementById('settings-search-empty');
+  const emptyDescEl = document.getElementById('settings-search-empty-desc');
+  const groups = document.querySelectorAll('.settings-group');
+  const tabs = document.querySelectorAll('.settings-cat-btn');
+  const scrollContainer = document.querySelector('.settings-scroll-container');
+
+  if (clearBtn) {
+    clearBtn.style.display = q ? 'flex' : 'none';
+  }
+
+  if (!q) {
+    // Search cleared: restore normal category view
+    if (emptyEl) emptyEl.style.display = 'none';
+    document.querySelectorAll('.settings-search-group-header').forEach(h => h.remove());
+
+    tabs.forEach(tab => {
+      tab.classList.remove('search-dimmed');
+      const badge = tab.querySelector('.cat-match-badge');
+      if (badge) badge.remove();
+      if (tab.id === `cat-btn-${activeSettingsCat}`) {
+        tab.classList.add('active');
+      } else {
+        tab.classList.remove('active');
+      }
+    });
+
+    groups.forEach(group => {
+      group.style.display = '';
+      group.querySelectorAll('.setting-card').forEach(card => {
+        card.style.display = '';
+      });
+      if (group.id === `group-${activeSettingsCat}`) {
+        group.classList.add('active');
+      } else {
+        group.classList.remove('active');
+      }
+    });
+
+    // Restore conditional cards (e.g. Custom Output Path) to their valid visibility
+    if (typeof toggleOutputDirCustomField === 'function') {
+      toggleOutputDirCustomField();
+    }
+    return;
+  }
+
+  // Active query: search across all settings groups
+  let totalMatches = 0;
+  const catMatches = {};
+
+  const getCatTitle = (catName) => {
+    const tab = document.getElementById(`cat-btn-${catName}`);
+    if (!tab) return catName;
+    const i18nKey = tab.getAttribute('data-i18n');
+    if (i18nKey && typeof t === 'function') {
+      const translated = t(i18nKey);
+      if (translated && translated !== i18nKey) return translated;
+    }
+    return tab.childNodes[0]?.textContent?.trim() || tab.textContent.trim();
+  };
+
+  groups.forEach(group => {
+    const catName = group.id.replace('group-', '');
+    let groupMatches = 0;
+    const cards = group.querySelectorAll('.setting-card');
+
+    cards.forEach(card => {
+      const searchTags = (card.getAttribute('data-search-tags') || '').toLowerCase();
+      const title = (card.querySelector('.setting-title')?.textContent || '').toLowerCase();
+      const desc = (card.querySelector('.setting-desc')?.textContent || '').toLowerCase();
+      const descPoints = (card.querySelector('.setting-desc-points')?.textContent || '').toLowerCase();
+      
+      const optionsText = Array.from(card.querySelectorAll('select option'))
+        .map(o => o.textContent.toLowerCase()).join(' ');
+
+      const matches = searchTags.includes(q) ||
+                      title.includes(q) ||
+                      desc.includes(q) ||
+                      descPoints.includes(q) ||
+                      optionsText.includes(q);
+
+      if (matches) {
+        card.style.display = '';
+        groupMatches++;
+        totalMatches++;
+      } else {
+        card.style.display = 'none';
+      }
+    });
+
+    catMatches[catName] = groupMatches;
+
+    if (groupMatches > 0) {
+      group.classList.add('active');
+      group.style.display = 'flex';
+
+      // Insert or update category header for group
+      let header = group.querySelector(':scope > .settings-search-group-header');
+      if (!header) {
+        header = document.createElement('div');
+        header.className = 'settings-search-group-header';
+        group.insertBefore(header, group.firstChild);
+      }
+      header.textContent = getCatTitle(catName);
+      header.style.display = 'flex';
+    } else {
+      group.classList.remove('active');
+      group.style.display = 'none';
+      const header = group.querySelector(':scope > .settings-search-group-header');
+      if (header) header.style.display = 'none';
+    }
+  });
+
+  // Update tabs with match badges or dim them
+  tabs.forEach(tab => {
+    const catName = tab.id.replace('cat-btn-', '');
+    const count = catMatches[catName] || 0;
+    let badge = tab.querySelector('.cat-match-badge');
+
+    if (count > 0) {
+      tab.classList.remove('search-dimmed');
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'cat-match-badge';
+        tab.appendChild(badge);
+      }
+      badge.textContent = count;
+    } else {
+      tab.classList.add('search-dimmed');
+      if (badge) badge.remove();
+    }
+  });
+
+  // Handle empty state
+  if (totalMatches === 0) {
+    if (emptyEl) emptyEl.style.display = 'flex';
+    if (emptyDescEl) {
+      emptyDescEl.textContent = typeof t === 'function'
+        ? t('settings.searchNoResultsDesc', { query: (query || '').trim() })
+        : `No configuration options match "${(query || '').trim()}".`;
+    }
+    if (scrollContainer) scrollContainer.scrollTop = 0;
+  } else {
+    if (emptyEl) emptyEl.style.display = 'none';
+  }
+}
+
+window.filterSettings = function(query, immediate = false) {
+  if (filterSettings._timer) {
+    clearTimeout(filterSettings._timer);
+    filterSettings._timer = null;
+  }
+  if (immediate || !query) {
+    executeFilterSettings(query);
+  } else {
+    filterSettings._timer = setTimeout(() => {
+      filterSettings._timer = null;
+      executeFilterSettings(query);
+    }, 80);
   }
 };
 
@@ -2105,6 +2449,13 @@ function bindSettingsToDOM() {
         };
       } else if (el.tagName === 'SELECT' || el.type === 'text' || el.type === 'number') {
         el.value = settingsState[key];
+        if (key === 'prompt' || el.id === 'opt-prompt' || el.hasAttribute('dir')) {
+          applyDynamicDirection(el);
+          if (!el._hasDynamicDirListener) {
+            el._hasDynamicDirListener = true;
+            el.addEventListener('input', () => applyDynamicDirection(el));
+          }
+        }
         el.onchange = () => {
           let val = el.value;
           if (INT_SETTING_KEYS.has(key)) {
@@ -2953,10 +3304,10 @@ function updateTranscribeUIConfigs() {
   const quickBackendSelect = document.getElementById('quick-opt-selectedBackend');
   if (quickBackendSelect) {
     const backendDefs = [
-      { key: 'Standard', label: 'CPU (Standard)' },
-      { key: 'Vulkan', label: 'Vulkan GPU' },
-      { key: 'CUDA', label: 'CUDA GPU' },
-      { key: 'OpenVINO', label: 'OpenVINO Intel' }
+      { key: 'Standard', label: t('transcribe.backendCpu') },
+      { key: 'Vulkan', label: t('transcribe.backendVulkan') },
+      { key: 'CUDA', label: t('transcribe.backendCuda') },
+      { key: 'OpenVINO', label: t('transcribe.backendOpenvino') }
     ];
     
     // Filter to only include compiled backends (Standard CPU is always present as fallback)
@@ -2975,6 +3326,13 @@ function updateTranscribeUIConfigs() {
           opt.selected = true;
         }
         quickBackendSelect.appendChild(opt);
+      });
+    } else {
+      Array.from(quickBackendSelect.options).forEach(opt => {
+        const match = availableBackends.find(b => b.key === opt.value);
+        if (match && opt.textContent !== match.label) {
+          opt.textContent = match.label;
+        }
       });
     }
     quickBackendSelect.value = backend;
@@ -3953,7 +4311,12 @@ window.abortBatchExtraction = async function() {
   } finally {
     if (cancelBtn) {
       cancelBtn.disabled = false;
-      cancelBtn.textContent = 'Cancel';
+      const cancelSpan = cancelBtn.querySelector('span');
+      if (cancelSpan) {
+        cancelSpan.textContent = t('common.cancel');
+      } else {
+        cancelBtn.innerHTML = `<span data-i18n="common.cancel">${t('common.cancel')}</span>`;
+      }
       cancelBtn.style.display = 'none';
     }
   }
@@ -4296,6 +4659,8 @@ window.switchModelCategory = function(category, clearSearch = true) {
   if (clearSearch) {
     const searchInput = document.getElementById('model-search');
     if (searchInput) searchInput.value = '';
+    const clearBtn = document.getElementById('model-search-clear');
+    if (clearBtn) clearBtn.style.display = 'none';
   }
 
   const buttons = document.querySelectorAll('#model-categories-sidebar .settings-cat-btn');
@@ -4318,6 +4683,8 @@ window.switchModelCategory = function(category, clearSearch = true) {
 
 window.clearModelSearch = function() {
   const searchInput = document.getElementById('model-search');
+  const clearBtn = document.getElementById('model-search-clear');
+  if (clearBtn) clearBtn.style.display = 'none';
   if (searchInput) {
     searchInput.value = '';
     searchInput.focus();
@@ -4543,13 +4910,16 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
 };
 
 window.filterModelsGrid = function() {
+  const searchInput = document.getElementById('model-search');
+  const clearBtn = document.getElementById('model-search-clear');
+  const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+  if (clearBtn) clearBtn.style.display = query ? 'flex' : 'none';
+
   // Debounce: the search box calls this per keystroke, and a full grid rebuild
   // + IPC round-trip on every key makes typing janky.
   if (filterModelsGrid._timer) clearTimeout(filterModelsGrid._timer);
   filterModelsGrid._timer = setTimeout(() => {
     filterModelsGrid._timer = null;
-    const searchInput = document.getElementById('model-search');
-    const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
     // If typing a search while currently on Guide tab, automatically switch to 'all' category
     if (query && currentCategoryFilter === 'guide') {
       currentCategoryFilter = 'all';
@@ -4975,7 +5345,9 @@ window.onProviderChanged = function(keepCurrentTab = false, skipTableRender = fa
     // Load General configuration fields
     document.getElementById('mgr-provider-url').value = provider.baseUrl || provider.base_url || '';
     document.getElementById('mgr-provider-format').value = provider.apiFormat || provider.api_format || 'Chat completions';
-    document.getElementById('mgr-provider-prompt').value = provider.customPrompt || provider.custom_prompt || '';
+    const providerPromptEl = document.getElementById('mgr-provider-prompt');
+    providerPromptEl.value = provider.customPrompt || provider.custom_prompt || '';
+    applyDynamicDirection(providerPromptEl);
     
     // Set API Key field. If stored in Keyring, we show a generic placeholder value and mark it for lazy retrieval.
     const keyVal = provider.apiKey || provider.api_key || '';
@@ -6020,7 +6392,11 @@ window.setupTranslationEventListeners = function() {
   if (urlInput) urlInput.addEventListener('change', triggerAutoSave);
   if (formatSelect) formatSelect.addEventListener('change', triggerAutoSave);
   if (keyInput) keyInput.addEventListener('change', triggerAutoSave);
-  if (promptTextarea) promptTextarea.addEventListener('change', triggerAutoSave);
+  if (promptTextarea) {
+    applyDynamicDirection(promptTextarea);
+    promptTextarea.addEventListener('input', () => applyDynamicDirection(promptTextarea));
+    promptTextarea.addEventListener('change', triggerAutoSave);
+  }
 
   const addCustomModelBtn = document.getElementById('mgr-btn-add-custom-model');
   if (addCustomModelBtn) {

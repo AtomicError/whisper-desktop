@@ -198,6 +198,16 @@
                 <h3 style="font-size:1.2rem; margin-bottom:4px;" data-i18n="settings.title">Whisper Engine Configuration</h3>
                 <p style="font-size:0.8rem; color:var(--color-text-muted);" data-i18n="settings.subtitle">Adjust decoding thresholds and performance variables</p>
               </div>
+              <div class="settings-search-wrapper">
+                <svg class="settings-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input class="text-input settings-search-input" id="settings-search-input" type="text" placeholder="Search..." data-i18n-placeholder="settings.searchPlaceholder" oninput="filterSettings(this.value)" autocomplete="off" spellcheck="false" />
+                <button type="button" class="settings-search-clear" id="settings-search-clear" onclick="clearSettingsSearch()" style="display: none;" title="Clear Search" aria-label="Clear Search">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+              </div>
             </div>
 
             <div class="settings-layout">
@@ -212,6 +222,18 @@
               </div>
 
               <div class="settings-scroll-container">
+                <!-- Search Empty State -->
+                <div class="settings-search-empty" id="settings-search-empty" style="display: none;" role="status" aria-live="polite">
+                  <div class="search-empty-icon-wrap">
+                    <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.8">
+                      <circle cx="11" cy="11" r="8"></circle>
+                      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                  </div>
+                  <div class="search-empty-title" data-i18n="settings.searchNoResults">No settings found</div>
+                  <div class="search-empty-desc" id="settings-search-empty-desc" data-i18n="settings.searchNoResultsDesc">No configuration options match your search.</div>
+                  <button type="button" class="btn-secondary" onclick="clearSettingsSearch()" data-i18n="settings.clearSearch">Clear Search</button>
+                </div>
                 <!-- Settings Groups -->
                 <div class="settings-group active" id="group-general">
                   <!-- Interface Language Card -->
@@ -277,11 +299,10 @@
                     </div>
                   </div>
 
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="-m --model">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.modelSelectTitle">Model Selection</span>
-                        <span class="setting-flag">-m</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.modelSelectDesc">Active Whisper GGML speech recognition model.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.modelSelectPoints">
@@ -376,11 +397,10 @@
                     </div>
                   </div>
 
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="-l --language">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.langSpokenTitle">Language Spoken</span>
-                        <span class="setting-flag">-l</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.langSpokenDesc">Primary spoken language code in the audio (e.g. <code>fa</code>, <code>en</code>, <code>es</code>).</span>
                         <div class="setting-desc-points" data-i18n-html="settings.langSpokenPoints">
@@ -394,11 +414,10 @@
                     </div>
                   </div>
 
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="--prompt">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.initialPromptTitle">Initial Prompt</span>
-                        <span class="setting-flag">--prompt</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.initialPromptDesc">Contextual prompt to guide model spelling, domain terms, and acronyms.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.initialPromptPoints">
@@ -408,15 +427,14 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" type="text" id="opt-prompt" />
+                      <input class="text-input" type="text" id="opt-prompt" dir="auto" />
                     </div>
                   </div>
 
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="--carry-initial-prompt">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.carryPromptTitle">Carry Initial Prompt</span>
-                        <span class="setting-flag">--carry-initial-prompt</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.carryPromptDesc">Maintains the initial prompt across all 30-second audio chunks instead of only the first chunk.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.carryPromptPoints">
@@ -432,11 +450,10 @@
                     </div>
                   </div>
 
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="-tr --translate">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.translateTitle">Translate to English</span>
-                        <span class="setting-flag">-tr</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.translateDesc">Directly translates non-English speech into English text output during transcription without requiring an external translation service.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.translatePoints">
@@ -452,11 +469,10 @@
                     </div>
                   </div>
 
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="--dtw">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.dtwTitle">DTW Timestamps</span>
-                        <span class="setting-flag">--dtw</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.dtwDesc">Enables exact word-level timestamp alignment using Dynamic Time Warping (DTW).</span>
                         <div class="setting-desc-points" data-i18n-html="settings.dtwPoints">
@@ -475,11 +491,10 @@
                 </div>
 
                 <div class="settings-group" id="group-computation">
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="-t --threads">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.threadsTitle">Threads Count</span>
-                        <span class="setting-flag">-t</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.threadsDesc">Number of CPU worker threads allocated for decoding.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.threadsPoints">
@@ -497,11 +512,10 @@
                     </div>
                   </div>
 
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="-p --processors">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.processorsTitle">Processors Count</span>
-                        <span class="setting-flag">-p</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.processorsDesc">Number of parallel audio decoder instances.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.processorsPoints">
@@ -519,11 +533,10 @@
                     </div>
                   </div>
 
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="-mc --max-context">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.maxContextTitle">Max Token Context</span>
-                        <span class="setting-flag">-mc</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.maxContextDesc">Maximum preceding token history passed to the decoder.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.maxContextPoints">
@@ -541,11 +554,10 @@
                     </div>
                   </div>
 
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="-ml --max-len">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.maxLenTitle">Max Segment Length</span>
-                        <span class="setting-flag">-ml</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.maxLenDesc">Maximum character count allowed per subtitle line.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.maxLenPoints">
@@ -563,11 +575,10 @@
                     </div>
                   </div>
 
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="-ot --offset-t">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.offsetTTitle">Time Offset (ms)</span>
-                        <span class="setting-flag">-ot</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.offsetTDesc">Skip audio from the beginning up to this timestamp in milliseconds.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.offsetTPoints">
@@ -581,11 +592,10 @@
                     </div>
                   </div>
 
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="-d --duration">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.durationTitle">Process Duration (ms)</span>
-                        <span class="setting-flag">-d</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.durationDesc">Process only a slice of audio in milliseconds starting from offset.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.durationPoints">
@@ -599,11 +609,10 @@
                     </div>
                   </div>
 
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="-sow --split-on-word">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.splitOnWordTitle">Split on Word</span>
-                        <span class="setting-flag">-sow</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.splitOnWordDesc">Forces subtitle line breaks strictly between full words rather than splitting in the middle of words.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.splitOnWordPoints">
@@ -619,11 +628,10 @@
                     </div>
                   </div>
 
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="-di --diarize">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.diarizeTitle">Speaker Diarization</span>
-                        <span class="setting-flag">-di</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.diarizeDesc">Separates and labels speakers across stereo audio channels (Left vs Right channel).</span>
                         <div class="setting-desc-points" data-i18n-html="settings.diarizePoints">
@@ -640,11 +648,10 @@
                     </div>
                   </div>
 
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="-tdrz --tinydiarize">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.tinyDiarizeTitle">Tiny Diarization</span>
-                        <span class="setting-flag">-tdrz</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.tinyDiarizeDesc">Detects speaker turn transitions within a single mono channel using specialized models.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.tinyDiarizePoints">
@@ -662,11 +669,10 @@
                 </div>
 
                 <div class="settings-group" id="group-search">
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="-bo --best-of">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.bestOfTitle">Best Candidates Count</span>
-                        <span class="setting-flag">-bo</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.bestOfDesc">Number of candidate sequences sampled during decoding.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.bestOfPoints">
@@ -684,11 +690,10 @@
                     </div>
                   </div>
 
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="-bs --beam-size">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.beamSizeTitle">Beam Search Size</span>
-                        <span class="setting-flag">-bs</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.beamSizeDesc">Exploration beam width for finding optimal word sequences.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.beamSizePoints">
@@ -706,11 +711,10 @@
                     </div>
                   </div>
 
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="-ac --audio-ctx">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.audioCtxTitle">Audio Context Size</span>
-                        <span class="setting-flag">-ac</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.audioCtxDesc">Audio frame context length in samples.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.audioCtxPoints">
@@ -724,11 +728,10 @@
                     </div>
                   </div>
 
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="-wt --word-thold">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.wordTholdTitle">Word Timestamp Threshold</span>
-                        <span class="setting-flag">-wt</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.wordTholdDesc">Acoustic probability cutoff for locking individual word timestamps.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.wordTholdPoints">
@@ -742,11 +745,10 @@
                     </div>
                   </div>
 
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="-et --entropy-thold">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.entropyTholdTitle">Entropy Threshold</span>
-                        <span class="setting-flag">-et</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.entropyTholdDesc">Decoder uncertainty cutoff for triggering temperature fallback retry.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.entropyTholdPoints">
@@ -760,11 +762,10 @@
                     </div>
                   </div>
 
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="-lpt --logprob-thold">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.logprobTholdTitle">Log Probability Threshold</span>
-                        <span class="setting-flag">-lpt</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.logprobTholdDesc">Average token confidence threshold before fallback decoding is triggered.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.logprobTholdPoints">
@@ -778,11 +779,10 @@
                     </div>
                   </div>
 
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="-nth --no-speech-thold">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.noSpeechTholdTitle">No Speech Threshold</span>
-                        <span class="setting-flag">-nth</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.noSpeechTholdDesc">Silence detection probability cutoff to suppress hallucinated words.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.noSpeechTholdPoints">
@@ -796,11 +796,10 @@
                     </div>
                   </div>
 
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="-tp --temperature">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.temperatureTitle">Sampling Temperature</span>
-                        <span class="setting-flag">-tp</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.temperatureDesc">Controls decoding randomness and exploration.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.temperaturePoints">
@@ -814,11 +813,10 @@
                     </div>
                   </div>
 
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="-tpi --temperature-inc">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.tempIncTitle">Temperature Increment</span>
-                        <span class="setting-flag">-tpi</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.tempIncDesc">Step size to increase temperature on each fallback retry.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.tempIncPoints">
@@ -833,11 +831,10 @@
                   </div>
 
                   <!-- Advanced Decoding Flags -->
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="-nf --no-fallback">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.noFallbackTitle">Disable Temperature Fallback</span>
-                        <span class="setting-flag">-nf</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.noFallbackDesc">Skips retry passes with higher temperatures and accepts the first greedy pass.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.noFallbackPoints">
@@ -854,11 +851,10 @@
                     </div>
                   </div>
 
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="-ls --log-score">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.logScoreTitle">Log Decoder Scores</span>
-                        <span class="setting-flag">-ls</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.logScoreDesc">Prints raw confidence and probability scores for each decoded token into the activity log stream.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.logScorePoints">
@@ -878,11 +874,10 @@
                 <div class="settings-group" id="group-outputs">
                   <!-- Output checklist -->
                   <div class="outputs-grid">
-                    <div class="setting-card">
+                    <div class="setting-card" data-search-tags="-otxt --output-txt">
                       <div class="setting-info">
                         <span class="setting-title" data-i18n="settings.txtFormatTitle">Text Transcript (.txt)</span>
-                        <span class="setting-flag">-otxt</span>
-                      </div>
+                        </div>
                       <div class="setting-control">
                         <label class="switch">
                           <input type="checkbox" id="opt-outputTxt" />
@@ -891,11 +886,10 @@
                       </div>
                     </div>
 
-                    <div class="setting-card">
+                    <div class="setting-card" data-search-tags="-osrt --output-srt">
                       <div class="setting-info">
                         <span class="setting-title" data-i18n="settings.srtFormatTitle">SRT Subtitles (.srt)</span>
-                        <span class="setting-flag">-osrt</span>
-                      </div>
+                        </div>
                       <div class="setting-control">
                         <label class="switch">
                           <input type="checkbox" id="opt-outputSrt" />
@@ -904,11 +898,10 @@
                       </div>
                     </div>
 
-                    <div class="setting-card">
+                    <div class="setting-card" data-search-tags="-ovtt --output-vtt">
                       <div class="setting-info">
                         <span class="setting-title" data-i18n="settings.vttFormatTitle">WebVTT Subtitles (.vtt)</span>
-                        <span class="setting-flag">-ovtt</span>
-                      </div>
+                        </div>
                       <div class="setting-control">
                         <label class="switch">
                           <input type="checkbox" id="opt-outputVtt" />
@@ -917,11 +910,10 @@
                       </div>
                     </div>
 
-                    <div class="setting-card">
+                    <div class="setting-card" data-search-tags="-olrc --output-lrc">
                       <div class="setting-info">
                         <span class="setting-title" data-i18n="settings.lrcFormatTitle">LRC Lyrics (.lrc)</span>
-                        <span class="setting-flag">-olrc</span>
-                      </div>
+                        </div>
                       <div class="setting-control">
                         <label class="switch">
                           <input type="checkbox" id="opt-outputLrc" />
@@ -930,11 +922,10 @@
                       </div>
                     </div>
 
-                    <div class="setting-card">
+                    <div class="setting-card" data-search-tags="-ocsv --output-csv">
                       <div class="setting-info">
                         <span class="setting-title" data-i18n="settings.csvFormatTitle">CSV Dataset (.csv)</span>
-                        <span class="setting-flag">-ocsv</span>
-                      </div>
+                        </div>
                       <div class="setting-control">
                         <label class="switch">
                           <input type="checkbox" id="opt-outputCsv" />
@@ -943,11 +934,10 @@
                       </div>
                     </div>
 
-                    <div class="setting-card">
+                    <div class="setting-card" data-search-tags="-oj --output-json">
                       <div class="setting-info">
                         <span class="setting-title" data-i18n="settings.jsonFormatTitle">JSON Formatted (.json)</span>
-                        <span class="setting-flag">-oj</span>
-                      </div>
+                        </div>
                       <div class="setting-control">
                         <label class="switch">
                           <input type="checkbox" id="opt-outputJson" />
@@ -956,11 +946,10 @@
                       </div>
                     </div>
 
-                    <div class="setting-card">
+                    <div class="setting-card" data-search-tags="-ojf --output-json-full">
                       <div class="setting-info">
                         <span class="setting-title" data-i18n="settings.jsonFullFormatTitle">Full Detailed JSON</span>
-                        <span class="setting-flag">-ojf</span>
-                      </div>
+                        </div>
                       <div class="setting-control">
                         <label class="switch">
                           <input type="checkbox" id="opt-outputJsonFull" />
@@ -969,11 +958,10 @@
                       </div>
                     </div>
 
-                    <div class="setting-card" id="card-printConfidence">
+                    <div class="setting-card" id="card-printConfidence" data-search-tags="--print-confidence">
                       <div class="setting-info">
                         <span class="setting-title"><span data-i18n="settings.printConfidenceTitle">Word Confidence</span> <span style="font-size:0.75rem; color:var(--color-text-muted); font-weight:normal;">(in JSON)</span></span>
-                        <span class="setting-flag">--print-confidence</span>
-                      </div>
+                        </div>
                       <div class="setting-control">
                         <label class="switch">
                           <input type="checkbox" id="opt-printConfidence" />
@@ -1034,7 +1022,6 @@
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.gpuDeviceTitle">GPU Device Index</span>
-                        <span class="setting-flag">-dev</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.gpuDeviceDesc">Target graphics card index on multi-GPU systems.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.gpuDevicePoints">
@@ -1052,11 +1039,10 @@
                     </div>
                   </div>
 
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="-oved --ov-e-device">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.openvinoDeviceTitle">OpenVINO Hardware Device</span>
-                        <span class="setting-flag">-oved</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.openvinoDeviceDesc">Target execution device for Intel OpenVINO acceleration.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.openvinoDevicePoints">
@@ -1075,11 +1061,10 @@
                 </div>
 
                 <div class="settings-group" id="group-vad">
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="--vad">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.vadEnableTitle">Enable Voice Activity Detection</span>
-                        <span class="setting-flag">--vad</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.vadEnableDesc">Pre-filters audio using Silero VAD to detect and remove silent and non-speech sections before Whisper decoding.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.vadEnablePoints">
@@ -1096,11 +1081,10 @@
                     </div>
                   </div>
 
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="-vm --vad-model">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.vadModelTitle">VAD Model</span>
-                        <span class="setting-flag">-vm</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.vadModelDesc">Active Silero VAD model binary.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.vadModelPoints">
@@ -1113,11 +1097,10 @@
                     </div>
                   </div>
 
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="-vt --vad-thold">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.vadThresholdTitle">VAD Threshold</span>
-                        <span class="setting-flag">-vt</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.vadThresholdDesc">Speech probability cutoff for triggering voice activity detection.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.vadThresholdPoints">
@@ -1132,11 +1115,10 @@
                     </div>
                   </div>
 
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="-vspd --vad-min-speech">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.vadMinSpeechTitle">VAD Min Speech (ms)</span>
-                        <span class="setting-flag">-vspd</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.vadMinSpeechDesc">Minimum continuous voice duration required to trigger transcription.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.vadMinSpeechPoints">
@@ -1150,11 +1132,10 @@
                     </div>
                   </div>
 
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="-vsd --vad-min-silence">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.vadMinSilenceTitle">VAD Min Silence (ms)</span>
-                        <span class="setting-flag">-vsd</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.vadMinSilenceDesc">Minimum silence duration required to split speech into a new subtitle segment.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.vadMinSilencePoints">
@@ -1168,11 +1149,10 @@
                     </div>
                   </div>
 
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="-vmsd --vad-max-speech">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.vadMaxSpeechTitle">VAD Max Speech (ms)</span>
-                        <span class="setting-flag">-vmsd</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.vadMaxSpeechDesc">Maximum continuous speech segment duration sent to Whisper in one chunk.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.vadMaxSpeechPoints">
@@ -1186,11 +1166,10 @@
                     </div>
                   </div>
 
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="-vp --vad-speech-pad">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.vadSpeechPadTitle">VAD Speech Padding (ms)</span>
-                        <span class="setting-flag">-vp</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.vadSpeechPadDesc">Audio buffer added before and after each detected speech segment.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.vadSpeechPadPoints">
@@ -1204,11 +1183,10 @@
                     </div>
                   </div>
 
-                  <div class="setting-card">
+                  <div class="setting-card" data-search-tags="-vo --vad-overlap">
                     <div class="setting-info">
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.vadOverlapTitle">VAD Segment Overlap</span>
-                        <span class="setting-flag">-vo</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.vadOverlapDesc">Contextual overlap ratio between consecutive speech segments.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.vadOverlapPoints">
@@ -1472,7 +1450,7 @@
                         <div class="provider-field" style="margin-bottom: 16px;">
                           <label data-i18n="settings.providerCustomPrompt">Provider Custom System Prompt</label>
                           <span data-i18n="settings.providerCustomPromptDesc">Custom instructions to guide translation tone, domain vocabulary, or formatting conventions. Leave blank for system defaults.</span>
-                          <textarea class="textarea-control" id="mgr-provider-prompt" rows="3" placeholder="You are a professional translator..."></textarea>
+                          <textarea class="textarea-control" id="mgr-provider-prompt" rows="3" placeholder="You are a professional translator..." dir="auto"></textarea>
                         </div>
 
                         <div class="provider-actions">
@@ -1611,7 +1589,10 @@
                   <circle cx="11" cy="11" r="8"></circle>
                   <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                 </svg>
-                <input class="text-input models-search-input" type="text" id="model-search" placeholder="Search models..." data-i18n-placeholder="common.search" oninput="filterModelsGrid()" />
+                <input class="text-input models-search-input" type="text" id="model-search" placeholder="Search..." data-i18n-placeholder="common.search" oninput="filterModelsGrid()" autocomplete="off" spellcheck="false" />
+                <button type="button" class="models-search-clear" id="model-search-clear" onclick="clearModelSearch()" style="display: none;" title="Clear Search" aria-label="Clear Search">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
               </div>
             </div>
 
@@ -1688,8 +1669,8 @@
                         <line x1="17" y1="7" x2="22" y2="7"/>
                       </svg>
                       <div>
-                        <p style="font-weight:600; margin-bottom:4px;" id="lbl-file-name">No Media File Loaded</p>
-                        <p style="font-size:0.8rem; color:var(--color-text-muted);" id="lbl-file-path">Select audio or video file</p>
+                        <p style="font-weight:600; margin-bottom:4px;" id="lbl-file-name" data-i18n="transcribe.noFileLoaded">No Media File Loaded</p>
+                        <p style="font-size:0.8rem; color:var(--color-text-muted);" id="lbl-file-path" data-i18n="transcribe.selectFilePrompt">Select audio or video file</p>
                       </div>
                       <button class="btn-secondary" onclick="browseMediaFile()" data-i18n="transcribe.browseSystem">Browse System</button>
                     </div>
@@ -1788,7 +1769,7 @@
                         <p data-i18n="transcribe.batchGlobalNote">Global configurations selected in the settings panel will be applied **globally** to all files in the batch. Processing runs sequentially to ensure stability.</p>
                       </div>
                     </div>
-                    <button class="btn-primary wizard-next-btn" id="btn-next-step-2" onclick="openWizardStep(3)">
+                    <button class="btn-primary wizard-next-btn" id="btn-next-step-2" onclick="openWizardStep(3)" data-i18n="transcribe.continueToTranscription">
                       Continue to Transcription
                     </button>
                   </div>
@@ -1826,27 +1807,27 @@
                           <span data-i18n="transcribe.spokenLang">Spoken Language</span>
                         </div>
                         <select class="select-control quick-select" id="quick-opt-language" aria-label="Quick Select Language">
-                          <option value="auto">Auto Detect</option>
-                          <option value="fa">Persian</option>
-                          <option value="en">English</option>
-                          <option value="ar">Arabic</option>
-                          <option value="tr">Turkish</option>
-                          <option value="es">Spanish</option>
-                          <option value="fr">French</option>
-                          <option value="de">German</option>
-                          <option value="ru">Russian</option>
-                          <option value="zh">Chinese</option>
-                          <option value="ja">Japanese</option>
-                          <option value="ko">Korean</option>
-                          <option value="it">Italian</option>
-                          <option value="pt">Portuguese</option>
-                          <option value="hi">Hindi</option>
-                          <option value="ur">Urdu</option>
-                          <option value="nl">Dutch</option>
-                          <option value="pl">Polish</option>
-                          <option value="uk">Ukrainian</option>
-                          <option value="sv">Swedish</option>
-                          <option value="id">Indonesian</option>
+                          <option value="auto" data-i18n="transcribe.langAuto">Auto Detect</option>
+                          <option value="fa" data-i18n="transcribe.langFa">Persian (فارسی)</option>
+                          <option value="en" data-i18n="transcribe.langEn">English</option>
+                          <option value="ar" data-i18n="transcribe.langAr">Arabic (العربية)</option>
+                          <option value="tr" data-i18n="transcribe.langTr">Turkish (Türkçe)</option>
+                          <option value="es" data-i18n="transcribe.langEs">Spanish (Español)</option>
+                          <option value="fr" data-i18n="transcribe.langFr">French (Français)</option>
+                          <option value="de" data-i18n="transcribe.langDe">German (Deutsch)</option>
+                          <option value="ru" data-i18n="transcribe.langRu">Russian (Русский)</option>
+                          <option value="zh" data-i18n="transcribe.langZh">Chinese (中文)</option>
+                          <option value="ja" data-i18n="transcribe.langJa">Japanese (日本語)</option>
+                          <option value="ko" data-i18n="transcribe.langKo">Korean (한국어)</option>
+                          <option value="it" data-i18n="transcribe.langIt">Italian (Italiano)</option>
+                          <option value="pt" data-i18n="transcribe.langPt">Portuguese (Português)</option>
+                          <option value="hi" data-i18n="transcribe.langHi">Hindi (हिन्दी)</option>
+                          <option value="ur" data-i18n="transcribe.langUr">Urdu (اردو)</option>
+                          <option value="nl" data-i18n="transcribe.langNl">Dutch (Nederlands)</option>
+                          <option value="pl" data-i18n="transcribe.langPl">Polish (Polski)</option>
+                          <option value="uk" data-i18n="transcribe.langUk">Ukrainian (Українська)</option>
+                          <option value="sv" data-i18n="transcribe.langSv">Swedish (Svenska)</option>
+                          <option value="id" data-i18n="transcribe.langId">Indonesian (Bahasa Indonesia)</option>
                         </select>
                       </div>
 
@@ -1858,7 +1839,7 @@
                           <span data-i18n="transcribe.engine">Engine</span>
                         </div>
                         <select class="select-control quick-select" id="quick-opt-selectedBackend" aria-label="Quick Select Engine">
-                          <option value="Standard">CPU (Standard)</option>
+                          <option value="Standard" data-i18n="transcribe.backendCpu">CPU (Standard)</option>
                         </select>
                       </div>
 
@@ -1871,7 +1852,7 @@
                         </div>
                         <button type="button" class="quick-vad-toggle-btn" id="quick-toggle-vad" onclick="toggleQuickVad()" title="Toggle Silero Voice Activity Detection">
                           <span class="quick-vad-dot"></span>
-                          <span id="quick-vad-status-text">VAD OFF</span>
+                          <span id="quick-vad-status-text" data-i18n="transcribe.vadDisabledStatus">VAD OFF</span>
                         </button>
                       </div>
                     </div>
@@ -1934,7 +1915,7 @@
                         
                         <div class="hud-status-subtitle">
                           <div class="hud-pulse-dot" id="hud-pulse-dot"></div>
-                          <span class="radial-msg" id="lbl-radial-msg">Standing By</span>
+                          <span class="radial-msg" id="lbl-radial-msg" data-i18n="transcribe.standingBy">Standing By</span>
                         </div>
                       </div>
                       
@@ -1944,12 +1925,12 @@
                           <div class="analytics-metrics-col">
                             <div class="analytic-chip" title="Total processing time">
                               <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--color-cyan);"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                              <span class="chip-label">Time:</span>
+                              <span class="chip-label" data-i18n="transcribe.timeLabel">Time:</span>
                               <span class="chip-val" id="analytic-time">0s</span>
                             </div>
                             <div class="analytic-chip" title="Speed factor relative to real-time audio">
                               <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--color-green);"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                              <span class="chip-label">Speed:</span>
+                              <span class="chip-label" data-i18n="transcribe.speedLabel">Speed:</span>
                               <span class="chip-val" style="color:var(--color-green);" id="analytic-speed">0.0x</span>
                             </div>
                           </div>
@@ -2435,7 +2416,7 @@
                       <!-- Vertical Offset Slider -->
                       <div id="hardsub-posy-wrapper">
                         <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--color-text-muted); margin-bottom: 6px;">
-                          <span id="lbl-posy-title" title="Adjust subtitle vertical distance from edge">Vertical Margin Offset</span>
+                          <span id="lbl-posy-title" title="Adjust subtitle vertical distance from edge" data-i18n="hardsub.vMarginOffset">Vertical Margin Offset</span>
                           <div style="display: flex; align-items: center; gap: 6px;">
                             <span id="hardsub-posy-val" style="color: var(--color-royal-blue); font-weight: 700; font-size: 0.88rem; background: rgba(var(--color-royal-blue-rgb), 0.12); padding: 1px 7px; border-radius: 6px; line-height: 1.2;">30px</span>
                             <button class="reset-link-btn" id="reset-posy" title="Reset vertical position to 30px" style="display: none; padding: 2px;">
@@ -2548,7 +2529,7 @@
                     <!-- Quality Parameter Slider with Dynamic Label & Value -->
                     <div id="hardsub-quality-slider-container" style="background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 14px;">
                       <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; margin-bottom: 8px;">
-                        <span id="hardsub-quality-param-label" style="font-weight: 500; color: var(--color-text-main);">CRF (Constant Rate Factor)</span>
+                        <span id="hardsub-quality-param-label" style="font-weight: 500; color: var(--color-text-main);" data-i18n="hardsub.crfLabel">CRF (Constant Rate Factor)</span>
                         <span id="hardsub-quality-param-val" style="color: var(--color-royal-blue); font-weight: 700; font-size: 0.95rem; background: rgba(var(--color-royal-blue-rgb), 0.12); padding: 2px 8px; border-radius: 6px;">22</span>
                       </div>
                       <input type="range" class="range-slider" id="hardsub-quality-slider" min="0" max="51" value="22" aria-labelledby="hardsub-quality-param-label" aria-describedby="hardsub-quality-hint" style="width: 100%;" />
@@ -2640,7 +2621,7 @@
           <button class="btn-primary" id="app-modal-close-btn" onclick="closeAppModal()" style="width: 100%; justify-content: center;" data-i18n="modals.ok">OK</button>
         </div>
         <div class="modal-footer" id="app-modal-confirm-footer" style="display: none; gap: 12px; width: 100%;">
-          <button class="btn-primary" id="app-modal-delete-btn" onclick="resolveAppConfirm(true)" style="flex: 1; justify-content: center; background: linear-gradient(135deg, #b91c1c, #991b1b); border-color: #b91c1c; padding: 8px 20px;">Delete</button>
+          <button class="btn-primary" id="app-modal-delete-btn" onclick="resolveAppConfirm(true)" style="flex: 1; justify-content: center; background: linear-gradient(135deg, #b91c1c, #991b1b); border-color: #b91c1c; padding: 8px 20px;" data-i18n="modals.deleteBtn">Delete</button>
           <button class="btn-secondary" id="app-modal-cancel-btn" onclick="resolveAppConfirm(false)" style="flex: 1; justify-content: center; padding: 8px 20px;" data-i18n="modals.cancelBtn">Cancel</button>
         </div>
       </div>

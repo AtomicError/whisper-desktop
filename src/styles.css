@@ -1636,6 +1636,143 @@ header {
   margin-bottom: 24px;
   padding-bottom: 16px;
   border-bottom: 1px solid var(--border-glass);
+  gap: 16px;
+}
+
+.settings-search-wrapper {
+  position: relative;
+  width: 320px;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.settings-search-icon {
+  position: absolute;
+  left: 12px;
+  width: 16px;
+  height: 16px;
+  color: var(--color-text-dim);
+  pointer-events: none;
+  transition: color 0.2s ease;
+}
+
+.settings-search-wrapper:focus-within .settings-search-icon {
+  color: var(--color-royal-blue);
+}
+
+.settings-search-input {
+  padding-left: 38px !important;
+  padding-right: 36px !important;
+  width: 100% !important;
+  height: 38px !important;
+  background: var(--bg-input) !important;
+  border: 1px solid var(--border-glass) !important;
+  border-radius: 8px !important;
+  font-size: 0.85rem !important;
+  color: #fff !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.settings-search-input:focus {
+  border-color: var(--color-royal-blue) !important;
+  box-shadow: 0 0 12px rgba(var(--color-royal-blue-rgb), 0.2) !important;
+  outline: none !important;
+}
+
+.settings-search-clear {
+  position: absolute;
+  right: 10px;
+  background: transparent;
+  border: none;
+  color: var(--color-text-dim);
+  cursor: pointer;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  padding: 0;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.settings-search-clear:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.cat-match-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  background: rgba(var(--color-royal-blue-rgb), 0.2);
+  color: var(--color-royal-blue);
+  border-radius: 9px;
+  margin-left: auto;
+}
+
+.settings-cat-btn.search-dimmed {
+  opacity: 0.35;
+}
+
+.settings-search-group-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--color-royal-blue);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 8px 4px 4px 4px;
+  margin-top: 10px;
+  border-bottom: 1px solid rgba(var(--color-royal-blue-rgb), 0.15);
+}
+
+.settings-search-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.search-empty-icon-wrap {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-glass);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  color: var(--color-text-dim);
+}
+
+.search-empty-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--color-text-main);
+  margin-bottom: 6px;
+}
+
+.search-empty-desc {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  max-width: 380px;
+  margin-bottom: 20px;
+  line-height: 1.5;
 }
 
 .settings-scroll-container {
@@ -1692,12 +1829,7 @@ header {
 }
 
 .setting-flag {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--color-royal-blue);
-  background: rgba(var(--color-royal-blue-rgb), 0.08);
-  padding: 2px 6px;
-  border-radius: 4px;
+  display: none !important;
 }
 
 .setting-status-pill {
@@ -1804,19 +1936,28 @@ header {
   display: inline-block;
   vertical-align: baseline;
   line-height: 1.2;
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 
 .setting-control {
   flex-shrink: 0;
-  width: 180px;
+  width: 240px;
   display: flex;
   justify-content: flex-end;
   align-items: center;
 }
 
+.setting-card:has(#opt-modelPath) .setting-control,
+.setting-control:has(#opt-modelPath) {
+  width: 280px;
+}
+
 .setting-card:has(#opt-translateAiTargetLang) .setting-control,
-.setting-control.setting-control-wide {
-  width: 260px;
+.setting-control.setting-control-wide,
+.setting-card:has(#opt-prompt) .setting-control,
+.setting-control:has(#opt-prompt) {
+  width: 250px;
 }
 
 .outputs-grid {
@@ -1913,6 +2054,7 @@ input:checked + .slider:before {
   overflow: hidden;
   box-sizing: border-box;
   transition: var(--transition-smooth);
+  direction: ltr !important;
 }
 
 .number-input-control:hover {
@@ -1956,7 +2098,9 @@ input:checked + .slider:before {
   width: 48px;
   height: 100%;
   line-height: 42px;
-  text-align: center;
+  text-align: center !important;
+  direction: ltr !important;
+  font-variant-numeric: tabular-nums;
   background: transparent;
   border: none;
   border-left: 1px solid rgba(255, 255, 255, 0.05);
@@ -5371,6 +5515,133 @@ select.select-control {
   pointer-events: none;
 }
 
+/* Technical inputs and language code inputs: preserve LTR orientation */
+#opt-language,
+.readonly-path-input,
+.input-technical {
+  direction: ltr !important;
+  text-align: left !important;
+}
+
+/* Dynamic content-based direction for text inputs and textareas */
+.text-input[dir="ltr"],
+.textarea-control[dir="ltr"] {
+  direction: ltr !important;
+  text-align: left !important;
+}
+
+.text-input[dir="rtl"],
+.textarea-control[dir="rtl"] {
+  direction: rtl !important;
+  text-align: right !important;
+}
+
+/* Technical English/Latin custom selects: force strict LTR presentation even in RTL app mode */
+html[dir="rtl"] .custom-select-container.custom-select-ltr .custom-select-trigger,
+.rtl-layout .custom-select-container.custom-select-ltr .custom-select-trigger,
+.custom-select-container.custom-select-ltr .custom-select-trigger {
+  direction: ltr !important;
+  text-align: left !important;
+  flex-direction: row !important;
+}
+
+html[dir="rtl"] .custom-select-container.custom-select-ltr .custom-select-value,
+.rtl-layout .custom-select-container.custom-select-ltr .custom-select-value,
+.custom-select-container.custom-select-ltr .custom-select-value {
+  direction: ltr !important;
+  text-align: left !important;
+}
+
+html[dir="rtl"] .custom-select-options.custom-select-ltr,
+.rtl-layout .custom-select-options.custom-select-ltr,
+.custom-select-options.custom-select-ltr {
+  direction: ltr !important;
+  text-align: left !important;
+}
+
+html[dir="rtl"] .custom-select-options.custom-select-ltr .custom-select-option,
+.rtl-layout .custom-select-options.custom-select-ltr .custom-select-option,
+.custom-select-options.custom-select-ltr .custom-select-option {
+  direction: ltr !important;
+  text-align: left !important;
+  justify-content: flex-start !important;
+  padding-left: 20px !important;
+  padding-right: 14px !important;
+}
+
+html[dir="rtl"] .custom-select-options.custom-select-ltr .custom-select-option::before,
+.rtl-layout .custom-select-options.custom-select-ltr .custom-select-option::before,
+.custom-select-options.custom-select-ltr .custom-select-option::before {
+  left: 8px !important;
+  right: auto !important;
+}
+
+html[dir="rtl"] .custom-select-options.custom-select-ltr .custom-select-option:hover,
+html[dir="rtl"] .custom-select-options.custom-select-ltr .custom-select-option.focused,
+html[dir="rtl"] .custom-select-options.custom-select-ltr .custom-select-option.selected,
+.rtl-layout .custom-select-options.custom-select-ltr .custom-select-option:hover,
+.rtl-layout .custom-select-options.custom-select-ltr .custom-select-option.focused,
+.rtl-layout .custom-select-options.custom-select-ltr .custom-select-option.selected,
+.custom-select-options.custom-select-ltr .custom-select-option:hover,
+.custom-select-options.custom-select-ltr .custom-select-option.focused,
+.custom-select-options.custom-select-ltr .custom-select-option.selected {
+  padding-left: 24px !important;
+  padding-right: 14px !important;
+  background: linear-gradient(90deg, rgba(var(--color-royal-blue-rgb), 0.12) 0%, transparent 100%) !important;
+}
+
+/* RTL Presentation for Arabic/Persian custom selects */
+html[dir="rtl"] .custom-select-options:not(.custom-select-ltr) .custom-select-option,
+.rtl-layout .custom-select-options:not(.custom-select-ltr) .custom-select-option {
+  direction: rtl !important;
+  text-align: right !important;
+  justify-content: flex-start !important;
+  padding-left: 14px !important;
+  padding-right: 20px !important;
+}
+
+html[dir="rtl"] .custom-select-options:not(.custom-select-ltr) .custom-select-option::before,
+.rtl-layout .custom-select-options:not(.custom-select-ltr) .custom-select-option::before {
+  right: 8px !important;
+  left: auto !important;
+}
+
+html[dir="rtl"] .custom-select-options:not(.custom-select-ltr) .custom-select-option:hover,
+html[dir="rtl"] .custom-select-options:not(.custom-select-ltr) .custom-select-option.focused,
+html[dir="rtl"] .custom-select-options:not(.custom-select-ltr) .custom-select-option.selected,
+.rtl-layout .custom-select-options:not(.custom-select-ltr) .custom-select-option:hover,
+.rtl-layout .custom-select-options:not(.custom-select-ltr) .custom-select-option.focused,
+.rtl-layout .custom-select-options:not(.custom-select-ltr) .custom-select-option.selected {
+  padding-left: 14px !important;
+  padding-right: 24px !important;
+  background: linear-gradient(270deg, rgba(var(--color-royal-blue-rgb), 0.12) 0%, transparent 100%) !important;
+}
+
+/* Search Inputs RTL overrides (Settings & Models) */
+html[dir="rtl"] .settings-search-icon,
+html[dir="rtl"] .models-search-icon {
+  left: auto;
+  right: 12px;
+}
+
+html[dir="rtl"] .settings-search-clear,
+html[dir="rtl"] .models-search-clear {
+  right: auto;
+  left: 10px;
+}
+
+html[dir="rtl"] .settings-search-input,
+html[dir="rtl"] .models-search-input {
+  padding-left: 36px !important;
+  padding-right: 38px !important;
+  text-align: right !important;
+}
+
+html[dir="rtl"] .cat-match-badge {
+  margin-left: 0;
+  margin-right: auto;
+}
+
 /* ==========================================================================
    Responsive Layout & Small Window Sizing Fixes (Tauri Desktop App)
    ========================================================================== */
@@ -5433,6 +5704,9 @@ select.select-control {
     flex-direction: column !important;
     align-items: flex-start !important;
     gap: 12px !important;
+  }
+  .settings-search-wrapper {
+    width: 100% !important;
   }
   .models-toolbar {
     flex-direction: column !important;
