@@ -34,8 +34,16 @@
 @font-face {
   font-family: 'Inter';
   src: url('./fonts/Inter.ttf') format('truetype');
-  font-weight: normal;
+  font-weight: 400;
   font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('./fonts/JetBrainsMono.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
 }
 @font-face {
   font-family: 'Roboto';
@@ -207,7 +215,7 @@ html {
   --nav-active-hover-border: rgba(45, 127, 255, 0.58);
   --nav-active-hover-shadow: 0 6px 20px rgba(45, 127, 255, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2), inset 0 0 16px rgba(45, 127, 255, 0.15);
   
-  --font-sans: 'Outfit', 'Vazirmatn', 'Vazir', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-sans: 'Inter', 'Outfit', 'Vazirmatn', 'Vazir', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', 'Vazirmatn', 'Vazir', monospace;
   
   --transition-smooth: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
@@ -1911,9 +1919,19 @@ header {
 }
 
 .setting-desc-point {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 3px;
+  display: inline-block;
+  line-height: 1.5;
+}
+
+.setting-desc-point::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--color-text);
+  vertical-align: 0.25em;
+  margin-inline-end: 6px;
 }
 
 .setting-desc-point strong {
@@ -2246,8 +2264,13 @@ select.select-control {
   display: flex;
   align-items: center;
   justify-content: center;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
   font-weight: 700;
   font-size: 0.85rem;
+  line-height: 1;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  box-sizing: border-box;
   transition: var(--transition-smooth);
 }
 
@@ -3108,18 +3131,26 @@ select.select-control {
   line-height: 1.6;
   overflow-y: auto;
   box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.8);
+  direction: ltr !important;
+  text-align: left !important;
+  unicode-bidi: isolate;
 }
 
 .log-line {
   display: flex;
   align-items: flex-start;
   margin-bottom: 4px;
+  direction: ltr !important;
+  text-align: left !important;
 }
 
 .log-line .log-time {
   flex-shrink: 0;
   width: 70px;
   color: var(--color-text-dim);
+  direction: ltr !important;
+  text-align: left !important;
+  font-variant-numeric: tabular-nums;
 }
 
 .log-line .log-time-spacer {
@@ -3136,6 +3167,7 @@ select.select-control {
   font-weight: 500;
   margin-right: 12px;
   margin-left: 8px;
+  direction: ltr !important;
 }
 
 .log-line .log-cat-spacer {
@@ -3153,6 +3185,8 @@ select.select-control {
   color: var(--color-text);
   white-space: pre-wrap;
   word-break: break-all;
+  direction: ltr !important;
+  text-align: left !important;
 }
 
 /* Glassmorphic In-App Toast Notification System */

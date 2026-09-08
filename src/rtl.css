@@ -1,7 +1,7 @@
 /* Whisper Desktop - RTL & Persian Typography Stylesheet */
 
 html[dir="rtl"] {
-  --font-sans: 'Vazirmatn', 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-sans: 'Vazirmatn', 'Vazir', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   text-align: right;
   direction: rtl;
 }
@@ -102,6 +102,11 @@ html[dir="rtl"] .setting-desc-points {
   padding-left: 0;
 }
 
+html[dir="rtl"] .setting-desc-point::before {
+  vertical-align: 0.06em;
+}
+
+
 /* 4. Form Controls & Inputs */
 html[dir="rtl"] input[type="text"]:not(.readonly-path-input):not(.mono),
 html[dir="rtl"] textarea:not(.mono),
@@ -177,6 +182,7 @@ html[dir="rtl"] .toast-notification.hide {
 /* 6. Technical & Monospace Elements Isolation */
 html[dir="rtl"] .mono,
 html[dir="rtl"] .timecode,
+html[dir="rtl"] .log-viewport,
 html[dir="rtl"] .log-line,
 html[dir="rtl"] .setting-flag,
 html[dir="rtl"] code,
