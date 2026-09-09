@@ -1345,6 +1345,7 @@ class CustomSelect {
       optDiv.setAttribute('role', 'option');
       optDiv.setAttribute('aria-selected', opt.value === this.select.value ? 'true' : 'false');
       optDiv.textContent = opt.textContent;
+      optDiv.title = opt.textContent;
       optDiv.dataset.value = opt.value;
       if (opt.disabled) {
         optDiv.classList.add('disabled');
@@ -1372,7 +1373,12 @@ class CustomSelect {
   syncSelectedValue() {
     const selectedOpt = this.select.options[this.select.selectedIndex];
     const valText = selectedOpt ? selectedOpt.textContent : (this.select.placeholder || 'Select...');
-    this.trigger.querySelector('.custom-select-value').textContent = valText;
+    const valEl = this.trigger.querySelector('.custom-select-value');
+    if (valEl) {
+      valEl.textContent = valText;
+      valEl.title = valText;
+    }
+    this.trigger.title = valText;
 
     Array.from(this.optionsContainer.children).forEach(child => {
       const isSelected = child.dataset.value === this.select.value;
@@ -1393,24 +1399,16 @@ class CustomSelect {
     const spaceBelow = window.innerHeight - rect.bottom;
     const spaceAbove = rect.top;
 
-    // Intelligent width expansion: ensure popup never cuts off longer option text
+    // Strict pixel-perfect alignment with trigger box (no overhangs or size discrepancies)
     this.optionsContainer.style.position = 'fixed';
     this.optionsContainer.style.zIndex = '999999';
 
-    const contentWidth = this.optionsContainer.scrollWidth || rect.width;
-    const targetWidth = Math.max(rect.width, Math.min(contentWidth, 360));
-    this.optionsContainer.style.minWidth = `${rect.width}px`;
-    this.optionsContainer.style.maxWidth = `${Math.min(window.innerWidth - 24, Math.max(targetWidth, rect.width))}px`;
-    this.optionsContainer.style.width = 'max-content';
+    const targetWidth = Math.round(rect.width);
+    this.optionsContainer.style.width = `${targetWidth}px`;
+    this.optionsContainer.style.minWidth = `${targetWidth}px`;
+    this.optionsContainer.style.maxWidth = `${targetWidth}px`;
 
-    const isLtrDropdown = this.container.classList.contains('custom-select-ltr');
-    const isRtl = !isLtrDropdown && document.documentElement.getAttribute('dir') === 'rtl';
-    let leftPos = rect.left;
-    if (isRtl && targetWidth > rect.width) {
-      leftPos = rect.right - targetWidth;
-    }
-    // Clamp inside viewport
-    leftPos = Math.max(12, Math.min(leftPos, window.innerWidth - targetWidth - 12));
+    const leftPos = Math.round(rect.left);
     this.optionsContainer.style.left = `${leftPos}px`;
     this.optionsContainer.style.right = 'auto';
 
