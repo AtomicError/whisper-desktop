@@ -2042,12 +2042,15 @@ header {
   width: 44px;
   height: 24px;
   direction: ltr;
+  flex-shrink: 0;
+  user-select: none;
 }
 
 .switch input {
   opacity: 0;
   width: 0;
   height: 0;
+  position: absolute;
 }
 
 .slider {
@@ -2058,9 +2061,11 @@ header {
   right: 0;
   bottom: 0;
   background-color: rgba(255, 255, 255, 0.08);
-  transition: background-color 0.3s, border-color 0.3s, box-shadow 0.3s;
   border-radius: 24px;
   border: 1px solid var(--border-glass);
+  transition: background-color 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.28s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .slider:before {
@@ -2071,27 +2076,29 @@ header {
   left: 3px;
   bottom: 3px;
   background-color: var(--color-text-muted);
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.25s ease, width 0.2s ease;
   border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  transition: transform 0.28s cubic-bezier(0.34, 1.25, 0.64, 1),
+              background-color 0.25s ease,
+              box-shadow 0.25s ease;
+  will-change: transform;
 }
 
-.switch:hover .slider {
-  border-color: var(--border-glass);
-  background-color: rgba(255, 255, 255, 0.08);
-}
-
+.switch:hover .slider,
 .setting-control:hover .slider {
-  border-color: var(--border-glass);
-  background-color: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.16);
+  background-color: rgba(255, 255, 255, 0.12);
 }
 
-.setting-control:hover input:checked + .slider {
+.setting-control:hover input:checked + .slider,
+.switch:hover input:checked + .slider {
   background-color: var(--color-royal-blue);
   border-color: var(--border-glass-active);
+  box-shadow: 0 0 16px rgba(var(--color-royal-blue-rgb), 0.45);
 }
 
-.switch input:focus + .slider {
-  box-shadow: 0 0 0 2px var(--border-glass-active);
+.switch input:focus-visible + .slider {
+  box-shadow: 0 0 0 2px var(--border-glass-active), 0 0 8px rgba(var(--color-royal-blue-rgb), 0.3);
 }
 
 input:checked + .slider {
@@ -2102,11 +2109,17 @@ input:checked + .slider {
 
 input:checked + .slider:before {
   transform: translateX(20px);
-  background-color: #fff;
+  background-color: #ffffff;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35), 0 0 1px rgba(0, 0, 0, 0.2);
 }
 
+/* Tactile press squish effect on active state without layout reflow */
 .switch:active .slider:before {
-  width: 20px;
+  transform: scale(0.92);
+}
+
+.switch:active input:checked + .slider:before {
+  transform: translateX(20px) scale(0.92);
 }
 
 /* Number inputs UI */
