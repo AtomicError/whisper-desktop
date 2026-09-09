@@ -518,6 +518,13 @@ jobs:
           cp -r staging-universal/appimage/* src-tauri/target/release/bundle/appimage/
           cp -r staging-universal/deb/* src-tauri/target/release/bundle/deb/
           cp -r staging-universal/rpm/* src-tauri/target/release/bundle/rpm/
+          # Normalize any space in bundle filenames to prevent issues in terminal and release links
+          find src-tauri/target/release/bundle -type f -name "*Whisper Desktop*" | while read -r f; do
+            dir="$(dirname "$f")"
+            base="$(basename "$f")"
+            mv "$f" "$dir/${base//Whisper Desktop/WhisperDesktop}"
+          done || true
+
           rm -rf staging-universal appimagetool-temp appimagetool
 
       # --- BUILD TAURI (WINDOWS X64: UNIVERSAL + NVIDIA CUDA EDITIONS) ---
@@ -558,7 +565,7 @@ jobs:
           Write-Host "Packaging Windows Universal Portable Archive..."
           $universalPortableDir = "WhisperDesktop_${{ steps.app_version.outputs.version }}_x64-portable"
           New-Item -ItemType Directory -Force -Path $universalPortableDir
-          $mainExe = Get-ChildItem -Path "src-tauri/target/release/*.exe" | Where-Object { $_.Name -match "^(whisper[-_]desktop|WhisperDesktop)\.exe$" } | Select-Object -First 1
+          $mainExe = Get-ChildItem -Path "src-tauri/target/release/*.exe" | Where-Object { $_.Name -match "^(whisper[-_ ]desktop|Whisper\s?Desktop)\.exe$" } | Select-Object -First 1
           if ($mainExe) {
             Copy-Item $mainExe.FullName "$universalPortableDir/whisper-desktop.exe" -Force
           } else {
@@ -605,7 +612,7 @@ jobs:
           Write-Host "Packaging Windows NVIDIA CUDA Portable Archive..."
           $cudaPortableDir = "WhisperDesktop_${{ steps.app_version.outputs.version }}_x64-cuda-portable"
           New-Item -ItemType Directory -Force -Path $cudaPortableDir
-          $cudaMainExe = Get-ChildItem -Path "src-tauri/target/release/*.exe" | Where-Object { $_.Name -match "^(whisper[-_]desktop|WhisperDesktop)\.exe$" } | Select-Object -First 1
+          $cudaMainExe = Get-ChildItem -Path "src-tauri/target/release/*.exe" | Where-Object { $_.Name -match "^(whisper[-_ ]desktop|Whisper\s?Desktop)\.exe$" } | Select-Object -First 1
           if ($cudaMainExe) {
             Copy-Item $cudaMainExe.FullName "$cudaPortableDir/whisper-desktop.exe" -Force
           } else {
@@ -620,6 +627,12 @@ jobs:
           Copy-Item "staging-universal/msi/*" "src-tauri/target/release/bundle/msi/" -Force
           Copy-Item "staging-universal/zip/*" "src-tauri/target/release/bundle/zip/" -Force
           Remove-Item -Path "staging-universal" -Recurse -Force
+
+          # Normalize any space in bundle filenames to prevent broken links
+          Get-ChildItem -Path "src-tauri/target/release/bundle" -Recurse -File | Where-Object { $_.Name -like "*Whisper Desktop*" } | ForEach-Object {
+            $cleanName = $_.Name -replace "Whisper Desktop", "WhisperDesktop"
+            Rename-Item -Path $_.FullName -NewName $cleanName -Force
+          }
 
       # --- BUILD TAURI (LINUX ARM64 & MACOS) ---
       - name: Build Tauri Application (macOS / Linux ARM64)
@@ -636,6 +649,13 @@ jobs:
           cp src/fonts/* src-tauri/resources/fonts/ || true
           chmod +x src-tauri/resources/whisper-cli-* src-tauri/resources/ffmpeg src-tauri/resources/ffprobe
           npm run tauri build -- ${{ matrix.args }}
+
+          # Normalize any space in bundle filenames
+          find src-tauri/target/ -type f -name "*Whisper Desktop*" | while read -r f; do
+            dir="$(dirname "$f")"
+            base="$(basename "$f")"
+            mv "$f" "$dir/${base//Whisper Desktop/WhisperDesktop}"
+          done || true
 
       - name: Create Release and Upload Assets
         uses: softprops/action-gh-release@v2

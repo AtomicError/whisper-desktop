@@ -243,3 +243,47 @@ html[dir="rtl"] .modal-footer {
   direction: rtl;
 }
 
+/* About Modal & Sidebar Footer RTL */
+html[dir="rtl"] .about-btn-name {
+  letter-spacing: 0;
+}
+
+html[dir="rtl"] .about-version-chip,
+html[dir="rtl"] .about-btn-version,
+html[dir="rtl"] .setting-status-pill {
+  direction: ltr;
+}
+
+html[dir="rtl"] .about-spec-row {
+  grid-template-columns: 104px 1fr;
+  direction: rtl;
+}
+
+html[dir="rtl"] .about-spec-label {
+  text-align: right;
+}
+
+html[dir="rtl"] .about-spec-value {
+  font-family: var(--font-sans) !important;
+  direction: rtl;
+  text-align: right;
+  unicode-bidi: isolate;
+}
+
+html[dir="rtl"] .about-copyright {
+  direction: rtl;
+}
+
+html[dir="rtl"] .about-update-card {
+  direction: rtl;
+}
+
+html[dir="rtl"] .about-update-content {
+  text-align: right;
+}
+
+html[dir="rtl"] .about-update-subtext {
+  direction: ltr;
+  text-align: right;
+  unicode-bidi: plaintext;
+}

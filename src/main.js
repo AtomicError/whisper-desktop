@@ -227,6 +227,379 @@ window.closeAppModal = function() {
   }
 };
 
+let _aboutModalTimer = null;
+let _aboutModalLastFocus = null;
+
+let _updateCheckerState = {
+  status: 'idle',
+  latestVersion: null,
+  releaseUrl: null,
+  errorMsg: null
+};
+
+function compareSemver(v1, v2) {
+  const clean = (v) => String(v || '').trim().replace(/^v/i, '');
+  const [clean1, pre1] = clean(v1).split('-');
+  const [clean2, pre2] = clean(v2).split('-');
+  const parts1 = clean1.split('.').map(n => parseInt(n, 10) || 0);
+  const parts2 = clean2.split('.').map(n => parseInt(n, 10) || 0);
+
+  const len = Math.max(parts1.length, parts2.length, 3);
+  for (let i = 0; i < len; i++) {
+    const num1 = parts1[i] || 0;
+    const num2 = parts2[i] || 0;
+    if (num1 > num2) return 1;
+    if (num1 < num2) return -1;
+  }
+  if (pre1 && !pre2) return -1;
+  if (!pre1 && pre2) return 1;
+  if (pre1 && pre2) {
+    const p1 = pre1.split('.');
+    const p2 = pre2.split('.');
+    const pLen = Math.max(p1.length, p2.length);
+    for (let i = 0; i < pLen; i++) {
+      const seg1 = p1[i];
+      const seg2 = p2[i];
+      if (seg1 === undefined) return -1;
+      if (seg2 === undefined) return 1;
+      const n1 = parseInt(seg1, 10);
+      const n2 = parseInt(seg2, 10);
+      if (!isNaN(n1) && !isNaN(n2)) {
+        if (n1 > n2) return 1;
+        if (n1 < n2) return -1;
+      } else {
+        const cmp = seg1.localeCompare(seg2);
+        if (cmp !== 0) return cmp > 0 ? 1 : -1;
+      }
+    }
+  }
+  return 0;
+}
+
+function renderUpdateCheckerUI() {
+  const card = document.getElementById('about-update-card');
+  const iconWrapper = document.getElementById('about-update-icon-wrapper');
+  const statusEl = document.getElementById('about-update-status');
+  const subtextEl = document.getElementById('about-update-subtext');
+  const btn = document.getElementById('about-update-btn');
+  const btnText = document.getElementById('about-update-btn-text');
+
+  if (!card || !statusEl || !subtextEl || !btn || !btnText) return;
+
+  card.classList.remove('state-checking', 'state-up-to-date', 'state-update-available', 'state-error');
+
+  const currentVer = __APP_VERSION__;
+
+  switch (_updateCheckerState.status) {
+    case 'checking':
+      card.classList.add('state-checking');
+      btn.disabled = true;
+      btn.onclick = null;
+      statusEl.removeAttribute('data-i18n');
+      statusEl.textContent = t('about.checkingUpdates');
+      subtextEl.textContent = 'api.github.com';
+      btnText.removeAttribute('data-i18n');
+      btnText.textContent = t('about.checkingShort');
+      if (iconWrapper) {
+        iconWrapper.innerHTML = `
+          <svg class="about-update-icon icon-checking" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+          </svg>
+        `;
+      }
+      break;
+
+    case 'up-to-date':
+      card.classList.add('state-up-to-date');
+      btn.disabled = false;
+      btn.onclick = () => window.checkForAppUpdates();
+      statusEl.removeAttribute('data-i18n');
+      statusEl.textContent = t('about.upToDate');
+      subtextEl.textContent = `v${currentVer}`;
+      btnText.removeAttribute('data-i18n');
+      btnText.textContent = t('about.checkAgain');
+      if (iconWrapper) {
+        iconWrapper.innerHTML = `
+          <svg class="about-update-icon icon-success" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+            <polyline points="22 4 12 14.01 9 11.01"/>
+          </svg>
+        `;
+      }
+      break;
+
+    case 'available':
+      card.classList.add('state-update-available');
+      btn.disabled = false;
+      btn.onclick = () => {
+        const url = _updateCheckerState.releaseUrl || 'https://github.com/AtomicError/whisper-desktop/releases/latest';
+        if (typeof window.openUrl === 'function') {
+          window.openUrl(url);
+        } else {
+          window.open(url, '_blank');
+        }
+      };
+      statusEl.removeAttribute('data-i18n');
+      statusEl.textContent = t('about.updateAvailable', { version: _updateCheckerState.latestVersion });
+      subtextEl.textContent = `v${currentVer} → ${_updateCheckerState.latestVersion}`;
+      btnText.removeAttribute('data-i18n');
+      btnText.textContent = t('about.viewRelease');
+      if (iconWrapper) {
+        iconWrapper.innerHTML = `
+          <svg class="about-update-icon icon-update" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+        `;
+      }
+      break;
+
+    case 'error':
+      card.classList.add('state-error');
+      btn.disabled = false;
+      btn.onclick = () => window.checkForAppUpdates();
+      statusEl.removeAttribute('data-i18n');
+      statusEl.textContent = t('about.updateError');
+      subtextEl.textContent = _updateCheckerState.errorMsg || 'GitHub API unreachable';
+      btnText.removeAttribute('data-i18n');
+      btnText.textContent = t('about.retryCheck');
+      if (iconWrapper) {
+        iconWrapper.innerHTML = `
+          <svg class="about-update-icon icon-error" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+        `;
+      }
+      break;
+
+    case 'idle':
+    default:
+      btn.disabled = false;
+      btn.onclick = () => window.checkForAppUpdates();
+      statusEl.setAttribute('data-i18n', 'about.updateTitle');
+      statusEl.textContent = t('about.updateTitle');
+      subtextEl.textContent = 'GitHub Releases';
+      btnText.setAttribute('data-i18n', 'about.checkUpdate');
+      btnText.textContent = t('about.checkUpdate');
+      if (iconWrapper) {
+        iconWrapper.innerHTML = `
+          <svg class="about-update-icon icon-idle" id="about-update-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+            <path d="M3 3v5h5"/>
+            <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
+            <path d="M16 21h5v-5"/>
+          </svg>
+        `;
+      }
+      break;
+  }
+}
+
+window.checkForAppUpdates = async function() {
+  if (_updateCheckerState.status === 'checking') return;
+
+  _updateCheckerState = {
+    status: 'checking',
+    latestVersion: null,
+    releaseUrl: null,
+    errorMsg: null
+  };
+  renderUpdateCheckerUI();
+
+  let timeoutId = null;
+  try {
+    const controller = new AbortController();
+    timeoutId = setTimeout(() => controller.abort(), 8000);
+
+    const res = await fetch('https://api.github.com/repos/AtomicError/whisper-desktop/releases/latest', {
+      headers: {
+        'Accept': 'application/vnd.github.v3+json'
+      },
+      signal: controller.signal
+    });
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+
+    if (!res.ok) {
+      if (res.status === 403) {
+        throw new Error('Rate limit exceeded');
+      } else if (res.status === 404) {
+        throw new Error('No release found');
+      }
+      throw new Error(`HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    const latestTag = (data.tag_name || data.name || '').trim();
+    const releaseUrl = data.html_url || 'https://github.com/AtomicError/whisper-desktop/releases/latest';
+
+    if (!latestTag) {
+      throw new Error('Invalid release metadata');
+    }
+
+    const currentVer = __APP_VERSION__;
+
+    if (compareSemver(latestTag, currentVer) > 0) {
+      _updateCheckerState = {
+        status: 'available',
+        latestVersion: latestTag.startsWith('v') ? latestTag : `v${latestTag}`,
+        releaseUrl: releaseUrl,
+        errorMsg: null
+      };
+    } else {
+      _updateCheckerState = {
+        status: 'up-to-date',
+        latestVersion: latestTag.startsWith('v') ? latestTag : `v${latestTag}`,
+        releaseUrl: releaseUrl,
+        errorMsg: null
+      };
+    }
+  } catch (err) {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+    let msg = 'GitHub API unreachable';
+    if (err && err.name === 'AbortError') {
+      msg = 'Connection timed out';
+    } else if (err && err.message) {
+      msg = err.message;
+    }
+    _updateCheckerState = {
+      status: 'error',
+      latestVersion: null,
+      releaseUrl: null,
+      errorMsg: msg
+    };
+  } finally {
+    renderUpdateCheckerUI();
+  }
+};
+
+window.addEventListener('whisper:languageChanged', () => {
+  renderUpdateCheckerUI();
+});
+
+function syncAppVersionUI() {
+  try {
+    const ver = __APP_VERSION__;
+    const sidebarVer = document.getElementById('sidebar-about-version-text');
+    if (sidebarVer && ver) sidebarVer.textContent = ver.startsWith('v') ? ver : `v${ver}`;
+    const modalVer = document.getElementById('about-modal-version-text');
+    if (modalVer && ver) modalVer.textContent = ver.startsWith('v') ? ver : `v${ver}`;
+    renderUpdateCheckerUI();
+  } catch (_) {}
+}
+
+function _handleAboutModalKeydown(e) {
+  const overlay = document.getElementById('about-modal-overlay');
+  if (!overlay || !overlay.classList.contains('show')) return;
+
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    e.stopPropagation();
+    window.closeAboutModal();
+    return;
+  }
+
+  if (e.key === 'Tab') {
+    const focusable = overlay.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])');
+    if (!focusable.length) return;
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const card = overlay.querySelector('.about-modal-card');
+
+    if (e.shiftKey) {
+      const isFirst = document.activeElement === first;
+      const isCard = document.activeElement === card;
+      const isOutside = !overlay.contains(document.activeElement);
+      if (isFirst || isCard || isOutside) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else {
+      const isLast = document.activeElement === last;
+      const isOutside = !overlay.contains(document.activeElement);
+      if (isLast || isOutside) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  }
+}
+
+window.openAboutModal = function() {
+  const overlay = document.getElementById('about-modal-overlay');
+  if (overlay) {
+    if (_aboutModalTimer) {
+      clearTimeout(_aboutModalTimer);
+      _aboutModalTimer = null;
+    }
+    _aboutModalLastFocus = document.activeElement;
+
+    overlay.style.display = 'flex';
+    void overlay.offsetWidth;
+    overlay.classList.add('show');
+
+    document.addEventListener('keydown', _handleAboutModalKeydown);
+
+    requestAnimationFrame(() => {
+      syncAppVersionUI();
+      const card = overlay.querySelector('.about-modal-card');
+      if (card) {
+        card.focus({ preventScroll: true });
+      } else {
+        const closeBtn = overlay.querySelector('.about-modal-close-btn');
+        if (closeBtn) closeBtn.focus({ preventScroll: true });
+      }
+    });
+  }
+};
+
+window.closeAboutModal = function() {
+  const overlay = document.getElementById('about-modal-overlay');
+  if (overlay) {
+    if (_aboutModalTimer) {
+      clearTimeout(_aboutModalTimer);
+    }
+    overlay.classList.remove('show');
+    document.removeEventListener('keydown', _handleAboutModalKeydown);
+
+    _aboutModalTimer = setTimeout(() => {
+      overlay.style.display = 'none';
+      _aboutModalTimer = null;
+    }, 250);
+
+    if (_aboutModalLastFocus && typeof _aboutModalLastFocus.focus === 'function') {
+      try {
+        _aboutModalLastFocus.focus();
+      } catch (_) {}
+      _aboutModalLastFocus = null;
+    }
+  }
+};
+
+let _isAboutOverlayMouseDown = false;
+
+document.addEventListener('mousedown', (e) => {
+  const overlay = document.getElementById('about-modal-overlay');
+  _isAboutOverlayMouseDown = Boolean(overlay && e.target === overlay);
+});
+
+document.addEventListener('click', (e) => {
+  const overlay = document.getElementById('about-modal-overlay');
+  if (overlay && e.target === overlay && _isAboutOverlayMouseDown) {
+    window.closeAboutModal();
+  }
+  _isAboutOverlayMouseDown = false;
+});
+
 // Promise-based confirm dialog using the themed modal
 window._confirmModalResolve = null;
 
@@ -1721,6 +2094,9 @@ async function initApp() {
   window.dispatchEvent(new CustomEvent('whisper:languageChanged', { detail: { language: getLanguage(), isRtl: getLanguage() === 'fa' } }));
 
   window.saveCurrentSettings = saveCurrentSettings;
+
+  // Initialize dynamic version display from package.json
+  syncAppVersionUI();
 
   // Switch to default transcribe view
   switchView('transcribe');

@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square&color=2d7fff" alt="License MIT"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-blue?style=flat-square&color=2d7fff" alt="License GPL-3.0"></a>
   <img src="https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-orange?style=flat-square&color=0057d9" alt="Platform Cross-Platform">
   <img src="https://img.shields.io/badge/Arch-x86__64%20%7C%20ARM64%20%7C%20Universal-green?style=flat-square&color=10b981" alt="Arch x86_64, ARM64 & Universal">
   <img src="https://img.shields.io/badge/Built%20With-Rust%20%26%20Tauri-red?style=flat-square&logo=tauri&logoColor=white&color=8b5cf6" alt="Built With Rust & Tauri">
@@ -242,10 +242,10 @@ If you find **Whisper Desktop** helpful and want to support its ongoing developm
 
 Have a question, feedback, or want to collaborate? Feel free to reach out:
 
-* **Telegram:** [@TheMrAhmad](https://t.me/TheMrAhmad)
+* **Telegram:** [@AtomicError](https://t.me/AtomicError)
 
 ---
 
 ## 📄 License
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [GNU General Public License v3.0](LICENSE).
 

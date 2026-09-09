@@ -2,9 +2,10 @@
 name = "whisper-desktop"
 version = "3.0.0"
 description = "A premium, state-of-the-art, and gorgeous native Rust & Tauri GUI designed for whisper.cpp"
-authors = ["TheMrAhmad"]
+authors = ["Ahmad (AtomicError)"]
 homepage = "https://github.com/AtomicError/whisper-desktop"
 repository = "https://github.com/AtomicError/whisper-desktop"
+license = "GPL-3.0-or-later"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
