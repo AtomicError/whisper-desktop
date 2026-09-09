@@ -2041,6 +2041,7 @@ header {
   display: inline-block;
   width: 44px;
   height: 24px;
+  direction: ltr;
 }
 
 .switch input {

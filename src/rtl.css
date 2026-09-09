@@ -197,6 +197,10 @@ html[dir="rtl"] .duration-display {
   font-family: var(--font-mono) !important;
 }
 
+html[dir="rtl"] .switch {
+  direction: ltr !important;
+}
+
 /* 7. Dropzone & File Select */
 html[dir="rtl"] .drop-zone {
   text-align: center;
