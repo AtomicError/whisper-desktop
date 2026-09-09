@@ -2292,7 +2292,7 @@
                           <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--color-text-muted); margin-bottom: 6px;">
                             <span data-i18n="hardsub.fontSize">Font Size</span>
                             <div style="display: flex; align-items: center; gap: 6px;">
-                              <span id="hardsub-fontsize-val" style="color: var(--color-royal-blue); font-weight: 700; font-size: 0.88rem; background: rgba(var(--color-royal-blue-rgb), 0.12); padding: 1px 7px; border-radius: 6px; line-height: 1.2;">14px</span>
+                              <span id="hardsub-fontsize-val" class="slider-val-badge">14px</span>
                               <button class="reset-link-btn" id="reset-fontsize" title="Reset font size to 14px" style="display: none; padding: 2px;">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:12px; height:12px; display:block;"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
                               </button>
@@ -2338,7 +2338,7 @@
                         <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--color-text-muted); margin-bottom: 8px;">
                           <span style="font-weight: 500; color: var(--color-text-main);" data-i18n="hardsub.textOutlineStroke">Text Outline Stroke</span>
                           <div style="display: flex; align-items: center; gap: 6px;">
-                            <span id="hardsub-outline-val" style="color: var(--color-royal-blue); font-weight: 700; font-size: 0.88rem; background: rgba(var(--color-royal-blue-rgb), 0.12); padding: 1px 7px; border-radius: 6px; line-height: 1.2;">2px</span>
+                            <span id="hardsub-outline-val" class="slider-val-badge">2px</span>
                             <button class="reset-link-btn" id="reset-outline" title="Reset outline size to 2px" style="display: none; padding: 2px;">
                               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:12px; height:12px; display:block;"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
                             </button>
@@ -2383,14 +2383,14 @@
                           <div>
                             <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.78rem; color: var(--color-text-muted); margin-bottom: 6px;">
                               <label for="hardsub-bgbox-opacity" data-i18n="hardsub.boxOpacity">Box Opacity</label>
-                              <span id="hardsub-bgbox-opacity-val" style="color: var(--color-royal-blue); font-weight: 700; font-size: 0.82rem; background: rgba(var(--color-royal-blue-rgb), 0.12); padding: 1px 6px; border-radius: 5px;">50%</span>
+                              <span id="hardsub-bgbox-opacity-val" class="slider-val-badge">50%</span>
                             </div>
                             <input type="range" class="range-slider" id="hardsub-bgbox-opacity" min="0" max="100" value="50" style="width:100%;" />
                           </div>
                           <div>
                             <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.78rem; color: var(--color-text-muted); margin-bottom: 6px;">
                               <label for="hardsub-bgbox-radius" data-i18n="hardsub.cornerRadius">Corner Radius</label>
-                              <span id="hardsub-bgbox-radius-val" style="color: var(--color-royal-blue); font-weight: 700; font-size: 0.82rem; background: rgba(var(--color-royal-blue-rgb), 0.12); padding: 1px 6px; border-radius: 5px;">0px</span>
+                              <span id="hardsub-bgbox-radius-val" class="slider-val-badge">0px</span>
                             </div>
                             <input type="range" class="range-slider" id="hardsub-bgbox-radius" min="0" max="24" value="0" style="width:100%;" />
                           </div>
@@ -2406,7 +2406,7 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px; height:18px;"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 12h10"/><path d="M12 7v10"/></svg>
                         <span data-i18n="hardsub.posTitle">Position & Alignment</span>
                       </h3>
-                      <span id="hardsub-align-val" style="font-size: 0.76rem; color: var(--color-royal-blue); font-weight: 600; background: rgba(var(--color-royal-blue-rgb), 0.15); border: 1px solid rgba(var(--color-royal-blue-rgb), 0.3); padding: 3px 10px; border-radius: 20px;">Bottom Center</span>
+                      <span id="hardsub-align-val" class="hardsub-align-badge">Bottom Center</span>
                     </div>
 
                     <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 18px; align-items: center;">
@@ -2434,7 +2434,7 @@
                         <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--color-text-muted); margin-bottom: 6px;">
                           <span id="lbl-posy-title" title="Adjust subtitle vertical distance from edge" data-i18n="hardsub.vMarginOffset">Vertical Margin Offset</span>
                           <div style="display: flex; align-items: center; gap: 6px;">
-                            <span id="hardsub-posy-val" style="color: var(--color-royal-blue); font-weight: 700; font-size: 0.88rem; background: rgba(var(--color-royal-blue-rgb), 0.12); padding: 1px 7px; border-radius: 6px; line-height: 1.2;">30px</span>
+                            <span id="hardsub-posy-val" class="slider-val-badge">30px</span>
                             <button class="reset-link-btn" id="reset-posy" title="Reset vertical position to 30px" style="display: none; padding: 2px;">
                               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:12px; height:12px; display:block;"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
                             </button>
@@ -2456,8 +2456,8 @@
                       <span data-i18n="hardsub.exportSettingsTitle">Format, Codec & Performance</span>
                     </h3>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
-                      <div>
+                    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;">
+                      <div style="min-width: 0;">
                         <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;" data-i18n="hardsub.hwAccel">Hardware Accelerator</label>
                         <select class="select-control" id="hardsub-hw" style="width:100%;">
                           <option value="cpu">Standard CPU (Universal)</option>
@@ -2468,7 +2468,7 @@
                         </select>
                       </div>
 
-                      <div>
+                      <div style="min-width: 0;">
                         <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;" data-i18n="hardsub.videoCodec">Video Codec</label>
                         <select class="select-control" id="hardsub-codec" style="width:100%;">
                           <option value="h264">H.264 / AVC (Universal)</option>
@@ -2479,7 +2479,7 @@
                         </select>
                       </div>
 
-                      <div>
+                      <div style="min-width: 0;">
                         <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;" data-i18n="hardsub.containerFormat">Output Container</label>
                         <select class="select-control" id="hardsub-format" style="width:100%;">
                           <option value="mp4">MP4 (.mp4)</option>
@@ -2489,7 +2489,7 @@
                         </select>
                       </div>
 
-                      <div>
+                      <div style="min-width: 0;">
                         <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;" data-i18n="hardsub.resolution">Resolution / Scale</label>
                         <select class="select-control" id="hardsub-resolution" style="width:100%;">
                           <option value="original">Original (Source Resolution)</option>
@@ -2501,7 +2501,7 @@
                         </select>
                       </div>
 
-                      <div style="grid-column: span 2;">
+                      <div style="grid-column: span 2; min-width: 0;">
                         <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;" data-i18n="hardsub.speedPreset">Encoding Speed & Compression Effort</label>
                         <select class="select-control" id="hardsub-speed-preset" style="width: 100%;">
                           <option value="fast">Fast (Quick Export, Slightly Larger Size)</option>
@@ -2546,7 +2546,7 @@
                     <div id="hardsub-quality-slider-container" style="background: rgba(0, 0, 0, 0.2); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 14px;">
                       <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; margin-bottom: 8px;">
                         <span id="hardsub-quality-param-label" style="font-weight: 500; color: var(--color-text-main);" data-i18n="hardsub.crfLabel">CRF (Constant Rate Factor)</span>
-                        <span id="hardsub-quality-param-val" style="color: var(--color-royal-blue); font-weight: 700; font-size: 0.95rem; background: rgba(var(--color-royal-blue-rgb), 0.12); padding: 2px 8px; border-radius: 6px;">22</span>
+                        <span id="hardsub-quality-param-val" class="slider-val-badge">22</span>
                       </div>
                       <input type="range" class="range-slider" id="hardsub-quality-slider" min="0" max="51" value="22" aria-labelledby="hardsub-quality-param-label" aria-describedby="hardsub-quality-hint" style="width: 100%;" />
                       <div id="hardsub-quality-hint" style="font-size: 0.72rem; color: var(--color-text-muted); margin-top: 6px; display: flex; align-items: center; gap: 4px;">
@@ -2564,26 +2564,26 @@
                       <span data-i18n="hardsub.audioSettingsTitle">Audio Settings</span>
                     </h3>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
-                      <div>
+                    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;">
+                      <div style="min-width: 0;">
                         <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;" data-i18n="hardsub.audioCodec">Audio Codec</label>
                         <select class="select-control" id="hardsub-audio-codec" style="width:100%;">
-                          <option value="copy">Pass-through Audio (Copy - Fast & Lossless)</option>
+                          <option value="copy">Pass-through (Copy Original)</option>
                           <option value="aac">AAC (Universal Compatibility)</option>
-                          <option value="opus">Opus (Modern High Efficiency)</option>
+                          <option value="opus">Opus (High Efficiency)</option>
                           <option value="mp3">MP3 (Legacy Audio)</option>
                           <option value="mute">Mute / Remove Audio Track</option>
                         </select>
                       </div>
 
-                      <div id="hardsub-audio-bitrate-container">
+                      <div id="hardsub-audio-bitrate-container" style="min-width: 0;">
                         <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;" data-i18n="hardsub.audioBitrate">Audio Bitrate</label>
                         <select class="select-control" id="hardsub-audio-bitrate" style="width:100%;">
-                          <option value="96k">96 kbps (Voice / Compact)</option>
-                          <option value="128k">128 kbps (Standard Quality)</option>
-                          <option value="192k" selected>192 kbps (High Quality - Recommended)</option>
-                          <option value="256k">256 kbps (Very High Quality)</option>
-                          <option value="320k">320 kbps (Studio Master Quality)</option>
+                          <option value="96k">96 kbps (Voice / Low)</option>
+                          <option value="128k">128 kbps (Standard)</option>
+                          <option value="192k" selected>192 kbps (Recommended)</option>
+                          <option value="256k">256 kbps (High Quality)</option>
+                          <option value="320k">320 kbps (Studio Master)</option>
                         </select>
                       </div>
                     </div>

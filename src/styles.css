@@ -2198,6 +2198,11 @@ input:checked + .slider:before {
 .select-control {
   padding: 10px 36px 10px 14px;
   min-height: 42px;
+  min-width: 0;
+  max-width: 100%;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
   background-color: var(--bg-input) !important;
   background: var(--bg-input) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239ca3af'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E") no-repeat right 12px center / 16px !important;
   border: 1px solid var(--border-glass);
@@ -5470,6 +5475,7 @@ select.select-control {
   align-items: center;
   gap: 8px;
   min-height: 42px;
+  min-width: 0;
   padding: 10px 14px;
   background-color: var(--bg-input);
   border: 1px solid var(--border-glass);
@@ -5489,6 +5495,7 @@ select.select-control {
   overflow: hidden;
   text-overflow: ellipsis;
   flex: 1;
+  min-width: 0;
 }
 
 .custom-select-trigger:hover {
@@ -6013,6 +6020,39 @@ html[dir="rtl"] .cat-match-badge {
   background: linear-gradient(135deg, var(--color-royal-blue), var(--color-royal-blue-dark)) !important;
   color: #ffffff !important;
   box-shadow: 0 2px 8px rgba(var(--color-royal-blue-rgb), 0.35) !important;
+}
+
+.slider-val-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: var(--color-royal-blue);
+  background: rgba(var(--color-royal-blue-rgb), 0.12);
+  padding: 3px 7px;
+  border-radius: 6px;
+  line-height: 1;
+  text-align: center;
+  box-sizing: border-box;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.hardsub-align-badge {
+  font-size: 0.76rem;
+  color: var(--color-royal-blue);
+  font-weight: 600;
+  background: rgba(var(--color-royal-blue-rgb), 0.15);
+  border: 1px solid rgba(var(--color-royal-blue-rgb), 0.3);
+  padding: 3px 10px;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.2;
+  box-sizing: border-box;
 }
 
 .range-slider {
