@@ -191,8 +191,7 @@ impl Default for WhisperSettings {
 
 impl WhisperSettings {
     pub fn default_settings() -> Self {
-        let home = get_user_home_dir();
-        let default_models = home.join("whisper.cpp").to_string_lossy().to_string();
+        let default_models = resolve_default_models_dir().to_string_lossy().to_string();
 
         WhisperSettings {
             selected_backend: "Standard".to_string(),
@@ -325,14 +324,41 @@ impl WhisperSettings {
 
         // Models dir fallback
         if self.models_dir.trim().is_empty() {
-            let home = get_user_home_dir();
-            self.models_dir = home.join("whisper.cpp").to_string_lossy().to_string();
+            self.models_dir = resolve_default_models_dir().to_string_lossy().to_string();
         }
 
         // FFmpeg source fallback
         if self.ffmpeg_source != "bundled" && self.ffmpeg_source != "system" {
             self.ffmpeg_source = "bundled".to_string();
         }
+    }
+}
+
+/// Resolves the default models directory cross-platform.
+/// Defaults to `<HOME>/whisper-desktop/models`.
+/// For backward compatibility:
+/// 1. If `<HOME>/whisper-desktop/models` exists, uses it.
+/// 2. If `<HOME>/whisper-desktop` (flat) exists, preserves it.
+/// 3. If legacy `<HOME>/whisper.cpp/models` exists, falls back to it.
+/// 4. If legacy `<HOME>/whisper.cpp` exists, falls back to it.
+/// 5. Otherwise, defaults to `<HOME>/whisper-desktop/models`.
+pub fn resolve_default_models_dir() -> PathBuf {
+    let home = get_user_home_dir();
+    let modern = home.join("whisper-desktop").join("models");
+    let modern_flat = home.join("whisper-desktop");
+    let legacy = home.join("whisper.cpp");
+    let legacy_models = legacy.join("models");
+
+    if modern.exists() {
+        modern
+    } else if modern_flat.exists() {
+        modern_flat
+    } else if legacy_models.exists() {
+        legacy_models
+    } else if legacy.exists() {
+        legacy
+    } else {
+        modern
     }
 }
 
@@ -359,6 +385,16 @@ pub fn get_user_home_dir() -> PathBuf {
                 return PathBuf::from(combined);
             }
         }
+        if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
+            if !local_app_data.trim().is_empty() {
+                return PathBuf::from(local_app_data);
+            }
+        }
+        if let Ok(app_data) = std::env::var("APPDATA") {
+            if !app_data.trim().is_empty() {
+                return PathBuf::from(app_data);
+            }
+        }
     }
 
     if let Ok(home) = std::env::var("HOME") {
@@ -367,14 +403,16 @@ pub fn get_user_home_dir() -> PathBuf {
         }
     }
 
-    #[cfg(target_os = "windows")]
-    {
-        PathBuf::from("C:\\")
-    }
     #[cfg(not(target_os = "windows"))]
     {
-        PathBuf::from("/home/user")
+        if let Ok(xdg_data) = std::env::var("XDG_DATA_HOME") {
+            if !xdg_data.trim().is_empty() {
+                return PathBuf::from(xdg_data);
+            }
+        }
     }
+
+    std::env::temp_dir()
 }
 
 pub fn get_settings_path() -> PathBuf {
@@ -962,5 +1000,30 @@ mod tests {
         assert_eq!(loaded.ui_language, "fa");
 
         let _ = fs::remove_file(&temp_path);
+    }
+
+    #[test]
+    fn test_default_models_dir_resolution() {
+        let home = get_user_home_dir();
+        let modern = home.join("whisper-desktop").join("models");
+        let modern_flat = home.join("whisper-desktop");
+        let legacy = home.join("whisper.cpp");
+        let legacy_models = legacy.join("models");
+        let resolved = resolve_default_models_dir();
+
+        if modern.exists() {
+            assert_eq!(resolved, modern);
+        } else if modern_flat.exists() {
+            assert_eq!(resolved, modern_flat);
+        } else if legacy_models.exists() {
+            assert_eq!(resolved, legacy_models);
+        } else if legacy.exists() {
+            assert_eq!(resolved, legacy);
+        } else {
+            assert_eq!(resolved, modern);
+        }
+
+        let defaults = WhisperSettings::default_settings();
+        assert_eq!(defaults.models_dir, resolved.to_string_lossy());
     }
 }

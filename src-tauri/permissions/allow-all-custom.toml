@@ -20,6 +20,7 @@ allow = [
   "select_subtitle_file",
   "select_files",
   "select_directory",
+  "verify_directory_writable",
   "get_system_fonts",
   "check_hardware_encoders",
   "get_font_render_scale",

@@ -300,16 +300,23 @@
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.modelsDirDesc">Local disk directory where GGML model files (<code>.bin</code>) are stored and scanned.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.modelsDirPoints">
-                          <span class="setting-desc-point"><strong>Default:</strong> <code>~/whisper.cpp</code></span>
+                          <span class="setting-desc-point"><strong>Default:</strong> <code>~/whisper-desktop/models</code> (Linux/macOS) or <code>C:\Users\&lt;Username&gt;\whisper-desktop\models</code> (Windows)</span>
                         </div>
                       </div>
                     </div>
                     <div class="setting-control setting-control-path">
-                      <div class="readonly-path-field" onclick="browseModelsDirectory()" title="Click to browse models directory">
-                        <svg class="path-folder-icon" viewBox="0 0 24 24" width="16" height="16">
+                      <div class="readonly-path-field">
+                        <svg class="path-folder-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
                           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
                         </svg>
-                        <input class="readonly-path-input" type="text" id="opt-modelsDir" readonly tabindex="-1" />
+                        <input class="readonly-path-input" type="text" id="opt-modelsDir" readonly spellcheck="false" aria-label="Models storage directory path" data-i18n-aria="settings.modelsDirInputAria" />
+                        <button class="path-action-btn" type="button" onclick="openModelsDirectory()" title="Click to open folder in File Manager" data-i18n-title="settings.openModelsDirTooltip" aria-label="Open folder in File Manager" data-i18n-aria="settings.openModelsDirTooltip">
+                          <svg class="path-open-icon" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                            <polyline points="15 3 21 3 21 9"></polyline>
+                            <line x1="10" y1="14" x2="21" y2="3"></line>
+                          </svg>
+                        </button>
                       </div>
                       <button class="btn-secondary path-browse-btn" onclick="browseModelsDirectory()" type="button" data-i18n="common.browse">Browse</button>
                     </div>
@@ -387,14 +394,14 @@
                     </div>
                     <div class="setting-control ui-scale-control-group">
                       <button class="btn-secondary ui-scale-btn ui-scale-btn-icon" type="button" onclick="adjustUiZoom(-0.05)" title="Zoom Out (Ctrl+-)" aria-label="Zoom Out (Ctrl+-)">−</button>
-                      <select class="select-control" id="opt-uiScale" style="min-width:155px; width:155px;" onchange="setUiZoom(parseFloat(this.value))" aria-label="Select UI Scale">
+                      <select class="select-control" id="opt-uiScale" style="min-width:120px; width:120px;" onchange="setUiZoom(parseFloat(this.value))" aria-label="Select UI Scale">
                         <option value="0.7">70%</option>
                         <option value="0.75">75%</option>
                         <option value="0.8">80%</option>
                         <option value="0.85">85%</option>
                         <option value="0.9">90%</option>
                         <option value="0.95">95%</option>
-                        <option value="1">100% (Default)</option>
+                        <option value="1">100%</option>
                         <option value="1.05">105%</option>
                         <option value="1.1">110%</option>
                         <option value="1.15">115%</option>
@@ -1021,11 +1028,18 @@
                       </div>
                     </div>
                     <div class="setting-control setting-control-path">
-                      <div class="readonly-path-field" onclick="browseOutputDir()" title="Click to browse custom output directory">
-                        <svg class="path-folder-icon" viewBox="0 0 24 24" width="16" height="16">
+                      <div class="readonly-path-field">
+                        <svg class="path-folder-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
                           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
                         </svg>
-                        <input class="readonly-path-input" type="text" id="opt-outputDirPath" readonly tabindex="-1" placeholder="Select output folder..." data-i18n-placeholder="settings.outputDirSelectPlaceholder" />
+                        <input class="readonly-path-input" type="text" id="opt-outputDirPath" readonly placeholder="Select output folder..." data-i18n-placeholder="settings.outputDirSelectPlaceholder" spellcheck="false" aria-label="Custom output directory path" data-i18n-aria="settings.outputDirInputAria" />
+                        <button class="path-action-btn" type="button" onclick="openCustomOutputDir()" title="Click to open output folder in File Manager" data-i18n-title="settings.openOutputDirTooltip" aria-label="Open output folder in File Manager" data-i18n-aria="settings.openOutputDirTooltip">
+                          <svg class="path-open-icon" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                            <polyline points="15 3 21 3 21 9"></polyline>
+                            <line x1="10" y1="14" x2="21" y2="3"></line>
+                          </svg>
+                        </button>
                       </div>
                       <button class="btn-secondary path-browse-btn" onclick="browseOutputDir()" type="button" data-i18n="common.browse">Browse</button>
                     </div>

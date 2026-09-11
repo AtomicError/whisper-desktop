@@ -697,7 +697,11 @@ export const fa: Translations = {
     noMatchingModelsTitle: 'هیچ مدل منطبقی یافت نشد',
     resetFilterSearch: 'بازنشانی فیلتر و جستجو',
     backendPoints: '<span class="setting-desc-point"><strong>استاندارد:</strong> سازگاری کامل روی پردازنده مرکزی (CPU)</span><span class="setting-desc-point"><strong>Vulkan:</strong> شتاب‌دهنده عمومی کارت گرافیک (AMD، اینتل یا انویدیا)</span><span class="setting-desc-point"><strong>CUDA:</strong> کارت‌های گرافیک اختصاصی انویدیا (NVIDIA)</span><span class="setting-desc-point"><strong>OpenVINO:</strong> پردازنده‌ها و گرافیک‌های اینتل (Intel Arc یا گرافیک مجتمع iGPU)</span>',
-    modelsDirPoints: '<span class="setting-desc-point"><strong>پیش‌فرض:</strong> <code>~/whisper.cpp</code></span>',
+    modelsDirPoints: '<span class="setting-desc-point"><strong>پیش‌فرض:</strong> <code dir="ltr">~/whisper-desktop/models</code> (لینوکس و مک) یا <code dir="ltr">C:\\Users\\&lt;Username&gt;\\whisper-desktop\\models</code> (ویندوز)</span>',
+    openModelsDirTooltip: 'کلیک برای باز کردن پوشه مدل‌ها در مدیریت فایل',
+    openOutputDirTooltip: 'کلیک برای باز کردن پوشه خروجی در مدیریت فایل',
+    modelsDirInputAria: 'مسیر دایرکتوری ذخیره مدل‌ها',
+    outputDirInputAria: 'مسیر دایرکتوری ذخیره فایل‌های خروجی',
     modelSelectPoints: '<span class="setting-desc-point"><strong>سریع و کم‌مصرف:</strong> <code>tiny</code>، <code>base</code>، <code>small</code></span><span class="setting-desc-point"><strong>دقت بالا:</strong> <code>medium</code>، <code>large-v3</code></span>',
     ffmpegPoints: '<span class="setting-desc-point"><strong>داخلی:</strong> باینری اختصاصی همراه برنامه (پیشنهادی، بدون نیاز به نصب)</span><span class="setting-desc-point"><strong>سیستمی:</strong> استفاده از FFmpeg نصب‌شده روی سیستم‌عامل</span>',
     trayPoints: '<span class="setting-desc-point"><strong>پیش‌فرض:</strong> غیرفعال (خروج کامل با بستن پنجره)</span>',
@@ -866,6 +870,8 @@ export const fa: Translations = {
     nameAndUrlRequired: 'نام ارائه‌دهنده و آدرس پایه الزامی هستند.',
     providerNameExists: 'ارائه‌دهنده‌ای با نام «{name}» از قبل وجود دارد.',
     providerAddedSuccess: 'ارائه‌دهنده با موفقیت افزوده شد! مدل‌های آن را در زیر پیکربندی کنید.',
-    noProviderToTest: 'هیچ ارائه‌دهنده‌ای برای تست انتخاب نشده است.'
+    noProviderToTest: 'هیچ ارائه‌دهنده‌ای برای تست انتخاب نشده است.',
+    modelsDirNotWritable: 'پوشه مدل‌های انتخاب‌شده قابل نوشتن نیست: {error}',
+    outputDirNotWritable: 'پوشه خروجی انتخاب‌شده قابل نوشتن نیست: {error}'
   }
 };

@@ -676,7 +676,7 @@ const invoke = async function(cmd, args = {}) {
   if (cmd === 'load_settings') {
     return {
       selectedBackend: 'Standard',
-      modelsDir: '/home/user/whisper.cpp',
+      modelsDir: '/home/user/whisper-desktop/models',
       threads: 4,
       processors: 1,
       offsetT: 0,
@@ -2496,19 +2496,81 @@ async function refreshBuildStatuses() {
   updateTranscribeUIConfigs();
 }
 
+let _isBrowsingModelsDirectory = false;
+let _isOpeningModelsDirectory = false;
+
+window.openModelsDirectory = async function() {
+  if (_isOpeningModelsDirectory) return;
+  _isOpeningModelsDirectory = true;
+
+  const dirPath = (settingsState && settingsState.modelsDir) || document.getElementById('opt-modelsDir')?.value;
+  if (!dirPath) {
+    _isOpeningModelsDirectory = false;
+    return;
+  }
+
+  try {
+    try {
+      await invoke('verify_directory_writable', { dirPath });
+    } catch (permErr) {
+      showNotification(t('toasts.modelsDirNotWritable', { error: String(permErr) }), "error");
+      return;
+    }
+    await window.openFileInEditor(dirPath);
+  } catch (err) {
+    console.error('Failed to open models directory:', err);
+    const msg = (err && (err.message || err.toString())) || String(err);
+    showNotification(t('toasts.openFolderError', { error: msg }), "error");
+  } finally {
+    setTimeout(() => {
+      _isOpeningModelsDirectory = false;
+    }, 1000);
+  }
+};
+
 window.browseModelsDirectory = async function() {
-  const path = await invoke('select_directory');
-  if (path) {
-    const inputEl = document.getElementById('opt-modelsDir');
-    if (inputEl) {
-      inputEl.value = path;
+  if (_isBrowsingModelsDirectory) return;
+  _isBrowsingModelsDirectory = true;
+
+  const inputEl = document.getElementById('opt-modelsDir');
+  const pathControl = inputEl?.closest('.setting-control-path');
+  const browseBtn = pathControl?.querySelector('.path-browse-btn');
+  const pathField = pathControl?.querySelector('.readonly-path-field');
+  if (browseBtn) browseBtn.disabled = true;
+  if (pathField) pathField.style.pointerEvents = 'none';
+
+  try {
+    const path = await invoke('select_directory');
+    if (path) {
+      try {
+        await invoke('verify_directory_writable', { dirPath: path });
+      } catch (permErr) {
+        showNotification(t('toasts.modelsDirNotWritable', { error: String(permErr) }), "error");
+        return;
+      }
+
+      if (inputEl) {
+        inputEl.value = path;
+        inputEl.title = path;
+        if (inputEl.parentElement) {
+          inputEl.parentElement.title = path;
+        }
+      }
+      if (settingsState) {
+        settingsState.modelsDir = path;
+        await saveCurrentSettings();
+        await scanAndPopulateModels();
+      }
+      _cachedModelStatuses = null;
+      _cachedModelStatusesTime = 0;
+      await refreshBuildStatuses();
     }
-    if (settingsState) {
-      settingsState.modelsDir = path;
-      saveCurrentSettings();
-      scanAndPopulateModels();
-    }
-    await refreshBuildStatuses();
+  } catch (err) {
+    console.error('Failed to select models directory:', err);
+  } finally {
+    if (browseBtn) browseBtn.disabled = false;
+    if (pathField) pathField.style.pointerEvents = '';
+    _isBrowsingModelsDirectory = false;
   }
 };
 
@@ -2779,6 +2841,10 @@ async function refreshSettings() {
     const inputEl = document.getElementById('opt-modelsDir');
     if (inputEl) {
       inputEl.value = settingsState.modelsDir;
+      inputEl.title = settingsState.modelsDir;
+      if (inputEl.parentElement) {
+        inputEl.parentElement.title = settingsState.modelsDir;
+      }
     }
     
     // Bind all options dynamically
@@ -3442,15 +3508,78 @@ window.toggleOutputDirCustomField = function() {
   }
 };
 
-window.browseOutputDir = async function() {
-  const dir = await invoke('select_directory');
-  if (dir) {
-    const inputEl = document.getElementById('opt-outputDirPath');
-    if (inputEl) inputEl.value = dir;
-    if (settingsState) {
-      settingsState.outputDirPath = dir;
-      saveCurrentSettings();
+let _isBrowsingOutputDir = false;
+let _isOpeningOutputDir = false;
+
+window.openCustomOutputDir = async function() {
+  if (_isOpeningOutputDir) return;
+  _isOpeningOutputDir = true;
+
+  const dirPath = (settingsState && settingsState.outputDirPath) || document.getElementById('opt-outputDirPath')?.value;
+  if (!dirPath) {
+    _isOpeningOutputDir = false;
+    showNotification(t('toasts.noOutputDirFound'), "info");
+    return;
+  }
+
+  try {
+    try {
+      await invoke('verify_directory_writable', { dirPath });
+    } catch (permErr) {
+      showNotification(t('toasts.outputDirNotWritable', { error: String(permErr) }), "error");
+      return;
     }
+    await window.openFileInEditor(dirPath);
+  } catch (err) {
+    console.error('Failed to open output directory:', err);
+    const msg = (err && (err.message || err.toString())) || String(err);
+    showNotification(t('toasts.openFolderError', { error: msg }), "error");
+  } finally {
+    setTimeout(() => {
+      _isOpeningOutputDir = false;
+    }, 1000);
+  }
+};
+
+window.browseOutputDir = async function() {
+  if (_isBrowsingOutputDir) return;
+  _isBrowsingOutputDir = true;
+
+  const inputEl = document.getElementById('opt-outputDirPath');
+  const pathControl = inputEl?.closest('.setting-control-path');
+  const browseBtn = pathControl?.querySelector('.path-browse-btn');
+  const pathField = pathControl?.querySelector('.readonly-path-field');
+  if (browseBtn) browseBtn.disabled = true;
+  if (pathField) pathField.style.pointerEvents = 'none';
+
+  try {
+    const dir = await invoke('select_directory');
+    if (dir) {
+      try {
+        await invoke('verify_directory_writable', { dirPath: dir });
+      } catch (permErr) {
+        showNotification(t('toasts.outputDirNotWritable', { error: String(permErr) }), "error");
+        return;
+      }
+
+      if (inputEl) {
+        inputEl.value = dir;
+        inputEl.title = dir;
+        if (inputEl.parentElement) {
+          inputEl.parentElement.title = dir;
+        }
+      }
+      if (settingsState) {
+        settingsState.outputDirPath = dir;
+        await saveCurrentSettings();
+      }
+    }
+  } catch (err) {
+    console.error('Failed to select output directory:', err);
+  } finally {
+    if (browseBtn) browseBtn.disabled = false;
+    if (pathField) pathField.style.pointerEvents = '';
+    _isBrowsingOutputDir = false;
   }
 };
 

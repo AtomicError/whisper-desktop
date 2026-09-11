@@ -343,7 +343,7 @@ fn walk_models_dir(
                     let rel_path = path.strip_prefix(root)
                         .unwrap_or(&path)
                         .to_string_lossy()
-                        .to_string();
+                        .replace('\\', "/");
                         
                     if filename.contains("silero") {
                         vad_models.push(rel_path);
@@ -503,6 +503,28 @@ async fn select_directory(app: AppHandle) -> Option<String> {
     rx.await.ok().flatten().and_then(|p| p.into_path().ok()).map(|p| p.to_string_lossy().to_string())
 }
 
+#[tauri::command]
+async fn verify_directory_writable(dir_path: String) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || {
+        let p = std::path::Path::new(&dir_path);
+        if !p.exists() {
+            std::fs::create_dir_all(p)
+                .map_err(|e| format!("Failed to create directory '{}': {}", dir_path, e))?;
+        }
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let test_file = p.join(format!(".whisper_perm_test_{}_{}", std::process::id(), nonce));
+        std::fs::write(&test_file, b"ok")
+            .map_err(|e| format!("Directory '{}' is not writable: {}", dir_path, e))?;
+        let _ = std::fs::remove_file(&test_file);
+        Ok(())
+    })
+    .await
+    .map_err(|e| format!("Directory check failed: {e}"))?
+}
+
 
 
 #[tauri::command]
@@ -566,9 +588,17 @@ fn copy_to_clipboard(app: AppHandle, text: String) -> Result<(), String> {
         .map_err(|e| format!("Failed to copy to clipboard: {}", e))
 }
 
+pub(crate) fn ensure_directory_exists_if_folder(file_path: &str) {
+    let path = std::path::Path::new(file_path);
+    if !path.exists() && (path.extension().is_none() || file_path.contains("whisper.cpp") || file_path.ends_with('/') || file_path.ends_with('\\')) {
+        let _ = std::fs::create_dir_all(path);
+    }
+}
+
 #[tauri::command]
 fn open_file_in_editor(app: AppHandle, file_path: String) -> Result<(), String> {
     use tauri_plugin_opener::OpenerExt;
+    ensure_directory_exists_if_folder(&file_path);
     app.opener()
         .open_path(&file_path, None::<&str>)
         .map_err(|e| format!("Failed to open file in editor: {}", e))
@@ -845,6 +875,7 @@ fn main() {
             select_subtitle_file,
             select_files,
             select_directory,
+            verify_directory_writable,
             read_text_file_content,
             write_text_file_content,
             start_download_model_task,
@@ -871,4 +902,25 @@ fn main() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod main_tests {
+    use super::*;
+
+    #[test]
+    fn test_ensure_directory_exists_if_folder() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let temp_dir = std::env::temp_dir().join(format!("whisper_main_test_folder_{}", nonce));
+        let path_str = temp_dir.to_string_lossy().to_string();
+
+        assert!(!temp_dir.exists());
+        ensure_directory_exists_if_folder(&path_str);
+        assert!(temp_dir.exists() && temp_dir.is_dir());
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
 }

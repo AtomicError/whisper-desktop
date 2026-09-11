@@ -340,23 +340,17 @@ async fn download_inner(
         .map_err(|e| format!("Failed to create models directory: {e}"))?;
 
     let bin_path = models_dir.join(format!("ggml-{clean_name}.bin"));
-    let legacy_bin = models_dir.join("models").join(format!("ggml-{clean_name}.bin"));
 
-    if (bin_path.exists() && bin_path.metadata().map(|m| m.len() == expected_size).unwrap_or(false))
-        || (legacy_bin.exists() && legacy_bin.metadata().map(|m| m.len() == expected_size).unwrap_or(false))
-    {
-        return Err(format!("Model ggml-{clean_name}.bin already exists locally."));
+    if let Some(existing) = find_model_path_in_dir(models_dir, clean_name) {
+        if existing.metadata().map(|m| m.len() == expected_size).unwrap_or(false) {
+            return Err(format!("Model ggml-{clean_name}.bin already exists locally at {}.", existing.display()));
+        }
     }
 
-    let tmp_new = models_dir.join(format!("ggml-{clean_name}.bin.tmp"));
-    let tmp_legacy = models_dir.join("models").join(format!("ggml-{clean_name}.bin.tmp"));
-
     let len_of = |p: &Path| p.metadata().map(|m| m.len()).unwrap_or(0);
-    let (tmp_path, mut downloaded) = match (len_of(&tmp_new), len_of(&tmp_legacy)) {
-        (0, 0) => (tmp_new, 0),
-        (n, l) if l > n => (tmp_legacy, l),
-        (n, _) => (tmp_new, n),
-    };
+    let tmp_path = find_model_tmp_in_dir(models_dir, clean_name)
+        .unwrap_or_else(|| models_dir.join(format!("ggml-{clean_name}.bin.tmp")));
+    let mut downloaded = len_of(&tmp_path);
 
     if expected_size > 0 && downloaded == expected_size {
         return finalize(&tmp_path, &bin_path, expected_size, expected_hash).await;
@@ -585,13 +579,264 @@ fn verify_file(path: &PathBuf) -> Result<(u64, String), String> {
     Ok((len, hex))
 }
 
+const MAX_SEARCH_DEPTH: usize = 8;
+
+/// Find any existing model file matching `ggml-{clean_name}.bin` within `models_dir` (including subfolders).
+/// Checks root and legacy `models/` first for fast response.
+pub fn find_model_path_in_dir(models_dir: &Path, clean_name: &str) -> Option<PathBuf> {
+    let direct = models_dir.join(format!("ggml-{clean_name}.bin"));
+    if direct.is_file() {
+        return Some(direct);
+    }
+    let legacy = models_dir.join("models").join(format!("ggml-{clean_name}.bin"));
+    if legacy.is_file() {
+        return Some(legacy);
+    }
+
+    let target_name = format!("ggml-{clean_name}.bin");
+    let root_canonical = models_dir.canonicalize().ok();
+    let mut visited = std::collections::HashSet::new();
+    find_file_recursive(models_dir, &target_name, 0, root_canonical.as_ref(), &mut visited)
+}
+
+/// Find any existing partial download file matching `ggml-{clean_name}.bin.tmp` within `models_dir`.
+pub fn find_model_tmp_in_dir(models_dir: &Path, clean_name: &str) -> Option<PathBuf> {
+    let direct = models_dir.join(format!("ggml-{clean_name}.bin.tmp"));
+    if direct.is_file() {
+        return Some(direct);
+    }
+    let legacy = models_dir.join("models").join(format!("ggml-{clean_name}.bin.tmp"));
+    if legacy.is_file() {
+        return Some(legacy);
+    }
+
+    let target_name = format!("ggml-{clean_name}.bin.tmp");
+    let root_canonical = models_dir.canonicalize().ok();
+    let mut visited = std::collections::HashSet::new();
+    find_file_recursive(models_dir, &target_name, 0, root_canonical.as_ref(), &mut visited)
+}
+
+/// Find all matching files (both completed and tmp) within `models_dir`.
+pub fn find_all_matching_model_files(models_dir: &Path, clean_name: &str) -> Vec<PathBuf> {
+    let mut matches = Vec::new();
+    let bin_target = format!("ggml-{clean_name}.bin");
+    let tmp_target = format!("ggml-{clean_name}.bin.tmp");
+
+    let direct_bin = models_dir.join(&bin_target);
+    if direct_bin.exists() { matches.push(direct_bin); }
+    let legacy_bin = models_dir.join("models").join(&bin_target);
+    if legacy_bin.exists() { matches.push(legacy_bin); }
+
+    let direct_tmp = models_dir.join(&tmp_target);
+    if direct_tmp.exists() { matches.push(direct_tmp); }
+    let legacy_tmp = models_dir.join("models").join(&tmp_target);
+    if legacy_tmp.exists() { matches.push(legacy_tmp); }
+
+    let root_canonical = models_dir.canonicalize().ok();
+    let mut visited = std::collections::HashSet::new();
+    collect_files_recursive(models_dir, &bin_target, &tmp_target, 0, root_canonical.as_ref(), &mut visited, &mut matches);
+
+    matches.sort();
+    matches.dedup();
+    matches
+}
+
+fn find_file_recursive(
+    dir: &Path,
+    target_name: &str,
+    depth: usize,
+    root_canonical: Option<&PathBuf>,
+    visited: &mut std::collections::HashSet<PathBuf>,
+) -> Option<PathBuf> {
+    if depth > MAX_SEARCH_DEPTH {
+        return None;
+    }
+    if let Ok(canonical) = dir.canonicalize() {
+        if !visited.insert(canonical) {
+            return None;
+        }
+    }
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let file_type = match entry.file_type() {
+                Ok(ft) => ft,
+                Err(_) => continue,
+            };
+            let is_file = file_type.is_file() || (file_type.is_symlink() && path.is_file());
+            let is_dir = if file_type.is_dir() {
+                true
+            } else if file_type.is_symlink() && path.is_dir() {
+                if let (Ok(canon_path), Some(canon_root)) = (path.canonicalize(), root_canonical) {
+                    canon_path.starts_with(canon_root)
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+
+            if is_file {
+                if let Some(name) = path.file_name() {
+                    if name == target_name {
+                        return Some(path);
+                    }
+                }
+            } else if is_dir {
+                let dir_name = path.file_name().unwrap_or_default().to_string_lossy();
+                if !dir_name.starts_with('.') && dir_name != "node_modules" && dir_name != "target" && dir_name != "build" {
+                    if let Some(found) = find_file_recursive(&path, target_name, depth + 1, root_canonical, visited) {
+                        return Some(found);
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+fn collect_files_recursive(
+    dir: &Path,
+    target_bin: &str,
+    target_tmp: &str,
+    depth: usize,
+    root_canonical: Option<&PathBuf>,
+    visited: &mut std::collections::HashSet<PathBuf>,
+    matches: &mut Vec<PathBuf>,
+) {
+    if depth > MAX_SEARCH_DEPTH {
+        return;
+    }
+    if let Ok(canonical) = dir.canonicalize() {
+        if !visited.insert(canonical) {
+            return;
+        }
+    }
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let file_type = match entry.file_type() {
+                Ok(ft) => ft,
+                Err(_) => continue,
+            };
+            let is_file = file_type.is_file() || (file_type.is_symlink() && path.is_file());
+            let is_dir = if file_type.is_dir() {
+                true
+            } else if file_type.is_symlink() && path.is_dir() {
+                if let (Ok(canon_path), Some(canon_root)) = (path.canonicalize(), root_canonical) {
+                    canon_path.starts_with(canon_root)
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+
+            if is_file {
+                if let Some(name) = path.file_name() {
+                    if name == target_bin || name == target_tmp {
+                        matches.push(path);
+                    }
+                }
+            } else if is_dir {
+                let dir_name = path.file_name().unwrap_or_default().to_string_lossy();
+                if !dir_name.starts_with('.') && dir_name != "node_modules" && dir_name != "target" && dir_name != "build" {
+                    collect_files_recursive(&path, target_bin, target_tmp, depth + 1, root_canonical, visited, matches);
+                }
+            }
+        }
+    }
+}
+
+struct DiscoveredModels {
+    bins: std::collections::HashMap<String, Vec<PathBuf>>,
+    tmps: std::collections::HashMap<String, Vec<PathBuf>>,
+}
+
+fn scan_models_dir_single_pass(models_dir: &Path) -> DiscoveredModels {
+    let mut bins = std::collections::HashMap::new();
+    let mut tmps = std::collections::HashMap::new();
+    let root_canonical = models_dir.canonicalize().ok();
+    let mut visited = std::collections::HashSet::new();
+
+    collect_models_single_pass(
+        models_dir,
+        0,
+        root_canonical.as_ref(),
+        &mut visited,
+        &mut bins,
+        &mut tmps,
+    );
+
+    DiscoveredModels { bins, tmps }
+}
+
+fn collect_models_single_pass(
+    dir: &Path,
+    depth: usize,
+    root_canonical: Option<&PathBuf>,
+    visited: &mut std::collections::HashSet<PathBuf>,
+    bins: &mut std::collections::HashMap<String, Vec<PathBuf>>,
+    tmps: &mut std::collections::HashMap<String, Vec<PathBuf>>,
+) {
+    if depth > MAX_SEARCH_DEPTH {
+        return;
+    }
+    if let Ok(canonical) = dir.canonicalize() {
+        if !visited.insert(canonical) {
+            return;
+        }
+    }
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let file_type = match entry.file_type() {
+                Ok(ft) => ft,
+                Err(_) => continue,
+            };
+            let is_file = file_type.is_file() || (file_type.is_symlink() && path.is_file());
+            let is_dir = if file_type.is_dir() {
+                true
+            } else if file_type.is_symlink() && path.is_dir() {
+                if let (Ok(canon_path), Some(canon_root)) = (path.canonicalize(), root_canonical) {
+                    canon_path.starts_with(canon_root)
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+
+            if is_file {
+                if let Some(name_os) = path.file_name() {
+                    let name = name_os.to_string_lossy();
+                    if name.starts_with("ggml-") {
+                        if name.ends_with(".bin") {
+                            let clean = normalize_model_name(&name);
+                            bins.entry(clean).or_default().push(path);
+                        } else if name.ends_with(".bin.tmp") {
+                            let base_name = name.strip_suffix(".tmp").unwrap_or(&name);
+                            let clean = normalize_model_name(base_name);
+                            tmps.entry(clean).or_default().push(path);
+                        }
+                    }
+                }
+            } else if is_dir {
+                let dir_name = path.file_name().unwrap_or_default().to_string_lossy();
+                if !dir_name.starts_with('.') && dir_name != "node_modules" && dir_name != "target" && dir_name != "build" {
+                    collect_models_single_pass(&path, depth + 1, root_canonical, visited, bins, tmps);
+                }
+            }
+        }
+    }
+}
+
 fn partial_bytes(models_dir: &Path, clean_name: &str) -> u64 {
-    let tmp = models_dir.join(format!("ggml-{clean_name}.bin.tmp"));
-    let legacy_tmp = models_dir.join("models").join(format!("ggml-{clean_name}.bin.tmp"));
-    tmp.metadata()
-        .or_else(|_| legacy_tmp.metadata())
-        .map(|m| m.len())
-        .unwrap_or(0)
+    if let Some(tmp) = find_model_tmp_in_dir(models_dir, clean_name) {
+        tmp.metadata().map(|m| m.len()).unwrap_or(0)
+    } else {
+        0
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -614,12 +859,16 @@ fn get_all_models_status_sync(
     models_dir: &str,
 ) -> Result<Vec<ModelStatus>, String> {
     let dir = Path::new(models_dir);
-    let active_models: std::collections::HashSet<String> =
-        lock_session(download_state).active.keys().cloned().collect();
+    let active_models: std::collections::HashSet<String> = match download_state.lock() {
+        Ok(lock) => lock.active.keys().cloned().collect(),
+        Err(poisoned) => poisoned.into_inner().active.keys().cloned().collect(),
+    };
 
     let is_valid_bin = |p: &Path, expected: u64| -> bool {
         p.metadata().map(|m| m.len() == expected).unwrap_or(false)
     };
+
+    let discovered = scan_models_dir_single_pass(dir);
 
     let mut result = Vec::new();
     for m in get_models_list() {
@@ -628,19 +877,26 @@ fn get_all_models_status_sync(
         };
 
         let is_active = active_models.contains(m);
-        let (state, downloaded_bytes) = if is_valid_bin(&dir.join(format!("ggml-{m}.bin")), expected_size)
-            || is_valid_bin(&dir.join("models").join(format!("ggml-{m}.bin")), expected_size)
-        {
-            (ModelState::Downloaded, expected_size)
-        } else {
-            let partial = partial_bytes(dir, m);
-            if is_active {
-                (ModelState::Downloading, partial)
-            } else if partial > 0 {
-                (ModelState::Paused, partial)
+        let max_tmp_bytes = discovered.tmps.get(m)
+            .map(|list| list.iter().filter_map(|p| p.metadata().ok().map(|md| md.len())).max().unwrap_or(0))
+            .unwrap_or(0);
+
+        let (state, downloaded_bytes) = if let Some(bin_paths) = discovered.bins.get(m) {
+            if bin_paths.iter().any(|p| is_valid_bin(p, expected_size)) {
+                (ModelState::Downloaded, expected_size)
+            } else if is_active {
+                (ModelState::Downloading, max_tmp_bytes)
+            } else if max_tmp_bytes > 0 {
+                (ModelState::Paused, max_tmp_bytes)
             } else {
                 (ModelState::NotDownloaded, 0)
             }
+        } else if is_active {
+            (ModelState::Downloading, max_tmp_bytes)
+        } else if max_tmp_bytes > 0 {
+            (ModelState::Paused, max_tmp_bytes)
+        } else {
+            (ModelState::NotDownloaded, 0)
         };
 
         let progress = match state {
@@ -681,8 +937,8 @@ pub fn pause_download_model(
     }
 }
 
-/// Deletes both current and legacy layouts unconditionally, so a leftover copy
-/// in the old location can no longer make Delete look broken. Cancels an
+/// Deletes both current and legacy layouts unconditionally, including any subfolder matches,
+/// so a leftover copy can no longer make Delete look broken. Cancels an
 /// active download first and waits for the owning task to release its file
 /// handles — required on Windows, where deleting an open file fails with a
 /// sharing violation.
@@ -711,15 +967,23 @@ pub async fn delete_model_file(
     }
 
     let dir = Path::new(&models_dir);
-    let candidates = [
-        dir.join(format!("ggml-{clean_name}.bin")),
-        dir.join("models").join(format!("ggml-{clean_name}.bin")),
-        dir.join(format!("ggml-{clean_name}.bin.tmp")),
-        dir.join("models").join(format!("ggml-{clean_name}.bin.tmp")),
-    ];
+    let Ok(canon_dir) = dir.canonicalize() else {
+        return Err(format!("Cannot verify models directory path '{}'.", models_dir));
+    };
+
+    let candidates = find_all_matching_model_files(dir, &clean_name);
 
     let mut last_error = None;
     for path in candidates {
+        // Enforce path traversal safety: parent directory must reside inside models_dir
+        let parent_is_safe = path.parent()
+            .and_then(|p| p.canonicalize().ok())
+            .map(|canon_parent| canon_parent.starts_with(&canon_dir))
+            .unwrap_or(false);
+
+        if !parent_is_safe {
+            continue;
+        }
         match tokio::fs::remove_file(&path).await {
             Ok(()) => {}
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
@@ -732,4 +996,73 @@ pub async fn delete_model_file(
         Some((path, e)) => Err(format!("Failed to delete {}: {e}", path.display())),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::{self, File};
+
+    #[test]
+    fn test_find_model_path_in_dir_subdirectories() {
+        let temp_dir = std::env::temp_dir().join(format!("whisper_test_models_{}", std::process::id()));
+        let sub_dir = temp_dir.join("nested").join("custom");
+        fs::create_dir_all(&sub_dir).unwrap();
+
+        let model_file = sub_dir.join("ggml-tiny.bin");
+        File::create(&model_file).unwrap();
+
+        let found = find_model_path_in_dir(&temp_dir, "tiny");
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().canonicalize().unwrap(), model_file.canonicalize().unwrap());
+
+        let not_found = find_model_path_in_dir(&temp_dir, "medium");
+        assert!(not_found.is_none());
+
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_find_all_matching_model_files() {
+        let temp_dir = std::env::temp_dir().join(format!("whisper_test_matches_{}", std::process::id()));
+        let sub_dir = temp_dir.join("a").join("b");
+        fs::create_dir_all(&sub_dir).unwrap();
+
+        let f1 = temp_dir.join("ggml-base.bin");
+        let f2 = sub_dir.join("ggml-base.bin.tmp");
+        let f_unrelated = sub_dir.join("ggml-small.bin");
+        File::create(&f1).unwrap();
+        File::create(&f2).unwrap();
+        File::create(&f_unrelated).unwrap();
+
+        let matches = find_all_matching_model_files(&temp_dir, "base");
+        assert_eq!(matches.len(), 2);
+
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_scan_models_dir_single_pass() {
+        let temp_dir = std::env::temp_dir().join(format!("whisper_test_single_pass_{}", std::process::id()));
+        let sub_dir = temp_dir.join("sub");
+        fs::create_dir_all(&sub_dir).unwrap();
+
+        let f_root = temp_dir.join("ggml-base.bin");
+        let f_nested_base = sub_dir.join("ggml-base.bin");
+        let f_nested = sub_dir.join("ggml-tiny.bin");
+        let f_tmp = temp_dir.join("ggml-small.bin.tmp");
+        File::create(&f_root).unwrap();
+        File::create(&f_nested_base).unwrap();
+        File::create(&f_nested).unwrap();
+        File::create(&f_tmp).unwrap();
+
+        let discovered = scan_models_dir_single_pass(&temp_dir);
+        assert!(discovered.bins.contains_key("base"));
+        assert_eq!(discovered.bins["base"].len(), 2);
+        assert!(discovered.bins.contains_key("tiny"));
+        assert!(discovered.tmps.contains_key("small"));
+
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+}
+
 

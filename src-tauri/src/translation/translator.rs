@@ -1835,7 +1835,7 @@ mod tests {
             "5: \n9:00 صبح بود\n6: خوبی؟\n7: باشه\n",
             &order,
         );
-        assert!(map.get(&9).is_none(), "cue 9 must not be hijacked");
+        assert!(!map.contains_key(&9), "cue 9 must not be hijacked");
     }
 
     #[test]

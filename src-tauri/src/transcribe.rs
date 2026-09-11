@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, AsyncBufRead, BufReader};
 use tokio::process::Command;
@@ -283,6 +283,20 @@ pub async fn convert_to_wav(
     Ok(tmp_wav_str)
 }
 
+pub(crate) fn resolve_model_subpath(root: &Path, rel_or_abs: &str) -> PathBuf {
+    let p = Path::new(rel_or_abs);
+    if p.is_absolute() {
+        return p.to_path_buf();
+    }
+    let mut resolved = root.to_path_buf();
+    for comp in rel_or_abs.split(&['/', '\\'][..]) {
+        if !comp.is_empty() && comp != "." && comp != ".." {
+            resolved.push(comp);
+        }
+    }
+    resolved
+}
+
 pub async fn run_transcription(
     app: AppHandle,
     logs: std::sync::Arc<AppLogs>,
@@ -446,8 +460,8 @@ pub async fn run_transcription(
     let out_name = resolve_non_colliding_output_name(&out_dir, &base_name);
     let out_name_str = out_name.to_str().ok_or("Invalid output name path")?.to_string();
     
-    let model_full_path = root.join(&settings.model_path);
-    if !model_full_path.exists() {
+    let model_full_path = resolve_model_subpath(root, &settings.model_path);
+    if !model_full_path.is_file() {
         return Err(format!(
             "Model file not found: '{}'. Please download this model first from the Model Hub.",
             settings.model_path
@@ -455,8 +469,8 @@ pub async fn run_transcription(
     }
 
     if settings.vad && !settings.vad_model.is_empty() {
-        let vad_full_path = root.join(&settings.vad_model);
-        if !vad_full_path.exists() {
+        let vad_full_path = resolve_model_subpath(root, &settings.vad_model);
+        if !vad_full_path.is_file() {
             return Err(format!(
                 "VAD model file not found: '{}'. Please ensure the VAD model is downloaded.",
                 settings.vad_model
@@ -552,8 +566,8 @@ pub async fn run_transcription(
         } else {
             "ggml-silero-v6.2.0.bin".to_string()
         };
-        let vad_full_path = root.join(&vad_model_name);
-        if !vad_full_path.exists() {
+        let vad_full_path = resolve_model_subpath(root, &vad_model_name);
+        if !vad_full_path.is_file() {
             return Err(format!(
                 "VAD is enabled, but VAD model file not found: '{}'. Please ensure the Silero VAD model is downloaded from Model Hub.",
                 vad_full_path.display()
@@ -1057,6 +1071,23 @@ mod tests {
         assert_eq!(resolved_2, temp_dir.join("sample-2"));
 
         let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_resolve_model_subpath_handles_mixed_separators() {
+        let root = Path::new("/tmp/whisper_models");
+        
+        let path_unix = resolve_model_subpath(root, "models/ggml-base.bin");
+        assert_eq!(path_unix, root.join("models").join("ggml-base.bin"));
+
+        let path_win = resolve_model_subpath(root, "models\\ggml-base.bin");
+        assert_eq!(path_win, root.join("models").join("ggml-base.bin"));
+
+        let path_nested = resolve_model_subpath(root, "sub/dir\\nested/ggml-tiny.bin");
+        assert_eq!(path_nested, root.join("sub").join("dir").join("nested").join("ggml-tiny.bin"));
+
+        let path_traversal = resolve_model_subpath(root, "../../etc/passwd");
+        assert_eq!(path_traversal, root.join("etc").join("passwd"));
     }
 }
 

@@ -1247,12 +1247,13 @@ header {
 /* Read-only Path Field for Directory Selector Settings */
 .setting-control-path {
   width: auto !important;
-  max-width: 400px;
-  flex: 1;
+  max-width: 580px;
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
   gap: 10px;
   justify-content: flex-end;
+  min-width: 0;
 }
 
 .readonly-path-field {
@@ -1265,18 +1266,70 @@ header {
   padding: 0 14px;
   min-height: 42px;
   height: 42px;
-  flex: 1;
-  min-width: 180px;
-  max-width: 300px;
-  cursor: pointer;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 480px;
   box-sizing: border-box;
   transition: var(--transition-smooth);
 }
 
 .readonly-path-field:hover {
-  border-color: rgba(var(--color-royal-blue-rgb), 0.4);
-  background: rgba(255, 255, 255, 0.04);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.readonly-path-field:focus-within {
+  border-color: rgba(var(--color-royal-blue-rgb), 0.5);
+  background: rgba(255, 255, 255, 0.03);
+  box-shadow: 0 0 0 1px rgba(var(--color-royal-blue-rgb), 0.2), 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.path-action-btn {
+  background: transparent;
+  border: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  flex-shrink: 0;
+  margin-inline-start: auto;
+  color: #94a3b8;
+  transition: var(--transition-smooth);
+}
+
+.path-action-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.path-action-btn:hover .path-open-icon {
+  opacity: 1;
+  stroke: var(--color-royal-blue);
+  transform: scale(1.12);
+}
+
+.path-action-btn:focus-visible {
+  outline: 2px solid var(--color-royal-blue);
+  outline-offset: 1px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.path-open-icon {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  stroke: currentColor;
+  stroke-width: 2;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.85;
+  transition: var(--transition-smooth);
 }
 
 .path-folder-icon {
@@ -1292,6 +1345,7 @@ header {
 }
 
 .readonly-path-input {
+  flex: 1 1 auto;
   width: 100%;
   background: transparent;
   border: none;
@@ -1299,12 +1353,17 @@ header {
   color: #e2e8f0;
   font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
   font-size: 0.88rem;
-  cursor: pointer;
+  cursor: text;
+  white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
-  white-space: nowrap;
   user-select: all;
   padding: 0;
+  min-width: 0;
+}
+
+.readonly-path-input:focus {
+  text-overflow: clip;
 }
 
 .path-browse-btn {
@@ -5806,6 +5865,28 @@ html[dir="rtl"] .cat-match-badge {
     flex-grow: 1 !important;
     min-height: 0 !important;
     height: auto !important;
+  }
+  .setting-card:has(.setting-control-path) {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+  }
+  .setting-card:has(.setting-control-path) .setting-control-path {
+    max-width: 100% !important;
+    width: 100% !important;
+    justify-content: flex-start !important;
+  }
+  .setting-card:has(.setting-control-path) .readonly-path-field {
+    max-width: 100% !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .setting-control-path {
+    flex-wrap: wrap !important;
+  }
+  .setting-control-path .path-browse-btn {
+    width: 100% !important;
   }
 }
 

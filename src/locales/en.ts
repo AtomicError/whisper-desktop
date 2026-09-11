@@ -695,7 +695,11 @@ export const en = {
     noMatchingModelsTitle: 'No Matching Models Found',
     resetFilterSearch: 'Reset Filter & Search',
     backendPoints: '<span class="setting-desc-point"><strong>Standard:</strong> Universal CPU-only compatibility</span><span class="setting-desc-point"><strong>Vulkan:</strong> Universal GPU acceleration (AMD, Intel, or NVIDIA)</span><span class="setting-desc-point"><strong>CUDA:</strong> Dedicated NVIDIA GPUs</span><span class="setting-desc-point"><strong>OpenVINO:</strong> Intel CPUs, Arc &amp; iGPUs</span>',
-    modelsDirPoints: '<span class="setting-desc-point"><strong>Default:</strong> <code>~/whisper.cpp</code></span>',
+    modelsDirPoints: '<span class="setting-desc-point"><strong>Default:</strong> <code>~/whisper-desktop/models</code> (Linux/macOS) or <code>C:\\Users\\&lt;Username&gt;\\whisper-desktop\\models</code> (Windows)</span>',
+    openModelsDirTooltip: 'Click to open folder in File Manager',
+    openOutputDirTooltip: 'Click to open output folder in File Manager',
+    modelsDirInputAria: 'Models storage directory path',
+    outputDirInputAria: 'Custom output directory path',
     modelSelectPoints: '<span class="setting-desc-point"><strong>Fast &amp; Low RAM:</strong> <code>tiny</code>, <code>base</code>, <code>small</code></span><span class="setting-desc-point"><strong>High Accuracy:</strong> <code>medium</code>, <code>large-v3</code></span>',
     ffmpegPoints: '<span class="setting-desc-point"><strong>Internal:</strong> Standalone bundled binary (recommended, zero-config)</span><span class="setting-desc-point"><strong>System:</strong> Uses OS-installed FFmpeg binary</span>',
     trayPoints: '<span class="setting-desc-point"><strong>Default:</strong> Disabled (exits on window close)</span>',
@@ -864,7 +868,9 @@ export const en = {
     nameAndUrlRequired: 'Name and Base URL are required.',
     providerNameExists: 'A provider named \'{name}\' already exists.',
     providerAddedSuccess: 'Provider added successfully! Configure its models below.',
-    noProviderToTest: 'No active provider selected to test.'
+    noProviderToTest: 'No active provider selected to test.',
+    modelsDirNotWritable: 'Selected models directory is not writable: {error}',
+    outputDirNotWritable: 'Selected output directory is not writable: {error}'
   }
 };
 
