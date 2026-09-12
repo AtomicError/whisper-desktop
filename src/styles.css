@@ -8020,6 +8020,8 @@ html[dir="rtl"] .cat-match-badge {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  contain: layout paint;
+  will-change: scroll-position;
 }
 
 .translate-cue-item {
@@ -8032,6 +8034,7 @@ html[dir="rtl"] .cat-match-badge {
   gap: 4px;
   transition-property: border-color, background-color;
   transition-duration: 0.15s;
+  contain: content;
 }
 
 .translate-cue-item:hover {

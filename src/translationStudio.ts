@@ -282,7 +282,10 @@ export class TranslationStudioController {
   private hardsubCtaCard: HTMLElement | null = null;
   private btnSendToHardsub: HTMLButtonElement | null = null;
 
-  private isSyncingScroll: boolean = false;
+  private activeScrollDriver: HTMLElement | null = null;
+  private isScrollingThrottled: boolean = false;
+  private scrollThrottledTimeout: any = null;
+  private syncScrollRaf: number | null = null;
 
   public state: TranslationStudioState = {
     subtitlePath: '',
@@ -489,8 +492,18 @@ export class TranslationStudioController {
     });
   }
 
+  private markScrolling() {
+    this.isScrollingThrottled = true;
+    if (this.scrollThrottledTimeout) clearTimeout(this.scrollThrottledTimeout);
+    this.scrollThrottledTimeout = setTimeout(() => {
+      this.isScrollingThrottled = false;
+      this.activeScrollDriver = null;
+    }, 120);
+  }
+
   private setupSynchronizedHighlighting() {
     const handleMouseOver = (e: MouseEvent) => {
+      if (this.isScrollingThrottled) return;
       const target = (e.target as HTMLElement)?.closest('.translate-cue-item') as HTMLElement | null;
       if (!target) return;
       const cueId = target.dataset.id;
@@ -501,6 +514,7 @@ export class TranslationStudioController {
     };
 
     const handleMouseOut = (e: MouseEvent) => {
+      if (this.isScrollingThrottled) return;
       const target = (e.target as HTMLElement)?.closest('.translate-cue-item') as HTMLElement | null;
       if (!target) return;
       const cueId = target.dataset.id;
@@ -519,31 +533,55 @@ export class TranslationStudioController {
   private setupSynchronizedScrolling() {
     if (!this.sourceList || !this.targetList) return;
 
-    this.sourceList.addEventListener('scroll', () => {
-      if (this.isSyncingScroll || this.state.viewMode !== 'split') return;
-      this.isSyncingScroll = true;
-      if (this.sourceList && this.targetList) {
-        const scrollRange = this.sourceList.scrollHeight - this.sourceList.clientHeight;
-        if (scrollRange > 0) {
-          const ratio = this.sourceList.scrollTop / scrollRange;
-          this.targetList.scrollTop = ratio * (this.targetList.scrollHeight - this.targetList.clientHeight);
-        }
-      }
-      requestAnimationFrame(() => { this.isSyncingScroll = false; });
-    });
+    const onSourceScroll = () => {
+      if (this.state.viewMode !== 'split') return;
+      // If targetList is driving, ignore sourceList scroll event to prevent feedback loop
+      if (this.activeScrollDriver && this.activeScrollDriver !== this.sourceList) return;
+      if (!this.activeScrollDriver) this.activeScrollDriver = this.sourceList;
 
-    this.targetList.addEventListener('scroll', () => {
-      if (this.isSyncingScroll || this.state.viewMode !== 'split') return;
-      this.isSyncingScroll = true;
-      if (this.sourceList && this.targetList) {
-        const scrollRange = this.targetList.scrollHeight - this.targetList.clientHeight;
-        if (scrollRange > 0) {
-          const ratio = this.targetList.scrollTop / scrollRange;
-          this.sourceList.scrollTop = ratio * (this.sourceList.scrollHeight - this.sourceList.clientHeight);
+      this.markScrolling();
+
+      if (this.syncScrollRaf) cancelAnimationFrame(this.syncScrollRaf);
+      this.syncScrollRaf = requestAnimationFrame(() => {
+        this.syncScrollRaf = null;
+        if (!this.sourceList || !this.targetList) return;
+        const sourceMax = this.sourceList.scrollHeight - this.sourceList.clientHeight;
+        if (sourceMax > 0) {
+          const ratio = this.sourceList.scrollTop / sourceMax;
+          const targetMax = this.targetList.scrollHeight - this.targetList.clientHeight;
+          this.targetList.scrollTop = Math.round(ratio * targetMax);
         }
-      }
-      requestAnimationFrame(() => { this.isSyncingScroll = false; });
-    });
+      });
+    };
+
+    const onTargetScroll = () => {
+      if (this.state.viewMode !== 'split') return;
+      // If sourceList is driving, ignore targetList scroll event to prevent feedback loop
+      if (this.activeScrollDriver && this.activeScrollDriver !== this.targetList) return;
+      if (!this.activeScrollDriver) this.activeScrollDriver = this.targetList;
+
+      this.markScrolling();
+
+      if (this.syncScrollRaf) cancelAnimationFrame(this.syncScrollRaf);
+      this.syncScrollRaf = requestAnimationFrame(() => {
+        this.syncScrollRaf = null;
+        if (!this.sourceList || !this.targetList) return;
+        const targetMax = this.targetList.scrollHeight - this.targetList.clientHeight;
+        if (targetMax > 0) {
+          const ratio = this.targetList.scrollTop / targetMax;
+          const sourceMax = this.sourceList.scrollHeight - this.sourceList.clientHeight;
+          this.sourceList.scrollTop = Math.round(ratio * sourceMax);
+        }
+      });
+    };
+
+    this.sourceList.addEventListener('wheel', () => { this.activeScrollDriver = this.sourceList; }, { passive: true });
+    this.sourceList.addEventListener('pointerdown', () => { this.activeScrollDriver = this.sourceList; }, { passive: true });
+    this.sourceList.addEventListener('scroll', onSourceScroll, { passive: true });
+
+    this.targetList.addEventListener('wheel', () => { this.activeScrollDriver = this.targetList; }, { passive: true });
+    this.targetList.addEventListener('pointerdown', () => { this.activeScrollDriver = this.targetList; }, { passive: true });
+    this.targetList.addEventListener('scroll', onTargetScroll, { passive: true });
   }
 
   private setupDropZone() {
