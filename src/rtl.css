@@ -319,3 +319,36 @@ html[dir="rtl"] .about-update-subtext {
   text-align: right;
   unicode-bidi: plaintext;
 }
+
+/* 8. Translation Studio RTL */
+html[dir="rtl"] #translate-drop-zone.has-file #lbl-translate-sub-path,
+html[dir="rtl"] .translate-output-display.has-custom-path {
+  direction: ltr;
+  text-align: left;
+  unicode-bidi: isolate;
+  font-family: var(--font-mono);
+}
+
+html[dir="rtl"] .translate-cue-time {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+html[dir="rtl"] .translate-cue-num {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+html[dir="rtl"] .translate-lines-badge {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+html[dir="rtl"] .translate-companion-badge {
+  direction: rtl;
+}
+
+html[dir="rtl"] .translate-switch-info {
+  text-align: right;
+}
+

@@ -115,6 +115,18 @@
             <span data-i18n="nav.transcribe">Transcription Studio</span>
           </div>
 
+          <div class="nav-item" id="nav-tab-translate" role="tab" data-view="translate" tabindex="-1" aria-selected="false" aria-controls="panel-translate" onclick="switchView('translate')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m5 8 6 6"/>
+              <path d="m4 14 6-6 2-3"/>
+              <path d="M2 5h12"/>
+              <path d="M7 2h1"/>
+              <path d="m22 22-5-10-5 10"/>
+              <path d="M14 18h6"/>
+            </svg>
+            <span data-i18n="nav.translate">Translation Studio</span>
+          </div>
+
           <div class="nav-item" id="nav-tab-hardsub" role="tab" data-view="hardsub" tabindex="-1" aria-selected="false" aria-controls="panel-hardsub" onclick="switchView('hardsub')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <polygon points="23 7 16 12 23 17 23 7"/>
@@ -1997,6 +2009,307 @@
                   <div class="transcript-viewport" id="transcript-viewport" style="flex-grow: 1; min-height: 0; overflow-y: auto; font-family: var(--font-sans); font-size: 0.85rem; line-height: 1.6; padding: 12px; border-radius: 8px; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255,255,255,0.03); user-select: text;">
                     <div style="color: var(--color-text-dim); text-align: center; margin-top: 40px;" id="transcript-placeholder" data-i18n="transcribe.streamNotice">
                       Start transcription to stream live text preview.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TRANSLATION STUDIO PANEL -->
+          <div class="view-panel fixed-layout-panel" id="panel-translate" role="tabpanel" aria-labelledby="nav-tab-translate" tabindex="0">
+            <div class="translate-layout">
+              <!-- Left Column: Source Subtitle Dropzone, Quick Deck, Telemetry, and Golden Pipeline -->
+              <div class="translate-left-panel">
+                
+                <!-- Card 1: Subtitle Resource Dropzone -->
+                <div class="wizard-step active" id="translate-media-step">
+                  <div class="wizard-step-header">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                      <div class="wizard-step-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px;">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                          <polyline points="14 2 14 8 20 8"/>
+                          <line x1="16" y1="13" x2="8" y2="13"/>
+                          <line x1="16" y1="17" x2="8" y2="17"/>
+                          <polyline points="10 9 9 9 8 9"/>
+                        </svg>
+                      </div>
+                      <div class="wizard-step-title" data-i18n="translate.selectResource">Select Subtitle Resource</div>
+                    </div>
+                  </div>
+
+                  <div class="wizard-step-body">
+                    <div class="media-drop-zone" id="translate-drop-zone">
+                      <svg class="media-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/>
+                        <path d="M6 6h10"/>
+                        <path d="M6 10h10"/>
+                        <path d="M6 14h6"/>
+                      </svg>
+                      <div style="flex:1; overflow: hidden; min-width: 0;">
+                        <p style="font-weight:600; margin-bottom:4px;" id="lbl-translate-sub-name" data-i18n="translate.noSubLoaded">No Subtitle Loaded</p>
+                        <p style="font-size:0.8rem; color:var(--color-text-muted); margin:0;" id="lbl-translate-sub-path" data-i18n="translate.dropSubPrompt">Drag &amp; drop subtitle (.srt, .vtt, .lrc, .txt)</p>
+                        <p style="font-size:0.75rem; color:var(--color-cyan); margin-top:4px; display:none;" id="lbl-translate-sub-meta"></p>
+                        <!-- Companion video badge -->
+                        <div id="translate-companion-chip" class="translate-companion-badge" style="display:none;">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px; height:12px;">
+                            <polygon points="23 7 16 12 23 17 23 7"/>
+                            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                          </svg>
+                          <span id="lbl-companion-video-name"></span>
+                        </div>
+                      </div>
+                      <div class="translate-dropzone-actions">
+                        <button class="btn-secondary" id="btn-browse-translate-sub" data-i18n="translate.browseSub" type="button">Browse Subtitle</button>
+                        <button class="btn-secondary btn-clear-sub" id="btn-clear-translate-sub" data-i18n="translate.clearSub" type="button" style="display:none;">Clear</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Card 2: Studio Quick Deck -->
+                <div class="glass-card translate-deck-card">
+                  <div class="translate-deck-header">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; color:var(--color-royal-blue);">
+                      <circle cx="12" cy="12" r="3"/>
+                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                    </svg>
+                    <span style="font-weight:600; font-size:0.95rem;" data-i18n="settings.aiTranslateTitle">AI Translation</span>
+                  </div>
+
+                  <div class="translate-deck-body">
+                    <!-- Target Language -->
+                    <div class="translate-field-group">
+                      <label for="translate-target-lang" data-i18n="translate.targetLang">Target Language</label>
+                      <select class="select-control" id="translate-target-lang">
+                        <option value="Persian">Persian (فارسی)</option>
+                        <option value="English">English</option>
+                        <option value="Simplified Chinese">Chinese (Simplified / 简体)</option>
+                        <option value="Traditional Chinese">Chinese (Traditional / 繁體)</option>
+                        <option value="Spanish">Spanish (Español)</option>
+                        <option value="French">French (Français)</option>
+                        <option value="German">German (Deutsch)</option>
+                        <option value="Japanese">Japanese (日本語)</option>
+                        <option value="Korean">Korean (한국어)</option>
+                        <option value="Hindi">Hindi (हिन्दी)</option>
+                        <option value="Arabic">Arabic (العربية)</option>
+                        <option value="Russian">Russian (Русский)</option>
+                        <option value="Portuguese (Brazil)">Portuguese (Brasil)</option>
+                        <option value="Portuguese (Portugal)">Portuguese (Portugal)</option>
+                        <option value="Indonesian">Indonesian (Bahasa Indonesia)</option>
+                        <option value="Vietnamese">Vietnamese (Tiếng Việt)</option>
+                        <option value="Italian">Italian (Italiano)</option>
+                        <option value="Cantonese">Cantonese (粵語)</option>
+                        <option value="Turkish">Turkish (Türkçe)</option>
+                        <option value="Hebrew">Hebrew (עברית)</option>
+                        <option value="Urdu">Urdu (اردو)</option>
+                        <option value="Pashto">Pashto (پښتو)</option>
+                        <option value="Dari">Dari (دری)</option>
+                        <option value="Central Kurdish">Central Kurdish (کوردی / Sorani)</option>
+                        <option value="Northern Kurdish">Northern Kurdish (Kurdî / Kurmanji)</option>
+                        <option value="Polish">Polish (Polski)</option>
+                        <option value="Ukrainian">Ukrainian (Українська)</option>
+                        <option value="Dutch">Dutch (Nederlands)</option>
+                        <option value="Romanian">Romanian (Română)</option>
+                        <option value="Greek">Greek (Ελληνικά)</option>
+                        <option value="Hungarian">Hungarian (Magyar)</option>
+                        <option value="Swedish">Swedish (Svenska)</option>
+                        <option value="Czech">Czech (Čeština)</option>
+                        <option value="Catalan">Català</option>
+                        <option value="Serbian">Serbian (Српски)</option>
+                        <option value="Bulgarian">Bulgarian (Български)</option>
+                        <option value="Armenian">Armenian (Հայերեն)</option>
+                        <option value="Danish">Danish (Dansk)</option>
+                        <option value="Albanian">Albanian (Shqip)</option>
+                        <option value="Finnish">Finnish (Suomi)</option>
+                        <option value="Norwegian Bokmål">Norwegian (Norsk bokmål)</option>
+                        <option value="Slovak">Slovak (Slovenčina)</option>
+                        <option value="Croatian">Croatian (Hrvatski)</option>
+                        <option value="Belarusian">Belarusian (Беларуская)</option>
+                        <option value="Uzbek">Uzbek (Oʻzbekcha)</option>
+                        <option value="Kazakh">Kazakh (Қазақ тілі)</option>
+                        <option value="Azerbaijani">Azerbaijani (Azərbaycan)</option>
+                        <option value="Tajik">Tajik (Тоҷикӣ)</option>
+                        <option value="Thai">Thai (ไทย)</option>
+                        <option value="Malay">Malay (Bahasa Melayu)</option>
+                        <option value="Filipino">Filipino (Tagalog)</option>
+                      </select>
+                    </div>
+
+                    <!-- Provider and Model Selection Row -->
+                    <div class="translate-field-group">
+                      <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <label for="translate-provider-select" data-i18n="translate.activeModel">Active Model &amp; Provider</label>
+                        <button type="button" class="btn-link-settings" id="btn-translate-manage-providers" title="Configure providers and API keys in Settings">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px; height:12px;">
+                            <path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+                          </svg>
+                          <span data-i18n="translate.manageInSettings">Configure in Settings</span>
+                        </button>
+                      </div>
+                      <div class="translate-provider-model-row">
+                        <select class="select-control" id="translate-provider-select" title="Active Provider"></select>
+                        <select class="select-control" id="translate-model-select" title="Active Model"></select>
+                      </div>
+                    </div>
+
+                    <!-- Polish Pass Toggle -->
+                    <div class="translate-switch-row">
+                      <div class="translate-switch-info">
+                        <span class="translate-switch-title" data-i18n="translate.polishPass">Conversational Polish Pass</span>
+                        <span class="translate-switch-desc" data-i18n="translate.polishDesc">Refines phrasing for natural subtitle flow and reading rhythm</span>
+                      </div>
+                      <label class="switch">
+                        <input type="checkbox" id="translate-polish-toggle" checked />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+
+                    <!-- Output Folder -->
+                    <div class="translate-field-group">
+                      <label data-i18n="translate.outputFolder">Output Folder</label>
+                      <div class="translate-output-row">
+                        <div class="translate-output-display" id="translate-output-dir-text" data-i18n="translate.sameAsSource">Same as source file folder</div>
+                        <button class="btn-secondary btn-sm" id="btn-browse-translate-dir" data-i18n="translate.changeFolder" type="button">Change...</button>
+                        <button class="btn-secondary btn-sm" id="btn-reset-translate-dir" data-i18n="translate.resetFolder" type="button" style="display:none;">Reset</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Card 3: Action & Telemetry Deck -->
+                <div class="glass-card translate-action-card">
+                  <div class="translate-actions-bar">
+                    <button class="btn-primary btn-start-translation" id="btn-start-translation" type="button" disabled>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px; height:18px;">
+                        <path d="m5 8 6 6"/>
+                        <path d="m4 14 6-6 2-3"/>
+                        <path d="M2 5h12"/>
+                        <path d="M7 2h1"/>
+                        <path d="m22 22-5-10-5 10"/>
+                        <path d="M14 18h6"/>
+                      </svg>
+                      <span id="btn-start-translation-text" data-i18n="translate.startTranslate">Translate Subtitle</span>
+                    </button>
+                    <button class="btn-secondary btn-cancel-translation" id="btn-cancel-translation" type="button" style="display:none;" data-i18n="translate.cancelTranslate">Cancel</button>
+                  </div>
+
+                  <!-- Telemetry HUD -->
+                  <div class="translate-telemetry" id="translate-telemetry-box" style="display:none;">
+                    <div class="translate-telemetry-header">
+                      <div class="translate-telemetry-status">
+                        <span class="translate-status-badge" id="translate-status-badge" data-i18n="translate.statusReady">Ready</span>
+                        <span id="lbl-translate-lines" class="translate-lines-badge" style="display:none;"></span>
+                      </div>
+                      <div class="translate-telemetry-pct" id="lbl-translate-pct">0%</div>
+                    </div>
+                    <div class="translate-linear-track">
+                      <div class="translate-linear-fill" id="translate-progress-fill" style="width:0%;"></div>
+                    </div>
+                    <div class="translate-telemetry-msg" id="lbl-translate-msg"></div>
+                  </div>
+                </div>
+
+                <!-- Card 4: Golden Pipeline to Hardsub Studio -->
+                <div class="glass-card translate-hardsub-cta" id="translate-hardsub-cta-card">
+                  <div class="translate-hardsub-cta-content">
+                    <div class="translate-hardsub-cta-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="23 7 16 12 23 17 23 7"/>
+                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                      </svg>
+                    </div>
+                    <div class="translate-hardsub-cta-text">
+                      <div class="translate-hardsub-cta-title" data-i18n="translate.sendToHardsub">Send to Hardsub Studio</div>
+                      <div class="translate-hardsub-cta-desc" data-i18n="translate.sendToHardsubDesc">Burn this translated subtitle directly onto your video with custom typography, styling, and GPU encoding.</div>
+                    </div>
+                  </div>
+                  <button class="btn-secondary btn-send-hardsub" id="btn-send-to-hardsub" type="button" disabled>
+                    <span data-i18n="translate.sendToHardsub">Send to Hardsub Studio</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;">
+                      <path d="M5 12h14"/>
+                      <path d="m12 5 7 7-7 7"/>
+                    </svg>
+                  </button>
+                </div>
+
+              </div>
+
+              <!-- Right Column: Dual Subtitle Comparison Deck -->
+              <div class="translate-right-panel">
+                <div class="glass-card translate-preview-card">
+                  <!-- Header Toolbar -->
+                  <div class="translate-preview-toolbar">
+                    <div class="translate-view-segmented">
+                      <button class="view-segment-btn active" id="btn-view-split" type="button" data-i18n="translate.viewSplit">Split View</button>
+                      <button class="view-segment-btn" id="btn-view-source" type="button" data-i18n="translate.viewSource">Original Only</button>
+                      <button class="view-segment-btn" id="btn-view-target" type="button" data-i18n="translate.viewTarget">Translated Only</button>
+                    </div>
+                    <div class="translate-toolbar-actions">
+                      <button class="btn-secondary btn-icon-text" id="btn-copy-translated" type="button" disabled title="Copy translated subtitles">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;">
+                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                        </svg>
+                        <span data-i18n="translate.copyTranslation">Copy Subtitles</span>
+                      </button>
+                      <button class="btn-secondary btn-icon-text" id="btn-open-translated-dir" type="button" disabled title="Open containing folder">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;">
+                          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                        </svg>
+                        <span data-i18n="translate.openOutputFolder">Open Folder</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Dual Preview Grid -->
+                  <div class="translate-preview-grid" id="translate-preview-grid">
+                    <!-- Source Subtitle Pane -->
+                    <div class="translate-pane" id="translate-source-pane">
+                      <div class="translate-pane-header">
+                        <div class="translate-pane-title">
+                          <span data-i18n="translate.sourceSub">Original Subtitle</span>
+                          <span class="translate-count-badge" id="translate-source-count">0</span>
+                        </div>
+                      </div>
+                      <div class="translate-cues-list" id="translate-source-cues-list">
+                        <div class="translate-empty-pane">
+                          <svg class="translate-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="16" y1="13" x2="8" y2="13"/>
+                            <line x1="16" y1="17" x2="8" y2="17"/>
+                            <polyline points="10 9 9 9 8 9"/>
+                          </svg>
+                          <div class="translate-empty-title" data-i18n="translate.emptySourceTitle">No Subtitle Loaded</div>
+                          <div class="translate-empty-desc" data-i18n="translate.emptySourceDesc">Drop an SRT, VTT, LRC, or TXT subtitle file to inspect cues and begin translation.</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Target Subtitle Pane -->
+                    <div class="translate-pane" id="translate-target-pane">
+                      <div class="translate-pane-header">
+                        <div class="translate-pane-title">
+                          <span data-i18n="translate.targetSub">Translated Subtitle</span>
+                          <span class="translate-count-badge" id="translate-target-count">0</span>
+                        </div>
+                      </div>
+                      <div class="translate-cues-list" id="translate-target-cues-list">
+                        <div class="translate-empty-pane">
+                          <svg class="translate-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="m5 8 6 6"/>
+                            <path d="m4 14 6-6 2-3"/>
+                            <path d="M2 5h12"/>
+                            <path d="M7 2h1"/>
+                            <path d="m22 22-5-10-5 10"/>
+                            <path d="M14 18h6"/>
+                          </svg>
+                          <div class="translate-empty-title" data-i18n="translate.emptyTargetTitle">No Translation Yet</div>
+                          <div class="translate-empty-desc" data-i18n="translate.emptyTargetDesc">Choose your destination language and click "Translate Subtitle" to generate AI subtitles.</div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -1,4 +1,5 @@
 import { hardsubController } from './hardsub.ts';
+import { translationStudioController } from './translationStudio.ts';
 import { initI18n, t, setLanguage, getLanguage, translateDOM } from './i18n/index.ts';
 
 // Global error catcher for visual debugging in frontend
@@ -2167,6 +2168,13 @@ window.switchView = function(viewName) {
     if (guideBtn) guideBtn.classList.add('active');
     loadModelStatusesGrid();
   }
+
+  if (viewName === 'translate') {
+    if (window.translationStudioController) {
+      window.translationStudioController.syncFromGlobalSettings();
+      window.translationStudioController.refreshLocalization();
+    }
+  }
 };
 
 
@@ -2865,6 +2873,9 @@ function bindSettingsToDOM() {
     populateProvidersDropdown();
     onProviderChanged();
   }
+  if (window.translationStudioController) {
+    window.translationStudioController.syncFromGlobalSettings();
+  }
   
   if (typeof toggleTranslationSubSettingsVisibility === 'function') {
     toggleTranslationSubSettingsVisibility();
@@ -2882,6 +2893,9 @@ function bindSettingsToDOM() {
           saveCurrentSettings();
           if (key === 'translateAiEnabled' && typeof toggleTranslationSubSettingsVisibility === 'function') {
             toggleTranslationSubSettingsVisibility();
+          }
+          if (key === 'translateAiPolish' && window.translationStudioController) {
+            window.translationStudioController.syncFromGlobalSettings();
           }
           if (key === 'outputJson' || key === 'outputJsonFull') {
             syncJsonConfidenceDependency();
@@ -2936,6 +2950,9 @@ function bindSettingsToDOM() {
             if (typeof onProviderChanged === 'function') {
               onProviderChanged();
             }
+          }
+          if ((key === 'translateAiTargetLang' || key === 'translateAiModel') && window.translationStudioController) {
+            window.translationStudioController.syncFromGlobalSettings();
           }
           if (key === 'outputDirMode') {
             if (typeof toggleOutputDirCustomField === 'function') {
@@ -5703,6 +5720,10 @@ window.populateProvidersDropdown = function() {
   
   // Render the tiles grid
   renderProvidersGrid(providers);
+
+  if (window.translationStudioController) {
+    window.translationStudioController.refreshProviderOptions();
+  }
 };
 
 window.renderProvidersGrid = function(providers = null) {
@@ -5958,6 +5979,10 @@ window.onProviderChanged = function(keepCurrentTab = false, skipTableRender = fa
     
     const tbody = document.getElementById('mgr-models-tbody');
     if (tbody) tbody.innerHTML = '';
+  }
+
+  if (window.translationStudioController) {
+    window.translationStudioController.refreshModelOptions();
   }
   
   saveCurrentSettings();

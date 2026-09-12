@@ -3698,3 +3698,4 @@ ${events}`;
 }
 
 export const hardsubController = new HardsubController();
+(window as any).hardsubController = hardsubController;
