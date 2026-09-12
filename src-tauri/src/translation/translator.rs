@@ -1005,6 +1005,7 @@ pub async fn translate_files(
 
     let client = build_http_client();
     let mut last_progress = 0.0_f64;
+    let mut last_extras: ProgressExtras = None;
 
     for (file_idx, file_name) in generated_files.iter().enumerate() {
         // Honour a cancel request between files.
@@ -1116,18 +1117,20 @@ pub async fn translate_files(
         } else {
             format!("Translating AI: 0/{} lines ({})", total_lines, file_name)
         };
+        let initial_extras = Some((
+            translations_map.len(),
+            total_lines,
+            file_idx + 1,
+            total_files,
+        ));
         emit_status(
             &app,
             initial_progress,
             &initial_msg,
             true,
-            Some((
-                translations_map.len(),
-                total_lines,
-                file_idx + 1,
-                total_files,
-            )),
+            initial_extras,
         );
+        last_extras = initial_extras;
         last_progress = initial_progress;
 
         let mut stall_rounds: usize = 0;
@@ -1164,18 +1167,20 @@ pub async fn translate_files(
                     current_translated_lines, total_lines, file_name
                 )
             };
+            let chunk_extras = Some((
+                current_translated_lines,
+                total_lines,
+                file_idx + 1,
+                total_files,
+            ));
             emit_status(
                 &app,
                 global_progress,
                 &msg,
                 true,
-                Some((
-                    current_translated_lines,
-                    total_lines,
-                    file_idx + 1,
-                    total_files,
-                )),
+                chunk_extras,
             );
+            last_extras = chunk_extras;
             last_progress = global_progress;
 
             let system_prompt = build_system_prompt(
@@ -1373,18 +1378,20 @@ pub async fn translate_files(
                             current_translated_lines, total_lines, file_name
                         )
                     };
+                    let chunk_extras = Some((
+                        current_translated_lines,
+                        total_lines,
+                        file_idx + 1,
+                        total_files,
+                    ));
                     emit_status(
                         &app,
                         global_progress,
                         &msg,
                         true,
-                        Some((
-                            current_translated_lines,
-                            total_lines,
-                            file_idx + 1,
-                            total_files,
-                        )),
+                        chunk_extras,
                     );
+                    last_extras = chunk_extras;
                     last_progress = global_progress;
                 }
             }
@@ -1404,6 +1411,12 @@ pub async fn translate_files(
             .filter(|(idx, _)| !translations_map.contains_key(idx))
             .count();
         if untranslated > 0 {
+            let untranslated_extras = Some((
+                total_lines - untranslated,
+                total_lines,
+                file_idx + 1,
+                total_files,
+            ));
             emit_status(
                 &app,
                 last_progress,
@@ -1412,13 +1425,9 @@ pub async fn translate_files(
                     untranslated
                 ),
                 true,
-                Some((
-                    total_lines - untranslated,
-                    total_lines,
-                    file_idx + 1,
-                    total_files,
-                )),
+                untranslated_extras,
             );
+            last_extras = untranslated_extras;
         }
 
         // Reconstruct and save
@@ -1439,7 +1448,13 @@ pub async fn translate_files(
         emit_status(&app, 1.0, "Nothing to translate", false, None);
         logs.log(&app, "Translate", "Finished: no file produced a translation");
     } else {
-        emit_status(&app, 1.0, "AI translation complete", false, None);
+        let final_extras = match last_extras {
+            Some((_, total_lines, file_idx, total_files)) => {
+                Some((total_lines, total_lines, file_idx, total_files))
+            }
+            None => None,
+        };
+        emit_status(&app, 1.0, "AI translation complete", false, final_extras);
         logs.log(&app, "Translate", &format!(
             "Finished: {} file(s) translated successfully",
             successfully_translated.len()

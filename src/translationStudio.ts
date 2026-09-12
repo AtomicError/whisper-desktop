@@ -316,6 +316,7 @@ export class TranslationStudioController {
       this.setupDropZone();
       this.listenToProgressEvents();
       this.syncFromGlobalSettings();
+      this.updateActionButtons();
     };
 
     if (document.readyState === 'loading') {
@@ -372,6 +373,13 @@ export class TranslationStudioController {
   }
 
   private setupEventListeners() {
+    this.dropZone?.addEventListener('click', (e) => {
+      if (this.state.subtitlePath) return;
+      const target = e.target as HTMLElement;
+      if (target.closest('button')) return;
+      this.browseSubtitleFile();
+    });
+
     this.btnBrowseSub?.addEventListener('click', () => this.browseSubtitleFile());
     this.btnClearSub?.addEventListener('click', () => this.clearLoadedSubtitle());
 
@@ -707,6 +715,7 @@ export class TranslationStudioController {
           if (this.companionChip && this.lblCompanionName) {
             const candidateName = candidate.split(/[\/\\]/).pop() || '';
             this.lblCompanionName.textContent = candidateName;
+            this.companionChip.title = candidate;
             this.companionChip.style.display = 'inline-flex';
           }
           return;
@@ -722,6 +731,7 @@ export class TranslationStudioController {
 
     if (this.state.subtitlePath) {
       this.lblSubName.textContent = this.state.subtitleName;
+      this.lblSubName.title = this.state.subtitlePath;
       this.lblSubPath.textContent = this.state.subtitlePath;
       this.lblSubPath.title = this.state.subtitlePath;
 
@@ -729,18 +739,24 @@ export class TranslationStudioController {
       const sizeStr = formatBytes(this.state.subtitleSize);
       const extUpper = this.state.subtitleExt.toUpperCase();
       this.lblSubMeta.textContent = `${extUpper} • ${t('translate.cuesCount', { count: cueCount })} • ${sizeStr}`;
-      this.lblSubMeta.style.display = 'block';
+      this.lblSubMeta.style.display = 'inline-flex';
 
       this.btnClearSub.style.display = 'inline-flex';
       this.dropZone?.classList.add('has-file');
+      this.dropZone?.setAttribute('title', this.state.subtitlePath);
     } else {
       this.lblSubName.textContent = t('translate.noSubLoaded');
+      this.lblSubName.removeAttribute('title');
       this.lblSubPath.textContent = t('translate.dropSubPrompt');
       this.lblSubPath.removeAttribute('title');
       this.lblSubMeta.style.display = 'none';
       this.btnClearSub.style.display = 'none';
       this.dropZone?.classList.remove('has-file');
-      if (this.companionChip) this.companionChip.style.display = 'none';
+      this.dropZone?.setAttribute('title', t('translate.dropSubPrompt'));
+      if (this.companionChip) {
+        this.companionChip.style.display = 'none';
+        this.companionChip.removeAttribute('title');
+      }
     }
 
     this.updateOutputDirUI();
@@ -981,10 +997,19 @@ export class TranslationStudioController {
       this.telemetryBox.style.display = (isTranslating || this.state.progress > 0) ? 'block' : 'none';
     }
 
-    const hasTranslation = !!this.state.translatedPath && this.state.translatedCues.length > 0;
-    if (this.btnCopy) this.btnCopy.disabled = !hasTranslation;
-    if (this.btnOpenFolder) this.btnOpenFolder.disabled = !hasTranslation;
-    if (this.btnSendToHardsub) this.btnSendToHardsub.disabled = !hasSub && !hasTranslation;
+    const hasTranslation = !this.state.isTranslating && !!this.state.translatedPath && this.state.translatedCues.length > 0;
+    if (this.btnCopy) {
+      this.btnCopy.disabled = !hasTranslation;
+      this.btnCopy.title = hasTranslation ? t('translate.copyTranslation') : t('translate.emptyTargetTitle');
+    }
+    if (this.btnOpenFolder) {
+      this.btnOpenFolder.disabled = !hasTranslation;
+      this.btnOpenFolder.title = hasTranslation ? t('translate.openOutputFolder') : t('translate.emptyTargetTitle');
+    }
+    if (this.btnSendToHardsub) {
+      this.btnSendToHardsub.disabled = !hasTranslation;
+      this.btnSendToHardsub.title = hasTranslation ? t('translate.sendToHardsub') : t('translate.emptyTargetTitle');
+    }
   }
 
   private listenToProgressEvents() {
@@ -995,10 +1020,30 @@ export class TranslationStudioController {
       const progressVal = typeof payload.progress === 'number' ? payload.progress : 0;
       this.state.progress = progressVal;
       this.state.progressMsg = payload.message || '';
-      this.state.currentLine = payload.currentLine || 0;
-      this.state.totalLines = payload.totalLines || this.state.sourceCues.length;
+
+      if (typeof payload.currentLine === 'number') {
+        this.state.currentLine = payload.currentLine;
+      }
+      if (typeof payload.totalLines === 'number' && payload.totalLines > 0) {
+        this.state.totalLines = payload.totalLines;
+      } else if (!this.state.totalLines && this.state.sourceCues.length > 0) {
+        this.state.totalLines = this.state.sourceCues.length;
+      }
 
       const pct = Math.min(100, Math.max(0, Math.round(progressVal * 100)));
+
+      // When translation is complete or progress reached 100%, line counter should display full completion (e.g. 12 / 12)
+      const isCancelled = payload.message === 'Translation cancelled';
+      const isComplete = !isCancelled && (payload.message === 'AI translation complete' || (!payload.active && (progressVal >= 1.0 || pct >= 100)));
+      if (isComplete && this.state.totalLines > 0) {
+        this.state.currentLine = this.state.totalLines;
+      } else if (this.state.totalLines > 0 && this.state.currentLine > this.state.totalLines) {
+        this.state.currentLine = this.state.totalLines;
+      }
+
+      if (this.telemetryBox) {
+        this.telemetryBox.style.display = (payload.active || this.state.progress > 0 || isComplete) ? 'block' : 'none';
+      }
 
       if (this.progressFill) {
         this.progressFill.style.width = `${pct}%`;
@@ -1021,10 +1066,10 @@ export class TranslationStudioController {
         if (payload.active) {
           this.statusBadge.textContent = t('translate.statusTranslating');
           this.statusBadge.className = 'translate-status-badge active';
-        } else if (payload.message === 'Translation cancelled') {
+        } else if (isCancelled) {
           this.statusBadge.textContent = t('translate.statusCancelled');
           this.statusBadge.className = 'translate-status-badge cancelled';
-        } else if (payload.message === 'AI translation complete') {
+        } else if (payload.message === 'AI translation complete' || isComplete) {
           this.statusBadge.textContent = t('translate.statusComplete');
           this.statusBadge.className = 'translate-status-badge complete';
         }
@@ -1066,6 +1111,24 @@ export class TranslationStudioController {
     };
 
     this.state.isTranslating = true;
+    this.state.progress = 0;
+    this.state.currentLine = 0;
+    this.state.translatedPath = '';
+    this.state.translatedName = '';
+    this.state.translatedRawText = '';
+    this.state.translatedCues = [];
+    this.renderTargetCues();
+
+    if (!this.state.totalLines && this.state.sourceCues.length > 0) {
+      this.state.totalLines = this.state.sourceCues.length;
+    }
+    if (this.progressFill) this.progressFill.style.width = '0%';
+    if (this.lblPct) this.lblPct.textContent = '0%';
+    if (this.lblLines && this.state.totalLines > 0) {
+      this.lblLines.textContent = `0 / ${this.state.totalLines}`;
+      this.lblLines.style.display = 'inline';
+    }
+    if (this.lblMsg) this.lblMsg.textContent = '';
     this.updateActionButtons();
 
     if (this.statusBadge) {
@@ -1104,6 +1167,20 @@ export class TranslationStudioController {
         this.state.translatedCues = parseSubtitleContent(transContent, outExt);
 
         this.renderTargetCues();
+
+        this.state.progress = 1.0;
+        if (!this.state.totalLines && this.state.sourceCues.length > 0) {
+          this.state.totalLines = this.state.sourceCues.length;
+        }
+        if (this.state.totalLines > 0) {
+          this.state.currentLine = this.state.totalLines;
+        }
+        if (this.progressFill) this.progressFill.style.width = '100%';
+        if (this.lblPct) this.lblPct.textContent = '100%';
+        if (this.lblLines && this.state.totalLines > 0) {
+          this.lblLines.textContent = `${this.state.currentLine} / ${this.state.totalLines}`;
+          this.lblLines.style.display = 'inline';
+        }
 
         if (this.statusBadge) {
           this.statusBadge.textContent = t('translate.statusComplete');
@@ -1151,7 +1228,7 @@ export class TranslationStudioController {
   }
 
   public async copyTranslatedText() {
-    if (!this.state.translatedRawText && this.state.translatedCues.length === 0) return;
+    if (!this.state.translatedPath || (!this.state.translatedRawText && this.state.translatedCues.length === 0)) return;
     const textToCopy = this.state.translatedRawText || this.state.translatedCues.map(c => c.text).join('\n');
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -1171,11 +1248,15 @@ export class TranslationStudioController {
   }
 
   public async openOutputFolder() {
-    const targetFile = this.state.translatedPath || this.state.subtitlePath;
-    if (!targetFile) return;
-    const targetFolder = getParentDir(targetFile);
+    if (!this.state.translatedPath) return;
+    const targetFolder = getParentDir(this.state.translatedPath);
     if (!targetFolder) return;
     try {
+      const win = window as any;
+      if (typeof win.openFileInEditor === 'function') {
+        await win.openFileInEditor(targetFolder);
+        return;
+      }
       await invoke('open_file_in_editor', { filePath: targetFolder });
     } catch (err) {
       console.error('Failed to open folder:', err);
@@ -1190,29 +1271,31 @@ export class TranslationStudioController {
     else if (mode === 'source') this.btnViewSource?.classList.add('active');
     else if (mode === 'target') this.btnViewTarget?.classList.add('active');
 
-    if (!this.previewGrid || !this.sourcePane || !this.targetPane) return;
-
-    if (mode === 'split') {
-      this.previewGrid.classList.remove('view-source-only', 'view-target-only');
-      this.sourcePane.style.display = 'flex';
-      this.targetPane.style.display = 'flex';
-    } else if (mode === 'source') {
-      this.previewGrid.classList.add('view-source-only');
-      this.previewGrid.classList.remove('view-target-only');
-      this.sourcePane.style.display = 'flex';
-      this.targetPane.style.display = 'none';
-    } else if (mode === 'target') {
-      this.previewGrid.classList.add('view-target-only');
-      this.previewGrid.classList.remove('view-source-only');
-      this.sourcePane.style.display = 'none';
-      this.targetPane.style.display = 'flex';
+    if (this.previewGrid && this.sourcePane && this.targetPane) {
+      if (mode === 'split') {
+        this.previewGrid.classList.remove('view-source-only', 'view-target-only');
+        this.sourcePane.style.display = 'flex';
+        this.targetPane.style.display = 'flex';
+      } else if (mode === 'source') {
+        this.previewGrid.classList.add('view-source-only');
+        this.previewGrid.classList.remove('view-target-only');
+        this.sourcePane.style.display = 'flex';
+        this.targetPane.style.display = 'none';
+      } else if (mode === 'target') {
+        this.previewGrid.classList.add('view-target-only');
+        this.previewGrid.classList.remove('view-source-only');
+        this.sourcePane.style.display = 'none';
+        this.targetPane.style.display = 'flex';
+      }
     }
+
+    this.updateActionButtons();
   }
 
   public sendToHardsubStudio() {
-    const subToLoad = this.state.translatedPath || this.state.subtitlePath;
+    const subToLoad = this.state.translatedPath;
     if (!subToLoad) {
-      this.notify(t('translate.noSubSelectedError'), 'error');
+      this.notify(t('translate.emptyTargetTitle'), 'error');
       return;
     }
 

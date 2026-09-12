@@ -321,6 +321,19 @@ html[dir="rtl"] .about-update-subtext {
 }
 
 /* 8. Translation Studio RTL */
+html[dir="rtl"] #translate-drop-zone .translate-sub-info {
+  text-align: right;
+}
+
+html[dir="rtl"] #translate-drop-zone.has-file .translate-sub-name {
+  direction: ltr;
+  text-align: left;
+}
+
+html[dir="rtl"] #translate-drop-zone.has-file .translate-sub-meta-badge {
+  unicode-bidi: isolate;
+}
+
 html[dir="rtl"] #translate-drop-zone.has-file #lbl-translate-sub-path,
 html[dir="rtl"] .translate-output-display.has-custom-path {
   direction: ltr;
@@ -345,7 +358,8 @@ html[dir="rtl"] .translate-lines-badge {
 }
 
 html[dir="rtl"] .translate-companion-badge {
-  direction: rtl;
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 
 html[dir="rtl"] .translate-switch-info {
