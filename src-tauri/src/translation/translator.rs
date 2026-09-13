@@ -42,6 +42,30 @@ const MAX_STALL_ROUNDS: usize = 3;
 /// generous, but it prevents permanently hung connections.
 pub const REQUEST_TIMEOUT_SECS: u64 = 240;
 pub const CONNECT_TIMEOUT_SECS: u64 = 15;
+pub const PREVIEW_TIMEOUT_SECS: u64 = 25;
+pub const PREVIEW_CONNECT_TIMEOUT_SECS: u64 = 10;
+
+use std::sync::atomic::{AtomicBool, Ordering};
+
+static PREVIEW_CANCELLED: AtomicBool = AtomicBool::new(false);
+static PREVIEW_NOTIFY: OnceLock<tokio::sync::Notify> = OnceLock::new();
+
+fn preview_notify() -> &'static tokio::sync::Notify {
+    PREVIEW_NOTIFY.get_or_init(tokio::sync::Notify::new)
+}
+
+pub fn cancel_preview_request() {
+    PREVIEW_CANCELLED.store(true, Ordering::SeqCst);
+    preview_notify().notify_waiters();
+}
+
+fn build_preview_http_client() -> reqwest::Client {
+    reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(PREVIEW_TIMEOUT_SECS))
+        .connect_timeout(std::time::Duration::from_secs(PREVIEW_CONNECT_TIMEOUT_SECS))
+        .build()
+        .unwrap_or_else(|_| reqwest::Client::new())
+}
 
 pub const TRANSLATION_CANCELLED_MSG: &str = "Translation cancelled by user";
 
@@ -954,8 +978,11 @@ pub async fn translate_files(
             None
         },
         reasoning_effort: active_model.and_then(|m| {
+            if m.supports_reasoning == Some(false) {
+                return None;
+            }
             let r = m.reasoning.trim().to_lowercase();
-            if r == "low" || r == "medium" || r == "high" {
+            if r == "minimal" || r == "low" || r == "medium" || r == "high" || r == "xhigh" || r == "max" {
                 Some(m.reasoning.clone())
             } else {
                 None
@@ -1485,13 +1512,7 @@ pub async fn preview_translate(
     settings: WhisperSettings,
     file_content: String,
 ) -> Result<String, String> {
-    logs.log(&app, "Translate", &format!(
-        "Preview requested (provider: '{}', model: '{}')",
-        settings.translate_ai_provider, settings.translate_ai_model
-    ));
-    if settings.translate_ai_model.trim().is_empty() {
-        return Err("No active translation model is selected. Please configure and select a model under your active provider first.".to_string());
-    }
+    PREVIEW_CANCELLED.store(false, Ordering::SeqCst);
 
     let providers_list: Vec<AiProvider> = serde_json::from_str(&settings.translate_ai_providers)
         .map_err(|e| format!("Failed to parse providers: {}", e))?;
@@ -1506,10 +1527,36 @@ pub async fn preview_translate(
             )
         })?;
 
-    if provider.base_url.trim().is_empty() {
+    let model = if !settings.translate_ai_model.trim().is_empty()
+        && (provider.models.is_empty() || provider.models.iter().any(|m| m.id == settings.translate_ai_model.trim()))
+    {
+        settings.translate_ai_model.trim().to_string()
+    } else if let Some(m) = provider.models.iter().find(|m| m.enabled) {
+        m.id.clone()
+    } else if let Some(m) = provider.models.first() {
+        m.id.clone()
+    } else if !settings.translate_ai_model.trim().is_empty() {
+        settings.translate_ai_model.trim().to_string()
+    } else {
+        return Err("No active translation model is selected. Please configure and select a model under your active provider first.".to_string());
+    };
+
+    logs.log(&app, "Translate", &format!(
+        "Preview requested (provider: '{}', model: '{}')",
+        settings.translate_ai_provider, model
+    ));
+
+    let trimmed_base_url = provider.base_url.trim();
+    if trimmed_base_url.is_empty() {
         return Err(format!(
             "Provider '{}' has no Base URL configured.",
             provider.name
+        ));
+    }
+    if !trimmed_base_url.starts_with("http://") && !trimmed_base_url.starts_with("https://") {
+        return Err(format!(
+            "Provider '{}' has an invalid Base URL '{}'. URL must begin with http:// or https://",
+            provider.name, trimmed_base_url
         ));
     }
 
@@ -1546,7 +1593,7 @@ pub async fn preview_translate(
         return Err("No dialogues found in the provided preview content.".to_string());
     }
 
-    let client = build_http_client();
+    let client = build_preview_http_client();
     let system_prompt = build_system_prompt(
         &provider.custom_prompt,
         &settings.translate_ai_target_lang,
@@ -1568,64 +1615,112 @@ pub async fn preview_translate(
         ..crate::translation::provider::RequestOptions::default()
     };
 
-    // Preview has no cancel channel, but the client timeout still bounds it.
-    let outcome = tokio::time::timeout(
-        std::time::Duration::from_secs(REQUEST_TIMEOUT_SECS),
-        async {
-            let mut attempt: usize = 0;
-            loop {
-                let request_body = provider.format_request_body_ext(
-                    &settings.translate_ai_model,
-                    &system_prompt,
-                    &user_content,
-                    &request_options,
-                )?;
-                let request_url = build_request_url(
-                    api_format,
-                    &provider.base_url,
-                    &settings.translate_ai_model,
-                    &api_key,
-                );
-                let req = apply_auth_headers(
-                    client.post(&request_url).json(&request_body),
-                    api_format,
-                    &api_key,
-                );
+    let cancel_watcher = async {
+        loop {
+            if PREVIEW_CANCELLED.load(Ordering::SeqCst) {
+                return;
+            }
+            tokio::select! {
+                _ = preview_notify().notified() => {},
+                _ = tokio::time::sleep(std::time::Duration::from_millis(50)) => {},
+            }
+        }
+    };
 
-                let res = req
-                    .send()
-                    .await
-                    .map_err(|e| format!("Request failed: {}", e))?;
+    let request_task = async {
+        let mut attempt: usize = 0;
+        loop {
+            if PREVIEW_CANCELLED.load(Ordering::SeqCst) {
+                return Err("Connection test cancelled by user.".to_string());
+            }
+            let request_body = provider.format_request_body_ext(
+                &model,
+                &system_prompt,
+                &user_content,
+                &request_options,
+            )?;
+            let request_url = build_request_url(
+                api_format,
+                &provider.base_url,
+                &model,
+                &api_key,
+            );
+            let req = apply_auth_headers(
+                client.post(&request_url).json(&request_body),
+                api_format,
+                &api_key,
+            );
 
-                if !res.status().is_success() {
-                    let status = res.status();
-                    let err_text = res.text().await.unwrap_or_default();
-                    if (status.as_u16() == 400 || status.as_u16() == 422)
-                        && attempt < 3
-                        && negotiate_parameter_error(&err_text, &mut request_options, &app, &logs)
-                    {
-                        attempt += 1;
-                        continue;
+            let res = req
+                .send()
+                .await
+                .map_err(|e| {
+                    let err_str = e.to_string();
+                    let err_lower = err_str.to_lowercase();
+                    if e.is_timeout() {
+                        format!("Connection timed out after {} seconds. Check network connection or proxy/VPN. Note: If using a free-tier (:free) or heavy model, the provider's public queue may be busy; try selecting a lighter/faster model.", PREVIEW_TIMEOUT_SECS)
+                    } else if err_lower.contains("certificate") || err_lower.contains("unknownissuer") {
+                        format!("SSL/TLS certificate verification failed ({}). The connection may be intercepted or blocked. Please verify your proxy or VPN.", e)
+                    } else if err_lower.contains("reset by peer") || err_lower.contains("broken pipe") {
+                        format!("Connection was reset by peer. The endpoint may be blocked or interrupted by network filtering. Please check your proxy/VPN: {}", e)
+                    } else if e.is_connect() {
+                        format!("Failed to connect to provider endpoint: {}. Please check your internet connection or proxy settings.", e)
+                    } else {
+                        format!("Request failed: {}", e)
                     }
+                })?;
+
+            if !res.status().is_success() {
+                let status = res.status();
+                let err_text = res.text().await.unwrap_or_default();
+                if (status.as_u16() == 400 || status.as_u16() == 422)
+                    && attempt < 2
+                    && negotiate_parameter_error(&err_text, &mut request_options, &app, &logs)
+                {
+                    attempt += 1;
+                    continue;
+                }
+                return Err(format!(
+                    "API returned error status ({}): {}",
+                    status, err_text
+                ));
+            }
+
+            let res_json: Value = res
+                .json()
+                .await
+                .map_err(|e| format!("Failed to parse JSON response: {}", e))?;
+
+            return parse_response_content(api_format, &res_json);
+        }
+    };
+
+    let timed_request = tokio::time::timeout(
+        std::time::Duration::from_secs(PREVIEW_TIMEOUT_SECS),
+        request_task,
+    );
+
+    let outcome = tokio::select! {
+        _ = cancel_watcher => {
+            logs.log(&app, "Translate", "Preview cancelled by user");
+            return Err("Connection test cancelled by user.".to_string());
+        }
+        res = timed_request => {
+            match res {
+                Ok(Ok(content)) => content,
+                Ok(Err(e)) => return Err(e),
+                Err(_) => {
+                    logs.log(&app, "Translate", &format!("Preview timed out after {}s", PREVIEW_TIMEOUT_SECS));
                     return Err(format!(
-                        "API returned error status ({}): {}",
-                        status, err_text
+                        "Connection test timed out after {} seconds. Please check your network connection, proxy, or provider endpoint URL.",
+                        PREVIEW_TIMEOUT_SECS
                     ));
                 }
-
-                let res_json: Value = res
-                    .json()
-                    .await
-                    .map_err(|e| format!("Failed to parse JSON response: {}", e))?;
-
-                return parse_response_content(api_format, &res_json);
             }
-        },
-    )
-    .await
-    .map_err(|_| format!("Request timed out after {} seconds.", REQUEST_TIMEOUT_SECS))??;
+        }
+    };
 
-    let chunk_translations = align_translations(&original_entries, &outcome, false);
+    let chunk_translations = align_translations(&original_entries, &outcome, true);
     if chunk_translations.is_empty() {
         logs.log(&app, "Translate", "Preview failed: response could not be aligned to numbered lines");
         return Err(format!(
@@ -1766,6 +1861,43 @@ fn update_model_limits(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn test_preview_cancel_request() {
+        PREVIEW_CANCELLED.store(false, Ordering::SeqCst);
+        assert!(!PREVIEW_CANCELLED.load(Ordering::SeqCst));
+
+        let handle = tokio::spawn(async {
+            loop {
+                if PREVIEW_CANCELLED.load(Ordering::SeqCst) {
+                    return true;
+                }
+                preview_notify().notified().await;
+            }
+        });
+
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        cancel_preview_request();
+        assert!(PREVIEW_CANCELLED.load(Ordering::SeqCst));
+        let notified = tokio::time::timeout(std::time::Duration::from_secs(1), handle)
+            .await
+            .expect("timeout")
+            .unwrap();
+        assert!(notified);
+    }
+
+    #[test]
+    fn test_align_translations_positional_fallback_single_line() {
+        let entries = vec![(1, "Hello world".to_string())];
+        // Model returns single translation without numbering
+        let response = "سلام دنیا";
+        let aligned = align_translations(&entries, response, true);
+        assert_eq!(aligned.get(&1), Some(&"سلام دنیا".to_string()));
+
+        // With positional fallback false, it fails to match unnumbered line
+        let aligned_no_pos = align_translations(&entries, response, false);
+        assert!(aligned_no_pos.is_empty());
+    }
 
     #[test]
     fn compute_progress_is_monotonic_and_bounded() {

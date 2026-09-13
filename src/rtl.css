@@ -366,3 +366,15 @@ html[dir="rtl"] .translate-switch-info {
   text-align: right;
 }
 
+[dir="rtl"] .about-modal-close-btn,
+html[dir="rtl"] .about-modal-close-btn {
+  right: auto;
+  left: 16px;
+}
+
+[dir="rtl"] #translation-test-modal .modal-title-row,
+html[dir="rtl"] #translation-test-modal .modal-title-row {
+  padding-right: 0 !important;
+  padding-left: 32px !important;
+}
+

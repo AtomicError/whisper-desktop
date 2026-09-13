@@ -484,6 +484,12 @@ window.checkForAppUpdates = async function() {
 
 window.addEventListener('whisper:languageChanged', () => {
   renderUpdateCheckerUI();
+  if (typeof window.updateFilterCounts === 'function') {
+    window.updateFilterCounts();
+  }
+  if (typeof window.applyModelsFilterAndRender === 'function' && typeof currentProviderModels !== 'undefined' && currentProviderModels && currentProviderModels.length > 0) {
+    window.applyModelsFilterAndRender(0);
+  }
 });
 
 function syncAppVersionUI() {
@@ -1088,8 +1094,9 @@ window.customSelectsMap = new Map();
 let customSelectInstanceCounter = 0;
 
 class CustomSelect {
-  constructor(selectElement) {
+  constructor(selectElement, options = {}) {
     this.select = selectElement;
+    this.options = options || {};
     this.instanceId = this.select.id || `custom-select-auto-${++customSelectInstanceCounter}`;
     this.container = null;
     this.trigger = null;
@@ -1098,6 +1105,7 @@ class CustomSelect {
     this.focusedIndex = -1;
     this.typeaheadBuffer = '';
     this.typeaheadTimeout = null;
+    this.observer = null;
     this.init();
   }
 
@@ -1108,7 +1116,10 @@ class CustomSelect {
     this.container.className = 'custom-select-container';
     
     if (this.select.className) {
-      this.container.classList.add(...this.select.className.split(' ').filter(c => c !== 'select-control'));
+      const classesToAdd = this.select.className.split(/\s+/).filter(c => Boolean(c) && c !== 'select-control');
+      if (classesToAdd.length > 0) {
+        this.container.classList.add(...classesToAdd);
+      }
     }
     this.container.id = `custom-select-${this.instanceId}`;
     
@@ -1250,16 +1261,30 @@ class CustomSelect {
     };
     this.trigger.addEventListener('keydown', this._keydownHandler);
 
-    this._documentClickHandler = (e) => {
-      if (this.isOpen && !this.container.contains(e.target) && !this.optionsContainer.contains(e.target)) {
+    this._documentPointerHandler = (e) => {
+      if (this.isOpen && this.container && this.optionsContainer) {
+        if (!this.container.contains(e.target) && !this.optionsContainer.contains(e.target)) {
+          this.close();
+        }
+      }
+    };
+
+    this._globalEscapeHandler = (e) => {
+      if (e.key === 'Escape' && this.isOpen) {
         this.close();
       }
     };
-    document.addEventListener('click', this._documentClickHandler);
 
-    this._scrollResizeHandler = () => {
+    this._scrollResizeHandler = (e) => {
       if (this.isOpen) {
-        this.updatePosition();
+        if (e && e.type === 'scroll') {
+          // If scrolling anywhere outside the optionsContainer itself, close the dropdown
+          if (!this.optionsContainer.contains(e.target)) {
+            this.close();
+          }
+        } else {
+          this.updatePosition();
+        }
       }
     };
 
@@ -1280,10 +1305,19 @@ class CustomSelect {
       this.syncSelectedValue();
     });
 
-    this.observer = new MutationObserver(() => {
-      this.updateOptions();
-    });
-    this.observer.observe(this.select, { childList: true, attributes: true, subtree: true });
+    // Avoid running heavy MutationObservers on table row selects and static controls
+    const isRowSelect = this.select && this.select.classList.contains('model-reasoning-select');
+    const isPaginationSelect = this.select && this.select.classList.contains('pagination-size-select');
+    const shouldObserve = this.options.observe !== undefined 
+      ? Boolean(this.options.observe)
+      : (!isRowSelect && !isPaginationSelect);
+
+    if (shouldObserve) {
+      this.observer = new MutationObserver(() => {
+        this.updateOptions();
+      });
+      this.observer.observe(this.select, { childList: true, attributes: true, subtree: true });
+    }
 
     // Register this instance globally for sync
     window.customSelectsMap.set(this.select.id || this.select, this);
@@ -1335,8 +1369,9 @@ class CustomSelect {
   }
 
   updateOptions() {
+    if (!this.select || !this.optionsContainer || !this.container) return;
     this.optionsContainer.innerHTML = '';
-    const options = Array.from(this.select.options);
+    const options = Array.from(this.select.options || []);
     const frag = document.createDocumentFragment();
 
     options.forEach((opt, idx) => {
@@ -1372,7 +1407,8 @@ class CustomSelect {
   }
 
   syncSelectedValue() {
-    const selectedOpt = this.select.options[this.select.selectedIndex];
+    if (!this.select || !this.trigger || !this.optionsContainer) return;
+    const selectedOpt = this.select.options ? this.select.options[this.select.selectedIndex] : null;
     const valText = selectedOpt ? selectedOpt.textContent : (this.select.placeholder || 'Select...');
     const valEl = this.trigger.querySelector('.custom-select-value');
     if (valEl) {
@@ -1381,16 +1417,18 @@ class CustomSelect {
     }
     this.trigger.title = valText;
 
-    Array.from(this.optionsContainer.children).forEach(child => {
-      const isSelected = child.dataset.value === this.select.value;
-      if (isSelected) {
-        child.classList.add('selected');
-        child.setAttribute('aria-selected', 'true');
-      } else {
-        child.classList.remove('selected');
-        child.setAttribute('aria-selected', 'false');
-      }
-    });
+    if (this.optionsContainer.children) {
+      Array.from(this.optionsContainer.children).forEach(child => {
+        const isSelected = child.dataset && child.dataset.value === this.select.value;
+        if (isSelected) {
+          child.classList.add('selected');
+          child.setAttribute('aria-selected', 'true');
+        } else {
+          child.classList.remove('selected');
+          child.setAttribute('aria-selected', 'false');
+        }
+      });
+    }
   }
 
   updatePosition() {
@@ -1404,13 +1442,24 @@ class CustomSelect {
     this.optionsContainer.style.position = 'fixed';
     this.optionsContainer.style.zIndex = '999999';
 
-    const targetWidth = Math.round(rect.width);
-    this.optionsContainer.style.width = `${targetWidth}px`;
+    const triggerWidth = Math.round(rect.width);
+    const isReasoning = this.select && this.select.classList.contains('model-reasoning-select');
+    const isPaginationSize = this.select && this.select.classList.contains('pagination-size-select');
+    const minDropdownWidth = isReasoning ? 136 : (isPaginationSize ? 70 : 118);
+    const targetWidth = Math.max(triggerWidth, minDropdownWidth);
+    this.optionsContainer.style.width = isReasoning ? 'max-content' : 'auto';
     this.optionsContainer.style.minWidth = `${targetWidth}px`;
-    this.optionsContainer.style.maxWidth = `${targetWidth}px`;
+    this.optionsContainer.style.maxWidth = `${Math.max(targetWidth, 280)}px`;
 
-    const leftPos = Math.round(rect.left);
-    this.optionsContainer.style.left = `${leftPos}px`;
+    const measuredWidth = this.optionsContainer.getBoundingClientRect().width || targetWidth;
+    const effectiveWidth = Math.max(targetWidth, Math.round(measuredWidth));
+    const isRtl = (typeof getLanguage === 'function' && getLanguage() === 'fa') ||
+                  document.documentElement.dir === 'rtl' ||
+                  document.body.dir === 'rtl';
+
+    const leftPos = isRtl ? Math.round(rect.right - effectiveWidth) : Math.round(rect.left);
+    const maxLeft = Math.max(8, window.innerWidth - effectiveWidth - 8);
+    this.optionsContainer.style.left = `${Math.max(8, Math.min(leftPos, maxLeft))}px`;
     this.optionsContainer.style.right = 'auto';
 
     if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
@@ -1433,15 +1482,13 @@ class CustomSelect {
   }
 
   open() {
-    document.querySelectorAll('.custom-select-container').forEach(c => {
-      if (c !== this.container) c.classList.remove('open');
-    });
-    document.querySelectorAll('.custom-select-options').forEach(opt => {
-      if (opt !== this.optionsContainer) {
-        opt.classList.remove('open');
-        opt.style.willChange = 'auto';
-      }
-    });
+    if (window.customSelectsMap) {
+      window.customSelectsMap.forEach(cs => {
+        if (cs !== this && cs && typeof cs.close === 'function' && cs.isOpen) {
+          cs.close();
+        }
+      });
+    }
 
     // 1. Promote to GPU compositing layer right before animation begins
     this.optionsContainer.style.willChange = 'transform, opacity';
@@ -1451,7 +1498,9 @@ class CustomSelect {
     this.trigger.setAttribute('aria-expanded', 'true');
     this.updatePosition();
 
-    // Attach scroll and resize listeners only while open
+    // Attach document, window, scroll, and resize listeners only while open
+    document.addEventListener('pointerdown', this._documentPointerHandler, true);
+    document.addEventListener('keydown', this._globalEscapeHandler);
     window.addEventListener('scroll', this._scrollResizeHandler, true);
     window.addEventListener('resize', this._scrollResizeHandler);
 
@@ -1484,7 +1533,9 @@ class CustomSelect {
     this.typeaheadBuffer = '';
     clearTimeout(this.typeaheadTimeout);
 
-    // Detach scroll and resize listeners immediately on close
+    // Detach document, window, scroll, and resize listeners immediately on close
+    document.removeEventListener('pointerdown', this._documentPointerHandler, true);
+    document.removeEventListener('keydown', this._globalEscapeHandler);
     window.removeEventListener('scroll', this._scrollResizeHandler, true);
     window.removeEventListener('resize', this._scrollResizeHandler);
 
@@ -1501,7 +1552,12 @@ class CustomSelect {
     if (this.trigger && this._keydownHandler) {
       this.trigger.removeEventListener('keydown', this._keydownHandler);
     }
-    document.removeEventListener('click', this._documentClickHandler);
+    if (this._documentPointerHandler) {
+      document.removeEventListener('pointerdown', this._documentPointerHandler, true);
+    }
+    if (this._globalEscapeHandler) {
+      document.removeEventListener('keydown', this._globalEscapeHandler);
+    }
     window.removeEventListener('scroll', this._scrollResizeHandler, true);
     window.removeEventListener('resize', this._scrollResizeHandler);
     if (this.optionsContainer && this.optionsContainer.parentNode) {
@@ -1510,7 +1566,9 @@ class CustomSelect {
     if (this.container && this.container.parentNode) {
       this.container.parentNode.removeChild(this.container);
     }
-    this.observer.disconnect();
+    if (this.observer) {
+      this.observer.disconnect();
+    }
     window.customSelectsMap.delete(this.select.id || this.select);
   }
 }
@@ -1518,6 +1576,7 @@ class CustomSelect {
 window.initializeCustomSelects = function() {
   document.querySelectorAll('select.select-control, select#batch-sort-select').forEach(select => {
     if (select.style.display === 'none') return; // leave hidden data-binder stubs unwrapped
+    if (select.classList.contains('model-reasoning-select')) return; // handled by table pagination renderer
     if (!select.dataset.customSelectInitialized) {
       new CustomSelect(select);
       select.dataset.customSelectInitialized = 'true';
@@ -2861,6 +2920,7 @@ async function refreshSettings() {
     // Scan models path
     await scanAndPopulateModels();
   } catch (e) {
+    console.error("Failed to load settings in refreshSettings:", e);
     showNotification(t('toasts.settingsLoadError'), "error");
   }
 }
@@ -2868,17 +2928,19 @@ async function refreshSettings() {
 function bindSettingsToDOM() {
   if (!settingsState) return;
 
-  // Initialize AI translation elements
-  if (typeof populateProvidersDropdown === 'function') {
-    populateProvidersDropdown();
-    onProviderChanged();
-  }
-  if (window.translationStudioController) {
-    window.translationStudioController.syncFromGlobalSettings();
-  }
-  
-  if (typeof toggleTranslationSubSettingsVisibility === 'function') {
-    toggleTranslationSubSettingsVisibility();
+  // Initialize AI translation elements defensively so table/provider issues never block settings loading
+  try {
+    if (typeof window.populateProvidersDropdown === 'function') {
+      window.populateProvidersDropdown();
+    }
+    if (typeof window.onProviderChanged === 'function') {
+      window.onProviderChanged();
+    }
+    if (window.translationStudioController) {
+      window.translationStudioController.syncFromGlobalSettings();
+    }
+  } catch (aiErr) {
+    console.error("Error initializing AI translation elements in bindSettingsToDOM:", aiErr);
   }
   
   // Helper to map keys
@@ -2891,9 +2953,6 @@ function bindSettingsToDOM() {
         el.onchange = () => {
           settingsState[key] = el.checked;
           saveCurrentSettings();
-          if (key === 'translateAiEnabled' && typeof toggleTranslationSubSettingsVisibility === 'function') {
-            toggleTranslationSubSettingsVisibility();
-          }
           if (key === 'translateAiPolish' && window.translationStudioController) {
             window.translationStudioController.syncFromGlobalSettings();
           }
@@ -5862,8 +5921,19 @@ window.onProviderChanged = function(keepCurrentTab = false, skipTableRender = fa
     if (modelsPlaceholder) modelsPlaceholder.style.display = 'none';
     if (modelsFields) modelsFields.style.display = 'block';
     
-    if (!keepCurrentTab) {
-      switchProviderTab('providers');
+    if (typeof keepCurrentTab === 'string') {
+      switchProviderTab(keepCurrentTab);
+    } else if (!keepCurrentTab) {
+      const activeBtn = document.querySelector('.provider-tab-btn.active');
+      if (activeBtn && activeBtn.id === 'tab-btn-providers') {
+        switchProviderTab('providers');
+      } else if (activeBtn && activeBtn.id === 'tab-btn-general') {
+        switchProviderTab('general');
+      } else if (activeBtn && activeBtn.id === 'tab-btn-models') {
+        switchProviderTab('models');
+      } else {
+        switchProviderTab('auto');
+      }
     }
     
     // Load General configuration fields
@@ -5931,21 +6001,7 @@ window.onProviderChanged = function(keepCurrentTab = false, skipTableRender = fa
     modelSelect.value = settingsState.translateAiModel || '';
     
     // Update active model top status banner
-    const bannerEl = document.getElementById('active-model-banner');
-    const bannerVal = document.getElementById('active-model-banner-value');
-    if (bannerEl && bannerVal) {
-      if (settingsState.translateAiModel) {
-        bannerVal.innerHTML = `
-          <div class="active-model-chip-group">
-            <span class="active-model-chip-provider">${escapeHTML(providerName)}</span>
-            <span class="active-model-chip-model">${escapeHTML(settingsState.translateAiModel)}</span>
-          </div>
-        `;
-        bannerEl.style.display = 'flex';
-      } else {
-        bannerEl.style.display = 'none';
-      }
-    }
+    updateActiveModelBannerUI(settingsState.translateAiModel);
     
     // Render models registry
     if (!skipTableRender) {
@@ -5958,8 +6014,19 @@ window.onProviderChanged = function(keepCurrentTab = false, skipTableRender = fa
     if (modelsPlaceholder) modelsPlaceholder.style.display = 'flex';
     if (modelsFields) modelsFields.style.display = 'none';
     
-    if (!keepCurrentTab) {
-      switchProviderTab('providers');
+    if (typeof keepCurrentTab === 'string') {
+      switchProviderTab(keepCurrentTab);
+    } else if (!keepCurrentTab) {
+      const activeBtn = document.querySelector('.provider-tab-btn.active');
+      if (activeBtn && activeBtn.id === 'tab-btn-providers') {
+        switchProviderTab('providers');
+      } else if (activeBtn && activeBtn.id === 'tab-btn-general') {
+        switchProviderTab('general');
+      } else if (activeBtn && activeBtn.id === 'tab-btn-models') {
+        switchProviderTab('models');
+      } else {
+        switchProviderTab('auto');
+      }
     }
     
     modelSelect.innerHTML = '';
@@ -6027,24 +6094,37 @@ window.togglePasswordVisibility = async function(inputId, btn) {
 };
 
 window.switchProviderTab = function(tab) {
+  if (window.customSelectsMap) {
+    window.customSelectsMap.forEach(cs => {
+      if (cs && cs.isOpen && typeof cs.close === 'function') cs.close();
+    });
+  }
+
+  const btnAuto = document.getElementById('tab-btn-auto');
   const btnProv = document.getElementById('tab-btn-providers');
   const btnGen = document.getElementById('tab-btn-general');
   const btnMod = document.getElementById('tab-btn-models');
   
+  const divAuto = document.getElementById('provider-tab-auto');
   const divProv = document.getElementById('provider-tab-providers');
   const divGen = document.getElementById('provider-tab-general');
   const divMod = document.getElementById('provider-tab-models');
   
+  if (btnAuto) btnAuto.classList.remove('active');
   if (btnProv) btnProv.classList.remove('active');
   if (btnGen) btnGen.classList.remove('active');
   if (btnMod) btnMod.classList.remove('active');
   
+  if (divAuto) divAuto.style.display = 'none';
   if (divProv) divProv.style.display = 'none';
   if (divGen) divGen.style.display = 'none';
   if (divMod) divMod.style.display = 'none';
   
   let activeDiv = null;
-  if (tab === 'providers') {
+  if (tab === 'auto') {
+    if (btnAuto) btnAuto.classList.add('active');
+    if (divAuto) { divAuto.style.display = 'flex'; activeDiv = divAuto; }
+  } else if (tab === 'providers') {
     if (btnProv) btnProv.classList.add('active');
     if (divProv) { divProv.style.display = 'block'; activeDiv = divProv; }
   } else if (tab === 'general') {
@@ -6054,10 +6134,22 @@ window.switchProviderTab = function(tab) {
     if (btnMod) btnMod.classList.add('active');
     if (divMod) { divMod.style.display = 'block'; activeDiv = divMod; }
     
-    const search = document.getElementById('mgr-models-search');
-    if (search) search.value = '';
-    if (typeof filterModelsStatus === 'function') {
-      filterModelsStatus('all', 450);
+    if (typeof applyModelsFilterAndRender === 'function') {
+      if (currentProviderModels.length === 0 && settingsState.translateAiProvider) {
+        try {
+          const providers = JSON.parse(settingsState.translateAiProviders || '[]');
+          const curProv = providers.find(p => p.name === settingsState.translateAiProvider);
+          if (curProv && curProv.models && curProv.models.length > 0) {
+            renderModelsRegistryTable(curProv);
+          } else {
+            applyModelsFilterAndRender(0);
+          }
+        } catch (e) {
+          applyModelsFilterAndRender(0);
+        }
+      } else {
+        applyModelsFilterAndRender(0);
+      }
     }
   }
   
@@ -6275,276 +6367,969 @@ window.parseTokensInput = function(val) {
   return 200000;
 };
 
+let currentProviderModels = [];
+let currentModelsSortCol = null;
+let currentModelsSortDir = 'none';
+let currentModelsPage = 1;
+const DEFAULT_MODELS_PAGE_SIZE = 20;
+let currentModelsPageSize = (function() {
+  const saved = localStorage.getItem('whisper_models_page_size');
+  if (saved === 'all') return 'all';
+  const parsed = parseInt(saved, 10);
+  return (parsed === 20 || parsed === 50 || parsed === 100) ? parsed : DEFAULT_MODELS_PAGE_SIZE;
+})();
+
+window.changeModelsPageSize = function(newSize) {
+  if (newSize === 'all') {
+    currentModelsPageSize = 'all';
+    localStorage.setItem('whisper_models_page_size', 'all');
+  } else {
+    const parsed = parseInt(newSize, 10);
+    currentModelsPageSize = isNaN(parsed) || parsed <= 0 ? DEFAULT_MODELS_PAGE_SIZE : parsed;
+    localStorage.setItem('whisper_models_page_size', String(currentModelsPageSize));
+  }
+  currentModelsPage = 1;
+  window.applyModelsFilterAndRender(0);
+};
+
+window.isReasoningSupportedModel = function(modelObj) {
+  if (!modelObj) return false;
+  if (typeof modelObj === 'object') {
+    if (typeof modelObj.supportsReasoning === 'boolean') {
+      return modelObj.supportsReasoning;
+    }
+    if (typeof modelObj.supports_reasoning === 'boolean') {
+      return modelObj.supports_reasoning;
+    }
+    // Backward-compatibility fallback for legacy saved models without metadata:
+    const reasoning = (modelObj.reasoning || '').trim().toLowerCase();
+    if (reasoning && reasoning !== 'none') return true;
+    return false;
+  }
+  if (typeof modelObj === 'string') {
+    let found = currentProviderModels.find(m => m && m.id === modelObj);
+    if (!found) {
+      try {
+        const providers = JSON.parse(settingsState.translateAiProviders || '[]');
+        for (const p of providers) {
+          if (Array.isArray(p.models)) {
+            const m = p.models.find(mod => mod && mod.id === modelObj);
+            if (m) {
+              found = m;
+              break;
+            }
+          }
+        }
+      } catch (e) {}
+    }
+    if (found) {
+      return window.isReasoningSupportedModel(found);
+    }
+  }
+  return false;
+};
+
+let currentModelStatusFilter = 'all';
+let filterTimeout = null;
+let modelSaveDebounceTimer = null;
+
 function destroyModelRowCustomSelects(parentEl) {
   if (!parentEl) return;
   const selects = parentEl.querySelectorAll('select.model-reasoning-select');
   selects.forEach(sel => {
     let inst = null;
     if (window.customSelectsMap) {
-      if (sel.id) {
-        inst = window.customSelectsMap.get(sel.id);
-        window.customSelectsMap.delete(sel.id);
-      }
-      if (!inst) {
-        inst = window.customSelectsMap.get(sel);
-      }
+      inst = (sel.id ? window.customSelectsMap.get(sel.id) : null) || window.customSelectsMap.get(sel);
+      if (sel.id) window.customSelectsMap.delete(sel.id);
       window.customSelectsMap.delete(sel);
     }
     if (inst && typeof inst.destroy === 'function') {
-      inst.destroy();
+      try {
+        inst.destroy();
+      } catch (err) {
+        console.warn("Error destroying custom select:", err);
+      }
     }
+    delete sel.dataset.customSelectInitialized;
   });
 }
 
-window.updateFilterCountsFromDOM = function() {
-  const rows = document.querySelectorAll('#mgr-models-tbody .model-data-row');
-  let totalCount = 0;
-  let freeCount = 0;
-  let reasoningCount = 0;
+window.formatNumberForLang = function(num) {
+  if (num === null || num === undefined) return '';
+  const str = String(num);
+  if (typeof getLanguage === 'function' && getLanguage() === 'fa') {
+    const persianDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+    return str.replace(/[0-9]/g, d => persianDigits[d]);
+  }
+  return str;
+};
 
-  rows.forEach(r => {
-    const idInput = r.querySelector('.model-id-input');
-    if (!idInput) return;
-    const modelId = (idInput.value || '').trim().toLowerCase();
-    if (!modelId) return;
-    totalCount++;
-    if (modelId.includes('free')) freeCount++;
-    const reasoning = r.dataset.reasoning || 'None';
-    if (reasoning !== 'None') reasoningCount++;
-  });
+const POPULAR_PROVIDER_FILTERS = [
+  { id: 'openai', label: 'OpenAI', test: id => id.includes('openai') || id.startsWith('gpt') || id.startsWith('o1') || id.startsWith('o3') },
+  { id: 'anthropic', label: 'Anthropic', test: id => id.includes('anthropic') || id.startsWith('claude') },
+  { id: 'google', label: 'Google', test: id => id.includes('google') || id.startsWith('gemini') },
+  { id: 'meta', label: 'Meta', test: id => id.includes('meta') || id.includes('llama') },
+  { id: 'deepseek', label: 'DeepSeek', test: id => id.includes('deepseek') },
+  { id: 'mistral', label: 'Mistral', test: id => id.includes('mistral') },
+  { id: 'amazon', label: 'Amazon', test: id => id.includes('amazon') || id.startsWith('nova') },
+  { id: 'qwen', label: 'Qwen', test: id => id.includes('qwen') }
+];
+
+window.updateFilterCounts = function() {
+  const totalCount = currentProviderModels.length;
+  const freeCount = currentProviderModels.filter(m => (m.id || '').toLowerCase().includes('free')).length;
+  const reasoningCount = currentProviderModels.filter(m => {
+    if (!window.isReasoningSupportedModel(m)) return false;
+    const r = (m && m.reasoning ? String(m.reasoning).trim().toLowerCase() : '');
+    return Boolean(r && r !== 'none');
+  }).length;
 
   const countBadge = document.getElementById('provider-models-count');
-  if (countBadge) countBadge.textContent = totalCount;
-  
-  const elAll = document.getElementById('filter-count-all');
-  const elFree = document.getElementById('filter-count-free');
-  const elReasoning = document.getElementById('filter-count-reasoning');
-  if (elAll) elAll.textContent = totalCount;
-  if (elFree) elFree.textContent = freeCount;
-  if (elReasoning) elReasoning.textContent = reasoningCount;
+  if (countBadge) countBadge.textContent = window.formatNumberForLang(totalCount);
+
+  const pillsContainer = document.getElementById('models-filter-pills') || document.querySelector('.models-filter-pills');
+  if (!pillsContainer) return;
+
+  const filterDefs = [
+    {
+      id: 'all',
+      label: t('settings.allModels') || 'All Models',
+      count: totalCount,
+      dotClass: ''
+    }
+  ];
+
+  if (freeCount > 0 || currentModelStatusFilter === 'free') {
+    filterDefs.push({
+      id: 'free',
+      label: t('settings.freeTier') || 'Free Tier',
+      count: freeCount,
+      dotClass: 'filter-dot-free'
+    });
+  }
+
+  // Consecutive: All Models -> Free Tier -> Reasoning as requested by user
+  if (reasoningCount > 0 || currentModelStatusFilter === 'reasoning') {
+    filterDefs.push({
+      id: 'reasoning',
+      label: t('settings.reasoning') || 'Reasoning',
+      count: reasoningCount,
+      dotClass: 'filter-dot-reasoning'
+    });
+  }
+
+  POPULAR_PROVIDER_FILTERS.forEach(p => {
+    const pCount = currentProviderModels.filter(m => p.test((m.id || '').toLowerCase())).length;
+    if (pCount > 0 || currentModelStatusFilter === p.id) {
+      filterDefs.push({
+        id: p.id,
+        label: p.label,
+        count: pCount,
+        dotClass: ''
+      });
+    }
+  });
+
+  if (!filterDefs.some(f => f.id === currentModelStatusFilter)) {
+    currentModelStatusFilter = 'all';
+  }
+
+  pillsContainer.innerHTML = filterDefs.map(f => `
+    <button type="button" class="btn-filter ${currentModelStatusFilter === f.id ? 'active' : ''}" data-filter="${f.id}" onclick="filterModelsStatus('${f.id}')" id="filter-models-${f.id}">
+      ${f.dotClass ? `<span class="${f.dotClass}"></span>` : ''}
+      <span>${escapeHTML(f.label)}</span>
+      <span class="filter-badge" id="filter-count-${f.id}">${window.formatNumberForLang(f.count)}</span>
+    </button>
+  `).join('');
 };
+
+window.updateFilterCountsFromDOM = window.updateFilterCounts;
 
 window.clearModelsSearch = function() {
   const searchInput = document.getElementById('mgr-models-search');
   const clearBtn = document.getElementById('mgr-models-search-clear');
   if (searchInput) searchInput.value = '';
   if (clearBtn) clearBtn.style.display = 'none';
+  currentModelsPage = 1;
   window.filterModelsStatus('all', 0);
   if (searchInput) searchInput.focus();
 };
 
 window.renderModelsRegistryTable = function(provider) {
-  const tbody = document.getElementById('mgr-models-tbody');
-  if (!tbody) return;
-  
-  destroyModelRowCustomSelects(tbody);
-  tbody.innerHTML = '';
-  
-  const models = provider.models || [];
-  const totalCount = models.length;
-  const freeCount = models.filter(m => (m.id || '').toLowerCase().includes('free')).length;
-  const reasoningCount = models.filter(m => m.reasoning && m.reasoning !== 'None').length;
-
-  const countBadge = document.getElementById('provider-models-count');
-  if (countBadge) countBadge.textContent = totalCount;
-  
-  const elAll = document.getElementById('filter-count-all');
-  const elFree = document.getElementById('filter-count-free');
-  const elReasoning = document.getElementById('filter-count-reasoning');
-  if (elAll) elAll.textContent = totalCount;
-  if (elFree) elFree.textContent = freeCount;
-  if (elReasoning) elReasoning.textContent = reasoningCount;
-  
-  const activeModelId = settingsState.translateAiModel;
-  
-  models.forEach(m => {
-    const isModelActive = m.id === activeModelId;
-    addManualModelRow(
-      m.id || '',
-      m.contextWindow || m.context_window || 200000,
-      m.reasoning || 'None',
-      isModelActive
-    );
+  currentProviderModels = (provider && provider.models ? provider.models : []).map(m => {
+    const isReasoning = window.isReasoningSupportedModel(m);
+    let reasoningVal = isReasoning
+      ? ((m.reasoning !== undefined && m.reasoning !== null && m.reasoning !== '') ? m.reasoning : 'Medium')
+      : 'None';
+    return {
+      id: m.id || '',
+      contextWindow: window.parseTokensInput(m.contextWindow || m.context_window || 200000),
+      reasoning: reasoningVal,
+      supportsReasoning: typeof m.supportsReasoning === 'boolean'
+        ? m.supportsReasoning
+        : (typeof m.supports_reasoning === 'boolean' ? m.supports_reasoning : (isReasoning ? true : undefined)),
+      enabled: m.enabled !== false
+    };
   });
-
-  filterModelsTable(0);
+  
+  currentModelsPage = 1;
+  currentModelsSortCol = null;
+  currentModelsSortDir = 'none';
+  window.updateFilterCounts();
+  window.applyModelsFilterAndRender(0);
 };
 
-let modelSaveDebounceTimer = null;
+function updateSortHeaderIcons() {
+  const cols = ['active', 'id', 'ctx', 'reasoning'];
+  cols.forEach(col => {
+    const th = document.querySelector(`.models-table-head .th-${col}`);
+    const icon = document.getElementById(`sort-icon-${col}`);
+    if (!th || !icon) return;
+    
+    th.classList.remove('sorted-asc', 'sorted-desc');
+    if (currentModelsSortCol === col) {
+      if (currentModelsSortDir === 'asc') {
+        th.classList.add('sorted-asc');
+        th.setAttribute('aria-sort', 'ascending');
+        icon.textContent = '▲';
+      } else if (currentModelsSortDir === 'desc') {
+        th.classList.add('sorted-desc');
+        th.setAttribute('aria-sort', 'descending');
+        icon.textContent = '▼';
+      } else {
+        th.setAttribute('aria-sort', 'none');
+        icon.textContent = '↕';
+      }
+    } else {
+      th.setAttribute('aria-sort', 'none');
+      icon.textContent = '↕';
+    }
+  });
+}
 
-window.addManualModelRow = function(modelId = "", contextWindow = 200000, reasoning = "None", isActive = false, focus = false) {
+function saveActiveProviderModelsDebounced() {
+  const currentProvider = settingsState.translateAiProvider;
+  clearTimeout(modelSaveDebounceTimer);
+  modelSaveDebounceTimer = setTimeout(() => {
+    if (settingsState.translateAiProvider === currentProvider) {
+      saveActiveProviderModels(true, true, currentProvider);
+    }
+  }, 200);
+}
+
+function updateActiveModelBannerUI(modelId) {
+  const bannerEl = document.getElementById('active-model-banner');
+  const bannerVal = document.getElementById('active-model-banner-value');
+  const providerName = settingsState.translateAiProvider || '';
+  if (bannerEl && bannerVal) {
+    if (modelId && providerName) {
+      bannerVal.innerHTML = `
+        <div class="active-model-chip-group">
+          <span class="active-model-chip-provider">${escapeHTML(providerName)}</span>
+          <span class="active-model-chip-model">${escapeHTML(modelId)}</span>
+        </div>
+      `;
+      bannerEl.style.display = 'flex';
+    } else {
+      bannerEl.style.display = 'none';
+    }
+  }
+}
+
+window.setActiveModelFromTable = async function(modelId) {
+  if (!modelId) return;
+  const prevActiveModelId = settingsState.translateAiModel;
+  if (prevActiveModelId === modelId) return;
+
+  settingsState.translateAiModel = modelId;
+  
+  // Atomically synchronize in-memory models into provider settings and populate DOM select options
+  await saveActiveProviderModels(true, true);
+  
+  updateActiveModelBannerUI(modelId);
+  
+  const selectDOM = document.getElementById('opt-translateAiModel');
+  if (selectDOM) selectDOM.value = modelId;
+  
+  await saveCurrentSettings();
+  updateTranscribeUIConfigs();
+  if (window.translationStudioController) {
+    window.translationStudioController.syncFromGlobalSettings();
+  }
+  
+  // If sorted by active column, row ordering changes, so re-render table
+  if (currentModelsSortCol === 'active') {
+    window.applyModelsFilterAndRender(0);
+    return;
+  }
+
+  // Otherwise, perform sleek zero-flicker in-place DOM update without resetting scroll
   const tbody = document.getElementById('mgr-models-tbody');
   if (!tbody) return;
-  
+
+  const rows = tbody.querySelectorAll('.model-data-row');
+  rows.forEach(row => {
+    const rowModelId = (row.dataset.modelId || '').toLowerCase();
+    const isNowActive = rowModelId === modelId.toLowerCase();
+    const wasActive = row.classList.contains('active-model-row');
+
+    if (isNowActive && !wasActive) {
+      row.classList.add('active-model-row');
+      row.setAttribute('aria-checked', 'true');
+      const activeCell = row.querySelector('.td-active');
+      if (activeCell) {
+        activeCell.innerHTML = `
+          <div class="model-active-badge is-active" title="${t('settings.activeBadge')}">
+            <span class="active-dot"></span>
+            <span class="badge-text">${t('settings.activeBadge')}</span>
+          </div>
+        `;
+      }
+      const actionCell = row.querySelector('.td-action');
+      if (actionCell) {
+        actionCell.innerHTML = '';
+      }
+    } else if (!isNowActive && wasActive) {
+      row.classList.remove('active-model-row');
+      row.setAttribute('aria-checked', 'false');
+      const activeCell = row.querySelector('.td-active');
+      if (activeCell) {
+        activeCell.innerHTML = `
+          <button type="button" class="model-radio-btn" title="${t('settings.setActiveBadge')}" aria-label="${t('settings.setActiveBadge')}">
+            <span class="radio-circle"></span>
+          </button>
+        `;
+      }
+      const actionCell = row.querySelector('.td-action');
+      if (actionCell) {
+        actionCell.innerHTML = `
+          <button type="button" class="model-btn-trash" title="Remove Model Row" aria-label="Remove Model Row">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              <line x1="10" y1="11" x2="10" y2="17"></line>
+              <line x1="14" y1="11" x2="14" y2="17"></line>
+            </svg>
+          </button>
+        `;
+      }
+    }
+  });
+};
+
+window.toggleSortModels = function(col) {
+  if (currentModelsSortCol === col) {
+    const initialDir = (col === 'id') ? 'asc' : 'desc';
+    const secondDir = (initialDir === 'asc') ? 'desc' : 'asc';
+    
+    if (currentModelsSortDir === initialDir) {
+      currentModelsSortDir = secondDir;
+    } else if (currentModelsSortDir === secondDir) {
+      currentModelsSortDir = 'none';
+      currentModelsSortCol = null;
+    } else {
+      currentModelsSortDir = initialDir;
+    }
+  } else {
+    currentModelsSortCol = col;
+    currentModelsSortDir = (col === 'id') ? 'asc' : 'desc';
+  }
+  currentModelsPage = 1;
+  window.applyModelsFilterAndRender(0);
+};
+
+window.changeModelsPage = function(delta) {
+  currentModelsPage += delta;
+  window.applyModelsFilterAndRender(0);
+  const container = document.getElementById('mgr-models-tbody');
+  if (container) container.scrollTop = 0;
+};
+
+window.applyModelsFilterAndRender = function(delay = 0) {
+  clearTimeout(filterTimeout);
+  const execute = () => {
+    const searchEl = document.getElementById('mgr-models-search');
+    const query = searchEl ? searchEl.value.trim().toLowerCase() : '';
+    const clearBtn = document.getElementById('mgr-models-search-clear');
+    if (clearBtn) {
+      clearBtn.style.display = query ? 'flex' : 'none';
+    }
+
+    // 1. Filter
+    let filtered = currentProviderModels.filter(m => {
+      const idLower = (m.id || '').toLowerCase();
+      if (query && !idLower.includes(query)) return false;
+      if (currentModelStatusFilter === 'all') return true;
+      if (currentModelStatusFilter === 'free') return idLower.includes('free');
+      if (currentModelStatusFilter === 'reasoning') {
+        if (!window.isReasoningSupportedModel(m)) return false;
+        const r = (m && m.reasoning ? String(m.reasoning).trim().toLowerCase() : '');
+        return Boolean(r && r !== 'none');
+      }
+      const prov = POPULAR_PROVIDER_FILTERS.find(p => p.id === currentModelStatusFilter);
+      if (prov) return prov.test(idLower);
+      return true;
+    });
+
+    // 2. Sort
+    if (currentModelsSortCol && currentModelsSortDir !== 'none') {
+      const dir = currentModelsSortDir === 'asc' ? 1 : -1;
+      const activeModelId = settingsState.translateAiModel || '';
+      
+      filtered.sort((a, b) => {
+        if (currentModelsSortCol === 'active') {
+          const aActive = (a.id === activeModelId) ? 1 : 0;
+          const bActive = (b.id === activeModelId) ? 1 : 0;
+          return (aActive - bActive) * dir;
+        } else if (currentModelsSortCol === 'id') {
+          return a.id.localeCompare(b.id, undefined, { sensitivity: 'base' }) * dir;
+        } else if (currentModelsSortCol === 'ctx') {
+          return (a.contextWindow - b.contextWindow) * dir;
+        } else if (currentModelsSortCol === 'reasoning') {
+          const rank = {
+            'none': 0,
+            'minimal': 1,
+            'low': 2,
+            'medium': 3,
+            'high': 4,
+            'xhigh': 5,
+            'max': 6
+          };
+          const aRank = rank[(a.reasoning || '').toLowerCase()] ?? 0;
+          const bRank = rank[(b.reasoning || '').toLowerCase()] ?? 0;
+          return (aRank - bRank) * dir;
+        }
+        return 0;
+      });
+    }
+
+    updateSortHeaderIcons();
+
+    // 3. Pagination
+    const totalFiltered = filtered.length;
+    const pageSize = currentModelsPageSize === 'all' ? Math.max(1, totalFiltered) : currentModelsPageSize;
+    const totalPages = currentModelsPageSize === 'all' ? 1 : Math.max(1, Math.ceil(totalFiltered / pageSize));
+    if (currentModelsPage > totalPages) currentModelsPage = totalPages;
+    if (currentModelsPage < 1) currentModelsPage = 1;
+
+    const startIndex = currentModelsPageSize === 'all' ? 0 : (currentModelsPage - 1) * pageSize;
+    const endIndex = currentModelsPageSize === 'all' ? totalFiltered : Math.min(startIndex + pageSize, totalFiltered);
+    const pageItems = filtered.slice(startIndex, endIndex);
+
+    // 4. Counts & Stats Bar
+    const showingCountEl = document.getElementById('models-showing-count');
+    if (showingCountEl) {
+      if (currentProviderModels.length === 0) {
+        showingCountEl.textContent = t('settings.zeroModels');
+      } else if (query || currentModelStatusFilter !== 'all') {
+        if (totalFiltered <= pageSize || currentModelsPageSize === 'all') {
+          showingCountEl.textContent = t('settings.showingModelsCount', {
+            visible: window.formatNumberForLang(totalFiltered),
+            total: window.formatNumberForLang(currentProviderModels.length)
+          });
+        } else {
+          showingCountEl.textContent = t('settings.showingFilteredPageRange', {
+            start: window.formatNumberForLang(totalFiltered > 0 ? startIndex + 1 : 0),
+            end: window.formatNumberForLang(endIndex),
+            visible: window.formatNumberForLang(totalFiltered),
+            total: window.formatNumberForLang(currentProviderModels.length)
+          });
+        }
+      } else {
+        if (totalFiltered <= pageSize || currentModelsPageSize === 'all') {
+          showingCountEl.textContent = t('settings.showingAllModelsCount', {
+            total: window.formatNumberForLang(currentProviderModels.length)
+          });
+        } else {
+          showingCountEl.textContent = t('settings.showingPageRange', {
+            start: window.formatNumberForLang(startIndex + 1),
+            end: window.formatNumberForLang(endIndex),
+            total: window.formatNumberForLang(totalFiltered)
+          });
+        }
+      }
+    }
+
+    // 5. Render rows
+    const tbody = document.getElementById('mgr-models-tbody');
+    if (tbody) {
+      const prevScrollTop = tbody.scrollTop;
+      destroyModelRowCustomSelects(tbody);
+      tbody.innerHTML = '';
+      const activeModelId = settingsState.translateAiModel || '';
+      const frag = document.createDocumentFragment();
+      pageItems.forEach((modelObj, idx) => {
+        const isActive = modelObj.id === activeModelId && !!activeModelId;
+        const row = createModelRowElement(modelObj, isActive, startIndex + idx);
+        frag.appendChild(row);
+      });
+      tbody.appendChild(frag);
+
+      // Restore scroll position after DOM rebuild
+      if (prevScrollTop > 0) {
+        tbody.scrollTop = prevScrollTop;
+      }
+
+      // Initialize CustomSelect on reasoning dropdowns safely after row is in DOM (without heavy MutationObservers)
+      const selects = tbody.querySelectorAll('select.model-reasoning-select');
+      selects.forEach(sel => {
+        if (!sel.dataset.customSelectInitialized) {
+          try {
+            const cs = new CustomSelect(sel, { observe: false });
+            sel.dataset.customSelectInitialized = 'true';
+            const container = cs.container || sel.closest('.custom-select-container');
+            if (container) {
+              if (sel.value.toLowerCase() === 'none') {
+                container.classList.remove('reasoning-active');
+              } else {
+                container.classList.add('reasoning-active');
+              }
+            }
+          } catch (selErr) {
+            console.error("Failed to initialize CustomSelect on reasoning select:", selErr);
+          }
+        }
+      });
+    }
+
+    // 6. Pagination UI
+    const pagContainer = document.getElementById('mgr-models-pagination');
+    const pagInfo = document.getElementById('mgr-pagination-info');
+    const pagIndicator = document.getElementById('mgr-pagination-page-indicator');
+    const btnPrev = document.getElementById('btn-page-prev');
+    const btnNext = document.getElementById('btn-page-next');
+    const pageSizeSelect = document.getElementById('models-page-size-select');
+    const pagNav = pagContainer ? pagContainer.querySelector('.pagination-nav') : null;
+
+    if (pageSizeSelect) {
+      if (!pageSizeSelect.dataset.customSelectInitialized) {
+        new CustomSelect(pageSizeSelect, { observe: false });
+        pageSizeSelect.dataset.customSelectInitialized = 'true';
+      }
+      pageSizeSelect.value = String(currentModelsPageSize);
+      const cs = window.customSelectsMap && window.customSelectsMap.get('models-page-size-select');
+      if (cs) {
+        cs.syncSelectedValue();
+      }
+    }
+
+    const tableWrapper = document.getElementById('mgr-models-table-wrapper');
+    if (pagContainer) {
+      if (totalFiltered > 0) {
+        pagContainer.style.display = 'flex';
+        if (tableWrapper) tableWrapper.classList.add('has-pagination');
+        if (pagInfo) {
+          if (currentModelsPageSize === 'all' || totalFiltered <= pageSize) {
+            pagInfo.textContent = t('settings.showingAllModelsCount', {
+              total: window.formatNumberForLang(totalFiltered)
+            });
+          } else {
+            pagInfo.textContent = t('settings.showingPageRange', {
+              start: window.formatNumberForLang(totalFiltered > 0 ? startIndex + 1 : 0),
+              end: window.formatNumberForLang(endIndex),
+              total: window.formatNumberForLang(totalFiltered)
+            });
+          }
+        }
+        if (pagNav) {
+          pagNav.style.display = totalPages > 1 ? 'flex' : 'none';
+        }
+        if (pagIndicator) {
+          pagIndicator.textContent = t('settings.pageOf', {
+            current: window.formatNumberForLang(currentModelsPage),
+            total: window.formatNumberForLang(totalPages)
+          });
+        }
+        if (btnPrev) btnPrev.disabled = currentModelsPage <= 1;
+        if (btnNext) btnNext.disabled = currentModelsPage >= totalPages;
+      } else {
+        pagContainer.style.display = 'none';
+        if (tableWrapper) tableWrapper.classList.remove('has-pagination');
+      }
+    }
+
+    // 7. Empty states
+    const emptyState = document.getElementById('mgr-models-empty-state');
+    const emptyTitle = emptyState ? emptyState.querySelector('.models-empty-title') : null;
+    const emptyDesc = emptyState ? emptyState.querySelector('.models-empty-desc') : null;
+    const emptyResetBtn = document.getElementById('mgr-models-empty-reset-btn');
+    const headEl = document.querySelector('.models-table-head');
+    const bodyEl = document.querySelector('.models-table-body');
+
+    if (emptyState) {
+      if (currentProviderModels.length === 0) {
+        emptyState.style.display = 'flex';
+        if (emptyTitle) emptyTitle.textContent = t('settings.noModelsConfiguredTitle');
+        if (emptyDesc) emptyDesc.textContent = t('settings.noModelsConfiguredDesc');
+        if (emptyResetBtn) emptyResetBtn.style.display = 'none';
+        if (headEl) headEl.style.display = 'none';
+        if (bodyEl) bodyEl.style.display = 'none';
+      } else if (totalFiltered === 0) {
+        emptyState.style.display = 'flex';
+        if (emptyTitle) emptyTitle.textContent = t('settings.noMatchingModelsTitle');
+        if (emptyDesc) emptyDesc.textContent = t('settings.noMatchingModelsDesc');
+        if (emptyResetBtn) emptyResetBtn.style.display = 'inline-flex';
+        if (headEl) headEl.style.display = 'none';
+        if (bodyEl) bodyEl.style.display = 'none';
+      } else {
+        emptyState.style.display = 'none';
+        if (headEl) headEl.style.display = 'grid';
+        if (bodyEl) bodyEl.style.display = 'block';
+      }
+    }
+  };
+
+  if (delay > 0) {
+    filterTimeout = setTimeout(execute, delay);
+  } else {
+    execute();
+  }
+};
+
+function createModelRowElement(modelObj, isActive, index = 0) {
   const row = document.createElement('div');
-  row.className = `model-data-row${isActive ? ' active-model-row' : ''}${focus ? ' row-anim-enter' : ''}`;
-  row.dataset.modelId = modelId.trim().toLowerCase();
-  row.dataset.reasoning = reasoning;
+  row.className = `model-data-row${isActive ? ' active-model-row' : ''}`;
+  row.dataset.modelId = (modelObj.id || '').trim().toLowerCase();
+  row.dataset.reasoning = modelObj.reasoning || 'None';
+  row.setAttribute('role', 'radio');
+  row.setAttribute('aria-checked', isActive ? 'true' : 'false');
+  row.setAttribute('tabindex', '0');
   
-  const isFree = modelId.toLowerCase().includes('free');
-  const formattedCtx = window.formatTokensShort(contextWindow);
+  const isFree = (modelObj.id || '').toLowerCase().includes('free');
+  const formattedCtx = window.formatTokensShort(modelObj.contextWindow);
+  const safeId = (modelObj.id || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const selectId = `model-reasoning-${safeId}-${index}`;
+
+  const supportsReasoning = window.isReasoningSupportedModel(modelObj);
+  const curReasoning = (modelObj.reasoning || 'None').trim();
+  const curReasoningLower = curReasoning.toLowerCase();
+  const isReasoningActive = curReasoningLower !== 'none' && curReasoningLower !== '';
+
+  const fullId = (modelObj.id || '').trim();
+  let providerPrefix = '';
+  let modelName = fullId;
+  const slashIdx = fullId.indexOf('/');
+  if (slashIdx !== -1) {
+    providerPrefix = fullId.substring(0, slashIdx + 1);
+    modelName = fullId.substring(slashIdx + 1);
+  }
+
+  const isManualNew = !fullId;
 
   row.innerHTML = `
     <div class="td-cell td-active">
-      <label class="radio-container" title="${isActive ? 'Active Model' : 'Set as Active Model'}">
-        <input type="radio" name="mgr-active-model" class="model-active-radio" ${isActive ? 'checked' : ''} />
-        <span class="custom-radio"></span>
-      </label>
+      ${isActive ? `
+        <div class="model-active-badge is-active" title="${t('settings.activeBadge')}">
+          <span class="active-dot"></span>
+          <span class="badge-text">${t('settings.activeBadge')}</span>
+        </div>
+      ` : `
+        <button type="button" class="model-radio-btn" title="${t('settings.setActiveBadge')}" aria-label="${t('settings.setActiveBadge')}">
+          <span class="radio-circle"></span>
+        </button>
+      `}
     </div>
     <div class="td-cell td-id">
-      <input type="text" class="model-cell-input model-id-input" value="${escapeHTML(modelId)}" placeholder="e.g. gpt-4o-mini" title="${escapeHTML(modelId || 'Model Identifier')}" />
-      ${isFree ? '<span class="model-tag-free">FREE</span>' : ''}
+      ${isManualNew ? `
+        <input type="text" class="model-cell-input model-id-input" value="" placeholder="e.g. gpt-4o-mini" title="Model Identifier" />
+      ` : `
+        <div class="model-id-wrapper" dir="ltr">
+          <div class="model-id-display" title="${escapeHTML(fullId)}">${providerPrefix ? `<span class="model-id-prefix">${escapeHTML(providerPrefix)}</span>` : ''}<span class="model-id-name">${escapeHTML(modelName)}</span></div>
+          ${isFree ? '<span class="model-tag-free">FREE</span>' : ''}
+        </div>
+      `}
     </div>
     <div class="td-cell td-ctx">
-      <input type="text" class="model-cell-input model-ctx-input" value="${formattedCtx}" data-raw-tokens="${contextWindow}" placeholder="128K" title="Context tokens: ${formattedCtx} (${Number(contextWindow).toLocaleString()})" />
+      ${isManualNew ? `
+        <input type="text" class="model-cell-input model-ctx-input" value="${formattedCtx}" data-raw-tokens="${modelObj.contextWindow}" placeholder="128K" title="Context tokens: ${formattedCtx} (${Number(modelObj.contextWindow).toLocaleString()})" />
+      ` : `
+        <span class="model-ctx-value" title="Context tokens: ${formattedCtx} (${Number(modelObj.contextWindow).toLocaleString()})">${formattedCtx}</span>
+      `}
     </div>
     <div class="td-cell td-reasoning">
-      <select class="select-control model-reasoning-select">
-        <option value="None" ${reasoning === 'None' ? 'selected' : ''}>None</option>
-        <option value="Low" ${reasoning === 'Low' ? 'selected' : ''}>Low</option>
-        <option value="Medium" ${reasoning === 'Medium' ? 'selected' : ''}>Medium</option>
-        <option value="High" ${reasoning === 'High' ? 'selected' : ''}>High</option>
-      </select>
+      ${supportsReasoning ? `
+        <select id="${selectId}" class="select-control model-reasoning-select${isReasoningActive ? ' reasoning-active' : ''}">
+          <option value="None" ${curReasoningLower === 'none' ? 'selected' : ''}>None</option>
+          <option value="Minimal" ${curReasoningLower === 'minimal' ? 'selected' : ''}>Minimal</option>
+          <option value="Low" ${curReasoningLower === 'low' ? 'selected' : ''}>Low</option>
+          <option value="Medium" ${curReasoningLower === 'medium' ? 'selected' : ''}>Medium</option>
+          <option value="High" ${curReasoningLower === 'high' ? 'selected' : ''}>High</option>
+          <option value="XHigh" ${curReasoningLower === 'xhigh' ? 'selected' : ''}>XHigh</option>
+          <option value="Max" ${curReasoningLower === 'max' ? 'selected' : ''}>Max</option>
+        </select>
+      ` : `
+        <span class="reasoning-none-dash" title="${t('settings.reasoningNotSupported')}" aria-label="${t('settings.reasoningNotSupported')}">—</span>
+      `}
     </div>
     <div class="td-cell td-action">
-      <button type="button" class="model-btn-trash" title="Remove Model Row">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      </button>
+      ${isActive ? '' : `
+        <button type="button" class="model-btn-trash" title="Remove Model Row" aria-label="Remove Model Row">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            <line x1="10" y1="11" x2="10" y2="17"></line>
+            <line x1="14" y1="11" x2="14" y2="17"></line>
+          </svg>
+        </button>
+      `}
     </div>
   `;
-  if (focus) {
-    tbody.insertBefore(row, tbody.firstChild);
-  } else {
-    tbody.appendChild(row);
-  }
 
-  const idInput = row.querySelector('.model-id-input');
-  const idCell = row.querySelector('.td-id');
-  const ctxInput = row.querySelector('.model-ctx-input');
-  const reasoningSelect = row.querySelector('.model-reasoning-select');
-  new CustomSelect(reasoningSelect);
-  const activeRadio = row.querySelector('.model-active-radio');
-  const trashBtn = row.querySelector('.model-btn-trash');
-  
-  const updateStatsAndSave = () => {
-    updateFilterCountsFromDOM();
-    const currentProvider = settingsState.translateAiProvider;
-    clearTimeout(modelSaveDebounceTimer);
-    modelSaveDebounceTimer = setTimeout(() => {
-      if (settingsState.translateAiProvider === currentProvider) {
-        saveActiveProviderModels(true, true, currentProvider);
-      }
-    }, 150);
-  };
-  
-  const updateReasoningStyle = () => {
-    const el = reasoningSelect.closest('.custom-select-container') || reasoningSelect;
-    if (reasoningSelect.value === 'None') {
-      el.classList.add('reasoning-none');
-      el.classList.remove('reasoning-active');
-    } else {
-      el.classList.remove('reasoning-none');
-      el.classList.add('reasoning-active');
-    }
-  };
-  
-  idInput.addEventListener('input', () => {
-    const val = idInput.value.trim();
-    row.dataset.modelId = val.toLowerCase();
-    idInput.title = val || "Model Identifier";
-    
-    let freeTag = idCell.querySelector('.model-tag-free');
-    if (val.toLowerCase().includes('free')) {
-      if (!freeTag) {
-        freeTag = document.createElement('span');
-        freeTag.className = 'model-tag-free';
-        freeTag.textContent = 'FREE';
-        idCell.appendChild(freeTag);
-      }
-    } else {
-      if (freeTag) freeTag.remove();
-    }
-    updateFilterCountsFromDOM();
-  });
-
-  idInput.addEventListener('change', () => {
-    const val = idInput.value.trim();
-    row.dataset.modelId = val.toLowerCase();
-    idInput.title = val || "Model Identifier";
-    updateStatsAndSave();
-  });
-  
-  ctxInput.addEventListener('change', () => {
-    const rawTokens = window.parseTokensInput(ctxInput.value);
-    ctxInput.dataset.rawTokens = rawTokens;
-    const formatted = window.formatTokensShort(rawTokens);
-    ctxInput.value = formatted;
-    ctxInput.title = `Context tokens: ${formatted} (${Number(rawTokens).toLocaleString()})`;
-    updateStatsAndSave();
-  });
-
-  // Smooth keyboard navigation across rows
-  const handleKeyNavigation = (e) => {
-    if (e.key === 'ArrowDown') {
-      let next = row.nextElementSibling;
-      while (next && (next.style.display === 'none' || !next.classList.contains('model-data-row'))) {
-        next = next.nextElementSibling;
-      }
-      if (next) {
-        e.preventDefault();
-        const targetInput = next.querySelector(e.target.classList.contains('model-ctx-input') ? '.model-ctx-input' : '.model-id-input');
-        if (targetInput) targetInput.focus();
-      }
-    } else if (e.key === 'ArrowUp') {
-      let prev = row.previousElementSibling;
-      while (prev && (prev.style.display === 'none' || !prev.classList.contains('model-data-row'))) {
-        prev = prev.previousElementSibling;
-      }
-      if (prev) {
-        e.preventDefault();
-        const targetInput = prev.querySelector(e.target.classList.contains('model-ctx-input') ? '.model-ctx-input' : '.model-id-input');
-        if (targetInput) targetInput.focus();
-      }
-    }
-  };
-
-  idInput.addEventListener('keydown', handleKeyNavigation);
-  ctxInput.addEventListener('keydown', handleKeyNavigation);
-  
-  reasoningSelect.addEventListener('change', () => {
-    row.dataset.reasoning = reasoningSelect.value;
-    updateReasoningStyle();
-    updateStatsAndSave();
-  });
-  
-  updateReasoningStyle();
-  
-  activeRadio.addEventListener('change', () => {
-    const siblingRows = tbody.querySelectorAll('.model-data-row');
-    siblingRows.forEach(r => r.classList.remove('active-model-row'));
-    row.classList.add('active-model-row');
-    
-    updateStatsAndSave();
-  });
-  
-  trashBtn.addEventListener('click', () => {
-    if (activeRadio.checked) {
-      showNotification(t('toasts.cannotDeleteActiveModel'), "info");
+  const handleActivate = () => {
+    if (!modelObj.id || !modelObj.id.trim()) {
+      showNotification(t('toasts.noModelIdError'), 'info');
       return;
     }
-    destroyModelRowCustomSelects(row);
-    row.remove();
-    updateStatsAndSave();
-    filterModelsTable(0);
+    if (!isActive) {
+      window.setActiveModelFromTable(modelObj.id.trim());
+    }
+  };
+
+  row.addEventListener('click', (e) => {
+    const trashBtn = e.target.closest('.model-btn-trash');
+    if (trashBtn) {
+      e.stopPropagation();
+      const currentActive = (settingsState.translateAiModel || '').toLowerCase();
+      const thisId = (modelObj.id || '').toLowerCase();
+      if (isActive || (currentActive && currentActive === thisId)) {
+        showNotification(t('toasts.cannotDeleteActiveModel'), "info");
+        return;
+      }
+      const idx = currentProviderModels.indexOf(modelObj);
+      if (idx !== -1) {
+        currentProviderModels.splice(idx, 1);
+      }
+      window.updateFilterCounts();
+      saveActiveProviderModelsDebounced();
+      window.applyModelsFilterAndRender(0);
+      return;
+    }
+
+    if (
+      e.target.closest('.model-reasoning-select') ||
+      e.target.closest('.custom-select-container') ||
+      e.target.closest('input') ||
+      e.target.closest('.reasoning-none-dash')
+    ) {
+      return;
+    }
+    handleActivate();
   });
 
+  row.addEventListener('keydown', (e) => {
+    if (e.target === row && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault();
+      handleActivate();
+    }
+  });
+
+  const radioBtn = row.querySelector('.model-radio-btn');
+  if (radioBtn) {
+    radioBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      handleActivate();
+    });
+  }
+
+  const reasoningSelect = row.querySelector('.model-reasoning-select');
+  if (reasoningSelect) {
+    reasoningSelect.addEventListener('change', (e) => {
+      e.stopPropagation();
+      modelObj.reasoning = reasoningSelect.value;
+      row.dataset.reasoning = reasoningSelect.value;
+      if (typeof modelObj.supportsReasoning !== 'boolean') {
+        modelObj.supportsReasoning = true;
+      }
+      const cs = window.customSelectsMap && (window.customSelectsMap.get(reasoningSelect.id) || window.customSelectsMap.get(reasoningSelect));
+      const container = (cs && cs.container) || (reasoningSelect.nextElementSibling && reasoningSelect.nextElementSibling.classList.contains('custom-select-container') ? reasoningSelect.nextElementSibling : reasoningSelect.closest('.custom-select-container'));
+      if (container) {
+        if (reasoningSelect.value.toLowerCase() === 'none') {
+          container.classList.remove('reasoning-active');
+        } else {
+          container.classList.add('reasoning-active');
+        }
+      }
+      window.updateFilterCounts();
+      saveActiveProviderModelsDebounced();
+      if (currentModelStatusFilter === 'reasoning') {
+        window.applyModelsFilterAndRender(0);
+      }
+    });
+  }
+
+  // Inline editing on double click
+  const idDisplay = row.querySelector('.model-id-display');
+  if (idDisplay) {
+    idDisplay.addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'model-cell-input model-id-input';
+      input.value = modelObj.id || '';
+      input.style.direction = 'ltr';
+      input.style.textAlign = 'left';
+      input.addEventListener('click', ev => ev.stopPropagation());
+      const commit = () => {
+        const val = input.value.trim();
+        if (val && val !== modelObj.id) {
+          modelObj.id = val;
+          row.dataset.modelId = val.toLowerCase();
+          if (isActive) {
+            settingsState.translateAiModel = val;
+            updateActiveModelBannerUI(val);
+          }
+          window.updateFilterCounts();
+          saveActiveProviderModelsDebounced();
+        }
+        window.applyModelsFilterAndRender(0);
+      };
+      input.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') commit();
+        if (ev.key === 'Escape') window.applyModelsFilterAndRender(0);
+      });
+      input.addEventListener('blur', commit);
+      idDisplay.replaceWith(input);
+      input.focus();
+      input.select();
+    });
+  }
+
+  const ctxValue = row.querySelector('.model-ctx-value');
+  if (ctxValue) {
+    ctxValue.addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'model-cell-input model-ctx-input';
+      input.value = formattedCtx;
+      input.style.maxWidth = '80px';
+      input.style.margin = '0 auto';
+      input.addEventListener('click', ev => ev.stopPropagation());
+      const commit = () => {
+        const rawTokens = window.parseTokensInput(input.value);
+        if (rawTokens !== modelObj.contextWindow) {
+          modelObj.contextWindow = rawTokens;
+          saveActiveProviderModelsDebounced();
+        }
+        window.applyModelsFilterAndRender(0);
+      };
+      input.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') commit();
+        if (ev.key === 'Escape') window.applyModelsFilterAndRender(0);
+      });
+      input.addEventListener('blur', commit);
+      ctxValue.replaceWith(input);
+      input.focus();
+      input.select();
+    });
+  }
+
+  // Handle inputs for newly added manual model
+  const idInput = row.querySelector('.model-id-input');
+  if (idInput) {
+    idInput.addEventListener('click', e => e.stopPropagation());
+    idInput.addEventListener('input', () => {
+      const val = idInput.value.trim();
+      modelObj.id = val;
+      row.dataset.modelId = val.toLowerCase();
+    });
+    idInput.addEventListener('blur', () => {
+      const val = idInput.value.trim();
+      if (val) {
+        window.updateFilterCounts();
+        saveActiveProviderModelsDebounced();
+        setTimeout(() => {
+          if (!row.contains(document.activeElement)) {
+            window.applyModelsFilterAndRender(0);
+          }
+        }, 120);
+      } else {
+        setTimeout(() => {
+          if (!row.contains(document.activeElement)) {
+            const idx = currentProviderModels.indexOf(modelObj);
+            if (idx !== -1 && !modelObj.id) {
+              currentProviderModels.splice(idx, 1);
+              window.updateFilterCounts();
+              window.applyModelsFilterAndRender(0);
+            }
+          }
+        }, 120);
+      }
+    });
+    idInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        idInput.blur();
+      }
+    });
+  }
+
+  const ctxInput = row.querySelector('.model-ctx-input');
+  if (ctxInput) {
+    ctxInput.addEventListener('click', e => e.stopPropagation());
+    ctxInput.addEventListener('change', () => {
+      const rawTokens = window.parseTokensInput(ctxInput.value);
+      modelObj.contextWindow = rawTokens;
+      saveActiveProviderModelsDebounced();
+    });
+    ctxInput.addEventListener('blur', () => {
+      setTimeout(() => {
+        if (!row.contains(document.activeElement)) {
+          window.applyModelsFilterAndRender(0);
+        }
+      }, 120);
+    });
+    ctxInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        ctxInput.blur();
+      }
+    });
+  }
+
+  const handleKeyNavigation = (e) => {
+    if (e.key === 'ArrowDown') {
+      const next = row.nextElementSibling;
+      if (next && next.classList.contains('model-data-row')) {
+        e.preventDefault();
+        const target = next.querySelector('.model-cell-input') || next;
+        target.focus();
+      }
+    } else if (e.key === 'ArrowUp') {
+      const prev = row.previousElementSibling;
+      if (prev && prev.classList.contains('model-data-row')) {
+        e.preventDefault();
+        const target = prev.querySelector('.model-cell-input') || prev;
+        target.focus();
+      }
+    }
+  };
+
+  row.addEventListener('keydown', handleKeyNavigation);
+
+  return row;
+}
+
+window.addManualModelRow = function(modelId = "", contextWindow = 200000, reasoning = "None", isActive = false, focus = false, supportsReasoning = true) {
+  const newModel = {
+    id: modelId,
+    contextWindow: window.parseTokensInput(contextWindow),
+    reasoning: reasoning || 'None',
+    supportsReasoning: typeof supportsReasoning === 'boolean' ? supportsReasoning : true,
+    enabled: true
+  };
+  currentProviderModels.unshift(newModel);
+  if (isActive && modelId) {
+    settingsState.translateAiModel = modelId;
+  }
+  currentModelsPage = 1;
+  currentModelStatusFilter = 'all';
+  window.updateFilterCounts();
+  window.applyModelsFilterAndRender(0);
+  
   if (focus) {
     setTimeout(() => {
-      if (idInput) {
-        idInput.focus({ preventScroll: true });
+      const firstInput = document.querySelector('#mgr-models-tbody .model-id-input');
+      if (firstInput) {
+        firstInput.focus();
       }
     }, 50);
   }
@@ -6592,21 +7377,52 @@ window.fetchActiveProviderModels = async function() {
   
   try {
     const modelsList = await invoke('fetch_provider_models', { baseUrl, apiKey, apiFormat });
-    const tbody = document.getElementById('mgr-models-tbody');
-    destroyModelRowCustomSelects(tbody);
-    tbody.innerHTML = '';
-    
     const currentActive = settingsState.translateAiModel;
     
-    modelsList.forEach((m, idx) => {
-      const modelId = (m && typeof m === 'object') ? m.id : m;
-      const modelCtx = (m && typeof m === 'object') ? (m.contextWindow || 200000) : 200000;
-      const idLower = modelId.toLowerCase();
-      let reasoning = (idLower.includes('reasoning') || idLower.includes('o1') || idLower.includes('o3') || idLower.includes('deepseek-r1')) ? 'High' : 'None';
-      const makeActive = !currentActive && idx === 0;
-      addManualModelRow(modelId, modelCtx, reasoning, makeActive);
+    const existingMap = new Map();
+    if (provider && Array.isArray(provider.models)) {
+      provider.models.forEach(pm => {
+        if (pm && pm.id) existingMap.set(pm.id, pm);
+      });
+    }
+
+    currentProviderModels = modelsList.map((m, idx) => {
+      const modelId = String((m && typeof m === 'object') ? m.id : m);
+      const modelCtx = (m && typeof m === 'object') ? (m.contextWindow || m.context_window || 200000) : 200000;
+      const isReasoning = window.isReasoningSupportedModel(m);
+      const existing = existingMap.get(modelId);
+
+      let reasoning = isReasoning ? 'Medium' : 'None';
+      let enabled = true;
+      if (existing) {
+        if (isReasoning) {
+          reasoning = (existing.reasoning && existing.reasoning.toLowerCase() !== 'none')
+            ? existing.reasoning
+            : 'None';
+        } else {
+          reasoning = 'None';
+        }
+        if (typeof existing.enabled === 'boolean') {
+          enabled = existing.enabled;
+        }
+      }
+      return {
+        id: modelId,
+        contextWindow: window.parseTokensInput(modelCtx),
+        reasoning,
+        supportsReasoning: isReasoning,
+        enabled
+      };
     });
     
+    if (!currentActive && currentProviderModels.length > 0) {
+      settingsState.translateAiModel = currentProviderModels[0].id;
+    }
+    
+    currentModelsPage = 1;
+    currentModelsSortCol = null;
+    currentModelsSortDir = 'none';
+    window.updateFilterCounts();
     await saveActiveProviderModels(true, false);
     showNotification(t('toasts.modelsFetchedSuccess', { count: modelsList.length }), "success");
   } catch (e) {
@@ -6630,189 +7446,91 @@ window.saveActiveProviderModels = async function(keepCurrentTab = false, skipTab
   if (providerIdx === -1) return;
   
   const provider = providers[providerIdx];
-  const models = [];
+  const validModels = [];
   const seenIds = new Set();
-  const rows = document.querySelectorAll('#mgr-models-tbody .model-data-row');
-  let activeModelId = '';
-  let checkedModelId = '';
-  
-  rows.forEach(row => {
-    const idInput = row.querySelector('.model-id-input');
-    const ctxInput = row.querySelector('.model-ctx-input');
-    const reasoningSelect = row.querySelector('.model-reasoning-select');
-    const activeRadio = row.querySelector('.model-active-radio');
-    if (!idInput) return;
-    
-    const modelId = idInput.value.trim();
-    if (!modelId) return;
+  currentProviderModels.forEach(m => {
+    const trimmedId = (m.id || '').trim();
+    if (trimmedId && !seenIds.has(trimmedId)) {
+      seenIds.add(trimmedId);
+      const supportsReasoning = typeof m.supportsReasoning === 'boolean'
+        ? m.supportsReasoning
+        : (typeof m.supports_reasoning === 'boolean' ? m.supports_reasoning : undefined);
 
-    if (activeRadio && activeRadio.checked) {
-      checkedModelId = modelId;
-    }
-
-    if (!seenIds.has(modelId)) {
-      seenIds.add(modelId);
-      const contextWindow = window.parseTokensInput(ctxInput ? (ctxInput.dataset.rawTokens || ctxInput.value) : 200000);
-      const reasoning = reasoningSelect ? reasoningSelect.value : 'None';
-      models.push({ id: modelId, contextWindow, reasoning, enabled: true });
+      validModels.push({
+        id: trimmedId,
+        contextWindow: m.contextWindow || 200000,
+        reasoning: m.reasoning || 'None',
+        supportsReasoning: supportsReasoning !== undefined
+          ? supportsReasoning
+          : (m.reasoning && m.reasoning.toLowerCase() !== 'none' ? true : undefined),
+        enabled: m.enabled !== false
+      });
     }
   });
-  
-  if (checkedModelId && models.some(m => m.id === checkedModelId)) {
-    activeModelId = checkedModelId;
-  } else if (models.length > 0) {
-    activeModelId = models[0].id;
-  }
-  
-  provider.models = models;
+
+  provider.models = validModels;
   providers[providerIdx] = provider;
   settingsState.translateAiProviders = JSON.stringify(providers);
 
   const isCurrentActiveProvider = providerName === settingsState.translateAiProvider;
   if (isCurrentActiveProvider) {
-    settingsState.translateAiModel = activeModelId;
+    if (!validModels.some(m => m.id === settingsState.translateAiModel)) {
+      settingsState.translateAiModel = validModels.length > 0 ? validModels[0].id : '';
+    }
     
     const selectDOM = document.getElementById('opt-translateAiModel');
     if (selectDOM) {
       selectDOM.innerHTML = '';
-      models.forEach(m => {
+      validModels.forEach(m => {
         const opt = document.createElement('option');
         opt.value = m.id;
         opt.textContent = m.id;
         selectDOM.appendChild(opt);
       });
-      selectDOM.value = activeModelId;
+      selectDOM.value = settingsState.translateAiModel;
     }
     
-    const bannerEl = document.getElementById('active-model-banner');
-    const bannerVal = document.getElementById('active-model-banner-value');
-    if (bannerEl && bannerVal) {
-      if (activeModelId) {
-        bannerVal.innerHTML = `
-          <div class="active-model-chip-group">
-            <span class="active-model-chip-provider">${escapeHTML(providerName)}</span>
-            <span class="active-model-chip-model">${escapeHTML(activeModelId)}</span>
-          </div>
-        `;
-        bannerEl.style.display = 'flex';
-      } else {
-        bannerEl.style.display = 'none';
-      }
-    }
+    updateActiveModelBannerUI(settingsState.translateAiModel);
   }
   
   await saveCurrentSettings();
   if (isCurrentActiveProvider) {
     updateTranscribeUIConfigs();
+    if (window.translationStudioController) {
+      window.translationStudioController.refreshModelOptions();
+    }
     if (!skipTableRender) {
-      renderModelsRegistryTable(provider);
+      window.applyModelsFilterAndRender(0);
     }
   }
 };
 
-let currentModelStatusFilter = 'all';
-let filterTimeout;
-
 window.filterModelsTable = function(delay = 150) {
-  clearTimeout(filterTimeout);
-  filterTimeout = setTimeout(() => {
-    const searchEl = document.getElementById('mgr-models-search');
-    const query = searchEl ? searchEl.value.trim().toLowerCase() : '';
-    const clearBtn = document.getElementById('mgr-models-search-clear');
-    if (clearBtn) {
-      clearBtn.style.display = query ? 'flex' : 'none';
-    }
-
-    const rows = document.querySelectorAll('#mgr-models-tbody .model-data-row');
-    let visibleCount = 0;
-    const totalRows = rows.length;
-    
-    rows.forEach(row => {
-      const modelId = row.dataset.modelId || '';
-      const isFree = modelId.includes('free');
-      const reasoning = row.dataset.reasoning || 'None';
-      const hasReasoning = reasoning !== 'None';
-      
-      const matchQuery = !query || modelId.includes(query);
-      let matchStatus = true;
-      
-      if (currentModelStatusFilter === 'free') {
-        matchStatus = isFree;
-      } else if (currentModelStatusFilter === 'reasoning') {
-        matchStatus = hasReasoning;
-      }
-      
-      if (matchQuery && matchStatus) {
-        row.style.display = '';
-        visibleCount++;
-      } else {
-        row.style.display = 'none';
-      }
-    });
-
-    const showingCountEl = document.getElementById('models-showing-count');
-    if (showingCountEl) {
-      if (totalRows === 0) {
-        showingCountEl.textContent = t('settings.zeroModels');
-      } else if (query || currentModelStatusFilter !== 'all') {
-        showingCountEl.textContent = t('settings.showingModelsCount', { visible: visibleCount, total: totalRows });
-      } else {
-        showingCountEl.textContent = t('settings.showingAllModelsCount', { total: totalRows });
-      }
-    }
-
-    const emptyState = document.getElementById('mgr-models-empty-state');
-    const emptyTitle = emptyState ? emptyState.querySelector('.models-empty-title') : null;
-    const emptyDesc = emptyState ? emptyState.querySelector('.models-empty-desc') : null;
-    const emptyResetBtn = document.getElementById('mgr-models-empty-reset-btn');
-    const headEl = document.querySelector('.models-table-head');
-    const bodyEl = document.querySelector('.models-table-body');
-
-    if (emptyState) {
-      if (totalRows === 0) {
-        emptyState.style.display = 'flex';
-        if (emptyTitle) emptyTitle.textContent = t('settings.noModelsConfiguredTitle');
-        if (emptyDesc) emptyDesc.textContent = t('settings.noModelsConfiguredDesc');
-        if (emptyResetBtn) emptyResetBtn.style.display = 'none';
-        if (headEl) headEl.style.display = 'none';
-        if (bodyEl) bodyEl.style.display = 'none';
-      } else if (visibleCount === 0) {
-        emptyState.style.display = 'flex';
-        if (emptyTitle) emptyTitle.textContent = t('settings.noMatchingModelsTitle');
-        if (emptyDesc) emptyDesc.textContent = t('settings.noMatchingModelsDesc');
-        if (emptyResetBtn) emptyResetBtn.style.display = 'inline-flex';
-        if (headEl) headEl.style.display = 'none';
-        if (bodyEl) bodyEl.style.display = 'none';
-      } else {
-        emptyState.style.display = 'none';
-        if (headEl) headEl.style.display = 'grid';
-        if (bodyEl) bodyEl.style.display = 'block';
-      }
-    }
-  }, delay);
+  currentModelsPage = 1;
+  window.applyModelsFilterAndRender(delay);
 };
 
-window.filterModelsStatus = function(status, delay = 150) {
+window.filterModelsStatus = function(status, delay = 0) {
   currentModelStatusFilter = status;
   
-  const filters = ['all', 'free', 'reasoning'];
-  filters.forEach(f => {
-    const btn = document.getElementById(`filter-models-${f}`);
-    if (btn) {
-      if (f === status) {
+  const pillsContainer = document.getElementById('models-filter-pills') || document.querySelector('.models-filter-pills');
+  if (pillsContainer) {
+    pillsContainer.querySelectorAll('.btn-filter').forEach(btn => {
+      if (btn.dataset.filter === status || btn.id === `filter-models-${status}`) {
         btn.classList.add('active');
       } else {
         btn.classList.remove('active');
       }
-    }
-  });
+    });
+  }
   
+  currentModelsPage = 1;
   const container = document.getElementById('mgr-models-tbody');
   if (container) {
     container.scrollTop = 0;
   }
   
-  filterModelsTable(delay);
+  window.applyModelsFilterAndRender(delay);
 };
 
 window.openAddProviderModal = function() {
@@ -6885,7 +7603,7 @@ window.saveProviderConfig = async function() {
   
   await saveCurrentSettings();
   populateProvidersDropdown();
-  onProviderChanged(false); // Load general tab for newly created provider
+  onProviderChanged('general'); // Switch directly to Provider Configuration tab for newly created provider
   closeProviderModal();
   
   showNotification(t('toasts.providerAddedSuccess'), "success");
@@ -6940,10 +7658,73 @@ window.setupTranslationEventListeners = function() {
   }
 };
 
-window.closeTestModal = function() {
+let isPreviewTesting = false;
+let previewTestId = 0;
+
+function _handleTestModalKeydown(e) {
   const modal = document.getElementById('translation-test-modal');
-  modal.classList.remove('show');
-  setTimeout(() => modal.style.display = 'none', 300);
+  if (!modal || !modal.classList.contains('show')) return;
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    e.stopPropagation();
+    window.abortAndCloseTestModal();
+  }
+}
+
+window.handleTestModalBackdropClick = function(event) {
+  if (event.target && event.target.id === 'translation-test-modal') {
+    window.abortAndCloseTestModal();
+  }
+};
+
+window.abortAndCloseTestModal = async function() {
+  if (isPreviewTesting) {
+    isPreviewTesting = false;
+    previewTestId++; // Invalidate any delayed in-flight response
+    try {
+      await invoke('cancel_preview_translate');
+    } catch (e) {
+      console.warn("Failed to cancel preview translate backend:", e);
+    }
+    const testBtn = document.getElementById('mgr-btn-test-connection');
+    if (testBtn) {
+      testBtn.disabled = false;
+      testBtn.textContent = testBtn.dataset.originalText || t('settings.testConnBtn') || 'Test Connection';
+    }
+    showNotification(t('toasts.testCancelled'), "info");
+  }
+  const modal = document.getElementById('translation-test-modal');
+  if (modal) {
+    modal.classList.remove('show');
+    setTimeout(() => {
+      if (!modal.classList.contains('show')) {
+        modal.style.display = 'none';
+      }
+    }, 300);
+  }
+  document.removeEventListener('keydown', _handleTestModalKeydown);
+};
+
+window.closeTestModal = function() {
+  if (isPreviewTesting) {
+    window.abortAndCloseTestModal();
+    return;
+  }
+  const modal = document.getElementById('translation-test-modal');
+  if (modal) {
+    modal.classList.remove('show');
+    setTimeout(() => {
+      if (!modal.classList.contains('show')) {
+        modal.style.display = 'none';
+      }
+    }, 300);
+  }
+  document.removeEventListener('keydown', _handleTestModalKeydown);
+  const testBtn = document.getElementById('mgr-btn-test-connection');
+  if (testBtn && !isPreviewTesting) {
+    testBtn.disabled = false;
+    testBtn.textContent = testBtn.dataset.originalText || t('settings.testConnBtn') || 'Test Connection';
+  }
 };
 
 window.testTranslationConnection = async function() {
@@ -6956,54 +7737,106 @@ window.testTranslationConnection = async function() {
   }
   
   const testBtn = document.getElementById('mgr-btn-test-connection');
-  const originalText = testBtn.textContent;
+  const originalText = t('settings.testConnBtn') || testBtn.textContent;
+  testBtn.dataset.originalText = originalText;
   testBtn.disabled = true;
   testBtn.textContent = t('modals.testingBtn');
   
   // Make sure general settings are saved silently first
-  await saveActiveProviderGeneral(true);
+  try {
+    await saveActiveProviderGeneral(true);
+  } catch (e) {
+    console.warn("Failed to silently save provider configuration before test:", e);
+  }
+
+  // Synchronize settingsState provider
+  settingsState.translateAiProvider = providerName;
+
+  // Validate or fallback to an active/enabled model of this specific provider
+  let providers = [];
+  try {
+    providers = JSON.parse(settingsState.translateAiProviders || '[]');
+  } catch (e) {}
+  const p = providers.find(item => item.name === providerName);
+  const models = (p && Array.isArray(p.models)) ? p.models : [];
+  const modelBelongsToProvider = models.some(m => m.id === settingsState.translateAiModel);
+  if (!modelBelongsToProvider && models.length > 0) {
+    const enabledModel = models.find(m => m.enabled !== false) || models[0];
+    if (enabledModel) {
+      settingsState.translateAiModel = enabledModel.id;
+    }
+  }
   
   const testSrt = `1\n00:00:01,000 --> 00:00:05,000\nHello, this is a test of the AI translation system connection.`;
   
   const testModal = document.getElementById('translation-test-modal');
   const statusEl = document.getElementById('test-modal-status');
   const resultEl = document.getElementById('test-modal-result');
+  const cancelBtn = document.getElementById('test-modal-cancel-btn');
+  const okBtn = document.getElementById('test-modal-ok-btn');
   
   statusEl.textContent = t('modals.testingConnection');
   statusEl.style.color = 'var(--color-cyan)';
   resultEl.textContent = t('modals.waitingApiResponse');
   
+  if (cancelBtn) cancelBtn.style.display = 'inline-flex';
+  if (okBtn) okBtn.style.display = 'none';
+
   testModal.style.display = 'flex';
   setTimeout(() => testModal.classList.add('show'), 10);
-  
+  document.addEventListener('keydown', _handleTestModalKeydown);
+
+  isPreviewTesting = true;
+  const currentTestId = ++previewTestId;
+
+  // Client-side safety timeout (26 seconds)
+  let timerId = null;
+  const timeoutPromise = new Promise((_, reject) => {
+    timerId = setTimeout(() => {
+      // Abort backend preview request immediately
+      invoke('cancel_preview_translate').catch(() => {});
+      reject(new Error(t('modals.connectionTimeoutDesc', { seconds: 25 })));
+    }, 26000);
+  });
+
   try {
-    const response = await invoke('preview_translate_first_lines', {
+    const invokePromise = invoke('preview_translate_first_lines', {
       settings: settingsState,
       fileContent: testSrt
     });
+
+    const response = await Promise.race([invokePromise, timeoutPromise]);
+    if (timerId) clearTimeout(timerId);
     
+    if (currentTestId !== previewTestId || !isPreviewTesting) return;
+
     statusEl.textContent = t('modals.connectionSuccess');
     statusEl.style.color = 'var(--color-green)';
     resultEl.textContent = response;
   } catch (err) {
-    statusEl.textContent = t('modals.connectionFailed');
+    if (timerId) clearTimeout(timerId);
+    if (currentTestId !== previewTestId || !isPreviewTesting) return;
+
+    const errStr = typeof err === 'string' ? err : (err && err.message ? err.message : String(err));
+    const isTimeout = errStr.toLowerCase().includes('timeout') || errStr.toLowerCase().includes('timed out') || errStr.includes('تایم‌اوت');
+    statusEl.textContent = isTimeout ? (t('modals.connectionTimeout') || t('modals.connectionFailed')) : t('modals.connectionFailed');
     statusEl.style.color = 'var(--color-red)';
-    resultEl.textContent = err;
+    resultEl.textContent = errStr;
   } finally {
-    testBtn.disabled = false;
-    testBtn.textContent = originalText;
+    if (timerId) clearTimeout(timerId);
+    if (currentTestId === previewTestId) {
+      isPreviewTesting = false;
+      testBtn.disabled = false;
+      testBtn.textContent = originalText;
+      if (cancelBtn) cancelBtn.style.display = 'none';
+      if (okBtn) {
+        okBtn.style.display = 'inline-flex';
+        okBtn.focus();
+      }
+    }
   }
 };
 
 window.toggleTranslationSubSettingsVisibility = function() {
-  const enabled = settingsState.translateAiEnabled === true;
-  const group = document.getElementById('group-translation');
-  if (!group) return;
-  
-  const cards = group.querySelectorAll('.setting-card, .provider-manager-card');
-  cards.forEach(c => {
-    const checkbox = c.querySelector('#opt-translateAiEnabled');
-    if (checkbox) return;
-    c.style.display = enabled ? '' : 'none';
-  });
+  // Deprecated: UI visibility is permanently decoupled from the auto-translate after transcription toggle.
 };

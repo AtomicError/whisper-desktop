@@ -15,6 +15,8 @@ pub struct AiModel {
     #[serde(default)]
     pub reasoning: String, // "None" | "Low" | "Medium" | "High"
     #[serde(default)]
+    pub supports_reasoning: Option<bool>,
+    #[serde(default)]
     pub vision: bool,
     #[serde(default = "default_model_enabled")]
     pub enabled: bool,
@@ -261,8 +263,11 @@ impl AiProvider {
                 // Reasoning effort: forward if configured for model or in options
                 let effort = options.reasoning_effort.as_deref().or_else(|| {
                     self.models.iter().find(|m| m.id == model).and_then(|m| {
+                        if m.supports_reasoning == Some(false) {
+                            return None;
+                        }
                         let r = m.reasoning.trim().to_lowercase();
-                        if r == "low" || r == "medium" || r == "high" {
+                        if r == "minimal" || r == "low" || r == "medium" || r == "high" || r == "xhigh" || r == "max" {
                             Some(m.reasoning.as_str())
                         } else {
                             None
@@ -352,6 +357,7 @@ mod tests {
                 context_window: 128000,
                 max_output_tokens: None,
                 reasoning: "low".to_string(),
+                supports_reasoning: None,
                 vision: false,
                 enabled: true,
             }],

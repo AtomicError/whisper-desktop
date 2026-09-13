@@ -836,7 +836,6 @@ export class TranslationStudioController {
       this.state.targetLang = settings.translateAiTargetLang;
       if (this.targetLangSelect && this.targetLangSelect.value !== this.state.targetLang) {
         this.targetLangSelect.value = this.state.targetLang;
-        this.targetLangSelect.dispatchEvent(new Event('change'));
       }
     }
 

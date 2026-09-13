@@ -1245,184 +1245,8 @@
                 
                 <!-- AI Translation Settings Group -->
                 <div class="settings-group" id="group-translation">
-                  <div class="setting-card">
-                    <div class="setting-info">
-                      <div class="setting-label-row">
-                        <span class="setting-title" data-i18n="settings.aiTranslateTitle">Enable AI Translation</span>
-                      </div>
-                      <div class="setting-desc"><span data-i18n="settings.aiTranslateDesc">Automatically translates transcribed subtitles into your target language using cloud or local LLM APIs.</span>
-                        <div class="setting-desc-points" data-i18n-html="settings.aiTranslatePoints">
-                          <span class="setting-desc-point"><strong>Supported:</strong> OpenAI, Claude, Gemini, Groq, Ollama, DeepSeek</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="setting-control">
-                      <label class="switch">
-                        <input type="checkbox" id="opt-translateAiEnabled" />
-                        <span class="slider"></span>
-                      </label>
-                    </div>
-                  </div>
-                  <div class="setting-card">
-                    <div class="setting-info">
-                      <div class="setting-label-row">
-                        <span class="setting-title" data-i18n="settings.targetLangTitle">Target Language</span>
-                      </div>
-                      <div class="setting-desc"><span data-i18n="settings.targetLangDesc">Destination language for AI subtitle translation.</span>
-                        <div class="setting-desc-points" data-i18n-html="settings.targetLangPoints">
-                          <span class="setting-desc-point"><strong>Supported:</strong> 100+ global languages with native script rendering</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="setting-control setting-control-wide">
-                      <select class="select-control" id="opt-translateAiTargetLang" onchange="saveCurrentSettings()">
-                        <option value="Persian">Persian (فارسی)</option>
-                        <option value="English">English</option>
-                        <option value="Simplified Chinese">Chinese (Simplified / 简体)</option>
-                        <option value="Traditional Chinese">Chinese (Traditional / 繁體)</option>
-                        <option value="Spanish">Spanish (Español)</option>
-                        <option value="French">French (Français)</option>
-                        <option value="German">German (Deutsch)</option>
-                        <option value="Japanese">Japanese (日本語)</option>
-                        <option value="Korean">Korean (한국어)</option>
-                        <option value="Hindi">Hindi (हिन्दी)</option>
-                        <option value="Arabic">Arabic (العربية)</option>
-                        <option value="Russian">Russian (Русский)</option>
-                        <option value="Portuguese (Brazil)">Portuguese (Brasil)</option>
-                        <option value="Portuguese (Portugal)">Portuguese (Portugal)</option>
-                        <option value="Indonesian">Indonesian (Bahasa Indonesia)</option>
-                        <option value="Vietnamese">Vietnamese (Tiếng Việt)</option>
-                        <option value="Italian">Italian (Italiano)</option>
-                        <option value="Cantonese">Cantonese (粵語)</option>
-                        <option value="Turkish">Turkish (Türkçe)</option>
-                        <option value="Hebrew">Hebrew (עברית)</option>
-                        <option value="Urdu">Urdu (اردو)</option>
-                        <option value="Pashto">Pashto (پښتو)</option>
-                        <option value="Dari">Dari (دری)</option>
-                        <option value="Central Kurdish">Central Kurdish (کوردی / Sorani)</option>
-                        <option value="Northern Kurdish">Northern Kurdish (Kurdî / Kurmanji)</option>
-                        <option value="Polish">Polish (Polski)</option>
-                        <option value="Ukrainian">Ukrainian (Українська)</option>
-                        <option value="Dutch">Dutch (Nederlands)</option>
-                        <option value="Romanian">Romanian (Română)</option>
-                        <option value="Greek">Greek (Ελληνικά)</option>
-                        <option value="Hungarian">Hungarian (Magyar)</option>
-                        <option value="Swedish">Swedish (Svenska)</option>
-                        <option value="Czech">Czech (Čeština)</option>
-                        <option value="Catalan">Catalan (Català)</option>
-                        <option value="Serbian">Serbian (Српски)</option>
-                        <option value="Bulgarian">Bulgarian (Български)</option>
-                        <option value="Armenian">Armenian (Հայերեն)</option>
-                        <option value="Danish">Danish (Dansk)</option>
-                        <option value="Albanian">Albanian (Shqip)</option>
-                        <option value="Finnish">Finnish (Suomi)</option>
-                        <option value="Norwegian Bokmål">Norwegian (Norsk bokmål)</option>
-                        <option value="Slovak">Slovak (Slovenčina)</option>
-                        <option value="Croatian">Croatian (Hrvatski)</option>
-                        <option value="Belarusian">Belarusian (Беларуская)</option>
-                        <option value="Sicilian">Sicilian (Sicilianu)</option>
-                        <option value="Georgian">Georgian (ქართული)</option>
-                        <option value="Lombard">Lombard (Lombard)</option>
-                        <option value="Lithuanian">Lithuanian (Lietuvių)</option>
-                        <option value="Galician">Galician (Galego)</option>
-                        <option value="Bosnian">Bosnian (Bosanski)</option>
-                        <option value="Slovenian">Slovenian (Slovenščina)</option>
-                        <option value="Macedonian">Macedonian (Македонски)</option>
-                        <option value="Latvian">Latvian (Latviešu)</option>
-                        <option value="Estonian">Estonian (Eesti)</option>
-                        <option value="Icelandic">Icelandic (Íslenska)</option>
-                        <option value="Maltese">Maltese (Malti)</option>
-                        <option value="Welsh">Welsh (Cymraeg)</option>
-                        <option value="Irish">Irish (Gaeilge)</option>
-                        <option value="Breton">Breton (Brezhoneg)</option>
-                        <option value="Basque">Basque (Euskara)</option>
-                        <option value="Yiddish">Yiddish (ייִדיש)</option>
-                        <option value="Luxembourgish">Luxembourgish (Lëtzebuergesch)</option>
-                        <option value="Occitan">Occitan (Occitan)</option>
-                        <option value="Aragonese">Aragonese (Aragonés)</option>
-                        <option value="Latin">Latin (Latina)</option>
-                        <option value="Esperanto">Esperanto</option>
-                        <option value="Uzbek">Uzbek (Oʻzbekcha)</option>
-                        <option value="Kazakh">Kazakh (Қазақ тілі)</option>
-                        <option value="Kyrgyz">Kyrgyz (Кыргызча)</option>
-                        <option value="Turkmen">Turkmen (Türkmençe)</option>
-                        <option value="Azerbaijani">Azerbaijani (Azərbaycan)</option>
-                        <option value="Tajik">Tajik (Тоҷикӣ)</option>
-                        <option value="Mongolian">Mongolian (Монгол)</option>
-                        <option value="Bashkir">Bashkir (Башҡортса)</option>
-                        <option value="Tatar">Tatar (Татар теле)</option>
-                        <option value="Uyghur">Uyghur (ئۇيغۇرچە)</option>
-                        <option value="Bengali">Bengali (বাংলা)</option>
-                        <option value="Marathi">Marathi (मराठी)</option>
-                        <option value="Telugu">Telugu (తెలుగు)</option>
-                        <option value="Tamil">Tamil (தமிழ்)</option>
-                        <option value="Gujarati">Gujarati (ગુજરાતી)</option>
-                        <option value="Kannada">Kannada (ಕನ್ನಡ)</option>
-                        <option value="Punjabi">Punjabi (ਪੰਜਾਬੀ)</option>
-                        <option value="Malayalam">Malayalam (മലയാളം)</option>
-                        <option value="Bhojpuri">Bhojpuri (भोजपुरी)</option>
-                        <option value="Maithili">Maithili (मैथिली)</option>
-                        <option value="Nepali">Nepali (नेपाली)</option>
-                        <option value="Sinhala">Sinhala (සිංහල)</option>
-                        <option value="Assamese">Assamese (অসমীয়া)</option>
-                        <option value="Konkani">Konkani (कोंकणी)</option>
-                        <option value="Sanskrit">Sanskrit (संस्कृतम्)</option>
-                        <option value="Thai">Thai (ไทย)</option>
-                        <option value="Lao">Lao (ລາວ)</option>
-                        <option value="Burmese">Burmese (မြန်မာ)</option>
-                        <option value="Khmer">Khmer (ខ្មែរ)</option>
-                        <option value="Malay">Malay (Bahasa Melayu)</option>
-                        <option value="Filipino">Filipino (Tagalog)</option>
-                        <option value="Javanese">Javanese (Basa Jawa)</option>
-                        <option value="Sundanese">Sundanese (Basa Sunda)</option>
-                        <option value="Acehnese">Acehnese (Acèh)</option>
-                        <option value="Pangasinan">Pangasinan (Salitan Pangasinan)</option>
-                        <option value="Pampangan">Pampangan (Kapampangan)</option>
-                        <option value="Cebuano">Cebuano</option>
-                        <option value="Swahili">Swahili (Kiswahili)</option>
-                        <option value="Hausa">Hausa (هَرْشٜىٰن هَوْسَا)</option>
-                        <option value="Amharic">Amharic (አማርኛ)</option>
-                        <option value="Igbo">Igbo</option>
-                        <option value="Wolof">Wolof</option>
-                        <option value="Xhosa">Xhosa (isiXhosa)</option>
-                        <option value="Zulu">Zulu (isiZulu)</option>
-                        <option value="Afrikaans">Afrikaans</option>
-                        <option value="Oromo">Oromo (Afaan Oromoo)</option>
-                        <option value="Southern Sotho">Southern Sotho (Sesotho)</option>
-                        <option value="Tswana">Tswana (Setswana)</option>
-                        <option value="Tsonga">Tsonga (Xitsonga)</option>
-                        <option value="Malagasy">Malagasy</option>
-                        <option value="Lingala">Lingala (Lingála)</option>
-                        <option value="Haitian Creole">Haitian Creole (Kreyòl ayisyen)</option>
-                        <option value="Quechua">Quechua (Runa Simi)</option>
-                        <option value="Aymara">Aymara (Aymar aru)</option>
-                        <option value="Guarani">Guarani (Avañe'ẽ)</option>
-                        <option value="Maori">Maori (Māori)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div class="setting-card">
-                    <div class="setting-info">
-                      <div class="setting-label-row">
-                        <span class="setting-title" data-i18n="settings.polishTitle">Enable Polish Pass</span>
-                      </div>
-                      <div class="setting-desc"><span data-i18n="settings.polishDesc">Refines translated subtitles for natural conversational rhythm and reading speed.</span>
-                        <div class="setting-desc-points" data-i18n-html="settings.polishPoints">
-                          <span class="setting-desc-point"><strong>Recommended:</strong> Enabled for natural subtitle flow, avoiding rigid word-for-word machine translations.</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="setting-control">
-                      <label class="switch">
-                        <input type="checkbox" id="opt-translateAiPolish" onchange="saveCurrentSettings()" />
-                        <span class="slider"></span>
-                      </label>
-                    </div>
-                  </div>
-
                   <!-- Tabbed Provider Manager Card -->
-                  <div class="provider-manager-card" id="provider-manager-card" style="display: none;">
+                  <div class="provider-manager-card" id="provider-manager-card">
                     <!-- Active Model Banner -->
                     <div class="active-model-banner" id="active-model-banner" style="display: none;">
                       <div class="active-model-banner-info">
@@ -1433,13 +1257,194 @@
                     </div>
                     <!-- Tab buttons -->
                     <div class="provider-tabs">
-                      <button class="provider-tab-btn active" onclick="switchProviderTab('providers')" id="tab-btn-providers" data-i18n="settings.tabProviders">API Providers</button>
-                      <button class="provider-tab-btn" onclick="switchProviderTab('general')" id="tab-btn-general" data-i18n="settings.tabGeneral">General Configuration</button>
+                      <button class="provider-tab-btn active" onclick="switchProviderTab('auto')" id="tab-btn-auto" data-i18n="settings.tabAutoTranslate">Auto-Translate</button>
+                      <button class="provider-tab-btn" onclick="switchProviderTab('providers')" id="tab-btn-providers" data-i18n="settings.tabProviders">API Providers</button>
+                      <button class="provider-tab-btn" onclick="switchProviderTab('general')" id="tab-btn-general" data-i18n="settings.tabGeneral">Provider Configuration</button>
                       <button class="provider-tab-btn" onclick="switchProviderTab('models')" id="tab-btn-models"><span data-i18n="settings.tabModels">Models</span> (<span id="provider-models-count">0</span>)</button>
                     </div>
 
-                    <!-- Tab 0 Content: Providers Card Grid -->
-                    <div class="provider-tab-content" id="provider-tab-providers">
+                    <!-- Tab 0 Content: Auto-Translate Automation Settings -->
+                    <div class="provider-tab-content" id="provider-tab-auto">
+                      <div class="setting-card">
+                        <div class="setting-info">
+                          <div class="setting-label-row">
+                            <span class="setting-title" data-i18n="settings.aiTranslateTitle">Auto-Translate After Transcription</span>
+                          </div>
+                          <div class="setting-desc"><span data-i18n="settings.aiTranslateDesc">Automatically translates transcribed subtitles into your target language using cloud or local LLM APIs once transcription finishes.</span>
+                            <div class="setting-desc-points" data-i18n-html="settings.aiTranslatePoints">
+                              <span class="setting-desc-point"><strong>Supported:</strong> OpenAI, Claude, Gemini, Groq, LM Studio, DeepSeek</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="setting-control">
+                          <label class="switch">
+                            <input type="checkbox" id="opt-translateAiEnabled" onchange="saveCurrentSettings()" />
+                            <span class="slider"></span>
+                          </label>
+                        </div>
+                      </div>
+
+                      <div class="setting-card">
+                        <div class="setting-info">
+                          <div class="setting-label-row">
+                            <span class="setting-title" data-i18n="settings.targetLangTitle">Target Language</span>
+                          </div>
+                          <div class="setting-desc"><span data-i18n="settings.targetLangDesc">Destination language for AI subtitle translation.</span>
+                            <div class="setting-desc-points" data-i18n-html="settings.targetLangPoints">
+                              <span class="setting-desc-point"><strong>Supported:</strong> 100+ global languages with native script rendering</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="setting-control setting-control-wide">
+                          <select class="select-control" id="opt-translateAiTargetLang" onchange="saveCurrentSettings()">
+                            <option value="Persian">Persian (فارسی)</option>
+                            <option value="English">English</option>
+                            <option value="Simplified Chinese">Chinese (Simplified / 简体)</option>
+                            <option value="Traditional Chinese">Chinese (Traditional / 繁體)</option>
+                            <option value="Spanish">Spanish (Español)</option>
+                            <option value="French">French (Français)</option>
+                            <option value="German">German (Deutsch)</option>
+                            <option value="Japanese">Japanese (日本語)</option>
+                            <option value="Korean">Korean (한국어)</option>
+                            <option value="Hindi">Hindi (हिन्दी)</option>
+                            <option value="Arabic">Arabic (العربية)</option>
+                            <option value="Russian">Russian (Русский)</option>
+                            <option value="Portuguese (Brazil)">Portuguese (Brasil)</option>
+                            <option value="Portuguese (Portugal)">Portuguese (Portugal)</option>
+                            <option value="Indonesian">Indonesian (Bahasa Indonesia)</option>
+                            <option value="Vietnamese">Vietnamese (Tiếng Việt)</option>
+                            <option value="Italian">Italian (Italiano)</option>
+                            <option value="Cantonese">Cantonese (粵語)</option>
+                            <option value="Turkish">Turkish (Türkçe)</option>
+                            <option value="Hebrew">Hebrew (עבריت)</option>
+                            <option value="Urdu">Urdu (اردو)</option>
+                            <option value="Pashto">Pashto (پښتو)</option>
+                            <option value="Dari">Dari (دری)</option>
+                            <option value="Central Kurdish">Central Kurdish (کوردی / Sorani)</option>
+                            <option value="Northern Kurdish">Northern Kurdish (Kurdî / Kurmanji)</option>
+                            <option value="Polish">Polish (Polski)</option>
+                            <option value="Ukrainian">Ukrainian (Українська)</option>
+                            <option value="Dutch">Dutch (Nederlands)</option>
+                            <option value="Romanian">Romanian (Română)</option>
+                            <option value="Greek">Greek (Ελληνικά)</option>
+                            <option value="Hungarian">Hungarian (Magyar)</option>
+                            <option value="Swedish">Swedish (Svenska)</option>
+                            <option value="Czech">Czech (Čeština)</option>
+                            <option value="Catalan">Catalan (Català)</option>
+                            <option value="Serbian">Serbian (Српски)</option>
+                            <option value="Bulgarian">Bulgarian (Български)</option>
+                            <option value="Armenian">Armenian (Հայերեն)</option>
+                            <option value="Danish">Danish (Dansk)</option>
+                            <option value="Albanian">Albanian (Shqip)</option>
+                            <option value="Finnish">Finnish (Suomi)</option>
+                            <option value="Norwegian Bokmål">Norwegian (Norsk bokmål)</option>
+                            <option value="Slovak">Slovak (Slovenčina)</option>
+                            <option value="Croatian">Croatian (Hrvatski)</option>
+                            <option value="Belarusian">Belarusian (Беларуская)</option>
+                            <option value="Sicilian">Sicilian (Sicilianu)</option>
+                            <option value="Georgian">Georgian (ქართული)</option>
+                            <option value="Lombard">Lombard (Lombard)</option>
+                            <option value="Lithuanian">Lithuanian (Lietuvių)</option>
+                            <option value="Galician">Galician (Galego)</option>
+                            <option value="Bosnian">Bosnian (Bosanski)</option>
+                            <option value="Slovenian">Slovenian (Slovenščina)</option>
+                            <option value="Macedonian">Macedonian (Македонски)</option>
+                            <option value="Latvian">Latvian (Latviešu)</option>
+                            <option value="Estonian">Estonian (Eesti)</option>
+                            <option value="Icelandic">Icelandic (Íslenska)</option>
+                            <option value="Maltese">Maltese (Malti)</option>
+                            <option value="Welsh">Welsh (Cymraeg)</option>
+                            <option value="Irish">Irish (Gaeilge)</option>
+                            <option value="Breton">Breton (Brezhoneg)</option>
+                            <option value="Basque">Basque (Euskara)</option>
+                            <option value="Yiddish">Yiddish (ייִדיش)</option>
+                            <option value="Luxembourgish">Luxembourgish (Lëtzebuergesch)</option>
+                            <option value="Occitan">Occitan (Occitan)</option>
+                            <option value="Aragonese">Aragonese (Aragonés)</option>
+                            <option value="Latin">Latin (Latina)</option>
+                            <option value="Esperanto">Esperanto</option>
+                            <option value="Uzbek">Uzbek (Oʻzbekcha)</option>
+                            <option value="Kazakh">Kazakh (Қазақ тілі)</option>
+                            <option value="Kyrgyz">Kyrgyz (Кыргызча)</option>
+                            <option value="Turkmen">Turkmen (Türkmençe)</option>
+                            <option value="Azerbaijani">Azerbaijani (Azərbaycan)</option>
+                            <option value="Tajik">Tajik (Тоҷикӣ)</option>
+                            <option value="Mongolian">Mongolian (Монгол)</option>
+                            <option value="Bashkir">Bashkir (Баشҡортса)</option>
+                            <option value="Tatar">Tatar (Татар теле)</option>
+                            <option value="Uyghur">Uyghur (ئۇيغۇرچە)</option>
+                            <option value="Bengali">Bengali (বাংলা)</option>
+                            <option value="Marathi">Marathi (मराठी)</option>
+                            <option value="Telugu">Telugu (తెలుగు)</option>
+                            <option value="Tamil">Tamil (தமிழ்)</option>
+                            <option value="Gujarati">Gujarati (ગુજરાતી)</option>
+                            <option value="Kannada">Kannada (ಕನ್ನಡ)</option>
+                            <option value="Punjabi">Punjabi (ਪੰਜਾਬੀ)</option>
+                            <option value="Malayalam">Malayalam (മലയാളം)</option>
+                            <option value="Bhojpuri">Bhojpuri (भोजपुरी)</option>
+                            <option value="Maithili">Maithili (मैथिली)</option>
+                            <option value="Nepali">Nepali (नेपाली)</option>
+                            <option value="Sinhala">Sinhala (සිංහල)</option>
+                            <option value="Assamese">Assamese (অসমীয়া)</option>
+                            <option value="Konkani">Konkani (कोंकणी)</option>
+                            <option value="Sanskrit">Sanskrit (संस्कृतम्)</option>
+                            <option value="Thai">Thai (ไทย)</option>
+                            <option value="Lao">Lao (ລາວ)</option>
+                            <option value="Burmese">Burmese (မြန်မာ)</option>
+                            <option value="Khmer">Khmer (ខ្មែរ)</option>
+                            <option value="Malay">Malay (Bahasa Melayu)</option>
+                            <option value="Filipino">Filipino (Tagalog)</option>
+                            <option value="Javanese">Javanese (Basa Jawa)</option>
+                            <option value="Sundanese">Sundanese (Basa Sunda)</option>
+                            <option value="Acehnese">Acehnese (Acèh)</option>
+                            <option value="Pangasinan">Pangasinan (Salitan Pangasinan)</option>
+                            <option value="Pampangan">Pampangan (Kapampangan)</option>
+                            <option value="Cebuano">Cebuano</option>
+                            <option value="Swahili">Swahili (Kiswahili)</option>
+                            <option value="Hausa">Hausa (هَرْشٜىٰن هَوْسَا)</option>
+                            <option value="Amharic">Amharic (አማርኛ)</option>
+                            <option value="Igbo">Igbo</option>
+                            <option value="Wolof">Wolof</option>
+                            <option value="Xhosa">Xhosa (isiXhosa)</option>
+                            <option value="Zulu">Zulu (isiZulu)</option>
+                            <option value="Afrikaans">Afrikaans</option>
+                            <option value="Oromo">Oromo (Afaan Oromoo)</option>
+                            <option value="Southern Sotho">Southern Sotho (Sesotho)</option>
+                            <option value="Tswana">Tswana (Setswana)</option>
+                            <option value="Tsonga">Tsonga (Xitsonga)</option>
+                            <option value="Malagasy">Malagasy</option>
+                            <option value="Lingala">Lingala (Lingála)</option>
+                            <option value="Haitian Creole">Haitian Creole (Kreyòl ayisyen)</option>
+                            <option value="Quechua">Quechua (Runa Simi)</option>
+                            <option value="Aymara">Aymara (Aymar aru)</option>
+                            <option value="Guarani">Guarani (Avañe'ẽ)</option>
+                            <option value="Maori">Maori (Māori)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div class="setting-card">
+                        <div class="setting-info">
+                          <div class="setting-label-row">
+                            <span class="setting-title" data-i18n="settings.polishTitle">Enable Polish Pass</span>
+                          </div>
+                          <div class="setting-desc"><span data-i18n="settings.polishDesc">Refines translated subtitles for natural conversational rhythm and reading speed.</span>
+                            <div class="setting-desc-points" data-i18n-html="settings.polishPoints">
+                              <span class="setting-desc-point"><strong>Recommended:</strong> Enabled for natural subtitle flow, avoiding rigid word-for-word machine translations.</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="setting-control">
+                          <label class="switch">
+                            <input type="checkbox" id="opt-translateAiPolish" onchange="saveCurrentSettings()" />
+                            <span class="slider"></span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Tab 1 Content: Providers Card Grid -->
+                    <div class="provider-tab-content" id="provider-tab-providers" style="display: none;">
                       <!-- Hidden select boxes for bindSettingsToDOM mapping -->
                       <select class="select-control" id="opt-translateAiProvider" style="display: none;"></select>
                       <select class="select-control" id="opt-translateAiModel" style="display: none;"></select>
@@ -1549,7 +1554,7 @@
 
                         <!-- Filters Quick Actions & Stats bar -->
                         <div class="models-header-bar">
-                          <div class="models-filter-pills">
+                          <div class="models-filter-pills" id="models-filter-pills">
                             <button class="btn-filter active" onclick="filterModelsStatus('all')" id="filter-models-all">
                               <span data-i18n="settings.allModels">All Models</span>
                               <span class="filter-badge" id="filter-count-all">0</span>
@@ -1572,12 +1577,26 @@
 
                         <!-- Models Data Table (CSS Grid with Absolute Column Alignment) -->
                         <div class="models-data-table" id="mgr-models-table-wrapper">
-                          <div class="models-table-head">
-                            <div class="th-cell th-active" data-i18n="settings.thActive">Active</div>
-                            <div class="th-cell th-id" data-i18n="settings.thModelId">Model Identifier</div>
-                            <div class="th-cell th-ctx" data-i18n="settings.thContextWindow">Context Window</div>
-                            <div class="th-cell th-reasoning" data-i18n="settings.thReasoning">Reasoning</div>
-                            <div class="th-cell th-action" data-i18n="settings.thAction">Action</div>
+                          <div class="models-table-head" role="row">
+                            <div class="th-cell th-active" role="columnheader" tabindex="0" aria-sort="none" onclick="toggleSortModels('active')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSortModels('active');}" title="Sort by Active" data-i18n-title="settings.sortActive">
+                              <span data-i18n="settings.thActive">Active</span>
+                              <span class="sort-indicator" id="sort-icon-active" aria-hidden="true">↕</span>
+                            </div>
+                            <div class="th-cell th-id" role="columnheader" tabindex="0" aria-sort="none" onclick="toggleSortModels('id')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSortModels('id');}" title="Sort by Model Identifier" data-i18n-title="settings.sortId">
+                              <span data-i18n="settings.thModelId">Model Identifier</span>
+                              <span class="sort-indicator" id="sort-icon-id" aria-hidden="true">↕</span>
+                            </div>
+                            <div class="th-cell th-ctx" role="columnheader" tabindex="0" aria-sort="none" onclick="toggleSortModels('ctx')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSortModels('ctx');}" title="Sort by Context Window" data-i18n-title="settings.sortCtx">
+                              <span data-i18n="settings.thContextWindow">Context Window</span>
+                              <span class="sort-indicator" id="sort-icon-ctx" aria-hidden="true">↕</span>
+                            </div>
+                            <div class="th-cell th-reasoning" role="columnheader" tabindex="0" aria-sort="none" onclick="toggleSortModels('reasoning')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSortModels('reasoning');}" title="Sort by Reasoning Level" data-i18n-title="settings.sortReasoning">
+                              <span data-i18n="settings.thReasoning">Reasoning</span>
+                              <span class="sort-indicator" id="sort-icon-reasoning" aria-hidden="true">↕</span>
+                            </div>
+                            <div class="th-cell th-action" role="columnheader">
+                              <span data-i18n="settings.thAction">Action</span>
+                            </div>
                           </div>
                           <div class="models-table-body" id="mgr-models-tbody">
                             <!-- Populated dynamically via JS -->
@@ -1598,6 +1617,33 @@
                           </div>
                         </div>
 
+                        <!-- Models Pagination Controls -->
+                        <div class="models-pagination" id="mgr-models-pagination" style="display: none;">
+                          <div class="pagination-left">
+                            <div class="pagination-info" id="mgr-pagination-info"></div>
+                            <div class="pagination-size-wrapper">
+                              <label for="models-page-size-select" class="pagination-size-label" data-i18n="settings.perPage">Per page:</label>
+                              <select id="models-page-size-select" class="select-control pagination-size-select" onchange="changeModelsPageSize(this.value)">
+                                <option value="20">20</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                                <option value="all" data-i18n="settings.allPageSize">All</option>
+                              </select>
+                            </div>
+                          </div>
+                          <div class="pagination-nav">
+                            <button type="button" class="btn-pagination" id="btn-page-prev" onclick="changeModelsPage(-1)" title="Previous Page" data-i18n-title="settings.prevPage" aria-label="Previous Page" data-i18n-aria="settings.prevPage">
+                              <svg class="pagination-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                              <span data-i18n="settings.prevPage">Previous</span>
+                            </button>
+                            <span class="pagination-current-page" id="mgr-pagination-page-indicator">Page 1 of 1</span>
+                            <button type="button" class="btn-pagination" id="btn-page-next" onclick="changeModelsPage(1)" title="Next Page" data-i18n-title="settings.nextPage" aria-label="Next Page" data-i18n-aria="settings.nextPage">
+                              <span data-i18n="settings.nextPage">Next</span>
+                              <svg class="pagination-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                            </button>
+                          </div>
+                        </div>
+
                         <!-- Table Footer Tip & Help -->
                         <div class="models-table-footer">
                           <div class="models-footer-tip">
@@ -1606,7 +1652,7 @@
                               <line x1="12" y1="16" x2="12" y2="12"></line>
                               <line x1="12" y1="8" x2="12.01" y2="8"></line>
                             </svg>
-                            <span data-i18n="settings.modelsTip">Model edits auto-save in real time. Choose an active radio to set your default translation model.</span>
+                            <span data-i18n="settings.modelsTip">Model edits auto-save in real time. Click any model row to set it as your default translation model.</span>
                           </div>
                         </div>
                       </div>
@@ -3053,10 +3099,17 @@
     </div>
 
     <!-- Test Connection Modal -->
-    <div class="modal-overlay" id="translation-test-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="test-conn-title">
-      <div class="glass-card modal-card" style="max-width: 480px;">
+    <div class="modal-overlay" id="translation-test-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="test-conn-title" onclick="handleTestModalBackdropClick(event)">
+      <div class="glass-card modal-card" style="max-width: 480px; position: relative;">
+        <!-- Close Button (X) -->
+        <button class="about-modal-close-btn" id="test-modal-close-x" onclick="abortAndCloseTestModal()" aria-label="Close" data-i18n-aria="common.close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
         <div class="modal-header">
-          <div class="modal-title-row">
+          <div class="modal-title-row" style="padding-right: 32px; margin-bottom: 0;">
             <svg class="modal-icon" viewBox="0 0 24 24" fill="none" stroke="var(--color-cyan)" stroke-width="2" style="width: 24px; height: 24px;">
               <circle cx="12" cy="12" r="10"/>
               <polyline points="12 6 12 12 16 14"/>
@@ -3064,14 +3117,15 @@
             <h3 id="test-conn-title" style="color: var(--color-cyan);" data-i18n="modals.testConnTitle">Connection Test Results</h3>
           </div>
         </div>
-        <div class="modal-body" style="padding-top: 10px;">
+        <div class="modal-body" style="padding-top: 14px;">
           <div id="test-modal-status" style="font-weight: 600; margin-bottom: 12px; font-size: 1rem;" data-i18n="modals.testing">Testing...</div>
           <div class="textarea-control" id="test-modal-result" style="width: 100%; height: 160px; overflow-y: auto; white-space: pre-wrap; font-family: monospace; font-size: 0.85rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 10px; box-sizing: border-box; color: var(--color-text); width: 100%;" data-i18n="modals.waitingResponse">
             Waiting for response...
           </div>
         </div>
         <div class="modal-footer" style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 16px;">
-          <button class="btn-primary" onclick="closeTestModal()" style="padding: 10px 20px; font-size: 0.9rem; width: 100%; justify-content: center;" data-i18n="modals.ok">OK</button>
+          <button class="btn-secondary" id="test-modal-cancel-btn" onclick="abortAndCloseTestModal()" style="padding: 10px 20px; font-size: 0.9rem; flex: 1; justify-content: center;" data-i18n="modals.cancelBtn">Cancel</button>
+          <button class="btn-primary" id="test-modal-ok-btn" onclick="closeTestModal()" style="padding: 10px 20px; font-size: 0.9rem; flex: 1; justify-content: center; display: none;" data-i18n="modals.ok">OK</button>
         </div>
       </div>
     </div>

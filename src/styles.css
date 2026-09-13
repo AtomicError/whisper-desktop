@@ -4617,7 +4617,7 @@ select.select-control {
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
   flex-wrap: wrap;
 }
 
@@ -4742,7 +4742,7 @@ select.select-control {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
   flex-wrap: wrap;
   gap: 12px;
 }
@@ -5225,6 +5225,12 @@ select.select-control {
   display: block;
 }
 
+#provider-tab-auto {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
@@ -5259,67 +5265,154 @@ select.select-control {
 
 .models-data-table {
   border: 1px solid var(--border-glass);
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--bg-table-body);
   overflow-x: auto;
   overflow-y: hidden;
-  max-height: 480px;
+  height: clamp(140px, calc(100vh - 630px), 600px);
   display: flex;
   flex-direction: column;
+  transition: border-radius 0.15s ease;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.models-data-table.has-pagination {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
 .models-table-head {
   display: grid;
-  grid-template-columns: 38px minmax(180px, 1fr) 130px 130px 38px;
-  column-gap: 14px;
+  grid-template-columns: 80px minmax(240px, 1fr) 115px 115px 44px;
+  column-gap: 16px;
   align-items: center;
-  padding: 11px 16px;
+  padding: 10px 18px;
   background: var(--bg-table-head);
-  border-bottom: 1px solid var(--border-glass);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   user-select: none;
   flex-shrink: 0;
-  min-width: 520px;
+  min-width: 690px;
+  scrollbar-gutter: stable;
+  overflow-y: scroll;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.models-table-head::-webkit-scrollbar {
+  width: 8px;
+  background: transparent;
+}
+
+.models-table-head::-webkit-scrollbar-thumb {
+  background: transparent;
 }
 
 .models-table-head .th-cell {
-  font-size: 0.76rem;
-  font-weight: 600;
+  font-size: 0.74rem;
+  font-weight: 700;
   color: var(--color-text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.models-table-head .th-cell:not(.th-action):hover {
+  color: #ffffff;
+}
+
+.models-table-head .th-cell:not(.th-action):focus-visible {
+  color: #ffffff;
+  outline: 2px solid var(--color-royal-blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.models-table-head .th-action {
+  cursor: default;
+  justify-content: center;
+  text-align: center;
 }
 
 .models-table-head .th-active,
 .models-table-head .th-ctx,
-.models-table-head .th-action {
+.models-table-head .th-reasoning {
+  justify-content: center;
   text-align: center;
+}
+
+.models-table-head .th-id {
+  justify-content: flex-start;
+  text-align: start;
+}
+
+.sort-indicator {
+  display: inline-flex;
+  margin-inline-start: 4px;
+  font-size: 0.72rem;
+  color: var(--color-text-dim);
+  opacity: 0.45;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.models-table-head .th-cell:hover .sort-indicator {
+  opacity: 0.9;
+  color: var(--color-text-muted);
+}
+
+.models-table-head .th-cell.sorted-asc .sort-indicator,
+.models-table-head .th-cell.sorted-desc .sort-indicator {
+  opacity: 1;
+  color: var(--color-royal-blue);
+  font-weight: 700;
 }
 
 .models-table-body {
   overflow-y: auto;
+  scrollbar-gutter: stable;
   flex: 1 1 auto;
-  min-width: 520px;
+  min-width: 690px;
 }
 
 .model-data-row {
   display: grid;
-  grid-template-columns: 38px minmax(180px, 1fr) 130px 130px 38px;
-  column-gap: 14px;
+  grid-template-columns: 80px minmax(240px, 1fr) 115px 115px 44px;
+  column-gap: 16px;
   align-items: center;
-  padding: 7px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-  transition: background-color 0.15s ease;
+  padding: 7px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.035);
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+  min-width: 690px;
+  cursor: pointer;
+  outline: none;
+  content-visibility: auto;
+  contain-intrinsic-size: 0 44px;
+}
+
+.model-data-row:nth-child(even) {
+  background: rgba(255, 255, 255, 0.012);
 }
 
 .model-data-row:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.038);
+}
+
+.model-data-row:focus-visible {
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 0 1.5px var(--color-royal-blue);
 }
 
 .model-data-row.active-model-row {
-  background: linear-gradient(90deg, rgba(var(--color-royal-blue-rgb), 0.1) 0%, rgba(var(--color-royal-blue-rgb), 0.02) 100%);
-  border-left: 3px solid var(--color-royal-blue);
-  padding-left: 13px; /* compensate for 3px left border */
+  background: linear-gradient(90deg, rgba(var(--color-royal-blue-rgb), 0.14) 0%, rgba(var(--color-royal-blue-rgb), 0.02) 100%) !important;
+  box-shadow: inset 3px 0 0 var(--color-royal-blue);
+}
+
+[dir="rtl"] .model-data-row.active-model-row {
+  background: linear-gradient(270deg, rgba(var(--color-royal-blue-rgb), 0.14) 0%, rgba(var(--color-royal-blue-rgb), 0.02) 100%) !important;
+  box-shadow: inset -3px 0 0 var(--color-royal-blue);
 }
 
 /* Cell Layouts */
@@ -5340,6 +5433,7 @@ select.select-control {
 .td-id {
   gap: 8px;
   min-width: 0;
+  justify-content: flex-start;
 }
 
 .td-ctx {
@@ -5351,33 +5445,193 @@ select.select-control {
 .td-reasoning {
   display: flex;
   align-items: center;
+  justify-content: center;
 }
 
-/* High-Contrast, Clean Typography & Inline Inputs (No Clunky Boxes by Default) */
-.model-cell-input {
+/* Radio Selection Button for Inactive Rows */
+.model-radio-btn {
   background: transparent;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  color: #ffffff;
+  border: none;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  outline: none;
+}
+
+.radio-circle {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
+  background: transparent;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-sizing: border-box;
+  opacity: 0.2;
+}
+
+.model-data-row:hover .radio-circle {
+  opacity: 0.8;
+  border-color: rgba(var(--color-royal-blue-rgb), 0.65);
+  background: rgba(var(--color-royal-blue-rgb), 0.1);
+}
+
+.model-radio-btn:hover .radio-circle {
+  opacity: 1 !important;
+  border-color: var(--color-royal-blue) !important;
+  background: rgba(var(--color-royal-blue-rgb), 0.25) !important;
+  box-shadow: 0 0 8px rgba(var(--color-royal-blue-rgb), 0.4) !important;
+  transform: scale(1.15);
+}
+
+/* Active Default Model Indicator Neon Badge */
+.model-active-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 2.5px 8px;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.2;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.model-active-badge.is-active {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #34d399;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.2);
+  cursor: default;
+}
+
+.model-active-badge .active-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+  flex-shrink: 0;
+}
+
+/* Two-Level Model Identifier Typography */
+.model-id-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.model-id-display {
   font-family: var(--font-mono);
   font-size: 0.85rem;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: ltr;
+  text-align: left;
+  display: inline-block;
+  min-width: 0;
+  max-width: 100%;
+  user-select: text;
+}
+
+.model-id-prefix {
+  color: var(--color-text-dim, #64748b);
+  opacity: 0.55;
+  font-weight: 400;
+  transition: opacity 0.15s ease;
+}
+
+.model-data-row:hover .model-id-prefix {
+  opacity: 0.8;
+}
+
+.model-id-name {
+  color: #f8fafc;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* Clean Tabular Context Value */
+.model-ctx-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.82rem;
+  font-weight: 550;
+  color: #94a3b8;
+  letter-spacing: -0.01em;
+  transition: color 0.15s ease;
+  text-align: center;
+  user-select: text;
+}
+
+.model-data-row:hover .model-ctx-value {
+  color: #f1f5f9;
+}
+
+/* Reasoning Dash for Non-Reasoning Models */
+.reasoning-none-dash {
+  color: var(--color-text-dim, #475569);
+  font-size: 1.1rem;
+  opacity: 0.35;
+  user-select: none;
+  cursor: default;
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.model-data-row:hover .reasoning-none-dash {
+  opacity: 0.45;
+}
+
+/* Free Tag */
+.model-tag-free {
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #34d399;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+  user-select: none;
+  line-height: 1.3;
+}
+
+/* Inline Inputs (for manual addition or editing) */
+.model-cell-input {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #f1f5f9;
+  font-family: var(--font-mono);
+  font-size: 0.84rem;
   font-weight: 500;
-  padding: 6px 8px;
+  height: 30px !important;
+  padding: 0 8px !important;
   width: 100%;
   box-sizing: border-box;
   outline: none;
   transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
   min-width: 0;
-}
-
-.model-data-row:hover .model-cell-input {
-  background: rgba(255, 255, 255, 0.03);
-  border-color: rgba(255, 255, 255, 0.06);
+  line-height: 28px !important;
 }
 
 .model-cell-input:hover {
   background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .model-cell-input:focus {
@@ -5388,73 +5642,334 @@ select.select-control {
 }
 
 .model-id-input {
-  color: #ffffff !important;
-  font-weight: 600 !important;
-  letter-spacing: -0.01em;
-  text-overflow: ellipsis;
-  overflow: hidden;
-  white-space: nowrap;
+  direction: ltr !important;
+  text-align: left !important;
+  color: #f8fafc !important;
+  font-weight: 550 !important;
 }
 
 .model-ctx-input {
-  color: #ffffff !important;
-  font-family: var(--font-mono) !important;
-  font-size: 0.85rem !important;
+  color: #cbd5e1 !important;
+  font-size: 0.82rem !important;
+  font-weight: 600 !important;
   text-align: center !important;
+  max-width: 80px;
+  margin: 0 auto;
 }
 
-/* Free Tag */
-.model-tag-free {
-  font-size: 0.66rem;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: rgba(16, 185, 129, 0.15);
-  border: 1px solid rgba(16, 185, 129, 0.35);
-  color: #10b981;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  flex-shrink: 0;
-  user-select: none;
+/* Sleek Borderless Reasoning Dropdown with Gentle Hover Glass */
+.td-reasoning {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-/* Reasoning Dropdown */
 .td-reasoning .custom-select-container {
-  width: 100%;
+  width: auto !important;
+  min-width: 106px;
+  max-width: 124px;
+  height: 30px !important;
+  min-height: 30px !important;
+  margin: 0 auto;
 }
 
 .td-reasoning .custom-select-trigger {
-  height: 32px !important;
-  background: rgba(255, 255, 255, 0.03) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  width: 100% !important;
+  min-width: 106px;
+  max-width: 124px;
+  height: 30px !important;
+  min-height: 30px !important;
+  max-height: 30px !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
   border-radius: 6px !important;
-  padding: 0 10px !important;
+  padding: 0 14px !important;
+  font-family: var(--font-sans) !important;
   font-size: 0.82rem !important;
-  color: var(--color-text-muted) !important;
-  display: flex !important;
+  font-weight: 500 !important;
+  color: var(--color-text-dim) !important;
+  display: inline-flex !important;
   align-items: center !important;
-  justify-content: space-between !important;
+  justify-content: center !important;
   box-sizing: border-box !important;
+  cursor: pointer !important;
   transition: all 0.15s ease !important;
+  user-select: none !important;
+  line-height: 28px !important;
+  position: relative !important;
 }
 
-.td-reasoning .custom-select-trigger:hover {
+.td-reasoning .custom-select-trigger .custom-select-value {
+  width: 100%;
+  text-align: center;
+  font-size: 0.82rem;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.td-reasoning .custom-select-arrow {
+  position: absolute !important;
+  right: 8px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 12px !important;
+  height: 12px !important;
+  color: var(--color-text-dim) !important;
+  opacity: 0.4 !important;
+  flex-shrink: 0;
+  transition: opacity 0.15s ease, color 0.15s ease, transform 0.2s ease !important;
+}
+
+[dir="rtl"] .td-reasoning .custom-select-arrow {
+  right: auto !important;
+  left: 8px !important;
+}
+
+/* Hover / Open: Subtle Glass Pill Highlight with Soft Halo */
+.td-reasoning .custom-select-trigger:hover,
+.td-reasoning .custom-select-container.open .custom-select-trigger {
   background: rgba(255, 255, 255, 0.06) !important;
-  border-color: rgba(255, 255, 255, 0.16) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
   color: #ffffff !important;
 }
 
-.td-reasoning .custom-select-container.open .custom-select-trigger,
-.td-reasoning .custom-select-trigger:focus-visible {
-  border-color: var(--color-royal-blue) !important;
-  box-shadow: 0 0 0 2px rgba(var(--color-royal-blue-rgb), 0.25) !important;
+.td-reasoning .custom-select-trigger:hover .custom-select-arrow,
+.td-reasoning .custom-select-container.open .custom-select-arrow {
+  opacity: 0.85 !important;
+  color: #ffffff !important;
 }
 
-.td-reasoning .model-reasoning-select.reasoning-active .custom-select-trigger {
+.td-reasoning .custom-select-container.open .custom-select-trigger {
+  border-color: rgba(var(--color-royal-blue-rgb), 0.5) !important;
+  box-shadow: 0 0 8px rgba(var(--color-royal-blue-rgb), 0.2) !important;
+}
+
+.td-reasoning .custom-select-container.open .custom-select-arrow {
+  transform: translateY(-50%) rotate(180deg) !important;
+}
+
+/* Active Reasoning (Minimal / Low / Medium / High / XHigh / Max): Subtle Lavender Glow */
+.td-reasoning .custom-select-container.reasoning-active .custom-select-trigger {
   color: #c084fc !important;
-  border-color: rgba(168, 85, 247, 0.35) !important;
-  background: rgba(168, 85, 247, 0.1) !important;
   font-weight: 600 !important;
+  background: rgba(168, 85, 247, 0.08) !important;
+  border-color: rgba(168, 85, 247, 0.22) !important;
+}
+
+.td-reasoning .custom-select-container.reasoning-active .custom-select-arrow {
+  color: #c084fc !important;
+  opacity: 0.85 !important;
+}
+
+.td-reasoning .custom-select-container.reasoning-active .custom-select-trigger:hover {
+  background: rgba(168, 85, 247, 0.14) !important;
+  border-color: rgba(168, 85, 247, 0.4) !important;
+  box-shadow: 0 0 8px rgba(168, 85, 247, 0.18) !important;
+}
+
+/* Reasoning dropdown options list styling - ensure no text truncation */
+.custom-select-options[class*="options-for-model-reasoning"],
+[class*="options-for-model-reasoning"] {
+  min-width: 136px !important;
+  width: max-content !important;
+  padding: 4px 0 !important;
+}
+
+[class*="options-for-model-reasoning"] .custom-select-option {
+  padding: 6px 14px 6px 18px !important;
+  font-size: 0.82rem !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
+[class*="options-for-model-reasoning"] .custom-select-option.selected,
+[class*="options-for-model-reasoning"] .custom-select-option:hover {
+  padding-left: 20px !important;
+  padding-right: 14px !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
+[dir="rtl"] [class*="options-for-model-reasoning"] .custom-select-option {
+  padding: 6px 14px 6px 18px !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
+[dir="rtl"] [class*="options-for-model-reasoning"] .custom-select-option.selected,
+[dir="rtl"] [class*="options-for-model-reasoning"] .custom-select-option:hover {
+  padding-left: 20px !important;
+  padding-right: 14px !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
+/* Pagination Controls */
+.models-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--bg-table-head);
+  border: 1px solid var(--border-glass);
+  border-top: none;
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  gap: 12px;
+  user-select: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  flex-wrap: wrap;
+}
+
+.pagination-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.pagination-info {
+  font-size: 0.8rem;
+  color: var(--color-text-dim);
+}
+
+.pagination-size-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--color-text-dim);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.pagination-size-label {
+  font-size: 0.78rem;
+  color: var(--color-text-dim);
+  user-select: none;
+  white-space: nowrap;
+}
+
+select.pagination-size-select {
+  height: 28px;
+  min-height: 28px;
+  padding: 2px 22px 2px 8px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: var(--color-text-main);
+  cursor: pointer;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+[dir="rtl"] select.pagination-size-select {
+  padding: 2px 8px 2px 22px;
+}
+
+.custom-select-container.pagination-size-select {
+  display: inline-block;
+  width: auto;
+  min-width: 68px;
+  vertical-align: middle;
+}
+
+.custom-select-container.pagination-size-select .custom-select-trigger {
+  min-height: 28px;
+  height: 28px;
+  padding: 2px 8px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: var(--color-text-main);
+  cursor: pointer;
+  outline: none;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.custom-select-container.pagination-size-select .custom-select-trigger:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(var(--color-royal-blue-rgb), 0.4);
+}
+
+.custom-select-container.pagination-size-select.open .custom-select-trigger,
+.custom-select-container.pagination-size-select .custom-select-trigger:focus-visible {
+  border-color: var(--color-royal-blue);
+  box-shadow: 0 0 0 2px rgba(var(--color-royal-blue-rgb), 0.25);
+  background: rgba(var(--color-royal-blue-rgb), 0.08);
+}
+
+.custom-select-container.pagination-size-select .custom-select-arrow {
+  width: 12px;
+  height: 12px;
+}
+
+.custom-select-options[class*="options-for-models-page-size-select"] {
+  min-width: 70px;
+}
+
+.custom-select-options[class*="options-for-models-page-size-select"] .custom-select-option {
+  padding: 5px 12px;
+  font-size: 0.78rem;
+}
+
+.pagination-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-pagination {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--color-text-main);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-pagination:hover:not(:disabled) {
+  background: rgba(var(--color-royal-blue-rgb), 0.2);
+  border-color: rgba(var(--color-royal-blue-rgb), 0.4);
+  color: #fff;
+}
+
+.btn-pagination:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.pagination-arrow {
+  width: 14px;
+  height: 14px;
+}
+
+[dir="rtl"] .pagination-arrow {
+  transform: scaleX(-1);
+}
+
+.pagination-current-page {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text-main);
+  padding: 0 6px;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Trash Icon Button */
@@ -5470,21 +5985,32 @@ select.select-control {
   justify-content: center;
   cursor: pointer;
   padding: 0;
-  transition: color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
 }
 
 .model-btn-trash svg {
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
 }
 
-.model-data-row:hover .model-btn-trash {
-  color: var(--color-text-muted);
+.model-data-row:hover .model-btn-trash,
+.model-data-row:focus-within .model-btn-trash,
+.model-btn-trash:focus-visible {
+  opacity: 0.6;
+  pointer-events: auto;
+}
+
+.model-btn-trash:focus-visible {
+  outline: 2px solid var(--color-royal-blue);
+  outline-offset: 1px;
 }
 
 .model-btn-trash:hover {
-  background: rgba(var(--color-red-rgb), 0.15) !important;
-  color: var(--color-red) !important;
+  opacity: 1 !important;
+  background: rgba(239, 68, 68, 0.15) !important;
+  color: #ef4444 !important;
   transform: scale(1.1);
 }
 
@@ -5532,8 +6058,8 @@ select.select-control {
 
 /* Models Table Footer Tip */
 .models-table-footer {
-  margin-top: 12px;
-  padding: 10px 14px;
+  margin-top: 8px;
+  padding: 7px 12px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.05);
@@ -5806,6 +6332,75 @@ html[dir="rtl"] .custom-select-options:not(.custom-select-ltr) .custom-select-op
   padding-left: 14px !important;
   padding-right: 24px !important;
   background: linear-gradient(270deg, rgba(var(--color-royal-blue-rgb), 0.12) 0%, transparent 100%) !important;
+}
+
+/* High-specificity override for reasoning dropdown in both LTR and RTL to permanently eliminate truncation */
+html[dir="rtl"] .custom-select-options[class*="options-for-model-reasoning"],
+.rtl-layout .custom-select-options[class*="options-for-model-reasoning"],
+.custom-select-options[class*="options-for-model-reasoning"] {
+  min-width: 136px !important;
+  width: max-content !important;
+}
+
+html[dir="rtl"] .custom-select-options[class*="options-for-model-reasoning"] .custom-select-option,
+html[dir="rtl"] .custom-select-options[class*="options-for-model-reasoning"].custom-select-ltr .custom-select-option,
+.rtl-layout .custom-select-options[class*="options-for-model-reasoning"] .custom-select-option,
+.rtl-layout .custom-select-options[class*="options-for-model-reasoning"].custom-select-ltr .custom-select-option,
+.custom-select-options[class*="options-for-model-reasoning"] .custom-select-option {
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+  padding: 6px 14px 6px 18px !important;
+}
+
+html[dir="rtl"] .custom-select-options[class*="options-for-model-reasoning"] .custom-select-option.selected,
+html[dir="rtl"] .custom-select-options[class*="options-for-model-reasoning"] .custom-select-option:hover,
+html[dir="rtl"] .custom-select-options[class*="options-for-model-reasoning"].custom-select-ltr .custom-select-option.selected,
+html[dir="rtl"] .custom-select-options[class*="options-for-model-reasoning"].custom-select-ltr .custom-select-option:hover,
+.rtl-layout .custom-select-options[class*="options-for-model-reasoning"] .custom-select-option.selected,
+.rtl-layout .custom-select-options[class*="options-for-model-reasoning"] .custom-select-option:hover,
+.custom-select-options[class*="options-for-model-reasoning"] .custom-select-option.selected,
+.custom-select-options[class*="options-for-model-reasoning"] .custom-select-option:hover {
+  padding-left: 20px !important;
+  padding-right: 14px !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
+/* High-specificity overrides for pagination page size dropdown in both LTR and RTL */
+html[dir="rtl"] .custom-select-options[class*="options-for-models-page-size-select"],
+.rtl-layout .custom-select-options[class*="options-for-models-page-size-select"],
+.custom-select-options[class*="options-for-models-page-size-select"] {
+  min-width: 70px !important;
+  width: auto !important;
+}
+
+html[dir="rtl"] .custom-select-options[class*="options-for-models-page-size-select"] .custom-select-option,
+html[dir="rtl"] .custom-select-options[class*="options-for-models-page-size-select"].custom-select-ltr .custom-select-option,
+.rtl-layout .custom-select-options[class*="options-for-models-page-size-select"] .custom-select-option,
+.rtl-layout .custom-select-options[class*="options-for-models-page-size-select"].custom-select-ltr .custom-select-option,
+.custom-select-options[class*="options-for-models-page-size-select"] .custom-select-option {
+  padding: 5px 12px !important;
+  font-size: 0.78rem !important;
+  white-space: nowrap !important;
+  line-height: 1.4 !important;
+}
+
+html[dir="rtl"] .custom-select-options[class*="options-for-models-page-size-select"] .custom-select-option::before,
+.rtl-layout .custom-select-options[class*="options-for-models-page-size-select"] .custom-select-option::before,
+.custom-select-options[class*="options-for-models-page-size-select"] .custom-select-option::before {
+  display: none !important;
+}
+
+html[dir="rtl"] .custom-select-options[class*="options-for-models-page-size-select"] .custom-select-option.selected,
+html[dir="rtl"] .custom-select-options[class*="options-for-models-page-size-select"] .custom-select-option:hover,
+html[dir="rtl"] .custom-select-options[class*="options-for-models-page-size-select"].custom-select-ltr .custom-select-option.selected,
+html[dir="rtl"] .custom-select-options[class*="options-for-models-page-size-select"].custom-select-ltr .custom-select-option:hover,
+.rtl-layout .custom-select-options[class*="options-for-models-page-size-select"] .custom-select-option.selected,
+.rtl-layout .custom-select-options[class*="options-for-models-page-size-select"] .custom-select-option:hover,
+.custom-select-options[class*="options-for-models-page-size-select"] .custom-select-option.selected,
+.custom-select-options[class*="options-for-models-page-size-select"] .custom-select-option:hover {
+  padding: 5px 12px !important;
 }
 
 /* Search Inputs RTL overrides (Settings & Models) */
