@@ -4737,29 +4737,38 @@ select.select-control {
   transform: scale(1.1);
 }
 
-/* Models Filter & Stats Header Bar */
+/* Models Filter & Stats Header Bar (Always Clean Single Line) */
 .models-header-bar {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
-  flex-wrap: wrap;
-  gap: 12px;
+  margin-bottom: 8px;
+  width: 100%;
 }
 
 .models-filter-pills {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap !important;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 2px 2px 4px 2px;
+  width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+
+.models-filter-pills::-webkit-scrollbar {
+  display: none;
 }
 
 .btn-filter {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 20px;
-  padding: 5px 14px;
-  font-size: 0.78rem;
+  padding: 4px 10px;
+  font-size: 0.76rem;
   font-weight: 500;
   color: var(--color-text-muted);
   cursor: pointer;
@@ -4767,7 +4776,9 @@ select.select-control {
   outline: none;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .btn-filter:hover {
@@ -5269,7 +5280,7 @@ select.select-control {
   background: var(--bg-table-body);
   overflow-x: auto;
   overflow-y: hidden;
-  height: clamp(140px, calc(100vh - 630px), 600px);
+  height: clamp(140px, calc(100vh - 670px), 600px);
   display: flex;
   flex-direction: column;
   transition: border-radius 0.15s ease;
@@ -5812,7 +5823,7 @@ select.select-control {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 16px;
+  padding: 8px 16px;
   background: var(--bg-table-head);
   border: 1px solid var(--border-glass);
   border-top: none;
@@ -5823,19 +5834,26 @@ select.select-control {
   gap: 12px;
   user-select: none;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  flex-wrap: wrap;
-}
-
-.pagination-left {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
 }
 
 .pagination-info {
   font-size: 0.8rem;
   color: var(--color-text-dim);
+  white-space: nowrap;
+}
+
+.pagination-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pagination-divider {
+  width: 1px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 0 4px;
+  flex-shrink: 0;
 }
 
 .pagination-size-wrapper {

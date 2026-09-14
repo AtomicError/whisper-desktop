@@ -1552,7 +1552,7 @@
                           </div>
                         </div>
 
-                        <!-- Filters Quick Actions & Stats bar -->
+                        <!-- Filters Quick Actions Bar (Single-line Chips) -->
                         <div class="models-header-bar">
                           <div class="models-filter-pills" id="models-filter-pills">
                             <button class="btn-filter active" onclick="filterModelsStatus('all')" id="filter-models-all">
@@ -1569,9 +1569,6 @@
                               <span data-i18n="settings.reasoning">Reasoning</span>
                               <span class="filter-badge badge-reasoning" id="filter-count-reasoning">0</span>
                             </button>
-                          </div>
-                          <div class="models-stats-info" id="models-stats-info">
-                            <span class="models-count-text" id="models-showing-count">Showing 0 models</span>
                           </div>
                         </div>
 
@@ -1619,8 +1616,8 @@
 
                         <!-- Models Pagination Controls -->
                         <div class="models-pagination" id="mgr-models-pagination" style="display: none;">
-                          <div class="pagination-left">
-                            <div class="pagination-info" id="mgr-pagination-info"></div>
+                          <div class="pagination-info" id="mgr-pagination-info"></div>
+                          <div class="pagination-nav">
                             <div class="pagination-size-wrapper">
                               <label for="models-page-size-select" class="pagination-size-label" data-i18n="settings.perPage">Per page:</label>
                               <select id="models-page-size-select" class="select-control pagination-size-select" onchange="changeModelsPageSize(this.value)">
@@ -1630,8 +1627,7 @@
                                 <option value="all" data-i18n="settings.allPageSize">All</option>
                               </select>
                             </div>
-                          </div>
-                          <div class="pagination-nav">
+                            <div class="pagination-divider" aria-hidden="true"></div>
                             <button type="button" class="btn-pagination" id="btn-page-prev" onclick="changeModelsPage(-1)" title="Previous Page" data-i18n-title="settings.prevPage" aria-label="Previous Page" data-i18n-aria="settings.prevPage">
                               <svg class="pagination-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
                               <span data-i18n="settings.prevPage">Previous</span>

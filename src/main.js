@@ -6932,7 +6932,7 @@ window.applyModelsFilterAndRender = function(delay = 0) {
           }
         }
         if (pagNav) {
-          pagNav.style.display = totalPages > 1 ? 'flex' : 'none';
+          pagNav.style.display = 'flex';
         }
         if (pagIndicator) {
           pagIndicator.textContent = t('settings.pageOf', {
