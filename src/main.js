@@ -902,7 +902,7 @@ window.formatFileNameMiddleTruncate = function(filename, maxLength = 26) {
 
 // Global States
 let activeView = 'transcribe';
-let activeSettingsCat = 'general';
+let activeSettingsCat = 'app';
 let activeLogCategory = 'All';
 let logSearchQuery = '';
 let settingsState = null;
@@ -2642,6 +2642,7 @@ window.browseModelsDirectory = async function() {
 };
 
 window.switchSettingsCategory = function(catName) {
+  if (catName === 'general') catName = 'app';
   const searchInput = document.getElementById('settings-search-input');
   const hasActiveSearch = Boolean(searchInput && searchInput.value.trim().length > 0);
   

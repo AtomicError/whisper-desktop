@@ -240,7 +240,8 @@
 
             <div class="settings-layout">
               <div class="settings-categories">
-                <div class="settings-cat-btn active" id="cat-btn-general" onclick="switchSettingsCategory('general')" data-i18n="settings.catGeneral">General Setup</div>
+                <div class="settings-cat-btn active" id="cat-btn-app" onclick="switchSettingsCategory('app')" data-i18n="settings.catApp">App Preferences</div>
+                <div class="settings-cat-btn" id="cat-btn-transcription" onclick="switchSettingsCategory('transcription')" data-i18n="settings.catTranscription">Core Transcription</div>
                 <div class="settings-cat-btn" id="cat-btn-computation" onclick="switchSettingsCategory('computation')" data-i18n="settings.catComputation">Computation</div>
                 <div class="settings-cat-btn" id="cat-btn-search" onclick="switchSettingsCategory('search')" data-i18n="settings.catSearch">Decoding Strategy</div>
                 <div class="settings-cat-btn" id="cat-btn-outputs" onclick="switchSettingsCategory('outputs')" data-i18n="settings.catOutputs">Outputs</div>
@@ -263,7 +264,8 @@
                   <button type="button" class="btn-secondary" onclick="clearSettingsSearch()" data-i18n="settings.clearSearch">Clear Search</button>
                 </div>
                 <!-- Settings Groups -->
-                <div class="settings-group active" id="group-general">
+                <!-- Group: App Preferences -->
+                <div class="settings-group active" id="group-app">
                   <!-- Interface Language Card -->
                   <div class="setting-card">
                     <div class="setting-info">
@@ -280,117 +282,7 @@
                     </div>
                   </div>
 
-                  <!-- General cards -->
-                  <div class="setting-card">
-                    <div class="setting-info">
-                      <div class="setting-label-row">
-                        <span class="setting-title" data-i18n="settings.backendTitle">Active Backend</span>
-                      </div>
-                      <div class="setting-desc"><span data-i18n="settings.backendDesc">Execution backend for Whisper model inference.</span>
-                        <div class="setting-desc-points" data-i18n-html="settings.backendPoints">
-                          <span class="setting-desc-point"><strong>Standard:</strong> Universal CPU-only compatibility</span>
-                          <span class="setting-desc-point"><strong>Vulkan:</strong> Universal GPU acceleration (AMD, Intel, or NVIDIA)</span>
-                          <span class="setting-desc-point"><strong>CUDA:</strong> Dedicated NVIDIA GPUs</span>
-                          <span class="setting-desc-point"><strong>OpenVINO:</strong> Intel CPUs, Arc &amp; iGPUs</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="setting-control">
-                      <select class="select-control" id="opt-selectedBackend">
-                        <option value="Standard">Standard CPU</option>
-                        <option value="Vulkan">Vulkan GPU</option>
-                        <option value="OpenVINO">OpenVINO Intel</option>
-                        <option value="CUDA">NVIDIA CUDA</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div class="setting-card">
-                    <div class="setting-info">
-                      <div class="setting-label-row">
-                        <span class="setting-title" data-i18n="settings.modelsDirTitle">Models Storage Directory</span>
-                      </div>
-                      <div class="setting-desc"><span data-i18n="settings.modelsDirDesc">Local disk directory where GGML model files (<code>.bin</code>) are stored and scanned.</span>
-                        <div class="setting-desc-points" data-i18n-html="settings.modelsDirPoints">
-                          <span class="setting-desc-point"><strong>Default:</strong> <code>~/whisper-desktop/models</code> (Linux/macOS) or <code>C:\Users\&lt;Username&gt;\whisper-desktop\models</code> (Windows)</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="setting-control setting-control-path">
-                      <div class="readonly-path-field">
-                        <svg class="path-folder-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-                        </svg>
-                        <input class="readonly-path-input" type="text" id="opt-modelsDir" readonly spellcheck="false" aria-label="Models storage directory path" data-i18n-aria="settings.modelsDirInputAria" />
-                        <button class="path-action-btn" type="button" onclick="openModelsDirectory()" title="Click to open folder in File Manager" data-i18n-title="settings.openModelsDirTooltip" aria-label="Open folder in File Manager" data-i18n-aria="settings.openModelsDirTooltip">
-                          <svg class="path-open-icon" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
-                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                            <polyline points="15 3 21 3 21 9"></polyline>
-                            <line x1="10" y1="14" x2="21" y2="3"></line>
-                          </svg>
-                        </button>
-                      </div>
-                      <button class="btn-secondary path-browse-btn" onclick="browseModelsDirectory()" type="button" data-i18n="common.browse">Browse</button>
-                    </div>
-                  </div>
-
-                  <div class="setting-card" data-search-tags="-m --model">
-                    <div class="setting-info">
-                      <div class="setting-label-row">
-                        <span class="setting-title" data-i18n="settings.modelSelectTitle">Model Selection</span>
-                      </div>
-                      <div class="setting-desc"><span data-i18n="settings.modelSelectDesc">Active Whisper GGML speech recognition model.</span>
-                        <div class="setting-desc-points" data-i18n-html="settings.modelSelectPoints">
-                          <span class="setting-desc-point"><strong>Fast &amp; Low RAM:</strong> <code>tiny</code>, <code>base</code>, <code>small</code></span>
-                          <span class="setting-desc-point"><strong>High Accuracy:</strong> <code>medium</code>, <code>large-v3</code></span>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="setting-control">
-                      <select class="select-control" id="opt-modelPath"></select>
-                    </div>
-                  </div>
-
-                  <div class="setting-card">
-                    <div class="setting-info">
-                      <div class="setting-label-row">
-                        <span class="setting-title" data-i18n="settings.ffmpegTitle">FFmpeg Engine</span>
-                        <span id="ffmpeg-status-badge" class="setting-status-pill checking"><span class="ffmpeg-status-dot blue"></span> Checking...</span>
-                      </div>
-                      <div class="setting-desc"><span data-i18n="settings.ffmpegDesc">Audio extractor engine used to decode input media files into 16kHz mono audio.</span>
-                        <div class="setting-desc-points" data-i18n-html="settings.ffmpegPoints">
-                          <span class="setting-desc-point"><strong>Internal:</strong> Standalone bundled binary (recommended, zero-config)</span>
-                          <span class="setting-desc-point"><strong>System:</strong> Uses OS-installed FFmpeg binary</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="setting-control">
-                      <select class="select-control" id="opt-ffmpegSource">
-                        <option value="bundled" data-i18n="settings.ffmpegInternal">Internal</option>
-                        <option value="system" data-i18n="settings.ffmpegSystem">System</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div class="setting-card">
-                    <div class="setting-info">
-                      <div class="setting-label-row">
-                        <span class="setting-title" data-i18n="settings.trayTitle">Minimize to System Tray on Close</span>
-                      </div>
-                      <div class="setting-desc"><span data-i18n="settings.trayDesc">Keeps Whisper Desktop active in the background system tray when the main window is closed.</span>
-                        <div class="setting-desc-points" data-i18n-html="settings.trayPoints">
-                          <span class="setting-desc-point"><strong>Default:</strong> Disabled (exits on window close)</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="setting-control">
-                      <label class="switch">
-                        <input type="checkbox" id="opt-closeToTray" />
-                        <span class="slider"></span>
-                      </label>
-                    </div>
-                  </div>
-
+                  <!-- UI Scale & Zoom Card -->
                   <div class="setting-card">
                     <div class="setting-info">
                       <div class="setting-label-row">
@@ -432,6 +324,125 @@
                     </div>
                   </div>
 
+                  <!-- Minimize to Tray Card -->
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.trayTitle">Minimize to System Tray on Close</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.trayDesc">Keeps Whisper Desktop active in the background system tray when the main window is closed.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.trayPoints">
+                          <span class="setting-desc-point"><strong>Default:</strong> Disabled (exits on window close)</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <label class="switch">
+                        <input type="checkbox" id="opt-closeToTray" />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <!-- Models Storage Directory Card -->
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.modelsDirTitle">Models Storage Directory</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.modelsDirDesc">Local disk directory where GGML model files (<code>.bin</code>) are stored and scanned.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.modelsDirPoints">
+                          <span class="setting-desc-point"><strong>Default:</strong> <code>~/whisper-desktop/models</code> (Linux/macOS) or <code>C:\Users\&lt;Username&gt;\whisper-desktop\models</code> (Windows)</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control setting-control-path">
+                      <div class="readonly-path-field">
+                        <svg class="path-folder-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        <input class="readonly-path-input" type="text" id="opt-modelsDir" readonly spellcheck="false" aria-label="Models storage directory path" data-i18n-aria="settings.modelsDirInputAria" />
+                        <button class="path-action-btn" type="button" onclick="openModelsDirectory()" title="Click to open folder in File Manager" data-i18n-title="settings.openModelsDirTooltip" aria-label="Open folder in File Manager" data-i18n-aria="settings.openModelsDirTooltip">
+                          <svg class="path-open-icon" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                            <polyline points="15 3 21 3 21 9"></polyline>
+                            <line x1="10" y1="14" x2="21" y2="3"></line>
+                          </svg>
+                        </button>
+                      </div>
+                      <button class="btn-secondary path-browse-btn" onclick="browseModelsDirectory()" type="button" data-i18n="common.browse">Browse</button>
+                    </div>
+                  </div>
+
+                  <!-- FFmpeg Engine Card -->
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.ffmpegTitle">FFmpeg Engine</span>
+                        <span id="ffmpeg-status-badge" class="setting-status-pill checking"><span class="ffmpeg-status-dot blue"></span> Checking...</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.ffmpegDesc">Audio extractor engine used to decode input media files into 16kHz mono audio.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.ffmpegPoints">
+                          <span class="setting-desc-point"><strong>Internal:</strong> Standalone bundled binary (recommended, zero-config)</span>
+                          <span class="setting-desc-point"><strong>System:</strong> Uses OS-installed FFmpeg binary</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <select class="select-control" id="opt-ffmpegSource">
+                        <option value="bundled" data-i18n="settings.ffmpegInternal">Internal</option>
+                        <option value="system" data-i18n="settings.ffmpegSystem">System</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Group: Core Transcription -->
+                <div class="settings-group" id="group-transcription">
+                  <!-- Model Selection Card -->
+                  <div class="setting-card" data-search-tags="-m --model">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.modelSelectTitle">Model Selection</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.modelSelectDesc">Active Whisper GGML speech recognition model.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.modelSelectPoints">
+                          <span class="setting-desc-point"><strong>Fast &amp; Low RAM:</strong> <code>tiny</code>, <code>base</code>, <code>small</code></span>
+                          <span class="setting-desc-point"><strong>High Accuracy:</strong> <code>medium</code>, <code>large-v3</code></span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <select class="select-control" id="opt-modelPath"></select>
+                    </div>
+                  </div>
+
+                  <!-- Active Backend Card -->
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.backendTitle">Active Backend</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.backendDesc">Execution backend for Whisper model inference.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.backendPoints">
+                          <span class="setting-desc-point"><strong>Standard:</strong> Universal CPU-only compatibility</span>
+                          <span class="setting-desc-point"><strong>Vulkan:</strong> Universal GPU acceleration (AMD, Intel, or NVIDIA)</span>
+                          <span class="setting-desc-point"><strong>CUDA:</strong> Dedicated NVIDIA GPUs</span>
+                          <span class="setting-desc-point"><strong>OpenVINO:</strong> Intel CPUs, Arc &amp; iGPUs</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <select class="select-control" id="opt-selectedBackend">
+                        <option value="Standard">Standard CPU</option>
+                        <option value="Vulkan">Vulkan GPU</option>
+                        <option value="OpenVINO">OpenVINO Intel</option>
+                        <option value="CUDA">NVIDIA CUDA</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <!-- Language Spoken Card -->
                   <div class="setting-card" data-search-tags="-l --language">
                     <div class="setting-info">
                       <div class="setting-label-row">
@@ -449,6 +460,7 @@
                     </div>
                   </div>
 
+                  <!-- Initial Prompt Card -->
                   <div class="setting-card" data-search-tags="--prompt">
                     <div class="setting-info">
                       <div class="setting-label-row">
@@ -466,6 +478,7 @@
                     </div>
                   </div>
 
+                  <!-- Carry Initial Prompt Card -->
                   <div class="setting-card" data-search-tags="--carry-initial-prompt">
                     <div class="setting-info">
                       <div class="setting-label-row">
@@ -485,6 +498,7 @@
                     </div>
                   </div>
 
+                  <!-- Translate to English Card -->
                   <div class="setting-card" data-search-tags="-tr --translate">
                     <div class="setting-info">
                       <div class="setting-label-row">
@@ -504,6 +518,7 @@
                     </div>
                   </div>
 
+                  <!-- DTW Timestamps Card -->
                   <div class="setting-card" data-search-tags="--dtw">
                     <div class="setting-info">
                       <div class="setting-label-row">

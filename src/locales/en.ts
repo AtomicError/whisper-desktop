@@ -539,6 +539,8 @@ export const en = {
     title: 'Whisper Engine Configuration',
     subtitle: 'Adjust execution backend, language, decoding thresholds and performance variables',
     catGeneral: 'General Setup',
+    catApp: 'App Preferences',
+    catTranscription: 'Core Transcription',
     catComputation: 'Computation',
     catSearch: 'Decoding Strategy',
     catOutputs: 'Outputs',

@@ -541,6 +541,8 @@ export const fa: Translations = {
     title: 'پیکربندی موتور ویسپر',
     subtitle: 'تنظیم موتور پردازش، زبان، آستانه‌های دیکودینگ و متغیرهای کارایی',
     catGeneral: 'تنظیمات عمومی',
+    catApp: 'پیکربندی برنامه',
+    catTranscription: 'هستهٔ رونویسی',
     catComputation: 'محاسبات و پردازش',
     catSearch: 'استراتژی رمزگشایی',
     catOutputs: 'خروجی‌ها',
