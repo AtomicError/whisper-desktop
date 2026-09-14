@@ -1749,6 +1749,18 @@ const THEME_REGISTRY = {
       </svg>
     `
   },
+  'carbon': {
+    id: 'carbon',
+    label: 'Carbon',
+    dataTheme: 'carbon',
+    metaColor: '#121214',
+    toastName: 'Carbon',
+    iconSvg: `
+      <svg class="theme-btn-icon icon-carbon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="12 2 22 12 12 22 2 12 12 2"/>
+      </svg>
+    `
+  },
   'fire-orange': {
     id: 'fire-orange',
     label: 'Fiery Orange',
@@ -1760,12 +1772,32 @@ const THEME_REGISTRY = {
         <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>
       </svg>
     `
+  },
+  'emerald': {
+    id: 'emerald',
+    label: 'Emerald',
+    dataTheme: 'emerald',
+    metaColor: '#060e0a',
+    toastName: 'Emerald',
+    iconSvg: `
+      <svg class="theme-btn-icon icon-emerald" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6 3h12l4 6-10 13L2 9Z"/>
+        <path d="M11 3 8 9l4 13 4-13-3-6"/>
+        <path d="M2 9h20"/>
+      </svg>
+    `
   }
 };
 
 function resolveThemeConfig(themeName) {
+  if (themeName === 'carbon') {
+    return THEME_REGISTRY['carbon'];
+  }
   if (themeName === 'fire' || themeName === 'fire-orange') {
     return THEME_REGISTRY['fire-orange'];
+  }
+  if (themeName === 'emerald') {
+    return THEME_REGISTRY['emerald'];
   }
   if (themeName === 'cyber-blue' || themeName === 'royal-blue') {
     return THEME_REGISTRY['royal-blue'];
@@ -1779,8 +1811,12 @@ function applyTheme(themeName) {
 
   if (config.id === 'royal-blue') {
     root.removeAttribute('data-theme');
+    root.style.removeProperty('--bg-space');
   } else {
     root.setAttribute('data-theme', config.dataTheme || config.id);
+    if (config.metaColor) {
+      root.style.setProperty('--bg-space', config.metaColor);
+    }
   }
 
   // Update localStorage cache to prevent FOUC on next startup
@@ -1794,23 +1830,22 @@ function applyTheme(themeName) {
     metaTheme.setAttribute('content', config.metaColor);
   }
 
-  // Update segmented theme switcher buttons
-  const isFire = (config.id === 'fire-orange' || config.id === 'fire');
-  const royalBtn = document.getElementById('theme-seg-royal');
-  const fireBtn = document.getElementById('theme-seg-fire');
-  if (royalBtn && fireBtn) {
-    if (isFire) {
-      royalBtn.classList.remove('active');
-      royalBtn.setAttribute('aria-checked', 'false');
-      fireBtn.classList.add('active');
-      fireBtn.setAttribute('aria-checked', 'true');
-    } else {
-      fireBtn.classList.remove('active');
-      fireBtn.setAttribute('aria-checked', 'false');
-      royalBtn.classList.add('active');
-      royalBtn.setAttribute('aria-checked', 'true');
-    }
-  }
+  // Update theme picker cards in Settings -> App Preferences
+  const activeThemeId = config.id;
+  const themeCardMap = {
+    'royal-blue': 'theme-card-royal',
+    'carbon': 'theme-card-carbon',
+    'fire-orange': 'theme-card-fire',
+    'fire': 'theme-card-fire',
+    'emerald': 'theme-card-emerald'
+  };
+  const activeCardId = themeCardMap[activeThemeId] || 'theme-card-royal';
+
+  document.querySelectorAll('.theme-picker-card').forEach(card => {
+    const isActive = (card.id === activeCardId);
+    card.classList.toggle('active', isActive);
+    card.setAttribute('aria-checked', isActive ? 'true' : 'false');
+  });
 
   if (window.syncCustomSelects) {
     window.syncCustomSelects();
@@ -1819,17 +1854,21 @@ function applyTheme(themeName) {
 
 window.toggleTheme = function() {
   const currentThemeAttr = document.documentElement.getAttribute('data-theme') || 'royal-blue';
-  const nextTheme = (currentThemeAttr === 'fire-orange' || currentThemeAttr === 'fire') ? 'royal-blue' : 'fire-orange';
+  let nextTheme = 'carbon';
+  if (currentThemeAttr === 'carbon') {
+    nextTheme = 'fire-orange';
+  } else if (currentThemeAttr === 'fire-orange' || currentThemeAttr === 'fire') {
+    nextTheme = 'emerald';
+  } else if (currentThemeAttr === 'emerald') {
+    nextTheme = 'royal-blue';
+  } else {
+    nextTheme = 'carbon';
+  }
   window.switchTheme(nextTheme);
 };
 
 window.handleThemeSegmentClick = function(targetTheme) {
-  const sidebar = document.querySelector('sidebar');
-  if (sidebar && sidebar.classList.contains('sidebar-collapsed')) {
-    window.toggleTheme();
-  } else {
-    window.switchTheme(targetTheme);
-  }
+  window.switchTheme(targetTheme);
 };
 
 window.switchTheme = function(themeName, animated = true) {
@@ -1854,7 +1893,11 @@ window.switchTheme = function(themeName, animated = true) {
     applyTheme(config.id);
   }
 
-  showNotification(t('toasts.themeSwitched', { theme: config.toastName || config.label }), 'info');
+  const themeKey = (config.id === 'royal-blue') ? 'royal' : (config.id === 'fire-orange' || config.id === 'fire') ? 'fire' : config.id;
+  const localizedThemeName = (typeof t === 'function' && t(`theme.${themeKey}`) !== `theme.${themeKey}`)
+    ? t(`theme.${themeKey}`)
+    : (config.toastName || config.label);
+  showNotification(t('toasts.themeSwitched', { theme: localizedThemeName }), 'info');
 };
 
 function setupZoomKeyboardShortcuts() {
@@ -2796,12 +2839,15 @@ function executeFilterSettings(query) {
       
       const optionsText = Array.from(card.querySelectorAll('select option'))
         .map(o => o.textContent.toLowerCase()).join(' ');
+      const subCardsText = Array.from(card.querySelectorAll('.theme-card-title, .theme-card-desc, .radio-label, .preset-label'))
+        .map(el => el.textContent.toLowerCase()).join(' ');
 
       const matches = searchTags.includes(q) ||
                       title.includes(q) ||
                       desc.includes(q) ||
                       descPoints.includes(q) ||
-                      optionsText.includes(q);
+                      optionsText.includes(q) ||
+                      subCardsText.includes(q);
 
       if (matches) {
         card.style.display = '';

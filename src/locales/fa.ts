@@ -42,8 +42,14 @@ export const fa: Translations = {
     retryCheck: 'تلاش مجدد'
   },
   theme: {
-    royal: 'رویال',
-    fire: 'آتشین'
+    royal: 'آبی سلطنتی',
+    carbon: 'کربن',
+    fire: 'آتشین',
+    emerald: 'زمردین',
+    royalDesc: 'بوم سایبرپانک سرمه‌ای با اکسنت‌های نئونی آبی الکتریک',
+    carbonDesc: 'بوم خنثی زغالی با تایپوگرافی سفید شفاف و اکسنت‌های قرمز کرمزون',
+    fireDesc: 'بوم گرم دودی با اکسنت‌های آتشین و کهربایی پرانرژی',
+    emeraldDesc: 'بوم استودیویی آبسیدین با اکسنت‌های زمردین و آرامش‌بخش نعنایی'
   },
   common: {
     save: 'ذخیرهٔ تغییرات',
@@ -555,6 +561,8 @@ export const fa: Translations = {
     clearSearch: 'پاک کردن جستجو',
     
     // General
+    themeTitle: 'پوستهٔ برنامه',
+    themeDesc: 'پوسته و زبان بصری کل رابط کاربری نرم‌افزار را انتخاب کنید.',
     languageSettingTitle: 'زبان رابط کاربری',
     languageSettingDesc: 'زبان نمایش منوها، دکمه‌ها و پنجره‌های برنامه را انتخاب کنید.',
     langEn: 'English',

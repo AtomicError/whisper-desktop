@@ -47,15 +47,23 @@ html[dir="rtl"] .credit-content {
   gap: 8px;
 }
 
-/* 2.1. Theme Segmented Switch Indicator in RTL */
-html[dir="rtl"] .theme-segment-indicator {
-  left: auto;
-  right: 3px;
+/* 2.1. Theme Picker Cards in RTL */
+html[dir="rtl"] .theme-picker-card {
+  text-align: right;
 }
 
-html[dir="rtl"][data-theme="fire-orange"] .theme-segment-indicator,
-html[dir="rtl"][data-theme="fire"] .theme-segment-indicator {
-  transform: translate3d(-100%, 0, 0);
+html[dir="rtl"] .theme-card-preview {
+  direction: ltr;
+}
+
+html[dir="rtl"] .theme-card-title-row {
+  direction: rtl;
+}
+
+html[dir="rtl"] .theme-card-desc {
+  text-align: right;
+  line-height: 1.55;
+  min-height: 3.1em;
 }
 
 /* 3. Settings & Model Categories */

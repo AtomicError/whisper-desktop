@@ -267,7 +267,9 @@ impl WhisperSettings {
     pub fn sanitize_and_validate(&mut self) {
         self.theme = match self.theme.as_str() {
             "fire-orange" | "fire" => "fire-orange".to_string(),
-            "cyber-blue" | "royal-blue" => "royal-blue".to_string(),
+            "cyber-blue" | "royal-blue" | "royal" => "royal-blue".to_string(),
+            "carbon" => "carbon".to_string(),
+            "emerald" => "emerald".to_string(),
             _ => "royal-blue".to_string(),
         };
 
@@ -957,6 +959,11 @@ mod tests {
         settings.sanitize_and_validate();
         assert_eq!(settings.theme, "royal-blue");
 
+        // Legacy royal alias migration
+        settings.theme = "royal".to_string();
+        settings.sanitize_and_validate();
+        assert_eq!(settings.theme, "royal-blue");
+
         // Valid fire-orange theme
         settings.theme = "fire-orange".to_string();
         settings.sanitize_and_validate();
@@ -967,12 +974,22 @@ mod tests {
         settings.sanitize_and_validate();
         assert_eq!(settings.theme, "fire-orange");
 
+        // Valid carbon theme
+        settings.theme = "carbon".to_string();
+        settings.sanitize_and_validate();
+        assert_eq!(settings.theme, "carbon");
+
+        // Valid emerald theme
+        settings.theme = "emerald".to_string();
+        settings.sanitize_and_validate();
+        assert_eq!(settings.theme, "emerald");
+
         // Test persistence roundtrip
         let temp_path = temp_test_file("theme_test");
         save_settings_to_path(&temp_path, &settings).unwrap();
 
         let loaded = load_settings_from_path(&temp_path);
-        assert_eq!(loaded.theme, "fire-orange");
+        assert_eq!(loaded.theme, "emerald");
 
         let _ = fs::remove_file(&temp_path);
     }

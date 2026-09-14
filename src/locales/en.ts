@@ -40,8 +40,14 @@ export const en = {
     retryCheck: 'Retry'
   },
   theme: {
-    royal: 'Royal',
-    fire: 'Fire'
+    royal: 'Royal Blue',
+    carbon: 'Carbon',
+    fire: 'Fiery Orange',
+    emerald: 'Emerald',
+    royalDesc: 'Cyberpunk dark navy canvas with electric neon blue accents',
+    carbonDesc: 'Minimal neutral dark canvas with crisp white typography and crimson red accents',
+    fireDesc: 'Warm dark canvas with vibrant amber and fiery orange accents',
+    emeraldDesc: 'Obsidian studio canvas with cyber mint and relaxing emerald accents'
   },
   common: {
     save: 'Save Changes',
@@ -553,6 +559,8 @@ export const en = {
     clearSearch: 'Clear Search',
     
     // General
+    themeTitle: 'Application Theme',
+    themeDesc: 'Choose the visual theme for the entire application interface.',
     languageSettingTitle: 'Interface Language',
     languageSettingDesc: 'Select the display language for the application interface and menus.',
     langEn: 'English',
