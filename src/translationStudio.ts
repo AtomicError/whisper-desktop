@@ -184,6 +184,8 @@ export function parseSubtitleContent(content: string, ext: string): SubtitleCue[
         if (times.length === 2) {
           const startStr = times[0].trim().split(' ')[0];
           const endStr = times[1].trim().split(' ')[0];
+          const currentCueNum = lastPotentialCueNum;
+          lastPotentialCueNum = '';
 
           // Collect dialogue lines until next empty line or next timeline
           const dialogueParts: string[] = [];
@@ -192,7 +194,6 @@ export function parseSubtitleContent(content: string, ext: string): SubtitleCue[
             // Check if this line is actually a cue number for the subsequent timeline
             const nextLineIsTimeline = (i + 1 < total) && lines[i + 1].includes('-->');
             if (/^\d+$/.test(lines[i].trim()) && nextLineIsTimeline) {
-              lastPotentialCueNum = lines[i].trim();
               break;
             }
             dialogueParts.push(lines[i]);
@@ -201,8 +202,8 @@ export function parseSubtitleContent(content: string, ext: string): SubtitleCue[
 
           const rawText = dialogueParts.join('\n').replace(/<[^>]+>/g, '').trim();
           if (rawText || startStr) {
-            const parsedId = lastPotentialCueNum && /^\d+$/.test(lastPotentialCueNum)
-              ? parseInt(lastPotentialCueNum, 10)
+            const parsedId = currentCueNum && /^\d+$/.test(currentCueNum)
+              ? parseInt(currentCueNum, 10)
               : cueId;
 
             cues.push({
@@ -215,7 +216,6 @@ export function parseSubtitleContent(content: string, ext: string): SubtitleCue[
             });
             cueId = parsedId + 1;
           }
-          lastPotentialCueNum = '';
           continue;
         }
       } else {
@@ -432,6 +432,9 @@ export class TranslationStudioController {
           if (globalModelSelect) {
             globalModelSelect.value = this.state.activeModel;
           }
+          if (typeof win.updateActiveModelBannerUI === 'function') {
+            win.updateActiveModelBannerUI(this.state.activeModel);
+          }
           if (typeof win.saveCurrentSettings === 'function') {
             win.saveCurrentSettings();
           }
@@ -444,7 +447,9 @@ export class TranslationStudioController {
       const win = window as any;
       if (typeof win.switchView === 'function') {
         win.switchView('settings');
-        if (typeof win.switchSettingsTab === 'function') {
+        if (typeof win.switchSettingsCategory === 'function') {
+          win.switchSettingsCategory('translation');
+        } else if (typeof win.switchSettingsTab === 'function') {
           win.switchSettingsTab('translation');
         }
       }
@@ -524,10 +529,100 @@ export class TranslationStudioController {
       this.targetList?.querySelectorAll(`.translate-cue-item[data-id="${cueId}"]`).forEach(el => el.classList.remove('highlighted'));
     };
 
+    const handleFocusIn = (e: FocusEvent) => {
+      const target = (e.target as HTMLElement)?.closest('.translate-cue-item') as HTMLElement | null;
+      if (!target) return;
+      const cueId = target.dataset.id;
+      if (!cueId) return;
+
+      this.sourceList?.querySelectorAll(`.translate-cue-item[data-id="${cueId}"]`).forEach(el => el.classList.add('highlighted'));
+      this.targetList?.querySelectorAll(`.translate-cue-item[data-id="${cueId}"]`).forEach(el => el.classList.add('highlighted'));
+    };
+
+    const handleFocusOut = (e: FocusEvent) => {
+      const target = (e.target as HTMLElement)?.closest('.translate-cue-item') as HTMLElement | null;
+      if (!target) return;
+      const cueId = target.dataset.id;
+      if (!cueId) return;
+
+      this.sourceList?.querySelectorAll(`.translate-cue-item[data-id="${cueId}"]`).forEach(el => el.classList.remove('highlighted'));
+      this.targetList?.querySelectorAll(`.translate-cue-item[data-id="${cueId}"]`).forEach(el => el.classList.remove('highlighted'));
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = (e.target as HTMLElement)?.closest('.translate-cue-item') as HTMLElement | null;
+      if (!target) return;
+
+      if (e.key === 'ArrowDown') {
+        const next = target.nextElementSibling as HTMLElement | null;
+        if (next && next.classList.contains('translate-cue-item')) {
+          e.preventDefault();
+          next.focus();
+          next.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      } else if (e.key === 'ArrowUp') {
+        const prev = target.previousElementSibling as HTMLElement | null;
+        if (prev && prev.classList.contains('translate-cue-item')) {
+          e.preventDefault();
+          prev.focus();
+          prev.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      } else if (e.key === 'Home') {
+        const parent = target.parentElement;
+        const first = parent?.querySelector('.translate-cue-item') as HTMLElement | null;
+        if (first) {
+          e.preventDefault();
+          first.focus();
+          first.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      } else if (e.key === 'End') {
+        const parent = target.parentElement;
+        const items = parent?.querySelectorAll('.translate-cue-item');
+        if (items && items.length > 0) {
+          const last = items[items.length - 1] as HTMLElement;
+          e.preventDefault();
+          last.focus();
+          last.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      } else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        if (this.state.viewMode === 'split') {
+          const isRtl = document.documentElement.getAttribute('dir') === 'rtl';
+          const isSource = target.parentElement === this.sourceList;
+          const cueId = target.dataset.id;
+          if (cueId) {
+            const shouldJumpToTarget = isRtl ? (e.key === 'ArrowLeft' && isSource) : (e.key === 'ArrowRight' && isSource);
+            const shouldJumpToSource = isRtl ? (e.key === 'ArrowRight' && !isSource) : (e.key === 'ArrowLeft' && !isSource);
+            if (shouldJumpToTarget) {
+              const counterpart = this.targetList?.querySelector(`.translate-cue-item[data-id="${cueId}"]`) as HTMLElement | null;
+              if (counterpart) {
+                e.preventDefault();
+                counterpart.focus();
+                counterpart.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+              }
+            } else if (shouldJumpToSource) {
+              const counterpart = this.sourceList?.querySelector(`.translate-cue-item[data-id="${cueId}"]`) as HTMLElement | null;
+              if (counterpart) {
+                e.preventDefault();
+                counterpart.focus();
+                counterpart.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+              }
+            }
+          }
+        }
+      }
+    };
+
     this.sourceList?.addEventListener('mouseover', handleMouseOver);
     this.sourceList?.addEventListener('mouseout', handleMouseOut);
+    this.sourceList?.addEventListener('focusin', handleFocusIn);
+    this.sourceList?.addEventListener('focusout', handleFocusOut);
+    this.sourceList?.addEventListener('keydown', handleKeyDown);
+
     this.targetList?.addEventListener('mouseover', handleMouseOver);
     this.targetList?.addEventListener('mouseout', handleMouseOut);
+    this.targetList?.addEventListener('focusin', handleFocusIn);
+    this.targetList?.addEventListener('focusout', handleFocusOut);
+    this.targetList?.addEventListener('keydown', handleKeyDown);
   }
 
   private setupSynchronizedScrolling() {
@@ -969,7 +1064,7 @@ export class TranslationStudioController {
     }
 
     const html = this.state.sourceCues.map(cue => `
-      <div class="translate-cue-item" data-id="${cue.id}">
+      <div class="translate-cue-item" data-id="${cue.id}" role="listitem" tabindex="0" aria-label="Cue #${cue.id}">
         <div class="translate-cue-header">
           <span class="translate-cue-num">#${cue.id}</span>
           ${cue.startTimeStr ? `<span class="translate-cue-time">${escapeHTML(cue.startTimeStr)}${cue.endTimeStr ? ` ➔ ${escapeHTML(cue.endTimeStr)}` : ''}</span>` : ''}
@@ -1004,7 +1099,7 @@ export class TranslationStudioController {
     }
 
     const html = this.state.translatedCues.map(cue => `
-      <div class="translate-cue-item translate-cue-translated" data-id="${cue.id}">
+      <div class="translate-cue-item translate-cue-translated" data-id="${cue.id}" role="listitem" tabindex="0" aria-label="Translated cue #${cue.id}">
         <div class="translate-cue-header">
           <span class="translate-cue-num">#${cue.id}</span>
           ${cue.startTimeStr ? `<span class="translate-cue-time">${escapeHTML(cue.startTimeStr)}${cue.endTimeStr ? ` ➔ ${escapeHTML(cue.endTimeStr)}` : ''}</span>` : ''}
@@ -1174,26 +1269,18 @@ export class TranslationStudioController {
     }
 
     try {
+      const trimmedOutputDir = this.state.outputDir ? this.state.outputDir.trim() : '';
       const translatedFiles = await invoke<string[]>('translate_transcription_files', {
         settings: runSettings,
         generatedFiles: [fileName],
         parentDir: parentDir,
+        outputDir: trimmedOutputDir || null,
       });
 
       if (translatedFiles && translatedFiles.length > 0) {
         const outName = translatedFiles[0];
-        let outPath = joinPath(parentDir, outName);
-
-        if (this.state.outputDir && this.state.outputDir !== parentDir) {
-          try {
-            const outContent = await invoke<string>('read_text_file_content', { filePath: outPath });
-            const customPath = joinPath(this.state.outputDir, outName);
-            await invoke('write_text_file_content', { filePath: customPath, content: outContent });
-            outPath = customPath;
-          } catch (writeErr) {
-            console.warn('Could not mirror translated file to custom outputDir:', writeErr);
-          }
-        }
+        const effectiveDir = trimmedOutputDir || parentDir;
+        const outPath = joinPath(effectiveDir, outName);
 
         this.state.translatedPath = outPath;
         this.state.translatedName = outName;

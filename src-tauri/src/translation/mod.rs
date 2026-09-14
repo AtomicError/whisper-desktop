@@ -393,6 +393,7 @@ pub async fn translate_transcription_files(
     settings: WhisperSettings,
     generated_files: Vec<String>,
     parent_dir: String,
+    output_dir: Option<String>,
 ) -> Result<Vec<String>, String> {
     translator::translate_files(
         app,
@@ -401,6 +402,7 @@ pub async fn translate_transcription_files(
         settings,
         generated_files,
         parent_dir,
+        output_dir,
     )
     .await
 }

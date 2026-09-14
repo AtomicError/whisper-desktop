@@ -913,9 +913,26 @@ pub async fn translate_files(
     settings: WhisperSettings,
     generated_files: Vec<String>,
     parent_dir: String,
+    output_dir: Option<String>,
 ) -> Result<Vec<String>, String> {
-    if !settings.translate_ai_enabled {
+    if !settings.translate_ai_enabled || generated_files.is_empty() {
         return Ok(Vec::new());
+    }
+
+    let target_dir = match output_dir {
+        Some(ref dir) if !dir.trim().is_empty() => dir.trim().to_string(),
+        _ => parent_dir.clone(),
+    };
+
+    if let Err(e) = fs::create_dir_all(&target_dir) {
+        logs.log(
+            &app,
+            "Translate",
+            &format!(
+                "Warning: failed to ensure output directory '{}': {}",
+                target_dir, e
+            ),
+        );
     }
 
     if settings.translate_ai_model.trim().is_empty() {
@@ -1063,7 +1080,7 @@ pub async fn translate_files(
         // Output file path: e.g. "movie.fa.srt"
         let base_stem = input_path.file_stem().unwrap_or_default().to_string_lossy();
         let output_file_name = format!("{}.{}.{}", base_stem, lang_code, ext);
-        let output_path = Path::new(&parent_dir).join(&output_file_name);
+        let output_path = Path::new(&target_dir).join(&output_file_name);
 
         let content = read_subtitle_string(&input_path)?;
 
@@ -1092,8 +1109,8 @@ pub async fn translate_files(
         // A valid checkpoint for this exact source+target restores every line
         // already translated in a previous run, so work is never repeated.
         let mut resumed_lines: usize = 0;
-        if let Some(ckpt) = crate::translation::checkpoint::load(
-            Path::new(&parent_dir),
+        let loaded_ckpt = crate::translation::checkpoint::load(
+            Path::new(&target_dir),
             &output_file_name,
             file_name,
             &lang_code,
@@ -1101,7 +1118,23 @@ pub async fn translate_files(
             &settings.translate_ai_provider,
             &settings.translate_ai_model,
             &content,
-        ) {
+        ).or_else(|| {
+            if target_dir != parent_dir {
+                crate::translation::checkpoint::load(
+                    Path::new(&parent_dir),
+                    &output_file_name,
+                    file_name,
+                    &lang_code,
+                    &ext,
+                    &settings.translate_ai_provider,
+                    &settings.translate_ai_model,
+                    &content,
+                )
+            } else {
+                None
+            }
+        });
+        if let Some(ckpt) = loaded_ckpt {
             let restored = ckpt.translations.len();
             translations_map.extend(ckpt.translations);
             remaining_entries.retain(|(idx, _)| !translations_map.contains_key(idx));
@@ -1374,7 +1407,7 @@ pub async fn translate_files(
                             translations_map.clone(),
                         );
                         if let Err(e) = crate::translation::checkpoint::save(
-                            Path::new(&parent_dir),
+                            Path::new(&target_dir),
                             &output_file_name,
                             &ckpt,
                         ) {
@@ -1463,7 +1496,10 @@ pub async fn translate_files(
             .map_err(|e| format!("Failed to write output translated file: {}", e))?;
 
         // File is fully written: the checkpoint has served its purpose.
-        crate::translation::checkpoint::remove(Path::new(&parent_dir), &output_file_name);
+        crate::translation::checkpoint::remove(Path::new(&target_dir), &output_file_name);
+        if target_dir != parent_dir {
+            crate::translation::checkpoint::remove(Path::new(&parent_dir), &output_file_name);
+        }
 
         successfully_translated.push(output_file_name);
     }

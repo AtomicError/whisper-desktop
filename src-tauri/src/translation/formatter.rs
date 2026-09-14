@@ -339,6 +339,17 @@ mod tests {
     }
 
     #[test]
+    fn srt_compact_subtitles_parse_cues_correctly() {
+        let content = "1\n00:00:01,000 --> 00:00:02,000\nHello\n2\n00:00:03,000 --> 00:00:04,000\nWorld\n";
+        let p = parse(content, "srt");
+        assert_eq!(p.cues.len(), 2);
+        assert_eq!(p.cues[0].cue_id.as_deref(), Some("1"));
+        assert_eq!(p.cues[0].text, "Hello");
+        assert_eq!(p.cues[1].cue_id.as_deref(), Some("2"));
+        assert_eq!(p.cues[1].text, "World");
+    }
+
+    #[test]
     fn vtt_note_block_with_arrow_not_misparsed() {
         let content = "WEBVTT\n\nNOTE This block mentions 00:00:01.000 --> 00:00:02.000 inside text\n\n00:00:03.000 --> 00:00:04.000\nHello\n";
         let p = parse(content, "vtt");

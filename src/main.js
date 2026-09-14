@@ -6635,6 +6635,7 @@ function updateActiveModelBannerUI(modelId) {
     }
   }
 }
+window.updateActiveModelBannerUI = updateActiveModelBannerUI;
 
 window.setActiveModelFromTable = async function(modelId) {
   if (!modelId) return;
@@ -6675,6 +6676,7 @@ window.setActiveModelFromTable = async function(modelId) {
 
     if (isNowActive && !wasActive) {
       row.classList.add('active-model-row');
+      row.setAttribute('aria-selected', 'true');
       row.setAttribute('aria-checked', 'true');
       const activeCell = row.querySelector('.td-active');
       if (activeCell) {
@@ -6691,11 +6693,12 @@ window.setActiveModelFromTable = async function(modelId) {
       }
     } else if (!isNowActive && wasActive) {
       row.classList.remove('active-model-row');
+      row.setAttribute('aria-selected', 'false');
       row.setAttribute('aria-checked', 'false');
       const activeCell = row.querySelector('.td-active');
       if (activeCell) {
         activeCell.innerHTML = `
-          <button type="button" class="model-radio-btn" title="${t('settings.setActiveBadge')}" aria-label="${t('settings.setActiveBadge')}">
+          <button type="button" class="model-radio-btn" role="radio" aria-checked="false" title="${t('settings.setActiveBadge')}" aria-label="${t('settings.setActiveBadge')}">
             <span class="radio-circle"></span>
           </button>
         `;
@@ -6934,14 +6937,26 @@ window.applyModelsFilterAndRender = function(delay = 0) {
         if (pagNav) {
           pagNav.style.display = 'flex';
         }
+        const hidePageNavButtons = totalPages <= 1 || currentModelsPageSize === 'all';
+        const pagDivider = pagContainer.querySelector('.pagination-divider');
+        if (pagDivider) {
+          pagDivider.style.display = hidePageNavButtons ? 'none' : 'block';
+        }
+        if (btnPrev) {
+          btnPrev.style.display = hidePageNavButtons ? 'none' : 'inline-flex';
+          btnPrev.disabled = currentModelsPage <= 1;
+        }
+        if (btnNext) {
+          btnNext.style.display = hidePageNavButtons ? 'none' : 'inline-flex';
+          btnNext.disabled = currentModelsPage >= totalPages;
+        }
         if (pagIndicator) {
+          pagIndicator.style.display = hidePageNavButtons ? 'none' : 'inline-block';
           pagIndicator.textContent = t('settings.pageOf', {
             current: window.formatNumberForLang(currentModelsPage),
             total: window.formatNumberForLang(totalPages)
           });
         }
-        if (btnPrev) btnPrev.disabled = currentModelsPage <= 1;
-        if (btnNext) btnNext.disabled = currentModelsPage >= totalPages;
       } else {
         pagContainer.style.display = 'none';
         if (tableWrapper) tableWrapper.classList.remove('has-pagination');
@@ -6991,7 +7006,8 @@ function createModelRowElement(modelObj, isActive, index = 0) {
   row.className = `model-data-row${isActive ? ' active-model-row' : ''}`;
   row.dataset.modelId = (modelObj.id || '').trim().toLowerCase();
   row.dataset.reasoning = modelObj.reasoning || 'None';
-  row.setAttribute('role', 'radio');
+  row.setAttribute('role', 'row');
+  row.setAttribute('aria-selected', isActive ? 'true' : 'false');
   row.setAttribute('aria-checked', isActive ? 'true' : 'false');
   row.setAttribute('tabindex', '0');
   
@@ -7017,19 +7033,19 @@ function createModelRowElement(modelObj, isActive, index = 0) {
   const isManualNew = !fullId;
 
   row.innerHTML = `
-    <div class="td-cell td-active">
+    <div class="td-cell td-active" role="cell">
       ${isActive ? `
         <div class="model-active-badge is-active" title="${t('settings.activeBadge')}">
           <span class="active-dot"></span>
           <span class="badge-text">${t('settings.activeBadge')}</span>
         </div>
       ` : `
-        <button type="button" class="model-radio-btn" title="${t('settings.setActiveBadge')}" aria-label="${t('settings.setActiveBadge')}">
+        <button type="button" class="model-radio-btn" role="radio" aria-checked="false" title="${t('settings.setActiveBadge')}" aria-label="${t('settings.setActiveBadge')}">
           <span class="radio-circle"></span>
         </button>
       `}
     </div>
-    <div class="td-cell td-id">
+    <div class="td-cell td-id" role="cell">
       ${isManualNew ? `
         <input type="text" class="model-cell-input model-id-input" value="" placeholder="e.g. gpt-4o-mini" title="Model Identifier" />
       ` : `
@@ -7039,14 +7055,14 @@ function createModelRowElement(modelObj, isActive, index = 0) {
         </div>
       `}
     </div>
-    <div class="td-cell td-ctx">
+    <div class="td-cell td-ctx" role="cell">
       ${isManualNew ? `
         <input type="text" class="model-cell-input model-ctx-input" value="${formattedCtx}" data-raw-tokens="${modelObj.contextWindow}" placeholder="128K" title="Context tokens: ${formattedCtx} (${Number(modelObj.contextWindow).toLocaleString()})" />
       ` : `
         <span class="model-ctx-value" title="Context tokens: ${formattedCtx} (${Number(modelObj.contextWindow).toLocaleString()})">${formattedCtx}</span>
       `}
     </div>
-    <div class="td-cell td-reasoning">
+    <div class="td-cell td-reasoning" role="cell">
       ${supportsReasoning ? `
         <select id="${selectId}" class="select-control model-reasoning-select${isReasoningActive ? ' reasoning-active' : ''}">
           <option value="None" ${curReasoningLower === 'none' ? 'selected' : ''}>None</option>
@@ -7061,7 +7077,7 @@ function createModelRowElement(modelObj, isActive, index = 0) {
         <span class="reasoning-none-dash" title="${t('settings.reasoningNotSupported')}" aria-label="${t('settings.reasoningNotSupported')}">—</span>
       `}
     </div>
-    <div class="td-cell td-action">
+    <div class="td-cell td-action" role="cell">
       ${isActive ? '' : `
         <button type="button" class="model-btn-trash" title="Remove Model Row" aria-label="Remove Model Row">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -7169,7 +7185,21 @@ function createModelRowElement(modelObj, isActive, index = 0) {
       input.style.direction = 'ltr';
       input.style.textAlign = 'left';
       input.addEventListener('click', ev => ev.stopPropagation());
+
+      let discarded = false;
+      const onBlur = () => {
+        if (discarded) return;
+        commit();
+      };
+      const cancel = () => {
+        discarded = true;
+        input.removeEventListener('blur', onBlur);
+        window.applyModelsFilterAndRender(0);
+      };
       const commit = () => {
+        if (discarded) return;
+        discarded = true;
+        input.removeEventListener('blur', onBlur);
         const val = input.value.trim();
         if (val && val !== modelObj.id) {
           modelObj.id = val;
@@ -7183,11 +7213,17 @@ function createModelRowElement(modelObj, isActive, index = 0) {
         }
         window.applyModelsFilterAndRender(0);
       };
+
       input.addEventListener('keydown', (ev) => {
-        if (ev.key === 'Enter') commit();
-        if (ev.key === 'Escape') window.applyModelsFilterAndRender(0);
+        if (ev.key === 'Enter') {
+          ev.preventDefault();
+          commit();
+        } else if (ev.key === 'Escape') {
+          ev.preventDefault();
+          cancel();
+        }
       });
-      input.addEventListener('blur', commit);
+      input.addEventListener('blur', onBlur);
       idDisplay.replaceWith(input);
       input.focus();
       input.select();
@@ -7205,7 +7241,21 @@ function createModelRowElement(modelObj, isActive, index = 0) {
       input.style.maxWidth = '80px';
       input.style.margin = '0 auto';
       input.addEventListener('click', ev => ev.stopPropagation());
+
+      let discarded = false;
+      const onBlur = () => {
+        if (discarded) return;
+        commit();
+      };
+      const cancel = () => {
+        discarded = true;
+        input.removeEventListener('blur', onBlur);
+        window.applyModelsFilterAndRender(0);
+      };
       const commit = () => {
+        if (discarded) return;
+        discarded = true;
+        input.removeEventListener('blur', onBlur);
         const rawTokens = window.parseTokensInput(input.value);
         if (rawTokens !== modelObj.contextWindow) {
           modelObj.contextWindow = rawTokens;
@@ -7213,11 +7263,17 @@ function createModelRowElement(modelObj, isActive, index = 0) {
         }
         window.applyModelsFilterAndRender(0);
       };
+
       input.addEventListener('keydown', (ev) => {
-        if (ev.key === 'Enter') commit();
-        if (ev.key === 'Escape') window.applyModelsFilterAndRender(0);
+        if (ev.key === 'Enter') {
+          ev.preventDefault();
+          commit();
+        } else if (ev.key === 'Escape') {
+          ev.preventDefault();
+          cancel();
+        }
       });
-      input.addEventListener('blur', commit);
+      input.addEventListener('blur', onBlur);
       ctxValue.replaceWith(input);
       input.focus();
       input.select();

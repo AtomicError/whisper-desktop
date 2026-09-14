@@ -5280,7 +5280,7 @@ select.select-control {
   background: var(--bg-table-body);
   overflow-x: auto;
   overflow-y: hidden;
-  height: clamp(140px, calc(100vh - 670px), 600px);
+  height: clamp(220px, calc(100vh - 670px), 600px);
   display: flex;
   flex-direction: column;
   transition: border-radius 0.15s ease;
@@ -7931,6 +7931,8 @@ html[dir="rtl"] .cat-match-badge {
   font-size: 0.9rem;
   color: var(--color-text);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .translate-deck-body {
@@ -8653,6 +8655,12 @@ html[dir="rtl"] .cat-match-badge {
 .translate-cue-item:hover {
   background: rgba(255, 255, 255, 0.04);
   border-color: rgba(var(--color-royal-blue-rgb), 0.3);
+}
+
+.translate-cue-item:focus-visible {
+  outline: 2px solid var(--color-royal-blue);
+  outline-offset: 1px;
+  background: rgba(var(--color-royal-blue-rgb), 0.08);
 }
 
 .translate-cue-header {
