@@ -61,6 +61,7 @@ export const en = {
     reset: 'Reset to Defaults',
     loading: 'Loading...',
     search: 'Search...',
+    searchLanguage: 'Search language...',
     error: 'Error',
     success: 'Success',
     info: 'Information',
@@ -87,6 +88,11 @@ export const en = {
     minimize: 'Minimize',
     maximize: 'Maximize',
     close: 'Close'
+  },
+  languages: {
+    recent: 'Recent languages',
+    all: 'All languages',
+    noResults: 'No matching language'
   },
   transcribe: {
     title: 'Transcribe File',
@@ -592,7 +598,7 @@ export const en = {
     uiScaleDesc: 'Adjust the interface scaling to fit high-DPI displays.',
     uiScaleReset: 'Reset',
     langSpokenTitle: 'Language Spoken',
-    langSpokenDesc: 'Primary spoken language code in the audio (e.g. fa, en, es).',
+    langSpokenDesc: 'Language spoken in the audio. Pick Auto Detect to let Whisper detect it automatically.',
     initialPromptTitle: 'Initial Prompt',
     initialPromptDesc: 'Optional context, prompt or vocabulary list passed to Whisper.',
     carryPromptTitle: 'Carry Initial Prompt',

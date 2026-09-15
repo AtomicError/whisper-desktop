@@ -63,6 +63,7 @@ export const tr: Translations = {
     reset: 'Varsayılanlara Sıfırla',
     loading: 'Yükleniyor...',
     search: 'Ara...',
+    searchLanguage: 'Dil ara...',
     error: 'Hata',
     success: 'Başarılı',
     info: 'Bilgi',
@@ -89,6 +90,11 @@ export const tr: Translations = {
     minimize: 'Simge Durumuna Küçült',
     maximize: 'Ekranı Kapla',
     close: 'Kapat'
+  },
+  languages: {
+    recent: 'Son kullanılan diller',
+    all: 'Tüm diller',
+    noResults: 'Eşleşen dil yok'
   },
   transcribe: {
     title: 'Dosyayı Deşifre Et',
@@ -594,7 +600,7 @@ export const tr: Translations = {
     uiScaleDesc: 'Yüksek çözünürlüklü (High-DPI) ekranlar için arayüz ölçeğini ayarlayın.',
     uiScaleReset: 'Sıfırla',
     langSpokenTitle: 'Konuşulan Dil',
-    langSpokenDesc: 'Sesteki ana konuşma dili kodu (örn. tr, en, es).',
+    langSpokenDesc: 'Sesteki konuşma dili. Whisper\'ın otomatik algılaması için Otomatik Algıla seçeneğini seçin.',
     initialPromptTitle: 'Başlangıç İpucu (Prompt)',
     initialPromptDesc: 'Whisper\'a bağlam, özel terimler veya yazım kuralları için iletilen isteğe bağlı başlangıç metni.',
     carryPromptTitle: 'Başlangıç İpucunu Sürdür',

@@ -63,6 +63,7 @@ export const de: Translations = {
     reset: 'Auf Standard Zurücksetzen',
     loading: 'Wird geladen...',
     search: 'Suchen...',
+    searchLanguage: 'Sprache suchen...',
     error: 'Fehler',
     success: 'Erfolg',
     info: 'Information',
@@ -89,6 +90,11 @@ export const de: Translations = {
     minimize: 'Minimieren',
     maximize: 'Maximieren',
     close: 'Schließen'
+  },
+  languages: {
+    recent: 'Zuletzt verwendet',
+    all: 'Alle Sprachen',
+    noResults: 'Keine passende Sprache'
   },
   transcribe: {
     title: 'Datei Transkribieren',
@@ -593,7 +599,7 @@ export const de: Translations = {
     uiScaleDesc: 'Passen Sie die Skalierung der Oberfläche für hochauflösende Monitore an.',
     uiScaleReset: 'Zurücksetzen',
     langSpokenTitle: 'Gesprochene Sprache',
-    langSpokenDesc: 'Sprachcode der im Audio gesprochenen Hauptsprache (z.B. de, en, fr).',
+    langSpokenDesc: 'Im Audio gesprochene Sprache. Wähle „Automatisch erkennen“, damit Whisper sie automatisch erkennt.',
     initialPromptTitle: 'Initialer Prompt',
     initialPromptDesc: 'Optionaler Kontext, Fachbegriffe oder Namen zur Führung des Modells.',
     carryPromptTitle: 'Initialen Prompt Fortführen',

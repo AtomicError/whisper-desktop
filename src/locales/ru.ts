@@ -63,6 +63,7 @@ export const ru: Translations = {
     reset: 'Сбросить по умолчанию',
     loading: 'Загрузка...',
     search: 'Поиск...',
+    searchLanguage: 'Поиск языка...',
     error: 'Ошибка',
     success: 'Успешно',
     info: 'Информация',
@@ -89,6 +90,11 @@ export const ru: Translations = {
     minimize: 'Свернуть',
     maximize: 'Развернуть',
     close: 'Закрыть'
+  },
+  languages: {
+    recent: 'Недавние языки',
+    all: 'Все языки',
+    noResults: 'Совпадающих языков нет'
   },
   transcribe: {
     title: 'Транскрибировать файл',
@@ -593,7 +599,7 @@ export const ru: Translations = {
     uiScaleDesc: 'Настройка масштабирования элементов для экранов высокой четкости (HiDPI / 4K).',
     uiScaleReset: 'Сброс',
     langSpokenTitle: 'Язык исходного аудио',
-    langSpokenDesc: 'Код основного языка, на котором говорят в аудио (например ru, en, de).',
+    langSpokenDesc: 'Язык речи в аудио. Выберите «Автоопределение», чтобы Whisper определил его автоматически.',
     initialPromptTitle: 'Начальный промпт',
     initialPromptDesc: 'Подсказка для Whisper с терминами, именами или контекстом темы.',
     carryPromptTitle: 'Сохранять промпт во всех блоках',

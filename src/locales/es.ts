@@ -63,6 +63,7 @@ export const es: Translations = {
     reset: 'Restablecer Valores',
     loading: 'Cargando...',
     search: 'Buscar...',
+    searchLanguage: 'Buscar idioma...',
     error: 'Error',
     success: 'Éxito',
     info: 'Información',
@@ -89,6 +90,11 @@ export const es: Translations = {
     minimize: 'Minimizar',
     maximize: 'Maximizar',
     close: 'Cerrar'
+  },
+  languages: {
+    recent: 'Idiomas recientes',
+    all: 'Todos los idiomas',
+    noResults: 'Ningún idioma coincidente'
   },
   transcribe: {
     title: 'Transcribir Archivo',
@@ -593,7 +599,7 @@ export const es: Translations = {
     uiScaleDesc: 'Ajusta el escalado de la interfaz para pantallas de alta densidad (HiDPI).',
     uiScaleReset: 'Restablecer',
     langSpokenTitle: 'Idioma Hablado',
-    langSpokenDesc: 'Código del idioma principal hablado en el audio (ej. es, en, fr).',
+    langSpokenDesc: 'Idioma hablado en el audio. Elige Detección automática para que Whisper lo detecte automáticamente.',
     initialPromptTitle: 'Prompt Inicial',
     initialPromptDesc: 'Contexto opcional, prompt o vocabulario técnico enviado a Whisper.',
     carryPromptTitle: 'Mantener Prompt Inicial',

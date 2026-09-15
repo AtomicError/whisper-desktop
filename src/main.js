@@ -1,6 +1,8 @@
 import { hardsubController } from './hardsub.ts';
 import { translationStudioController } from './translationStudio.ts';
 import { initI18n, t, setLanguage, getLanguage, translateDOM, isRtlLanguage } from './i18n/index.ts';
+import { normalizeForSearch } from './languages.ts';
+import { initLanguageSelects, renderLanguageSelect } from './languageSelect.ts';
 
 // Global error catcher for visual debugging in frontend
 window.onerror = function(message, source, lineno, colno, error) {
@@ -1106,6 +1108,10 @@ class CustomSelect {
     this.typeaheadBuffer = '';
     this.typeaheadTimeout = null;
     this.observer = null;
+    this.searchable = this.select.hasAttribute('data-searchable');
+    this.searchRow = null;
+    this.searchInput = null;
+    this.noResultsRow = null;
     this.init();
   }
 
@@ -1158,6 +1164,25 @@ class CustomSelect {
     this.optionsContainer.dataset.selectId = this.instanceId;
     document.body.appendChild(this.optionsContainer);
 
+    if (this.searchable) {
+      this.searchRow = document.createElement('div');
+      this.searchRow.className = 'custom-select-search-row';
+      this.searchInput = document.createElement('input');
+      this.searchInput.type = 'text';
+      this.searchInput.className = 'custom-select-search';
+      this.searchInput.autocomplete = 'off';
+      this.searchInput.spellcheck = false;
+      this.searchInput.setAttribute('role', 'searchbox');
+      this.applySearchPlaceholder();
+      this.searchInput.addEventListener('input', () => this.applyFilter(this.searchInput.value));
+      this.searchInput.addEventListener('keydown', (e) => this.handleSearchKeydown(e));
+      this.searchRow.appendChild(this.searchInput);
+
+      this.noResultsRow = document.createElement('div');
+      this.noResultsRow.className = 'custom-select-no-results';
+      this.noResultsRow.setAttribute('role', 'presentation');
+    }
+
     this.select.parentNode.insertBefore(this.container, this.select.nextSibling);
 
     this.trigger.addEventListener('click', (e) => {
@@ -1171,12 +1196,10 @@ class CustomSelect {
         if (!this.isOpen) {
           this.open();
         } else {
-          if (this.focusedIndex >= 0 && this.focusedIndex < this.optionsContainer.children.length) {
-            const optDiv = this.optionsContainer.children[this.focusedIndex];
-            if (optDiv && optDiv.dataset.value !== undefined && !optDiv.classList.contains('disabled')) {
-              this.select.value = optDiv.dataset.value;
-              this.select.dispatchEvent(new Event('change'));
-            }
+          const optDiv = this.getNavigableOptions()[this.focusedIndex];
+          if (optDiv && optDiv.dataset.value !== undefined && !optDiv.classList.contains('disabled')) {
+            this.select.value = optDiv.dataset.value;
+            this.select.dispatchEvent(new Event('change'));
           }
           this.close();
         }
@@ -1218,11 +1241,14 @@ class CustomSelect {
           this.close();
         }
       } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (this.isSearchable()) {
+          return; // search input owns text entry in searchable mode
+        }
         // WAI-ARIA Typeahead search with single-letter repeating cycle
         clearTimeout(this.typeaheadTimeout);
         const char = e.key.toLowerCase();
         const isRepeat = this.typeaheadBuffer.length === 1 && this.typeaheadBuffer === char;
-        const options = Array.from(this.optionsContainer.children);
+        const options = this.getNavigableOptions();
 
         if (isRepeat) {
           const startFrom = (this.focusedIndex + 1) % options.length;
@@ -1323,40 +1349,42 @@ class CustomSelect {
     window.customSelectsMap.set(this.select.id || this.select, this);
   }
 
+  getOptionDivs() {
+    return Array.from(this.optionsContainer.querySelectorAll('.custom-select-option'));
+  }
+
+  getNavigableOptions() {
+    return this.getOptionDivs().filter(el =>
+      !el.classList.contains('disabled') && !el.classList.contains('hidden')
+    );
+  }
+
   getNextAvailableIndex(fromIdx, direction = 1) {
-    const children = Array.from(this.optionsContainer.children);
-    const len = children.length;
+    const options = this.getNavigableOptions();
+    const len = options.length;
     if (len === 0) return -1;
-    let curr = fromIdx + direction;
-    while (curr >= 0 && curr < len) {
-      if (!children[curr].classList.contains('disabled')) {
-        return curr;
-      }
-      curr += direction;
-    }
-    return fromIdx >= 0 ? fromIdx : this.getFirstAvailableIndex();
+    const next = fromIdx + direction;
+    if (next >= 0 && next < len) return next;
+    return (fromIdx >= 0 && fromIdx < len) ? fromIdx : (direction > 0 ? 0 : len - 1);
   }
 
   getFirstAvailableIndex() {
-    const children = Array.from(this.optionsContainer.children);
-    return children.findIndex(c => !c.classList.contains('disabled'));
+    const options = this.getNavigableOptions();
+    return options.length > 0 ? 0 : -1;
   }
 
   getLastAvailableIndex() {
-    const children = Array.from(this.optionsContainer.children);
-    for (let i = children.length - 1; i >= 0; i--) {
-      if (!children[i].classList.contains('disabled')) return i;
-    }
-    return -1;
+    const options = this.getNavigableOptions();
+    return options.length > 0 ? options.length - 1 : -1;
   }
 
   setFocusedOptionIndex(idx) {
-    const children = Array.from(this.optionsContainer.children);
-    children.forEach(c => c.classList.remove('focused'));
+    const options = this.getNavigableOptions();
+    options.forEach(c => c.classList.remove('focused'));
 
-    if (idx >= 0 && idx < children.length && !children[idx].classList.contains('disabled')) {
+    if (idx >= 0 && idx < options.length) {
       this.focusedIndex = idx;
-      const target = children[idx];
+      const target = options[idx];
       target.classList.add('focused');
       if (target.id) {
         this.trigger.setAttribute('aria-activedescendant', target.id);
@@ -1371,31 +1399,66 @@ class CustomSelect {
   updateOptions() {
     if (!this.select || !this.optionsContainer || !this.container) return;
     this.optionsContainer.innerHTML = '';
-    const options = Array.from(this.select.options || []);
     const frag = document.createDocumentFragment();
 
-    options.forEach((opt, idx) => {
+    if (this.isSearchable()) {
+      this.applySearchPlaceholder();
+      frag.appendChild(this.searchRow);
+    }
+
+    let optionIdx = 0;
+    const appendOption = (opt) => {
       const optDiv = document.createElement('div');
       optDiv.className = 'custom-select-option';
-      optDiv.id = `opt-${this.instanceId}-${idx}`;
+      optDiv.id = `opt-${this.instanceId}-${optionIdx++}`;
       optDiv.setAttribute('role', 'option');
       optDiv.setAttribute('aria-selected', opt.value === this.select.value ? 'true' : 'false');
       optDiv.textContent = opt.textContent;
       optDiv.title = opt.textContent;
       optDiv.dataset.value = opt.value;
+      const searchData = opt.dataset.search || opt.getAttribute('data-search');
+      if (searchData) {
+        optDiv.dataset.search = searchData;
+      }
       if (opt.disabled) {
         optDiv.classList.add('disabled');
         optDiv.setAttribute('aria-disabled', 'true');
       }
       frag.appendChild(optDiv);
+    };
+    const appendGroup = (group) => {
+      const labelDiv = document.createElement('div');
+      labelDiv.className = 'custom-select-group-label';
+      labelDiv.textContent = group.label || '';
+      labelDiv.setAttribute('role', 'presentation');
+      frag.appendChild(labelDiv);
+      Array.from(group.children).forEach((child) => {
+        if (child.tagName === 'OPTION') appendOption(child);
+      });
+    };
+
+    Array.from(this.select.children).forEach((child) => {
+      if (child.tagName === 'OPTGROUP') appendGroup(child);
+      else if (child.tagName === 'OPTION') appendOption(child);
     });
+
+    if (this.isSearchable()) {
+      this.noResultsRow.textContent = (typeof window.t === 'function')
+        ? window.t('languages.noResults')
+        : 'No matching language';
+      this.noResultsRow.classList.add('hidden');
+      frag.appendChild(this.noResultsRow);
+      this.optionsContainer.classList.add('has-search');
+    } else {
+      this.optionsContainer.classList.remove('has-search');
+    }
 
     this.optionsContainer.appendChild(frag);
 
     // Modern Web Guidance: Detect technical/English dropdowns (e.g. model filenames, hardware devices)
     // and enforce strict LTR layout even in RTL mode so names like ggml-*.bin are left-aligned.
-    const hasRtlChar = options.some(opt => /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(opt.textContent || ''));
-    if (!hasRtlChar && options.length > 0) {
+    const hasRtlChar = Array.from(this.select.options).some(opt => /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(opt.textContent || ''));
+    if (!hasRtlChar && this.select.options.length > 0) {
       this.container.classList.add('custom-select-ltr');
       this.optionsContainer.classList.add('custom-select-ltr');
     } else {
@@ -1404,6 +1467,89 @@ class CustomSelect {
     }
 
     this.syncSelectedValue();
+  }
+
+  applySearchPlaceholder() {
+    if (!this.searchInput) return;
+    const placeholder = (typeof window.t === 'function')
+      ? window.t('common.searchLanguage')
+      : 'Search…';
+    this.searchInput.placeholder = placeholder;
+    this.searchInput.setAttribute('aria-label', placeholder);
+  }
+
+  handleSearchKeydown(e) {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      e.stopPropagation();
+      if (this.getNavigableOptions().length === 0) return;
+      const nextIdx = this.getNextAvailableIndex(this.focusedIndex, e.key === 'ArrowDown' ? 1 : -1);
+      if (nextIdx !== -1) this.setFocusedOptionIndex(nextIdx);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+      const options = this.getNavigableOptions();
+      if (options.length === 0) return;
+      const pickIdx = (this.focusedIndex >= 0 && this.focusedIndex < options.length) ? this.focusedIndex : 0;
+      const optDiv = options[pickIdx];
+      if (optDiv && optDiv.dataset.value !== undefined) {
+        this.select.value = optDiv.dataset.value;
+        this.select.dispatchEvent(new Event('change'));
+      }
+      this.close();
+    } else if (e.key === 'Escape') {
+      e.stopPropagation(); // keep the global close handler from firing on the clear step
+      if (this.searchInput.value) {
+        this.searchInput.value = '';
+        this.applyFilter('');
+      } else {
+        this.close();
+      }
+    } else if (e.key === 'Tab') {
+      this.close();
+    }
+  }
+
+  applyFilter(rawQuery) {
+    if (!this.isSearchable()) return;
+    const query = normalizeForSearch(rawQuery || '');
+    let visibleCount = 0;
+    this.getOptionDivs().forEach((div) => {
+      const haystack = div.dataset.search !== undefined ? div.dataset.search : (div.textContent || '');
+      const match = !query || normalizeForSearch(haystack).includes(query);
+      div.classList.toggle('hidden', !match);
+      if (match) visibleCount++;
+    });
+    // Collapse group headers whose section has no visible options left
+    Array.from(this.optionsContainer.children).forEach((el) => {
+      if (!el.classList.contains('custom-select-group-label')) return;
+      let sib = el.nextElementSibling;
+      let hasVisible = false;
+      while (sib && !sib.classList.contains('custom-select-group-label')) {
+        if (sib.classList.contains('custom-select-option') && !sib.classList.contains('hidden')) {
+          hasVisible = true;
+          break;
+        }
+        sib = sib.nextElementSibling;
+      }
+      el.classList.toggle('hidden', !hasVisible);
+    });
+    this.noResultsRow.textContent = (typeof window.t === 'function')
+      ? window.t('languages.noResults')
+      : 'No matching language';
+    this.noResultsRow.classList.toggle('hidden', visibleCount > 0);
+    this.setFocusedOptionIndex(visibleCount > 0 && this.isOpen ? 0 : -1);
+  }
+
+  clearFilter() {
+    if (this.searchInput) {
+      this.searchInput.value = '';
+    }
+    this.applyFilter('');
+  }
+
+  isSearchable() {
+    return Boolean(this.searchable && this.searchRow && this.searchInput && this.noResultsRow);
   }
 
   syncSelectedValue() {
@@ -1434,7 +1580,8 @@ class CustomSelect {
   updatePosition() {
     if (!this.isOpen || !this.trigger || !this.optionsContainer) return;
     const rect = this.trigger.getBoundingClientRect();
-    const dropdownHeight = Math.min(this.optionsContainer.scrollHeight || 220, 240);
+    const maxHeight = this.isSearchable() ? 340 : 240;
+    const dropdownHeight = Math.min(this.optionsContainer.scrollHeight || 220, maxHeight);
     const spaceBelow = window.innerHeight - rect.bottom;
     const spaceAbove = rect.top;
 
@@ -1505,12 +1652,21 @@ class CustomSelect {
     window.addEventListener('resize', this._scrollResizeHandler);
 
     // Focus active or selected non-disabled option
-    const children = Array.from(this.optionsContainer.children);
-    let selectedIdx = children.findIndex(c => c.classList.contains('selected') && !c.classList.contains('disabled'));
+    const options = this.getNavigableOptions();
+    let selectedIdx = options.findIndex(c => c.classList.contains('selected') && !c.classList.contains('disabled'));
     if (selectedIdx === -1) {
       selectedIdx = this.getFirstAvailableIndex();
     }
     this.setFocusedOptionIndex(selectedIdx);
+
+    // Searchable dropdowns put the caret in the filter box
+    if (this.isSearchable()) {
+      requestAnimationFrame(() => {
+        if (this.isOpen && this.searchInput) {
+          this.searchInput.focus();
+        }
+      });
+    }
 
     // 3. Use double requestAnimationFrame to defer class additions to the next frames,
     // avoiding layout thrashing/reflow block while starting CSS transitions.
@@ -1532,6 +1688,9 @@ class CustomSelect {
     this.setFocusedOptionIndex(-1);
     this.typeaheadBuffer = '';
     clearTimeout(this.typeaheadTimeout);
+    if (this.isSearchable()) {
+      this.clearFilter();
+    }
 
     // Detach document, window, scroll, and resize listeners immediately on close
     document.removeEventListener('pointerdown', this._documentPointerHandler, true);
@@ -2962,6 +3121,10 @@ async function refreshSettings() {
       }
     }
     
+    // Render language dropdowns (localized, sorted, searchable) before binding
+    // so the settings binder's value assignment finds their options in place
+    initLanguageSelects();
+
     // Bind all options dynamically
     bindSettingsToDOM();
     
@@ -3047,6 +3210,9 @@ function bindSettingsToDOM() {
           settingsState[key] = val;
           saveCurrentSettings(true);
           
+          if (key === 'language') {
+            updateTranscribeUIConfigs();
+          }
           if (key === 'selectedBackend') {
             refreshBuildStatuses();
           }
@@ -3978,20 +4144,11 @@ function updateTranscribeUIConfigs() {
     quickModelSelect.value = settingsState.modelPath;
   }
 
-  // 3. Sync Quick Language Select
+  // 3. Sync Quick Language Select (re-render keeps localization, sort order,
+  //    recents and legacy custom values in sync with settingsState.language)
   const quickLangSelect = document.getElementById('quick-opt-language');
   if (quickLangSelect) {
-    const currentLang = (settingsState.language || 'auto').trim();
-    const matchedOption = Array.from(quickLangSelect.options).find(o => o.value.toLowerCase() === currentLang.toLowerCase());
-    if (!matchedOption && currentLang) {
-      const customOpt = document.createElement('option');
-      customOpt.value = currentLang.toLowerCase();
-      customOpt.textContent = currentLang.toUpperCase();
-      quickLangSelect.appendChild(customOpt);
-      quickLangSelect.value = customOpt.value;
-    } else if (matchedOption) {
-      quickLangSelect.value = matchedOption.value;
-    }
+    renderLanguageSelect(quickLangSelect, 'spoken', (settingsState.language || 'auto').trim());
   }
   
   // 4. Sync Quick VAD Button State & Tooltip

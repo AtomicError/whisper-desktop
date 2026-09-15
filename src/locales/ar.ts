@@ -63,6 +63,7 @@ export const ar: Translations = {
     reset: 'استعادة الإعدادات الافتراضية',
     loading: 'جارٍ التحميل...',
     search: 'بحث...',
+    searchLanguage: 'البحث عن لغة...',
     error: 'خطأ',
     success: 'نجاح',
     info: 'معلومات',
@@ -89,6 +90,11 @@ export const ar: Translations = {
     minimize: 'تصغير',
     maximize: 'تكبير',
     close: 'إغلاق'
+  },
+  languages: {
+    recent: 'اللغات الأخيرة',
+    all: 'كل اللغات',
+    noResults: 'لا توجد لغة مطابقة'
   },
   transcribe: {
     title: 'تفريغ ملف صوتي أو مرئي',
@@ -593,7 +599,7 @@ export const ar: Translations = {
     uiScaleDesc: 'ضبط مقياس وحجم الخطوط للشاشات ذات الكثافة العالية (HiDPI / 4K).',
     uiScaleReset: 'إعادة تعيين',
     langSpokenTitle: 'لغة الصوت المتحدث بها',
-    langSpokenDesc: 'رمز لغة الكلام الأساسية في الصوت (مثل ar, en, es).',
+    langSpokenDesc: 'اللغة المنطوقة في الصوت. اختر «كشف تلقائي» للسماح لـ Whisper بكشفها تلقائياً.',
     initialPromptTitle: 'التوجيه الأولي (Initial Prompt)',
     initialPromptDesc: 'سياق أولي أو مصطلحات تخصصية لمساعدة النموذج في دقة التعرف وعلامات الترقيم.',
     carryPromptTitle: 'استمرار التوجيه عبر كل المقاطع',

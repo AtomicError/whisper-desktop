@@ -63,6 +63,7 @@ export const pt: Translations = {
     reset: 'Restaurar Padrões',
     loading: 'Carregando...',
     search: 'Pesquisar...',
+    searchLanguage: 'Pesquisar idioma...',
     error: 'Erro',
     success: 'Sucesso',
     info: 'Informação',
@@ -89,6 +90,11 @@ export const pt: Translations = {
     minimize: 'Minimizar',
     maximize: 'Maximizar',
     close: 'Fechar'
+  },
+  languages: {
+    recent: 'Idiomas recentes',
+    all: 'Todos os idiomas',
+    noResults: 'Nenhum idioma correspondente'
   },
   transcribe: {
     title: 'Transcrever Arquivo',
@@ -593,7 +599,7 @@ export const pt: Translations = {
     uiScaleDesc: 'Ajuste a proporção dos elementos para monitores de alta densidade (HiDPI).',
     uiScaleReset: 'Redefinir',
     langSpokenTitle: 'Idioma Falado no Áudio',
-    langSpokenDesc: 'Código do idioma principal falado no áudio (ex. pt, en, es).',
+    langSpokenDesc: 'Idioma falado no áudio. Escolha Detecção automática para que o Whisper o detecte automaticamente.',
     initialPromptTitle: 'Prompt Inicial',
     initialPromptDesc: 'Contexto opcional, termos técnicos ou vocabulário fornecido ao Whisper.',
     carryPromptTitle: 'Manter Prompt Inicial em Todos os Blocos',

@@ -63,6 +63,7 @@ export const ko: Translations = {
     reset: '기본값으로 초기화',
     loading: '로딩 중...',
     search: '검색...',
+    searchLanguage: '언어 검색...',
     error: '오류',
     success: '성공',
     info: '정보',
@@ -89,6 +90,11 @@ export const ko: Translations = {
     minimize: '최소화',
     maximize: '최대화',
     close: '닫기'
+  },
+  languages: {
+    recent: '최근 사용한 언어',
+    all: '모든 언어',
+    noResults: '일치하는 언어가 없습니다'
   },
   transcribe: {
     title: '파일 음성 변환',
@@ -594,7 +600,7 @@ export const ko: Translations = {
     uiScaleDesc: '고해상도(High-DPI) 디스플레이에 맞게 인터페이스 크기를 조정합니다.',
     uiScaleReset: '초기화',
     langSpokenTitle: '음성 언어',
-    langSpokenDesc: '오디오의 주요 음성 언어 코드입니다 (예: ko, en, ja).',
+    langSpokenDesc: '오디오의 음성 언어입니다. 자동 감지를 선택하면 Whisper가 자동으로 감지합니다.',
     initialPromptTitle: '초기 프롬프트',
     initialPromptDesc: '문맥, 특수 용어 또는 어휘 목록을 Whisper에 전달하기 위한 선택적 초기 프롬프트입니다.',
     carryPromptTitle: '초기 프롬프트 유지',

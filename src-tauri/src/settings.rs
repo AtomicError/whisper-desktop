@@ -117,6 +117,10 @@ pub struct WhisperSettings {
     pub close_to_tray: bool,
     #[serde(default = "default_ui_language")]
     pub ui_language: String,
+    #[serde(default)]
+    pub recent_spoken_languages: Vec<String>,
+    #[serde(default)]
+    pub recent_translation_targets: Vec<String>,
 }
 
 fn deserialize_i32_lenient<'de, D>(deserializer: D) -> Result<i32, D::Error>
@@ -260,6 +264,8 @@ impl WhisperSettings {
             theme: "royal-blue".to_string(),
             close_to_tray: false,
             ui_language: "en".to_string(),
+            recent_spoken_languages: Vec::new(),
+            recent_translation_targets: Vec::new(),
         }
     }
 
@@ -335,7 +341,28 @@ impl WhisperSettings {
         if self.ffmpeg_source != "bundled" && self.ffmpeg_source != "system" {
             self.ffmpeg_source = "bundled".to_string();
         }
+
+        self.recent_spoken_languages = sanitize_recent_list(&self.recent_spoken_languages, true);
+        self.recent_translation_targets = sanitize_recent_list(&self.recent_translation_targets, false);
     }
+}
+
+/// Keeps at most 3 recent language entries, non-empty and deduplicated in
+/// original order. Spoken-language entries are whisper codes -> lowercase.
+fn sanitize_recent_list(raw: &[String], lowercase: bool) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    let mut out = Vec::new();
+    for value in raw {
+        let cleaned = if lowercase { value.trim().to_lowercase() } else { value.trim().to_string() };
+        if cleaned.is_empty() || (lowercase && cleaned == "auto") || !seen.insert(cleaned.clone()) {
+            continue;
+        }
+        out.push(cleaned);
+        if out.len() >= 3 {
+            break;
+        }
+    }
+    out
 }
 
 /// Resolves the default models directory cross-platform.
@@ -1051,4 +1078,31 @@ mod tests {
         let defaults = WhisperSettings::default_settings();
         assert_eq!(defaults.models_dir, resolved.to_string_lossy());
     }
+
+    #[test]
+    fn test_recent_languages_sanitization() {
+        let raw_spoken = vec![
+            "en".to_string(),
+            "auto".to_string(),
+            "FA".to_string(),
+            "en".to_string(),
+            "".to_string(),
+            "de".to_string(),
+            "fr".to_string(),
+        ];
+        let sanitized_spoken = sanitize_recent_list(&raw_spoken, true);
+        assert_eq!(sanitized_spoken, vec!["en", "fa", "de"]);
+
+        let raw_targets = vec![
+            "Persian".to_string(),
+            "English".to_string(),
+            "Persian".to_string(),
+            "".to_string(),
+            "German".to_string(),
+            "French".to_string(),
+        ];
+        let sanitized_targets = sanitize_recent_list(&raw_targets, false);
+        assert_eq!(sanitized_targets, vec!["Persian", "English", "German"]);
+    }
 }
+

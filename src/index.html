@@ -569,7 +569,7 @@
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.langSpokenTitle">Language Spoken</span>
                       </div>
-                      <div class="setting-desc"><span data-i18n="settings.langSpokenDesc">Primary spoken language code in the audio (e.g. <code>fa</code>, <code>en</code>, <code>es</code>).</span>
+                      <div class="setting-desc"><span data-i18n="settings.langSpokenDesc">Language spoken in the audio. Pick <code>Auto Detect</code> to let Whisper detect it automatically.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.langSpokenPoints">
                           <span class="setting-desc-point"><strong>Default:</strong> <code>auto</code> (automatic detection)</span>
                           <span class="setting-desc-point"><strong>Tip:</strong> Explicitly setting the language skips detection and speeds up transcription.</span>
@@ -577,7 +577,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" type="text" id="opt-language" />
+                      <select class="select-control" id="opt-language" data-searchable data-language-select="spoken"></select>
                     </div>
                   </div>
 
@@ -1432,130 +1432,7 @@
                           </div>
                         </div>
                         <div class="setting-control setting-control-wide">
-                          <select class="select-control" id="opt-translateAiTargetLang" onchange="saveCurrentSettings()">
-                            <option value="Persian">Persian (فارسی)</option>
-                            <option value="English">English</option>
-                            <option value="Simplified Chinese">Chinese (Simplified / 简体)</option>
-                            <option value="Traditional Chinese">Chinese (Traditional / 繁體)</option>
-                            <option value="Spanish">Spanish (Español)</option>
-                            <option value="French">French (Français)</option>
-                            <option value="German">German (Deutsch)</option>
-                            <option value="Japanese">Japanese (日本語)</option>
-                            <option value="Korean">Korean (한국어)</option>
-                            <option value="Hindi">Hindi (हिन्दी)</option>
-                            <option value="Arabic">Arabic (العربية)</option>
-                            <option value="Russian">Russian (Русский)</option>
-                            <option value="Portuguese (Brazil)">Portuguese (Brasil)</option>
-                            <option value="Portuguese (Portugal)">Portuguese (Portugal)</option>
-                            <option value="Indonesian">Indonesian (Bahasa Indonesia)</option>
-                            <option value="Vietnamese">Vietnamese (Tiếng Việt)</option>
-                            <option value="Italian">Italian (Italiano)</option>
-                            <option value="Cantonese">Cantonese (粵語)</option>
-                            <option value="Turkish">Turkish (Türkçe)</option>
-                            <option value="Hebrew">Hebrew (עבריت)</option>
-                            <option value="Urdu">Urdu (اردو)</option>
-                            <option value="Pashto">Pashto (پښتو)</option>
-                            <option value="Dari">Dari (دری)</option>
-                            <option value="Central Kurdish">Central Kurdish (کوردی / Sorani)</option>
-                            <option value="Northern Kurdish">Northern Kurdish (Kurdî / Kurmanji)</option>
-                            <option value="Polish">Polish (Polski)</option>
-                            <option value="Ukrainian">Ukrainian (Українська)</option>
-                            <option value="Dutch">Dutch (Nederlands)</option>
-                            <option value="Romanian">Romanian (Română)</option>
-                            <option value="Greek">Greek (Ελληνικά)</option>
-                            <option value="Hungarian">Hungarian (Magyar)</option>
-                            <option value="Swedish">Swedish (Svenska)</option>
-                            <option value="Czech">Czech (Čeština)</option>
-                            <option value="Catalan">Catalan (Català)</option>
-                            <option value="Serbian">Serbian (Српски)</option>
-                            <option value="Bulgarian">Bulgarian (Български)</option>
-                            <option value="Armenian">Armenian (Հայերեն)</option>
-                            <option value="Danish">Danish (Dansk)</option>
-                            <option value="Albanian">Albanian (Shqip)</option>
-                            <option value="Finnish">Finnish (Suomi)</option>
-                            <option value="Norwegian Bokmål">Norwegian (Norsk bokmål)</option>
-                            <option value="Slovak">Slovak (Slovenčina)</option>
-                            <option value="Croatian">Croatian (Hrvatski)</option>
-                            <option value="Belarusian">Belarusian (Беларуская)</option>
-                            <option value="Sicilian">Sicilian (Sicilianu)</option>
-                            <option value="Georgian">Georgian (ქართული)</option>
-                            <option value="Lombard">Lombard (Lombard)</option>
-                            <option value="Lithuanian">Lithuanian (Lietuvių)</option>
-                            <option value="Galician">Galician (Galego)</option>
-                            <option value="Bosnian">Bosnian (Bosanski)</option>
-                            <option value="Slovenian">Slovenian (Slovenščina)</option>
-                            <option value="Macedonian">Macedonian (Македонски)</option>
-                            <option value="Latvian">Latvian (Latviešu)</option>
-                            <option value="Estonian">Estonian (Eesti)</option>
-                            <option value="Icelandic">Icelandic (Íslenska)</option>
-                            <option value="Maltese">Maltese (Malti)</option>
-                            <option value="Welsh">Welsh (Cymraeg)</option>
-                            <option value="Irish">Irish (Gaeilge)</option>
-                            <option value="Breton">Breton (Brezhoneg)</option>
-                            <option value="Basque">Basque (Euskara)</option>
-                            <option value="Yiddish">Yiddish (ייִדיش)</option>
-                            <option value="Luxembourgish">Luxembourgish (Lëtzebuergesch)</option>
-                            <option value="Occitan">Occitan (Occitan)</option>
-                            <option value="Aragonese">Aragonese (Aragonés)</option>
-                            <option value="Latin">Latin (Latina)</option>
-                            <option value="Esperanto">Esperanto</option>
-                            <option value="Uzbek">Uzbek (Oʻzbekcha)</option>
-                            <option value="Kazakh">Kazakh (Қазақ тілі)</option>
-                            <option value="Kyrgyz">Kyrgyz (Кыргызча)</option>
-                            <option value="Turkmen">Turkmen (Türkmençe)</option>
-                            <option value="Azerbaijani">Azerbaijani (Azərbaycan)</option>
-                            <option value="Tajik">Tajik (Тоҷикӣ)</option>
-                            <option value="Mongolian">Mongolian (Монгол)</option>
-                            <option value="Bashkir">Bashkir (Баشҡортса)</option>
-                            <option value="Tatar">Tatar (Татар теле)</option>
-                            <option value="Uyghur">Uyghur (ئۇيغۇرچە)</option>
-                            <option value="Bengali">Bengali (বাংলা)</option>
-                            <option value="Marathi">Marathi (मराठी)</option>
-                            <option value="Telugu">Telugu (తెలుగు)</option>
-                            <option value="Tamil">Tamil (தமிழ்)</option>
-                            <option value="Gujarati">Gujarati (ગુજરાતી)</option>
-                            <option value="Kannada">Kannada (ಕನ್ನಡ)</option>
-                            <option value="Punjabi">Punjabi (ਪੰਜਾਬੀ)</option>
-                            <option value="Malayalam">Malayalam (മലയാളം)</option>
-                            <option value="Bhojpuri">Bhojpuri (भोजपुरी)</option>
-                            <option value="Maithili">Maithili (मैथिली)</option>
-                            <option value="Nepali">Nepali (नेपाली)</option>
-                            <option value="Sinhala">Sinhala (සිංහල)</option>
-                            <option value="Assamese">Assamese (অসমীয়া)</option>
-                            <option value="Konkani">Konkani (कोंकणी)</option>
-                            <option value="Sanskrit">Sanskrit (संस्कृतम्)</option>
-                            <option value="Thai">Thai (ไทย)</option>
-                            <option value="Lao">Lao (ລາວ)</option>
-                            <option value="Burmese">Burmese (မြန်မာ)</option>
-                            <option value="Khmer">Khmer (ខ្មែរ)</option>
-                            <option value="Malay">Malay (Bahasa Melayu)</option>
-                            <option value="Filipino">Filipino (Tagalog)</option>
-                            <option value="Javanese">Javanese (Basa Jawa)</option>
-                            <option value="Sundanese">Sundanese (Basa Sunda)</option>
-                            <option value="Acehnese">Acehnese (Acèh)</option>
-                            <option value="Pangasinan">Pangasinan (Salitan Pangasinan)</option>
-                            <option value="Pampangan">Pampangan (Kapampangan)</option>
-                            <option value="Cebuano">Cebuano</option>
-                            <option value="Swahili">Swahili (Kiswahili)</option>
-                            <option value="Hausa">Hausa (هَرْشٜىٰن هَوْسَا)</option>
-                            <option value="Amharic">Amharic (አማርኛ)</option>
-                            <option value="Igbo">Igbo</option>
-                            <option value="Wolof">Wolof</option>
-                            <option value="Xhosa">Xhosa (isiXhosa)</option>
-                            <option value="Zulu">Zulu (isiZulu)</option>
-                            <option value="Afrikaans">Afrikaans</option>
-                            <option value="Oromo">Oromo (Afaan Oromoo)</option>
-                            <option value="Southern Sotho">Southern Sotho (Sesotho)</option>
-                            <option value="Tswana">Tswana (Setswana)</option>
-                            <option value="Tsonga">Tsonga (Xitsonga)</option>
-                            <option value="Malagasy">Malagasy</option>
-                            <option value="Lingala">Lingala (Lingála)</option>
-                            <option value="Haitian Creole">Haitian Creole (Kreyòl ayisyen)</option>
-                            <option value="Quechua">Quechua (Runa Simi)</option>
-                            <option value="Aymara">Aymara (Aymar aru)</option>
-                            <option value="Guarani">Guarani (Avañe'ẽ)</option>
-                            <option value="Maori">Maori (Māori)</option>
-                          </select>
+                          <select class="select-control" id="opt-translateAiTargetLang" data-searchable data-language-select="translation" onchange="saveCurrentSettings()"></select>
                         </div>
                       </div>
 
@@ -2026,29 +1903,7 @@
                           </svg>
                           <span data-i18n="transcribe.spokenLang">Spoken Language</span>
                         </div>
-                        <select class="select-control quick-select" id="quick-opt-language" aria-label="Quick Select Language">
-                          <option value="auto" data-i18n="transcribe.langAuto">Auto Detect</option>
-                          <option value="fa" data-i18n="transcribe.langFa">Persian</option>
-                          <option value="en" data-i18n="transcribe.langEn">English</option>
-                          <option value="ar" data-i18n="transcribe.langAr">Arabic</option>
-                          <option value="tr" data-i18n="transcribe.langTr">Turkish</option>
-                          <option value="es" data-i18n="transcribe.langEs">Spanish</option>
-                          <option value="fr" data-i18n="transcribe.langFr">French</option>
-                          <option value="de" data-i18n="transcribe.langDe">German</option>
-                          <option value="ru" data-i18n="transcribe.langRu">Russian</option>
-                          <option value="zh" data-i18n="transcribe.langZh">Chinese</option>
-                          <option value="ja" data-i18n="transcribe.langJa">Japanese</option>
-                          <option value="ko" data-i18n="transcribe.langKo">Korean</option>
-                          <option value="it" data-i18n="transcribe.langIt">Italian</option>
-                          <option value="pt" data-i18n="transcribe.langPt">Portuguese</option>
-                          <option value="hi" data-i18n="transcribe.langHi">Hindi</option>
-                          <option value="ur" data-i18n="transcribe.langUr">Urdu</option>
-                          <option value="nl" data-i18n="transcribe.langNl">Dutch</option>
-                          <option value="pl" data-i18n="transcribe.langPl">Polish</option>
-                          <option value="uk" data-i18n="transcribe.langUk">Ukrainian</option>
-                          <option value="sv" data-i18n="transcribe.langSv">Swedish</option>
-                          <option value="id" data-i18n="transcribe.langId">Indonesian</option>
-                        </select>
+                        <select class="select-control quick-select" id="quick-opt-language" data-searchable data-language-select="spoken" aria-label="Quick Select Language"></select>
                       </div>
 
                       <div class="quick-config-card">
@@ -2259,59 +2114,7 @@
                         </svg>
                         <span data-i18n="translate.targetLang">Target Language</span>
                       </label>
-                      <select class="select-control" id="translate-target-lang">
-                        <option value="Persian">Persian (فارسی)</option>
-                        <option value="English">English</option>
-                        <option value="Simplified Chinese">Chinese (Simplified / 简体)</option>
-                        <option value="Traditional Chinese">Chinese (Traditional / 繁體)</option>
-                        <option value="Spanish">Spanish (Español)</option>
-                        <option value="French">French (Français)</option>
-                        <option value="German">German (Deutsch)</option>
-                        <option value="Japanese">Japanese (日本語)</option>
-                        <option value="Korean">Korean (한국어)</option>
-                        <option value="Hindi">Hindi (हिन्दी)</option>
-                        <option value="Arabic">Arabic (العربية)</option>
-                        <option value="Russian">Russian (Русский)</option>
-                        <option value="Portuguese (Brazil)">Portuguese (Brasil)</option>
-                        <option value="Portuguese (Portugal)">Portuguese (Portugal)</option>
-                        <option value="Indonesian">Indonesian (Bahasa Indonesia)</option>
-                        <option value="Vietnamese">Vietnamese (Tiếng Việt)</option>
-                        <option value="Italian">Italian (Italiano)</option>
-                        <option value="Cantonese">Cantonese (粵語)</option>
-                        <option value="Turkish">Turkish (Türkçe)</option>
-                        <option value="Hebrew">Hebrew (עבריت)</option>
-                        <option value="Urdu">Urdu (اردو)</option>
-                        <option value="Pashto">Pashto (پښتو)</option>
-                        <option value="Dari">Dari (دری)</option>
-                        <option value="Central Kurdish">Central Kurdish (کوردی / Sorani)</option>
-                        <option value="Northern Kurdish">Northern Kurdish (Kurdî / Kurmanji)</option>
-                        <option value="Polish">Polish (Polski)</option>
-                        <option value="Ukrainian">Ukrainian (Українська)</option>
-                        <option value="Dutch">Dutch (Nederlands)</option>
-                        <option value="Romanian">Română</option>
-                        <option value="Greek">Greek (Ελληνικά)</option>
-                        <option value="Hungarian">Hungarian (Magyar)</option>
-                        <option value="Swedish">Swedish (Svenska)</option>
-                        <option value="Czech">Czech (Čeština)</option>
-                        <option value="Catalan">Català</option>
-                        <option value="Serbian">Serbian (Српски)</option>
-                        <option value="Bulgarian">Bulgarian (Български)</option>
-                        <option value="Armenian">Armenian (Հայերեն)</option>
-                        <option value="Danish">Danish (Dansk)</option>
-                        <option value="Albanian">Albanian (Shqip)</option>
-                        <option value="Finnish">Finnish (Suomi)</option>
-                        <option value="Norwegian Bokmål">Norwegian (Norsk bokmål)</option>
-                        <option value="Slovak">Slovak (Slovenčina)</option>
-                        <option value="Croatian">Croatian (Hrvatski)</option>
-                        <option value="Belarusian">Belarusian (Беларуская)</option>
-                        <option value="Uzbek">Uzbek (Oʻzbekcha)</option>
-                        <option value="Kazakh">Kazakh (Қазақ тілі)</option>
-                        <option value="Azerbaijani">Azerbaijani (Azərbaycan)</option>
-                        <option value="Tajik">Tajik (Тоҷикӣ)</option>
-                        <option value="Thai">Thai (ไทย)</option>
-                        <option value="Malay">Malay (Bahasa Melayu)</option>
-                        <option value="Filipino">Filipino (Tagalog)</option>
-                      </select>
+                      <select class="select-control" id="translate-target-lang" data-searchable data-language-select="translation"></select>
                     </div>
 
                     <!-- 3. Provider Selector (Full Width) -->

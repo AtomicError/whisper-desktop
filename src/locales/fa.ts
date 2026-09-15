@@ -63,6 +63,7 @@ export const fa: Translations = {
     reset: 'بازنشانی به پیش‌فرض',
     loading: 'در حال بارگذاری...',
     search: 'جستجو...',
+    searchLanguage: 'جستجوی زبان...',
     error: 'خطا',
     success: 'موفقیت',
     info: 'اطلاعات',
@@ -89,6 +90,11 @@ export const fa: Translations = {
     minimize: 'کوچک‌سازی',
     maximize: 'بزرگ‌سازی',
     close: 'بستن'
+  },
+  languages: {
+    recent: 'زبان‌های اخیر',
+    all: 'همه زبان‌ها',
+    noResults: 'زبان یافت نشد'
   },
   transcribe: {
     title: 'رونویسی فایل',
@@ -594,7 +600,7 @@ export const fa: Translations = {
     uiScaleDesc: 'تنظیم اندازه المان‌ها و فونت‌ها برای مانیتورهای با تراکم پیکسلی بالا.',
     uiScaleReset: 'بازنشانی',
     langSpokenTitle: 'زبان گفتار ورودی',
-    langSpokenDesc: 'کد زبان اصلی گفتار موجود در صوت (مانند fa, en, es).',
+    langSpokenDesc: 'زبان گفتار موجود در صوت. برای تشخیص خودکار توسط Whisper، گزینه «تشخیص خودکار» را انتخاب کنید.',
     initialPromptTitle: 'پرامپت اولیه راهنما',
     initialPromptDesc: 'متن راهنما یا کلمات تخصصی برای کمک به دقت مدل در رونویسی.',
     carryPromptTitle: 'حفظ پرامپت اولیه در تمام بخش‌ها',

@@ -63,6 +63,7 @@ export const ja: Translations = {
     reset: '初期設定に戻す',
     loading: '読み込み中...',
     search: '検索...',
+    searchLanguage: '言語を検索...',
     error: 'エラー',
     success: '成功',
     info: '情報',
@@ -89,6 +90,11 @@ export const ja: Translations = {
     minimize: '最小化',
     maximize: '最大化',
     close: '閉じる'
+  },
+  languages: {
+    recent: '最近使用した言語',
+    all: 'すべての言語',
+    noResults: '一致する言語がありません'
   },
   transcribe: {
     title: 'ファイルを文字起こし',
@@ -593,7 +599,7 @@ export const ja: Translations = {
     uiScaleDesc: '高解像度 (4K / HiDPI) ディスプレイに合わせて画面の大きさを調整します。',
     uiScaleReset: 'リセット',
     langSpokenTitle: '音声の言語コード',
-    langSpokenDesc: '入力音声の主要言語コード (例: ja, en, zh)。',
+    langSpokenDesc: '音声内の話されている言語。「自動検出」を選ぶと Whisper が自動的に判別します。',
     initialPromptTitle: '初期プロンプト',
     initialPromptDesc: '固有名詞、専門用語、句読点スタイルの誘導に使用されるプロンプト。',
     carryPromptTitle: '初期プロンプトを全区間に維持',

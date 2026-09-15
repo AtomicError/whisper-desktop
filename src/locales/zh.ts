@@ -63,6 +63,7 @@ export const zh: Translations = {
     reset: '恢复默认设置',
     loading: '加载中...',
     search: '搜索...',
+    searchLanguage: '搜索语言...',
     error: '错误',
     success: '成功',
     info: '提示',
@@ -89,6 +90,11 @@ export const zh: Translations = {
     minimize: '最小化',
     maximize: '最大化',
     close: '关闭'
+  },
+  languages: {
+    recent: '最近使用',
+    all: '所有语言',
+    noResults: '没有匹配的语言'
   },
   transcribe: {
     title: '转录媒体文件',
@@ -593,7 +599,7 @@ export const zh: Translations = {
     uiScaleDesc: '针对高分屏 (HiDPI / 4K) 精细调整软件字号与控件尺寸。',
     uiScaleReset: '重置',
     langSpokenTitle: '输入音频语种 (Language Spoken)',
-    langSpokenDesc: '媒体音频的主语言代码（如 zh, en, ja 等）。',
+    langSpokenDesc: '音频中的口语语言。选择“自动检测”可让 Whisper 自动识别。',
     initialPromptTitle: '初始提示词 (Initial Prompt)',
     initialPromptDesc: '输入专业专有名词或引导语，引导模型生成更精准的术语和标点风格。',
     carryPromptTitle: '跨切片传递初始提示词',
