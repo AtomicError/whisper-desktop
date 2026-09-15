@@ -1,6 +1,6 @@
 import { hardsubController } from './hardsub.ts';
 import { translationStudioController } from './translationStudio.ts';
-import { initI18n, t, setLanguage, getLanguage, translateDOM } from './i18n/index.ts';
+import { initI18n, t, setLanguage, getLanguage, translateDOM, isRtlLanguage } from './i18n/index.ts';
 
 // Global error catcher for visual debugging in frontend
 window.onerror = function(message, source, lineno, colno, error) {
@@ -1453,7 +1453,7 @@ class CustomSelect {
 
     const measuredWidth = this.optionsContainer.getBoundingClientRect().width || targetWidth;
     const effectiveWidth = Math.max(targetWidth, Math.round(measuredWidth));
-    const isRtl = (typeof getLanguage === 'function' && getLanguage() === 'fa') ||
+    const isRtl = (typeof isRtlLanguage === 'function' && isRtlLanguage(getLanguage())) ||
                   document.documentElement.dir === 'rtl' ||
                   document.body.dir === 'rtl';
 
@@ -1600,7 +1600,7 @@ window.syncCustomSelects = function() {
  */
 function applyDynamicDirection(el, defaultDir = null) {
   if (!el) return;
-  const currentAppDir = (typeof getLanguage === 'function' && getLanguage() === 'fa') ? 'rtl' : 'ltr';
+  const currentAppDir = (typeof isRtlLanguage === 'function' && isRtlLanguage(getLanguage())) ? 'rtl' : 'ltr';
   const effectiveDefaultDir = defaultDir || currentAppDir;
   const val = el.value || '';
   
@@ -2192,7 +2192,8 @@ async function initApp() {
   }
 
   // Trigger initial synchronization of dynamic components for startup language
-  window.dispatchEvent(new CustomEvent('whisper:languageChanged', { detail: { language: getLanguage(), isRtl: getLanguage() === 'fa' } }));
+  const isRtl = typeof isRtlLanguage === 'function' ? isRtlLanguage(getLanguage()) : (getLanguage() === 'fa' || getLanguage() === 'ar');
+  window.dispatchEvent(new CustomEvent('whisper:languageChanged', { detail: { language: getLanguage(), isRtl } }));
 
   window.saveCurrentSettings = saveCurrentSettings;
 
@@ -6504,9 +6505,16 @@ function destroyModelRowCustomSelects(parentEl) {
 window.formatNumberForLang = function(num) {
   if (num === null || num === undefined) return '';
   const str = String(num);
-  if (typeof getLanguage === 'function' && getLanguage() === 'fa') {
-    const persianDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
-    return str.replace(/[0-9]/g, d => persianDigits[d]);
+  if (typeof getLanguage === 'function') {
+    const lang = getLanguage();
+    if (lang === 'fa') {
+      const persianDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+      return str.replace(/[0-9]/g, d => persianDigits[d]);
+    }
+    if (lang === 'ar') {
+      const arabicDigits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+      return str.replace(/[0-9]/g, d => arabicDigits[d]);
+    }
   }
   return str;
 };

@@ -274,7 +274,9 @@ impl WhisperSettings {
         };
 
         self.ui_language = match self.ui_language.as_str() {
-            "fa" => "fa".to_string(),
+            "fa" | "es" | "fr" | "de" | "zh" | "ja" | "ru" | "ar" | "pt" | "it" | "tr" | "ko" => {
+                self.ui_language.clone()
+            }
             _ => "en".to_string(),
         };
 
@@ -1000,21 +1002,27 @@ mod tests {
         assert_eq!(settings.ui_language, "en");
 
         // Invalid language fallback
-        settings.ui_language = "fr".to_string();
+        settings.ui_language = "unsupported_xyz".to_string();
         settings.sanitize_and_validate();
         assert_eq!(settings.ui_language, "en");
 
-        // Valid Persian language
-        settings.ui_language = "fa".to_string();
-        settings.sanitize_and_validate();
-        assert_eq!(settings.ui_language, "fa");
+        // Valid living world languages
+        let supported = [
+            "en", "fa", "es", "fr", "de", "zh", "ja", "ru", "ar", "pt", "it", "tr", "ko",
+        ];
+        for lang in &supported {
+            settings.ui_language = lang.to_string();
+            settings.sanitize_and_validate();
+            assert_eq!(&settings.ui_language, lang);
+        }
 
         // Test persistence roundtrip
         let temp_path = temp_test_file("ui_language_test");
+        settings.ui_language = "ar".to_string();
         save_settings_to_path(&temp_path, &settings).unwrap();
 
         let loaded = load_settings_from_path(&temp_path);
-        assert_eq!(loaded.ui_language, "fa");
+        assert_eq!(loaded.ui_language, "ar");
 
         let _ = fs::remove_file(&temp_path);
     }

@@ -1,11 +1,68 @@
 import { en, type Translations } from '../locales/en';
 import { fa } from '../locales/fa';
+import { es } from '../locales/es';
+import { fr } from '../locales/fr';
+import { de } from '../locales/de';
+import { zh } from '../locales/zh';
+import { ja } from '../locales/ja';
+import { ru } from '../locales/ru';
+import { ar } from '../locales/ar';
+import { pt } from '../locales/pt';
+import { it } from '../locales/it';
+import { tr } from '../locales/tr';
+import { ko } from '../locales/ko';
 
-export type SupportedLanguage = 'en' | 'fa';
+export type SupportedLanguage =
+  | 'en'
+  | 'fa'
+  | 'es'
+  | 'fr'
+  | 'de'
+  | 'zh'
+  | 'ja'
+  | 'ru'
+  | 'ar'
+  | 'pt'
+  | 'it'
+  | 'tr'
+  | 'ko';
+
+export const SUPPORTED_LANGUAGES: SupportedLanguage[] = [
+  'en',
+  'fa',
+  'es',
+  'fr',
+  'de',
+  'zh',
+  'ja',
+  'ru',
+  'ar',
+  'pt',
+  'it',
+  'tr',
+  'ko'
+];
+
+export const RTL_LANGUAGES: SupportedLanguage[] = ['fa', 'ar'];
+
+export function isRtlLanguage(lang: string): boolean {
+  return lang === 'fa' || lang === 'ar';
+}
 
 const dictionaries: Record<SupportedLanguage, Translations> = {
   en,
-  fa
+  fa,
+  es,
+  fr,
+  de,
+  zh,
+  ja,
+  ru,
+  ar,
+  pt,
+  it,
+  tr,
+  ko
 };
 
 const STORAGE_KEY = 'whisper_language';
@@ -118,7 +175,7 @@ export function translateDOM(root: Document | Element = document): void {
 }
 
 export function setLanguage(lang: SupportedLanguage, notify: boolean = true): void {
-  if (lang !== 'en' && lang !== 'fa') {
+  if (!SUPPORTED_LANGUAGES.includes(lang)) {
     lang = 'en';
   }
 
@@ -127,7 +184,7 @@ export function setLanguage(lang: SupportedLanguage, notify: boolean = true): vo
     localStorage.setItem(STORAGE_KEY, lang);
   } catch (_) {}
 
-  const isRtl = lang === 'fa';
+  const isRtl = isRtlLanguage(lang);
   document.documentElement.setAttribute('lang', lang);
   document.documentElement.setAttribute('dir', isRtl ? 'rtl' : 'ltr');
   if (isRtl) {
@@ -185,8 +242,8 @@ export function setLanguage(lang: SupportedLanguage, notify: boolean = true): vo
 export function initI18n(): void {
   let initialLang: SupportedLanguage = 'en';
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved === 'en' || saved === 'fa') {
+    const saved = localStorage.getItem(STORAGE_KEY) as SupportedLanguage | null;
+    if (saved && SUPPORTED_LANGUAGES.includes(saved)) {
       initialLang = saved;
     }
   } catch (_) {}
@@ -200,4 +257,7 @@ if (typeof window !== 'undefined') {
   (window as any).setLanguage = setLanguage;
   (window as any).getLanguage = getLanguage;
   (window as any).translateDOM = translateDOM;
+  (window as any).isRtlLanguage = isRtlLanguage;
+  (window as any).SUPPORTED_LANGUAGES = SUPPORTED_LANGUAGES;
+  (window as any).RTL_LANGUAGES = RTL_LANGUAGES;
 }

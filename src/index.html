@@ -8,7 +8,7 @@
       (function() {
         try {
           const cachedLang = localStorage.getItem('whisper_language') || 'en';
-          const isRtl = (cachedLang === 'fa');
+          const isRtl = (cachedLang === 'fa' || cachedLang === 'ar');
           document.documentElement.setAttribute('lang', cachedLang);
           document.documentElement.setAttribute('dir', isRtl ? 'rtl' : 'ltr');
           if (isRtl) {
@@ -388,6 +388,17 @@
                       <select class="select-control" id="opt-uiLanguage" onchange="window.setLanguage(this.value)">
                         <option value="en" data-i18n="settings.langEn">English</option>
                         <option value="fa" data-i18n="settings.langFa">فارسی</option>
+                        <option value="es" data-i18n="settings.langEs">Español</option>
+                        <option value="fr" data-i18n="settings.langFr">Français</option>
+                        <option value="de" data-i18n="settings.langDe">Deutsch</option>
+                        <option value="zh" data-i18n="settings.langZh">简体中文</option>
+                        <option value="ja" data-i18n="settings.langJa">日本語</option>
+                        <option value="ru" data-i18n="settings.langRu">Русский</option>
+                        <option value="ar" data-i18n="settings.langAr">العربية</option>
+                        <option value="pt" data-i18n="settings.langPt">Português</option>
+                        <option value="it" data-i18n="settings.langIt">Italiano</option>
+                        <option value="tr" data-i18n="settings.langTr">Türkçe</option>
+                        <option value="ko" data-i18n="settings.langKo">한국어</option>
                       </select>
                     </div>
                   </div>
@@ -2017,26 +2028,26 @@
                         </div>
                         <select class="select-control quick-select" id="quick-opt-language" aria-label="Quick Select Language">
                           <option value="auto" data-i18n="transcribe.langAuto">Auto Detect</option>
-                          <option value="fa" data-i18n="transcribe.langFa">Persian (فارسی)</option>
+                          <option value="fa" data-i18n="transcribe.langFa">Persian</option>
                           <option value="en" data-i18n="transcribe.langEn">English</option>
-                          <option value="ar" data-i18n="transcribe.langAr">Arabic (العربية)</option>
-                          <option value="tr" data-i18n="transcribe.langTr">Turkish (Türkçe)</option>
-                          <option value="es" data-i18n="transcribe.langEs">Spanish (Español)</option>
-                          <option value="fr" data-i18n="transcribe.langFr">French (Français)</option>
-                          <option value="de" data-i18n="transcribe.langDe">German (Deutsch)</option>
-                          <option value="ru" data-i18n="transcribe.langRu">Russian (Русский)</option>
-                          <option value="zh" data-i18n="transcribe.langZh">Chinese (中文)</option>
-                          <option value="ja" data-i18n="transcribe.langJa">Japanese (日本語)</option>
-                          <option value="ko" data-i18n="transcribe.langKo">Korean (한국어)</option>
-                          <option value="it" data-i18n="transcribe.langIt">Italian (Italiano)</option>
-                          <option value="pt" data-i18n="transcribe.langPt">Portuguese (Português)</option>
-                          <option value="hi" data-i18n="transcribe.langHi">Hindi (हिन्दी)</option>
-                          <option value="ur" data-i18n="transcribe.langUr">Urdu (اردو)</option>
-                          <option value="nl" data-i18n="transcribe.langNl">Dutch (Nederlands)</option>
-                          <option value="pl" data-i18n="transcribe.langPl">Polish (Polski)</option>
-                          <option value="uk" data-i18n="transcribe.langUk">Ukrainian (Українська)</option>
-                          <option value="sv" data-i18n="transcribe.langSv">Swedish (Svenska)</option>
-                          <option value="id" data-i18n="transcribe.langId">Indonesian (Bahasa Indonesia)</option>
+                          <option value="ar" data-i18n="transcribe.langAr">Arabic</option>
+                          <option value="tr" data-i18n="transcribe.langTr">Turkish</option>
+                          <option value="es" data-i18n="transcribe.langEs">Spanish</option>
+                          <option value="fr" data-i18n="transcribe.langFr">French</option>
+                          <option value="de" data-i18n="transcribe.langDe">German</option>
+                          <option value="ru" data-i18n="transcribe.langRu">Russian</option>
+                          <option value="zh" data-i18n="transcribe.langZh">Chinese</option>
+                          <option value="ja" data-i18n="transcribe.langJa">Japanese</option>
+                          <option value="ko" data-i18n="transcribe.langKo">Korean</option>
+                          <option value="it" data-i18n="transcribe.langIt">Italian</option>
+                          <option value="pt" data-i18n="transcribe.langPt">Portuguese</option>
+                          <option value="hi" data-i18n="transcribe.langHi">Hindi</option>
+                          <option value="ur" data-i18n="transcribe.langUr">Urdu</option>
+                          <option value="nl" data-i18n="transcribe.langNl">Dutch</option>
+                          <option value="pl" data-i18n="transcribe.langPl">Polish</option>
+                          <option value="uk" data-i18n="transcribe.langUk">Ukrainian</option>
+                          <option value="sv" data-i18n="transcribe.langSv">Swedish</option>
+                          <option value="id" data-i18n="transcribe.langId">Indonesian</option>
                         </select>
                       </div>
 
