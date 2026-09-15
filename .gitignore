@@ -50,6 +50,7 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
+.zcode/
 *.suo
 *.ntvs*
 *.njsproj
