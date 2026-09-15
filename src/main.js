@@ -2410,13 +2410,18 @@ window.switchView = function(viewName) {
   }
   
   // Update Title
+  const localizedViewTitle = t(`nav.${viewName}`) || 'Whisper Manager';
   const titleEl = document.getElementById('current-view-title');
   if (titleEl) {
     titleEl.style.opacity = '0.7';
-    titleEl.textContent = t(`nav.${viewName}`) || 'Whisper Manager';
+    titleEl.textContent = localizedViewTitle;
     requestAnimationFrame(() => {
       titleEl.style.opacity = '1';
     });
+  }
+  const titlebarEl = document.getElementById('titlebar-view-title');
+  if (titlebarEl) {
+    titlebarEl.textContent = localizedViewTitle;
   }
 
   if (viewName === 'models') {

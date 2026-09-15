@@ -89,12 +89,7 @@
     <!-- Premium GNOME-Style CSD Headerbar -->
     <div data-tauri-drag-region class="titlebar">
       <div class="titlebar-brand" data-tauri-drag-region>
-        <svg class="titlebar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
-          <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
-          <line x1="12" x2="12" y1="19" y2="22"/>
-        </svg>
-        <span class="titlebar-text" data-tauri-drag-region data-i18n="app.title">Whisper Desktop</span>
+        <span class="titlebar-text" id="titlebar-view-title" data-tauri-drag-region>Transcription Studio</span>
       </div>
       
       <div class="titlebar-buttons">
@@ -193,24 +188,19 @@
         <div class="sidebar-about-wrapper">
           <button class="sidebar-about-btn" id="sidebar-about-btn" type="button" onclick="openAboutModal()" title="About Whisper Desktop" data-i18n-title="nav.about">
             <div class="about-btn-icon-wrapper" aria-hidden="true">
-              <svg class="about-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
-                <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
-                <line x1="12" x2="12" y1="19" y2="22"/>
+              <svg class="about-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="16" x2="12" y2="12"/>
+                <line x1="12" y1="8" x2="12.01" y2="8"/>
               </svg>
             </div>
             <div class="about-btn-info">
-              <span class="about-btn-name" data-i18n="app.title">Whisper Desktop</span>
+              <span class="about-btn-name" data-i18n="nav.about">About Whisper Desktop</span>
               <span class="about-btn-version">
                 <span class="version-pulse-dot" aria-hidden="true"></span>
                 <span id="sidebar-about-version-text">v__APP_VERSION__</span>
               </span>
             </div>
-            <svg class="about-btn-info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="12" y1="16" x2="12" y2="12"/>
-              <line x1="12" y1="8" x2="12.01" y2="8"/>
-            </svg>
           </button>
         </div>
       </sidebar>

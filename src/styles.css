@@ -349,19 +349,19 @@ html {
   --color-text-muted: #a1a1aa;
   --color-text-dim: #71717a;
 
-  /* Model Family Palette Accents */
+  /* Model Family Palette Accents (Obsidian Cherry to Platinum Spectrum) */
   --color-model-large: #ef4444;
   --color-model-large-rgb: 239, 68, 68;
   --color-model-medium: #f43f5e;
   --color-model-medium-rgb: 244, 63, 94;
-  --color-model-small: #10b981;
-  --color-model-small-rgb: 16, 185, 129;
-  --color-model-base: #f59e0b;
-  --color-model-base-rgb: 245, 158, 11;
+  --color-model-small: #fb7185;
+  --color-model-small-rgb: 251, 113, 133;
+  --color-model-base: #e4e4e7;
+  --color-model-base-rgb: 228, 228, 231;
 
   --shadow-neon-cyan: 0 0 12px rgba(244, 63, 94, 0.20);
   --shadow-neon-royal-blue: 0 0 20px rgba(239, 68, 68, 0.28);
-  --shadow-neon-gold: 0 0 15px rgba(245, 158, 11, 0.15);
+  --shadow-neon-gold: 0 0 15px rgba(244, 63, 94, 0.15);
 
   --bg-radial-1: rgba(255, 255, 255, 0.02);
   --bg-radial-2: rgba(255, 255, 255, 0.01);
@@ -830,8 +830,7 @@ sidebar.sidebar-collapsed .sidebar-about-btn .about-btn-icon-wrapper {
   margin: 0 auto;
 }
 
-sidebar.sidebar-collapsed .sidebar-about-btn .about-btn-info,
-sidebar.sidebar-collapsed .sidebar-about-btn .about-btn-info-icon {
+sidebar.sidebar-collapsed .sidebar-about-btn .about-btn-info {
   display: none !important;
 }
 
@@ -1178,20 +1177,6 @@ a:focus:not(:focus-visible),
   flex-shrink: 0;
   opacity: 0.95;
   box-shadow: 0 0 6px rgba(var(--color-accent-rgb), 0.5);
-}
-
-.about-btn-info-icon {
-  width: 16px;
-  height: 16px;
-  color: var(--color-text-dim);
-  opacity: 0.5;
-  transition: color 0.2s ease, opacity 0.2s ease;
-  flex-shrink: 0;
-}
-
-.sidebar-about-btn:hover .about-btn-info-icon {
-  opacity: 1;
-  color: var(--color-accent);
 }
 
 /* Main Workspace */
@@ -4205,6 +4190,30 @@ select.select-control {
   color: #ff9800;
   background: rgba(255, 152, 0, 0.14);
   border: 1px solid rgba(255, 152, 0, 0.28);
+}
+
+/* Guide Concept Themed Accents - Carbon (Obsidian Red) */
+:root[data-theme="carbon"] .guide-concept-lang .guide-concept-icon {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.14);
+  border: 1px solid rgba(239, 68, 68, 0.28);
+}
+
+:root[data-theme="carbon"] .guide-concept-quant .guide-concept-icon {
+  color: #f43f5e;
+  background: rgba(244, 63, 94, 0.14);
+  border: 1px solid rgba(244, 63, 94, 0.28);
+}
+
+:root[data-theme="carbon"] .guide-concept-vad .guide-concept-icon {
+  color: #fb7185;
+  background: rgba(251, 113, 133, 0.14);
+  border: 1px solid rgba(251, 113, 133, 0.28);
+}
+
+:root[data-theme="carbon"] .model-badge-vad {
+  background: rgba(251, 113, 133, 0.12);
+  color: #fb7185;
 }
 
 .guide-card:focus-visible,

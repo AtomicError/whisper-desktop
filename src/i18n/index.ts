@@ -210,8 +210,11 @@ export function setLanguage(lang: SupportedLanguage, notify: boolean = true): vo
   // Synchronize current view title
   const activeNav = document.querySelector<HTMLElement>('.nav-item.active');
   const viewTitle = document.getElementById('current-view-title');
-  if (activeNav && viewTitle && activeNav.dataset.view) {
-    viewTitle.textContent = t(`nav.${activeNav.dataset.view}`) || viewTitle.textContent;
+  const titlebarViewTitle = document.getElementById('titlebar-view-title');
+  if (activeNav && activeNav.dataset.view) {
+    const locTitle = t(`nav.${activeNav.dataset.view}`);
+    if (viewTitle && locTitle) viewTitle.textContent = locTitle;
+    if (titlebarViewTitle && locTitle) titlebarViewTitle.textContent = locTitle;
   }
 
   // Synchronize window/document title
