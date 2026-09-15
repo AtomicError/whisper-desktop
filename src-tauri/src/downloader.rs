@@ -14,6 +14,9 @@ use tokio::io::{AsyncWriteExt, BufWriter};
 
 const HF_WHISPER_BASE: &str = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main";
 const HF_VAD_BASE: &str = "https://huggingface.co/ggml-org/whisper-vad/resolve/main";
+/// tinydiarize builds live in their own repository — upstream whisper.cpp never
+/// published a `tdrz` model. Used for `small.en-tdrz`.
+const HF_TDRZ_BASE: &str = "https://huggingface.co/akashmjn/tinydiarize-whisper.cpp/resolve/main";
 const USER_AGENT_VALUE: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 const READ_TIMEOUT: Duration = Duration::from_secs(30);
@@ -26,8 +29,8 @@ const CANCEL_GRACE: Duration = Duration::from_secs(5);
 
 // ---------------------------------------------------------------------------
 // Model catalog — sizes and SHA-256 digests verified against the Hugging Face
-// tree API (ggerganov/whisper.cpp + ggml-org/whisper-vad) on 2026-08-23.
-// "small.en-tdrz" was removed: it does not exist upstream and never downloaded.
+// tree API (ggerganov/whisper.cpp + ggml-org/whisper-vad) on 2026-08-23, and
+// against akashmjn/tinydiarize-whisper.cpp for "small.en-tdrz" on 2026-09-16.
 // ---------------------------------------------------------------------------
 
 fn model_catalog(name: &str) -> Option<(u64, &'static str)> {
@@ -50,6 +53,9 @@ fn model_catalog(name: &str) -> Option<(u64, &'static str)> {
         "small.en" => (487614201, "c6138d6d58ecc8322097e0f987c32f1be8bb0a18532a3f88f734d1bbf9c41e5d"),
         "small.en-q5_1" => (190098681, "bfdff4894dcb76bbf647d56263ea2a96645423f1669176f4844a1bf8e478ad30"),
         "small.en-q8_0" => (264477561, "67a179f608ea6114bd3fdb9060e762b588a3fb3bd00c4387971be4d177958067"),
+        // tinydiarize fine-tune of small.en: the only model that supports
+        // `-tdrz` (tiny diarization). Not published upstream, see HF_TDRZ_BASE.
+        "small.en-tdrz" => (487614184, "ceac3ec06d1d98ef71aec665283564631055fd6129b79d8e1be4f9cc33cc54b4"),
         "medium" => (1533763059, "6c14d5adee5f86394037b4e4e8b59f1673b6cee10e3cf0b11bbdbee79c156208"),
         "medium-q5_0" => (539212467, "19fea4b380c3a618ec4723c3eef2eb785ffba0d0538cf43f8f235e7b3b34220f"),
         "medium-q8_0" => (823369779, "42a1ffcbe4167d224232443396968db4d02d4e8e87e213d3ee2e03095dea6502"),
@@ -77,6 +83,7 @@ pub fn get_models_list() -> Vec<&'static str> {
         "tiny", "tiny-q5_1", "tiny-q8_0", "tiny.en", "tiny.en-q5_1", "tiny.en-q8_0",
         "base", "base-q5_1", "base-q8_0", "base.en", "base.en-q5_1", "base.en-q8_0",
         "small", "small-q5_1", "small-q8_0", "small.en", "small.en-q5_1", "small.en-q8_0",
+        "small.en-tdrz",
         "medium", "medium-q5_0", "medium-q8_0", "medium.en", "medium.en-q5_0", "medium.en-q8_0",
         "large-v1", "large-v2", "large-v2-q5_0", "large-v2-q8_0",
         "large-v3", "large-v3-q5_0", "large-v3-turbo", "large-v3-turbo-q5_0", "large-v3-turbo-q8_0",
@@ -106,6 +113,8 @@ fn is_safe_model_name(name: &str) -> bool {
 fn model_url(clean_name: &str) -> String {
     if clean_name.starts_with("silero-") {
         format!("{HF_VAD_BASE}/ggml-{clean_name}.bin?download=true")
+    } else if clean_name.ends_with("-tdrz") {
+        format!("{HF_TDRZ_BASE}/ggml-{clean_name}.bin?download=true")
     } else {
         format!("{HF_WHISPER_BASE}/ggml-{clean_name}.bin")
     }
@@ -1036,6 +1045,80 @@ mod tests {
 
         let matches = find_all_matching_model_files(&temp_dir, "base");
         assert_eq!(matches.len(), 2);
+
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_model_url_routes_each_catalog_source() {
+        // Every entry in the catalog must resolve to the host that actually
+        // publishes it: tdrz models are absent from ggerganov/whisper.cpp.
+        assert_eq!(
+            model_url("small.en-tdrz"),
+            "https://huggingface.co/akashmjn/tinydiarize-whisper.cpp/resolve/main/ggml-small.en-tdrz.bin?download=true"
+        );
+        assert_eq!(
+            model_url("small.en"),
+            "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en.bin"
+        );
+        assert_eq!(
+            model_url("silero-v6.2.0"),
+            "https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v6.2.0.bin?download=true"
+        );
+    }
+
+    #[test]
+    fn test_catalog_digests_are_well_formed() {
+        // `finalize` compares the digest against a 64-char lowercase hex string,
+        // so a truncated or uppercase entry can never match and would block that
+        // model's download forever.
+        for name in get_models_list() {
+            let (_, digest) = model_catalog(name).expect("listed model missing from catalog");
+            assert_eq!(digest.len(), 64, "{name} digest is not 64 hex chars: {digest}");
+            assert!(
+                digest.chars().all(|c| c.is_ascii_digit() || ('a'..='f').contains(&c)),
+                "{name} digest is not lowercase hex: {digest}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_every_listed_model_is_in_catalog() {
+        // `scan_models` skips names the catalog does not know, so a listed model
+        // with no catalog entry would silently never appear in Model Hub.
+        for name in get_models_list() {
+            assert!(model_catalog(name).is_some(), "{name} missing from model_catalog");
+        }
+    }
+
+    #[test]
+    fn test_names_that_extend_another_model_do_not_collide() {
+        // "small.en" is a prefix of "small.en-tdrz". File lookup and the
+        // directory scan must therefore stay exact-match, or the tdrz build would
+        // be mistaken for small.en and report the wrong download state.
+        let temp_dir = std::env::temp_dir().join(format!("whisper_test_tdrz_collision_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&temp_dir);
+        fs::create_dir_all(&temp_dir).unwrap();
+
+        let plain = temp_dir.join("ggml-small.en.bin");
+        let tdrz = temp_dir.join("ggml-small.en-tdrz.bin");
+        File::create(&plain).unwrap();
+        File::create(&tdrz).unwrap();
+
+        assert_eq!(
+            find_model_path_in_dir(&temp_dir, "small.en").unwrap().canonicalize().unwrap(),
+            plain.canonicalize().unwrap()
+        );
+        assert_eq!(
+            find_model_path_in_dir(&temp_dir, "small.en-tdrz").unwrap().canonicalize().unwrap(),
+            tdrz.canonicalize().unwrap()
+        );
+        assert_eq!(find_all_matching_model_files(&temp_dir, "small.en").len(), 1);
+        assert_eq!(find_all_matching_model_files(&temp_dir, "small.en-tdrz").len(), 1);
+
+        let discovered = scan_models_dir_single_pass(&temp_dir);
+        assert_eq!(discovered.bins["small.en"].len(), 1);
+        assert_eq!(discovered.bins["small.en-tdrz"].len(), 1);
 
         let _ = fs::remove_dir_all(&temp_dir);
     }
