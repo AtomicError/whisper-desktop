@@ -843,6 +843,10 @@ sidebar.sidebar-collapsed .nav-divider {
   box-sizing: border-box;
 }
 
+/* Multi-color brand icon: one pre-rendered SVG per theme. The fills are hardcoded
+   inside each file as shades derived from that theme's palette (they are NOT bound to
+   the --color-* tokens above, so editing a token will not recolor the icon). Default /
+   fallback file is the Royal Blue variant. */
 .brand-icon {
   display: block;
   width: 32px;
@@ -851,33 +855,27 @@ sidebar.sidebar-collapsed .nav-divider {
   flex-shrink: 0;
   position: relative;
   z-index: 2;
-  /* Royal Blue (default) */
-  filter:
-    brightness(0) saturate(100%)
-    invert(42%) sepia(98%) saturate(1543%) hue-rotate(202deg) brightness(106%)
-    drop-shadow(0 0 8px rgba(45, 127, 255, 0.5));
+  background-image: url('./brand-icon-royal.svg');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  filter: drop-shadow(0 0 8px rgba(45, 127, 255, 0.5));
 }
 
 :root[data-theme="fire-orange"] .brand-icon,
 :root[data-theme="fire"] .brand-icon {
-  filter:
-    brightness(0) saturate(100%)
-    invert(44%) sepia(100%) saturate(2200%) hue-rotate(15deg) brightness(103%)
-    drop-shadow(0 0 8px rgba(255, 107, 0, 0.5));
+  background-image: url('./brand-icon-fire.svg');
+  filter: drop-shadow(0 0 8px rgba(255, 107, 0, 0.5));
 }
 
 :root[data-theme="carbon"] .brand-icon {
-  filter:
-    brightness(0) saturate(100%)
-    invert(39%) sepia(65%) saturate(3500%) hue-rotate(327deg) brightness(103%)
-    drop-shadow(0 0 8px rgba(239, 68, 68, 0.5));
+  background-image: url('./brand-icon-carbon.svg');
+  filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.5));
 }
 
 :root[data-theme="emerald"] .brand-icon {
-  filter:
-    brightness(0) saturate(100%)
-    invert(52%) sepia(55%) saturate(600%) hue-rotate(118deg) brightness(95%)
-    drop-shadow(0 0 8px rgba(16, 185, 129, 0.5));
+  background-image: url('./brand-icon-emerald.svg');
+  filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.5));
 }
 
 .brand-name {

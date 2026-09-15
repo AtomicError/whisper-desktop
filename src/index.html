@@ -80,6 +80,14 @@
     </style>
     <link rel="stylesheet" href="styles.css" />
     <link rel="stylesheet" href="rtl.css" />
+    <!-- Preload every theme's brand icon: the icon is a CSS background-image, so without this
+         the new variant is only fetched at the moment the theme switch starts and can miss the
+         260ms crossfade frame, flashing a blank icon. Low priority + local files, so they never
+         compete with the CSS/JS/fonts above. -->
+    <link rel="preload" as="image" fetchpriority="low" href="./brand-icon-royal.svg" />
+    <link rel="preload" as="image" fetchpriority="low" href="./brand-icon-fire.svg" />
+    <link rel="preload" as="image" fetchpriority="low" href="./brand-icon-carbon.svg" />
+    <link rel="preload" as="image" fetchpriority="low" href="./brand-icon-emerald.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Whisper Manager Desktop</title>
     <script type="module" src="main.js" defer></script>
@@ -117,7 +125,7 @@
       <!-- Left Sidebar Navigation -->
       <sidebar>
         <div class="brand">
-          <img src="brand-icon.svg" class="brand-icon" alt="Brand Icon" />
+          <span class="brand-icon" aria-hidden="true"></span>
           <div class="brand-name" data-i18n="app.title">Whisper Desktop</div>
         </div>
         
