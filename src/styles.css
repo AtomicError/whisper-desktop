@@ -843,11 +843,41 @@ sidebar.sidebar-collapsed .nav-divider {
   box-sizing: border-box;
 }
 
-/* Multi-color brand icon: one pre-rendered SVG per theme. The fills are hardcoded
-   inside each file as shades derived from that theme's palette (they are NOT bound to
-   the --color-* tokens above, so editing a token will not recolor the icon). Default /
-   fallback file is the Royal Blue variant. */
+/* Multi-color brand icon. The artwork is inlined once in index.html, where each of its 22
+   fill groups references --brand-icon-f1..f22; the blocks below supply those values per
+   theme, so switching themes is a repaint and never a fetch. The shades are derived from
+   each theme's palette but are NOT the --color-* tokens above, so editing a token won't
+   recolor the icon. The defaults here are the Royal Blue set (also the fallback when no
+   data-theme attribute is set).
+
+   The mapping is positional: <g> number N in the artwork reads --brand-icon-fN, so every
+   value must stay in slot order when editing. Adding a theme that has its own icon colors
+   means copying all 22 lines into a new block — a partial block would fall back per-slot
+   to the Royal Blue defaults above, mixing two palettes. */
 .brand-icon {
+  --brand-icon-f1: #00389a;
+  --brand-icon-f2: #0046b8;
+  --brand-icon-f3: #004ec9;
+  --brand-icon-f4: #0046b9;
+  --brand-icon-f5: #055bdc;
+  --brand-icon-f6: #004cc4;
+  --brand-icon-f7: #0056d7;
+  --brand-icon-f8: #0051ce;
+  --brand-icon-f9: #1668e9;
+  --brand-icon-f10: #0057d9;
+  --brand-icon-f11: #075dde;
+  --brand-icon-f12: #0f62e4;
+  --brand-icon-f13: #297bfb;
+  --brand-icon-f14: #1d99ed;
+  --brand-icon-f15: #1b6dee;
+  --brand-icon-f16: #2475f5;
+  --brand-icon-f17: #2c7efe;
+  --brand-icon-f18: #1c9aed;
+  --brand-icon-f19: #13a7e2;
+  --brand-icon-f20: #28bae7;
+  --brand-icon-f21: #72cbf9;
+  --brand-icon-f22: #f3f4f6;
+
   display: block;
   width: 32px;
   min-width: 32px;
@@ -855,26 +885,88 @@ sidebar.sidebar-collapsed .nav-divider {
   flex-shrink: 0;
   position: relative;
   z-index: 2;
-  background-image: url('./brand-icon-royal.svg');
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: contain;
   filter: drop-shadow(0 0 8px rgba(45, 127, 255, 0.5));
 }
 
 :root[data-theme="fire-orange"] .brand-icon,
 :root[data-theme="fire"] .brand-icon {
-  background-image: url('./brand-icon-fire.svg');
+  --brand-icon-f1: #71270c;
+  --brand-icon-f2: #8e2c04;
+  --brand-icon-f3: #9e3000;
+  --brand-icon-f4: #8f2c04;
+  --brand-icon-f5: #b13800;
+  --brand-icon-f6: #992e00;
+  --brand-icon-f7: #aa3500;
+  --brand-icon-f8: #a23200;
+  --brand-icon-f9: #c23f00;
+  --brand-icon-f10: #ab3500;
+  --brand-icon-f11: #b33900;
+  --brand-icon-f12: #bb3c00;
+  --brand-icon-f13: #dc4a00;
+  --brand-icon-f14: #f05d00;
+  --brand-icon-f15: #c94200;
+  --brand-icon-f16: #d54600;
+  --brand-icon-f17: #e04e00;
+  --brand-icon-f18: #f05e00;
+  --brand-icon-f19: #f96500;
+  --brand-icon-f20: #fd832c;
+  --brand-icon-f21: #fcac31;
+  --brand-icon-f22: #f3f4f6;
+
   filter: drop-shadow(0 0 8px rgba(255, 107, 0, 0.5));
 }
 
 :root[data-theme="carbon"] .brand-icon {
-  background-image: url('./brand-icon-carbon.svg');
+  --brand-icon-f1: #761e1e;
+  --brand-icon-f2: #94201f;
+  --brand-icon-f3: #a42121;
+  --brand-icon-f4: #952020;
+  --brand-icon-f5: #ba2423;
+  --brand-icon-f6: #9f2121;
+  --brand-icon-f7: #b32323;
+  --brand-icon-f8: #a92222;
+  --brand-icon-f9: #ce2525;
+  --brand-icon-f10: #b42323;
+  --brand-icon-f11: #bd2424;
+  --brand-icon-f12: #c52424;
+  --brand-icon-f13: #e53635;
+  --brand-icon-f14: #f54d63;
+  --brand-icon-f15: #d62626;
+  --brand-icon-f16: #e02d2d;
+  --brand-icon-f17: #e93b3b;
+  --brand-icon-f18: #f54e63;
+  --brand-icon-f19: #f7606a;
+  --brand-icon-f20: #fb7c8d;
+  --brand-icon-f21: #f7a4ad;
+  --brand-icon-f22: #f4f4f5;
+
   filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.5));
 }
 
 :root[data-theme="emerald"] .brand-icon {
-  background-image: url('./brand-icon-emerald.svg');
+  --brand-icon-f1: #0c4f3a;
+  --brand-icon-f2: #066147;
+  --brand-icon-f3: #066b4e;
+  --brand-icon-f4: #066248;
+  --brand-icon-f5: #067957;
+  --brand-icon-f6: #06684c;
+  --brand-icon-f7: #067554;
+  --brand-icon-f8: #066f50;
+  --brand-icon-f9: #06875f;
+  --brand-icon-f10: #067654;
+  --brand-icon-f11: #067b58;
+  --brand-icon-f12: #06815c;
+  --brand-icon-f13: #069a6b;
+  --brand-icon-f14: #0cad78;
+  --brand-icon-f15: #068c62;
+  --brand-icon-f16: #059468;
+  --brand-icon-f17: #079d6e;
+  --brand-icon-f18: #0cad79;
+  --brand-icon-f19: #0fb57e;
+  --brand-icon-f20: #25c68d;
+  --brand-icon-f21: #4ad9c2;
+  --brand-icon-f22: #f0fdf4;
+
   filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.5));
 }
 
