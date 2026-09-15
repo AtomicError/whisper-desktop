@@ -29,8 +29,19 @@ html[dir="rtl"] sidebar {
   border-left: 1px solid var(--border-glass);
 }
 
-html[dir="rtl"] .brand {
-  gap: 12px;
+
+html[dir="rtl"] .brand-icon {
+  transform: scaleX(-1);
+}
+
+html[dir="rtl"] .brand-name {
+  padding-right: 0;
+  padding-left: 4px;
+  /* background shorthand resets background-clip, so we must re-declare all three */
+  background: linear-gradient(to left, #fff 30%, var(--color-sky) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 html[dir="rtl"] .nav-item span {

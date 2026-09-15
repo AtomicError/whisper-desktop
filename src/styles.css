@@ -676,12 +676,6 @@ body {
   gap: 8px;
 }
 
-.titlebar-icon {
-  width: 15px;
-  height: 15px;
-  color: var(--color-cyan);
-}
-
 .titlebar-text {
   font-family: var(--font-sans);
   font-weight: 600;
@@ -850,14 +844,40 @@ sidebar.sidebar-collapsed .nav-divider {
 }
 
 .brand-icon {
+  display: block;
   width: 32px;
   min-width: 32px;
   height: 32px;
-  color: var(--color-royal-blue);
-  filter: drop-shadow(0 0 8px rgba(var(--color-royal-blue-rgb), 0.5));
   flex-shrink: 0;
   position: relative;
   z-index: 2;
+  /* Royal Blue (default) */
+  filter:
+    brightness(0) saturate(100%)
+    invert(42%) sepia(98%) saturate(1543%) hue-rotate(202deg) brightness(106%)
+    drop-shadow(0 0 8px rgba(45, 127, 255, 0.5));
+}
+
+:root[data-theme="fire-orange"] .brand-icon,
+:root[data-theme="fire"] .brand-icon {
+  filter:
+    brightness(0) saturate(100%)
+    invert(44%) sepia(100%) saturate(2200%) hue-rotate(15deg) brightness(103%)
+    drop-shadow(0 0 8px rgba(255, 107, 0, 0.5));
+}
+
+:root[data-theme="carbon"] .brand-icon {
+  filter:
+    brightness(0) saturate(100%)
+    invert(39%) sepia(65%) saturate(3500%) hue-rotate(327deg) brightness(103%)
+    drop-shadow(0 0 8px rgba(239, 68, 68, 0.5));
+}
+
+:root[data-theme="emerald"] .brand-icon {
+  filter:
+    brightness(0) saturate(100%)
+    invert(52%) sepia(55%) saturate(600%) hue-rotate(118deg) brightness(95%)
+    drop-shadow(0 0 8px rgba(16, 185, 129, 0.5));
 }
 
 .brand-name {
