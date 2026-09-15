@@ -64,7 +64,7 @@ fn model_catalog(name: &str) -> Option<(u64, &'static str)> {
         "large-v3-q5_0" => (1081140203, "d75795ecff3f83b5faa89d1900604ad8c780abd5739fae406de19f23ecd98ad1"),
         "large-v3-turbo" => (1624555275, "1fc70f774d38eb169993ac391eea357ef47c88757ef72ee5943879b7e8e2bc69"),
         "large-v3-turbo-q5_0" => (574041195, "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2"),
-        "large-v3-turbo-q8_0" => (874188075, "317eb69c11673c9de1f0d459b253999804ec71ac4c23c17ecf7fbe24e259a1"),
+        "large-v3-turbo-q8_0" => (874188075, "317eb69c11673c9de1e1f0d459b253999804ec71ac4c23c17ecf5fbe24e259a1"),
         "silero-v5.1.2" => (885098, "29940d98d42b91fbd05ce489f3ecf7c72f0a42f027e4875919a28fb4c04ea2cf"),
         "silero-v6.2.0" => (885098, "2aa269b785eeb53a82983a20501ddf7c1d9c48e33ab63a41391ac6c9f7fb6987"),
         _ => return None,
