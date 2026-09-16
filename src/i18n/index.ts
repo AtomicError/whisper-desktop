@@ -118,6 +118,26 @@ export function isolateDirection(text: string, fallbackDir?: 'rtl' | 'ltr'): str
 }
 
 /**
+ * Wraps an interpolated value in a bidi isolate when that value reads in the opposite
+ * direction to the copy it is written into — the `{path}`, `{error}`, `{name}` and
+ * `{version}` of a localized sentence.
+ *
+ * Each of those is a token of its own: a file name, a path, an error a backend produced,
+ * a version. Written straight into a sentence of the interface's language, the bidi
+ * algorithm reads through the join and takes the value apart — the leading `/` of a path
+ * is neutral, so in a right-to-left sentence it is handed the sentence's direction and
+ * surfaces at the far end of the token, printed as `…/film.mp4/`. Values that already
+ * read the way the sentence around them does need nothing: a count, or an error message
+ * already written in the interface's language, stays exactly as it is, which is what
+ * keeps this from writing invisible characters into every string in the app.
+ */
+function isolateForeignValue(text: string): string {
+  const strong = firstStrongDirection(text);
+  if (strong === null || strong === interfaceDirection()) return text;
+  return isolateDirection(text);
+}
+
+/**
  * The direction a piece of text lays out in, and whether that direction is the text's
  * own or the interface's. Text with a strong character to read follows it; text without
  * one (empty, digits, punctuation) has no direction of its own and takes `fallbackDir`,
@@ -132,9 +152,18 @@ function resolveTextDirection(
 ): { dir: 'rtl' | 'ltr'; neutral: boolean } {
   const strong = firstStrongDirection(text);
   return {
-    dir: strong || fallbackDir || (isRtlLanguage(getLanguage()) ? 'rtl' : 'ltr'),
+    dir: strong || fallbackDir || interfaceDirection(),
     neutral: strong === null,
   };
+}
+
+/**
+ * The direction the interface itself reads in — the direction its own copy lays out in,
+ * and so the direction a piece of content is measured against to tell whether it is
+ * foreign to the line it is being written into.
+ */
+function interfaceDirection(): 'rtl' | 'ltr' {
+  return isRtlLanguage(getLanguage()) ? 'rtl' : 'ltr';
 }
 
 /**
@@ -189,6 +218,18 @@ export function applyTextDirection(el: HTMLElement | null, fallbackDir?: 'rtl' |
   applyContentDirection(el, (el as HTMLInputElement).value || '', fallbackDir);
 }
 
+/**
+ * Hands an element back to the interface's own direction, for the moment its content
+ * stops being the user's and becomes the interface's copy again — the empty state of a
+ * file card, a chip whose file was cleared. A `dir` left behind by the last file would
+ * outlive it and lay the localized copy out in the direction of a file that is gone.
+ */
+export function clearContentDirection(el: HTMLElement | null): void {
+  if (!el) return;
+  el.removeAttribute('dir');
+  el.removeAttribute('data-no-strong-char');
+}
+
 const dictionaries: Record<SupportedLanguage, Translations> = {
   en,
   fa,
@@ -240,7 +281,9 @@ export function t(key: string, params?: Record<string, string | number>): string
   // 4. Interpolate parameters like {name}, {count} safely without regex special replacement interpretation
   if (params && typeof params === 'object') {
     for (const [paramKey, val] of Object.entries(params)) {
-      text = text.replace(new RegExp(`\\{${paramKey}\\}`, 'g'), () => String(val));
+      // A value that reads the other way round from the sentence it lands in keeps its
+      // own order through an isolate, so a path or a file name survives the join.
+      text = text.replace(new RegExp(`\\{${paramKey}\\}`, 'g'), () => isolateForeignValue(String(val)));
     }
   }
 

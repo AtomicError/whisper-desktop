@@ -1,4 +1,4 @@
-import { t, firstStrongDirection, applyTextDirection, isolateLtr } from './i18n/index';
+import { t, firstStrongDirection, applyTextDirection, applyContentDirection, clearContentDirection, isolateDirection, isolateLtr } from './i18n/index';
 import { spanOrigins, assRunOrder } from './hardsubLayout';
 
 const invoke = async <T>(cmd: string, args: Record<string, any> = {}): Promise<T> => {
@@ -528,7 +528,6 @@ export class HardsubController {
   private swatchOutline: HTMLElement | null = null;
   private swatchBg: HTMLElement | null = null;
   private hexTextLabel: HTMLElement | null = null;
-  private hexOutlineLabel: HTMLElement | null = null;
   private hexBgLabel: HTMLElement | null = null;
 
   // Buttons & Toggles
@@ -780,7 +779,6 @@ export class HardsubController {
     this.swatchOutline = document.getElementById('hardsub-swatch-outline');
     this.swatchBg = document.getElementById('hardsub-swatch-bg');
     this.hexTextLabel = document.getElementById('hardsub-hex-text');
-    this.hexOutlineLabel = document.getElementById('hardsub-hex-outline');
     this.hexBgLabel = document.getElementById('hardsub-hex-bg');
 
     this.boldToggle = document.getElementById('hardsub-btn-bold') as HTMLButtonElement;
@@ -1215,7 +1213,6 @@ export class HardsubController {
       const val = parseInt(this.outlineSizeSlider!.value, 10);
       this.state.outlineSize = val;
       if (this.outlineSizeVal) this.outlineSizeVal.textContent = `${val}px`;
-      if (this.hexOutlineLabel) this.hexOutlineLabel.textContent = `${this.state.outlineColor} (${val}px)`;
       this.updateSliderBackground(this.outlineSizeSlider!);
       this.updateLivePreview();
     });
@@ -1226,7 +1223,6 @@ export class HardsubController {
         this.updateSliderBackground(this.outlineSizeSlider);
       }
       if (this.outlineSizeVal) this.outlineSizeVal.textContent = '2px';
-      if (this.hexOutlineLabel) this.hexOutlineLabel.textContent = `${this.state.outlineColor} (2px)`;
       this.updateLivePreview();
     });
 
@@ -2842,8 +2838,16 @@ export class HardsubController {
       if (hasVideo) {
         const lastSlash = Math.max(this.state.videoPath.lastIndexOf('/'), this.state.videoPath.lastIndexOf('\\'));
         const vName = lastSlash >= 0 ? this.state.videoPath.substring(lastSlash + 1) : this.state.videoPath;
-        const subCount = this.subtitleCues.length > 0 ? ` • ${this.subtitleCues.length} Cues` : (hasSub ? ' • Sub Loaded' : '');
-        this.mediaSummaryBadge.textContent = `✓ ${vName}${subCount}`;
+        // A name and a count, and each reads its own way: the badge is built from one
+        // isolate per token instead of one line of mixed directions, which is what used
+        // to hand the count's digits to the name beside them and print the extension on
+        // the far side of the badge. The count comes from the interface's own keys — the
+        // same two the cue list under the card uses, so a subtitle file that parsed to no
+        // cues reads "0 Cues" in Persian rather than an English "Sub Loaded".
+        const subCount = this.subtitleCues.length > 0
+          ? ` • ${isolateDirection(t('hardsub.cuesCount', { count: this.subtitleCues.length }))}`
+          : (hasSub ? ` • ${isolateDirection(t('hardsub.cuesCountZero'))}` : '');
+        this.mediaSummaryBadge.textContent = `✓ ${isolateDirection(vName)}${subCount}`;
         this.mediaSummaryBadge.title = `Video: ${isolateLtr(this.state.videoPath)}${hasSub ? `\nSubtitle: ${isolateLtr(this.state.subtitlePath)}` : ''}`;
         this.mediaSummaryBadge.style.display = 'inline-block';
       } else {
@@ -2855,7 +2859,10 @@ export class HardsubController {
 
   private updateVideoDropzoneUI(videoPath: string) {
     if (!videoPath) {
-      if (this.lblVideoName) this.lblVideoName.textContent = t('hardsub.noVideoLoaded');
+      if (this.lblVideoName) {
+        this.lblVideoName.textContent = t('hardsub.noVideoLoaded');
+        clearContentDirection(this.lblVideoName);
+      }
       if (this.lblVideoPath) this.lblVideoPath.textContent = t('hardsub.dropVideoPrompt');
       this.videoDropZone?.classList.remove('has-file');
       this.updateMediaAccordionSummary();
@@ -2865,7 +2872,13 @@ export class HardsubController {
     const lastSlash = Math.max(videoPath.lastIndexOf('/'), videoPath.lastIndexOf('\\'));
     const fileName = lastSlash >= 0 ? videoPath.substring(lastSlash + 1) : videoPath;
 
-    if (this.lblVideoName) this.lblVideoName.textContent = `✓ ${fileName}`;
+    // A name is the user's own text and reads in its own direction: `01 - intro.mkv`
+    // keeps its number in front in a Persian interface instead of coming out as
+    // `intro.mkv - 01`, and `[Group] Show - 01.mkv` keeps its tag where it was written.
+    if (this.lblVideoName) {
+      this.lblVideoName.textContent = `✓ ${fileName}`;
+      applyContentDirection(this.lblVideoName, fileName);
+    }
     if (this.lblVideoPath) this.lblVideoPath.textContent = videoPath;
     this.videoDropZone?.classList.add('has-file');
     this.updateMediaAccordionSummary();
@@ -2873,7 +2886,10 @@ export class HardsubController {
 
   private updateSubDropzoneUI(subPath: string, cueCount?: number) {
     if (!subPath) {
-      if (this.lblSubName) this.lblSubName.textContent = t('hardsub.noSubLoaded');
+      if (this.lblSubName) {
+        this.lblSubName.textContent = t('hardsub.noSubLoaded');
+        clearContentDirection(this.lblSubName);
+      }
       if (this.lblSubPath) this.lblSubPath.textContent = t('hardsub.dropSubPrompt');
       this.subDropZone?.classList.remove('has-file');
       this.updateMediaAccordionSummary();
@@ -2882,9 +2898,16 @@ export class HardsubController {
 
     const lastSlash = Math.max(subPath.lastIndexOf('/'), subPath.lastIndexOf('\\'));
     const fileName = lastSlash >= 0 ? subPath.substring(lastSlash + 1) : subPath;
-    const countStr = typeof cueCount === 'number' ? ` (${t('hardsub.cuesCount', { count: cueCount })})` : '';
+    // The count is a token of its own and the name is another, so each is isolated in
+    // the direction it reads in and the parentheses between them stay the interface's.
+    const countStr = typeof cueCount === 'number'
+      ? ` (${isolateDirection(t('hardsub.cuesCount', { count: cueCount }))})`
+      : '';
 
-    if (this.lblSubName) this.lblSubName.textContent = `✓ ${fileName}${countStr}`;
+    if (this.lblSubName) {
+      this.lblSubName.textContent = `✓ ${fileName}${countStr}`;
+      applyContentDirection(this.lblSubName, fileName);
+    }
     if (this.lblSubPath) this.lblSubPath.textContent = subPath;
     this.subDropZone?.classList.add('has-file');
     this.updateMediaAccordionSummary();
@@ -3093,7 +3116,6 @@ export class HardsubController {
     if (this.hexTextLabel) this.hexTextLabel.textContent = this.state.primaryColor;
 
     if (this.swatchOutline) this.swatchOutline.style.background = this.state.outlineColor;
-    if (this.hexOutlineLabel) this.hexOutlineLabel.textContent = `${this.state.outlineColor} (${this.state.outlineSize}px)`;
 
     if (this.swatchBg) this.swatchBg.style.background = this.state.bgBoxColor;
     if (this.hexBgLabel) this.hexBgLabel.textContent = this.state.bgBoxColor;
@@ -3399,7 +3421,9 @@ export class HardsubController {
         this.progressPctText.textContent = `${pct}%`;
       }
       if (this.progressStatusText) {
-        this.progressStatusText.textContent = data.message;
+        // Progress comes from the backend as one message, English around file names and
+        // paths it names; isolating it keeps the order the backend wrote it in.
+        this.progressStatusText.textContent = isolateDirection(data.message);
       }
 
       this.updateEncodingUIState(data.active);

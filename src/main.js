@@ -1,6 +1,6 @@
 import { hardsubController } from './hardsub.ts';
 import { translationStudioController } from './translationStudio.ts';
-import { initI18n, t, setLanguage, getLanguage, translateDOM, isRtlLanguage, applyTextDirection, isolateLtr, APP_NAME } from './i18n/index.ts';
+import { initI18n, t, setLanguage, getLanguage, translateDOM, isRtlLanguage, applyTextDirection, applyContentDirection, clearContentDirection, isolateDirection, isolateLtr, APP_NAME } from './i18n/index.ts';
 import { normalizeForSearch } from './languages.ts';
 import { initLanguageSelects, renderLanguageSelect } from './languageSelect.ts';
 
@@ -26,6 +26,24 @@ window.onerror = function(message, source, lineno, colno, error) {
 function getBasename(path) {
   if (!path) return '';
   return path.replace(/\\/g, '/').split('/').pop();
+}
+/**
+ * The single-file card names the user's own file, so that line reads in the file's own
+ * direction rather than the interface's: `01 - intro.mkv` keeps its number in front in a
+ * Persian interface instead of coming out as `intro.mkv - 01`. Called with no file it goes
+ * back to the interface's copy and hands the line back to the interface's direction.
+ */
+function updateMediaCardName(path) {
+  const nameEl = document.getElementById('lbl-file-name');
+  if (!nameEl) return;
+  if (path) {
+    const name = getBasename(path);
+    nameEl.textContent = name;
+    applyContentDirection(nameEl, name);
+  } else {
+    nameEl.textContent = t('transcribe.noFileLoaded');
+    clearContentDirection(nameEl);
+  }
 }
 
 function getParentDir(path) {
@@ -2222,10 +2240,10 @@ async function initApp() {
     const filePathEl = document.getElementById('lbl-file-path');
     if (fileNameEl && filePathEl) {
       if (selectedMediaFile) {
-        fileNameEl.textContent = getBasename(selectedMediaFile);
+        updateMediaCardName(selectedMediaFile);
         filePathEl.textContent = selectedMediaFile;
       } else if (!batchItems || batchItems.length === 0) {
-        fileNameEl.textContent = t('transcribe.noFileLoaded');
+        updateMediaCardName(null);
         filePathEl.textContent = t('transcribe.selectFilePrompt');
       }
     }
@@ -2471,7 +2489,9 @@ function setupTauriListeners() {
     
     if (fillBar) fillBar.style.width = `${pct}%`;
     if (pctEl) pctEl.textContent = `${pct}%`;
-    if (msgEl) msgEl.textContent = payload.message;
+    // Backend progress is one message with file names and paths inside it, so it keeps
+    // the order it was written in rather than being re-read through the interface's.
+    if (msgEl) msgEl.textContent = isolateDirection(payload.message);
     
     if (pulseDot) {
       if (payload.active) {
@@ -2499,7 +2519,7 @@ function setupTauriListeners() {
 
     if (fillBar) fillBar.style.width = payload.active ? `${pct}%` : (progressVal >= 1 ? '100%' : '0%');
     if (pctEl) pctEl.textContent = payload.active ? `${pct}%` : (progressVal >= 1 ? '100%' : '0%');
-    if (msgEl && payload.message) msgEl.textContent = payload.message;
+    if (msgEl && payload.message) msgEl.textContent = isolateDirection(payload.message);
 
     if (pulseDot) {
       if (payload.active) {
@@ -3949,7 +3969,7 @@ window.browseMediaFile = async function() {
       // Update UI for Single-file Mode
       document.getElementById('lbl-file-name').style.display = 'block';
       document.getElementById('lbl-file-path').style.display = 'block';
-      document.getElementById('lbl-file-name').textContent = getBasename(selectedMediaFile);
+      updateMediaCardName(selectedMediaFile);
       document.getElementById('lbl-file-path').textContent = selectedMediaFile;
       document.getElementById('batch-queue-container').style.display = 'none';
       
@@ -4650,7 +4670,7 @@ window.clearBatchQueue = function() {
   // Revert UI to initial empty single-file state
   document.getElementById('lbl-file-name').style.display = 'block';
   document.getElementById('lbl-file-path').style.display = 'block';
-  document.getElementById('lbl-file-name').textContent = t('transcribe.noFileLoaded');
+  updateMediaCardName(null);
   document.getElementById('lbl-file-path').textContent = t('transcribe.selectFilePrompt');
   document.getElementById('batch-queue-container').style.display = 'none';
   
@@ -4763,6 +4783,10 @@ function renderBatchQueueTable() {
     // Name column
     const nameTd = document.createElement('td');
     nameTd.textContent = item.name;
+    // A queued file's name is the user's own text, so it reads in its own direction
+    // whatever the interface is doing around it — the same treatment the single-file
+    // card above gives the same name.
+    applyContentDirection(nameTd, item.name);
     nameTd.title = isolateLtr(item.path);
     tr.appendChild(nameTd);
     
@@ -5195,7 +5219,7 @@ async function handleDroppedFiles(files) {
     
     document.getElementById('lbl-file-name').style.display = 'block';
     document.getElementById('lbl-file-path').style.display = 'block';
-    document.getElementById('lbl-file-name').textContent = getBasename(selectedMediaFile);
+    updateMediaCardName(selectedMediaFile);
     document.getElementById('lbl-file-path').textContent = selectedMediaFile;
     document.getElementById('batch-queue-container').style.display = 'none';
     

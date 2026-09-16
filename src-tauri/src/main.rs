@@ -540,6 +540,18 @@ fn read_text_file_content(file_path: String) -> Result<String, String> {
     read_text_file(canonical.to_string_lossy().to_string())
 }
 
+/// A file's size on disk, in bytes, for the subtitle card's readout. The card used to
+/// measure the decoded text it had loaded, which counts characters rather than bytes — a
+/// Persian subtitle is mostly two-byte characters in UTF-8, so it was reported at about
+/// half its size. Only the file knows how many bytes it holds; how the text happened to
+/// be decoded (a UTF-16 file, a BOM the reader strips) does not change that.
+#[tauri::command]
+fn get_file_size(file_path: String) -> Result<u64, String> {
+    std::fs::metadata(&file_path)
+        .map(|meta| meta.len())
+        .map_err(|e| format!("Failed to read the file's size: {e}"))
+}
+
 #[tauri::command]
 fn write_text_file_content(file_path: String, content: String) -> Result<(), String> {
     let path = std::path::Path::new(&file_path);
@@ -878,6 +890,7 @@ fn main() {
             select_directory,
             verify_directory_writable,
             read_text_file_content,
+            get_file_size,
             write_text_file_content,
             start_download_model_task,
             get_all_models_status,

@@ -7,7 +7,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
  * `directionAttributes`, and the subtitle card's file name through
  * `applyContentDirection` — so a change here changes all of them at once. The badges
  * and lists that hold phrases of two directions in one line build on the same rule
- * through `isolateDirection`.
+ * through `isolateDirection`, and so does every value interpolated into localized
+ * copy, which `t()` isolates when it reads the other way round from the sentence.
  *
  * The module touches `document`/`window` as soon as a language is applied, which
  * Node has neither of, so a few stubs stand in for them and the module is imported
@@ -40,6 +41,7 @@ let applyContentDirection: typeof import('./index').applyContentDirection;
 let directionAttributes: typeof import('./index').directionAttributes;
 let isolateDirection: typeof import('./index').isolateDirection;
 let isolateLtr: typeof import('./index').isolateLtr;
+let clearContentDirection: typeof import('./index').clearContentDirection;
 let t: typeof import('./index').t;
 let setLanguage: typeof import('./index').setLanguage;
 
@@ -72,6 +74,7 @@ beforeAll(async () => {
     directionAttributes,
     isolateDirection,
     isolateLtr,
+    clearContentDirection,
     t,
     setLanguage,
   } = await import('./index'));
@@ -296,6 +299,93 @@ describe('isolateDirection', () => {
 
     setLanguage('en');
     expect(badge()).toBe('\u2066SRT\u2069 • \u206612 cues\u2069 • \u2066921 B\u2069');
+  });
+});
+
+/**
+ * `clearContentDirection` is the other half of `applyContentDirection`: the moment a
+ * card's content stops being the user's file and becomes the interface's own copy
+ * again. A `dir` left behind by the file that is gone lays the localized copy out in
+ * the direction of that file.
+ */
+describe('clearContentDirection', () => {
+  it('takes back the direction and the marker a file name left behind', () => {
+    const name = new FakeField('');
+    applyContentDirection(asField(name), '01 - intro.mkv');
+    expect(name.attributes.get('dir')).toBe('ltr');
+
+    clearContentDirection(asField(name));
+    expect(name.attributes.has('dir')).toBe(false);
+    expect(name.hasAttribute('data-no-strong-char')).toBe(false);
+  });
+
+  it('clears text with no strong character too, marker and all', () => {
+    const name = new FakeField('');
+    applyContentDirection(asField(name), '۱۲۳.');
+    expect(name.hasAttribute('data-no-strong-char')).toBe(true);
+
+    clearContentDirection(asField(name));
+    expect(name.attributes.has('dir')).toBe(false);
+    expect(name.hasAttribute('data-no-strong-char')).toBe(false);
+  });
+
+  it('takes a missing element, which a card without that line passes', () => {
+    expect(() => clearContentDirection(null)).not.toThrow();
+  });
+});
+
+/**
+ * A value interpolated into localized copy is a token of its own, and the one place
+ * every such value passes through is `t()`. A path or a file name that reads the other
+ * way round from the sentence it lands in is isolated, so it is not read apart by the
+ * bidi algorithm on the way in; a value that already reads with the sentence — a count,
+ * or copy written in the interface's own language — is left exactly as it is.
+ */
+describe('t() interpolation', () => {
+  it('isolates a path that reads the other way round from the copy', () => {
+    setLanguage('fa');
+    expect(t('toasts.openFolderError', { error: '/home/ahmad/Videos' })).toContain(
+      '\u2066/home/ahmad/Videos\u2069'
+    );
+  });
+
+  it('isolates a file name for the same reason, keeping its extension with it', () => {
+    setLanguage('fa');
+    expect(t('modals.confirmDeleteModelDesc', { name: 'q5_k_m' })).toContain(
+      '\u2066q5_k_m\u2069'
+    );
+  });
+
+  it('isolates right-to-left copy in a left-to-right interface', () => {
+    setLanguage('en');
+    expect(t('modals.confirmDeleteModelDesc', { name: 'دوبله' })).toContain(
+      '\u2067دوبله\u2069'
+    );
+  });
+
+  it('leaves a count alone, in either interface', () => {
+    setLanguage('fa');
+    const faMessage = t('toasts.filesLoaded', { count: 3 });
+    expect(faMessage).toContain('3');
+    expect(faMessage).not.toContain('\u2066');
+    expect(faMessage).not.toContain('\u2067');
+
+    setLanguage('en');
+    expect(t('toasts.filesLoaded', { count: 3 })).not.toContain('\u2066');
+  });
+
+  it('leaves a value written in the interface’s own language alone', () => {
+    setLanguage('fa');
+    const faMessage = t('modals.confirmDeleteProviderDesc', { name: 'اوپن‌ای‌آی' });
+    expect(faMessage).toContain('اوپن‌ای‌آی');
+    expect(faMessage).not.toContain('\u2066');
+    expect(faMessage).not.toContain('\u2067');
+  });
+
+  it('substitutes a value with no direction of its own without inventing one', () => {
+    setLanguage('fa');
+    expect(t('toasts.filesLoaded', { count: '...' })).toContain('...');
+    expect(t('toasts.filesLoaded', { count: '...' })).not.toContain('\u2066');
   });
 });
 

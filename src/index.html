@@ -2875,7 +2875,10 @@
                   </div>
 
                   <div class="wizard-step-body" id="hardsub-media-step-body">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                    <!-- The two cards' columns live in styles.css rather than here: they
+                         share the body's width (`minmax(0, 1fr)` each) and stack below
+                         1100px, both of which an inline style would outrank. -->
+                    <div class="hardsub-media-grid">
                       
                       <!-- Video File Dropzone -->
                       <div class="media-drop-zone" id="hardsub-video-drop-zone" style="padding: 20px 14px; gap: 10px; position: relative;">
@@ -2893,8 +2896,11 @@
                           <p style="font-weight:600; margin-bottom:4px; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-video-name" data-i18n="hardsub.noVideoLoaded">No Video Loaded</p>
                           <!-- dir="auto": this field holds either a localized prompt or a path. A path is
                                an LTR technical string, and without this an RTL interface moves its leading
-                               slash to the end ("home/ahmad/Videos/vid.srt/"). -->
-                          <p dir="auto" style="font-size:0.75rem; color:var(--color-text-muted); margin:0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-video-path" data-i18n="hardsub.dropVideoPrompt">Drag & drop video (.mp4, .mkv, .mov)</p>
+                               slash to the end ("home/ahmad/Videos/vid.srt/"). It also holds two
+                               shapes of text with opposite needs from one box, which is why its
+                               one-line ellipsis lives in styles.css, keyed on the card's
+                               `has-file` class, rather than here: a path elides, the prompt wraps. -->
+                          <p dir="auto" style="font-size:0.75rem; color:var(--color-text-muted); margin:0;" id="lbl-hardsub-video-path" data-i18n="hardsub.dropVideoPrompt">Drag & drop video (.mp4, .mkv, .mov)</p>
                         </div>
                         <button class="btn-secondary" id="btn-browse-video" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap;" data-i18n="hardsub.browseVideo">Browse Video</button>
                         <input type="hidden" id="hardsub-video-path" />
@@ -2909,7 +2915,7 @@
                         </svg>
                         <div style="flex:1; overflow: hidden; max-width: 100%;">
                           <p style="font-weight:600; margin-bottom:4px; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-sub-name" data-i18n="hardsub.noSubLoaded">No Subtitle Loaded</p>
-                          <p dir="auto" style="font-size:0.75rem; color:var(--color-text-muted); margin:0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-sub-path" data-i18n="hardsub.dropSubPrompt">Drag & drop subtitle (.srt, .vtt, .ass)</p>
+                          <p dir="auto" style="font-size:0.75rem; color:var(--color-text-muted); margin:0;" id="lbl-hardsub-sub-path" data-i18n="hardsub.dropSubPrompt">Drag & drop subtitle (.srt, .vtt, .ass)</p>
                         </div>
                         <button class="btn-secondary" id="btn-browse-sub" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap;" data-i18n="hardsub.browseSub">Browse Subtitle</button>
                         <input type="hidden" id="hardsub-sub-path" />

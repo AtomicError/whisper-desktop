@@ -4,6 +4,7 @@ import {
   isolateDirection,
   directionAttributes,
   applyContentDirection,
+  clearContentDirection,
 } from './i18n/index';
 import { hardsubController } from './hardsub';
 
@@ -65,6 +66,26 @@ function escapeHTML(str: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+/**
+ * The loaded subtitle's size in bytes, for the card's readout.
+ *
+ * From the file itself: `content.length` counts characters, and a Persian subtitle is
+ * mostly two-byte characters in UTF-8, so the card reported it at about half its size.
+ * How the text was decoded is the other reason to ask the file rather than measure the
+ * string — a UTF-16 subtitle's UTF-8 re-encoding is not the file either. Measuring the
+ * content stays as the fallback, for the moment the command cannot answer: a byte count
+ * of the text is still far nearer the truth than the character count it replaces.
+ */
+async function subtitleSizeInBytes(path: string, content: string): Promise<number> {
+  const measured = () => new TextEncoder().encode(content).length;
+  try {
+    const size = await invoke<number>('get_file_size', { filePath: path });
+    return typeof size === 'number' && size > 0 ? size : measured();
+  } catch (_) {
+    return measured();
+  }
 }
 
 function formatBytes(bytes: number): string {
@@ -292,6 +313,7 @@ export class TranslationStudioController {
   private isScrollingThrottled: boolean = false;
   private scrollThrottledTimeout: any = null;
   private syncScrollRaf: number | null = null;
+  private subtitleLoadId = 0;
 
   public state: TranslationStudioState = {
     subtitlePath: '',
@@ -757,13 +779,17 @@ export class TranslationStudioController {
       return;
     }
 
+    const loadId = ++this.subtitleLoadId;
     try {
       const content = await invoke<string>('read_text_file_content', { filePath });
+      if (loadId !== this.subtitleLoadId) return;
+      const size = await subtitleSizeInBytes(filePath, content);
+      if (loadId !== this.subtitleLoadId) return;
 
       this.state.subtitlePath = filePath;
       this.state.subtitleName = fileName;
       this.state.subtitleExt = ext;
-      this.state.subtitleSize = content.length;
+      this.state.subtitleSize = size;
       this.state.subtitleRawText = content;
       this.state.sourceCues = parseSubtitleContent(content, ext);
 
@@ -789,8 +815,9 @@ export class TranslationStudioController {
       this.renderSourceCues();
       this.renderTargetCues();
       this.updateActionButtons();
-      this.detectCompanionVideo(filePath);
+      void this.detectCompanionVideo(filePath, loadId);
     } catch (err: any) {
+      if (loadId !== this.subtitleLoadId) return;
       console.error('Failed to load subtitle file:', err);
       this.notify(String(err || t('translate.noSubSelectedError')), 'error');
     }
@@ -798,6 +825,7 @@ export class TranslationStudioController {
 
   public clearLoadedSubtitle() {
     if (this.state.isTranslating) return;
+    this.subtitleLoadId++;
     this.state.subtitlePath = '';
     this.state.subtitleName = '';
     this.state.subtitleSize = 0;
@@ -829,7 +857,7 @@ export class TranslationStudioController {
     this.updateActionButtons();
   }
 
-  private async detectCompanionVideo(subtitlePath: string) {
+  private async detectCompanionVideo(subtitlePath: string, loadId: number) {
     this.state.companionVideoPath = null;
     if (this.companionChip) this.companionChip.style.display = 'none';
 
@@ -847,9 +875,11 @@ export class TranslationStudioController {
 
     for (const stem of candidateStems) {
       for (const ext of videoExtensions) {
+        if (loadId !== this.subtitleLoadId) return;
         const candidate = `${stem}${ext}`;
         try {
           await invoke('probe_media_file', { filePath: candidate });
+          if (loadId !== this.subtitleLoadId) return;
           this.state.companionVideoPath = candidate;
           if (this.companionChip && this.lblCompanionName) {
             const candidateName = candidate.split(/[\/\\]/).pop() || '';
@@ -914,8 +944,7 @@ export class TranslationStudioController {
       // Back to the interface's own copy, and back to the interface's direction — a
       // `dir` left behind by the last file would outlive it.
       this.lblSubName.textContent = t('translate.noSubLoaded');
-      this.lblSubName.removeAttribute('dir');
-      this.lblSubName.removeAttribute('data-no-strong-char');
+      clearContentDirection(this.lblSubName);
       this.lblSubName.removeAttribute('title');
       this.lblSubPath.textContent = t('translate.dropSubPrompt');
       this.lblSubPath.removeAttribute('title');
@@ -929,8 +958,7 @@ export class TranslationStudioController {
       }
       if (this.lblCompanionName) {
         this.lblCompanionName.textContent = '';
-        this.lblCompanionName.removeAttribute('dir');
-        this.lblCompanionName.removeAttribute('data-no-strong-char');
+        clearContentDirection(this.lblCompanionName);
       }
     }
 
@@ -1239,7 +1267,9 @@ export class TranslationStudioController {
         }
       }
       if (this.lblMsg && payload.message) {
-        this.lblMsg.textContent = payload.message;
+        // Backend progress is one message, English around whatever file it names; an
+        // isolate keeps the order it was written in.
+        this.lblMsg.textContent = isolateDirection(payload.message);
       }
       if (this.statusBadge) {
         if (payload.active) {

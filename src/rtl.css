@@ -385,6 +385,15 @@ html[dir="rtl"] .translate-cue-time {
   unicode-bidi: isolate;
 }
 
+/* The Hardsub page's cues carry the same readout, and need the same treatment for the
+   same reason: `00:00:01,000 → 00:00:03,000` is digits and a neutral arrow, and in a
+   right-to-left line the arrow takes the paragraph's direction and the two times come
+   back in the other order. */
+html[dir="rtl"] .subtitle-cue-time {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
 html[dir="rtl"] .translate-cue-num {
   direction: ltr;
   unicode-bidi: isolate;
@@ -397,6 +406,39 @@ html[dir="rtl"] .translate-lines-badge {
 
 html[dir="rtl"] .translate-switch-info {
   text-align: right;
+}
+
+/* The queue table mirrors its columns in an RTL interface — that is the table's own
+   `direction` — so its cells have to read from the side its columns do. `.batch-table`
+   aligns them left for the left-to-right table, and without this the file name in the
+   rightmost column hugs the far edge, away from the header over it. The 18px that the
+   first and last columns keep from the table's edges swap sides with them. */
+html[dir="rtl"] .batch-table {
+  text-align: right;
+}
+
+html[dir="rtl"] .batch-table th:first-child,
+html[dir="rtl"] .batch-table td:first-child {
+  padding-left: 16px;
+  padding-right: 18px;
+}
+
+html[dir="rtl"] .batch-table th:last-child,
+html[dir="rtl"] .batch-table td:last-child {
+  padding-right: 16px;
+  padding-left: 18px;
+}
+
+/* The two color readouts are literals — `#FFFFFF` is how the color is written — and in a
+   right-to-left line the `#` is neutral, so it is handed the paragraph's direction and
+   surfaces on the far side of the letters, printed as `FFFFFF#`. They read as written,
+   in the same mono face the swatch and the picker beside them use. */
+html[dir="rtl"] #hardsub-hex-text,
+html[dir="rtl"] #hardsub-hex-bg {
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: left;
+  font-family: var(--font-mono);
 }
 
 [dir="rtl"] .about-modal-close-btn,

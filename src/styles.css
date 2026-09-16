@@ -2903,6 +2903,46 @@ select.select-control {
   color: var(--color-cyan);
 }
 
+/* The second line of a media card carries one of two things, and they want opposite
+   treatment from the same box. Empty, it is the interface's prompt — a sentence whose end
+   is the instruction ("… را رها کنید", "… hierher ziehen") — and the card is what half of
+   a split panel leaves: 184px against the 344px the Persian prompt needs at a 1280px
+   window. Elided, it was quietly dropping the end of the instruction; wrapped, the card
+   grows by a line instead. Loaded, the same line is a path, and a path is a technical
+   string that belongs on one line with an ellipsis. So the wrapping belongs to the empty
+   state and the ellipsis to the loaded one, keyed on the `has-file` class the controller
+   sets when a file arrives. */
+.media-drop-zone #lbl-hardsub-video-path,
+.media-drop-zone #lbl-hardsub-sub-path {
+  white-space: normal;
+  text-wrap: pretty;
+}
+
+.media-drop-zone.has-file #lbl-hardsub-video-path,
+.media-drop-zone.has-file #lbl-hardsub-sub-path {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The two media cards of the Hardsub page's first step. `minmax(0, 1fr)` rather than a
+   bare `1fr` per column: a bare `1fr` floors each column at its own content, and these
+   cards carry a nowrap browse button that is 125px wide in German, so the pair grew past
+   the body holding them instead of sharing it — 222px of overflow at a 1024px window in
+   Persian, with the second card clipped by the panel. Below 1100px the two no longer have
+   the ~660px they need side by side, so they stack and each takes the full width. */
+.hardsub-media-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+}
+
+@media (max-width: 1100px) {
+  .hardsub-media-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .media-icon {
   width: 38px;
   height: 38px;
@@ -2985,6 +3025,12 @@ select.select-control {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
 }
 
+/* A field's label, not a file name, so it wraps rather than eliding. The deck's cards
+   are what the left column leaves — 141px each at a 1024px window — and "SPOKEN
+   LANGUAGE", uppercase at 0.76rem with 0.5px of letter-spacing and a 13px icon beside
+   it, needs 152px of that: it was coming out as "SPOKEN LANGU…" in the band between the
+   widening of the column and the 960px breakpoint that stacks the layout. Wrapped, the
+   row of cards grows by a line and the label stays whole. */
 .quick-config-label {
   display: flex;
   align-items: center;
@@ -2994,9 +3040,8 @@ select.select-control {
   color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  text-wrap: pretty;
   user-select: none;
 }
 
@@ -9250,10 +9295,18 @@ html[dir="rtl"] .cat-match-badge {
   background: rgba(var(--color-royal-blue-rgb), 0.08);
 }
 
+/* A cue's index and its timecode. In the two-pane preview the pane is what the controls
+   column leaves of the right-hand side: 179px of header at a 1280px window against the
+   189px `#12 00:00:01,000 ➔ 00:00:03,000` needs, and the row pushed the time out of the
+   card — into the pane's side, which scrolls sideways once the cue list is a scroll
+   container. The row wraps instead, so the timecode takes the line under its index and
+   the pair still fits the narrowest pane this layout produces. */
 .translate-cue-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  row-gap: 2px;
   font-size: 0.7rem;
   color: var(--color-text-dim);
 }
@@ -9264,12 +9317,18 @@ html[dir="rtl"] .cat-match-badge {
   font-family: monospace;
 }
 
+/* The start and end time of a cue. It reads left to right whatever the interface does
+   (the rtl stylesheet isolates it too), and it may break between the two times: they are
+   two values with a space and an arrow between them, and in a narrow preview pane the
+   whole string is wider than the pane. Held on one line it pushed the right-hand time
+   out of the card, and a cue list is a scroll container, so the pane scrolled sideways
+   after it. */
 .translate-cue-time {
   font-family: monospace;
   letter-spacing: -0.2px;
   direction: ltr;
   display: inline-block;
-  white-space: nowrap;
+  text-wrap: pretty;
 }
 
 .translate-cue-text {
@@ -9361,6 +9420,19 @@ html[dir="rtl"] .cat-match-badge {
 }
 
 @media (max-width: 640px) {
+  .translate-preview-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Between the width where the controls column reappears (1025px) and the one where the
+   right-hand side is wide enough for two panes again, the two-pane preview is too narrow
+   to read: each pane is what `minmax(380px, 440px)` of controls leaves — 111px at 1100px
+   against the ~250px a cue row needs for its index, time and one line of text. In that
+   band the panes stack, so each takes the whole column; above it the side-by-side
+   comparison is back. Disjoint from the 640px rule above, which covers a narrower band
+   again (there the whole layout has already stacked). */
+@media (min-width: 1025px) and (max-width: 1300px) {
   .translate-preview-grid {
     grid-template-columns: 1fr;
   }

@@ -26,6 +26,7 @@ allow = [
   "get_font_render_scale",
   "start_hardsub_task",
   "read_text_file_content",
+  "get_file_size",
   "start_download_model_task",
   "get_model_download_progress",
   "get_all_models_status",
