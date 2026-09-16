@@ -1,4 +1,10 @@
-import { t, isolateLtr } from './i18n/index';
+import {
+  t,
+  isolateLtr,
+  isolateDirection,
+  directionAttributes,
+  applyContentDirection,
+} from './i18n/index';
 import { hardsubController } from './hardsub';
 
 const invoke = async <T>(cmd: string, args: Record<string, any> = {}): Promise<T> => {
@@ -848,7 +854,11 @@ export class TranslationStudioController {
           if (this.companionChip && this.lblCompanionName) {
             const candidateName = candidate.split(/[\/\\]/).pop() || '';
             this.lblCompanionName.textContent = candidateName;
-            this.companionChip.title = candidate;
+            // The chip names a file the same way the card above it names one: the
+            // name reads in its own direction, with the extension last in whatever
+            // order that is, and the chip's icon stays on the interface's own side.
+            applyContentDirection(this.lblCompanionName, candidateName);
+            this.companionChip.title = isolateLtr(candidate);
             this.companionChip.style.display = 'inline-flex';
           }
           return;
@@ -863,7 +873,13 @@ export class TranslationStudioController {
     if (!this.lblSubName || !this.lblSubPath || !this.lblSubMeta || !this.btnClearSub) return;
 
     if (this.state.subtitlePath) {
+      // A subtitle's name is the user's own text, so it reads in its own direction
+      // rather than the interface's: `دوبله فارسی.srt` keeps its name on the right and
+      // its extension at the end of the reading order, and `movie.srt` keeps both on
+      // the left. Only the line's *alignment* belongs to the interface — it is the
+      // card's own side that names hug (see the `.has-file .translate-sub-name` rule).
       this.lblSubName.textContent = this.state.subtitleName;
+      applyContentDirection(this.lblSubName, this.state.subtitleName);
       this.lblSubName.title = isolateLtr(this.state.subtitlePath);
       this.lblSubPath.textContent = this.state.subtitlePath;
       this.lblSubPath.title = isolateLtr(this.state.subtitlePath);
@@ -871,14 +887,35 @@ export class TranslationStudioController {
       const cueCount = this.state.sourceCues.length;
       const sizeStr = formatBytes(this.state.subtitleSize);
       const extUpper = this.state.subtitleExt.toUpperCase();
-      this.lblSubMeta.textContent = `${extUpper} • ${t('translate.cuesCount', { count: cueCount })} • ${sizeStr}`;
+      // Format, cue count and size, one token each and each isolated in the direction
+      // it reads in. Run together they are a single line of mixed directions, and the
+      // bidi algorithm resolves it against whichever token happens to be there: the
+      // count's digits get claimed by the `SRT` beside them (UAX #9 W7) and surface on
+      // the far side of it, the space between the count and the size lands on the wrong
+      // token, and the separator the reader looks for never falls where it is written.
+      // Isolating each token keeps all three whole and hands the ` • ` between them to
+      // the interface, so the badge reads in the interface's own order in every
+      // language and a Persian reader gets the count as `12 قطعه`, not `قطعه 12` split
+      // across the line.
+      this.lblSubMeta.textContent = [
+        isolateDirection(extUpper),
+        isolateDirection(t('translate.cuesCount', { count: cueCount })),
+        isolateDirection(sizeStr),
+      ].join(' • ');
       this.lblSubMeta.style.display = 'inline-flex';
 
       this.btnClearSub.style.display = 'inline-flex';
       this.dropZone?.classList.add('has-file');
-      this.dropZone?.setAttribute('title', this.state.subtitlePath);
+      // A tooltip is the browser's to render, and a path in a right-to-left interface
+      // is what `isolateLtr` exists for — the same treatment the two titles above and
+      // every other path tooltip in the app already get.
+      this.dropZone?.setAttribute('title', isolateLtr(this.state.subtitlePath));
     } else {
+      // Back to the interface's own copy, and back to the interface's direction — a
+      // `dir` left behind by the last file would outlive it.
       this.lblSubName.textContent = t('translate.noSubLoaded');
+      this.lblSubName.removeAttribute('dir');
+      this.lblSubName.removeAttribute('data-no-strong-char');
       this.lblSubName.removeAttribute('title');
       this.lblSubPath.textContent = t('translate.dropSubPrompt');
       this.lblSubPath.removeAttribute('title');
@@ -889,6 +926,11 @@ export class TranslationStudioController {
       if (this.companionChip) {
         this.companionChip.style.display = 'none';
         this.companionChip.removeAttribute('title');
+      }
+      if (this.lblCompanionName) {
+        this.lblCompanionName.textContent = '';
+        this.lblCompanionName.removeAttribute('dir');
+        this.lblCompanionName.removeAttribute('data-no-strong-char');
       }
     }
 
@@ -1063,13 +1105,18 @@ export class TranslationStudioController {
       return;
     }
 
+    // A cue reads in the direction of its own language, not the interface's — a Persian
+    // cue inside an English interface was laid out left-to-right, and an English cue
+    // inside a Persian one right-to-left. Both panes take that direction from the shared
+    // rule at render time (the text is written once, so it cannot be pointed at its
+    // content afterwards the way an editable field is).
     const html = this.state.sourceCues.map(cue => `
       <div class="translate-cue-item" data-id="${cue.id}" role="listitem" tabindex="0" aria-label="Cue #${cue.id}">
         <div class="translate-cue-header">
           <span class="translate-cue-num">#${cue.id}</span>
           ${cue.startTimeStr ? `<span class="translate-cue-time">${escapeHTML(cue.startTimeStr)}${cue.endTimeStr ? ` ➔ ${escapeHTML(cue.endTimeStr)}` : ''}</span>` : ''}
         </div>
-        <div class="translate-cue-text">${escapeHTML(cue.text)}</div>
+        <div class="translate-cue-text" ${directionAttributes(cue.text)}>${escapeHTML(cue.text)}</div>
       </div>
     `).join('');
 
@@ -1104,7 +1151,7 @@ export class TranslationStudioController {
           <span class="translate-cue-num">#${cue.id}</span>
           ${cue.startTimeStr ? `<span class="translate-cue-time">${escapeHTML(cue.startTimeStr)}${cue.endTimeStr ? ` ➔ ${escapeHTML(cue.endTimeStr)}` : ''}</span>` : ''}
         </div>
-        <div class="translate-cue-text translate-cue-text-target" dir="auto">${escapeHTML(cue.text)}</div>
+        <div class="translate-cue-text translate-cue-text-target" ${directionAttributes(cue.text)}>${escapeHTML(cue.text)}</div>
       </div>
     `).join('');
 

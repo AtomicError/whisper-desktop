@@ -1,9 +1,13 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 
 /**
- * Tests for the one rule every content-following text field resolves its direction
- * with — the cue editor, the transcript lines and the prompt fields all go through
- * `applyTextDirection`, so a change here changes all of them at once.
+ * Tests for the one rule every content-following piece of text resolves its direction
+ * with — the cue editor, the transcript lines and the prompt fields go through
+ * `applyTextDirection`, the Translation Studio's cue panes through
+ * `directionAttributes`, and the subtitle card's file name through
+ * `applyContentDirection` — so a change here changes all of them at once. The badges
+ * and lists that hold phrases of two directions in one line build on the same rule
+ * through `isolateDirection`.
  *
  * The module touches `document`/`window` as soon as a language is applied, which
  * Node has neither of, so a few stubs stand in for them and the module is imported
@@ -32,7 +36,11 @@ function asField(field: FakeField): HTMLElement {
 
 let firstStrongDirection: typeof import('./index').firstStrongDirection;
 let applyTextDirection: typeof import('./index').applyTextDirection;
+let applyContentDirection: typeof import('./index').applyContentDirection;
+let directionAttributes: typeof import('./index').directionAttributes;
+let isolateDirection: typeof import('./index').isolateDirection;
 let isolateLtr: typeof import('./index').isolateLtr;
+let t: typeof import('./index').t;
 let setLanguage: typeof import('./index').setLanguage;
 
 beforeAll(async () => {
@@ -57,7 +65,16 @@ beforeAll(async () => {
     ),
   });
 
-  ({ firstStrongDirection, applyTextDirection, isolateLtr, setLanguage } = await import('./index'));
+  ({
+    firstStrongDirection,
+    applyTextDirection,
+    applyContentDirection,
+    directionAttributes,
+    isolateDirection,
+    isolateLtr,
+    t,
+    setLanguage,
+  } = await import('./index'));
 });
 
 /** What applyTextDirection() decided, as the field itself would report it. */
@@ -161,6 +178,124 @@ describe('applyTextDirection', () => {
 
   it('ignores a missing element instead of throwing', () => {
     expect(() => applyTextDirection(null)).not.toThrow();
+  });
+});
+
+/**
+ * The rendered blocks a field cannot be: their text is written once, from a subtitle
+ * file, so the direction has to be decided while the markup is built. It must land on
+ * the same answer `applyTextDirection` would give for the same text, or a cue would
+ * read one way in the panes and another in the editor.
+ */
+describe('directionAttributes', () => {
+  it('writes the direction the text reads in, whichever way round it is', () => {
+    setLanguage('en');
+    expect(directionAttributes('سلام دنیا')).toBe('dir="rtl"');
+    expect(directionAttributes('Hello, world.')).toBe('dir="ltr"');
+
+    setLanguage('fa');
+    expect(directionAttributes('Hello, world.')).toBe('dir="ltr"');
+    expect(directionAttributes('سلام دنیا')).toBe('dir="rtl"');
+  });
+
+  it('hands text with no strong character to the interface and marks it as neutral', () => {
+    setLanguage('fa');
+    expect(directionAttributes('')).toBe('dir="rtl" data-no-strong-char');
+    expect(directionAttributes('...')).toBe('dir="rtl" data-no-strong-char');
+    expect(directionAttributes('۱۲۳')).toBe('dir="rtl" data-no-strong-char');
+
+    setLanguage('en');
+    expect(directionAttributes('42%')).toBe('dir="ltr" data-no-strong-char');
+  });
+
+  it('only uses the fallback when the text has no strong character of its own', () => {
+    setLanguage('en');
+    expect(directionAttributes('42%', 'rtl')).toBe('dir="rtl" data-no-strong-char');
+    expect(directionAttributes('Hello', 'rtl')).toBe('dir="ltr"');
+    expect(directionAttributes('', 'ltr')).toBe('dir="ltr" data-no-strong-char');
+  });
+});
+
+/**
+ * The element-level twin of `directionAttributes`, and the one the subtitle card's file
+ * name goes through: the name is the user's own text, written once with `textContent`,
+ * so its attribute has to be set alongside rather than built into markup.
+ */
+describe('applyContentDirection', () => {
+  it('points the element at the direction of the text it was just given', () => {
+    setLanguage('en');
+    const name = new FakeField();
+    applyContentDirection(asField(name), 'movie.srt');
+    expect(name.attributes.get('dir')).toBe('ltr');
+    applyContentDirection(asField(name), 'دوبله فارسی.srt');
+    expect(name.attributes.get('dir')).toBe('rtl');
+
+    // The interface is not consulted for text that can answer for itself.
+    setLanguage('fa');
+    applyContentDirection(asField(name), 'movie.srt');
+    expect(name.attributes.get('dir')).toBe('ltr');
+  });
+
+  it('marks text with no strong character and falls back to the interface', () => {
+    setLanguage('fa');
+    const name = new FakeField();
+    applyContentDirection(asField(name), '۱۲۳.');
+    expect(name.attributes.get('dir')).toBe('rtl');
+    expect(name.hasAttribute('data-no-strong-char')).toBe(true);
+    applyContentDirection(asField(name), '...', 'ltr');
+    expect(name.attributes.get('dir')).toBe('ltr');
+  });
+
+  it('ignores a missing element instead of throwing', () => {
+    expect(() => applyContentDirection(null, 'movie.srt')).not.toThrow();
+  });
+});
+
+/**
+ * `isolateDirection` is what the metadata badge is built from: a line holding a
+ * technical token, a localized phrase and another technical token has three
+ * directions in it, and an isolate per token is what stops the bidi algorithm from
+ * reading straight through them.
+ */
+describe('isolateDirection', () => {
+  it('wraps the text in an isolate of its own direction (RLI/LRI … PDI)', () => {
+    expect(isolateDirection('سلام دنیا')).toBe('\u2067سلام دنیا\u2069');
+    expect(isolateDirection('Hello')).toBe('\u2066Hello\u2069');
+    expect(isolateDirection('921 B')).toBe('\u2066921 B\u2069');
+  });
+
+  it('reads the text, not the interface, so a Latin token is left-to-right in Persian', () => {
+    setLanguage('fa');
+    expect(isolateDirection('SRT')).toBe('\u2066SRT\u2069');
+    setLanguage('en');
+    expect(isolateDirection('قطعه')).toBe('\u2067قطعه\u2069');
+  });
+
+  it('hands text with no strong character to the interface, or to the fallback', () => {
+    setLanguage('fa');
+    expect(isolateDirection('42')).toBe('\u206742\u2069');
+    expect(isolateDirection('42', 'ltr')).toBe('\u206642\u2069');
+    setLanguage('en');
+    expect(isolateDirection('...')).toBe('\u2066...\u2069');
+  });
+
+  it('keeps every token of the metadata badge separable, in both interfaces', () => {
+    // The string the badge is rendered from. A Persian count written next to `SRT`
+    // without its isolate is what puts the digits on the far side of the Latin run
+    // (UAX #9 W7) and the space between two tokens in the wrong place; the marks are
+    // invisible, so the arrangement they produce is pinned here instead.
+    const badge = () =>
+      [
+        isolateDirection('SRT'),
+        isolateDirection(t('translate.cuesCount', { count: 12 })),
+        isolateDirection('921 B'),
+      ].join(' • ');
+
+    setLanguage('fa');
+    expect(badge()).toBe('\u2066SRT\u2069 • \u206712 قطعه\u2069 • \u2066921 B\u2069');
+
+    setLanguage('en');
+    expect(badge()).toBe('\u2066SRT\u2069 • \u206612 cues\u2069 • \u2066921 B\u2069');
   });
 });
 

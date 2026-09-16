@@ -355,20 +355,24 @@ html[dir="rtl"] .about-update-subtext {
 }
 
 /* 8. Translation Studio RTL */
-html[dir="rtl"] #translate-drop-zone .translate-sub-info {
+/* The drop-zone's file card. The loaded name carries its own direction (`dir` is set
+   from the name itself), so it is not forced anywhere: a Persian name reads right to
+   left with its extension at the end of the reading order, a Latin one reads left to
+   right. Only its side is the interface's — the name sits against the card's icon,
+   which in this layout is the right-hand edge. styles.css aligns the loaded name to
+   the left for an English interface, so this is the other half of that pair, for the
+   interface whose icon is on the right. The meta badge used to need a rule here too,
+   back when it forced its own direction; it now follows the interface and carries its
+   isolation with the rest of its definition in styles.css. */
+html[dir="rtl"] #translate-drop-zone.has-file .translate-sub-name {
   text-align: right;
 }
 
-html[dir="rtl"] #translate-drop-zone.has-file .translate-sub-name {
-  direction: ltr;
-  text-align: left;
-}
 
-html[dir="rtl"] #translate-drop-zone.has-file .translate-sub-meta-badge {
-  unicode-bidi: isolate;
-}
-
-html[dir="rtl"] #translate-drop-zone.has-file #lbl-translate-sub-path,
+/* The output folder is a path wherever it is shown, so it reads left to right and in the
+   mono face. The drop-zone's own path line was styled alongside it until now, though
+   that line has been hidden since a loaded file started showing its name and size on the
+   card and its path only in the tooltip, isolated by `isolateLtr`. */
 html[dir="rtl"] .translate-output-display.has-custom-path {
   direction: ltr;
   text-align: left;
@@ -387,11 +391,6 @@ html[dir="rtl"] .translate-cue-num {
 }
 
 html[dir="rtl"] .translate-lines-badge {
-  direction: ltr;
-  unicode-bidi: isolate;
-}
-
-html[dir="rtl"] .translate-companion-badge {
   direction: ltr;
   unicode-bidi: isolate;
 }

@@ -2601,7 +2601,6 @@
                           </svg>
                           <div class="translate-sub-titles">
                             <p class="translate-sub-name" id="lbl-translate-sub-name" data-i18n="translate.noSubLoaded">No Subtitle Loaded</p>
-                            <p class="translate-sub-prompt" id="lbl-translate-sub-path" data-i18n="translate.dropSubPrompt">Drag &amp; drop subtitle (.srt, .vtt, .lrc, .txt)</p>
                           </div>
                         </div>
                         <div class="translate-dropzone-actions">
@@ -2609,6 +2608,15 @@
                           <button class="btn-secondary btn-clear-sub" id="btn-clear-translate-sub" data-i18n="translate.clearSub" type="button" style="display:none;">Clear</button>
                         </div>
                       </div>
+
+                      <!-- The empty-state prompt, on a line of the card's own rather than in the
+                           identity column beside the icon: that column is what the browse
+                           button leaves of a 440px panel (213px), and the sentence needs 251px
+                           in Persian, 223px in German, and 197px in English. Full width it
+                           fits on one line in every language, and it is hidden outright once
+                           a file is loaded — the loaded card puts the path in a tooltip and
+                           its name and size on the row above. -->
+                      <p class="translate-sub-prompt" id="lbl-translate-sub-path" data-i18n="translate.dropSubPrompt">Drag &amp; drop subtitle (.srt, .vtt, .lrc, .txt)</p>
 
                       <div class="translate-dropzone-meta-row">
                         <span class="translate-sub-meta-badge" id="lbl-translate-sub-meta" style="display:none;"></span>

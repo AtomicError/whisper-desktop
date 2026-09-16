@@ -7400,10 +7400,12 @@ html[dir="rtl"] .cat-match-badge {
    algorithm itself, ignoring the element's direction — which left the caret on the
    left in an empty field even in a Persian interface. A value with no strong character
    anywhere (empty, or digits and punctuation only) has no direction of its own, so
-   these fields honour their `dir` — the interface's — instead. `applyTextDirection`
-   in i18n sets and clears the attribute as the content is edited. */
+   these fields — and the cue blocks rendered from `directionAttributes` — honour their
+   `dir`, the interface's, instead. `applyTextDirection` in i18n sets and clears the
+   attribute as the content is edited. */
 .subtitle-cue-textarea[data-no-strong-char],
-.transcript-text-input[data-no-strong-char] {
+.transcript-text-input[data-no-strong-char],
+.translate-cue-text[data-no-strong-char] {
   unicode-bidi: normal;
 }
 
@@ -8568,13 +8570,23 @@ html[dir="rtl"] .cat-match-badge {
   text-overflow: ellipsis;
 }
 
+/* The empty-state prompt takes a line of the card rather than a place in the identity
+   column beside the icon (see the markup): that column is what the browse button leaves
+   of a 440px panel — 213px — and the sentence needs 251px in Persian, 223px in German
+   and 197px in English. Across the card it fits on one line in each of them. Two things
+   keep it honest when a translation does outgrow even that: it wraps instead of
+   eliding, because an ellipsis here was silently swallowing the end of an instruction
+   rather than the end of a file name, and `pretty` asks the engine to keep the last
+   line off a single word where it can (ignored where it is not understood). */
 .translate-dropzone-card .translate-sub-prompt {
   font-size: 0.75rem;
   color: var(--color-text-muted);
   margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* A line of the card, not a chip in a centred column of items — `.media-drop-zone`
+     shrinks its children to their content, which would centre the hint in place. */
+  width: 100%;
+  white-space: normal;
+  text-wrap: pretty;
 }
 
 .translate-dropzone-card .translate-dropzone-actions {
@@ -8626,6 +8638,16 @@ html[dir="rtl"] .cat-match-badge {
   display: none !important;
 }
 
+/* Where a loaded name sits is the interface's to decide, and it belongs against the
+   icon of the identity block: the left in a left-to-right interface, the right in a
+   right-to-left one, which is the other half of this pair in the RTL stylesheet. The
+   direction the name itself reads in is not this rule's business — that comes from the
+   name (`dir` is set from it), so a Persian name keeps its extension at the end of its
+   own reading order and a Latin one at the end of this one, either way beside the icon. */
+#translate-drop-zone.translate-dropzone-card.has-file .translate-sub-name {
+  text-align: left;
+}
+
 #translate-drop-zone.translate-dropzone-card.has-file .btn-sub-browse,
 #translate-drop-zone.translate-dropzone-card.has-file .btn-clear-sub {
   height: 28px;
@@ -8656,6 +8678,16 @@ html[dir="rtl"] .cat-match-badge {
   border-radius: 5px;
   white-space: nowrap;
   flex-shrink: 0;
+  /* The badge's direction is the interface's, so format, cue count and size are read in
+     the interface's own order — right to left in a Persian interface, where a Persian
+     reader takes the format first and the size last, exactly as they are written. What
+     holds that reading together is the isolation on the tokens themselves: the code
+     wraps each one in a bidi isolate of its own direction (see `isolateDirection`), so a
+     token of the other direction — a Persian cue count in an English badge, the size
+     with its unit in a Persian one — can neither be claimed by the token beside it nor
+     claim the neutral space between them. The isolate here keeps those three tokens a
+     single unit on the line rather than letting them interleave with what follows. */
+  unicode-bidi: isolate;
 }
 
 .translate-companion-badge {
@@ -8674,7 +8706,23 @@ html[dir="rtl"] .cat-match-badge {
   text-overflow: ellipsis;
   white-space: nowrap;
   margin: 0;
-  direction: ltr;
+  /* The chip holds an icon and a file name, and the icon is the part that belongs to
+     the interface: it stays on the interface's own side of the chip while the name
+     takes its direction from the file itself (`dir` is set from the name), so a
+     Persian video name reads right to left with its extension at the end of the
+     reading order and a Latin one reads left to right. The isolate keeps the chip a
+     single unit on the metadata row rather than letting its name interleave with the
+     badge beside it. */
+  unicode-bidi: isolate;
+}
+
+/* A companion's name is as long as the file it came from and the chip is a fixed 140px,
+   so the name is the part that gives: without a shrinkable box it kept its full width and
+   was cut off at the chip's edge, mid-glyph and without a mark of any kind. */
+.translate-companion-badge #lbl-companion-video-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* 2. Target Language Selector */
@@ -9135,6 +9183,19 @@ html[dir="rtl"] .cat-match-badge {
   border-bottom: 1px solid var(--border-glass);
 }
 
+/* The pane header is a label on a pane rather than a sentence in it — the same two
+   lines in every language — so its title and the count beside it keep the interface's
+   Latin face, Inter, whatever the interface is set in, just as the cue timecodes and
+   every other figure on this page keep theirs. Inter carries no Arabic script, so the
+   Persian titles fall through to the next face in `--font-sans` (Vazirmatn in a
+   Persian interface) and read exactly as they did; what comes out of Inter is the
+   count and any Latin in the title, which would otherwise take the shape of whichever
+   script the interface is using. */
+.translate-pane-title,
+.translate-count-badge {
+  font-family: 'Inter', var(--font-sans);
+}
+
 .translate-pane-title {
   display: flex;
   align-items: center;
@@ -9218,6 +9279,16 @@ html[dir="rtl"] .cat-match-badge {
   white-space: pre-wrap;
   user-select: text;
   word-break: break-word;
+  /* A cue reads in the direction of its own language, not the interface's: a Persian cue
+     in an English interface came out left-to-right (and an English cue in a Persian one
+     right-to-left), which moved its punctuation to the wrong end of the line and put it
+     on the wrong side of the pane. `plaintext` lays each line out by its own first strong
+     character, the direction the shared rule in i18n wrote to `dir`, and `text-align:
+     start` follows that instead of the `right` the RTL interface hands down to every
+     element. A cue with no strong character of its own is marked by that rule so the
+     marker rule further up lets it take the interface's direction instead. */
+  unicode-bidi: plaintext;
+  text-align: start;
 }
 
 .translate-cue-translated {

@@ -99,27 +99,94 @@ export function isolateLtr(text: string): string {
 }
 
 /**
- * Points a text field at the direction its content calls for, falling back to the
- * interface direction when the content has no strong character to read.
+ * Wraps a phrase in a bidi isolate in the direction that phrase reads in — the twin of
+ * `isolateLtr` for localized copy that has to keep its own order inside a line whose
+ * direction is the interface's.
+ *
+ * The translation card's metadata badge is where it earns its keep: `SRT • 12 قطعه •
+ * 921 B` is three tokens of three different directions in one line, and unisolated the
+ * bidi algorithm reads straight through them — the count's digits are claimed by the
+ * Latin run beside them and come back on the wrong side of it, and the neutral space
+ * between two tokens is handed to whichever run the rules reach first. One isolate per
+ * token keeps every token whole, and leaves the ` • ` separators to the interface's own
+ * direction, so the badge reads right to left in a Persian interface and left to right
+ * in an English one without a token changing its shape.
+ */
+export function isolateDirection(text: string, fallbackDir?: 'rtl' | 'ltr'): string {
+  const { dir } = resolveTextDirection(text, fallbackDir);
+  return dir === 'rtl' ? `\u2067${text}\u2069` : `\u2066${text}\u2069`;
+}
+
+/**
+ * The direction a piece of text lays out in, and whether that direction is the text's
+ * own or the interface's. Text with a strong character to read follows it; text without
+ * one (empty, digits, punctuation) has no direction of its own and takes `fallbackDir`,
+ * or the interface direction when no fallback is given.
+ *
+ * Every field and every cue that follows its content resolves it here, so none of them
+ * can disagree about a line's direction.
+ */
+function resolveTextDirection(
+  text: string,
+  fallbackDir?: 'rtl' | 'ltr'
+): { dir: 'rtl' | 'ltr'; neutral: boolean } {
+  const strong = firstStrongDirection(text);
+  return {
+    dir: strong || fallbackDir || (isRtlLanguage(getLanguage()) ? 'rtl' : 'ltr'),
+    neutral: strong === null,
+  };
+}
+
+/**
+ * The `dir` — plus, for text with no strong character to read, the marker that lets it
+ * honour that `dir` — for content written once as markup rather than edited in a field:
+ * the cue panes, which render their text through this and cannot be given attributes
+ * after the fact the way `applyTextDirection` does for a field.
+ */
+export function directionAttributes(text: string, fallbackDir?: 'rtl' | 'ltr'): string {
+  const { dir, neutral } = resolveTextDirection(text, fallbackDir);
+  return neutral ? `dir="${dir}" data-no-strong-char` : `dir="${dir}"`;
+}
+
+/**
+ * Points an element whose content was just written with `textContent` at the direction
+ * that content calls for — the element-level twin of `directionAttributes`, for the
+ * surfaces the code fills in rather than the markup. A file name and a cue both arrive
+ * as the user's own text, so each reads in its own direction whatever the interface is
+ * doing around it.
  *
  * The `data-no-strong-char` flag matters as much as `dir` does. A field styled
  * `unicode-bidi: plaintext` (the cue editor, the transcript lines) resolves each
  * paragraph from its own content, but a paragraph with no strong character settles
  * on LTR by the bidi algorithm itself — UAX #9 P3 — whatever the element's
  * direction says, which is what parks the caret on the left in an empty field even
- * in a Persian interface. A value with no strong character has no direction of its
- * own, so styles.css has such a field honour its `dir` instead.
+ * in a Persian interface. Content with no strong character has no direction of its
+ * own, so styles.css has such an element honour its `dir` instead.
+ */
+export function applyContentDirection(
+  el: HTMLElement | null,
+  text: string,
+  fallbackDir?: 'rtl' | 'ltr'
+): void {
+  if (!el) return;
+  const { dir, neutral } = resolveTextDirection(text, fallbackDir);
+  el.setAttribute('dir', dir);
+  if (neutral) {
+    el.setAttribute('data-no-strong-char', '');
+  } else {
+    el.removeAttribute('data-no-strong-char');
+  }
+}
+
+/**
+ * The same decision for a text field, whose content is its `value`. A rendered block
+ * takes it at render time through `directionAttributes`, above, and a filled element
+ * through `applyContentDirection`, so a cue reads the same way in a field, in the
+ * preview and in the panes.
  */
 export function applyTextDirection(el: HTMLElement | null, fallbackDir?: 'rtl' | 'ltr'): void {
   if (!el) return;
-  const value = (el as HTMLInputElement).value || '';
-  const strong = firstStrongDirection(value);
-  el.setAttribute('dir', strong || fallbackDir || (isRtlLanguage(getLanguage()) ? 'rtl' : 'ltr'));
-  if (strong) {
-    el.removeAttribute('data-no-strong-char');
-  } else {
-    el.setAttribute('data-no-strong-char', '');
-  }
+  applyContentDirection(el, (el as HTMLInputElement).value || '', fallbackDir);
 }
 
 const dictionaries: Record<SupportedLanguage, Translations> = {
