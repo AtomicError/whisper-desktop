@@ -7395,6 +7395,18 @@ html[dir="rtl"] .cat-match-badge {
   background: rgba(0, 0, 0, 0.4);
 }
 
+/* `unicode-bidi: plaintext` above keeps each line at its own direction, but a line
+   with no strong character has nothing to resolve and falls back to LTR by the bidi
+   algorithm itself, ignoring the element's direction — which left the caret on the
+   left in an empty field even in a Persian interface. A value with no strong character
+   anywhere (empty, or digits and punctuation only) has no direction of its own, so
+   these fields honour their `dir` — the interface's — instead. `applyTextDirection`
+   in i18n sets and clears the attribute as the content is edited. */
+.subtitle-cue-textarea[data-no-strong-char],
+.transcript-text-input[data-no-strong-char] {
+  unicode-bidi: normal;
+}
+
 #hardsub-subtitle-list {
   --scrollbar-thumb: rgba(255, 255, 255, 0.2);
   --scrollbar-track: rgba(0, 0, 0, 0.2);
@@ -7799,6 +7811,15 @@ html[dir="rtl"] .cat-match-badge {
   color: #ffffff !important;
   font-weight: 600;
   box-shadow: 0 2px 8px rgba(var(--color-royal-blue-rgb), 0.4);
+}
+
+/* The generated FFmpeg command is a themed accent like every other piece of
+   technical output in the app: it was a fixed cyan (#a5f3fc) here, so it stayed
+   blue under Carbon, Fiery Orange and Emerald. `--color-sky` is the light tint of
+   each theme's accent (registered via @property, so it also resolves when no
+   data-theme attribute is set). */
+#hardsub-ffmpeg-cmd-preview {
+  color: var(--color-sky);
 }
 
 #hardsub-ffmpeg-cmd-preview::-webkit-scrollbar {

@@ -2280,7 +2280,8 @@
                       </svg>
                       <div>
                         <p style="font-weight:600; margin-bottom:4px;" id="lbl-file-name" data-i18n="transcribe.noFileLoaded">No Media File Loaded</p>
-                        <p style="font-size:0.8rem; color:var(--color-text-muted);" id="lbl-file-path" data-i18n="transcribe.selectFilePrompt">Select audio or video file</p>
+                        <!-- dir="auto" for the same reason as the hardsub drop zones above. -->
+                        <p dir="auto" style="font-size:0.8rem; color:var(--color-text-muted);" id="lbl-file-path" data-i18n="transcribe.selectFilePrompt">Select audio or video file</p>
                       </div>
                       <button class="btn-secondary" onclick="browseMediaFile()" data-i18n="transcribe.browseSystem">Browse System</button>
                     </div>
@@ -2880,7 +2881,10 @@
                         </svg>
                         <div style="flex:1; overflow: hidden; max-width: 100%;">
                           <p style="font-weight:600; margin-bottom:4px; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-video-name" data-i18n="hardsub.noVideoLoaded">No Video Loaded</p>
-                          <p style="font-size:0.75rem; color:var(--color-text-muted); margin:0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-video-path" data-i18n="hardsub.dropVideoPrompt">Drag & drop video (.mp4, .mkv, .mov)</p>
+                          <!-- dir="auto": this field holds either a localized prompt or a path. A path is
+                               an LTR technical string, and without this an RTL interface moves its leading
+                               slash to the end ("home/ahmad/Videos/vid.srt/"). -->
+                          <p dir="auto" style="font-size:0.75rem; color:var(--color-text-muted); margin:0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-video-path" data-i18n="hardsub.dropVideoPrompt">Drag & drop video (.mp4, .mkv, .mov)</p>
                         </div>
                         <button class="btn-secondary" id="btn-browse-video" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap;" data-i18n="hardsub.browseVideo">Browse Video</button>
                         <input type="hidden" id="hardsub-video-path" />
@@ -2895,7 +2899,7 @@
                         </svg>
                         <div style="flex:1; overflow: hidden; max-width: 100%;">
                           <p style="font-weight:600; margin-bottom:4px; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-sub-name" data-i18n="hardsub.noSubLoaded">No Subtitle Loaded</p>
-                          <p style="font-size:0.75rem; color:var(--color-text-muted); margin:0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-sub-path" data-i18n="hardsub.dropSubPrompt">Drag & drop subtitle (.srt, .vtt, .ass)</p>
+                          <p dir="auto" style="font-size:0.75rem; color:var(--color-text-muted); margin:0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-sub-path" data-i18n="hardsub.dropSubPrompt">Drag & drop subtitle (.srt, .vtt, .ass)</p>
                         </div>
                         <button class="btn-secondary" id="btn-browse-sub" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap;" data-i18n="hardsub.browseSub">Browse Subtitle</button>
                         <input type="hidden" id="hardsub-sub-path" />
@@ -2910,7 +2914,7 @@
                   <div style="display: flex; justify-content: space-between; align-items: center;">
                     <h3 style="margin: 0; font-size: 1.05rem; color: var(--color-royal-blue); display: flex; align-items: center; gap: 8px;">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px; height:20px;"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-                      <span data-i18n="hardsub.framePreview">Real Video Frame Preview</span>
+                      <span data-i18n="hardsub.framePreview">Real Video Preview</span>
                     </h3>
                     <span id="hardsub-video-status-badge" style="font-size: 0.75rem; background: rgba(var(--color-royal-blue-rgb), 0.15); color: var(--color-royal-blue); padding: 3px 8px; border-radius: 12px; font-weight: 500;" data-i18n="transcribe.standingBy">Standing By</span>
                   </div>
@@ -2940,7 +2944,7 @@
                           </defs>
                         </svg>
                       </div>
-                      <span style="font-size: 0.85rem; color: var(--color-text-muted); font-weight: 500; max-width: 240px; line-height: 1.4;" data-i18n="hardsub.selectVideoNotice">Select a video file above to enable real-frame live preview</span>
+                      <span style="font-size: 0.85rem; color: var(--color-text-muted); font-weight: 500; max-width: 240px; line-height: 1.4;" data-i18n="hardsub.selectVideoNotice">Select a video file above to enable the live preview</span>
                     </div>
 
                     <!-- Video Frame Freeze Canvas (Seamless Double-Buffering during Seek) -->
@@ -3423,7 +3427,7 @@
                       </button>
                     </div>
                     
-                    <div style="position: relative; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.78rem; color: #a5f3fc; line-height: 1.5; overflow-x: auto; max-height: 100px; white-space: pre-wrap; word-break: break-all;" id="hardsub-ffmpeg-cmd-preview">
+                    <div style="position: relative; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.78rem; line-height: 1.5; overflow-x: auto; max-height: 100px; white-space: pre-wrap; word-break: break-all;" id="hardsub-ffmpeg-cmd-preview">
                       ffmpeg -nostdin -progress pipe:1 -i input.mp4 -vf subtitles=... -c:v libx264 -crf 22 -preset medium -c:a copy output.mp4
                     </div>
                   </div>

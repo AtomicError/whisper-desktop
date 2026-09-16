@@ -127,8 +127,15 @@ html[dir="rtl"] .setting-desc-point::before {
 
 
 /* 4. Form Controls & Inputs */
-html[dir="rtl"] input[type="text"]:not(.readonly-path-input):not(.mono),
-html[dir="rtl"] textarea:not(.mono),
+/* Fields that carry their own direction — dir="auto" in the markup, or one set
+   from the content by the shared direction helper (applyTextDirection in i18n,
+   applyDynamicDirection in main.js) — are excluded here: an author rule outranks
+   the dir attribute, which was forcing English subtitle cues and prompt text to
+   render right-to-left inside the RTL interface. Leaving them to their attribute
+   is also what keeps Persian cues right-aligned, since dir="auto" resolves from
+   the content. */
+html[dir="rtl"] input[type="text"]:not(.readonly-path-input):not(.mono):not([dir]),
+html[dir="rtl"] textarea:not(.mono):not([dir]),
 html[dir="rtl"] select {
   text-align: right;
   direction: rtl;
@@ -395,5 +402,31 @@ html[dir="rtl"] .about-modal-close-btn {
 html[dir="rtl"] #translation-test-modal .modal-title-row {
   padding-right: 0 !important;
   padding-left: 32px !important;
+}
+
+/* 11. Media Player Chrome in RTL (Hardsub Studio)
+   Transport buttons, the scrubber, the volume slider and the time readout are
+   conventional left-to-right player chrome: the browser's <video> controls keep
+   them that way regardless of the interface language, and media players generally
+   do the same. `direction` also drives flex order, so without this the whole row
+   was mirrored (play on the right) and the volume slider expanded the wrong way.
+   The range inputs are already forced LTR in section 6; this keeps their parent
+   consistent with them. The bar itself is positioned with left/right and an auto
+   width, which direction does not affect. */
+html[dir="rtl"] #hardsub-video-controls,
+html[dir="rtl"] #hardsub-volume-hud,
+html[dir="rtl"] .volume-control-wrapper {
+  direction: ltr !important;
+}
+
+/* Icon + label inside a transport button must not swap sides, and the time
+   readout must not be bidi-reordered: 00:10 / 02:30 stays in that order. */
+html[dir="rtl"] #hardsub-video-controls .pill-btn {
+  direction: ltr !important;
+}
+
+html[dir="rtl"] #hardsub-video-time {
+  direction: ltr !important;
+  unicode-bidi: isolate;
 }
 

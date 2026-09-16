@@ -322,7 +322,7 @@ export const ru: Translations = {
     noSubLoaded: 'Субтитры не загружены',
     dropSubPrompt: 'Перетащите субтитры (.srt, .vtt, .ass)',
     browseSub: 'Выбрать субтитры',
-    framePreview: 'Предпросмотр реального кадра',
+    framePreview: 'Предпросмотр реального видео',
     selectVideoNotice: 'Выберите видео выше для включения живого предпросмотра',
     tabEditor: 'Редактор реплик',
     tabStyleShort: 'Стиль',

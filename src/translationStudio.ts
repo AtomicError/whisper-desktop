@@ -1,4 +1,4 @@
-import { t } from './i18n/index';
+import { t, isolateLtr } from './i18n/index';
 import { hardsubController } from './hardsub';
 
 const invoke = async <T>(cmd: string, args: Record<string, any> = {}): Promise<T> => {
@@ -864,9 +864,9 @@ export class TranslationStudioController {
 
     if (this.state.subtitlePath) {
       this.lblSubName.textContent = this.state.subtitleName;
-      this.lblSubName.title = this.state.subtitlePath;
+      this.lblSubName.title = isolateLtr(this.state.subtitlePath);
       this.lblSubPath.textContent = this.state.subtitlePath;
-      this.lblSubPath.title = this.state.subtitlePath;
+      this.lblSubPath.title = isolateLtr(this.state.subtitlePath);
 
       const cueCount = this.state.sourceCues.length;
       const sizeStr = formatBytes(this.state.subtitleSize);
@@ -899,7 +899,7 @@ export class TranslationStudioController {
     if (!this.outputDirText || !this.btnResetDir) return;
     if (this.state.outputDir) {
       this.outputDirText.textContent = this.state.outputDir;
-      this.outputDirText.title = this.state.outputDir;
+      this.outputDirText.title = isolateLtr(this.state.outputDir);
       this.outputDirText.classList.add('has-custom-path');
       this.btnResetDir.style.display = 'inline-flex';
     } else {

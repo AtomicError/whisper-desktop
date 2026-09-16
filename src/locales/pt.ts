@@ -322,7 +322,7 @@ export const pt: Translations = {
     noSubLoaded: 'Nenhuma Legenda Carregada',
     dropSubPrompt: 'Arraste e solte a legenda (.srt, .vtt, .ass)',
     browseSub: 'Procurar Legenda',
-    framePreview: 'Pré-visualização do Quadro do Vídeo',
+    framePreview: 'Pré-visualização do Vídeo',
     selectVideoNotice: 'Selecione um arquivo de vídeo acima para habilitar a pré-visualização ao vivo',
     tabEditor: 'Editor',
     tabStyleShort: 'Estilo',

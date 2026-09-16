@@ -272,7 +272,7 @@ Translation is also available as an automatic step after transcription: enable *
 Burns subtitles permanently into a video file, with styling that matches what a subtitle renderer would produce.
 
 * **Input:** a video (`mp4`, `mkv`, `mov`, `webm` and other decodable formats) plus a subtitle file (`.srt`, `.vtt`, `.ass`).
-* **Real frame preview:** the video streams from a local-only media server (bound to `127.0.0.1` on an ephemeral port with an access token) so you can scrub, freeze on a frame, and see the subtitle rendered over the actual frame — the preview renderer matches the burn-in output geometry, including background boxes and video rotation.
+* **Real video preview:** the video streams from a local-only media server (bound to `127.0.0.1` on an ephemeral port with an access token) so you can scrub, freeze on a frame, and see the subtitle rendered over the actual frame — the preview renderer matches the burn-in output geometry, including background boxes and video rotation.
 * **Cue editor:** the subtitle blocks are listed next to the video; clicking one jumps the player to that cue, and the active cue is highlighted during playback.
 
 **Style and typography** — font family (from the fonts bundled with the app, so rendering is identical on every OS), font size, text colour, outline colour and width, shadow colour, and an optional background box with adjustable opacity and corner radius.
@@ -411,7 +411,7 @@ graph TD
     A[Interface - HTML / CSS / TypeScript] -->|Tauri IPC| B(Tauri core - Rust)
     B -->|Process orchestration| C[whisper-cli - whisper.cpp]
     B -->|Audio extraction and hardsub encoding| G[FFmpeg]
-    B -->|Local media server on 127.0.0.1| K[Video frame preview]
+    B -->|Local media server on 127.0.0.1| K[Video preview]
     C -->|CPU / Vulkan / CUDA / OpenVINO / Metal| E[Hardware acceleration]
     F[(GGML models on disk)] -.->|Loaded by| C
     D[(SHA-256 verified downloads)] -->|Hugging Face| F
@@ -434,10 +434,13 @@ whisper-desktop/
 │   ├── styles.css                         # Design system and theme tokens
 │   ├── rtl.css                            # Right-to-left layout overrides
 │   ├── hardsub.ts                         # Hardsub preview renderer and controller
+│   ├── hardsubLayout.ts                   # Bidi-aware run layout shared by preview and burn-in
+│   ├── hardsubLayout.test.ts              # Unit tests for the run layout
 │   ├── translationStudio.ts               # Subtitle parsing, chunking and translation UI
 │   ├── languages.ts                       # 100 Whisper languages, 122 translation targets
 │   ├── languageSelect.ts                  # Searchable language dropdown
-│   ├── i18n/index.ts                      # Interface language registry and runtime
+│   ├── i18n/index.ts                      # Interface language registry, text direction and runtime
+│   ├── i18n/textDirection.test.ts         # Unit tests for the direction rule
 │   ├── locales/                           # 13 interface translations (en, fa, ar, ...)
 │   └── fonts/                             # Bundled offline fonts (Inter, Vazirmatn, ...)
 ├── assets/screenshots/                    # Images used by this README
@@ -447,7 +450,7 @@ whisper-desktop/
 │   │   ├── lib.rs                         # Tauri builder, plugins, global state
 │   │   ├── transcribe.rs                  # Audio extraction and whisper-cli orchestration
 │   │   ├── hardsub.rs                     # Subtitle burn-in, encoder probing, font handling
-│   │   ├── video_server.rs                # Loopback streaming server for frame preview
+│   │   ├── video_server.rs                # Loopback streaming server for the video preview
 │   │   ├── ffmpeg_resolver.rs             # Bundled vs system FFmpeg resolution
 │   │   ├── downloader.rs                  # Streaming model downloads with size + SHA-256 pinning
 │   │   ├── settings.rs                    # settings.json persistence, defaults, migration

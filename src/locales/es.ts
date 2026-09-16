@@ -322,7 +322,7 @@ export const es: Translations = {
     noSubLoaded: 'Ningún Subtítulo Cargado',
     dropSubPrompt: 'Arrastra y suelta un subtítulo (.srt, .vtt, .ass)',
     browseSub: 'Examinar Subtítulo',
-    framePreview: 'Vista Previa de Fotograma Real',
+    framePreview: 'Vista Previa Real del Video',
     selectVideoNotice: 'Selecciona un archivo de video arriba para activar la vista previa en vivo',
     tabEditor: 'Editor',
     tabStyleShort: 'Estilo',

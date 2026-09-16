@@ -1,6 +1,6 @@
 import { hardsubController } from './hardsub.ts';
 import { translationStudioController } from './translationStudio.ts';
-import { initI18n, t, setLanguage, getLanguage, translateDOM, isRtlLanguage } from './i18n/index.ts';
+import { initI18n, t, setLanguage, getLanguage, translateDOM, isRtlLanguage, applyTextDirection, isolateLtr } from './i18n/index.ts';
 import { normalizeForSearch } from './languages.ts';
 import { initLanguageSelects, renderLanguageSelect } from './languageSelect.ts';
 
@@ -1756,23 +1756,13 @@ window.syncCustomSelects = function() {
  * Dynamically updates text direction (ltr vs rtl) of an input/textarea
  * based on its text content, independent of the overall app UI language.
  * Falls back cleanly to current app UI direction when empty.
+ *
+ * Kept under this name for the rest of main.js; the rule itself lives in i18n beside
+ * the language list, shared with the cue editor and the transcript lines so a line
+ * cannot be read one way in one field and another way somewhere else.
  */
 function applyDynamicDirection(el, defaultDir = null) {
-  if (!el) return;
-  const currentAppDir = (typeof isRtlLanguage === 'function' && isRtlLanguage(getLanguage())) ? 'rtl' : 'ltr';
-  const effectiveDefaultDir = defaultDir || currentAppDir;
-  const val = el.value || '';
-  
-  const RTL_CHAR_REGEX = /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
-  const STRONG_CHAR_REGEX = /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFFa-zA-Z\u00C0-\u024F]/;
-  
-  const firstStrongChar = val.match(STRONG_CHAR_REGEX);
-  if (firstStrongChar) {
-    const isRtl = RTL_CHAR_REGEX.test(firstStrongChar[0]);
-    el.setAttribute('dir', isRtl ? 'rtl' : 'ltr');
-  } else {
-    el.setAttribute('dir', effectiveDefaultDir);
-  }
+  applyTextDirection(el, defaultDir);
 }
 window.applyDynamicDirection = applyDynamicDirection;
 
@@ -2170,6 +2160,9 @@ async function initApp() {
   
   // Setup Transcribe drag & drop
   setupTranscribeDragAndDrop();
+
+  // Setup content-based direction for transcript lines
+  setupTranscriptDirection();
   
   // Setup Quick Configuration Deck listeners
   setupQuickConfigDeckEventListeners();
@@ -2826,9 +2819,11 @@ window.browseModelsDirectory = async function() {
 
       if (inputEl) {
         inputEl.value = path;
-        inputEl.title = path;
+        // Isolated so the path keeps its order in the tooltip, which the browser renders
+        // with the document's direction rather than the element's styles.
+        inputEl.title = isolateLtr(path);
         if (inputEl.parentElement) {
-          inputEl.parentElement.title = path;
+          inputEl.parentElement.title = isolateLtr(path);
         }
       }
       if (settingsState) {
@@ -3120,9 +3115,9 @@ async function refreshSettings() {
     const inputEl = document.getElementById('opt-modelsDir');
     if (inputEl) {
       inputEl.value = settingsState.modelsDir;
-      inputEl.title = settingsState.modelsDir;
+      inputEl.title = isolateLtr(settingsState.modelsDir);
       if (inputEl.parentElement) {
-        inputEl.parentElement.title = settingsState.modelsDir;
+        inputEl.parentElement.title = isolateLtr(settingsState.modelsDir);
       }
     }
     
@@ -3323,7 +3318,7 @@ async function refreshFFmpegStatus(sourceOverride, userInitiated = false) {
       }
       badgeEl.className = 'setting-status-pill ready';
       badgeEl.innerHTML = `<span class="ffmpeg-status-dot blue"></span> ${verFormatted}`;
-      badgeEl.title = `Source: ${info.configuredSource}\nPath: ${info.resolvedPath}\n${info.version}`;
+      badgeEl.title = `Source: ${info.configuredSource}\nPath: ${isolateLtr(info.resolvedPath)}\n${info.version}`;
     } else {
       badgeEl.className = 'setting-status-pill missing';
       badgeEl.innerHTML = `<span class="ffmpeg-status-dot red"></span> Not Found`;
@@ -3859,9 +3854,9 @@ window.browseOutputDir = async function() {
 
       if (inputEl) {
         inputEl.value = dir;
-        inputEl.title = dir;
+        inputEl.title = isolateLtr(dir);
         if (inputEl.parentElement) {
-          inputEl.parentElement.title = dir;
+          inputEl.parentElement.title = isolateLtr(dir);
         }
       }
       if (settingsState) {
@@ -4768,7 +4763,7 @@ function renderBatchQueueTable() {
     // Name column
     const nameTd = document.createElement('td');
     nameTd.textContent = item.name;
-    nameTd.title = item.path;
+    nameTd.title = isolateLtr(item.path);
     tr.appendChild(nameTd);
     
     // Duration column
@@ -5796,6 +5791,32 @@ window.deleteModelClick = async function(name) {
 // ----------------- Live Transcript Viewer Helper Functions -----------------
 let transcriptLines = [];
 
+/**
+ * Keeps a transcript line's direction in step with what is being typed into it. The
+ * lines are created in bulk (a long transcription can hold hundreds of them, and the
+ * viewport caps the DOM at 2000), so one delegated listener covers them all instead
+ * of a listener per input — each line opens on the side its content reads from, and
+ * a line emptied while editing falls back to the interface direction.
+ */
+function setupTranscriptDirection() {
+  const viewport = document.getElementById('transcript-viewport');
+  if (!viewport || viewport._hasDirectionListener) return;
+  viewport._hasDirectionListener = true;
+  viewport.addEventListener('input', (e) => {
+    const field = e.target;
+    if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement) {
+      applyTextDirection(field);
+    }
+  });
+
+  // A language switch changes the interface direction, which is what the lines with no
+  // strong character of their own fall back to. The hardsub cue fields re-resolve for
+  // the same reason when the cue list is re-rendered.
+  window.addEventListener('whisper:languageChanged', () => {
+    viewport.querySelectorAll('.transcript-text-input').forEach((input) => applyTextDirection(input));
+  });
+}
+
 function appendTranscriptLine(timeRange, text) {
   const placeholder = document.getElementById('transcript-placeholder');
   if (placeholder) placeholder.remove();
@@ -5822,6 +5843,7 @@ function appendTranscriptLine(timeRange, text) {
   input.type = 'text';
   input.className = 'transcript-text-input';
   input.value = cleanText;
+  applyTextDirection(input);
   input.onchange = function() { updateTranscriptLineText(lineObj.id, this.value); };
   textDiv.appendChild(input);
 
@@ -5887,6 +5909,7 @@ window.loadTranscriptFromFile = async function(fullPath) {
           <input type="text" class="transcript-text-input" value="${escapeHTML(lineText.trim())}" onchange="updateTranscriptLineText(${lineObj.id}, this.value)" />
         </div>
       `;
+      applyTextDirection(lineEl.querySelector('.transcript-text-input'));
       viewport.appendChild(lineEl);
     });
     

@@ -322,7 +322,7 @@ export const fr: Translations = {
     noSubLoaded: 'Aucun Sous-titre Chargé',
     dropSubPrompt: 'Glissez-déposez un sous-titre (.srt, .vtt, .ass)',
     browseSub: 'Parcourir Sous-titres',
-    framePreview: 'Aperçu de Trame Réelle',
+    framePreview: 'Aperçu Réel de la Vidéo',
     selectVideoNotice: 'Sélectionnez une vidéo ci-dessus pour activer la prévisualisation en direct',
     tabEditor: 'Éditeur',
     tabStyleShort: 'Style',

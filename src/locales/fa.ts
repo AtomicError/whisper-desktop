@@ -322,7 +322,7 @@ export const fa: Translations = {
     noSubLoaded: 'هیچ زیرنویسی انتخاب نشده است',
     dropSubPrompt: 'فایل زیرنویس را بکشید و رها کنید (\u200E.srt, .vtt, .ass)',
     browseSub: 'انتخاب زیرنویس',
-    framePreview: 'پیش‌نمایش زنده فریم ویدیو',
+    framePreview: 'پیش‌نمایش زنده ویدیو',
     selectVideoNotice: 'برای فعال‌سازی پیش‌نمایش زنده، یک فایل ویدیویی انتخاب کنید',
     tabEditor: 'ویرایشگر',
     tabStyleShort: 'استایل',

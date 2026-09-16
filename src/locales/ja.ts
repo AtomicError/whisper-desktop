@@ -322,7 +322,7 @@ export const ja: Translations = {
     noSubLoaded: '字幕が読み込まれていません',
     dropSubPrompt: '字幕ファイル (.srt, .vtt, .ass) をドロップ',
     browseSub: '字幕を参照',
-    framePreview: '実動画フレームプレビュー',
+    framePreview: '実動画プレビュー',
     selectVideoNotice: 'リアルタイムプレビューを有効にするには、上の動画ファイルを選択してください',
     tabEditor: 'エディタ',
     tabStyleShort: 'スタイル',

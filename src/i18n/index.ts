@@ -49,6 +49,70 @@ export function isRtlLanguage(lang: string): boolean {
   return lang === 'fa' || lang === 'ar';
 }
 
+/** Hebrew, Arabic and the right-to-left scripts written between them (Syriac,
+ *  Thaana, NKo, Samaritan, Mandaic, the Arabic supplements), plus their presentation
+ *  forms. The interface's own RTL languages need only the first two; the rest are
+ *  here so text pasted into a cue or a transcript cannot be read on the wrong side. */
+const RTL_CHAR_REGEX = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/;
+
+/** Only letters are strong characters to the bidi algorithm. Digits, marks and
+ *  punctuation are not, so a cue of Persian digits counts as having no direction
+ *  of its own — which is how browsers and libass read it too. */
+const LETTER_REGEX = /\p{L}/u;
+
+/**
+ * Direction of the first strong character — the P2/P3 rule CSS `dir="auto"` and
+ * libass both apply — or null when the text holds none (empty, or digits and
+ * punctuation only). Every field and every cue that follows its content resolves it
+ * here, so none of them can disagree about a line's direction.
+ */
+export function firstStrongDirection(text: string): 'rtl' | 'ltr' | null {
+  for (const char of text) {
+    if (!LETTER_REGEX.test(char)) continue;
+    return RTL_CHAR_REGEX.test(char) ? 'rtl' : 'ltr';
+  }
+  return null;
+}
+
+/**
+ * Wraps a technical string — a file path, a version — in a left-to-right isolate, so
+ * it keeps its own order wherever it is shown, including inside right-to-left text and
+ * in tooltips the browser renders itself.
+ *
+ * A path is mostly neutral characters with ASCII letters between them, and a leading
+ * `/` is neutral too: in a right-to-left paragraph the run boundary rules hand it the
+ * paragraph's direction, so `/home/vid.srt` comes out as `home/vid.srt/`. Isolating the
+ * path fixes the order without touching the surrounding text — the interface's own
+ * language still decides how the sentence around it reads.
+ */
+export function isolateLtr(text: string): string {
+  return `\u2066${text}\u2069`;
+}
+
+/**
+ * Points a text field at the direction its content calls for, falling back to the
+ * interface direction when the content has no strong character to read.
+ *
+ * The `data-no-strong-char` flag matters as much as `dir` does. A field styled
+ * `unicode-bidi: plaintext` (the cue editor, the transcript lines) resolves each
+ * paragraph from its own content, but a paragraph with no strong character settles
+ * on LTR by the bidi algorithm itself — UAX #9 P3 — whatever the element's
+ * direction says, which is what parks the caret on the left in an empty field even
+ * in a Persian interface. A value with no strong character has no direction of its
+ * own, so styles.css has such a field honour its `dir` instead.
+ */
+export function applyTextDirection(el: HTMLElement | null, fallbackDir?: 'rtl' | 'ltr'): void {
+  if (!el) return;
+  const value = (el as HTMLInputElement).value || '';
+  const strong = firstStrongDirection(value);
+  el.setAttribute('dir', strong || fallbackDir || (isRtlLanguage(getLanguage()) ? 'rtl' : 'ltr'));
+  if (strong) {
+    el.removeAttribute('data-no-strong-char');
+  } else {
+    el.setAttribute('data-no-strong-char', '');
+  }
+}
+
 const dictionaries: Record<SupportedLanguage, Translations> = {
   en,
   fa,

@@ -1,4 +1,5 @@
-import { t } from './i18n/index';
+import { t, firstStrongDirection, applyTextDirection, isolateLtr } from './i18n/index';
+import { spanOrigins, assRunOrder } from './hardsubLayout';
 
 const invoke = async <T>(cmd: string, args: Record<string, any> = {}): Promise<T> => {
   const tauri = (window as any).__TAURI__;
@@ -112,9 +113,19 @@ function msToAssTime(ms: number): string {
   return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(cs).padStart(2, '0')}`;
 }
 
-function hasRtlCharacters(text: string): boolean {
-  const rtlRegex = /[\u0600-\u06FF\u0750-\u077F\u0590-\u05FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
-  return rtlRegex.test(text);
+/**
+ * Paragraph direction of a cue, decided by its first strong character. Text with no
+ * strong character to read takes `fallback` — LTR by default, which is what libass
+ * does with such a line. The rule itself lives in i18n, shared with every text field
+ * that follows its content so a line cannot be read one way here and another way
+ * there.
+ *
+ * This exists because the canvas inherits the interface's base direction: in a
+ * Persian UI an English cue drawn without this renders its neutrals the wrong way
+ * round ("Hello:" comes out as ":Hello") and stops matching the burned video.
+ */
+function detectBaseDirection(text: string, fallback: 'rtl' | 'ltr' = 'ltr'): 'rtl' | 'ltr' {
+  return firstStrongDirection(text) ?? fallback;
 }
 
 function hexToAssColorAndAlpha(hex: string, opacity: number): string {
@@ -438,15 +449,18 @@ function wrapSpans(
   return wrappedLines;
 }
 
-function measureSpansWidth(ctx: CanvasRenderingContext2D, spans: TextSpan[], fontFamily: string, baseFontSize: number): number {
-  let width = 0;
-  for (const span of spans) {
+function measureSpanWidths(ctx: CanvasRenderingContext2D, spans: TextSpan[], fontFamily: string, baseFontSize: number): number[] {
+  return spans.map((span) => {
     ctx.save();
     setSpanFont(ctx, fontFamily, baseFontSize, span.bold, span.italic);
-    width += ctx.measureText(span.text).width;
+    const width = ctx.measureText(span.text).width;
     ctx.restore();
-  }
-  return width;
+    return width;
+  });
+}
+
+function measureSpansWidth(ctx: CanvasRenderingContext2D, spans: TextSpan[], fontFamily: string, baseFontSize: number): number {
+  return measureSpanWidths(ctx, spans, fontFamily, baseFontSize).reduce((total, width) => total + width, 0);
 }
 
 function drawUnderline(
@@ -1109,6 +1123,9 @@ export class HardsubController {
         const cue = this.subtitleCues.find((c) => c.id === cueId);
         if (cue) {
           cue.text = textarea.value;
+          // Keep the field's direction in step with its content, so clearing a cue
+          // mid-edit puts the caret back on the interface's side.
+          applyTextDirection(textarea);
           this.isSubtitlesModified = true;
           if (this.activeCueId === cue.id) {
             this.currentSubtitleText = cue.text;
@@ -2827,7 +2844,7 @@ export class HardsubController {
         const vName = lastSlash >= 0 ? this.state.videoPath.substring(lastSlash + 1) : this.state.videoPath;
         const subCount = this.subtitleCues.length > 0 ? ` • ${this.subtitleCues.length} Cues` : (hasSub ? ' • Sub Loaded' : '');
         this.mediaSummaryBadge.textContent = `✓ ${vName}${subCount}`;
-        this.mediaSummaryBadge.title = `Video: ${this.state.videoPath}${hasSub ? `\nSubtitle: ${this.state.subtitlePath}` : ''}`;
+        this.mediaSummaryBadge.title = `Video: ${isolateLtr(this.state.videoPath)}${hasSub ? `\nSubtitle: ${isolateLtr(this.state.subtitlePath)}` : ''}`;
         this.mediaSummaryBadge.style.display = 'inline-block';
       } else {
         this.mediaSummaryBadge.textContent = '';
@@ -2970,8 +2987,11 @@ export class HardsubController {
             ▶ ${t('hardsub.cuePlay')}
           </button>
         </div>
-        <textarea class="subtitle-cue-textarea" dir="auto" data-cue-id="${cue.id}">${cue.text}</textarea>
+        <textarea class="subtitle-cue-textarea" data-cue-id="${cue.id}">${cue.text}</textarea>
       `;
+
+      const cueField = card.querySelector<HTMLTextAreaElement>('textarea.subtitle-cue-textarea');
+      if (cueField) applyTextDirection(cueField);
 
       frag.appendChild(card);
     });
@@ -3252,7 +3272,8 @@ export class HardsubController {
       }
 
       // Calculate startX for this line based on alignment and width
-      const totalLineWidth = measureSpansWidth(ctx, lineSpans, this.state.fontName, renderedFontSize);
+      const lineWidths = measureSpanWidths(ctx, lineSpans, this.state.fontName, renderedFontSize);
+      const totalLineWidth = lineWidths.reduce((total, width) => total + width, 0);
       let startX: number;
       if (textAlignmentStr === 'left') {
         startX = anchorX;
@@ -3262,14 +3283,27 @@ export class HardsubController {
         startX = anchorX - totalLineWidth / 2;
       }
 
-      let currentX = startX;
-      ctx.textAlign = 'left'; // Draw spans left-to-right from startX
+      // The line reads in the direction of its own first strong character, and its runs
+      // follow that order: a right-to-left line starts at the right edge and walks left.
+      // That is the bidi order. A run with no strong character of its own — a space, a
+      // dash — takes the line's direction, as the bidi algorithm resolves it, and the
+      // runs' edges are the same either way. assRunOrder writes the burn script in the
+      // matching order.
+      const lineDirection = detectBaseDirection(lineSpans.map((span) => span.text).join(''));
+      const spanX = spanOrigins(lineWidths, startX, lineDirection);
 
-      for (const span of lineSpans) {
+      ctx.textAlign = 'left';
+
+      for (let i = 0; i < lineSpans.length; i++) {
+        const span = lineSpans[i];
         setSpanFont(ctx, this.state.fontName, renderedFontSize, span.bold, span.italic);
 
-        const spanText = hasRtlCharacters(span.text) ? `\u202B${span.text}\u202C` : span.text;
-        const spanWidth = ctx.measureText(span.text).width;
+        // Let the run's own content pick the base direction instead of inheriting the
+        // interface direction, then hint the same direction to the renderer.
+        const spanDirection = firstStrongDirection(span.text) ?? lineDirection;
+        ctx.direction = spanDirection;
+        const spanText = spanDirection === 'rtl' ? `\u202B${span.text}\u202C` : span.text;
+        const x = spanX[i];
 
         // --- Outline (matching ASS Outline with contour expansion) ---
         if (renderedOutline > 0) {
@@ -3278,20 +3312,18 @@ export class HardsubController {
           ctx.lineWidth = renderedOutline * 2; // ASS Outline expands outward; strokeText is centered
           ctx.lineJoin = 'round';
           ctx.miterLimit = 2;
-          ctx.strokeText(spanText, currentX, y);
+          ctx.strokeText(spanText, x, y);
           ctx.restore();
         }
 
         // --- Fill text (primary color) ---
         ctx.fillStyle = span.color;
-        ctx.fillText(spanText, currentX, y);
+        ctx.fillText(spanText, x, y);
 
         // --- Draw underline if requested ---
         if (span.underline) {
-          drawUnderline(ctx, spanWidth, renderedFontSize, currentX, y, span.color);
+          drawUnderline(ctx, lineWidths[i], renderedFontSize, x, y, span.color);
         }
-
-        currentX += spanWidth;
       }
     }
   }
@@ -3513,8 +3545,21 @@ export class HardsubController {
             dialogueAlignment = 9;
           }
 
+          // Every span below gets its own tag block, but libass splits its runs on style
+          // changes rather than on tag blocks: a line whose spans share one style stays a
+          // single run, one whose spans differ is resolved and placed run by run. That is
+          // what decides whether the spans are written in logical or in visual order, and
+          // assRunOrder holds the rule — it is what keeps an RTL line with a styled word
+          // from burning mirrored without also mirroring a plain one.
+          const lineText = lineSpans.map((span) => span.text).join('');
+          const orderedSpans = assRunOrder(
+            lineSpans,
+            detectBaseDirection(lineText),
+            (span) => `${span.bold}|${span.italic}|${span.underline}|${span.color}`,
+          );
+
           let assLineText = '';
-          for (const span of lineSpans) {
+          for (const span of orderedSpans) {
             const bTag = span.bold ? '\\b1' : '\\b0';
             const iTag = span.italic ? '\\i1' : '\\i0';
             const uTag = span.underline ? '\\u1' : '\\u0';
@@ -3532,8 +3577,11 @@ export class HardsubController {
             assLineText += `{${bTag}${iTag}${uTag}${cTag}}${span.text}`;
           }
 
-          const finalLineText = hasRtlCharacters(assLineText) ? `\u202B${assLineText}\u202C` : assLineText;
-          events += `Dialogue: 1,${startStr},${endStr},TextStyle,,0,0,0,,{\\an${dialogueAlignment}}{\\pos(${X},${lineY})}${finalLineText}\n`;
+          // No direction hint is written around the line. Wrapping it in an embedding
+          // character would assert one direction for the whole line, which is exactly
+          // what the run order above avoids relying on: libass resolves each run it
+          // keeps apart on its own, and handles a line it never splits as a whole.
+          events += `Dialogue: 1,${startStr},${endStr},TextStyle,,0,0,0,,{\\an${dialogueAlignment}}{\\pos(${X},${lineY})}${assLineText}\n`;
         });
       });
     }
