@@ -1,6 +1,6 @@
 [[permission]]
 identifier = "allow-all-custom"
-description = "Allow all custom Whisper Manager command invokes"
+description = "Allow all custom Whisper Desktop command invokes"
 
 [permission.commands]
 allow = [

@@ -1,6 +1,5 @@
 export const en = {
   app: {
-    title: 'Whisper Desktop',
     credit: 'Developed by'
   },
   nav: {
@@ -13,7 +12,6 @@ export const en = {
     about: 'About Whisper Desktop'
   },
   about: {
-    title: 'Whisper Desktop',
     version: 'Version',
     privacyBadge: '100% Offline & Private Processing',
     tagline: 'State-of-the-art speech recognition & subtitle workstation',

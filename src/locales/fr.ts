@@ -2,7 +2,6 @@ import type { Translations } from './en';
 
 export const fr: Translations = {
   app: {
-    title: 'Whisper Desktop',
     credit: 'Développé par'
   },
   nav: {
@@ -15,7 +14,6 @@ export const fr: Translations = {
     about: 'À Propos de Whisper Desktop'
   },
   about: {
-    title: 'Whisper Desktop',
     version: 'Version',
     privacyBadge: 'Traitement 100% Hors Ligne & Privé',
     tagline: 'Station de travail avancée de reconnaissance vocale et de sous-titrage',

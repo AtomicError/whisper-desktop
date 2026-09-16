@@ -312,6 +312,14 @@ html[dir="rtl"] .setting-status-pill {
   direction: ltr;
 }
 
+/* The About heading is the Latin product name in every locale, so its version chip
+   stays on the name's right in RTL too. `direction` drives flex order, so without
+   this the row mirrored and the chip sat to the left of the name. The row is centred
+   as a box by .about-header, so only the order of the two items changes. */
+html[dir="rtl"] .about-title-row {
+  direction: ltr;
+}
+
 html[dir="rtl"] .about-spec-row {
   grid-template-columns: 104px 1fr;
   direction: rtl;

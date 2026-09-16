@@ -2,7 +2,6 @@ import type { Translations } from './en';
 
 export const tr: Translations = {
   app: {
-    title: 'Whisper Desktop',
     credit: 'Geliştirici:'
   },
   nav: {
@@ -15,7 +14,6 @@ export const tr: Translations = {
     about: 'Whisper Desktop Hakkında'
   },
   about: {
-    title: 'Whisper Desktop',
     version: 'Sürüm',
     privacyBadge: '%100 Çevrimdışı ve Gizli İşleme',
     tagline: 'Gelişmiş konuşma tanıma ve altyazı iş istasyonu',

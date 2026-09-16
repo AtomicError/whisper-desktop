@@ -43,6 +43,15 @@ export const SUPPORTED_LANGUAGES: SupportedLanguage[] = [
   'ko'
 ];
 
+/**
+ * The product name, and deliberately the same in every interface language: it is what
+ * the bundle, the installer, the launcher entry and the release notes say, so the
+ * window title matches them instead of offering a second, transliterated name for the
+ * same program. Only the words around it are translated (see `nav.about`). The sidebar
+ * wordmark carries the same name as a literal, and like this one is not translated.
+ */
+export const APP_NAME = 'Whisper Desktop';
+
 export const RTL_LANGUAGES: SupportedLanguage[] = ['fa', 'ar'];
 
 export function isRtlLanguage(lang: string): boolean {
@@ -283,7 +292,7 @@ export function setLanguage(lang: SupportedLanguage, notify: boolean = true): vo
 
   // Synchronize window/document title
   if (typeof document !== 'undefined') {
-    document.title = t('app.title') || 'Whisper Desktop';
+    document.title = APP_NAME;
   }
 
   // Synchronize with settingsState and save to backend if available

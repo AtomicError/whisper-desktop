@@ -2,7 +2,6 @@ import type { Translations } from './en';
 
 export const fa: Translations = {
   app: {
-    title: 'ویسپر دسکتاپ',
     credit: 'توسعه‌یافته توسط'
   },
   nav: {
@@ -12,10 +11,9 @@ export const fa: Translations = {
     models: 'مرکز مدل‌ها',
     settings: 'تنظیمات',
     logs: 'گزارش عملکرد',
-    about: 'درباره ویسپر دسکتاپ'
+    about: 'درباره Whisper Desktop'
   },
   about: {
-    title: 'ویسپر دسکتاپ',
     version: 'نسخه',
     privacyBadge: 'پردازش ۱۰۰٪ محلی و آفلاین',
     tagline: 'استودیوی هوشمند پیاده‌سازی گفتار و ساخت زیرنویس',
@@ -28,7 +26,7 @@ export const fa: Translations = {
     licenseName: 'مجوز عمومی گنو (GPL-3.0)',
     githubRepo: 'مخزن گیت‌هاب',
     reportIssue: 'گزارش باگ و خطا',
-    copyright: '© ۲۰۲۶ پروژه ویسپر دسکتاپ. منتشر شده تحت مجوز GPL-3.0.',
+    copyright: '© ۲۰۲۶ پروژه Whisper Desktop. منتشر شده تحت مجوز GPL-3.0.',
     close: 'بستن',
     updateTitle: 'به‌روزرسانی نرم‌افزار',
     checkUpdate: 'بررسی نسخه جدید',

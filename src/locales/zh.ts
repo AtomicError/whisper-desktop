@@ -2,7 +2,6 @@ import type { Translations } from './en';
 
 export const zh: Translations = {
   app: {
-    title: 'Whisper Desktop',
     credit: '开发团队'
   },
   nav: {
@@ -15,7 +14,6 @@ export const zh: Translations = {
     about: '关于 Whisper Desktop'
   },
   about: {
-    title: 'Whisper Desktop',
     version: '版本',
     privacyBadge: '100% 本地离线 & 隐私安全',
     tagline: '先进的离线语音识别与字幕制作工作站',

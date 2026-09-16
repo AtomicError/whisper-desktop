@@ -2,7 +2,6 @@ import type { Translations } from './en';
 
 export const ko: Translations = {
   app: {
-    title: 'Whisper Desktop',
     credit: '개발자:'
   },
   nav: {
@@ -15,7 +14,6 @@ export const ko: Translations = {
     about: 'Whisper Desktop 정보'
   },
   about: {
-    title: 'Whisper Desktop',
     version: '버전',
     privacyBadge: '100% 오프라인 & 비공개 처리',
     tagline: '최첨단 음성 인식 및 자막 제작 워크스테이션',

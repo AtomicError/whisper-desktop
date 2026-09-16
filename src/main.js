@@ -1,6 +1,6 @@
 import { hardsubController } from './hardsub.ts';
 import { translationStudioController } from './translationStudio.ts';
-import { initI18n, t, setLanguage, getLanguage, translateDOM, isRtlLanguage, applyTextDirection, isolateLtr } from './i18n/index.ts';
+import { initI18n, t, setLanguage, getLanguage, translateDOM, isRtlLanguage, applyTextDirection, isolateLtr, APP_NAME } from './i18n/index.ts';
 import { normalizeForSearch } from './languages.ts';
 import { initLanguageSelects, renderLanguageSelect } from './languageSelect.ts';
 
@@ -2082,7 +2082,7 @@ function setupZoomKeyboardShortcuts() {
 }
 
 async function initApp() {
-  console.log("Whisper Manager Desktop UI Initialized!");
+  console.log("Whisper Desktop UI Initialized!");
   
   // Initialize internationalization (i18n) and translate DOM
   initI18n();
@@ -2403,7 +2403,7 @@ window.switchView = function(viewName) {
   }
   
   // Update Title
-  const localizedViewTitle = t(`nav.${viewName}`) || 'Whisper Manager';
+  const localizedViewTitle = t(`nav.${viewName}`) || APP_NAME;
   const titleEl = document.getElementById('current-view-title');
   if (titleEl) {
     titleEl.style.opacity = '0.7';
