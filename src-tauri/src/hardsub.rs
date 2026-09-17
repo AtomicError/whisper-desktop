@@ -1177,91 +1177,31 @@ pub async fn run_hardsub_task(
         active: true,
     });
 
-    // Probe duration, width, and height using ffprobe.
-    // Runs asynchronously with a hard timeout so a hung ffprobe (network mount,
-    // corrupt container) can never wedge the task; the blocking std::process
-    // variant previously stalled a tokio worker thread with no escape.
-    let ffprobe_bin = crate::ffmpeg_resolver::ensure_ffprobe_available(Some(&app))?;
-    let ffmpeg_bin = crate::ffmpeg_resolver::ensure_ffmpeg_available(Some(&app))?;
-
-    let mut total_duration_sec = 0.0;
-    let mut video_width = 1920;
-    let mut video_height = 1080;
-
-    let probe_out = tokio::time::timeout(
-        std::time::Duration::from_secs(30),
-        Command::new(&ffprobe_bin)
-            .args([
-                "-v", "error",
-                "-show_entries", "format=duration:stream=duration,width,height,codec_type,side_data_list,tags",
-                "-of", "json",
-                &settings.video_path,
-            ])
-            .output(),
-    )
-    .await;
-
-    let mut rotation = 0;
-    if let Ok(Ok(out)) = probe_out {
-        if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&out.stdout) {
-            if let Some(duration_str) = json.pointer("/format/duration").and_then(|v| v.as_str()) {
-                if let Ok(secs) = duration_str.parse::<f64>() {
-                    total_duration_sec = secs;
-                }
-            }
-            if let Some(streams) = json.pointer("/streams").and_then(|v| v.as_array()) {
-                for stream in streams {
-                    if stream.get("codec_type").and_then(|v| v.as_str()) != Some("video") {
-                        continue;
+    // Export and preview must select the same streams and display geometry.
+    // Export cancellation is flag-based; bridge it only for the shared probe,
+    // and await its completion so cancellation kills and reaps ffprobe first.
+    let probe_cancel = tokio_util::sync::CancellationToken::new();
+    let probe_result = {
+        let probe = crate::media_preview::probe_source_metadata(
+            &app,
+            Path::new(&settings.video_path),
+            probe_cancel.clone(),
+        );
+        tokio::pin!(probe);
+        loop {
+            tokio::select! {
+                result = &mut probe => break result,
+                _ = tokio::time::sleep(std::time::Duration::from_millis(50)) => {
+                    if session.lock().map(|l| l.cancel_requested).unwrap_or(false) {
+                        probe_cancel.cancel();
+                        break probe.await;
                     }
-                    if total_duration_sec <= 0.0 {
-                        if let Some(d_str) = stream.get("duration").and_then(|v| v.as_str()) {
-                            if let Ok(secs) = d_str.parse::<f64>() {
-                                if secs > 0.0 {
-                                    total_duration_sec = secs;
-                                }
-                            }
-                        }
-                    }
-                    if let (Some(w), Some(h)) = (stream.get("width").and_then(|v| v.as_u64()), stream.get("height").and_then(|v| v.as_u64())) {
-                        video_width = w as u32;
-                        video_height = h as u32;
-                    }
-                    
-                    // Try parsing rotation from Display Matrix in side_data_list
-                    if let Some(side_data_list) = stream.get("side_data_list").and_then(|v| v.as_array()) {
-                        for sd in side_data_list {
-                            if sd.get("side_data_type").and_then(|v| v.as_str()) == Some("Display Matrix") {
-                                if let Some(r) = sd.get("rotation").and_then(|v| v.as_i64()) {
-                                    rotation = r;
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Try parsing rotation from tags
-                    if rotation == 0 {
-                        if let Some(tags) = stream.get("tags") {
-                            if let Some(r_str) = tags.get("rotate").and_then(|v| v.as_str()) {
-                                if let Ok(r) = r_str.parse::<i64>() {
-                                    rotation = r;
-                                }
-                            }
-                        }
-                    }
-                    break;
                 }
             }
         }
-    }
+    };
 
-    let normalized_rotation = ((rotation % 360 + 360) % 360) as u32;
-    if normalized_rotation == 90 || normalized_rotation == 270 {
-        std::mem::swap(&mut video_width, &mut video_height);
-    }
-
-    // Honour a cancellation requested while the probe was running (previously
-    // unreachable: the first check only happened after filter construction).
+    // Preserve the export cancellation result after the probe has settled.
     if session.lock().map(|l| l.cancel_requested).unwrap_or(false) {
         let _ = app.emit("hardsub-status", TranscribeProgress {
             progress: 0.0,
@@ -1271,10 +1211,20 @@ pub async fn run_hardsub_task(
         return Err("Hardsubbing cancelled by user.".to_string());
     }
 
+    let probed = probe_result.map_err(|error| format!("Failed to probe source video: {}", error.detail))?;
+    let source = probed.source;
+    let total_duration_sec = source.duration_sec.unwrap_or(0.0);
+    let normalized_rotation = probed.rotation_degrees.rem_euclid(360) as u32;
+    let (mut video_width, mut video_height) = (source.width, source.height);
+    if normalized_rotation == 90 || normalized_rotation == 270 {
+        std::mem::swap(&mut video_width, &mut video_height);
+    }
+    let ffmpeg_bin = crate::ffmpeg_resolver::ensure_ffmpeg_available(Some(&app))?;
+
     logs.log(&app, "Hardsub", &format!("Probed video dimensions: {}x{} (Aspect: {:.3})", video_width, video_height, video_width as f64 / video_height as f64));
 
     // Calculate dynamic 288p reference canvas dimensions preserving video aspect ratio (for 16:9, 9:16, 4:3, 21:9, etc.)
-    let aspect = (video_width as f64) / (video_height.max(1) as f64);
+    let aspect = source.display_width / source.display_height;
     let ref_height: u32 = 288;
     let ref_width = ((ref_height as f64) * aspect).round().max(1.0) as u32;
 
@@ -1391,6 +1341,15 @@ pub async fn run_hardsub_task(
     ffmpeg_args.push("-y".to_string());
     ffmpeg_args.push("-i".to_string());
     ffmpeg_args.push(settings.video_path.clone());
+
+    ffmpeg_args.push("-map".to_string());
+    ffmpeg_args.push(format!("0:{}", source.video_stream_index));
+    if settings.audio_codec != "mute" {
+        if let Some(audio_stream_index) = source.audio_stream_index {
+            ffmpeg_args.push("-map".to_string());
+            ffmpeg_args.push(format!("0:{}", audio_stream_index));
+        }
+    }
 
     // 2. Video Filter
     let mut vf_filters = Vec::new();

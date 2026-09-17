@@ -10,6 +10,7 @@ mod downloader;
 mod translation;
 mod hardsub;
 mod video_server;
+mod media_preview;
 pub mod ffmpeg_resolver;
 
 use std::sync::{Arc, Mutex};
@@ -786,8 +787,13 @@ fn main() {
     let download_session = Arc::new(Mutex::new(DownloadSession::new()));
     let app_logs_for_sink = app_logs.clone();
 
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .setup(move |_app| {
+            let media_server = Arc::new(tauri::async_runtime::block_on(video_server::MediaServer::start())
+                .map_err(std::io::Error::other)?);
+            let preview_root = _app.path().app_cache_dir()?.join("hardsub-preview");
+            _app.manage(media_preview::PreviewState::new(media_server.clone(), preview_root));
+            _app.manage(media_server);
             let logs_for_sink = app_logs_for_sink.clone();
             let handle_for_sink = _app.handle().clone();
             settings::register_log_sink(Arc::new(move |message| {
@@ -913,10 +919,32 @@ fn main() {
             open_file_in_editor,
             exit_app,
             hide_to_tray,
-            video_server::get_media_stream_url
+            media_preview::begin_hardsub_preview,
+            media_preview::advance_hardsub_preview,
+            media_preview::release_hardsub_preview,
+            media_preview::probe_hardsub_source,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+    // 0 = running, 1 = draining, 2 = drained. Repeated quit requests must
+    // remain prevented until both preview children and media readers settle.
+    let exit_state = Arc::new(std::sync::atomic::AtomicU8::new(0));
+    app.run(move |app, event| {
+        if let tauri::RunEvent::ExitRequested { api, .. } = event {
+            use std::sync::atomic::Ordering;
+            if exit_state.load(Ordering::Acquire) == 2 { return; }
+            api.prevent_exit();
+            if exit_state.compare_exchange(0, 1, Ordering::AcqRel, Ordering::Acquire).is_err() { return; }
+            let app = app.clone();
+            let exit_state = exit_state.clone();
+            tauri::async_runtime::spawn(async move {
+                app.state::<media_preview::PreviewState>().shutdown().await;
+                app.state::<Arc<video_server::MediaServer>>().shutdown().await;
+                exit_state.store(2, Ordering::Release);
+                app.exit(0);
+            });
+        }
+    });
 }
 
 #[cfg(test)]

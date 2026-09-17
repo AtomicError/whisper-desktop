@@ -3017,6 +3017,16 @@
                       </div>
                     </div>
                   </div>
+                  <div id="hardsub-preview-status" style="display: none; flex-direction: column; gap: 8px;">
+                    <p id="hardsub-preview-status-text" role="status" aria-live="polite" style="margin: 0;"></p>
+                    <progress id="hardsub-preview-progress" max="1" aria-labelledby="hardsub-preview-status-text" style="width: 100%;" hidden></progress>
+                    <p id="hardsub-preview-detail" dir="auto" style="margin: 0; overflow-wrap: anywhere; white-space: pre-wrap;" hidden></p>
+                    <p id="hardsub-preview-original-note" style="margin: 0; color: var(--color-text-muted);" hidden></p>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                      <button type="button" id="btn-cancel-hardsub-preview" class="pill-btn" hidden></button>
+                      <button type="button" id="btn-retry-hardsub-preview" class="pill-btn" hidden></button>
+                    </div>
+                  </div>
                 </div>
 
                 <!-- Telemetry Progress & Action Card (Dark Glassmorphic Studio Theme) -->

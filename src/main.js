@@ -2419,6 +2419,12 @@ window.switchView = function(viewName) {
   if (targetPanel) {
     targetPanel.classList.add('active');
   }
+
+  // The player must know whether its page is authoritative before any
+  // deferred completion (URL loads, seeks, autoplay) touches the DOM.
+  if (window.hardsubController && typeof window.hardsubController.setPageActive === 'function') {
+    window.hardsubController.setPageActive(viewName === 'hardsub');
+  }
   
   // Update Title
   const localizedViewTitle = t(`nav.${viewName}`) || APP_NAME;
@@ -3443,6 +3449,10 @@ window.addEventListener('pagehide', () => {
       const cleanPayload = sanitizeSettingsPayload(settingsState);
       invoke('save_settings', { settings: cleanPayload });
     } catch (_) {}
+  }
+  // Best-effort frontend disposal; backend exit handling is authoritative.
+  if (window.hardsubController && typeof window.hardsubController.dispose === 'function') {
+    window.hardsubController.dispose();
   }
 });
 

@@ -4954,6 +4954,7 @@ dependencies = [
  "bytes",
  "futures-core",
  "futures-sink",
+ "futures-util",
  "pin-project-lite",
  "tokio",
 ]
@@ -5717,6 +5718,8 @@ dependencies = [
  "chrono",
  "encoding_rs",
  "futures-util",
+ "getrandom 0.3.4",
+ "httparse",
  "keyring",
  "regex",
  "reqwest 0.12.28",
@@ -5730,7 +5733,9 @@ dependencies = [
  "tauri-plugin-dialog",
  "tauri-plugin-notification",
  "tauri-plugin-opener",
+ "tempfile",
  "tokio",
+ "tokio-util",
  "webkit2gtk",
 ]
 

@@ -1,5 +1,7 @@
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::io::Read;
+use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
 use std::sync::RwLock;
 use serde::{Serialize, Deserialize};
 use tauri::Manager;
@@ -94,11 +96,50 @@ fn find_bundled_binary(app: Option<&tauri::AppHandle>, binary_name: &str) -> Opt
     None
 }
 
+// Drain both pipes concurrently: a verbose/broken executable must neither block
+// discovery on a full pipe nor retain unbounded output. Reap before returning.
+fn binary_version_output(binary: &Path) -> Option<Vec<u8>> {
+    let mut child = Command::new(binary)
+        .arg("-version")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn().ok()?;
+    fn drain(mut pipe: impl Read) -> Vec<u8> {
+        let mut retained = Vec::new();
+        let mut buffer = [0u8; 4096];
+        while let Ok(count) = pipe.read(&mut buffer) {
+            if count == 0 { break; }
+            let keep = count.min((64 * 1024usize).saturating_sub(retained.len()));
+            retained.extend_from_slice(&buffer[..keep]);
+        }
+        retained
+    }
+    let stdout = child.stdout.take()?;
+    let stderr = child.stderr.take()?;
+    let out = std::thread::spawn(move || drain(stdout));
+    let err = std::thread::spawn(move || drain(stderr));
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let success = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status.success(),
+            Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(20)),
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                break false;
+            }
+        }
+    };
+    let output = out.join().ok();
+    let _ = err.join();
+    if success { output } else { None }
+}
+
 /// Checks if a system binary exists in PATH and extracts its version in a single sub-process invocation.
 fn find_system_binary_with_version(binary_name: &str) -> Option<(PathBuf, String)> {
-    let output = Command::new(binary_name).arg("-version").output().ok()?;
-    if output.status.success() {
-        let out_str = String::from_utf8_lossy(&output.stdout);
+    if let Some(output) = binary_version_output(Path::new(binary_name)) {
+        let out_str = String::from_utf8_lossy(&output);
         let ver = out_str.lines().next().unwrap_or("Unknown version").trim().to_string();
         return Some((PathBuf::from(binary_name), ver));
     }
@@ -112,12 +153,10 @@ fn find_system_binary(binary_name: &str) -> Option<PathBuf> {
 
 /// Extracts version string from a working binary path.
 fn extract_binary_version(bin_path: &Path) -> String {
-    if let Ok(output) = Command::new(bin_path).arg("-version").output() {
-        if output.status.success() {
-            let out_str = String::from_utf8_lossy(&output.stdout);
-            if let Some(first_line) = out_str.lines().next() {
-                return first_line.trim().to_string();
-            }
+    if let Some(output) = binary_version_output(bin_path) {
+        let out_str = String::from_utf8_lossy(&output);
+        if let Some(first_line) = out_str.lines().next() {
+            return first_line.trim().to_string();
         }
     }
     "Unknown version".to_string()
