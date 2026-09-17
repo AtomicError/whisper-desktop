@@ -7741,7 +7741,6 @@ html[dir="rtl"] .cat-match-badge {
   opacity: 0.35 !important;
   cursor: not-allowed !important;
   transform: none !important;
-  pointer-events: none !important;
 }
 
 /* Hardsub Preview Status Card & Progress Bar */
@@ -7767,7 +7766,7 @@ html[dir="rtl"] .cat-match-badge {
   background: rgba(0, 0, 0, 0.25);
   padding: 8px 12px;
   border-radius: 6px;
-  border-left: 3px solid #ef4444;
+  border-inline-start: 3px solid #ef4444;
 }
 
 #hardsub-preview-original-note {

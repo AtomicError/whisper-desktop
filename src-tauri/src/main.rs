@@ -792,6 +792,9 @@ fn main() {
             let media_server = Arc::new(tauri::async_runtime::block_on(video_server::MediaServer::start())
                 .map_err(std::io::Error::other)?);
             let preview_root = _app.path().app_cache_dir()?.join("hardsub-preview");
+            if preview_root.exists() {
+                let _ = std::fs::remove_dir_all(&preview_root);
+            }
             _app.manage(media_preview::PreviewState::new(media_server.clone(), preview_root));
             _app.manage(media_server);
             let logs_for_sink = app_logs_for_sink.clone();

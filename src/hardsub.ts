@@ -2288,7 +2288,7 @@ export class HardsubController {
       this.previewDetail.textContent = this.phase === 'error' ? this.previewError?.detail ?? '' : '';
     }
     if (this.previewOriginalNote) {
-      this.previewOriginalNote.hidden = this.phase !== 'preparing' && !(ready && this.previewCandidateStage !== 'direct');
+      this.previewOriginalNote.hidden = this.phase !== 'preparing';
       this.previewOriginalNote.textContent = t('hardsub.previewOriginalUnchanged');
     }
   }
@@ -2822,10 +2822,8 @@ export class HardsubController {
           this.freezeCanvas.width = w;
           this.freezeCanvas.height = h;
         }
-        if (this.videoDisplayLeft || this.videoDisplayTop) {
-          this.freezeCanvas.style.left = `${Math.round(this.videoDisplayLeft)}px`;
-          this.freezeCanvas.style.top = `${Math.round(this.videoDisplayTop)}px`;
-        }
+        this.freezeCanvas.style.left = `${Math.round(this.videoDisplayLeft)}px`;
+        this.freezeCanvas.style.top = `${Math.round(this.videoDisplayTop)}px`;
         this.freezeCtx.clearRect(0, 0, w, h);
         this.freezeCtx.drawImage(this.videoElement, 0, 0, w, h);
         this.freezeCanvas.style.display = 'block';
