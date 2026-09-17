@@ -912,13 +912,21 @@ export class HardsubController {
       this.updateEncodingUIState(false);
       this.updateVolumeIcons(1.0, false);
 
+      let resizeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
       const container = document.getElementById('hardsub-player-container');
       if (container) {
         this.resizeObserver = new ResizeObserver(() => {
           if (this.resizeFrame !== null) cancelAnimationFrame(this.resizeFrame);
           this.resizeFrame = requestAnimationFrame(() => {
             this.resizeFrame = null;
-            if (!this.disposed) this.updateVideoPreviewOverlayBounds();
+            if (!this.disposed) {
+              this.updateVideoPreviewOverlayBounds(false);
+              if (resizeDebounceTimer !== null) clearTimeout(resizeDebounceTimer);
+              resizeDebounceTimer = setTimeout(() => {
+                resizeDebounceTimer = null;
+                if (!this.disposed) this.updateVideoPreviewOverlayBounds(true);
+              }, 60);
+            }
           });
         });
         this.resizeObserver.observe(container);
@@ -2257,7 +2265,8 @@ export class HardsubController {
         : playing ? 'rgba(16, 185, 129, 0.2)' : 'rgba(var(--color-royal-blue-rgb), 0.15)';
       this.videoStatusBadge.style.color = this.phase === 'error' ? '#EF4444' : playing ? '#10B981' : 'var(--color-royal-blue)';
     }
-    if (this.previewStatus) this.previewStatus.style.display = this.phase === 'idle' ? 'none' : 'flex';
+    const showPreviewCard = busy || recovery;
+    if (this.previewStatus) this.previewStatus.style.display = showPreviewCard ? 'flex' : 'none';
     if (this.previewStatusText && this.previewStatusText.textContent !== message) this.previewStatusText.textContent = message;
     if (this.previewCancelBtn) {
       this.previewCancelBtn.hidden = !busy || !actionsVisible;
@@ -2304,30 +2313,36 @@ export class HardsubController {
   private attachMediaListeners(generation: number, candidate: string, url: string): void {
     const video = this.videoElement;
     if (!video) return;
-    const current = () => !this.disposed && generation === this.videoLoadGeneration && candidate === this.candidateId && url === this.expectedMediaUrl && video.currentSrc === url;
+    const current = () => !this.disposed && generation === this.videoLoadGeneration && candidate === this.candidateId && url === this.expectedMediaUrl;
     const onMedia = (type: string, handler: () => void) => {
       const guarded = () => { if (current()) handler(); };
       video.addEventListener(type, guarded);
       this.mediaTeardowns.push(() => video.removeEventListener(type, guarded));
     };
     const ready = () => {
-      if (this.phase !== 'loading' || video.readyState < 2 || video.videoWidth <= 0 || video.videoHeight <= 0) return;
+      if (this.phase !== 'loading' || video.readyState < 2) return;
       this.clearLoadingTimeout();
       this.previewProgress = null;
-      if (this.previewCandidateStage === 'direct') this.directSourceGeometry = { width: video.videoWidth, height: video.videoHeight };
+      if (this.previewCandidateStage === 'direct' && video.videoWidth > 0 && video.videoHeight > 0) {
+        this.directSourceGeometry = { width: video.videoWidth, height: video.videoHeight };
+      }
       this.phase = 'ready';
       this.updateVideoPreviewOverlayBounds();
       this.updatePlaybackTime();
       this.syncPlayPauseUI();
     };
     onMedia('loadedmetadata', () => {
-      if (this.phase === 'loading') this.updateVideoPreviewOverlayBounds();
       if (this.previewCandidateStage === 'direct' && video.videoWidth > 0 && video.videoHeight > 0) {
         this.directSourceGeometry = { width: video.videoWidth, height: video.videoHeight };
+      }
+      if (this.phase === 'loading') {
+        this.updateVideoPreviewOverlayBounds();
+        if (video.readyState >= 2) ready();
       }
     });
     onMedia('loadeddata', ready);
     onMedia('canplay', ready);
+    onMedia('canplaythrough', ready);
     onMedia('progress', () => {
       if (this.phase === 'loading') {
         this.resetLoadingTimeout(generation, candidate, 45_000);
@@ -2353,8 +2368,13 @@ export class HardsubController {
     onMedia('pause', () => this.syncPlayPauseUI());
     onMedia('ended', () => { this.playIntent = false; this.updatePlaybackTime(); this.syncPlayPauseUI(); });
     onMedia('timeupdate', () => {
+      if (this.phase === 'loading' && video.readyState >= 2) ready();
       if (this.canInteractWithVideo() && !this.isUserSeeking && !this.isScrollingSeek && !this.isSeekingVideo) this.updatePlaybackTime();
     });
+
+    if (video.readyState >= 2) {
+      ready();
+    }
   }
 
   private updatePlaybackTime(): void {
@@ -2498,6 +2518,10 @@ export class HardsubController {
       if (this.videoIconFsEnter) this.videoIconFsEnter.style.display = isFs ? 'none' : 'block';
       if (this.videoIconFsExit) this.videoIconFsExit.style.display = isFs ? 'block' : 'none';
       this.renderPlayerPhase();
+      this.updateVideoPreviewOverlayBounds(false);
+      setTimeout(() => {
+        if (!this.disposed) this.updateVideoPreviewOverlayBounds(true);
+      }, 100);
     });
 
     // Auto-hide controls inside player container on mouse inactivity (especially for fullscreen)
@@ -2708,7 +2732,7 @@ export class HardsubController {
     }));
   }
 
-  private updateVideoPreviewOverlayBounds() {
+  private updateVideoPreviewOverlayBounds(fullRedraw = true) {
     if (!this.videoElement || !this.subtitleCanvas) return;
 
     const container = document.getElementById('hardsub-player-container');
@@ -2727,21 +2751,15 @@ export class HardsubController {
       this.videoDisplayHeight = containerHeight;
       this.videoDisplayLeft = 0;
       this.videoDisplayTop = 0;
-      if (this.subtitleCanvas.width !== containerWidth || this.subtitleCanvas.height !== containerHeight) {
+      if (fullRedraw && (this.subtitleCanvas.width !== containerWidth || this.subtitleCanvas.height !== containerHeight)) {
         this.subtitleCanvas.width = containerWidth;
         this.subtitleCanvas.height = containerHeight;
         this._lastRenderKey = '';
       }
+      this.subtitleCanvas.style.width = `${containerWidth}px`;
+      this.subtitleCanvas.style.height = `${containerHeight}px`;
       this.subtitleCanvas.style.left = '0px';
       this.subtitleCanvas.style.top = '0px';
-      if (this.freezeCanvas) {
-        if (this.freezeCanvas.width !== containerWidth || this.freezeCanvas.height !== containerHeight) {
-          this.freezeCanvas.width = containerWidth;
-          this.freezeCanvas.height = containerHeight;
-        }
-        this.freezeCanvas.style.left = '0px';
-        this.freezeCanvas.style.top = '0px';
-      }
       return;
     }
 
@@ -2774,26 +2792,20 @@ export class HardsubController {
     const leftPx = `${Math.round(left)}px`;
     const topPx = `${Math.round(top)}px`;
 
-    const dimsChanged = this.subtitleCanvas.width !== roundedW || this.subtitleCanvas.height !== roundedH;
-    if (dimsChanged) {
-      this.subtitleCanvas.width = roundedW;
-      this.subtitleCanvas.height = roundedH;
-      this._lastRenderKey = '';
-    }
+    this.subtitleCanvas.style.width = `${roundedW}px`;
+    this.subtitleCanvas.style.height = `${roundedH}px`;
     this.subtitleCanvas.style.left = leftPx;
     this.subtitleCanvas.style.top = topPx;
 
-    if (this.freezeCanvas) {
-      if (this.freezeCanvas.width !== roundedW || this.freezeCanvas.height !== roundedH) {
-        this.freezeCanvas.width = roundedW;
-        this.freezeCanvas.height = roundedH;
+    if (fullRedraw) {
+      const dimsChanged = this.subtitleCanvas.width !== roundedW || this.subtitleCanvas.height !== roundedH;
+      if (dimsChanged) {
+        this.subtitleCanvas.width = roundedW;
+        this.subtitleCanvas.height = roundedH;
+        this._lastRenderKey = '';
       }
-      this.freezeCanvas.style.left = leftPx;
-      this.freezeCanvas.style.top = topPx;
+      this.renderSubtitleOnCanvas(true);
     }
-
-    // Redraw subtitle on resized canvas
-    this.renderSubtitleOnCanvas(true);
   }
 
   private captureFreezeFrame(force = false) {
@@ -2803,9 +2815,17 @@ export class HardsubController {
     if (!force && this.isFreezingFrame) return;
 
     try {
-      const w = this.freezeCanvas.width;
-      const h = this.freezeCanvas.height;
+      const w = Math.round(this.videoDisplayWidth) || this.freezeCanvas.width;
+      const h = Math.round(this.videoDisplayHeight) || this.freezeCanvas.height;
       if (w > 0 && h > 0) {
+        if (this.freezeCanvas.width !== w || this.freezeCanvas.height !== h) {
+          this.freezeCanvas.width = w;
+          this.freezeCanvas.height = h;
+        }
+        if (this.videoDisplayLeft || this.videoDisplayTop) {
+          this.freezeCanvas.style.left = `${Math.round(this.videoDisplayLeft)}px`;
+          this.freezeCanvas.style.top = `${Math.round(this.videoDisplayTop)}px`;
+        }
         this.freezeCtx.clearRect(0, 0, w, h);
         this.freezeCtx.drawImage(this.videoElement, 0, 0, w, h);
         this.freezeCanvas.style.display = 'block';
@@ -3064,13 +3084,38 @@ export class HardsubController {
         // same two the cue list under the card uses, so a subtitle file that parsed to no
         // cues reads "0 Cues" in Persian rather than an English "Sub Loaded".
         const subCount = this.subtitleCues.length > 0
-          ? ` • ${isolateDirection(t('hardsub.cuesCount', { count: this.subtitleCues.length }))}`
-          : (hasSub ? ` • ${isolateDirection(t('hardsub.cuesCountZero'))}` : '');
-        this.mediaSummaryBadge.textContent = `✓ ${isolateDirection(vName)}${subCount}`;
+          ? ` • ${t('hardsub.cuesCount', { count: this.subtitleCues.length })}`
+          : (hasSub ? ` • ${t('hardsub.cuesCountZero')}` : '');
+        this.mediaSummaryBadge.innerHTML = '';
+        const checkSpan = document.createElement('span');
+        checkSpan.textContent = '✓';
+        checkSpan.style.flexShrink = '0';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = vName;
+        nameSpan.className = 'hardsub-summary-name';
+        nameSpan.style.overflow = 'hidden';
+        nameSpan.style.textOverflow = 'ellipsis';
+        nameSpan.style.whiteSpace = 'nowrap';
+        nameSpan.style.minWidth = '0';
+        nameSpan.style.flex = '1 1 auto';
+        applyContentDirection(nameSpan, vName);
+
+        this.mediaSummaryBadge.appendChild(checkSpan);
+        this.mediaSummaryBadge.appendChild(nameSpan);
+
+        if (subCount) {
+          const countSpan = document.createElement('span');
+          countSpan.textContent = subCount;
+          countSpan.style.flexShrink = '0';
+          countSpan.style.whiteSpace = 'nowrap';
+          this.mediaSummaryBadge.appendChild(countSpan);
+        }
+
         this.mediaSummaryBadge.title = `Video: ${isolateLtr(this.state.videoPath)}${hasSub ? `\nSubtitle: ${isolateLtr(this.state.subtitlePath)}` : ''}`;
-        this.mediaSummaryBadge.style.display = 'inline-block';
+        this.mediaSummaryBadge.style.display = 'inline-flex';
       } else {
-        this.mediaSummaryBadge.textContent = '';
+        this.mediaSummaryBadge.innerHTML = '';
         this.mediaSummaryBadge.style.display = 'none';
       }
     }

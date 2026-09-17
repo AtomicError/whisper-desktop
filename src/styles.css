@@ -2857,6 +2857,27 @@ select.select-control {
   opacity: 1;
 }
 
+#hardsub-media-summary-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 280px;
+  font-size: 0.78rem;
+  color: var(--color-royal-blue);
+  background: rgba(var(--color-royal-blue-rgb), 0.12);
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+#hardsub-media-summary-badge .hardsub-summary-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
 .wizard-step.active #hardsub-media-summary-badge {
   display: none !important;
 }
@@ -7638,9 +7659,26 @@ html[dir="rtl"] .cat-match-badge {
   object-fit: contain;
 }
 
-/* In fullscreen mode, allow video to scale fully without capping height */
-#hardsub-player-container:fullscreen #hardsub-video-element {
+/* In fullscreen mode, isolate layout completely, remove heavy shadows, and scale video cleanly */
+#hardsub-player-container:fullscreen,
+#hardsub-player-container:-webkit-full-screen {
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  min-height: 100vh !important;
+  background: #000000 !important;
+  contain: strict !important;
+}
+
+#hardsub-player-container:fullscreen #hardsub-video-element,
+#hardsub-player-container:-webkit-full-screen #hardsub-video-element {
   max-height: 100% !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  height: 100% !important;
 }
 
 #hardsub-video-controls {
