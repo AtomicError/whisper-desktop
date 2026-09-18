@@ -3029,29 +3029,10 @@
                   </div>
                 </div>
 
-                <!-- Telemetry Progress & Action Card (Dark Glassmorphic Studio Theme) -->
-                <div class="glass-card telemetry-hud" style="margin-bottom: 0; padding: 20px; display: flex; flex-direction: column; gap: 16px;">
-                  <div class="progress-linear-wrapper" style="margin: 0; width: 100%;">
-                    <div class="hud-stats-row" style="margin-bottom: 8px;">
-                      <span class="hud-stat-label" data-i18n="hardsub.encodingProgress">HARDSUB ENCODING PROGRESS</span>
-                      <span class="radial-pct" id="hardsub-pct-text">0%</span>
-                    </div>
-                    
-                    <div class="progress-linear-track" style="height: 10px;">
-                      <div class="progress-linear-fill" id="hardsub-progress-fill" style="width: 0%;">
-                        <div class="progress-linear-glow"></div>
-                        <div class="progress-linear-scanner"></div>
-                      </div>
-                    </div>
-                    
-                    <div class="hud-status-subtitle" style="margin-top: 10px;">
-                      <div class="hud-pulse-dot" id="hardsub-hud-pulse"></div>
-                      <span class="radial-msg" id="hardsub-status-text" data-i18n="transcribe.standingBy">Standing By</span>
-                    </div>
-                  </div>
-
-                  <!-- Output Folder Row -->
-                  <div class="translate-field-group" style="margin-top: 2px;">
+                <!-- Hardsub Action & Export Deck (Dark Glassmorphic Studio Theme) -->
+                <div class="glass-card hardsub-action-deck" style="margin-bottom: 0; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px;">
+                  <!-- 1. Output Folder Row -->
+                  <div class="translate-field-group" style="margin: 0;">
                     <label>
                       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-gold, #f59e0b)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
@@ -3065,7 +3046,8 @@
                     </div>
                   </div>
 
-                  <div style="display: flex; gap: 10px; margin-top: 4px;">
+                  <!-- 2. Primary Actions Row -->
+                  <div style="display: flex; gap: 10px; align-items: center;">
                     <button class="btn-primary" id="btn-start-hardsub" style="flex: 1; justify-content: center; padding: 12px 18px; font-size: 0.95rem; font-weight: 600; gap: 10px;">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width: 18px; height: 18px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                       <span data-i18n="hardsub.exportHardsubVideo">Export Hardsub Video</span>
@@ -3079,6 +3061,28 @@
                       </svg>
                       <span data-i18n="hardsub.openOutputFolder">Open Folder</span>
                     </button>
+                  </div>
+
+                  <!-- 3. Telemetry HUD (Revealed with smooth transition during & after encoding) -->
+                  <div class="hardsub-telemetry" id="hardsub-telemetry-box" style="display: none;">
+                    <div class="progress-linear-wrapper" style="margin: 0; width: 100%;">
+                      <div class="hud-stats-row" style="margin-bottom: 8px;">
+                        <span class="hud-stat-label" data-i18n="hardsub.encodingProgress">HARDSUB ENCODING PROGRESS</span>
+                        <span class="radial-pct" id="hardsub-pct-text">0%</span>
+                      </div>
+                      
+                      <div class="progress-linear-track" style="height: 10px;">
+                        <div class="progress-linear-fill" id="hardsub-progress-fill" style="width: 0%;">
+                          <div class="progress-linear-glow"></div>
+                          <div class="progress-linear-scanner"></div>
+                        </div>
+                      </div>
+                      
+                      <div class="hud-status-subtitle" style="margin-top: 10px;">
+                        <div class="hud-pulse-dot" id="hardsub-hud-pulse"></div>
+                        <span class="radial-msg" id="hardsub-status-text" data-i18n="transcribe.standingBy">Standing By</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 

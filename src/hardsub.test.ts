@@ -111,10 +111,12 @@ function fixture() {
   const btnBrowseDir = new Control();
   const btnResetDir = new Control();
   const btnOpenFolder = new Control();
+  const telemetryBox = new Control();
   doc.elements.set('hardsub-output-dir-text', outputDirText);
   doc.elements.set('btn-browse-hardsub-dir', btnBrowseDir);
   doc.elements.set('btn-reset-hardsub-dir', btnResetDir);
   doc.elements.set('btn-open-hardsub-folder', btnOpenFolder);
+  doc.elements.set('hardsub-telemetry-box', telemetryBox);
 
   // Inject only event-capable DOM/media boundaries. Loading, seeking and rendering are real.
   const internal = controller as unknown as {
@@ -128,6 +130,8 @@ function fixture() {
     btnBrowseDir: Control;
     btnResetDir: Control;
     btnOpenFolder: Control;
+    telemetryBox: Control;
+    updateEncodingUIState(active: boolean): void;
     setupVideoPlayerEvents(): void;
     browseOutputDir(): Promise<void>;
     resetOutputDir(): void;
@@ -136,7 +140,7 @@ function fixture() {
   };
   Object.assign(internal, {
     videoElement: video, videoSeekSlider: slider, videoPlayBtn: play, lblVideoName: label, videoStatusBadge: badge, videoTimeDisplay: time,
-    outputDirText, btnBrowseDir, btnResetDir, btnOpenFolder
+    outputDirText, btnBrowseDir, btnResetDir, btnOpenFolder, telemetryBox
   });
   Object.assign(internal, { previewCancelBtn: cancel, previewRetryBtn: retry });
   internal.setupVideoPlayerEvents();
@@ -147,7 +151,7 @@ function fixture() {
     if (active) controller.setPageActive(true);
     video.pause.mockClear();
   };
-  return { controller, video, slider, play, label, badge, time, container, internal, load, cancel, retry, outputDirText, btnBrowseDir, btnResetDir, btnOpenFolder };
+  return { controller, video, slider, play, label, badge, time, container, internal, load, cancel, retry, outputDirText, btnBrowseDir, btnResetDir, btnOpenFolder, telemetryBox };
 }
 
 beforeAll(async () => {
@@ -636,6 +640,26 @@ describe('hardsub output directory management', () => {
 
     expect(btnOpenFolder.style.display).toBe('none');
     expect((internal as any).lastExportedPath).toBeNull();
+  });
+
+  it('manages progressive disclosure of telemetry HUD during and after encoding', async () => {
+    const { controller, internal, telemetryBox } = fixture();
+    // Initially hidden
+    telemetryBox.style.display = 'none';
+
+    // When encoding becomes active, telemetryBox reveals
+    internal.updateEncodingUIState(true);
+    expect(telemetryBox.style.display).toBe('flex');
+
+    // When settled completed, telemetryBox remains visible
+    (internal as any).lastStatusPayload = { stage: 'completed', progress: 1.0, message: 'Done', active: false };
+    internal.updateEncodingUIState(false);
+    expect(telemetryBox.style.display).toBe('flex');
+
+    // When selecting a new video, telemetryBox resets to hidden
+    controller.prefillFilePaths('/media/movies/another_video.mp4', '');
+    await flush();
+    expect(telemetryBox.style.display).toBe('none');
   });
 });
 

@@ -742,6 +742,7 @@ export class HardsubController {
   private progressStatusText: HTMLElement | null = null;
   private progressPctText: HTMLElement | null = null;
   private hudPulseDot: HTMLElement | null = null;
+  private telemetryBox: HTMLElement | null = null;
 
   // Export Panel Elements
   private resolutionSelect: HTMLSelectElement | null = null;
@@ -1185,6 +1186,7 @@ export class HardsubController {
     this.progressStatusText = document.getElementById('hardsub-status-text');
     this.progressPctText = document.getElementById('hardsub-pct-text');
     this.hudPulseDot = document.getElementById('hardsub-hud-pulse');
+    this.telemetryBox = document.getElementById('hardsub-telemetry-box');
 
     // Output Folder Controls & Completion Action
     this.outputDirText = document.getElementById('hardsub-output-dir-text');
@@ -3317,8 +3319,21 @@ export class HardsubController {
     if (this.disposed) return;
     this.state.videoPath = videoPath;
     this.lastExportedPath = null;
+    this.lastStatusPayload = null;
     if (this.btnOpenFolder) {
       this.btnOpenFolder.style.display = 'none';
+    }
+    if (this.telemetryBox) {
+      this.telemetryBox.style.display = 'none';
+    }
+    if (this.progressFill) {
+      this.progressFill.style.width = '0%';
+    }
+    if (this.progressPctText) {
+      this.progressPctText.textContent = '0%';
+    }
+    if (this.progressStatusText) {
+      this.progressStatusText.textContent = t('transcribe.standingBy');
     }
     if (this.videoPathInput) this.videoPathInput.value = videoPath;
     this.updateVideoDropzoneUI(videoPath);
@@ -3706,6 +3721,10 @@ export class HardsubController {
       await invoke('open_file_in_editor', { filePath: targetFolder });
     } catch (err) {
       console.error('Failed to open folder:', err);
+      const notifyFn = (window as any).showNotification;
+      if (typeof notifyFn === 'function') {
+        notifyFn(String(err || 'Failed to open output directory'), 'error');
+      }
     }
   }
 
@@ -4021,6 +4040,22 @@ export class HardsubController {
       this.btnOpenFolder.style.display = 'none';
     }
 
+    if (this.telemetryBox) {
+      if (active) {
+        this.telemetryBox.style.display = 'flex';
+      } else {
+        const isSettled = this.lastStatusPayload && (
+          this.lastStatusPayload.stage === 'completed' ||
+          this.lastStatusPayload.progress >= 1.0 ||
+          this.lastStatusPayload.stage === 'cancelled' ||
+          this.lastStatusPayload.stage === 'failed'
+        );
+        if (!isSettled) {
+          this.telemetryBox.style.display = 'none';
+        }
+      }
+    }
+
     if (this.hudPulseDot) {
       if (active) {
         this.hudPulseDot.classList.add('active');
@@ -4044,6 +4079,9 @@ export class HardsubController {
       if (this.disposed) return;
       const data = event.payload;
       this.lastStatusPayload = data;
+      if (this.telemetryBox && data.active) {
+        this.telemetryBox.style.display = 'flex';
+      }
       const pct = Math.round(data.progress * 100);
 
       (window as any).isHardsubRunning = !!data.active;
@@ -4400,8 +4438,12 @@ ${events}`;
         this.progressStatusText.textContent = t('hardsub.statusInitEncoder');
       }
 
+      this.lastExportedPath = null;
       if (this.btnOpenFolder) {
         this.btnOpenFolder.style.display = 'none';
+      }
+      if (this.telemetryBox) {
+        this.telemetryBox.style.display = 'flex';
       }
       this.updateComputedOutputPath();
 

@@ -3239,6 +3239,36 @@ select.select-control {
   transform: none;
 }
 
+/* Hardsub Action Deck & Progressive Telemetry HUD */
+.hardsub-action-deck {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  box-shadow: var(--shadow-glass);
+  border-radius: 12px;
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hardsub-telemetry {
+  animation: hardsubFadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+@keyframes hardsubFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Premium Cyber-Neon Linear Progress HUD */
 .progress-linear-wrapper {
   width: 100%;
