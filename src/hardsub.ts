@@ -63,6 +63,7 @@ export interface HardsubSettings {
   videoPath: string;
   subtitlePath: string;
   outputPath: string;
+  outputDir?: string;
   outputFormat: string;
   videoCodec: string;
   hwAccel: string;
@@ -126,6 +127,106 @@ function msToAssTime(ms: number): string {
   const s = Math.floor((ms % 60000) / 1000);
   const cs = Math.floor((ms % 1000) / 10);
   return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(cs).padStart(2, '0')}`;
+}
+
+export function getParentDir(filePath: string): string {
+  if (!filePath) return '';
+  const clean = filePath.trim();
+  const lastSlash = Math.max(clean.lastIndexOf('/'), clean.lastIndexOf('\\'));
+  if (lastSlash === 0) return '/';
+  if (clean.length >= 3 && clean[1] === ':' && lastSlash === 2) {
+    return clean.substring(0, 3);
+  }
+  return lastSlash > 0 ? clean.substring(0, lastSlash) : '';
+}
+
+export function joinPath(dir: string, file: string): string {
+  if (!dir) return file;
+  const isWindows = dir.includes('\\');
+  const sep = isWindows ? '\\' : '/';
+  if (dir.endsWith('/') || dir.endsWith('\\')) {
+    return `${dir}${file}`;
+  }
+  return `${dir}${sep}${file}`;
+}
+
+export function formatHardsubStatus(data: {
+  progress: number;
+  message: string;
+  active: boolean;
+  stage?: string;
+  speed?: string;
+  fps?: string;
+}): string {
+  const pct = Math.round(data.progress * 100);
+  let stage = data.stage;
+  let speed = data.speed;
+  let fps = data.fps;
+
+  const rawMsg = data.message || '';
+  if (!stage) {
+    if (rawMsg.includes('Initializing') || rawMsg.includes('Encoder')) {
+      stage = 'init';
+    } else if (rawMsg.includes('Embedding Subtitles')) {
+      stage = 'encoding';
+    } else if (rawMsg.includes('Finalizing video export') || rawMsg.includes('Finalizing')) {
+      stage = 'finalizing';
+    } else if (rawMsg.includes('exported successfully')) {
+      stage = 'completed';
+    } else if (rawMsg.includes('cancelled') || rawMsg.includes('Cancelled')) {
+      stage = 'cancelled';
+    } else if (rawMsg.includes('encoding failed') || rawMsg.includes('failed')) {
+      stage = 'failed';
+    }
+  }
+
+  if (!speed) {
+    const speedMatch = rawMsg.match(/Speed:\s*([^\s|)]+)/i);
+    if (speedMatch) speed = speedMatch[1];
+  }
+  if (!fps) {
+    const fpsMatch = rawMsg.match(/([\d.]+)\s*FPS/i);
+    if (fpsMatch) fps = fpsMatch[1];
+  }
+
+  if (stage === 'init') {
+    return t('hardsub.statusInitEncoder');
+  }
+
+  if (stage === 'encoding') {
+    const detailParts: string[] = [];
+    if (speed) {
+      detailParts.push(t('hardsub.statSpeed', { speed }));
+    }
+    if (fps) {
+      detailParts.push(t('hardsub.statFps', { fps }));
+    }
+    if (detailParts.length > 0) {
+      return t('hardsub.statusEmbeddingStats', {
+        percent: pct,
+        stats: detailParts.join(' | '),
+      });
+    }
+    return t('hardsub.statusEmbedding', { percent: pct });
+  }
+
+  if (stage === 'finalizing') {
+    return t('hardsub.statusFinalizing');
+  }
+
+  if (stage === 'completed') {
+    return t('hardsub.statusExportSuccess');
+  }
+
+  if (stage === 'cancelled') {
+    return t('hardsub.statusEncodingCancelled');
+  }
+
+  if (stage === 'failed') {
+    return t('hardsub.statusEncodingFailed');
+  }
+
+  return rawMsg ? isolateDirection(rawMsg) : '';
 }
 
 /**
@@ -658,12 +759,26 @@ export class HardsubController {
   private audioBitrateSelect: HTMLSelectElement | null = null;
   private ffmpegCmdPreview: HTMLElement | null = null;
   private btnCopyFfmpegCmd: HTMLButtonElement | null = null;
+  private outputDirText: HTMLElement | null = null;
+  private btnBrowseDir: HTMLButtonElement | null = null;
+  private btnResetDir: HTMLButtonElement | null = null;
+  private btnOpenFolder: HTMLButtonElement | null = null;
+  private lastExportedPath: string | null = null;
+  private lastStatusPayload: {
+    progress: number;
+    message: string;
+    active: boolean;
+    stage?: string;
+    speed?: string;
+    fps?: string;
+  } | null = null;
 
   // Internal State
   private state: HardsubSettings = {
     videoPath: '',
     subtitlePath: '',
     outputPath: '',
+    outputDir: '',
     outputFormat: 'mp4',
     videoCodec: 'h264',
     hwAccel: 'cpu',
@@ -1070,6 +1185,12 @@ export class HardsubController {
     this.progressStatusText = document.getElementById('hardsub-status-text');
     this.progressPctText = document.getElementById('hardsub-pct-text');
     this.hudPulseDot = document.getElementById('hardsub-hud-pulse');
+
+    // Output Folder Controls & Completion Action
+    this.outputDirText = document.getElementById('hardsub-output-dir-text');
+    this.btnBrowseDir = document.getElementById('btn-browse-hardsub-dir') as HTMLButtonElement;
+    this.btnResetDir = document.getElementById('btn-reset-hardsub-dir') as HTMLButtonElement;
+    this.btnOpenFolder = document.getElementById('btn-open-hardsub-folder') as HTMLButtonElement;
   }
 
   private async loadFontsAndHardware() {
@@ -1585,6 +1706,19 @@ export class HardsubController {
         console.warn('Cancel hardsub error:', e);
       }
     });
+
+    // Output Directory Controls
+    this.on(this.btnBrowseDir, 'click', () => {
+      this.browseOutputDir();
+    });
+
+    this.on(this.btnResetDir, 'click', () => {
+      this.resetOutputDir();
+    });
+
+    this.on(this.btnOpenFolder, 'click', () => {
+      this.openOutputFolder();
+    });
   }
 
   private setupExportEventListeners() {
@@ -1592,7 +1726,7 @@ export class HardsubController {
     this.on(this.formatSelect, 'change', () => {
       this.state.outputFormat = this.formatSelect!.value;
       if (this.state.videoPath) {
-        this.autoSuggestSubtitleAndOutput(this.state.videoPath);
+        this.updateComputedOutputPath();
       }
       this.saveExportSettingsToStorage();
       this.updateFfmpegCommandPreview();
@@ -1985,6 +2119,10 @@ export class HardsubController {
     this.updateSubDropzoneUI(this.state.subtitlePath, this.subtitleCues.length);
     this.renderSubtitleCards();
     this.renderPlayerPhase();
+    this.updateOutputDirUI();
+    if (this.progressStatusText && this.lastStatusPayload) {
+      this.progressStatusText.textContent = formatHardsubStatus(this.lastStatusPayload);
+    }
     this.updateEncodingUIState(this.isEncoding);
   }
 
@@ -3178,6 +3316,10 @@ export class HardsubController {
   private selectVideoSource(videoPath: string): void {
     if (this.disposed) return;
     this.state.videoPath = videoPath;
+    this.lastExportedPath = null;
+    if (this.btnOpenFolder) {
+      this.btnOpenFolder.style.display = 'none';
+    }
     if (this.videoPathInput) this.videoPathInput.value = videoPath;
     this.updateVideoDropzoneUI(videoPath);
     this.autoSuggestSubtitleAndOutput(videoPath);
@@ -3497,6 +3639,76 @@ export class HardsubController {
     }
   }
 
+  private updateComputedOutputPath() {
+    if (!this.state.videoPath) return;
+    const originalVideoPath = this.state.videoPath;
+    const lastSlash = Math.max(originalVideoPath.lastIndexOf('/'), originalVideoPath.lastIndexOf('\\'));
+    const fileNameWithExt = lastSlash >= 0 ? originalVideoPath.substring(lastSlash + 1) : originalVideoPath;
+    const lastDot = fileNameWithExt.lastIndexOf('.');
+    const stem = lastDot > 0 ? fileNameWithExt.substring(0, lastDot) : fileNameWithExt;
+    const format = this.state.outputFormat || 'mp4';
+    const outFileName = `${stem}_hardsub.${format}`;
+
+    if (this.state.outputDir) {
+      this.state.outputPath = joinPath(this.state.outputDir, outFileName);
+    } else {
+      const parentDir = getParentDir(originalVideoPath);
+      this.state.outputPath = parentDir ? joinPath(parentDir, outFileName) : `${stem}_hardsub.${format}`;
+    }
+  }
+
+  public async browseOutputDir() {
+    try {
+      const selected = await invoke<string | null>('select_directory');
+      if (selected) {
+        this.state.outputDir = selected;
+        this.updateComputedOutputPath();
+        this.updateOutputDirUI();
+        this.updateFfmpegCommandPreview();
+      }
+    } catch (err) {
+      console.error('Failed to select directory:', err);
+    }
+  }
+
+  public resetOutputDir() {
+    this.state.outputDir = '';
+    this.updateComputedOutputPath();
+    this.updateOutputDirUI();
+    this.updateFfmpegCommandPreview();
+  }
+
+  private updateOutputDirUI() {
+    if (!this.outputDirText || !this.btnResetDir) return;
+    if (this.state.outputDir) {
+      this.outputDirText.textContent = this.state.outputDir;
+      this.outputDirText.title = isolateLtr(this.state.outputDir);
+      this.outputDirText.classList.add('has-custom-path');
+      this.btnResetDir.style.display = 'inline-flex';
+    } else {
+      this.outputDirText.textContent = t('hardsub.sameAsSource');
+      this.outputDirText.removeAttribute('title');
+      this.outputDirText.classList.remove('has-custom-path');
+      this.btnResetDir.style.display = 'none';
+    }
+  }
+
+  public async openOutputFolder() {
+    const targetPath = this.lastExportedPath || this.state.outputPath;
+    const targetFolder = (targetPath ? getParentDir(targetPath) : '') || this.state.outputDir;
+    if (!targetFolder) return;
+    try {
+      const win = window as any;
+      if (typeof win.openFileInEditor === 'function') {
+        await win.openFileInEditor(targetFolder);
+        return;
+      }
+      await invoke('open_file_in_editor', { filePath: targetFolder });
+    } catch (err) {
+      console.error('Failed to open folder:', err);
+    }
+  }
+
   private autoSuggestSubtitleAndOutput(videoPath: string) {
     const lastDot = videoPath.lastIndexOf('.');
     if (lastDot > 0) {
@@ -3509,7 +3721,8 @@ export class HardsubController {
           this.loadSubtitleFile(srtPath);
         }
       }
-      this.state.outputPath = `${basePath}_hardsub.${this.state.outputFormat}`;
+      this.updateComputedOutputPath();
+      this.updateOutputDirUI();
     }
   }
 
@@ -3798,6 +4011,16 @@ export class HardsubController {
       this.cancelBtn.style.display = active ? 'inline-flex' : 'none';
     }
 
+    if (this.btnBrowseDir) {
+      this.btnBrowseDir.disabled = active;
+    }
+    if (this.btnResetDir) {
+      this.btnResetDir.disabled = active;
+    }
+    if (active && this.btnOpenFolder) {
+      this.btnOpenFolder.style.display = 'none';
+    }
+
     if (this.hudPulseDot) {
       if (active) {
         this.hudPulseDot.classList.add('active');
@@ -3810,9 +4033,17 @@ export class HardsubController {
   }
 
   private listenToProgressEvents() {
-    this.retainNativeListener(listen<{ progress: number; message: string; active: boolean }>('hardsub-status', (event) => {
+    this.retainNativeListener(listen<{
+      progress: number;
+      message: string;
+      active: boolean;
+      stage?: string;
+      speed?: string;
+      fps?: string;
+    }>('hardsub-status', (event) => {
       if (this.disposed) return;
       const data = event.payload;
+      this.lastStatusPayload = data;
       const pct = Math.round(data.progress * 100);
 
       (window as any).isHardsubRunning = !!data.active;
@@ -3827,9 +4058,19 @@ export class HardsubController {
         this.progressPctText.textContent = `${pct}%`;
       }
       if (this.progressStatusText) {
-        // Progress comes from the backend as one message, English around file names and
-        // paths it names; isolating it keeps the order the backend wrote it in.
-        this.progressStatusText.textContent = isolateDirection(data.message);
+        this.progressStatusText.textContent = formatHardsubStatus(data);
+      }
+
+      if (!data.active && (data.stage === 'completed' || data.progress >= 1.0)) {
+        if (this.progressFill) {
+          this.progressFill.style.width = '100%';
+        }
+        if (this.progressPctText) {
+          this.progressPctText.textContent = '100%';
+        }
+        if (this.btnOpenFolder) {
+          this.btnOpenFolder.style.display = 'inline-flex';
+        }
       }
 
       this.updateEncodingUIState(data.active);
@@ -4159,10 +4400,30 @@ ${events}`;
         this.progressStatusText.textContent = t('hardsub.statusInitEncoder');
       }
 
+      if (this.btnOpenFolder) {
+        this.btnOpenFolder.style.display = 'none';
+      }
+      this.updateComputedOutputPath();
+
       if (!current()) return;
-      await invoke('start_hardsub_task', {
+      const result = await invoke<{ outputPath: string; durationMs: number; outputSizeMb: number }>('start_hardsub_task', {
         settings: { ...this.state, videoPath: originalVideoPath, subtitlePath: exportSubtitlePath },
       });
+      if (result?.outputPath) {
+        this.lastExportedPath = result.outputPath;
+      }
+      if (this.progressFill) {
+        this.progressFill.style.width = '100%';
+      }
+      if (this.progressPctText) {
+        this.progressPctText.textContent = '100%';
+      }
+      if (this.btnOpenFolder) {
+        this.btnOpenFolder.style.display = 'inline-flex';
+      }
+      if (this.progressStatusText) {
+        this.progressStatusText.textContent = t('hardsub.statusExportSuccess');
+      }
     } catch (e: any) {
       const msg = String(e || '');
       if (msg.includes('cancelled') || msg.includes('Cancelled')) {

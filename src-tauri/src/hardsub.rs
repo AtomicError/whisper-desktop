@@ -8,7 +8,6 @@ use tauri_plugin_notification::NotificationExt;
 use std::time::Instant;
 
 use crate::logger::AppLogs;
-use crate::transcribe::TranscribeProgress;
 
 #[derive(serde::Deserialize, serde::Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -63,6 +62,20 @@ pub struct HardsubResult {
     pub duration_ms: u64,
     pub output_path: String,
     pub output_size_mb: f64,
+}
+
+#[derive(serde::Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct HardsubProgress {
+    pub progress: f64,
+    pub message: String,
+    pub active: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stage: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub speed: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fps: Option<String>,
 }
 
 #[derive(serde::Serialize, Clone, Debug)]
@@ -1160,6 +1173,12 @@ pub async fn run_hardsub_task(
     let final_output_path = resolve_unique_output_path(&settings.output_path);
     settings.output_path = final_output_path.clone();
 
+    if let Some(parent) = Path::new(&settings.output_path).parent() {
+        if !parent.as_os_str().is_empty() && !parent.exists() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+    }
+
     let video_name = Path::new(&settings.video_path)
         .file_name()
         .unwrap_or_default()
@@ -1171,10 +1190,13 @@ pub async fn run_hardsub_task(
     // Trigger OS notification
     let _ = app.notification().builder().title("Hardsub Video Started").body(format!("Encoding {}...", video_name)).show();
 
-    let _ = app.emit("hardsub-status", TranscribeProgress {
+    let _ = app.emit("hardsub-status", HardsubProgress {
         progress: 0.0,
         message: "Initializing FFmpeg Encoder...".to_string(),
         active: true,
+        stage: Some("init".to_string()),
+        speed: None,
+        fps: None,
     });
 
     // Export and preview must select the same streams and display geometry.
@@ -1203,10 +1225,13 @@ pub async fn run_hardsub_task(
 
     // Preserve the export cancellation result after the probe has settled.
     if session.lock().map(|l| l.cancel_requested).unwrap_or(false) {
-        let _ = app.emit("hardsub-status", TranscribeProgress {
+        let _ = app.emit("hardsub-status", HardsubProgress {
             progress: 0.0,
             message: "Hardsubbing cancelled by user.".to_string(),
             active: false,
+            stage: Some("cancelled".to_string()),
+            speed: None,
+            fps: None,
         });
         return Err("Hardsubbing cancelled by user.".to_string());
     }
@@ -1402,10 +1427,13 @@ pub async fn run_hardsub_task(
         if Path::new(&settings.output_path).exists() {
             let _ = std::fs::remove_file(&settings.output_path);
         }
-        let _ = app.emit("hardsub-status", TranscribeProgress {
+        let _ = app.emit("hardsub-status", HardsubProgress {
             progress: 0.0,
             message: "Hardsubbing cancelled by user.".to_string(),
             active: false,
+            stage: Some("cancelled".to_string()),
+            speed: None,
+            fps: None,
         });
         return Err("Hardsubbing cancelled by user.".to_string());
     }
@@ -1442,10 +1470,13 @@ pub async fn run_hardsub_task(
         if Path::new(&settings.output_path).exists() {
             let _ = std::fs::remove_file(&settings.output_path);
         }
-        let _ = app.emit("hardsub-status", TranscribeProgress {
+        let _ = app.emit("hardsub-status", HardsubProgress {
             progress: 0.0,
             message: "Hardsubbing cancelled by user.".to_string(),
             active: false,
+            stage: Some("cancelled".to_string()),
+            speed: None,
+            fps: None,
         });
         return Err("Hardsubbing cancelled by user.".to_string());
     }
@@ -1513,12 +1544,23 @@ pub async fn run_hardsub_task(
                                         last_emit_time = now;
                                         last_emitted_percent = Some(percent);
 
+                                        let speed_opt = if !current_speed.is_empty() && current_speed != "N/A" {
+                                            Some(current_speed.clone())
+                                        } else {
+                                            None
+                                        };
+                                        let fps_opt = if !current_fps.is_empty() && current_fps != "0.00" && current_fps != "N/A" {
+                                            Some(current_fps.clone())
+                                        } else {
+                                            None
+                                        };
+
                                         let mut detail = Vec::new();
-                                        if !current_speed.is_empty() && current_speed != "N/A" {
-                                            detail.push(format!("Speed: {}", current_speed));
+                                        if let Some(ref s) = speed_opt {
+                                            detail.push(format!("Speed: {}", s));
                                         }
-                                        if !current_fps.is_empty() && current_fps != "0.00" && current_fps != "N/A" {
-                                            detail.push(format!("{} FPS", current_fps));
+                                        if let Some(ref f) = fps_opt {
+                                            detail.push(format!("{} FPS", f));
                                         }
 
                                         let msg = if !detail.is_empty() {
@@ -1527,10 +1569,13 @@ pub async fn run_hardsub_task(
                                             format!("Embedding Subtitles into Video... {}%", percent)
                                         };
 
-                                        let _ = app.emit("hardsub-status", TranscribeProgress {
+                                        let _ = app.emit("hardsub-status", HardsubProgress {
                                             progress: p,
                                             message: msg,
                                             active: true,
+                                            stage: Some("encoding".to_string()),
+                                            speed: speed_opt,
+                                            fps: fps_opt,
                                         });
                                     }
                                 }
@@ -1544,10 +1589,13 @@ pub async fn run_hardsub_task(
                                     current_fps = v.to_string();
                                 }
                                 "progress" if v == "end" => {
-                                    let _ = app.emit("hardsub-status", TranscribeProgress {
+                                    let _ = app.emit("hardsub-status", HardsubProgress {
                                         progress: 0.99,
                                         message: "Finalizing video export...".to_string(),
                                         active: true,
+                                        stage: Some("finalizing".to_string()),
+                                        speed: None,
+                                        fps: None,
                                     });
                                 }
                                 _ => {}
@@ -1588,18 +1636,24 @@ pub async fn run_hardsub_task(
         }
 
         if was_cancelled {
-            let _ = app.emit("hardsub-status", TranscribeProgress {
+            let _ = app.emit("hardsub-status", HardsubProgress {
                 progress: 0.0,
                 message: "Hardsubbing cancelled by user.".to_string(),
                 active: false,
+                stage: Some("cancelled".to_string()),
+                speed: None,
+                fps: None,
             });
             return Err("Hardsubbing cancelled by user.".to_string());
         }
 
-        let _ = app.emit("hardsub-status", TranscribeProgress {
+        let _ = app.emit("hardsub-status", HardsubProgress {
             progress: 0.0,
             message: "Hardsubbing encoding failed.".to_string(),
             active: false,
+            stage: Some("failed".to_string()),
+            speed: None,
+            fps: None,
         });
         return Err(format!("FFmpeg failed with exit code: {:?}", status.code()));
     }
@@ -1614,10 +1668,13 @@ pub async fn run_hardsub_task(
 
     logs.log(&app, "Hardsub", &format!("Hardsub completed successfully! Saved to: {}", settings.output_path));
 
-    let _ = app.emit("hardsub-status", TranscribeProgress {
+    let _ = app.emit("hardsub-status", HardsubProgress {
         progress: 1.0,
         message: "Hardsub video exported successfully!".to_string(),
         active: false,
+        stage: Some("completed".to_string()),
+        speed: None,
+        fps: None,
     });
 
     // Notify OS

@@ -2,12 +2,31 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import type { HardsubController } from './hardsub';
 
 let Controller: typeof HardsubController;
+let formatHardsubStatusFn: typeof import('./hardsub').formatHardsubStatus;
+let getParentDirFn: typeof import('./hardsub').getParentDir;
+let joinPathFn: typeof import('./hardsub').joinPath;
 const controllers: HardsubController[] = [];
+
+class ClassList {
+  private classes = new Set<string>();
+  add(...tokens: string[]) { tokens.forEach(t => this.classes.add(t)); }
+  remove(...tokens: string[]) { tokens.forEach(t => this.classes.delete(t)); }
+  toggle(token: string, force?: boolean) {
+    if (force === true) { this.classes.add(token); return true; }
+    if (force === false) { this.classes.delete(token); return false; }
+    if (this.classes.has(token)) { this.classes.delete(token); return false; }
+    this.classes.add(token); return true;
+  }
+  contains(token: string) { return this.classes.has(token); }
+}
+
 class Control extends EventTarget {
   value = '0';
   disabled = false;
   textContent = '';
+  title = '';
   style: Record<string, string> = {};
+  classList = new ClassList();
   closest = (_selector: string): Control | null => null;
   setAttribute() {}
   focus() {}
@@ -88,6 +107,15 @@ function fixture() {
   const time = new Control();
   const container = new Control();
   doc.elements.set('hardsub-player-container', container);
+  const outputDirText = new Control();
+  const btnBrowseDir = new Control();
+  const btnResetDir = new Control();
+  const btnOpenFolder = new Control();
+  doc.elements.set('hardsub-output-dir-text', outputDirText);
+  doc.elements.set('btn-browse-hardsub-dir', btnBrowseDir);
+  doc.elements.set('btn-reset-hardsub-dir', btnResetDir);
+  doc.elements.set('btn-open-hardsub-folder', btnOpenFolder);
+
   // Inject only event-capable DOM/media boundaries. Loading, seeking and rendering are real.
   const internal = controller as unknown as {
     videoElement: Media; videoSeekSlider: Control; videoPlayBtn: Control;
@@ -95,10 +123,21 @@ function fixture() {
     previewCancelBtn: Control; previewRetryBtn: Control;
     freezeCanvas: { width: number; height: number; style: Record<string, string> };
     freezeCtx: { clearRect(): void; drawImage(): void };
-    state: { videoPath: string; outputPath: string };
+    state: { videoPath: string; outputPath: string; outputDir: string };
+    outputDirText: Control;
+    btnBrowseDir: Control;
+    btnResetDir: Control;
+    btnOpenFolder: Control;
     setupVideoPlayerEvents(): void;
+    browseOutputDir(): Promise<void>;
+    resetOutputDir(): void;
+    updateOutputDirUI(): void;
+    openOutputFolder(): Promise<void>;
   };
-  Object.assign(internal, { videoElement: video, videoSeekSlider: slider, videoPlayBtn: play, lblVideoName: label, videoStatusBadge: badge, videoTimeDisplay: time });
+  Object.assign(internal, {
+    videoElement: video, videoSeekSlider: slider, videoPlayBtn: play, lblVideoName: label, videoStatusBadge: badge, videoTimeDisplay: time,
+    outputDirText, btnBrowseDir, btnResetDir, btnOpenFolder
+  });
   Object.assign(internal, { previewCancelBtn: cancel, previewRetryBtn: retry });
   internal.setupVideoPlayerEvents();
   const load = async (active = true) => {
@@ -108,7 +147,7 @@ function fixture() {
     if (active) controller.setPageActive(true);
     video.pause.mockClear();
   };
-  return { controller, video, slider, play, label, badge, time, container, internal, load, cancel, retry };
+  return { controller, video, slider, play, label, badge, time, container, internal, load, cancel, retry, outputDirText, btnBrowseDir, btnResetDir, btnOpenFolder };
 }
 
 beforeAll(async () => {
@@ -116,6 +155,9 @@ beforeAll(async () => {
   vi.stubGlobal('window', new EventTarget());
   const module = await import('./hardsub');
   Controller = module.HardsubController;
+  formatHardsubStatusFn = module.formatHardsubStatus;
+  getParentDirFn = module.getParentDir;
+  joinPathFn = module.joinPath;
   module.hardsubController.dispose();
 });
 beforeEach(() => {
@@ -440,3 +482,161 @@ describe('compatible preview recovery', () => {
     expect(invoke).toHaveBeenCalledWith('release_hardsub_preview', { requestId });
   });
 });
+
+describe('hardsub path utilities', () => {
+  it('correctly extracts parent directory for Unix and Windows paths', () => {
+    expect(getParentDirFn('/home/user/video.mp4')).toBe('/home/user');
+    expect(getParentDirFn('/video.mp4')).toBe('/');
+    expect(getParentDirFn('C:\\Videos\\sample.mkv')).toBe('C:\\Videos');
+    expect(getParentDirFn('C:\\sample.mkv')).toBe('C:\\');
+    expect(getParentDirFn('')).toBe('');
+  });
+
+  it('correctly joins paths for Unix and Windows', () => {
+    expect(joinPathFn('/home/user', 'out.mp4')).toBe('/home/user/out.mp4');
+    expect(joinPathFn('/home/user/', 'out.mp4')).toBe('/home/user/out.mp4');
+    expect(joinPathFn('C:\\Videos', 'out.mp4')).toBe('C:\\Videos\\out.mp4');
+    expect(joinPathFn('C:\\Videos\\', 'out.mp4')).toBe('C:\\Videos\\out.mp4');
+    expect(joinPathFn('', 'out.mp4')).toBe('out.mp4');
+  });
+});
+
+describe('formatHardsubStatus localization', () => {
+  it('formats encoding stage with speed and fps telemetry', () => {
+    const formatted = formatHardsubStatusFn({
+      progress: 0.82,
+      message: 'Embedding Subtitles into Video... 82% (Speed: 6.52x | 188.18 FPS)',
+      active: true,
+      stage: 'encoding',
+      speed: '6.52x',
+      fps: '188.18',
+    });
+    expect(formatted).toContain('82%');
+    expect(formatted).toContain('6.52x');
+    expect(formatted).toContain('188.18');
+  });
+
+  it('formats finalizing stage', () => {
+    const formatted = formatHardsubStatusFn({
+      progress: 0.99,
+      message: 'Finalizing video export...',
+      active: true,
+      stage: 'finalizing',
+    });
+    expect(formatted).toBeTruthy();
+    expect(formatted.length).toBeGreaterThan(0);
+  });
+
+  it('formats completion stage', () => {
+    const formatted = formatHardsubStatusFn({
+      progress: 1.0,
+      message: 'Hardsub video exported successfully!',
+      active: false,
+      stage: 'completed',
+    });
+    expect(formatted).toBeTruthy();
+    expect(formatted.length).toBeGreaterThan(0);
+  });
+
+  it('falls back to regex extraction from raw English messages', () => {
+    const formatted = formatHardsubStatusFn({
+      progress: 0.45,
+      message: 'Embedding Subtitles into Video... 45% (Speed: 4.12x | 120.00 FPS)',
+      active: true,
+    });
+    expect(formatted).toContain('45%');
+    expect(formatted).toContain('4.12x');
+    expect(formatted).toContain('120.00');
+  });
+});
+
+describe('hardsub output directory management', () => {
+  it('defaults to source video folder and updates when output directory is set or reset', async () => {
+    const { controller, internal, outputDirText, btnResetDir } = fixture();
+    controller.prefillFilePaths('/media/movies/intro.mp4', '');
+    await flush();
+
+    // Default output path is in the same directory as source video
+    expect(internal.state.outputPath).toBe('/media/movies/intro_hardsub.mp4');
+    expect(outputDirText.classList.contains('has-custom-path')).toBe(false);
+    expect(btnResetDir.style.display).toBe('none');
+
+    // Select custom output directory
+    invoke.mockImplementation(async (command: string) => {
+      if (command === 'select_directory') return '/custom/export/path';
+      return undefined;
+    });
+
+    await internal.browseOutputDir();
+    await flush();
+
+    expect(internal.state.outputDir).toBe('/custom/export/path');
+    expect(internal.state.outputPath).toBe('/custom/export/path/intro_hardsub.mp4');
+    expect(outputDirText.textContent).toBe('/custom/export/path');
+    expect(outputDirText.classList.contains('has-custom-path')).toBe(true);
+    expect(btnResetDir.style.display).toBe('inline-flex');
+
+    // Reset output directory
+    internal.resetOutputDir();
+    expect(internal.state.outputDir).toBe('');
+    expect(internal.state.outputPath).toBe('/media/movies/intro_hardsub.mp4');
+    expect(outputDirText.classList.contains('has-custom-path')).toBe(false);
+    expect(btnResetDir.style.display).toBe('none');
+  });
+
+  it('formats init stage and fallback for encoder initialization', () => {
+    const fromStage = formatHardsubStatusFn({
+      progress: 0.0,
+      message: 'Initializing FFmpeg Encoder...',
+      active: true,
+      stage: 'init',
+    });
+    expect(fromStage).toBeTruthy();
+
+    const fromRaw = formatHardsubStatusFn({
+      progress: 0.0,
+      message: 'Initializing FFmpeg Encoder...',
+      active: true,
+    });
+    expect(fromRaw).toBe(fromStage);
+  });
+
+  it('formats cancelled and failed stages', () => {
+    const cancelled = formatHardsubStatusFn({
+      progress: 0.0,
+      message: 'Hardsubbing cancelled by user.',
+      active: false,
+      stage: 'cancelled',
+    });
+    expect(cancelled).toBeTruthy();
+
+    const failed = formatHardsubStatusFn({
+      progress: 0.0,
+      message: 'Hardsubbing encoding failed.',
+      active: false,
+      stage: 'failed',
+    });
+    expect(failed).toBeTruthy();
+  });
+
+  it('openOutputFolder invokes open_file_in_editor with target directory', async () => {
+    const { internal } = fixture();
+    internal.state.outputPath = '/media/movies/intro_hardsub.mp4';
+    await internal.openOutputFolder();
+    expect(invoke).toHaveBeenCalledWith('open_file_in_editor', { filePath: '/media/movies' });
+  });
+
+  it('clears lastExportedPath and hides open folder button when new video is selected', async () => {
+    const { controller, internal, btnOpenFolder } = fixture();
+    btnOpenFolder.style.display = 'inline-flex';
+    (internal as any).lastExportedPath = '/media/movies/old_hardsub.mp4';
+
+    controller.prefillFilePaths('/media/movies/new_video.mp4', '');
+    await flush();
+
+    expect(btnOpenFolder.style.display).toBe('none');
+    expect((internal as any).lastExportedPath).toBeNull();
+  });
+});
+
+

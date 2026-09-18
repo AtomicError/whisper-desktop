@@ -3050,6 +3050,21 @@
                     </div>
                   </div>
 
+                  <!-- Output Folder Row -->
+                  <div class="translate-field-group" style="margin-top: 2px;">
+                    <label>
+                      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-gold, #f59e0b)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                      </svg>
+                      <span data-i18n="hardsub.outputFolder">Output Folder</span>
+                    </label>
+                    <div class="translate-output-row">
+                      <div class="translate-output-display" id="hardsub-output-dir-text" data-i18n="hardsub.sameAsSource">Same as source file folder</div>
+                      <button class="btn-secondary btn-sm" id="btn-browse-hardsub-dir" data-i18n="hardsub.changeFolder" type="button">Change...</button>
+                      <button class="btn-secondary btn-sm" id="btn-reset-hardsub-dir" data-i18n="hardsub.resetFolder" type="button" style="display:none;">Reset</button>
+                    </div>
+                  </div>
+
                   <div style="display: flex; gap: 10px; margin-top: 4px;">
                     <button class="btn-primary" id="btn-start-hardsub" style="flex: 1; justify-content: center; padding: 12px 18px; font-size: 0.95rem; font-weight: 600; gap: 10px;">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width: 18px; height: 18px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -3057,6 +3072,12 @@
                     </button>
                     <button class="btn-secondary" id="btn-cancel-hardsub" style="display: none; padding: 12px 18px; border-color: rgba(239, 68, 68, 0.4); color: #ef4444; background: rgba(239, 68, 68, 0.1); font-weight: 600;">
                       <span data-i18n="common.cancel">Cancel</span>
+                    </button>
+                    <button class="btn-secondary" id="btn-open-hardsub-folder" style="display: none; padding: 12px 18px; align-items: center; gap: 6px; font-weight: 600;" type="button" title="Open Output Folder" data-i18n-title="hardsub.openOutputFolder">
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                      </svg>
+                      <span data-i18n="hardsub.openOutputFolder">Open Folder</span>
                     </button>
                   </div>
                 </div>

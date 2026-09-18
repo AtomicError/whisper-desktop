@@ -243,7 +243,9 @@ html[dir="rtl"] .slider-val-badge {
 html[dir="rtl"] .switch,
 html[dir="rtl"] input[type="range"],
 html[dir="rtl"] .range-slider,
-html[dir="rtl"] .volume-slider {
+html[dir="rtl"] .volume-slider,
+html[dir="rtl"] .progress-linear-track,
+html[dir="rtl"] .translate-linear-track {
   direction: ltr !important;
 }
 
