@@ -153,35 +153,22 @@ The first ten minutes, in order:
 
 ## Installing
 
-All packages are attached to the [Releases](https://github.com/AtomicError/whisper-desktop/releases) page. Pick the edition that matches your hardware:
+All packages are available on the [Releases](https://github.com/AtomicError/whisper-desktop/releases) page. Choose the edition that matches your hardware:
 
-* **Universal edition** — CPU + Vulkan + OpenVINO. Correct choice for AMD, Intel, Apple and CPU-only systems.
-* **NVIDIA CUDA edition** — CUDA hardware acceleration for NVIDIA GPUs.
-
-The same release page lists every file with a direct download link.
+> [!TIP]
+> **Which edition should you download?**
+> * **Universal edition (recommended for most users)** — CPU + Vulkan + OpenVINO. The default choice for Intel, AMD, Apple Silicon, and systems without dedicated NVIDIA GPUs.
+> * **NVIDIA CUDA edition** — Dedicated hardware acceleration for systems with NVIDIA graphics cards.
 
 ### Linux
 
-| System | Universal | NVIDIA CUDA |
+| Distribution / Format | Universal (Default) | NVIDIA CUDA |
 |---|---|---|
-| Debian / Ubuntu (x86_64) | `WhisperDesktop_<version>_amd64.deb` | `WhisperDesktop_<version>_amd64-cuda.deb` |
-| Fedora / RHEL (x86_64) | `WhisperDesktop-<version>-1.x86_64.rpm` | `WhisperDesktop-<version>-1.x86_64-cuda.rpm` |
-| ARM64 (Debian / Fedora) | `WhisperDesktop_<version>_arm64.deb`, `-1.aarch64.rpm` | — |
-| Any Linux | `WhisperDesktop_<version>_amd64.AppImage`, `_aarch64.AppImage` | `WhisperDesktop_<version>_amd64-cuda.AppImage` |
+| **Debian / Ubuntu** | **.deb** (x86_64, ARM64) | **\*-cuda.deb** (x86_64) |
+| **Fedora / RHEL** | **.rpm** (x86_64, aarch64) | **\*-cuda.rpm** (x86_64) |
+| **Any Linux (Portable)** | **.AppImage** (x86_64, aarch64) | **\*-cuda.AppImage** (x86_64) |
 
-```bash
-# Debian / Ubuntu
-sudo apt install ./WhisperDesktop_*_amd64.deb
-
-# Fedora / RHEL
-sudo dnf install ./WhisperDesktop-*-1.x86_64.rpm
-
-# Portable AppImage (no installation)
-chmod +x WhisperDesktop_*.AppImage
-./WhisperDesktop_*.AppImage
-```
-
-The AppImage bundles the media framework it needs; the `.deb` and `.rpm` packages install normally and show up in your application menu.
+* **AppImage:** Make the downloaded file executable before running (`chmod +x *.AppImage` or through file properties).
 
 ### Arch Linux (AUR)
 
@@ -193,19 +180,22 @@ yay -S whisper-desktop-bin
 
 ### Windows
 
-| Package | Universal | NVIDIA CUDA |
+| Package Type | Universal (Default) | NVIDIA CUDA |
 |---|---|---|
-| Installer | `WhisperDesktop_<version>_x64-setup.exe` | `WhisperDesktop_<version>_x64-cuda-setup.exe` |
-| MSI | `WhisperDesktop_<version>_x64_en-US.msi` | `WhisperDesktop_<version>_x64_cuda_en-US.msi` |
-| Portable ZIP | `WhisperDesktop_<version>_x64-portable.zip` | `WhisperDesktop_<version>_x64-cuda-portable.zip` |
+| **Installer (Recommended)** | **.exe** Setup | **\*-cuda-setup.exe** |
+| **Enterprise / System** | **.msi** Package | **\*-cuda.msi** |
+| **Portable (No Install)** | **.zip** Archive | **\*-cuda-portable.zip** |
 
-* Run the installer, or extract the portable ZIP anywhere (USB stick included) and launch `whisper-desktop.exe` — the portable build needs no administrator rights.
-* The installer checks for the **Microsoft Visual C++ 2015–2022 x64 Redistributable** and installs it silently if it is missing, which is what the bundled `whisper-cli` needs.
+* **Installer:** Run the setup wizard. It automatically checks for and installs the **Microsoft Visual C++ 2015–2022 x64 Redistributable** if missing.
+* **Portable:** Extract the `.zip` anywhere (including a USB drive) and launch `whisper-desktop.exe` without administrator privileges.
 * Windows 11 on ARM is supported through Prism emulation.
 
 ### macOS
 
-Download `WhisperDesktop_<version>_universal.dmg`, open it, and drag **Whisper Desktop** into `Applications`. One binary covers both Apple Silicon (with Metal GPU acceleration) and Intel Macs. The build is not notarized by Apple, so if Gatekeeper refuses to open it, allow it under **System Settings → Privacy & Security**.
+Download the universal **.dmg** from the [Releases](https://github.com/AtomicError/whisper-desktop/releases), open it, and drag **Whisper Desktop** into `Applications`.
+
+* A single universal binary supports both **Apple Silicon** (with native Metal GPU acceleration) and **Intel** Macs.
+* If macOS Gatekeeper prevents opening on first launch (unnotarized binary), go to **System Settings → Privacy & Security** and click **Open Anyway**.
 
 ---
 
