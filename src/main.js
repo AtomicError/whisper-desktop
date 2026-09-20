@@ -2126,7 +2126,7 @@ async function initApp() {
         target.classList.remove('scrolling-active');
       }, 1500);
     }
-  }, true);
+  }, { capture: true, passive: true });
   
   // Initialize Custom Select components
   initializeCustomSelects();
@@ -2166,11 +2166,11 @@ async function initApp() {
           }
         }
       }
-      redrawLogsViewport();
     }
   } catch (e) {
     console.error("Failed to load initial logs:", e);
   }
+  redrawLogsViewport();
   if (typeof setupTranslationEventListeners === 'function') {
     setupTranslationEventListeners();
   }
@@ -2231,6 +2231,7 @@ async function initApp() {
 
   // Listen for language change events to re-render active dynamic components
   window.addEventListener('whisper:languageChanged', () => {
+    updateLogsButtonsState();
     if (activeView === 'models' && typeof loadModelStatusesGrid === 'function') {
       loadModelStatusesGrid(true, true);
     }
@@ -2636,6 +2637,7 @@ function setupTauriListeners() {
     payload.timestamp = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
     allLogsArray.push(payload);
     if (allLogsArray.length > 10000) allLogsArray.splice(0, allLogsArray.length - 10000);
+    updateLogsButtonsState();
     appendLogToViewport(payload);
 
     // Intercept Whisper lines containing timestamp ranges
@@ -2651,7 +2653,7 @@ function setupTauriListeners() {
 }
 
 // Append log to Viewport with AutoScroll & Filtering
-function appendLogToViewport(payload) {
+function appendLogToViewport(payload, isBatchRedraw = false) {
   // Check category filter
   if (activeLogCategory !== 'All' && payload.category !== activeLogCategory) {
     return;
@@ -2664,6 +2666,14 @@ function appendLogToViewport(payload) {
   
   const viewport = document.getElementById('log-viewport');
   if (!viewport) return;
+
+  if (!isBatchRedraw) {
+    const emptyState = viewport.querySelector('.log-empty-state');
+    if (emptyState) {
+      emptyState.remove();
+    }
+  }
+
   const logLine = document.createElement('div');
   logLine.className = 'log-line';
   
@@ -4591,21 +4601,57 @@ window.handleLogSearch = function() {
   }, 120);
 };
 
+function updateLogsButtonsState() {
+  const hasLogs = Boolean(allLogsArray && allLogsArray.length > 0);
+  const btnCopy = document.getElementById('btn-copy-all-logs');
+  if (btnCopy) {
+    btnCopy.disabled = !hasLogs;
+    btnCopy.setAttribute('title', hasLogs ? t('logs.copyBtn') : t('toasts.noLogsToCopy'));
+  }
+  const btnClear = document.getElementById('btn-clear-all-logs');
+  if (btnClear) {
+    btnClear.disabled = !hasLogs;
+    btnClear.setAttribute('title', hasLogs ? t('logs.clearBtn') : t('toasts.noLogsToCopy'));
+  }
+}
+
 function redrawLogsViewport() {
   lastAppendedCategory = null;
   const viewport = document.getElementById('log-viewport');
+  updateLogsButtonsState();
   if (!viewport) return;
   viewport.innerHTML = '';
   
   // Render the last 1500 logs to ensure responsive DOM performance
   const logsToRender = allLogsArray.slice(-1500);
   logsToRender.forEach(payload => {
-    appendLogToViewport(payload);
+    appendLogToViewport(payload, true);
   });
+
+  if (viewport.children.length === 0) {
+    const hasAnyLogs = Boolean(allLogsArray && allLogsArray.length > 0);
+    const emptyKey = hasAnyLogs ? 'logs.noMatchingLogs' : 'logs.emptyLogs';
+    viewport.innerHTML = `
+      <div class="log-empty-state">
+        <svg class="log-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+        </svg>
+        <div class="log-empty-text" data-i18n="${emptyKey}">${escapeHTML(t(emptyKey))}</div>
+      </div>
+    `;
+  }
 }
 
 window.copyAllLogs = async function() {
+  if (!allLogsArray || allLogsArray.length === 0) {
+    showNotification(t('toasts.noLogsToCopy'), "warning");
+    return;
+  }
   const rawLogs = allLogsArray.map(l => `[${l.timestamp}] [${l.category}] ${l.message}`).join('\n');
+  if (!rawLogs.trim()) {
+    showNotification(t('toasts.noLogsToCopy'), "warning");
+    return;
+  }
   try {
     await copyToClipboard(rawLogs);
     showNotification(t('toasts.logsCopied'), "success");
@@ -4616,6 +4662,7 @@ window.copyAllLogs = async function() {
 };
 
 window.clearLogsHistory = async function() {
+  if (!allLogsArray || allLogsArray.length === 0) return;
   const confirmed = await showConfirmModal(
     t('modals.confirmClearLogsTitle'),
     t('modals.confirmClearLogsDesc'),

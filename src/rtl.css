@@ -229,6 +229,12 @@ html[dir="rtl"] .duration-display {
   font-family: var(--font-mono) !important;
 }
 
+html[dir="rtl"] .log-empty-state {
+  direction: rtl !important;
+  text-align: center !important;
+  font-family: var(--font-primary) !important;
+}
+
 html[dir="rtl"] .slider-val-badge {
   direction: ltr !important;
   font-family: var(--font-mono) !important;

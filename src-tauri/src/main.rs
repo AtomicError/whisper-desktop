@@ -857,7 +857,7 @@ fn main() {
 
             #[cfg(target_os = "linux")]
             {
-                use webkit2gtk::{WebViewExt, PermissionRequestExt};
+                use webkit2gtk::{WebViewExt, PermissionRequestExt, SettingsExt};
                 if let Some(window) = _app.get_webview_window("main") {
                     let _ = window.with_webview(|webview| {
                         let webview = webview.inner();
@@ -866,6 +866,9 @@ fn main() {
                             true
                         });
                         webview.set_zoom_level(1.0);
+                        if let Some(settings) = webview.settings() {
+                            settings.set_enable_smooth_scrolling(false);
+                        }
                     });
                 }
             }
