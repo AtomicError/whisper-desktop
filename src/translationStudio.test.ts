@@ -99,4 +99,17 @@ describe('subtitle loading', () => {
     await controller.loadSubtitleFile('/A.txt');
     expect(controller.state.subtitleSize).toBe(size ?? 8);
   });
+
+  it('dispose unlistens all registered Tauri event listeners without error', () => {
+    const controller = new TranslationStudioController();
+    const mockUnlisten = vi.fn();
+    (controller as any).unlisteners.push(mockUnlisten);
+    (controller as any).scrollThrottledTimeout = setTimeout(() => {}, 1000);
+    (controller as any).syncScrollRaf = 123;
+    controller.dispose();
+    expect(mockUnlisten).toHaveBeenCalledTimes(1);
+    expect((controller as any).unlisteners).toHaveLength(0);
+    expect((controller as any).scrollThrottledTimeout).toBeNull();
+    expect((controller as any).syncScrollRaf).toBeNull();
+  });
 });

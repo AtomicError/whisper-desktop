@@ -195,8 +195,81 @@ window.showNotification = function(message, type = 'info', customDuration = null
   }, 20);
 };
 
+// Accessible Focus Trap & Escape Handler for Modals
+function _trapModalFocus(modalEl, closeCallback) {
+  let previousActiveElement = document.activeElement;
+
+  const isVisible = (el) => {
+    if (el.disabled || el.getAttribute('aria-hidden') === 'true') return false;
+    if (el.offsetParent !== null) return true;
+    if (el.style && (el.style.display === 'none' || el.style.visibility === 'hidden')) return false;
+    if (el.closest && el.closest('[style*="display: none"], [style*="display:none"], [hidden]')) return false;
+    if (typeof el.checkVisibility === 'function') {
+      try {
+        return el.checkVisibility();
+      } catch (_) {}
+    }
+    return true;
+  };
+
+  const keyHandler = (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      closeCallback();
+      return;
+    }
+
+    if (e.key === 'Tab') {
+      const candidates = Array.from(modalEl.querySelectorAll(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      ));
+      const focusable = candidates.filter(isVisible);
+      if (!focusable.length) {
+        e.preventDefault();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (e.shiftKey) {
+        if (document.activeElement === first || !modalEl.contains(document.activeElement)) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last || !modalEl.contains(document.activeElement)) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    }
+  };
+
+  document.addEventListener('keydown', keyHandler);
+
+  return {
+    release: () => {
+      document.removeEventListener('keydown', keyHandler);
+      if (previousActiveElement && typeof previousActiveElement.focus === 'function') {
+        try {
+          previousActiveElement.focus();
+        } catch (_) {}
+        previousActiveElement = null;
+      }
+    }
+  };
+}
+
+let _appModalTrap = null;
+
 // Centered Premium Glassmorphic Modal overlay API
 window.showAppModal = function(title, message, details = '') {
+  if (_appModalTrap) {
+    _appModalTrap.release();
+    _appModalTrap = null;
+  }
   const overlay = document.getElementById('app-modal-overlay');
   const titleEl = document.getElementById('app-modal-title');
   const msgEl = document.getElementById('app-modal-message');
@@ -223,10 +296,32 @@ window.showAppModal = function(title, message, details = '') {
     // Trigger reflow to run CSS animation
     void overlay.offsetWidth;
     overlay.classList.add('show');
+
+    _appModalTrap = _trapModalFocus(overlay, () => {
+      if (window._confirmModalResolve) {
+        window.resolveAppConfirm(false);
+      } else {
+        window.closeAppModal();
+      }
+    });
+
+    requestAnimationFrame(() => {
+      const okBtn = document.getElementById('app-modal-close-btn');
+      if (okBtn && okBtn.offsetParent !== null) {
+        okBtn.focus();
+      } else {
+        const first = overlay.querySelector('button:not([disabled])');
+        if (first) first.focus();
+      }
+    });
   }
 };
 
 window.closeAppModal = function() {
+  if (_appModalTrap) {
+    _appModalTrap.release();
+    _appModalTrap = null;
+  }
   // If a confirm modal is open, resolve as cancelled so the caller doesn't hang.
   // Inlined (not resolveAppConfirm) to avoid recursive closeAppModal calls.
   if (window._confirmModalResolve) {
@@ -655,11 +750,29 @@ window.showConfirmModal = function(title, message, confirmButtonText = null) {
     okFooter.style.display = 'none';
     confirmFooter.style.display = 'flex';
     
+    if (_appModalTrap) {
+      _appModalTrap.release();
+      _appModalTrap = null;
+    }
     window._confirmModalResolve = resolve;
     
     overlay.style.display = 'flex';
     void overlay.offsetWidth;
     overlay.classList.add('show');
+
+    _appModalTrap = _trapModalFocus(overlay, () => {
+      window.resolveAppConfirm(false);
+    });
+
+    requestAnimationFrame(() => {
+      const cancelBtn = document.getElementById('app-modal-cancel-btn');
+      if (cancelBtn && cancelBtn.offsetParent !== null) {
+        cancelBtn.focus();
+      } else {
+        const first = overlay.querySelector('button:not([disabled])');
+        if (first) first.focus();
+      }
+    });
   });
 };
 
@@ -2071,6 +2184,16 @@ function setupZoomKeyboardShortcuts() {
   window.addEventListener('keydown', (e) => {
     // ESC key closes active modals and dropdowns
     if (e.key === 'Escape') {
+      const providerModal = document.getElementById('translation-provider-modal');
+      if (providerModal && (providerModal.classList.contains('show') || providerModal.style.display === 'flex')) {
+        window.closeProviderModal();
+      }
+      const batchModal = document.getElementById('batch-error-modal');
+      if (batchModal && (batchModal.classList.contains('show') || batchModal.style.display === 'flex')) {
+        if (typeof window.resolveBatchError === 'function') {
+          window.resolveBatchError('abort');
+        }
+      }
       const overlay = document.getElementById('app-modal-overlay');
       if (overlay && (overlay.classList.contains('show') || overlay.style.display === 'flex')) {
         if (window._confirmModalResolve) {
@@ -7910,7 +8033,13 @@ window.filterModelsStatus = function(status, delay = 0) {
   window.applyModelsFilterAndRender(delay);
 };
 
+let _providerModalTrap = null;
+
 window.openAddProviderModal = function() {
+  if (_providerModalTrap) {
+    _providerModalTrap.release();
+    _providerModalTrap = null;
+  }
   document.getElementById('provider-name').value = '';
   document.getElementById('provider-url').value = '';
   document.getElementById('provider-key').value = '';
@@ -7918,12 +8047,25 @@ window.openAddProviderModal = function() {
   const modal = document.getElementById('translation-provider-modal');
   modal.style.display = 'flex';
   setTimeout(() => modal.classList.add('show'), 10);
+
+  _providerModalTrap = _trapModalFocus(modal, window.closeProviderModal);
+
+  requestAnimationFrame(() => {
+    const input = document.getElementById('provider-name');
+    if (input) input.focus();
+  });
 };
 
 window.closeProviderModal = function() {
+  if (_providerModalTrap) {
+    _providerModalTrap.release();
+    _providerModalTrap = null;
+  }
   const modal = document.getElementById('translation-provider-modal');
-  modal.classList.remove('show');
-  setTimeout(() => modal.style.display = 'none', 300);
+  if (modal) {
+    modal.classList.remove('show');
+    setTimeout(() => modal.style.display = 'none', 300);
+  }
 };
 
 window.saveProviderConfig = async function() {
@@ -7986,19 +8128,38 @@ window.saveProviderConfig = async function() {
   showNotification(t('toasts.providerAddedSuccess'), "success");
 };
 
+let _batchErrorModalTrap = null;
+
 window.showBatchErrorDialog = function(fileName, errorMsg) {
   return new Promise((resolve) => {
+    if (_batchErrorModalTrap) {
+      _batchErrorModalTrap.release();
+      _batchErrorModalTrap = null;
+    }
     const modal = document.getElementById('batch-error-modal');
     document.getElementById('batch-error-message').textContent = t('modals.batchErrorFormatted', { file: fileName, error: errorMsg });
     
     modal.style.display = 'flex';
     setTimeout(() => modal.classList.add('show'), 10);
     
+    _batchErrorModalTrap = _trapModalFocus(modal, () => {
+      window.resolveBatchError('abort');
+    });
+
     window.resolveBatchError = function(choice) {
+      if (_batchErrorModalTrap) {
+        _batchErrorModalTrap.release();
+        _batchErrorModalTrap = null;
+      }
       modal.classList.remove('show');
       setTimeout(() => modal.style.display = 'none', 300);
       resolve(choice);
     };
+
+    requestAnimationFrame(() => {
+      const retryBtn = modal.querySelector('button.btn-primary') || modal.querySelector('button');
+      if (retryBtn) retryBtn.focus();
+    });
   });
 };
 

@@ -99,12 +99,23 @@ fn find_bundled_binary(app: Option<&tauri::AppHandle>, binary_name: &str) -> Opt
 // Drain both pipes concurrently: a verbose/broken executable must neither block
 // discovery on a full pipe nor retain unbounded output. Reap before returning.
 fn binary_version_output(binary: &Path) -> Option<Vec<u8>> {
-    let mut child = Command::new(binary)
+    struct ChildDropGuard(Option<std::process::Child>);
+    impl Drop for ChildDropGuard {
+        fn drop(&mut self) {
+            if let Some(mut child) = self.0.take() {
+                let _ = child.kill();
+                let _ = child.wait();
+            }
+        }
+    }
+
+    let spawned = Command::new(binary)
         .arg("-version")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn().ok()?;
+    let mut guard = ChildDropGuard(Some(spawned));
     fn drain(mut pipe: impl Read) -> Vec<u8> {
         let mut retained = Vec::new();
         let mut buffer = [0u8; 4096];
@@ -115,25 +126,31 @@ fn binary_version_output(binary: &Path) -> Option<Vec<u8>> {
         }
         retained
     }
-    let stdout = child.stdout.take()?;
-    let stderr = child.stderr.take()?;
+    let stdout = guard.0.as_mut().unwrap().stdout.take()?;
+    let stderr = guard.0.as_mut().unwrap().stderr.take()?;
     let out = std::thread::spawn(move || drain(stdout));
     let err = std::thread::spawn(move || drain(stderr));
     let deadline = Instant::now() + Duration::from_secs(5);
     let success = loop {
-        match child.try_wait() {
+        match guard.0.as_mut().unwrap().try_wait() {
             Ok(Some(status)) => break status.success(),
             Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(20)),
-            _ => {
-                let _ = child.kill();
-                let _ = child.wait();
-                break false;
-            }
+            _ => break false,
         }
     };
     let output = out.join().ok();
     let _ = err.join();
-    if success { output } else { None }
+    if success {
+        let _ = guard.0.as_mut().unwrap().wait();
+        guard.0.take();
+        output
+    } else {
+        if let Some(mut child) = guard.0.take() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+        None
+    }
 }
 
 /// Checks if a system binary exists in PATH and extracts its version in a single sub-process invocation.

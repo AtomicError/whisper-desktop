@@ -5,6 +5,7 @@ let Controller: typeof HardsubController;
 let formatHardsubStatusFn: typeof import('./hardsub').formatHardsubStatus;
 let getParentDirFn: typeof import('./hardsub').getParentDir;
 let joinPathFn: typeof import('./hardsub').joinPath;
+let findCueAtTimeBinaryFn: typeof import('./hardsub').findCueAtTimeBinary;
 const controllers: HardsubController[] = [];
 
 class ClassList {
@@ -162,6 +163,7 @@ beforeAll(async () => {
   formatHardsubStatusFn = module.formatHardsubStatus;
   getParentDirFn = module.getParentDir;
   joinPathFn = module.joinPath;
+  findCueAtTimeBinaryFn = module.findCueAtTimeBinary;
   module.hardsubController.dispose();
 });
 beforeEach(() => {
@@ -660,6 +662,74 @@ describe('hardsub output directory management', () => {
     controller.prefillFilePaths('/media/movies/another_video.mp4', '');
     await flush();
     expect(telemetryBox.style.display).toBe('none');
+  });
+
+  describe('findCueAtTimeBinary', () => {
+    const cues = [
+      { id: 1, startMs: 1000, endMs: 3000, startTimeStr: '00:01', endTimeStr: '00:03', text: 'First' },
+      { id: 2, startMs: 5000, endMs: 8000, startTimeStr: '00:05', endTimeStr: '00:08', text: 'Second' },
+      { id: 3, startMs: 8000, endMs: 10000, startTimeStr: '00:08', endTimeStr: '00:10', text: 'Third' },
+      { id: 4, startMs: 9500, endMs: 12000, startTimeStr: '00:09', endTimeStr: '00:12', text: 'Fourth (overlapping)' },
+    ];
+
+    it('handles empty cues array', () => {
+      expect(findCueAtTimeBinaryFn([], 500)).toBeUndefined();
+    });
+
+    it('returns undefined before first cue', () => {
+      expect(findCueAtTimeBinaryFn(cues, 500)).toBeUndefined();
+    });
+
+    it('finds cue at start boundary', () => {
+      const cue = findCueAtTimeBinaryFn(cues, 1000);
+      expect(cue?.id).toBe(1);
+    });
+
+    it('finds cue within its duration', () => {
+      const cue = findCueAtTimeBinaryFn(cues, 2000);
+      expect(cue?.id).toBe(1);
+    });
+
+    it('returns undefined at end boundary when no cue starts there', () => {
+      expect(findCueAtTimeBinaryFn(cues, 3000)).toBeUndefined();
+    });
+
+    it('returns undefined during gaps between cues', () => {
+      expect(findCueAtTimeBinaryFn(cues, 4000)).toBeUndefined();
+    });
+
+    it('finds adjacent cue at exact handover time', () => {
+      const cue = findCueAtTimeBinaryFn(cues, 8000);
+      expect(cue?.id).toBe(3);
+    });
+
+    it('finds overlapping cues correctly', () => {
+      const cue = findCueAtTimeBinaryFn(cues, 9800);
+      // At 9800, cue 4 started at 9500
+      expect(cue?.id).toBe(4);
+    });
+
+    it('returns undefined past the last cue', () => {
+      expect(findCueAtTimeBinaryFn(cues, 15000)).toBeUndefined();
+    });
+
+    it('correctly finds long cues spanning more than 30 seconds despite intermediate cues', () => {
+      const longCues = [
+        { id: 10, startMs: 0, endMs: 50000, startTimeStr: '00:00', endTimeStr: '00:50', text: 'Long Intro' },
+        { id: 11, startMs: 5000, endMs: 8000, startTimeStr: '00:05', endTimeStr: '00:08', text: 'Short Interlude' },
+      ];
+      // At 35000 (35s), candidate is #11 (startMs 5000), but #11 ended at 8000.
+      // Binary search backwards must locate #10 despite delta > 30,000ms.
+      const foundWithoutMax = findCueAtTimeBinaryFn(longCues, 35000);
+      expect(foundWithoutMax?.id).toBe(10);
+
+      const foundWithMax = findCueAtTimeBinaryFn(longCues, 35000, 50000);
+      expect(foundWithMax?.id).toBe(10);
+
+      // If maxDuration is strictly smaller than the delta, it will prune
+      const pruned = findCueAtTimeBinaryFn(longCues, 35000, 10000);
+      expect(pruned).toBeUndefined();
+    });
   });
 });
 

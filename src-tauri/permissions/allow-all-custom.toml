@@ -4,7 +4,6 @@ description = "Allow all custom Whisper Desktop command invokes"
 
 [permission.commands]
 allow = [
-  "get_system_stats",
   "load_settings",
   "save_settings",
   "check_build",

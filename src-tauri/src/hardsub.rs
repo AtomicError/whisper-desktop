@@ -1443,7 +1443,8 @@ pub async fn run_hardsub_task(
     let mut cmd = Command::new(&ffmpeg_bin);
     cmd.args(&ffmpeg_args)
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
 
     #[cfg(unix)]
     {

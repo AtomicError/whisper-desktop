@@ -3380,9 +3380,9 @@
                       <div style="grid-column: span 2; min-width: 0;">
                         <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 4px;" data-i18n="hardsub.speedPreset">Encoding Speed & Compression Effort</label>
                         <select class="select-control" id="hardsub-speed-preset" style="width: 100%;">
-                          <option value="fast">Fast (Quick Export, Slightly Larger Size)</option>
-                          <option value="medium" selected>Balanced / Medium (Recommended)</option>
-                          <option value="slow">Slow (Maximum Compression Efficiency & Quality)</option>
+                          <option value="fast" data-i18n="hardsub.speedPresetFast">Fast (Quick Export, Slightly Larger Size)</option>
+                          <option value="medium" data-i18n="hardsub.speedPresetMedium" selected>Balanced / Medium (Recommended)</option>
+                          <option value="slow" data-i18n="hardsub.speedPresetSlow">Slow (Maximum Compression Efficiency & Quality)</option>
                         </select>
                       </div>
                     </div>
@@ -3493,7 +3493,7 @@
     </div>
 
     <!-- Centered Premium Glassmorphic Modal Overlay (for compilation errors or general diagnostics) -->
-    <div class="modal-overlay" id="app-modal-overlay" style="display: none;">
+    <div class="modal-overlay" id="app-modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="app-modal-title">
       <div class="glass-card modal-card">
         <div class="modal-header">
           <div class="modal-title-row">

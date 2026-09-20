@@ -16,7 +16,7 @@ const invoke = async <T>(cmd: string, args: Record<string, any> = {}): Promise<T
   throw new Error(`Tauri core API not available for command: ${cmd}`);
 };
 
-const listen = async <T>(event: string, handler: (e: { payload: T }) => void) => {
+const listen = async <T>(event: string, handler: (e: { payload: T }) => void): Promise<(() => void) | undefined> => {
   const tauri = (window as any).__TAURI__;
   if (tauri && tauri.event && tauri.event.listen) {
     return await tauri.event.listen(event, handler);
@@ -314,6 +314,7 @@ export class TranslationStudioController {
   private scrollThrottledTimeout: any = null;
   private syncScrollRaf: number | null = null;
   private subtitleLoadId = 0;
+  private unlisteners: Array<() => void> = [];
 
   public state: TranslationStudioState = {
     subtitlePath: '',
@@ -535,26 +536,36 @@ export class TranslationStudioController {
   }
 
   private setupSynchronizedHighlighting() {
+    const setHighlight = (cueId: string, highlight: boolean) => {
+      const sourceEl = document.getElementById(`translate-source-cue-${cueId}`);
+      const targetEl = document.getElementById(`translate-target-cue-${cueId}`);
+      if (highlight) {
+        if (sourceEl) sourceEl.classList.add('highlighted');
+        if (targetEl) targetEl.classList.add('highlighted');
+      } else {
+        if (sourceEl) sourceEl.classList.remove('highlighted');
+        if (targetEl) targetEl.classList.remove('highlighted');
+      }
+    };
+
     const handleMouseOver = (e: MouseEvent) => {
       if (this.isScrollingThrottled) return;
       const target = (e.target as HTMLElement)?.closest('.translate-cue-item') as HTMLElement | null;
       if (!target) return;
       const cueId = target.dataset.id;
       if (!cueId) return;
-
-      this.sourceList?.querySelectorAll(`.translate-cue-item[data-id="${cueId}"]`).forEach(el => el.classList.add('highlighted'));
-      this.targetList?.querySelectorAll(`.translate-cue-item[data-id="${cueId}"]`).forEach(el => el.classList.add('highlighted'));
+      setHighlight(cueId, true);
     };
 
     const handleMouseOut = (e: MouseEvent) => {
       if (this.isScrollingThrottled) return;
       const target = (e.target as HTMLElement)?.closest('.translate-cue-item') as HTMLElement | null;
       if (!target) return;
+      const related = (e.relatedTarget as HTMLElement)?.closest('.translate-cue-item');
+      if (related === target) return;
       const cueId = target.dataset.id;
       if (!cueId) return;
-
-      this.sourceList?.querySelectorAll(`.translate-cue-item[data-id="${cueId}"]`).forEach(el => el.classList.remove('highlighted'));
-      this.targetList?.querySelectorAll(`.translate-cue-item[data-id="${cueId}"]`).forEach(el => el.classList.remove('highlighted'));
+      setHighlight(cueId, false);
     };
 
     const handleFocusIn = (e: FocusEvent) => {
@@ -562,19 +573,17 @@ export class TranslationStudioController {
       if (!target) return;
       const cueId = target.dataset.id;
       if (!cueId) return;
-
-      this.sourceList?.querySelectorAll(`.translate-cue-item[data-id="${cueId}"]`).forEach(el => el.classList.add('highlighted'));
-      this.targetList?.querySelectorAll(`.translate-cue-item[data-id="${cueId}"]`).forEach(el => el.classList.add('highlighted'));
+      setHighlight(cueId, true);
     };
 
     const handleFocusOut = (e: FocusEvent) => {
       const target = (e.target as HTMLElement)?.closest('.translate-cue-item') as HTMLElement | null;
       if (!target) return;
+      const related = (e.relatedTarget as HTMLElement)?.closest('.translate-cue-item');
+      if (related === target) return;
       const cueId = target.dataset.id;
       if (!cueId) return;
-
-      this.sourceList?.querySelectorAll(`.translate-cue-item[data-id="${cueId}"]`).forEach(el => el.classList.remove('highlighted'));
-      this.targetList?.querySelectorAll(`.translate-cue-item[data-id="${cueId}"]`).forEach(el => el.classList.remove('highlighted'));
+      setHighlight(cueId, false);
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -621,14 +630,14 @@ export class TranslationStudioController {
             const shouldJumpToTarget = isRtl ? (e.key === 'ArrowLeft' && isSource) : (e.key === 'ArrowRight' && isSource);
             const shouldJumpToSource = isRtl ? (e.key === 'ArrowRight' && !isSource) : (e.key === 'ArrowLeft' && !isSource);
             if (shouldJumpToTarget) {
-              const counterpart = this.targetList?.querySelector(`.translate-cue-item[data-id="${cueId}"]`) as HTMLElement | null;
+              const counterpart = document.getElementById(`translate-target-cue-${cueId}`);
               if (counterpart) {
                 e.preventDefault();
                 counterpart.focus();
                 counterpart.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
               }
             } else if (shouldJumpToSource) {
-              const counterpart = this.sourceList?.querySelector(`.translate-cue-item[data-id="${cueId}"]`) as HTMLElement | null;
+              const counterpart = document.getElementById(`translate-source-cue-${cueId}`);
               if (counterpart) {
                 e.preventDefault();
                 counterpart.focus();
@@ -737,22 +746,21 @@ export class TranslationStudioController {
       }
     });
 
-    const tauri = (window as any).__TAURI__;
-    if (tauri && tauri.event && tauri.event.listen) {
-      tauri.event.listen('tauri://drag-drop', async (event: any) => {
-        const paths = event.payload?.paths;
-        if (Array.isArray(paths) && paths.length > 0) {
-          const path = paths[0];
-          const ext = path.split('.').pop()?.toLowerCase();
-          if (ext && (SUPPORTED_TRANSLATION_EXTENSIONS as readonly string[]).includes(ext)) {
-            const activePanel = document.querySelector('.view-panel.active');
-            if (activePanel && activePanel.id === 'panel-translate') {
-              await this.loadSubtitleFile(path);
-            }
+    listen<any>('tauri://drag-drop', async (event: any) => {
+      const paths = event.payload?.paths;
+      if (Array.isArray(paths) && paths.length > 0) {
+        const path = paths[0];
+        const ext = path.split('.').pop()?.toLowerCase();
+        if (ext && (SUPPORTED_TRANSLATION_EXTENSIONS as readonly string[]).includes(ext)) {
+          const activePanel = document.querySelector('.view-panel.active');
+          if (activePanel && activePanel.id === 'panel-translate') {
+            await this.loadSubtitleFile(path);
           }
         }
-      });
-    }
+      }
+    }).then((unlisten) => {
+      if (unlisten) this.unlisteners.push(unlisten);
+    });
   }
 
   public async browseSubtitleFile() {
@@ -1139,7 +1147,7 @@ export class TranslationStudioController {
     // rule at render time (the text is written once, so it cannot be pointed at its
     // content afterwards the way an editable field is).
     const html = this.state.sourceCues.map(cue => `
-      <div class="translate-cue-item" data-id="${cue.id}" role="listitem" tabindex="0" aria-label="Cue #${cue.id}">
+      <div class="translate-cue-item" data-id="${cue.id}" id="translate-source-cue-${cue.id}" role="listitem" tabindex="0" aria-label="Cue #${cue.id}">
         <div class="translate-cue-header">
           <span class="translate-cue-num">#${cue.id}</span>
           ${cue.startTimeStr ? `<span class="translate-cue-time">${escapeHTML(cue.startTimeStr)}${cue.endTimeStr ? ` ➔ ${escapeHTML(cue.endTimeStr)}` : ''}</span>` : ''}
@@ -1174,7 +1182,7 @@ export class TranslationStudioController {
     }
 
     const html = this.state.translatedCues.map(cue => `
-      <div class="translate-cue-item translate-cue-translated" data-id="${cue.id}" role="listitem" tabindex="0" aria-label="Translated cue #${cue.id}">
+      <div class="translate-cue-item translate-cue-translated" data-id="${cue.id}" id="translate-target-cue-${cue.id}" role="listitem" tabindex="0" aria-label="Translated cue #${cue.id}">
         <div class="translate-cue-header">
           <span class="translate-cue-num">#${cue.id}</span>
           ${cue.startTimeStr ? `<span class="translate-cue-time">${escapeHTML(cue.startTimeStr)}${cue.endTimeStr ? ` ➔ ${escapeHTML(cue.endTimeStr)}` : ''}</span>` : ''}
@@ -1283,6 +1291,8 @@ export class TranslationStudioController {
           this.statusBadge.className = 'translate-status-badge complete';
         }
       }
+    }).then((unlisten) => {
+      if (unlisten) this.unlisteners.push(unlisten);
     });
   }
 
@@ -1525,6 +1535,27 @@ export class TranslationStudioController {
       win.showNotification(msg, type);
     } else {
       console.log(`[Notification ${type}]: ${msg}`);
+    }
+  }
+
+  public dispose() {
+    for (const unlisten of this.unlisteners) {
+      try {
+        unlisten();
+      } catch (err) {
+        console.warn('Error during TranslationStudioController unlisten:', err);
+      }
+    }
+    this.unlisteners = [];
+    if (this.scrollThrottledTimeout) {
+      clearTimeout(this.scrollThrottledTimeout);
+      this.scrollThrottledTimeout = null;
+    }
+    if (this.syncScrollRaf !== null) {
+      if (typeof cancelAnimationFrame === 'function') {
+        cancelAnimationFrame(this.syncScrollRaf);
+      }
+      this.syncScrollRaf = null;
     }
   }
 }

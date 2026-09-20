@@ -18,7 +18,7 @@ use std::path::Path;
 use tauri::{AppHandle, Manager, State};
 
 use settings::{WhisperSettings, load_settings_file, save_settings_file};
-use hardware::{HardwareMonitor, SystemStats};
+use hardware::HardwareMonitor;
 use logger::AppLogs;
 use builder::check_build_exists;
 use transcribe::{probe_file_metadata, convert_to_wav, run_transcription, FileMetadata, TranscriptionResult, read_text_file};
@@ -58,29 +58,6 @@ pub struct HardsubSession {
     pub cancel_requested: bool,
 }
 pub struct HardsubState(pub Arc<Mutex<HardsubSession>>);
-
-#[tauri::command]
-async fn get_system_stats(state: State<'_, HardwareState>) -> Result<SystemStats, String> {
-    // Clone the Arc out and drop the State borrow immediately so we don't hold
-    // Tauri's managed-state reference. get_stats() refreshes sysinfo and polls
-    // the GPU (which can spawn nvidia-smi or scan /proc/*/fdinfo/*), so run it
-    // on a blocking thread to avoid stalling the async runtime and other IPC calls.
-    let monitor = state.0.clone();
-    let stats = tokio::task::spawn_blocking(move || match monitor.lock() {
-        Ok(mut monitor) => monitor.get_stats(),
-        Err(_) => SystemStats {
-            cpu: 0.0,
-            ram: "0GB / 0GB".to_string(),
-            gpu: "N/A".to_string(),
-        },
-    })
-    .await
-    .map_err(|e| format!("system stats task failed: {}", e))?;
-
-    // A panicking worker is recoverable: report degraded zeroed stats rather than
-    // surfacing an error that would throw on the frontend's HUD poll.
-    Ok(stats)
-}
 
 #[tauri::command]
 fn load_settings() -> WhisperSettings {
@@ -884,7 +861,6 @@ fn main() {
         .manage(HardsubState(hardsub_session))
         .manage(DownloadState(download_session))
         .invoke_handler(tauri::generate_handler![
-            get_system_stats,
             load_settings,
             save_settings,
             check_build,

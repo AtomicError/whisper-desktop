@@ -347,7 +347,40 @@ function parseSubtitleContent(content: string, ext: string): SubtitleCue[] {
       }
     }
   }
+  cues.sort((a, b) => a.startMs - b.startMs);
   return cues;
+}
+
+export function findCueAtTimeBinary(cues: SubtitleCue[], curMs: number, maxDuration?: number): SubtitleCue | undefined {
+  if (!cues.length) return undefined;
+  let low = 0;
+  let high = cues.length - 1;
+  let candidate = -1;
+
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    if (cues[mid].startMs <= curMs) {
+      candidate = mid;
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+
+  if (candidate !== -1) {
+    const cue = cues[candidate];
+    if (curMs >= cue.startMs && curMs < cue.endMs) {
+      return cue;
+    }
+    for (let i = candidate - 1; i >= 0; i--) {
+      const prev = cues[i];
+      if (maxDuration !== undefined && curMs - prev.startMs > maxDuration) break;
+      if (curMs >= prev.startMs && curMs < prev.endMs) {
+        return prev;
+      }
+    }
+  }
+  return undefined;
 }
 
 function convertCuesToSrt(cues: SubtitleCue[]): string {
@@ -815,10 +848,12 @@ export class HardsubController {
   private cachedHwStatus: HardwareStatus | null = null;
   private updateAlignmentUI: () => void = () => {};
   private subtitleCues: SubtitleCue[] = [];
+  private maxCueDuration: number = 0;
   private activeCueId: number | null = null;
   private searchFilterQuery: string = '';
   private searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private _lastRenderKey: string = '';
+  private _lastUIStateKey: string = '';
   private isUserSeeking: boolean = false;
   private targetClickedCueId: number | null = null;
   private clickLockTimer: any = null;
@@ -3521,6 +3556,7 @@ export class HardsubController {
       const lastDot = subPath.lastIndexOf('.');
       const ext = lastDot > 0 ? subPath.substring(lastDot + 1).toLowerCase() : 'srt';
       this.subtitleCues = parseSubtitleContent(content, ext);
+      this.maxCueDuration = this.subtitleCues.reduce((max, c) => Math.max(max, c.endMs - c.startMs), 0);
       this.isSubtitlesModified = false;
       this._lastRenderKey = '';
       this.updateSubDropzoneUI(subPath, this.subtitleCues.length);
@@ -3594,28 +3630,34 @@ export class HardsubController {
           this.activeCueId = clickedCue.id;
           this.highlightActiveCard(clickedCue.id);
         }
-        this.currentSubtitleText = clickedCue.text;
-        this.renderSubtitleOnCanvas();
+        if (this.currentSubtitleText !== clickedCue.text) {
+          this.currentSubtitleText = clickedCue.text;
+          this.renderSubtitleOnCanvas();
+        }
         return;
       }
     }
 
-    const activeCue = this.subtitleCues.find((c) => curMs >= c.startMs && curMs < c.endMs);
+    const activeCue = findCueAtTimeBinary(this.subtitleCues, curMs, this.maxCueDuration);
 
     if (activeCue) {
       if (this.activeCueId !== activeCue.id) {
         this.activeCueId = activeCue.id;
         this.highlightActiveCard(activeCue.id);
       }
-      this.currentSubtitleText = activeCue.text;
-      this.renderSubtitleOnCanvas();
+      if (this.currentSubtitleText !== activeCue.text) {
+        this.currentSubtitleText = activeCue.text;
+        this.renderSubtitleOnCanvas();
+      }
     } else {
       if (this.activeCueId !== null) {
         this.activeCueId = null;
         this.highlightActiveCard(null);
       }
-      this.currentSubtitleText = '';
-      this.renderSubtitleOnCanvas();
+      if (this.currentSubtitleText !== '') {
+        this.currentSubtitleText = '';
+        this.renderSubtitleOnCanvas();
+      }
     }
   }
 
@@ -3778,8 +3820,14 @@ export class HardsubController {
    */
   private renderSubtitleOnCanvas(force: boolean = false) {
     if (this.disposed || this.phase !== 'ready') return;
-    this.updateUIControlsState();
-    this.updateColorSwatches();
+
+    // Only update UI controls and color swatches when styling state actually changes or forced
+    const uiStateKey = `${this.state.fontSize}|${this.state.outlineSize}|${this.state.positionY}|${this.state.bgBox}|${this.state.primaryColor}|${this.state.outlineColor}|${this.state.bgBoxColor}`;
+    if (force || this._lastUIStateKey !== uiStateKey) {
+      this._lastUIStateKey = uiStateKey;
+      this.updateUIControlsState();
+      this.updateColorSwatches();
+    }
 
     const ctx = this.canvasCtx;
     const canvas = this.subtitleCanvas;
@@ -3794,8 +3842,10 @@ export class HardsubController {
     const renderKey = [
       this.currentSubtitleText,
       canvasW, canvasH,
-      JSON.stringify(this.state),
-      JSON.stringify(this.fontMetrics),
+      uiStateKey,
+      this.state.fontName, this.state.widthMargin, this.state.alignment,
+      this.state.bold, this.state.italic, this.state.bgBoxOpacity, this.state.bgBoxRadius,
+      this.fontMetrics.scale, this.fontMetrics.ascentRatio, this.fontMetrics.descentRatio,
     ].join('|');
     if (!force && this._lastRenderKey === renderKey) return;
     this._lastRenderKey = renderKey;

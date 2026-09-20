@@ -196,7 +196,8 @@ pub async fn convert_to_wav(
         &tmp_wav_str,
     ])
     .stdout(Stdio::piped())
-    .stderr(Stdio::piped());
+    .stderr(Stdio::piped())
+    .kill_on_drop(true);
 
     #[cfg(unix)]
     {
@@ -603,7 +604,8 @@ pub async fn run_transcription(
     let mut cmd = Command::new(&bin_path);
     cmd.args(&args)
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
 
     if let Some(bin_dir) = bin_path.parent() {
         cmd.current_dir(bin_dir);
