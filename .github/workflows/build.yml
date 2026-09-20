@@ -177,7 +177,7 @@ jobs:
             whisper-bins/**
             openvino-dlls/**
             cuda-dlls/**
-          key: whisper-bin-${{ matrix.platform }}-${{ matrix.arch }}-${{ steps.whisper_tag.outputs.tag }}-v5
+          key: whisper-bin-${{ matrix.platform }}-${{ matrix.arch }}-${{ steps.whisper_tag.outputs.tag }}-v6
 
       - name: Clone whisper.cpp
         if: steps.whisper-cache.outputs.cache-hit != 'true'
@@ -192,25 +192,25 @@ jobs:
 
           # 1. Standard CPU Backend
           echo "Building Standard CPU backend..."
-          cmake -B whisper.cpp-src/build-standard -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DBUILD_SHARED_LIBS=OFF
+          cmake -B whisper.cpp-src/build-standard -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF -DGGML_AVX512=OFF -DGGML_AVX512_VBMI=OFF -DGGML_AVX512_VNNI=OFF -DGGML_AVX=ON -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON
           cmake --build whisper.cpp-src/build-standard -j$(nproc) --config Release --target whisper-cli
           cp whisper.cpp-src/build-standard/bin/whisper-cli whisper-bins/whisper-cli-standard
 
           # 2. Vulkan Backend
           echo "Building Vulkan backend..."
-          cmake -B whisper.cpp-src/build-vulkan -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DGGML_VULKAN=ON -DBUILD_SHARED_LIBS=OFF
+          cmake -B whisper.cpp-src/build-vulkan -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DGGML_VULKAN=ON -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF -DGGML_AVX512=OFF -DGGML_AVX512_VBMI=OFF -DGGML_AVX512_VNNI=OFF -DGGML_AVX=ON -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON
           cmake --build whisper.cpp-src/build-vulkan -j$(nproc) --config Release --target whisper-cli
           cp whisper.cpp-src/build-vulkan/bin/whisper-cli whisper-bins/whisper-cli-vulkan
 
           # 3. OpenVINO Backend
           echo "Building OpenVINO backend..."
-          cmake -B whisper.cpp-src/build-openvino -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DWHISPER_OPENVINO=1 -DBUILD_SHARED_LIBS=OFF
+          cmake -B whisper.cpp-src/build-openvino -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DWHISPER_OPENVINO=1 -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF -DGGML_AVX512=OFF -DGGML_AVX512_VBMI=OFF -DGGML_AVX512_VNNI=OFF -DGGML_AVX=ON -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON
           cmake --build whisper.cpp-src/build-openvino -j$(nproc) --config Release --target whisper-cli
           cp whisper.cpp-src/build-openvino/bin/whisper-cli whisper-bins/whisper-cli-openvino
 
           # 4. CUDA Backend
           echo "Building CUDA backend..."
-          cmake -B whisper.cpp-src/build-cuda -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DGGML_CUDA=ON -DBUILD_SHARED_LIBS=OFF
+          cmake -B whisper.cpp-src/build-cuda -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DGGML_CUDA=ON -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF -DGGML_AVX512=OFF -DGGML_AVX512_VBMI=OFF -DGGML_AVX512_VNNI=OFF -DGGML_AVX=ON -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON
           cmake --build whisper.cpp-src/build-cuda -j$(nproc) --config Release --target whisper-cli
           cp whisper.cpp-src/build-cuda/bin/whisper-cli whisper-bins/whisper-cli-cuda
 
@@ -223,13 +223,13 @@ jobs:
 
           # 1. Standard CPU Backend (NEON Accelerated)
           echo "Building Standard ARM64 CPU backend..."
-          cmake -B whisper.cpp-src/build-standard -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DBUILD_SHARED_LIBS=OFF
+          cmake -B whisper.cpp-src/build-standard -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF
           cmake --build whisper.cpp-src/build-standard -j$(nproc) --config Release --target whisper-cli
           cp whisper.cpp-src/build-standard/bin/whisper-cli whisper-bins/whisper-cli-standard
 
           # 2. Vulkan Backend
           echo "Building Vulkan ARM64 backend..."
-          cmake -B whisper.cpp-src/build-vulkan -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DGGML_VULKAN=ON -DBUILD_SHARED_LIBS=OFF
+          cmake -B whisper.cpp-src/build-vulkan -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DGGML_VULKAN=ON -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF
           cmake --build whisper.cpp-src/build-vulkan -j$(nproc) --config Release --target whisper-cli
           cp whisper.cpp-src/build-vulkan/bin/whisper-cli whisper-bins/whisper-cli-vulkan
 
@@ -249,14 +249,14 @@ jobs:
 
           # 1. Standard CPU Backend (MSVC + AVX2 / OpenMP)
           Write-Host "Building Standard CPU backend for Windows..."
-          cmake -G "Visual Studio 17 2022" -A x64 -B whisper.cpp-src/build-standard -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DBUILD_SHARED_LIBS=OFF
+          cmake -G "Visual Studio 17 2022" -A x64 -B whisper.cpp-src/build-standard -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF -DGGML_AVX512=OFF -DGGML_AVX512_VBMI=OFF -DGGML_AVX512_VNNI=OFF -DGGML_AVX=ON -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON
           cmake --build whisper.cpp-src/build-standard --config Release --target whisper-cli
           Copy-Item whisper.cpp-src/build-standard/bin/Release/whisper-cli.exe whisper-bins/whisper-cli-standard.exe
           Get-ChildItem -Path "whisper.cpp-src/build-standard/bin/Release/*.dll" -ErrorAction SilentlyContinue | Copy-Item -Destination whisper-bins/ -Force
 
           # 2. Vulkan Backend (MSVC + Vulkan SDK)
           Write-Host "Building Vulkan backend for Windows..."
-          cmake -G "Visual Studio 17 2022" -A x64 -B whisper.cpp-src/build-vulkan -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_VULKAN=ON -DBUILD_SHARED_LIBS=OFF
+          cmake -G "Visual Studio 17 2022" -A x64 -B whisper.cpp-src/build-vulkan -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_VULKAN=ON -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF -DGGML_AVX512=OFF -DGGML_AVX512_VBMI=OFF -DGGML_AVX512_VNNI=OFF -DGGML_AVX=ON -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON
           cmake --build whisper.cpp-src/build-vulkan --config Release --target whisper-cli
           Copy-Item whisper.cpp-src/build-vulkan/bin/Release/whisper-cli.exe whisper-bins/whisper-cli-vulkan.exe
           Get-ChildItem -Path "whisper.cpp-src/build-vulkan/bin/Release/*.dll" -ErrorAction SilentlyContinue | Copy-Item -Destination whisper-bins/ -Force
@@ -278,7 +278,7 @@ jobs:
           $openvinoDir = Get-ChildItem -Path "openvino-extracted" -Directory | Select-Object -First 1
 
           Write-Host "Building OpenVINO backend for Windows..."
-          cmake -G "Visual Studio 17 2022" -A x64 -B whisper.cpp-src/build-openvino -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DWHISPER_OPENVINO=1 -DOpenVINO_DIR="$($openvinoDir.FullName)/runtime/cmake" -DBUILD_SHARED_LIBS=OFF
+          cmake -G "Visual Studio 17 2022" -A x64 -B whisper.cpp-src/build-openvino -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_OPENMP=ON -DWHISPER_OPENVINO=1 -DOpenVINO_DIR="$($openvinoDir.FullName)/runtime/cmake" -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF -DGGML_AVX512=OFF -DGGML_AVX512_VBMI=OFF -DGGML_AVX512_VNNI=OFF -DGGML_AVX=ON -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON
           cmake --build whisper.cpp-src/build-openvino --config Release --target whisper-cli
           Copy-Item whisper.cpp-src/build-openvino/bin/Release/whisper-cli.exe whisper-bins/whisper-cli-openvino.exe
           Get-ChildItem -Path "whisper.cpp-src/build-openvino/bin/Release/*.dll" -ErrorAction SilentlyContinue | Copy-Item -Destination whisper-bins/ -Force
@@ -306,7 +306,7 @@ jobs:
             }
           }
 
-          cmake -G "Visual Studio 17 2022" -A x64 -B whisper.cpp-src/build-cuda -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=ON -DGGML_OPENMP=ON -DCUDAToolkit_ROOT="$env:CUDA_PATH" -DCMAKE_CUDA_FLAGS="-allow-unsupported-compiler" -DBUILD_SHARED_LIBS=OFF
+          cmake -G "Visual Studio 17 2022" -A x64 -B whisper.cpp-src/build-cuda -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=ON -DGGML_OPENMP=ON -DCUDAToolkit_ROOT="$env:CUDA_PATH" -DCMAKE_CUDA_FLAGS="-allow-unsupported-compiler" -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF -DGGML_AVX512=OFF -DGGML_AVX512_VBMI=OFF -DGGML_AVX512_VNNI=OFF -DGGML_AVX=ON -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON
           cmake --build whisper.cpp-src/build-cuda --config Release --target whisper-cli
           Copy-Item whisper.cpp-src/build-cuda/bin/Release/whisper-cli.exe whisper-bins/whisper-cli-cuda.exe
           Get-ChildItem -Path "whisper.cpp-src/build-cuda/bin/Release/*.dll" -ErrorAction SilentlyContinue | Copy-Item -Destination cuda-dlls/ -Force
@@ -334,12 +334,12 @@ jobs:
 
           # 1. x86_64 Intel Build (Metal disabled on Intel cross)
           echo "Building x86_64 Intel binary..."
-          cmake -B whisper.cpp-src/build-x64 -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64" -DGGML_METAL=OFF -DBUILD_SHARED_LIBS=OFF
+          cmake -B whisper.cpp-src/build-x64 -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64" -DGGML_METAL=OFF -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF -DGGML_AVX512=OFF -DGGML_AVX=ON -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON
           cmake --build whisper.cpp-src/build-x64 -j$(sysctl -n hw.ncpu) --config Release --target whisper-cli
 
           # 2. ARM64 Apple Silicon Build (Metal Accelerated for M1-M4)
           echo "Building ARM64 Apple Silicon binary with Metal..."
-          cmake -B whisper.cpp-src/build-arm64 -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64" -DGGML_METAL=ON -DBUILD_SHARED_LIBS=OFF
+          cmake -B whisper.cpp-src/build-arm64 -S whisper.cpp-src -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64" -DGGML_METAL=ON -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF
           cmake --build whisper.cpp-src/build-arm64 -j$(sysctl -n hw.ncpu) --config Release --target whisper-cli
 
           # 3. Combine into Universal Mach-O Fat Binary
