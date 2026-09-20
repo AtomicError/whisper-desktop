@@ -1020,11 +1020,10 @@ sidebar.sidebar-collapsed .nav-divider {
   box-sizing: border-box;
   overflow: hidden;
   position: relative;
-  transition: color 0.26s cubic-bezier(0.16, 1, 0.3, 1),
-              background-color 0.26s cubic-bezier(0.16, 1, 0.3, 1),
-              border-color 0.26s cubic-bezier(0.16, 1, 0.3, 1),
-              box-shadow 0.26s cubic-bezier(0.16, 1, 0.3, 1),
-              transform 0.26s cubic-bezier(0.16, 1, 0.3, 1),
+  transition: color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1),
               width 0.38s cubic-bezier(0.34, 1.45, 0.64, 1),
               padding 0.38s cubic-bezier(0.34, 1.45, 0.64, 1);
 }
@@ -1094,14 +1093,12 @@ sidebar.sidebar-collapsed .nav-divider {
   font-weight: 600;
   border-color: var(--nav-active-border);
   box-shadow: var(--nav-active-shadow);
-  transform: translateY(-1px);
 }
 
 .nav-item.active:hover {
   background: var(--nav-active-hover-bg);
   border-color: var(--nav-active-hover-border);
   box-shadow: var(--nav-active-hover-shadow);
-  transform: translateY(-1px);
 }
 
 .nav-item.active svg {
@@ -1110,10 +1107,13 @@ sidebar.sidebar-collapsed .nav-divider {
   filter: drop-shadow(0 0 8px var(--border-glass-active));
 }
 
-.nav-item:active,
+.nav-item:active {
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .nav-item.active:active,
 .nav-item.active:hover:active {
-  transform: translateY(0) scale(0.98);
+  background: var(--nav-active-hover-bg);
 }
 
 .nav-item:focus-visible {
