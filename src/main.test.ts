@@ -228,4 +228,163 @@ describe('modal focus trap & accessibility', () => {
     trap.release();
     expect((globalThis as any).document.activeElement).toBe(trigger);
   });
+
+  it('skips elements styled with visibility: hidden even when layout parent is present', () => {
+    const modal = new MockElement('DIV');
+    const hiddenBtn = new MockElement('BUTTON');
+    hiddenBtn.style.visibility = 'hidden';
+    const visibleBtn = new MockElement('BUTTON');
+    modal.appendChild(hiddenBtn);
+    modal.appendChild(visibleBtn);
+
+    const trap = trapModalFocus(modal, vi.fn());
+    (globalThis as any).document.activeElement = null;
+
+    let defaultPrevented = false;
+    (globalThis as any).document.dispatchEvent({
+      type: 'keydown',
+      key: 'Tab',
+      shiftKey: false,
+      preventDefault: () => { defaultPrevented = true; },
+      stopPropagation: () => {}
+    });
+
+    expect(defaultPrevented).toBe(true);
+    expect((globalThis as any).document.activeElement).toBe(visibleBtn);
+    trap.release();
+  });
+});
+
+describe('logs category filter & copy', () => {
+  const sampleLogs = [
+    { timestamp: '10:00:00', category: 'Whisper', message: 'Model loaded' },
+    { timestamp: '10:00:01', category: 'Translate', message: 'Prompt sent' },
+    { timestamp: '10:00:02', category: 'Whisper', message: 'Decoding audio' },
+    { timestamp: '10:00:03', category: 'System', message: 'Memory safe' },
+  ];
+
+  function filterLogs(logs: any[], activeCategory: string, query = '') {
+    if (!logs || logs.length === 0) return [];
+    let result = logs;
+    if (activeCategory !== 'All') {
+      result = result.filter(l => l.category === activeCategory);
+    }
+    if (query) {
+      const q = query.toLowerCase();
+      result = result.filter(l =>
+        (l.message && l.message.toLowerCase().includes(q)) ||
+        (l.category && l.category.toLowerCase().includes(q))
+      );
+    }
+    return result;
+  }
+
+  it('filters whisper logs when whisper tab is active', () => {
+    const whisperLogs = filterLogs(sampleLogs, 'Whisper');
+    expect(whisperLogs.length).toBe(2);
+    expect(whisperLogs.every(l => l.category === 'Whisper')).toBe(true);
+  });
+
+  it('filters translate logs when translate tab is active', () => {
+    const translateLogs = filterLogs(sampleLogs, 'Translate');
+    expect(translateLogs.length).toBe(1);
+    expect(translateLogs[0].message).toBe('Prompt sent');
+  });
+
+  it('copies all logs when all tab is active', () => {
+    const all = filterLogs(sampleLogs, 'All');
+    expect(all.length).toBe(4);
+  });
+
+  it('filters by search query', () => {
+    const searched = filterLogs(sampleLogs, 'All', 'decoding');
+    expect(searched.length).toBe(1);
+    expect(searched[0].message).toBe('Decoding audio');
+  });
+
+  it('matches logs when search query matches category name', () => {
+    const searched = filterLogs(sampleLogs, 'All', 'whisper');
+    expect(searched.length).toBe(2);
+  });
+});
+
+describe('number localization formatting', () => {
+  function formatLocalizedNumber(num: any, lang: string, maxFrac = 1) {
+    if (num === null || num === undefined || num === '' || isNaN(num)) return '';
+    if (lang === 'fa') {
+      return Number(num).toLocaleString('fa-IR', { maximumFractionDigits: maxFrac });
+    }
+    if (lang === 'ar') {
+      return Number(num).toLocaleString('ar-SA', { maximumFractionDigits: maxFrac });
+    }
+    return Number(num).toLocaleString('en-US', { maximumFractionDigits: maxFrac });
+  }
+
+  it('formats numbers with Persian digits for fa', () => {
+    const result = formatLocalizedNumber(4, 'fa', 0);
+    expect(result).toBe('۴');
+  });
+
+  it('formats numbers with Arabic-Indic digits for ar', () => {
+    const result = formatLocalizedNumber(8, 'ar', 0);
+    expect(result).toBe('٨');
+  });
+
+  it('formats numbers with Latin digits for other locales', () => {
+    expect(formatLocalizedNumber(8, 'en', 0)).toBe('8');
+    expect(formatLocalizedNumber(8, 'de', 0)).toBe('8');
+  });
+
+  it('returns empty string for empty input, null, or undefined', () => {
+    expect(formatLocalizedNumber('', 'fa', 0)).toBe('');
+    expect(formatLocalizedNumber(null, 'fa', 0)).toBe('');
+    expect(formatLocalizedNumber(undefined, 'fa', 0)).toBe('');
+  });
+});
+
+describe('toast message multi-line rendering', () => {
+  function parseToastContent(message: string) {
+    if (message && typeof message === 'string' && message.includes('\n')) {
+      const newlineIndex = message.indexOf('\n');
+      const header = message.substring(0, newlineIndex).trim();
+      const technical = message.substring(newlineIndex + 1).trim();
+      if (technical) {
+        return {
+          isMultiLine: true,
+          header,
+          technical,
+        };
+      }
+      return {
+        isMultiLine: false,
+        text: header || message,
+      };
+    }
+    return {
+      isMultiLine: false,
+      text: message,
+    };
+  }
+
+  it('correctly splits multi-line error into header and technical detail', () => {
+    const errorMsg = 'رونویسی با خطا مواجه شد:\nVulkan GPU (whisper-cli-vulkan) was terminated unexpectedly by a system signal.';
+    const parsed = parseToastContent(errorMsg);
+    expect(parsed.isMultiLine).toBe(true);
+    expect(parsed.header).toBe('رونویسی با خطا مواجه شد:');
+    expect(parsed.technical).toBe('Vulkan GPU (whisper-cli-vulkan) was terminated unexpectedly by a system signal.');
+  });
+
+  it('falls back to single-line when technical detail after newline is empty', () => {
+    const errorMsg = 'خطا در بارگذاری تنظیمات:\n';
+    const parsed = parseToastContent(errorMsg);
+    expect(parsed.isMultiLine).toBe(false);
+    expect(parsed.text).toBe('خطا در بارگذاری تنظیمات:');
+  });
+
+  it('keeps single-line messages intact', () => {
+    const infoMsg = 'متن رونویسی با موفقیت کپی شد!';
+    const parsed = parseToastContent(infoMsg);
+    expect(parsed.isMultiLine).toBe(false);
+    expect(parsed.text).toBe(infoMsg);
+  });
 });

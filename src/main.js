@@ -107,7 +107,31 @@ window.showNotification = function(message, type = 'info', customDuration = null
     <button class="toast-close-btn" title="${t('common.close')}" aria-label="${t('common.close')}">${closeSvg}</button>
     <div class="toast-progress-bar"></div>
   `;
-  toast.querySelector('.toast-message').textContent = message;
+  const msgEl = toast.querySelector('.toast-message');
+  if (message && typeof message === 'string' && message.includes('\n')) {
+    const newlineIndex = message.indexOf('\n');
+    const header = message.substring(0, newlineIndex).trim();
+    const technical = message.substring(newlineIndex + 1).trim();
+
+    if (technical) {
+      msgEl.textContent = '';
+      const titleDiv = document.createElement('div');
+      titleDiv.className = 'toast-title';
+      titleDiv.textContent = header;
+
+      const techDiv = document.createElement('div');
+      techDiv.className = 'toast-tech-detail';
+      techDiv.setAttribute('dir', 'ltr');
+      techDiv.textContent = technical;
+
+      msgEl.appendChild(titleDiv);
+      msgEl.appendChild(techDiv);
+    } else {
+      msgEl.textContent = header || message;
+    }
+  } else {
+    msgEl.textContent = message;
+  }
   
   const progressBar = toast.querySelector('.toast-progress-bar');
   if (duration > 0 && duration !== Infinity) {
@@ -201,15 +225,14 @@ function _trapModalFocus(modalEl, closeCallback) {
 
   const isVisible = (el) => {
     if (el.disabled || el.getAttribute('aria-hidden') === 'true') return false;
-    if (el.offsetParent !== null) return true;
     if (el.style && (el.style.display === 'none' || el.style.visibility === 'hidden')) return false;
     if (el.closest && el.closest('[style*="display: none"], [style*="display:none"], [hidden]')) return false;
     if (typeof el.checkVisibility === 'function') {
       try {
-        return el.checkVisibility();
+        return el.checkVisibility({ checkVisibilityCSS: true });
       } catch (_) {}
     }
-    return true;
+    return el.offsetParent !== null;
   };
 
   const keyHandler = (e) => {
@@ -2780,7 +2803,7 @@ function setupTauriListeners() {
     payload.timestamp = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
     allLogsArray.push(payload);
     if (allLogsArray.length > 10000) allLogsArray.splice(0, allLogsArray.length - 10000);
-    updateLogsButtonsState();
+    scheduleUpdateLogsButtonsState();
     appendLogToViewport(payload);
 
     // Intercept Whisper lines containing timestamp ranges
@@ -2803,8 +2826,13 @@ function appendLogToViewport(payload, isBatchRedraw = false) {
   }
   
   // Check search query
-  if (logSearchQuery !== '' && !payload.message.toLowerCase().includes(logSearchQuery.toLowerCase())) {
-    return;
+  if (logSearchQuery !== '') {
+    const q = logSearchQuery.toLowerCase();
+    const msgMatch = Boolean(payload.message && payload.message.toLowerCase().includes(q));
+    const catMatch = Boolean(payload.category && payload.category.toLowerCase().includes(q));
+    if (!msgMatch && !catMatch) {
+      return;
+    }
   }
   
   const viewport = document.getElementById('log-viewport');
@@ -4223,6 +4251,17 @@ window.browseMediaFile = async function() {
   }
 };
 
+function formatLocalizedNumber(num, lang = getLanguage(), maxFrac = 1) {
+  if (num === null || num === undefined || num === '' || isNaN(num)) return '';
+  if (lang === 'fa') {
+    return Number(num).toLocaleString('fa-IR', { maximumFractionDigits: maxFrac });
+  }
+  if (lang === 'ar') {
+    return Number(num).toLocaleString('ar-SA', { maximumFractionDigits: maxFrac });
+  }
+  return Number(num).toLocaleString('en-US', { maximumFractionDigits: maxFrac });
+}
+
 function renderMediaMetadata(meta) {
   if (!meta || !meta.exists) return;
 
@@ -4253,23 +4292,15 @@ function renderMediaMetadata(meta) {
     const match = rawSize.match(/([\d.]+)\s*([A-Za-z]+)?/);
     if (match) {
       const num = parseFloat(match[1]);
-      const unit = (match[2] || 'MB').toUpperCase();
-      if (lang === 'fa') {
-        const faNum = num.toLocaleString('fa-IR', { maximumFractionDigits: 1 });
-        let faUnit = 'مگابایت';
-        if (unit === 'GB') faUnit = 'گیگابایت';
-        else if (unit === 'KB') faUnit = 'کیلوبایت';
-        else if (unit === 'B') faUnit = 'بایت';
-        sizeEl.textContent = `${faNum} ${faUnit}`;
-      } else if (lang === 'ar') {
-        const arNum = num.toLocaleString('ar-SA', { maximumFractionDigits: 1 });
-        let arUnit = 'ميجابايت';
-        if (unit === 'GB') arUnit = 'جيجابايت';
-        else if (unit === 'KB') arUnit = 'كيلوبايت';
-        sizeEl.textContent = `${arNum} ${arUnit}`;
-      } else {
-        sizeEl.textContent = `${num} ${unit}`;
-      }
+      const unitKey = (match[2] || 'MB').toUpperCase();
+      let localizedUnit = unitKey;
+      if (unitKey === 'GB') localizedUnit = t('transcribe.unitGB');
+      else if (unitKey === 'MB') localizedUnit = t('transcribe.unitMB');
+      else if (unitKey === 'KB') localizedUnit = t('transcribe.unitKB');
+      else if (unitKey === 'B') localizedUnit = t('transcribe.unitB');
+
+      const formattedNum = formatLocalizedNumber(num, lang, 1);
+      sizeEl.textContent = `${formattedNum} ${localizedUnit}`;
     } else {
       sizeEl.textContent = rawSize || '-';
     }
@@ -4286,51 +4317,31 @@ function renderMediaMetadata(meta) {
     if (dur <= 0) {
       durEl.textContent = '-';
       durEl.removeAttribute('title');
-    } else if (lang === 'fa') {
-      const toFa = (n) => n.toLocaleString('fa-IR');
+    } else {
+      const hStr = formatLocalizedNumber(hours, lang, 0);
+      const mStr = formatLocalizedNumber(minutes, lang, 0);
+      const sStr = formatLocalizedNumber(seconds, lang, 0);
+
       let text = '';
       if (hours > 0) {
         if (minutes > 0 && seconds > 0) {
-          text = `${toFa(hours)} ساعت و ${toFa(minutes)} دقیقه و ${toFa(seconds)} ثانیه`;
+          text = t('transcribe.durationHoursMinutesSeconds', { hours: hStr, minutes: mStr, seconds: sStr });
         } else if (minutes > 0) {
-          text = `${toFa(hours)} ساعت و ${toFa(minutes)} دقیقه`;
+          text = t('transcribe.durationHoursMinutes', { hours: hStr, minutes: mStr });
         } else {
-          text = `${toFa(hours)} ساعت`;
+          text = t('transcribe.durationHours', { hours: hStr });
         }
       } else if (minutes > 0) {
         if (seconds > 0) {
-          text = `${toFa(minutes)} دقیقه و ${toFa(seconds)} ثانیه`;
+          text = t('transcribe.durationMinutesSeconds', { minutes: mStr, seconds: sStr });
         } else {
-          text = `${toFa(minutes)} دقیقه`;
+          text = t('transcribe.durationMinutes', { minutes: mStr });
         }
       } else {
-        text = `${toFa(seconds)} ثانیه`;
+        text = t('transcribe.durationSeconds', { seconds: sStr });
       }
       durEl.textContent = text;
-      durEl.title = `تایم‌کد دقیق: ${digitalTimecode}`;
-    } else if (lang === 'ar') {
-      const toAr = (n) => n.toLocaleString('ar-SA');
-      let text = '';
-      if (hours > 0) {
-        text = minutes > 0 ? `${toAr(hours)} ساعة و ${toAr(minutes)} دقيقة` : `${toAr(hours)} ساعة`;
-      } else if (minutes > 0) {
-        text = seconds > 0 ? `${toAr(minutes)} دقيقة و ${toAr(seconds)} ثانية` : `${toAr(minutes)} دقيقة`;
-      } else {
-        text = `${toAr(seconds)} ثانية`;
-      }
-      durEl.textContent = text;
-      durEl.title = `الرمز الزمني: ${digitalTimecode}`;
-    } else {
-      let text = '';
-      if (hours > 0) {
-        text = minutes > 0 ? `${hours} hr ${minutes} min` : `${hours} hr`;
-      } else if (minutes > 0) {
-        text = seconds > 0 ? `${minutes} min ${seconds} sec` : `${minutes} min`;
-      } else {
-        text = `${seconds} sec`;
-      }
-      durEl.textContent = text;
-      durEl.title = `Timecode: ${digitalTimecode}`;
+      durEl.title = t('transcribe.timecodeTooltip', { timecode: digitalTimecode });
     }
   }
 
@@ -4338,9 +4349,7 @@ function renderMediaMetadata(meta) {
   if (recEl && settingsState) {
     const backendRaw = settingsState.selectedBackend || 'Standard';
     const backendName = backendRaw === 'Standard' ? t('transcribe.backendStandard') : backendRaw;
-    const threadsVal = lang === 'fa' 
-      ? Number(settingsState.threads || 4).toLocaleString('fa-IR') 
-      : (settingsState.threads || 4);
+    const threadsVal = formatLocalizedNumber(settingsState.threads || 4, lang, 0);
     recEl.textContent = t('transcribe.backendStatus', {
       backend: backendName,
       threads: threadsVal
@@ -4868,21 +4877,59 @@ window.handleLogSearch = function() {
   }, 120);
 };
 
+function getFilteredLogs() {
+  if (!allLogsArray || allLogsArray.length === 0) return [];
+  let logs = allLogsArray;
+  if (activeLogCategory !== 'All') {
+    logs = logs.filter(l => l.category === activeLogCategory);
+  }
+  if (logSearchQuery) {
+    const query = logSearchQuery.toLowerCase();
+    logs = logs.filter(l => 
+      (l.message && l.message.toLowerCase().includes(query)) || 
+      (l.category && l.category.toLowerCase().includes(query))
+    );
+  }
+  return logs;
+}
+
+let _updateLogsButtonsTimer = null;
+function scheduleUpdateLogsButtonsState() {
+  if (_updateLogsButtonsTimer) return;
+  _updateLogsButtonsTimer = setTimeout(() => {
+    _updateLogsButtonsTimer = null;
+    updateLogsButtonsState();
+  }, 100);
+}
+
 function updateLogsButtonsState() {
-  const hasLogs = Boolean(allLogsArray && allLogsArray.length > 0);
+  const hasAnyLogs = Boolean(allLogsArray && allLogsArray.length > 0);
+  const filteredLogs = getFilteredLogs();
+  const hasFilteredLogs = filteredLogs.length > 0;
+
   const btnCopy = document.getElementById('btn-copy-all-logs');
   if (btnCopy) {
-    btnCopy.disabled = !hasLogs;
-    btnCopy.setAttribute('title', hasLogs ? t('logs.copyBtn') : t('toasts.noLogsToCopy'));
+    btnCopy.disabled = !hasFilteredLogs;
+    let copyTitle = t('logs.copyBtn');
+    if (!hasAnyLogs) {
+      copyTitle = t('toasts.noLogsToCopy');
+    } else if (!hasFilteredLogs) {
+      copyTitle = t('toasts.noMatchingLogsToCopy');
+    }
+    btnCopy.setAttribute('title', copyTitle);
   }
   const btnClear = document.getElementById('btn-clear-all-logs');
   if (btnClear) {
-    btnClear.disabled = !hasLogs;
-    btnClear.setAttribute('title', hasLogs ? t('logs.clearBtn') : t('toasts.noLogsToCopy'));
+    btnClear.disabled = !hasAnyLogs;
+    btnClear.setAttribute('title', hasAnyLogs ? t('logs.clearBtn') : t('toasts.noLogsToCopy'));
   }
 }
 
 function redrawLogsViewport() {
+  if (_updateLogsButtonsTimer) {
+    clearTimeout(_updateLogsButtonsTimer);
+    _updateLogsButtonsTimer = null;
+  }
   lastAppendedCategory = null;
   const viewport = document.getElementById('log-viewport');
   updateLogsButtonsState();
@@ -4910,18 +4957,28 @@ function redrawLogsViewport() {
 }
 
 window.copyAllLogs = async function() {
-  if (!allLogsArray || allLogsArray.length === 0) {
-    showNotification(t('toasts.noLogsToCopy'), "warning");
+  const filteredLogs = getFilteredLogs();
+  if (!filteredLogs || filteredLogs.length === 0) {
+    const hasAnyLogs = Boolean(allLogsArray && allLogsArray.length > 0);
+    showNotification(hasAnyLogs ? t('toasts.noMatchingLogsToCopy') : t('toasts.noLogsToCopy'), "warning");
     return;
   }
-  const rawLogs = allLogsArray.map(l => `[${l.timestamp}] [${l.category}] ${l.message}`).join('\n');
+  const rawLogs = filteredLogs.map(l => `[${l.timestamp}] [${l.category}] ${l.message}`).join('\n');
   if (!rawLogs.trim()) {
     showNotification(t('toasts.noLogsToCopy'), "warning");
     return;
   }
   try {
     await copyToClipboard(rawLogs);
-    showNotification(t('toasts.logsCopied'), "success");
+    if (activeLogCategory === 'Whisper') {
+      showNotification(t('toasts.logsCopiedWhisper'), "success");
+    } else if (activeLogCategory === 'Translate') {
+      showNotification(t('toasts.logsCopiedTranslate'), "success");
+    } else if (activeLogCategory !== 'All' || logSearchQuery) {
+      showNotification(t('toasts.logsCopiedFiltered', { count: filteredLogs.length }), "success");
+    } else {
+      showNotification(t('toasts.logsCopied'), "success");
+    }
   } catch (e) {
     const msg = (e && (e.message || e.toString())) || String(e);
     showNotification(t('toasts.logsCopyError', { error: msg }), "error");

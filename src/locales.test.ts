@@ -43,6 +43,29 @@ describe('locale consistency for speed presets', () => {
       expect(typeof transcribe.backendStatus).toBe('string');
       expect(transcribe.backendStatus).toContain('{backend}');
       expect(transcribe.backendStatus).toContain('{threads}');
+      expect(typeof transcribe.unitGB).toBe('string');
+      expect(typeof transcribe.unitMB).toBe('string');
+      expect(typeof transcribe.unitKB).toBe('string');
+      expect(typeof transcribe.unitB).toBe('string');
+      expect(typeof transcribe.durationHours).toBe('string');
+      expect(typeof transcribe.durationHoursMinutes).toBe('string');
+      expect(typeof transcribe.durationHoursMinutesSeconds).toBe('string');
+      expect(typeof transcribe.durationMinutesSeconds).toBe('string');
+      expect(typeof transcribe.durationMinutes).toBe('string');
+      expect(typeof transcribe.durationSeconds).toBe('string');
+      expect(typeof transcribe.timecodeTooltip).toBe('string');
+      expect(transcribe.timecodeTooltip).toContain('{timecode}');
+    });
+
+    it(`locale ${code} formats transcription and translation errors on newlines`, () => {
+      const toasts = (dict as any).toasts;
+      expect(toasts).toBeDefined();
+      expect(toasts.transcriptionError).toContain(':\n{error}');
+      expect(toasts.aiTranslateError).toContain(':\n{error}');
+      expect(typeof toasts.logsCopiedWhisper).toBe('string');
+      expect(typeof toasts.logsCopiedTranslate).toBe('string');
+      expect(typeof toasts.logsCopiedFiltered).toBe('string');
+      expect(typeof toasts.noMatchingLogsToCopy).toBe('string');
     });
   }
 });

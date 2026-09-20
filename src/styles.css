@@ -3896,6 +3896,30 @@ select.select-control {
   flex: 1;
   word-break: break-word;
   line-height: 1.4;
+  white-space: pre-line;
+}
+
+.toast-title {
+  font-weight: 600;
+  color: var(--color-text-bright, #ffffff);
+  line-height: 1.45;
+}
+
+.toast-tech-detail {
+  direction: ltr !important;
+  text-align: left !important;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.88);
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 5px 8px;
+  margin-top: 5px;
+  unicode-bidi: isolate;
+  user-select: text;
+  word-break: break-all;
 }
 
 .toast-close-btn {
@@ -4827,6 +4851,10 @@ select.select-control {
   color: var(--color-text-muted);
   line-height: 1.5;
   margin: 0 0 16px 0;
+}
+
+#batch-error-message {
+  white-space: pre-line;
 }
 
 .modal-details-box {
