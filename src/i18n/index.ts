@@ -431,6 +431,11 @@ export function initI18n(): void {
     const saved = localStorage.getItem(STORAGE_KEY) as SupportedLanguage | null;
     if (saved && SUPPORTED_LANGUAGES.includes(saved)) {
       initialLang = saved;
+    } else if (typeof document !== 'undefined') {
+      const htmlLang = document.documentElement.getAttribute('lang') as SupportedLanguage | null;
+      if (htmlLang && SUPPORTED_LANGUAGES.includes(htmlLang)) {
+        initialLang = htmlLang;
+      }
     }
   } catch (_) {}
 

@@ -28,5 +28,21 @@ describe('locale consistency for speed presets', () => {
       expect(typeof hardsub.speedPresetSlow).toBe('string');
       expect(hardsub.speedPresetSlow.length).toBeGreaterThan(0);
     });
+
+    it(`locale ${code} has all media metadata specification keys`, () => {
+      const transcribe = (dict as any).transcribe;
+      expect(transcribe).toBeDefined();
+      expect(typeof transcribe.formatVideo).toBe('string');
+      expect(transcribe.formatVideo.length).toBeGreaterThan(0);
+      expect(typeof transcribe.formatAudio).toBe('string');
+      expect(transcribe.formatAudio.length).toBeGreaterThan(0);
+      expect(typeof transcribe.formatFile).toBe('string');
+      expect(transcribe.formatFile.length).toBeGreaterThan(0);
+      expect(typeof transcribe.backendStandard).toBe('string');
+      expect(transcribe.backendStandard.length).toBeGreaterThan(0);
+      expect(typeof transcribe.backendStatus).toBe('string');
+      expect(transcribe.backendStatus).toContain('{backend}');
+      expect(transcribe.backendStatus).toContain('{threads}');
+    });
   }
 });

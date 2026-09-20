@@ -605,6 +605,9 @@ window.addEventListener('whisper:languageChanged', () => {
   if (typeof window.applyModelsFilterAndRender === 'function' && typeof currentProviderModels !== 'undefined' && currentProviderModels && currentProviderModels.length > 0) {
     window.applyModelsFilterAndRender(0);
   }
+  if (typeof probedMetadata !== 'undefined' && probedMetadata && probedMetadata.exists) {
+    renderMediaMetadata(probedMetadata);
+  }
 });
 
 function syncAppVersionUI() {
@@ -2224,6 +2227,12 @@ function setupZoomKeyboardShortcuts() {
 
 async function initApp() {
   console.log("Whisper Desktop UI Initialized!");
+
+  // Defensive fail-safe curtain release to guarantee UI visibility even on unexpected load errors
+  setTimeout(() => {
+    document.documentElement.classList.add('app-ready');
+    document.documentElement.classList.remove('theme-initializing');
+  }, 350);
   
   // Initialize internationalization (i18n) and translate DOM
   initI18n();
@@ -2260,16 +2269,20 @@ async function initApp() {
   // Setup Tauri Listeners
   setupTauriListeners();
   
-  // Load system specs early to guide recommendation engine
+  // Initial load settings from disk first so theme & language are applied immediately
+  await refreshSettings();
+
+  // Seamless Zero-FOUC Reveal: Dismiss boot curtain now that disk settings, theme, and language are fully applied
+  document.documentElement.classList.add('app-ready');
+  document.documentElement.classList.remove('theme-initializing');
+
+  // Load system specs to guide recommendation engine
   try {
     systemSpecs = await invoke('get_system_specs');
   } catch (e) {
     console.error("Failed to load system specs on startup:", e);
     systemSpecs = { total_ram_gb: 8.0, cpu_cores: 4, gpu_type: 'unknown' };
   }
-  
-  // Initial load
-  await refreshSettings();
   setupNumberInputControls();
   // Load existing logs
   try {
@@ -2496,6 +2509,13 @@ async function initApp() {
 
   // Switch to default transcribe view
   switchView('transcribe');
+
+  // Lift the initial startup transition freeze after first layout has completed
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      document.documentElement.classList.remove('theme-initializing');
+    });
+  });
 }
 
 // Avoid DOMContentLoaded race condition
@@ -3259,12 +3279,18 @@ async function refreshSettings() {
       applyUiZoom(settingsState.uiScale, false, false);
     }
 
-    // Apply Color Theme from loaded settings
+    // Apply Color Theme from loaded settings and sync localStorage cache
     const currentTheme = (settingsState && settingsState.theme) ? settingsState.theme : 'royal-blue';
     applyTheme(currentTheme);
+    try {
+      localStorage.setItem('whisper_theme_cache', currentTheme);
+    } catch (_) {}
 
     // Apply UI Language from loaded settings if specified (disk config is authoritative)
     if (settingsState && settingsState.uiLanguage) {
+      try {
+        localStorage.setItem('whisper_language', settingsState.uiLanguage);
+      } catch (_) {}
       if (settingsState.uiLanguage !== getLanguage()) {
         setLanguage(settingsState.uiLanguage, false);
       }
@@ -4197,6 +4223,131 @@ window.browseMediaFile = async function() {
   }
 };
 
+function renderMediaMetadata(meta) {
+  if (!meta || !meta.exists) return;
+
+  const typeEl = document.getElementById('meta-type');
+  const sizeEl = document.getElementById('meta-size');
+  const durEl = document.getElementById('meta-duration');
+  const recEl = document.getElementById('meta-recommendation');
+
+  const lang = getLanguage();
+
+  // 1. File Type (Localized with emoji)
+  if (typeEl) {
+    const rawFmt = meta.format || '';
+    if (rawFmt.includes('Video')) {
+      typeEl.textContent = `${t('transcribe.formatVideo')} 🎥`;
+    } else if (rawFmt.includes('Audio')) {
+      typeEl.textContent = `${t('transcribe.formatAudio')} 🎵`;
+    } else if (rawFmt.includes('File')) {
+      typeEl.textContent = `${t('transcribe.formatFile')} 📁`;
+    } else {
+      typeEl.textContent = rawFmt || '-';
+    }
+  }
+
+  // 2. File Size (Properly isolated RTL/LTR numbers and localized units)
+  if (sizeEl) {
+    const rawSize = meta.size || '';
+    const match = rawSize.match(/([\d.]+)\s*([A-Za-z]+)?/);
+    if (match) {
+      const num = parseFloat(match[1]);
+      const unit = (match[2] || 'MB').toUpperCase();
+      if (lang === 'fa') {
+        const faNum = num.toLocaleString('fa-IR', { maximumFractionDigits: 1 });
+        let faUnit = 'مگابایت';
+        if (unit === 'GB') faUnit = 'گیگابایت';
+        else if (unit === 'KB') faUnit = 'کیلوبایت';
+        else if (unit === 'B') faUnit = 'بایت';
+        sizeEl.textContent = `${faNum} ${faUnit}`;
+      } else if (lang === 'ar') {
+        const arNum = num.toLocaleString('ar-SA', { maximumFractionDigits: 1 });
+        let arUnit = 'ميجابايت';
+        if (unit === 'GB') arUnit = 'جيجابايت';
+        else if (unit === 'KB') arUnit = 'كيلوبايت';
+        sizeEl.textContent = `${arNum} ${arUnit}`;
+      } else {
+        sizeEl.textContent = `${num} ${unit}`;
+      }
+    } else {
+      sizeEl.textContent = rawSize || '-';
+    }
+  }
+
+  // 3. Duration (Human conversational localized format + digital timecode tooltip)
+  if (durEl) {
+    const dur = Math.round(meta.durationSec || 0);
+    const hours = Math.floor(dur / 3600);
+    const minutes = Math.floor((dur % 3600) / 60);
+    const seconds = Math.floor(dur % 60);
+    const digitalTimecode = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+    if (dur <= 0) {
+      durEl.textContent = '-';
+      durEl.removeAttribute('title');
+    } else if (lang === 'fa') {
+      const toFa = (n) => n.toLocaleString('fa-IR');
+      let text = '';
+      if (hours > 0) {
+        if (minutes > 0 && seconds > 0) {
+          text = `${toFa(hours)} ساعت و ${toFa(minutes)} دقیقه و ${toFa(seconds)} ثانیه`;
+        } else if (minutes > 0) {
+          text = `${toFa(hours)} ساعت و ${toFa(minutes)} دقیقه`;
+        } else {
+          text = `${toFa(hours)} ساعت`;
+        }
+      } else if (minutes > 0) {
+        if (seconds > 0) {
+          text = `${toFa(minutes)} دقیقه و ${toFa(seconds)} ثانیه`;
+        } else {
+          text = `${toFa(minutes)} دقیقه`;
+        }
+      } else {
+        text = `${toFa(seconds)} ثانیه`;
+      }
+      durEl.textContent = text;
+      durEl.title = `تایم‌کد دقیق: ${digitalTimecode}`;
+    } else if (lang === 'ar') {
+      const toAr = (n) => n.toLocaleString('ar-SA');
+      let text = '';
+      if (hours > 0) {
+        text = minutes > 0 ? `${toAr(hours)} ساعة و ${toAr(minutes)} دقيقة` : `${toAr(hours)} ساعة`;
+      } else if (minutes > 0) {
+        text = seconds > 0 ? `${toAr(minutes)} دقيقة و ${toAr(seconds)} ثانية` : `${toAr(minutes)} دقيقة`;
+      } else {
+        text = `${toAr(seconds)} ثانية`;
+      }
+      durEl.textContent = text;
+      durEl.title = `الرمز الزمني: ${digitalTimecode}`;
+    } else {
+      let text = '';
+      if (hours > 0) {
+        text = minutes > 0 ? `${hours} hr ${minutes} min` : `${hours} hr`;
+      } else if (minutes > 0) {
+        text = seconds > 0 ? `${minutes} min ${seconds} sec` : `${minutes} min`;
+      } else {
+        text = `${seconds} sec`;
+      }
+      durEl.textContent = text;
+      durEl.title = `Timecode: ${digitalTimecode}`;
+    }
+  }
+
+  // 4. Engine / Backend & Threads
+  if (recEl && settingsState) {
+    const backendRaw = settingsState.selectedBackend || 'Standard';
+    const backendName = backendRaw === 'Standard' ? t('transcribe.backendStandard') : backendRaw;
+    const threadsVal = lang === 'fa' 
+      ? Number(settingsState.threads || 4).toLocaleString('fa-IR') 
+      : (settingsState.threads || 4);
+    recEl.textContent = t('transcribe.backendStatus', {
+      backend: backendName,
+      threads: threadsVal
+    });
+  }
+}
+
 async function probeSelectedFile() {
   if (!selectedMediaFile) return;
   
@@ -4205,18 +4356,7 @@ async function probeSelectedFile() {
     
     if (probedMetadata.exists) {
       document.getElementById('media-meta-box').style.display = 'grid';
-      document.getElementById('meta-type').textContent = probedMetadata.format;
-      document.getElementById('meta-size').textContent = probedMetadata.size;
-      
-      const recText = `Backend: ${settingsState.selectedBackend} (${settingsState.threads} threads)`;
-      document.getElementById('meta-recommendation').textContent = recText;
-      
-      const dur = probedMetadata.durationSec;
-      const hours = Math.floor(dur / 3600);
-      const minutes = Math.floor((dur % 3600) / 60);
-      const seconds = Math.floor(dur % 60);
-      const durStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-      document.getElementById('meta-duration').textContent = durStr;
+      renderMediaMetadata(probedMetadata);
       
       setWizardStepCompleted(2, true);
       openWizardStep(2);
@@ -4254,6 +4394,10 @@ function updateTranscribeUIConfigs() {
   if (backendEl) {
     backendEl.textContent = backend;
     backendEl.title = backend;
+  }
+  
+  if (typeof probedMetadata !== 'undefined' && probedMetadata && probedMetadata.exists) {
+    renderMediaMetadata(probedMetadata);
   }
   
   // 1. Sync Quick Engine / Backend Select (Show ONLY compiled/available backends)
@@ -4870,8 +5014,13 @@ window.clearBatchQueue = function() {
   // Clear any meta values
   document.getElementById('meta-type').textContent = '-';
   document.getElementById('meta-size').textContent = '-';
-  document.getElementById('meta-duration').textContent = '-';
+  const durEl = document.getElementById('meta-duration');
+  if (durEl) {
+    durEl.textContent = '-';
+    durEl.removeAttribute('title');
+  }
   document.getElementById('meta-recommendation').textContent = '-';
+  probedMetadata = null;
   
   if (settingsState) {
     settingsState.inputFile = "";

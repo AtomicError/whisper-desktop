@@ -7,6 +7,8 @@
     <script>
       (function() {
         try {
+          document.documentElement.classList.add('theme-initializing');
+
           const cachedLang = localStorage.getItem('whisper_language') || 'en';
           const isRtl = (cachedLang === 'fa' || cachedLang === 'ar');
           document.documentElement.setAttribute('lang', cachedLang);
@@ -17,8 +19,11 @@
             document.documentElement.classList.remove('rtl-layout');
           }
 
-          const cachedTheme = localStorage.getItem('whisper_theme_cache');
+          const cachedTheme = localStorage.getItem('whisper_theme_cache') || 'royal-blue';
           const themeMetaMap = {
+            'royal-blue': '#070913',
+            'royal': '#070913',
+            'cyber-blue': '#070913',
             'carbon': '#121214',
             'fire-orange': '#0c0a09',
             'fire': '#0c0a09',
@@ -34,13 +39,17 @@
             'emerald': 'theme-card-emerald'
           };
 
-          if (cachedTheme && themeMetaMap[cachedTheme]) {
+          if (cachedTheme && cachedTheme !== 'royal-blue' && cachedTheme !== 'royal' && cachedTheme !== 'cyber-blue') {
             const dataTheme = (cachedTheme === 'fire') ? 'fire-orange' : cachedTheme;
             document.documentElement.setAttribute('data-theme', dataTheme);
-            document.documentElement.style.setProperty('--bg-space', themeMetaMap[cachedTheme]);
-            const meta = document.querySelector('meta[name="theme-color"]');
-            if (meta) meta.setAttribute('content', themeMetaMap[cachedTheme]);
+          } else {
+            document.documentElement.removeAttribute('data-theme');
           }
+
+          const bg = themeMetaMap[cachedTheme] || '#070913';
+          document.documentElement.style.setProperty('--bg-space', bg);
+          const meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', bg);
 
           const updateInitialThemeCards = function() {
             const activeId = themeCardIdMap[cachedTheme] || 'theme-card-royal';
@@ -69,6 +78,23 @@
       })();
     </script>
     <style>
+      /* Zero-FOUC App Curtain: Keep main UI hidden until initial localization and theme are hydrated */
+      html:not(.app-ready) #app-container,
+      html:not(.app-ready) .titlebar {
+        opacity: 0 !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+      }
+      #app-container, .titlebar {
+        transition: opacity 0.12s ease-out;
+      }
+      html.theme-initializing,
+      html.theme-initializing *,
+      html.theme-initializing *::before,
+      html.theme-initializing *::after {
+        transition: none !important;
+        animation: none !important;
+      }
       :root, html, body {
         background-color: var(--bg-space, #070913);
         background: var(--bg-space, #070913);
