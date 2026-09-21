@@ -2251,11 +2251,46 @@ function setupZoomKeyboardShortcuts() {
 async function initApp() {
   console.log("Whisper Desktop UI Initialized!");
 
-  // Defensive fail-safe curtain release to guarantee UI visibility even on unexpected load errors
-  setTimeout(() => {
+  const splashStartTime = performance.now();
+  let splashDismissed = false;
+  let splashFailSafeTimer = null;
+
+  const dismissSplashCurtain = () => {
+    if (splashDismissed) return;
+    splashDismissed = true;
+
+    if (splashFailSafeTimer) {
+      clearTimeout(splashFailSafeTimer);
+      splashFailSafeTimer = null;
+    }
+
+    const splash = document.getElementById('splash-curtain');
+    if (splash) {
+      splash.classList.add('splash-leaving');
+    }
+
     document.documentElement.classList.add('app-ready');
     document.documentElement.classList.remove('theme-initializing');
-  }, 350);
+
+    if (splash) {
+      setTimeout(() => {
+        try {
+          splash.remove();
+        } catch (_) {}
+      }, 400);
+    }
+  };
+
+  // Defensive fail-safe curtain release to guarantee UI visibility even on unexpected load errors
+  splashFailSafeTimer = setTimeout(dismissSplashCurtain, 5000);
+  
+  const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Decouple entrance animation from JavaScript execution:
+  // Allow the 850ms entrance animation to run with 0% main-thread CPU contention for butter-smooth 60/120fps motion
+  if (!prefersReducedMotion) {
+    await new Promise(resolve => setTimeout(resolve, 850));
+  }
   
   // Initialize internationalization (i18n) and translate DOM
   initI18n();
@@ -2295,9 +2330,16 @@ async function initApp() {
   // Initial load settings from disk first so theme & language are applied immediately
   await refreshSettings();
 
-  // Seamless Zero-FOUC Reveal: Dismiss boot curtain now that disk settings, theme, and language are fully applied
-  document.documentElement.classList.add('app-ready');
-  document.documentElement.classList.remove('theme-initializing');
+  // Seamless Zero-FOUC Reveal: Complete branded splash animation before revealing the hydrated UI
+  const targetSplashDuration = prefersReducedMotion ? 100 : 1150;
+  const elapsed = performance.now() - splashStartTime;
+  const remaining = Math.max(0, targetSplashDuration - elapsed);
+
+  if (remaining > 0) {
+    await new Promise(resolve => setTimeout(resolve, remaining));
+  }
+
+  dismissSplashCurtain();
 
   // Load system specs to guide recommendation engine
   try {

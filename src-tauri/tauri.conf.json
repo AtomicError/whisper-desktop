@@ -22,7 +22,7 @@
         "decorations": false,
         "transparent": false,
         "theme": "Dark",
-        "backgroundColor": [7, 9, 19, 255]
+        "backgroundColor": [5, 5, 7, 255]
       }
     ],
     "security": {
