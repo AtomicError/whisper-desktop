@@ -404,7 +404,9 @@ pub async fn run_transcription(
 
     // Ensure executable permissions on Unix platforms.
     // If the binary is inside a read-only filesystem (like an AppImage mount) or execution is restricted,
-    // we copy the binary to the user's writable cache directory first and make it executable there.
+    // we copy the binary and any companion shared libraries to the user's writable cache directory first.
+    #[cfg(unix)]
+    let orig_bin_dir = bin_path.parent().map(|p| p.to_path_buf());
     #[cfg(unix)]
     let mut bin_path = bin_path;
     #[cfg(unix)]
@@ -442,6 +444,29 @@ pub async fn run_transcription(
                         let mut perms = meta.permissions();
                         perms.set_mode(perms.mode() | 0o111);
                         let _ = std::fs::set_permissions(&cached_bin, perms);
+                    }
+                }
+
+                // Copy companion shared libraries (.so / .so.*) from original directory to cache_dir
+                if let Some(ref orig_dir) = orig_bin_dir {
+                    if let Ok(entries) = std::fs::read_dir(orig_dir) {
+                        for entry in entries.flatten() {
+                            let src_file = entry.path();
+                            if let Some(name) = src_file.file_name() {
+                                let name_str = name.to_string_lossy();
+                                if name_str.ends_with(".so") || name_str.contains(".so.") {
+                                    let dst_file = cache_dir.join(name);
+                                    let copy_so = if let (Ok(s_meta), Ok(d_meta)) = (std::fs::metadata(&src_file), std::fs::metadata(&dst_file)) {
+                                        s_meta.len() != d_meta.len()
+                                    } else {
+                                        true
+                                    };
+                                    if copy_so {
+                                        let _ = std::fs::copy(&src_file, &dst_file);
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 
@@ -618,6 +643,40 @@ pub async fn run_transcription(
                 if let Ok(new_path) = std::env::join_paths(paths) {
                     cmd.env("PATH", new_path);
                 }
+            }
+        }
+
+        #[cfg(unix)]
+        {
+            let mut paths = Vec::new();
+            paths.push(bin_dir.to_path_buf());
+            if let Some(ref orig) = orig_bin_dir {
+                if !paths.contains(orig) {
+                    paths.push(orig.clone());
+                }
+            }
+            if let Some(old_ld) = std::env::var_os("LD_LIBRARY_PATH") {
+                for p in std::env::split_paths(&old_ld) {
+                    if !paths.contains(&p) {
+                        paths.push(p);
+                    }
+                }
+            }
+            if let Ok(new_ld) = std::env::join_paths(paths) {
+                cmd.env("LD_LIBRARY_PATH", new_ld);
+            }
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            if let Some(old_dyld) = std::env::var_os("DYLD_LIBRARY_PATH") {
+                let mut dyld_paths = std::env::split_paths(&old_dyld).collect::<Vec<_>>();
+                dyld_paths.insert(0, bin_dir.to_path_buf());
+                if let Ok(new_dyld) = std::env::join_paths(dyld_paths) {
+                    cmd.env("DYLD_LIBRARY_PATH", new_dyld);
+                }
+            } else {
+                cmd.env("DYLD_LIBRARY_PATH", bin_dir);
             }
         }
     }

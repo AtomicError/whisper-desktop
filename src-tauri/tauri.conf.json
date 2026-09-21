@@ -40,7 +40,8 @@
       "resources/whisper-cli-*",
       "resources/ffmpeg*",
       "resources/ffprobe*",
-      "resources/fonts/*"
+      "resources/fonts/*",
+      "resources/*.so*"
     ],
 
     "category": "Utility",
