@@ -576,6 +576,19 @@ jobs:
             fi
           }
 
+          recompress_deb_zstd() {
+            local target_deb="$1"
+            if [ -f "$target_deb" ]; then
+              echo "Recompressing DEB with zstd level 3: $target_deb"
+              local tmp_dir
+              tmp_dir=$(mktemp -d -t deb-repack-XXXXXX)
+              dpkg-deb -R "$target_deb" "$tmp_dir"
+              dpkg-deb --root-owner-group -Zzstd -z3 -b "$tmp_dir" "$tmp_dir/repacked.deb"
+              mv -f "$tmp_dir/repacked.deb" "$target_deb"
+              rm -rf "$tmp_dir"
+            fi
+          }
+
           # 1. Build Universal Edition (Standard CPU + Vulkan + OpenVINO)
           echo "=== 1/2: Building Linux Universal Edition (CPU + Vulkan + OpenVINO) ==="
           rm -rf src-tauri/resources/*
@@ -590,6 +603,10 @@ jobs:
 
           UNIVERSAL_APPIMAGE=$(find src-tauri/target/release/bundle/appimage/ -name "*.AppImage" | head -n 1)
           fix_appimage_graphics "$UNIVERSAL_APPIMAGE"
+
+          find src-tauri/target/release/bundle/deb/ -name "*.deb" | while IFS= read -r deb_pkg; do
+            recompress_deb_zstd "$deb_pkg"
+          done
 
           mkdir -p staging-universal/appimage staging-universal/deb staging-universal/rpm
           cp -r src-tauri/target/release/bundle/appimage/* staging-universal/appimage/ || true
@@ -613,6 +630,10 @@ jobs:
 
           CUDA_APPIMAGE=$(find src-tauri/target/release/bundle/appimage/ -name "*.AppImage" | head -n 1)
           fix_appimage_graphics "$CUDA_APPIMAGE"
+
+          find src-tauri/target/release/bundle/deb/ -name "*.deb" | while IFS= read -r deb_pkg; do
+            recompress_deb_zstd "$deb_pkg"
+          done
 
           # Rename CUDA bundles with -cuda suffix
           for f in src-tauri/target/release/bundle/appimage/*.AppImage; do
@@ -766,6 +787,25 @@ jobs:
           chmod +x src-tauri/resources/whisper-cli-* src-tauri/resources/ffmpeg src-tauri/resources/ffprobe 2>/dev/null || true
           find src-tauri/resources/ -name "*.so*" -exec chmod +x {} + 2>/dev/null || true
           npm run tauri build -- ${{ matrix.args }}
+
+          if [ "$(uname)" = "Linux" ]; then
+            recompress_deb_zstd() {
+              local target_deb="$1"
+              if [ -f "$target_deb" ]; then
+                echo "Recompressing DEB with zstd level 3: $target_deb"
+                local tmp_dir
+                tmp_dir=$(mktemp -d -t deb-repack-XXXXXX)
+                dpkg-deb -R "$target_deb" "$tmp_dir"
+                dpkg-deb --root-owner-group -Zzstd -z3 -b "$tmp_dir" "$tmp_dir/repacked.deb"
+                mv -f "$tmp_dir/repacked.deb" "$target_deb"
+                rm -rf "$tmp_dir"
+              fi
+            }
+
+            find src-tauri/target/release/bundle/deb/ -name "*.deb" 2>/dev/null | while IFS= read -r deb_pkg; do
+              recompress_deb_zstd "$deb_pkg"
+            done
+          fi
 
           # Normalize any space in bundle filenames
           find src-tauri/target/ -type f -name "*Whisper Desktop*" | while read -r f; do

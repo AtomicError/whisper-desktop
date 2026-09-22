@@ -62,7 +62,11 @@
         "desktopTemplate": "./desktop.desktop"
       },
       "rpm": {
-        "desktopTemplate": "./desktop.desktop"
+        "desktopTemplate": "./desktop.desktop",
+        "compression": {
+          "type": "zstd",
+          "level": 3
+        }
       },
       "appimage": {
         "bundleMediaFramework": true
