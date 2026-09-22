@@ -239,7 +239,6 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DGGML_OPENMP=ON \
             -DGGML_CUDA=ON \
-            -DGGML_STATIC=ON \
             -DGGML_BACKEND_DL=ON \
             -DGGML_CPU_ALL_VARIANTS=ON \
             -DGGML_NATIVE=OFF \
@@ -251,6 +250,15 @@ jobs:
           # Harvest OpenVINO runtime shared libraries from system
           find /usr/lib -name "libopenvino*.so*" -exec cp -d {} openvino-libs/ \; 2>/dev/null || true
           find /usr/lib -name "libtbb*.so*" -exec cp -d {} openvino-libs/ \; 2>/dev/null || true
+
+          # Harvest CUDA runtime shared libraries from system (cudart, cublas, cublasLt, nvJitLink)
+          find /usr/local/cuda* -name "libcudart.so*" -exec cp -d {} cuda-libs/ \; 2>/dev/null || true
+          find /usr/local/cuda* -name "libcublas*.so*" -exec cp -d {} cuda-libs/ \; 2>/dev/null || true
+          find /usr/local/cuda* -name "libnvJitLink*.so*" -exec cp -d {} cuda-libs/ \; 2>/dev/null || true
+          # Dynamic ldd dependency resolution: resolve and copy any other CUDA runtime dependencies
+          ldd whisper.cpp-src/build-cuda/bin/libggml-cuda.so 2>/dev/null | grep "/usr/local/cuda" | awk '{print $3}' | while read -r lib; do
+            [ -f "$lib" ] && cp -d "$lib"* cuda-libs/ 2>/dev/null || true
+          done
 
           # Populate Universal Edition folder (CPU + Vulkan + OpenVINO)
           cp whisper.cpp-src/build-standard/bin/whisper-cli whisper-bins/universal/whisper-cli-standard
@@ -268,6 +276,7 @@ jobs:
           cp -d whisper.cpp-src/build-standard/bin/*.so* whisper-bins/cuda/
           cp -d whisper.cpp-src/build-vulkan/bin/libggml-vulkan.so whisper-bins/cuda/ 2>/dev/null || true
           cp -d whisper.cpp-src/build-cuda/bin/libggml-cuda.so whisper-bins/cuda/ 2>/dev/null || true
+          cp -d cuda-libs/*.so* whisper-bins/cuda/ 2>/dev/null || true
           # Re-copy standard libwhisper to guarantee clean non-OpenVINO linkage in CUDA edition
           cp -d whisper.cpp-src/build-standard/bin/libwhisper.so* whisper-bins/cuda/ 2>/dev/null || true
 
@@ -275,6 +284,7 @@ jobs:
           cp -d whisper-bins/universal/* whisper-bins/ 2>/dev/null || true
           cp -d whisper-bins/cuda/whisper-cli-cuda whisper-bins/ 2>/dev/null || true
           cp -d whisper-bins/cuda/libggml-cuda.so whisper-bins/ 2>/dev/null || true
+          cp -d whisper-bins/cuda/*cuda*.so* whisper-bins/ 2>/dev/null || true
 
           chmod +x whisper-bins/**/*.so* whisper-bins/**/whisper-cli-* whisper-bins/*.so* whisper-bins/whisper-cli-* 2>/dev/null || true
 
@@ -400,6 +410,7 @@ jobs:
             Copy-Item "$env:CUDA_PATH\bin\cublas64_*.dll" cuda-dlls/ -ErrorAction SilentlyContinue -Force
             Copy-Item "$env:CUDA_PATH\bin\cublasLt64_*.dll" cuda-dlls/ -ErrorAction SilentlyContinue -Force
             Copy-Item "$env:CUDA_PATH\bin\cudart64_*.dll" cuda-dlls/ -ErrorAction SilentlyContinue -Force
+            Copy-Item "$env:CUDA_PATH\bin\nvJitLink*.dll" cuda-dlls/ -ErrorAction SilentlyContinue -Force
           }
 
           # Copy OpenMP runtime (vcomp140.dll)
@@ -743,12 +754,17 @@ jobs:
           NO_STRIP: true
         run: |
           mkdir -p src-tauri/resources/fonts
-          cp -d whisper-bins/whisper-cli-* src-tauri/resources/
-          cp -d whisper-bins/*.so* src-tauri/resources/ 2>/dev/null || true
+          if [ "$(uname)" = "Darwin" ]; then
+            cp -R whisper-bins/whisper-cli-* src-tauri/resources/
+          else
+            cp -d whisper-bins/whisper-cli-* src-tauri/resources/
+            cp -d whisper-bins/*.so* src-tauri/resources/ 2>/dev/null || true
+          fi
           cp ffmpeg-bins/ffmpeg src-tauri/resources/
           cp ffmpeg-bins/ffprobe src-tauri/resources/
           cp src/fonts/* src-tauri/resources/fonts/ || true
-          chmod +x src-tauri/resources/whisper-cli-* src-tauri/resources/*.so* src-tauri/resources/ffmpeg src-tauri/resources/ffprobe 2>/dev/null || true
+          chmod +x src-tauri/resources/whisper-cli-* src-tauri/resources/ffmpeg src-tauri/resources/ffprobe 2>/dev/null || true
+          [ -f src-tauri/resources/*.so* ] && chmod +x src-tauri/resources/*.so* 2>/dev/null || true
           npm run tauri build -- ${{ matrix.args }}
 
           # Normalize any space in bundle filenames
