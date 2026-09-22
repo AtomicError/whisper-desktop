@@ -459,7 +459,10 @@ fn progress_time(line: &str) -> Option<f64> {
 async fn run_process(binary: &Path, arguments: &[std::ffi::OsString], cancel: CancellationToken, mode: ProcessMode, mut progress: impl FnMut(Option<f64>, bool)) -> Result<Vec<u8>> {
     check_cancel(&cancel)?;
     let error_code = match mode { ProcessMode::Probe => PreviewErrorCode::ProbeFailed, ProcessMode::Encode(_) => PreviewErrorCode::ConversionFailed };
-    let mut child = tokio::process::Command::new(binary).args(arguments).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped()).kill_on_drop(true).spawn()
+    let mut cmd = tokio::process::Command::new(binary);
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(0x08000000);
+    let mut child = cmd.args(arguments).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped()).kill_on_drop(true).spawn()
         .map_err(|e| PreviewError::new(error_code.clone(), e.to_string()))?;
     let mut stdout = child.stdout.take().expect("piped stdout");
     let mut stderr = child.stderr.take().expect("piped stderr");

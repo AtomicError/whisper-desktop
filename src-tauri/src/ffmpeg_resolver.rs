@@ -109,7 +109,13 @@ fn binary_version_output(binary: &Path) -> Option<Vec<u8>> {
         }
     }
 
-    let spawned = Command::new(binary)
+    #[cfg(target_os = "windows")]
+    use std::os::windows::process::CommandExt;
+
+    let mut cmd = Command::new(binary);
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(0x08000000);
+    let spawned = cmd
         .arg("-version")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())

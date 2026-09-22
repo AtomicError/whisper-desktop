@@ -93,6 +93,8 @@ pub async fn probe_file_metadata(app: Option<&AppHandle>, file_path: &str) -> Fi
     };
     let ffprobe_bin = crate::ffmpeg_resolver::get_ffprobe_path(app);
     let mut probe_cmd = tokio::process::Command::new(&ffprobe_bin);
+    #[cfg(target_os = "windows")]
+    probe_cmd.creation_flags(0x08000000);
     probe_cmd
         .args([
             "-v", "error",
@@ -187,6 +189,8 @@ pub async fn convert_to_wav(
     }
 
     let mut cmd = Command::new(&ffmpeg_bin);
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(0x08000000);
     cmd.args([
         "-y",
         "-i", &safe_input,
@@ -627,6 +631,8 @@ pub async fn run_transcription(
     });
     
     let mut cmd = Command::new(&bin_path);
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(0x08000000);
     cmd.args(&args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

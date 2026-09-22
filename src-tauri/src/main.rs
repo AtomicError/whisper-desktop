@@ -162,7 +162,9 @@ async fn cancel_transcription(session_state: State<'_, TranscriptionState>) -> R
 
         #[cfg(windows)]
         {
-            let _ = tokio::process::Command::new("taskkill")
+            let mut cmd = tokio::process::Command::new("taskkill");
+            cmd.creation_flags(0x08000000);
+            let _ = cmd
                 .args(["/T", "/PID", &pid.to_string()])
                 .status()
                 .await;
@@ -214,7 +216,9 @@ async fn cancel_transcription(session_state: State<'_, TranscriptionState>) -> R
 
             #[cfg(windows)]
             if pid_still_ours {
-                let _ = tokio::process::Command::new("taskkill")
+                let mut cmd = tokio::process::Command::new("taskkill");
+                cmd.creation_flags(0x08000000);
+                let _ = cmd
                     .args(["/F", "/T", "/PID", &pid.to_string()])
                     .status()
                     .await;
@@ -251,7 +255,9 @@ async fn cancel_hardsub_task(
         }
         #[cfg(windows)]
         {
-            let _ = tokio::process::Command::new("taskkill")
+            let mut cmd = tokio::process::Command::new("taskkill");
+            cmd.creation_flags(0x08000000);
+            let _ = cmd
                 .args(["/F", "/T", "/PID", &pid.to_string()])
                 .status()
                 .await;

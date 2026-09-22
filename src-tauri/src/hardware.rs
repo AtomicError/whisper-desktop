@@ -41,7 +41,14 @@ impl HardwareMonitor {
 
 fn detect_gpu_type() -> String {
     // 1. Check for nvidia-smi (works on Windows & Linux)
-    if Command::new("nvidia-smi").arg("-L").output().map(|o| o.status.success()).unwrap_or(false) {
+    #[cfg(target_os = "windows")]
+    use std::os::windows::process::CommandExt;
+
+    let mut cmd = Command::new("nvidia-smi");
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(0x08000000);
+
+    if cmd.arg("-L").output().map(|o| o.status.success()).unwrap_or(false) {
         return "nvidia".to_string();
     }
 

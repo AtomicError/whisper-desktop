@@ -1441,6 +1441,8 @@ pub async fn run_hardsub_task(
     logs.log(&app, "FFmpeg", &format!("Executing command: {} {}", ffmpeg_bin.display(), ffmpeg_args.join(" ")));
 
     let mut cmd = Command::new(&ffmpeg_bin);
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(0x08000000);
     cmd.args(&ffmpeg_args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
