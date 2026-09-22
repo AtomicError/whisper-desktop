@@ -4263,10 +4263,13 @@ select.select-control {
   font-size: 0.75rem;
   white-space: nowrap;
   padding-top: 2px;
+  flex-shrink: 0;
+  direction: ltr;
 }
 
 .transcript-text {
   flex-grow: 1;
+  min-width: 0;
   color: var(--color-text);
 }
 
@@ -4277,11 +4280,20 @@ select.select-control {
   color: var(--color-text);
   font-family: inherit;
   font-size: inherit;
+  line-height: 1.5;
   padding: 0;
   margin: 0;
   outline: none;
+  resize: none;
+  overflow-y: hidden;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  field-sizing: content;
   unicode-bidi: plaintext;
   text-align: start;
+  box-sizing: border-box;
+  display: block;
 }
 
 .transcript-text-input:focus {

@@ -6250,6 +6250,13 @@ let transcriptLines = [];
  * of a listener per input — each line opens on the side its content reads from, and
  * a line emptied while editing falls back to the interface direction.
  */
+function autoResizeTranscriptField(el) {
+  if (!el) return;
+  el.style.height = 'auto';
+  el.style.height = `${el.scrollHeight}px`;
+}
+window.autoResizeTranscriptField = autoResizeTranscriptField;
+
 function setupTranscriptDirection() {
   const viewport = document.getElementById('transcript-viewport');
   if (!viewport || viewport._hasDirectionListener) return;
@@ -6258,6 +6265,9 @@ function setupTranscriptDirection() {
     const field = e.target;
     if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement) {
       applyTextDirection(field);
+      if (field.classList.contains('transcript-text-input')) {
+        autoResizeTranscriptField(field);
+      }
     }
   });
 
@@ -6265,7 +6275,17 @@ function setupTranscriptDirection() {
   // strong character of their own fall back to. The hardsub cue fields re-resolve for
   // the same reason when the cue list is re-rendered.
   window.addEventListener('whisper:languageChanged', () => {
-    viewport.querySelectorAll('.transcript-text-input').forEach((input) => applyTextDirection(input));
+    viewport.querySelectorAll('.transcript-text-input').forEach((input) => {
+      applyTextDirection(input);
+      autoResizeTranscriptField(input);
+    });
+  });
+
+  // Re-adjust heights on window resize if lines wrapped or unwrapped
+  window.addEventListener('resize', () => {
+    viewport.querySelectorAll('.transcript-text-input').forEach((input) => {
+      autoResizeTranscriptField(input);
+    });
   });
 }
 
@@ -6291,17 +6311,25 @@ function appendTranscriptLine(timeRange, text) {
 
   const textDiv = document.createElement('div');
   textDiv.className = 'transcript-text';
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.className = 'transcript-text-input';
-  input.value = cleanText;
-  applyTextDirection(input);
-  input.onchange = function() { updateTranscriptLineText(lineObj.id, this.value); };
-  textDiv.appendChild(input);
+  const textarea = document.createElement('textarea');
+  textarea.rows = 1;
+  textarea.className = 'transcript-text-input';
+  textarea.value = cleanText;
+  applyTextDirection(textarea);
+  textarea.oninput = function() {
+    autoResizeTranscriptField(this);
+    updateTranscriptLineText(lineObj.id, this.value);
+  };
+  textarea.onchange = function() {
+    updateTranscriptLineText(lineObj.id, this.value);
+  };
+  textDiv.appendChild(textarea);
 
   lineEl.appendChild(timeSpan);
   lineEl.appendChild(textDiv);
   viewport.appendChild(lineEl);
+
+  autoResizeTranscriptField(textarea);
 
   // Cap DOM children in viewport (mirrors the log-viewport cap) so a very long
   // transcription can't grow thousands of live <input> nodes. The full data
@@ -6331,6 +6359,9 @@ window.filterTranscriptLines = function() {
     if (textInput) {
       const match = textInput.value.toLowerCase().includes(query);
       lineEl.style.display = match ? 'flex' : 'none';
+      if (match) {
+        autoResizeTranscriptField(textInput);
+      }
     }
   });
 };
@@ -6358,11 +6389,13 @@ window.loadTranscriptFromFile = async function(fullPath) {
       lineEl.innerHTML = `
         <span class="transcript-time" style="color: var(--color-text-muted); font-family: inherit; font-size: 0.75rem;">[L${idx + 1}]</span>
         <div class="transcript-text">
-          <input type="text" class="transcript-text-input" value="${escapeHTML(lineText.trim())}" onchange="updateTranscriptLineText(${lineObj.id}, this.value)" />
+          <textarea rows="1" class="transcript-text-input" oninput="autoResizeTranscriptField(this); updateTranscriptLineText(${lineObj.id}, this.value)" onchange="updateTranscriptLineText(${lineObj.id}, this.value)">${escapeHTML(lineText.trim())}</textarea>
         </div>
       `;
-      applyTextDirection(lineEl.querySelector('.transcript-text-input'));
+      const textarea = lineEl.querySelector('.transcript-text-input');
+      applyTextDirection(textarea);
       viewport.appendChild(lineEl);
+      autoResizeTranscriptField(textarea);
     });
     
     if (transcriptLines.length === 0) {

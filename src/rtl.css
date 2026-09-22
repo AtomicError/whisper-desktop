@@ -221,6 +221,7 @@ html[dir="rtl"] code,
 html[dir="rtl"] pre,
 html[dir="rtl"] #logs-container,
 html[dir="rtl"] .transcript-timestamp,
+html[dir="rtl"] .transcript-time,
 html[dir="rtl"] .media-metadata-value,
 html[dir="rtl"] input[type="number"],
 html[dir="rtl"] .duration-display {
