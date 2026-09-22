@@ -631,6 +631,13 @@ window.addEventListener('whisper:languageChanged', () => {
   if (typeof probedMetadata !== 'undefined' && probedMetadata && probedMetadata.exists) {
     renderMediaMetadata(probedMetadata);
   }
+  const msgEl = document.getElementById('lbl-radial-msg');
+  if (msgEl && msgEl.dataset.batchSummaryTotal) {
+    msgEl.textContent = t('transcribe.batchCompletedSummary', {
+      success: Number(msgEl.dataset.batchSummarySuccess || 0),
+      total: Number(msgEl.dataset.batchSummaryTotal || 0)
+    });
+  }
 });
 
 function syncAppVersionUI() {
@@ -1737,16 +1744,29 @@ class CustomSelect {
   updatePosition() {
     if (!this.isOpen || !this.trigger || !this.optionsContainer) return;
     const rect = this.trigger.getBoundingClientRect();
+    const cssZoom = parseFloat(document.documentElement.style.zoom || '1') || 1;
     const maxHeight = this.isSearchable() ? 340 : 240;
     const dropdownHeight = Math.min(this.optionsContainer.scrollHeight || 220, maxHeight);
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const spaceAbove = rect.top;
+
+    // Normalize coordinates for environments with CSS zoom
+    const viewportHeight = window.innerHeight / cssZoom;
+    const viewportWidth = window.innerWidth / cssZoom;
+    const normalizedRect = {
+      left: rect.left / cssZoom,
+      right: rect.right / cssZoom,
+      top: rect.top / cssZoom,
+      bottom: rect.bottom / cssZoom,
+      width: rect.width / cssZoom,
+    };
+
+    const spaceBelow = viewportHeight - normalizedRect.bottom;
+    const spaceAbove = normalizedRect.top;
 
     // Strict pixel-perfect alignment with trigger box (no overhangs or size discrepancies)
     this.optionsContainer.style.position = 'fixed';
     this.optionsContainer.style.zIndex = '999999';
 
-    const triggerWidth = Math.round(rect.width);
+    const triggerWidth = Math.round(normalizedRect.width);
     const isReasoning = this.select && this.select.classList.contains('model-reasoning-select');
     const isPaginationSize = this.select && this.select.classList.contains('pagination-size-select');
     const minDropdownWidth = isReasoning ? 136 : (isPaginationSize ? 70 : 118);
@@ -1755,25 +1775,25 @@ class CustomSelect {
     this.optionsContainer.style.minWidth = `${targetWidth}px`;
     this.optionsContainer.style.maxWidth = `${Math.max(targetWidth, 280)}px`;
 
-    const measuredWidth = this.optionsContainer.getBoundingClientRect().width || targetWidth;
+    const measuredWidth = (this.optionsContainer.getBoundingClientRect().width / cssZoom) || targetWidth;
     const effectiveWidth = Math.max(targetWidth, Math.round(measuredWidth));
     const isRtl = (typeof isRtlLanguage === 'function' && isRtlLanguage(getLanguage())) ||
                   document.documentElement.dir === 'rtl' ||
                   document.body.dir === 'rtl';
 
-    const leftPos = isRtl ? Math.round(rect.right - effectiveWidth) : Math.round(rect.left);
-    const maxLeft = Math.max(8, window.innerWidth - effectiveWidth - 8);
+    const leftPos = isRtl ? Math.round(normalizedRect.right - effectiveWidth) : Math.round(normalizedRect.left);
+    const maxLeft = Math.max(8, viewportWidth - effectiveWidth - 8);
     this.optionsContainer.style.left = `${Math.max(8, Math.min(leftPos, maxLeft))}px`;
     this.optionsContainer.style.right = 'auto';
 
     if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
       // Space below insufficient -> open upward
       this.optionsContainer.style.top = 'auto';
-      this.optionsContainer.style.bottom = `${window.innerHeight - rect.top + 4}px`;
+      this.optionsContainer.style.bottom = `${viewportHeight - normalizedRect.top + 4}px`;
     } else {
       // Space available -> open downward
       this.optionsContainer.style.bottom = 'auto';
-      this.optionsContainer.style.top = `${rect.bottom + 4}px`;
+      this.optionsContainer.style.top = `${normalizedRect.bottom + 4}px`;
     }
   }
 
@@ -1978,7 +1998,7 @@ function setupHorizontalTabScroll() {
 let currentUiZoom = 1.0;
 let zoomSaveTimeout = null;
 
-function applyUiZoom(scale, persist = true, showToast = false) {
+async function applyUiZoom(scale, persist = true, showToast = false) {
   let numScale = typeof scale === 'number' ? scale : parseFloat(scale);
   if (isNaN(numScale) || numScale <= 0) {
     numScale = 1.0;
@@ -1987,9 +2007,25 @@ function applyUiZoom(scale, persist = true, showToast = false) {
   numScale = Math.round(Math.min(Math.max(numScale, 0.70), 1.60) * 100) / 100;
   currentUiZoom = numScale;
 
-  // Apply CSS zoom to document.documentElement (root scaling across WebKitGTK and modern WebViews)
-  document.documentElement.style.zoom = numScale;
-  document.body.style.zoom = '';
+  // Prefer Tauri native webview zoom (CoreWebView2 ZoomFactor on Windows, WebKitGTK zoom on Linux)
+  let nativeZoomSuccess = false;
+  if (originalInvoke) {
+    try {
+      await invoke('set_window_zoom', { scale: numScale });
+      nativeZoomSuccess = true;
+      // Clear CSS zoom when native zoom succeeds to prevent double-zoom and root shrinkage
+      document.documentElement.style.zoom = '';
+      document.body.style.zoom = '';
+    } catch (err) {
+      console.warn('[Zoom] Native set_window_zoom failed, falling back to CSS zoom:', err);
+    }
+  }
+
+  if (!nativeZoomSuccess) {
+    // Pure browser fallback outside Tauri
+    document.documentElement.style.zoom = numScale;
+    document.body.style.zoom = '';
+  }
 
   // Update localStorage cache to prevent layout jump on next startup
   try {
@@ -2695,9 +2731,34 @@ function setupTauriListeners() {
 
 
 
+  function mapTranscribeStatusKey(payload) {
+    if (!payload) return null;
+    if (payload.stage) {
+      switch (payload.stage) {
+        case 'converting': return 'transcribe.convertingAudio16k';
+        case 'wav_ready': return 'transcribe.wavReadyTranscribing';
+        case 'model_init': return 'transcribe.progressTranscribe';
+        case 'transcribing': return 'transcribe.aiTranscribingStatus';
+        case 'completed': return 'transcribe.progressComplete';
+        case 'aborted': return 'transcribe.cancelled';
+        case 'failed': return 'transcribe.taskFailed';
+      }
+    }
+    const msg = (typeof payload.message === 'string') ? payload.message : '';
+    if (msg.includes('Converting to 16kHz WAV')) return 'transcribe.convertingAudio16k';
+    if (msg.includes('Conversion complete')) return 'transcribe.wavReadyTranscribing';
+    if (msg.includes('Running Whisper AI model')) return 'transcribe.progressTranscribe';
+    if (msg.startsWith('Transcribing:')) return 'transcribe.aiTranscribingStatus';
+    if (msg.includes('Transcription successfully completed')) return 'transcribe.progressComplete';
+    if (msg === 'Aborted') return 'transcribe.cancelled';
+    if (msg === 'Task Failed') return 'transcribe.taskFailed';
+    return null;
+  }
+
   // Transcription progress
   on('transcribe-status', (event) => {
     const payload = event.payload;
+    if (!payload) return;
     window.isTranscriptionRunning = !!payload.active;
     if (typeof window.updateTaskbarProgress === 'function') {
       window.updateTaskbarProgress(payload.progress, payload.active);
@@ -2711,10 +2772,29 @@ function setupTauriListeners() {
     const pct = (payload.progress * 100).toFixed(0);
     
     if (fillBar) fillBar.style.width = `${pct}%`;
-    if (pctEl) pctEl.textContent = `${pct}%`;
-    // Backend progress is one message with file names and paths inside it, so it keeps
-    // the order it was written in rather than being re-read through the interface's.
-    if (msgEl) msgEl.textContent = isolateDirection(payload.message);
+    if (pctEl) {
+      pctEl.removeAttribute('data-i18n');
+      pctEl.textContent = `${pct}%`;
+    }
+    
+    if (msgEl) {
+      if (isBatchMode && payload.stage === 'completed') {
+        // In batch mode, single file completion is orchestrated by the batch queue
+      } else {
+        const i18nKey = mapTranscribeStatusKey(payload);
+        if (i18nKey) {
+          delete msgEl.dataset.batchSummarySuccess;
+          delete msgEl.dataset.batchSummaryTotal;
+          msgEl.setAttribute('data-i18n', i18nKey);
+          msgEl.textContent = t(i18nKey);
+        } else if (payload.message) {
+          delete msgEl.dataset.batchSummarySuccess;
+          delete msgEl.dataset.batchSummaryTotal;
+          msgEl.removeAttribute('data-i18n');
+          msgEl.textContent = isolateDirection(payload.message);
+        }
+      }
+    }
     
     if (pulseDot) {
       if (payload.active) {
@@ -2727,6 +2807,7 @@ function setupTauriListeners() {
 
   on('translation-status', (event) => {
     const payload = event.payload;
+    if (!payload) return;
     window.isTranslationRunning = !!payload.active;
     if (typeof window.updateTaskbarProgress === 'function') {
       window.updateTaskbarProgress(payload.progress, payload.active);
@@ -2741,8 +2822,28 @@ function setupTauriListeners() {
     const pct = Math.min(100, Math.max(0, Math.round(progressVal * 100)));
 
     if (fillBar) fillBar.style.width = payload.active ? `${pct}%` : (progressVal >= 1 ? '100%' : '0%');
-    if (pctEl) pctEl.textContent = payload.active ? `${pct}%` : (progressVal >= 1 ? '100%' : '0%');
-    if (msgEl && payload.message) msgEl.textContent = isolateDirection(payload.message);
+    if (pctEl) {
+      pctEl.removeAttribute('data-i18n');
+      pctEl.textContent = payload.active ? `${pct}%` : (progressVal >= 1 ? '100%' : '0%');
+    }
+    if (msgEl && payload.message) {
+      const msg = payload.message;
+      delete msgEl.dataset.batchSummarySuccess;
+      delete msgEl.dataset.batchSummaryTotal;
+      if (msg.includes('Translating with AI') || msg.includes('Translating AI:')) {
+        msgEl.setAttribute('data-i18n', 'transcribe.aiTranslating');
+        msgEl.textContent = t('transcribe.aiTranslating');
+      } else if (msg.includes('AI translation complete')) {
+        msgEl.setAttribute('data-i18n', 'translate.statusComplete');
+        msgEl.textContent = t('translate.statusComplete');
+      } else if (msg.includes('Translation cancelled')) {
+        msgEl.setAttribute('data-i18n', 'translate.statusCancelled');
+        msgEl.textContent = t('translate.statusCancelled');
+      } else {
+        msgEl.removeAttribute('data-i18n');
+        msgEl.textContent = isolateDirection(payload.message);
+      }
+    }
 
     if (pulseDot) {
       if (payload.active) {
@@ -4422,8 +4523,18 @@ async function probeSelectedFile() {
       
       const fillBar = document.getElementById('progress-linear-fill');
       if (fillBar) fillBar.style.width = '0%';
-      document.getElementById('lbl-radial-pct').textContent = '0%';
-      document.getElementById('lbl-radial-msg').textContent = t('transcribe.readyForTranscription');
+      const pctEl = document.getElementById('lbl-radial-pct');
+      if (pctEl) {
+        pctEl.removeAttribute('data-i18n');
+        pctEl.textContent = '0%';
+      }
+      const msgEl = document.getElementById('lbl-radial-msg');
+      if (msgEl) {
+        delete msgEl.dataset.batchSummarySuccess;
+        delete msgEl.dataset.batchSummaryTotal;
+        msgEl.setAttribute('data-i18n', 'transcribe.readyForTranscription');
+        msgEl.textContent = t('transcribe.readyForTranscription');
+      }
       
       setWizardStepCompleted(3, false);
       document.getElementById('analytics-box').style.display = 'none';
@@ -4670,29 +4781,48 @@ window.runWhisperTranscription = async function() {
   transcriptLines = [];
   const viewport = document.getElementById('transcript-viewport');
   if (viewport) {
-    viewport.innerHTML = `<div style="color: var(--color-cyan); text-align: center; margin-top: 40px; font-weight: 500;">${t('transcribe.aiModelInitializing')}</div>`;
+    viewport.innerHTML = `<div data-i18n="transcribe.aiModelInitializing" style="color: var(--color-cyan); text-align: center; margin-top: 40px; font-weight: 500;">${t('transcribe.aiModelInitializing')}</div>`;
   }
 
   try {
     // Phase 1: Auto-convert to WAV if not already done
     if (!wavPathForTranscription) {
-      if (btnSpan) btnSpan.textContent = t('transcribe.convertingToWav'); else btn.textContent = t('transcribe.convertingToWav');
-      if (msgEl) msgEl.textContent = t('transcribe.convertingAudio16k');
+      if (btnSpan) {
+        btnSpan.setAttribute('data-i18n', 'transcribe.convertingToWav');
+        btnSpan.textContent = t('transcribe.convertingToWav');
+      } else {
+        btn.textContent = t('transcribe.convertingToWav');
+      }
+      if (msgEl) {
+        msgEl.setAttribute('data-i18n', 'transcribe.convertingAudio16k');
+        msgEl.textContent = t('transcribe.convertingAudio16k');
+      }
       if (fillBar) {
         fillBar.style.width = '50%';
         fillBar.classList.add('indeterminate');
       }
-      if (pctEl) pctEl.textContent = t('transcribe.convertingProgress');
+      if (pctEl) {
+        pctEl.setAttribute('data-i18n', 'transcribe.convertingProgress');
+        pctEl.textContent = t('transcribe.convertingProgress');
+      }
 
       wavPathForTranscription = await invoke('convert_media_file', { filePath: selectedMediaFile });
 
       if (fillBar) fillBar.classList.remove('indeterminate');
-      if (msgEl) msgEl.textContent = t('transcribe.wavReadyTranscribing');
+      if (msgEl) {
+        msgEl.setAttribute('data-i18n', 'transcribe.wavReadyTranscribing');
+        msgEl.textContent = t('transcribe.wavReadyTranscribing');
+      }
     }
 
     // Phase 2: Run Whisper transcription
     if (cancelBtn) cancelBtn.style.display = 'inline-flex';
-    if (btnSpan) btnSpan.textContent = t('transcribe.aiTranscribingStatus'); else btn.textContent = t('transcribe.aiTranscribingStatus');
+    if (btnSpan) {
+      btnSpan.setAttribute('data-i18n', 'transcribe.aiTranscribingStatus');
+      btnSpan.textContent = t('transcribe.aiTranscribingStatus');
+    } else {
+      btn.textContent = t('transcribe.aiTranscribingStatus');
+    }
 
     const result = await invoke('start_transcription_task', {
       settings: settingsState,
@@ -4712,7 +4842,7 @@ window.runWhisperTranscription = async function() {
 
     document.getElementById('analytics-box').style.display = 'flex';
     document.getElementById('analytic-time').textContent = `${(result.durationMs / 1000).toFixed(1)}s`;
-    document.getElementById('analytic-speed').textContent = `${result.speedFactor.toFixed(1)}x Real-time`;
+    document.getElementById('analytic-speed').textContent = `${result.speedFactor.toFixed(1)}x`;
 
     const badgesRow = document.getElementById('badge-outputs-row');
     badgesRow.innerHTML = '';
@@ -4752,7 +4882,18 @@ window.runWhisperTranscription = async function() {
     // Run AI Translation if enabled
     if (settingsState.translateAiEnabled && result.generatedFiles && result.generatedFiles.length > 0) {
       try {
-        if (btnSpan) btnSpan.textContent = t('transcribe.aiTranslating'); else btn.textContent = t('transcribe.aiTranslating');
+        if (btnSpan) {
+          btnSpan.setAttribute('data-i18n', 'transcribe.aiTranslating');
+          btnSpan.textContent = t('transcribe.aiTranslating');
+        } else {
+          btn.textContent = t('transcribe.aiTranslating');
+        }
+        if (msgEl) {
+          delete msgEl.dataset.batchSummarySuccess;
+          delete msgEl.dataset.batchSummaryTotal;
+          msgEl.setAttribute('data-i18n', 'transcribe.aiTranslating');
+          msgEl.textContent = t('transcribe.aiTranslating');
+        }
         showNotification(t('toasts.aiTranslateStart'), "info");
 
         const translatedFiles = await invoke('translate_transcription_files', {
@@ -4782,22 +4923,42 @@ window.runWhisperTranscription = async function() {
     setWizardStepCompleted(3, false);
     if (errMsg.toLowerCase().includes('cancelled by the user') || errMsg.toLowerCase().includes('was cancelled by the user')) {
       showNotification(t('toasts.transcriptionCancelled'), "info");
-      if (msgEl) msgEl.textContent = t('transcribe.cancelled');
+      if (msgEl) {
+        delete msgEl.dataset.batchSummarySuccess;
+        delete msgEl.dataset.batchSummaryTotal;
+        msgEl.setAttribute('data-i18n', 'transcribe.cancelled');
+        msgEl.textContent = t('transcribe.cancelled');
+      }
     } else {
       showNotification(t('toasts.transcriptionError', { error: errMsg }), "error");
-      if (msgEl) msgEl.textContent = t('transcribe.taskFailed');
+      if (msgEl) {
+        delete msgEl.dataset.batchSummarySuccess;
+        delete msgEl.dataset.batchSummaryTotal;
+        msgEl.setAttribute('data-i18n', 'transcribe.taskFailed');
+        msgEl.textContent = t('transcribe.taskFailed');
+      }
     }
   } finally {
     // ALWAYS clear the temporary WAV state since it has been cleaned up by the backend
     wavPathForTranscription = null;
     btn.disabled = false;
-    if (btnSpan) btnSpan.textContent = t('transcribe.startAiExtraction'); else btn.textContent = t('transcribe.startAiExtraction');
+    if (btnSpan) {
+      btnSpan.setAttribute('data-i18n', 'transcribe.startAiExtraction');
+      btnSpan.textContent = t('transcribe.startAiExtraction');
+    } else {
+      btn.textContent = t('transcribe.startAiExtraction');
+    }
     if (fillBar) fillBar.classList.remove('indeterminate');
     // Guarantee the HUD pulse dot can never get stuck (success, error, or cancel).
     if (pulseDot) pulseDot.classList.remove('active');
     if (cancelBtn) {
       cancelBtn.disabled = false;
-      if (cancelBtnSpan) cancelBtnSpan.textContent = t('common.cancel'); else cancelBtn.textContent = t('common.cancel');
+      if (cancelBtnSpan) {
+        cancelBtnSpan.setAttribute('data-i18n', 'common.cancel');
+        cancelBtnSpan.textContent = t('common.cancel');
+      } else {
+        cancelBtn.textContent = t('common.cancel');
+      }
       cancelBtn.style.display = 'none';
     }
   }
@@ -5128,6 +5289,21 @@ window.clearBatchQueue = function() {
   }
   document.getElementById('meta-recommendation').textContent = '-';
   probedMetadata = null;
+
+  const fillBar = document.getElementById('progress-linear-fill');
+  if (fillBar) fillBar.style.width = '0%';
+  const pctEl = document.getElementById('lbl-radial-pct');
+  if (pctEl) {
+    pctEl.removeAttribute('data-i18n');
+    pctEl.textContent = '0%';
+  }
+  const msgEl = document.getElementById('lbl-radial-msg');
+  if (msgEl) {
+    delete msgEl.dataset.batchSummarySuccess;
+    delete msgEl.dataset.batchSummaryTotal;
+    msgEl.setAttribute('data-i18n', 'transcribe.standingBy');
+    msgEl.textContent = t('transcribe.standingBy');
+  }
   
   if (settingsState) {
     settingsState.inputFile = "";
@@ -5514,13 +5690,26 @@ window.runBatchExtraction = async function() {
   
   // Batch processing completed
   if (fillBar) fillBar.style.width = '100%';
-  if (pctEl) pctEl.textContent = '100%';
+  if (pctEl) {
+    pctEl.removeAttribute('data-i18n');
+    pctEl.textContent = '100%';
+  }
   
   if (batchCancelActive) {
-    if (msgEl) msgEl.textContent = t('transcribe.batchExtractionCancelled');
+    if (msgEl) {
+      delete msgEl.dataset.batchSummarySuccess;
+      delete msgEl.dataset.batchSummaryTotal;
+      msgEl.setAttribute('data-i18n', 'transcribe.batchExtractionCancelled');
+      msgEl.textContent = t('transcribe.batchExtractionCancelled');
+    }
     showNotification(t('toasts.batchCancelled'), "info");
   } else {
-    if (msgEl) msgEl.textContent = t('transcribe.batchCompletedSummary', { success: successCount, total: totalCount });
+    if (msgEl) {
+      msgEl.removeAttribute('data-i18n');
+      msgEl.textContent = t('transcribe.batchCompletedSummary', { success: successCount, total: totalCount });
+      msgEl.dataset.batchSummarySuccess = String(successCount);
+      msgEl.dataset.batchSummaryTotal = String(totalCount);
+    }
     showNotification(t('toasts.batchComplete', { success: successCount, total: totalCount }), "success");
   }
   

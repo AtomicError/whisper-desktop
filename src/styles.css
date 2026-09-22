@@ -655,6 +655,10 @@ body {
   flex-direction: column;
 }
 
+button, input, select, textarea {
+  font-family: inherit;
+}
+
 /* Premium GNOME-Style CSD Headerbar */
 .titlebar {
   height: 46px;
@@ -2737,7 +2741,7 @@ select.select-control {
   height: 100%;
   overflow-y: auto;
   scrollbar-gutter: stable;
-  padding-right: 8px;
+  padding-inline-end: 8px;
 }
 
 .transcribe-right-panel {
@@ -3694,9 +3698,10 @@ select.select-control {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
+  flex-wrap: wrap;
+  gap: 14px;
   background: var(--bg-card);
-  padding: 12px 24px;
+  padding: 12px 20px;
   border-radius: 12px;
   border: 1px solid var(--border-glass);
   flex-shrink: 0;
@@ -3800,7 +3805,7 @@ select.select-control {
   opacity: 0.7;
   max-width: 320px;
   line-height: 1.6;
-  font-family: var(--font-primary);
+  font-family: var(--font-sans);
 }
 
 .log-line {
@@ -4169,11 +4174,11 @@ select.select-control {
 }
 
 .batch-table th:first-child {
-  padding-left: 18px;
+  padding-inline-start: 18px;
 }
 
 .batch-table th:last-child {
-  padding-right: 18px;
+  padding-inline-end: 18px;
 }
 
 .batch-table td {
@@ -4187,11 +4192,11 @@ select.select-control {
 }
 
 .batch-table td:first-child {
-  padding-left: 18px;
+  padding-inline-start: 18px;
 }
 
 .batch-table td:last-child {
-  padding-right: 18px;
+  padding-inline-end: 18px;
 }
 
 .batch-table tr:hover {
@@ -4319,8 +4324,20 @@ select.select-control {
 
 .guide-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+
+@media (min-width: 1240px) {
+  .guide-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .guide-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .guide-card {
@@ -4818,6 +4835,11 @@ select.select-control {
 .modal-card {
   width: 90%;
   max-width: 580px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
+  overscroll-behavior: contain;
   background: var(--bg-card) !important;
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.8), 0 0 32px rgba(var(--color-red-rgb), 0.08) !important;
@@ -7510,7 +7532,6 @@ html[dir="rtl"] .cat-match-badge {
   justify-content: space-between;
   align-items: center;
   font-size: 0.76rem;
-  font-family: monospace;
 }
 
 .subtitle-cue-time {
@@ -7519,6 +7540,7 @@ html[dir="rtl"] .cat-match-badge {
   padding: 2px 6px;
   border-radius: 4px;
   font-weight: 600;
+  font-family: var(--font-mono);
 }
 
 .subtitle-cue-active-badge {
@@ -8640,7 +8662,8 @@ html[dir="rtl"] .cat-match-badge {
   gap: 10px;
   height: 100%;
   overflow-y: auto;
-  scrollbar-gutter: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
   padding-inline-end: 4px;
   min-width: 0;
 }
@@ -8658,8 +8681,9 @@ html[dir="rtl"] .cat-match-badge {
 .translate-unified-deck {
   display: flex;
   flex-direction: column;
-  height: 100%;
   min-height: 100%;
+  height: auto;
+  flex-shrink: 0;
   padding: 18px 20px;
   border-radius: 12px;
   background: var(--bg-glass-card, rgba(20, 24, 39, 0.65));

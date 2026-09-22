@@ -615,6 +615,14 @@ fn hide_to_tray(app: AppHandle) -> Result<(), String> {
     }
 }
 
+#[tauri::command]
+fn set_window_zoom(window: tauri::WebviewWindow, scale: f64) -> Result<(), String> {
+    if !scale.is_finite() || scale <= 0.0 {
+        return Err("Scale must be a positive finite number".to_string());
+    }
+    window.set_zoom(scale).map_err(|e| format!("Failed to set webview zoom: {}", e))
+}
+
 fn main() {
     #[cfg(target_os = "linux")]
     {
@@ -838,17 +846,25 @@ fn main() {
                     .build(_app)?;
             }
 
+            let initial_settings = load_settings_file();
+            let initial_scale = initial_settings.ui_scale;
+            if let Some(window) = _app.get_webview_window("main") {
+                if (initial_scale - 1.0).abs() > 0.001 {
+                    let _ = window.set_zoom(initial_scale);
+                }
+            }
+
             #[cfg(target_os = "linux")]
             {
                 use webkit2gtk::{WebViewExt, PermissionRequestExt, SettingsExt};
                 if let Some(window) = _app.get_webview_window("main") {
-                    let _ = window.with_webview(|webview| {
+                    let _ = window.with_webview(move |webview| {
                         let webview = webview.inner();
                         webview.connect_permission_request(|_webview, req| {
                             req.allow();
                             true
                         });
-                        webview.set_zoom_level(1.0);
+                        webview.set_zoom_level(initial_scale);
                         if let Some(settings) = webview.settings() {
                             settings.set_enable_smooth_scrolling(false);
                         }
@@ -907,6 +923,7 @@ fn main() {
             open_file_in_editor,
             exit_app,
             hide_to_tray,
+            set_window_zoom,
             media_preview::begin_hardsub_preview,
             media_preview::advance_hardsub_preview,
             media_preview::release_hardsub_preview,

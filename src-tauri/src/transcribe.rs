@@ -40,6 +40,8 @@ pub struct TranscribeProgress {
     pub progress: f64, // 0.0 to 1.0
     pub message: String,
     pub active: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stage: Option<String>,
 }
 
 #[derive(serde::Serialize, Clone)]
@@ -169,6 +171,7 @@ pub async fn convert_to_wav(
         progress: 0.0,
         message: "Converting to 16kHz WAV...".to_string(),
         active: true,
+        stage: Some("converting".to_string()),
     });
     
     let safe_input = if file_path.starts_with('-') {
@@ -184,6 +187,7 @@ pub async fn convert_to_wav(
             progress: 0.0,
             message: "Aborted".to_string(),
             active: false,
+            stage: Some("aborted".to_string()),
         });
         return Err("WAV conversion was cancelled by the user.".to_string());
     }
@@ -230,6 +234,7 @@ pub async fn convert_to_wav(
             progress: 0.0,
             message: "Aborted".to_string(),
             active: false,
+            stage: Some("aborted".to_string()),
         });
         return Err("WAV conversion was cancelled by the user.".to_string());
     }
@@ -269,6 +274,7 @@ pub async fn convert_to_wav(
             progress: 0.0,
             message: "Aborted".to_string(),
             active: false,
+            stage: Some("aborted".to_string()),
         });
         return Err("WAV conversion was cancelled by the user.".to_string());
     }
@@ -283,6 +289,7 @@ pub async fn convert_to_wav(
         progress: 1.0,
         message: "Conversion complete! Ready to transcribe.".to_string(),
         active: false,
+        stage: Some("wav_ready".to_string()),
     });
     
     Ok(tmp_wav_str)
@@ -619,6 +626,7 @@ pub async fn run_transcription(
             progress: 0.0,
             message: "Aborted".to_string(),
             active: false,
+            stage: Some("aborted".to_string()),
         });
         return Err("Whisper process was cancelled by the user.".to_string());
     }
@@ -628,6 +636,7 @@ pub async fn run_transcription(
         progress: 0.0,
         message: "Running Whisper AI model...".to_string(),
         active: true,
+        stage: Some("model_init".to_string()),
     });
     
     let mut cmd = Command::new(&bin_path);
@@ -723,6 +732,7 @@ pub async fn run_transcription(
             progress: 0.0,
             message: "Aborted".to_string(),
             active: false,
+            stage: Some("aborted".to_string()),
         });
         return Err("Whisper process was cancelled by the user.".to_string());
     }
@@ -762,6 +772,7 @@ pub async fn run_transcription(
                                         progress,
                                         message: format!("Transcribing: {:.0}%", progress * 100.0),
                                         active: true,
+                                        stage: Some("transcribing".to_string()),
                                     });
                                 }
                             }
@@ -796,11 +807,11 @@ pub async fn run_transcription(
         // never labels an unexpected crash as "Aborted".
         let cancelled = session.lock().map(|l| l.cancel_requested).unwrap_or(false);
         if cancelled {
-            let _ = app.emit("transcribe-status", TranscribeProgress { progress: 0.0, message: "Aborted".to_string(), active: false });
+            let _ = app.emit("transcribe-status", TranscribeProgress { progress: 0.0, message: "Aborted".to_string(), active: false, stage: Some("aborted".to_string()) });
             send_notification(&app, "Transcription Cancelled", &format!("Whisper process cancelled for {}!", file_name));
             return Err("Whisper process was cancelled by the user.".to_string());
         } else {
-            let _ = app.emit("transcribe-status", TranscribeProgress { progress: 0.0, message: "Task Failed".to_string(), active: false });
+            let _ = app.emit("transcribe-status", TranscribeProgress { progress: 0.0, message: "Task Failed".to_string(), active: false, stage: Some("failed".to_string()) });
             send_notification(&app, "Transcription Failed", &format!("Whisper process terminated for {}!", file_name));
 
             let detailed_err = format_cli_exit_error(
@@ -860,6 +871,7 @@ pub async fn run_transcription(
         progress: 1.0,
         message: "Transcription successfully completed!".to_string(),
         active: false,
+        stage: Some("completed".to_string()),
     });
     
     Ok(TranscriptionResult {

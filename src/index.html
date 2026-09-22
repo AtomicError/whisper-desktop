@@ -67,11 +67,13 @@
           } else {
             document.addEventListener('DOMContentLoaded', updateInitialThemeCards);
           }
-          const cachedZoom = localStorage.getItem('whisper_ui_scale_cache');
-          if (cachedZoom) {
-            const num = parseFloat(cachedZoom);
-            if (!isNaN(num) && num > 0) {
-              document.documentElement.style.zoom = num;
+          if (!window.__TAURI__) {
+            const cachedZoom = localStorage.getItem('whisper_ui_scale_cache');
+            if (cachedZoom) {
+              const num = parseFloat(cachedZoom);
+              if (!isNaN(num) && num > 0) {
+                document.documentElement.style.zoom = num;
+              }
             }
           }
         } catch (_) {}
@@ -3196,7 +3198,7 @@
                     <!-- Single-file controls -->
                     <div style="display:flex; gap:12px;">
                       <button class="btn-primary" id="btn-run-transcribe" style="flex:2;" onclick="runWhisperTranscription()">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:18px;height:18px;margin-right:8px;"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:18px;height:18px;margin-inline-end:8px;"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
                         <span data-i18n="transcribe.startAiExtraction">Start AI Extraction</span>
                       </button>
                       <button class="btn-secondary" id="btn-cancel-transcribe" style="display:none; flex:1; border-color:var(--color-red); color:var(--color-red); font-weight:600; text-align:center; justify-content:center;" onclick="abortTranscription()">
@@ -3210,7 +3212,7 @@
                       </div>
                       <div style="display:flex; gap:12px;">
                         <button class="btn-primary" id="btn-run-batch" style="flex:2;" onclick="runBatchExtraction()">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:18px;height:18px;margin-right:8px;"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:18px;height:18px;margin-inline-end:8px;"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
                           <span data-i18n="transcribe.startBatchAiExtraction">Start Batch AI Extraction</span>
                         </button>
                         <button class="btn-secondary" id="btn-cancel-batch" style="display:none; flex:1; border-color:var(--color-red); color:var(--color-red); font-weight:600; text-align:center; justify-content:center;" onclick="abortBatchExtraction()">
@@ -3274,7 +3276,7 @@
                           
                           <div class="analytics-actions-col">
                             <button class="btn-primary compact-copy-btn" id="btn-open-output-folder" onclick="openOutputFolder()" aria-label="Open output folder in file manager">
-                              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:5px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="margin-inline-end:5px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                               <span data-i18n="transcribe.openFolder">Open Folder</span>
                             </button>
                           </div>
@@ -3716,7 +3718,7 @@
                     <canvas id="hardsub-subtitle-canvas" style="position: absolute; top: 0; left: 0; pointer-events: none; display: none; z-index: 5;"></canvas>
 
                     <!-- Volume HUD Indicator -->
-                    <div id="hardsub-volume-hud" style="position: absolute; top: 15px; right: 15px; z-index: 15; pointer-events: none; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.15); padding: 8px 14px; border-radius: 20px; display: flex; align-items: center; gap: 8px; color: #fff; opacity: 0; transform: translateY(-10px); transition: opacity 0.25s ease, transform 0.25s ease; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 0.85rem; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
+                    <div id="hardsub-volume-hud" style="position: absolute; top: 15px; right: 15px; z-index: 15; pointer-events: none; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.15); padding: 8px 14px; border-radius: 20px; display: flex; align-items: center; gap: 8px; color: #fff; opacity: 0; transform: translateY(-10px); transition: opacity 0.25s ease, transform 0.25s ease; font-family: var(--font-sans); font-size: 0.85rem; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
                       <svg id="hardsub-hud-vol-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; display: none;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
                       <svg id="hardsub-hud-vol-low" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; display: none;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
                       <svg id="hardsub-hud-vol-mute" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; display: none;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
@@ -3862,7 +3864,7 @@
                       <input type="text" id="hardsub-search-input" class="text-input" placeholder="Search subtitle text..." data-i18n-placeholder="hardsub.searchSubText" style="width: 100%; padding-left: 32px; font-size: 0.85rem;" />
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--color-text-muted);"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                     </div>
-                    <span id="hardsub-subtitle-count" style="font-size: 0.95rem; font-weight: 600; font-family: monospace; background: rgba(var(--color-royal-blue-rgb), 0.05); padding: 8px 14px; border-radius: 8px; color: var(--color-royal-blue); white-space: nowrap; border: 1px solid rgba(var(--color-royal-blue-rgb), 0.2);">0 Cues</span>
+                    <span id="hardsub-subtitle-count" style="font-size: 0.95rem; font-weight: 600; background: rgba(var(--color-royal-blue-rgb), 0.05); padding: 8px 14px; border-radius: 8px; color: var(--color-royal-blue); white-space: nowrap; border: 1px solid rgba(var(--color-royal-blue-rgb), 0.2);">0 Cues</span>
                   </div>
 
                   <!-- Subtitle Cue Blocks Scrollable List -->

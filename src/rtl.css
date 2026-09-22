@@ -13,6 +13,19 @@ html[dir="rtl"] body {
   line-height: 1.55;
 }
 
+html[dir="rtl"] button,
+html[dir="rtl"] input,
+html[dir="rtl"] select,
+html[dir="rtl"] textarea,
+html[dir="rtl"] .pill-btn,
+html[dir="rtl"] .hardsub-tab-pill,
+html[dir="rtl"] #hardsub-subtitle-count,
+html[dir="rtl"] .btn,
+html[dir="rtl"] .btn-primary,
+html[dir="rtl"] .btn-secondary {
+  font-family: var(--font-sans) !important;
+}
+
 /* 1. GNOME Headerbar / Titlebar in RTL (Keep window buttons fixed on top-right) */
 html[dir="rtl"] .titlebar {
   direction: ltr;
@@ -233,7 +246,7 @@ html[dir="rtl"] .duration-display {
 html[dir="rtl"] .log-empty-state {
   direction: rtl !important;
   text-align: center !important;
-  font-family: var(--font-primary) !important;
+  font-family: var(--font-sans) !important;
 }
 
 html[dir="rtl"] .slider-val-badge {

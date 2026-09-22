@@ -57,6 +57,29 @@ describe('locale consistency for speed presets', () => {
       expect(transcribe.timecodeTooltip).toContain('{timecode}');
     });
 
+    it(`locale ${code} has all required transcribe progress and status keys`, () => {
+      const transcribe = (dict as any).transcribe;
+      expect(transcribe).toBeDefined();
+      const requiredKeys = [
+        'convertingAudio16k',
+        'wavReadyTranscribing',
+        'progressTranscribe',
+        'aiTranscribingStatus',
+        'progressComplete',
+        'readyForTranscription',
+        'standingBy',
+        'cancelled',
+        'taskFailed',
+        'convertingProgress',
+        'batchCompletedSummary',
+        'batchExtractionCancelled'
+      ];
+      for (const key of requiredKeys) {
+        expect(typeof transcribe[key]).toBe('string');
+        expect(transcribe[key].length).toBeGreaterThan(0);
+      }
+    });
+
     it(`locale ${code} formats transcription and translation errors on newlines`, () => {
       const toasts = (dict as any).toasts;
       expect(toasts).toBeDefined();
@@ -69,3 +92,4 @@ describe('locale consistency for speed presets', () => {
     });
   }
 });
+
