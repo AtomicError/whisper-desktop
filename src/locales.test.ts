@@ -90,6 +90,16 @@ describe('locale consistency for speed presets', () => {
       expect(typeof toasts.logsCopiedFiltered).toBe('string');
       expect(typeof toasts.noMatchingLogsToCopy).toBe('string');
     });
+
+    it(`locale ${code} has all required log scroll keys`, () => {
+      const logs = (dict as any).logs;
+      expect(logs).toBeDefined();
+      const requiredLogKeys = ['scrollToBottom', 'scrollToTop', 'jumpToBottom'];
+      for (const key of requiredLogKeys) {
+        expect(typeof logs[key]).toBe('string');
+        expect(logs[key].length).toBeGreaterThan(0);
+      }
+    });
   }
 });
 

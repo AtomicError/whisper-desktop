@@ -3757,11 +3757,104 @@ select.select-control {
 .logs-actions {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
+}
+
+.logs-scroll-btns {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-deep);
+  border: 1px solid var(--border-glass);
+  padding: 2px;
+  border-radius: 8px;
+}
+
+.log-nav-btn {
+  padding: 5px 8px !important;
+  font-size: 0.8rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none !important;
+  background: transparent !important;
+  border-radius: 6px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.log-nav-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #fff !important;
+}
+
+.log-nav-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.log-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.log-viewport-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  min-height: 0;
+}
+
+.log-jump-bottom-pill {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translate(-50%, 20px);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  background: rgba(18, 22, 34, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(var(--color-royal-blue-rgb), 0.45);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 14px rgba(var(--color-royal-blue-rgb), 0.25);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  padding: 6px 14px;
+  border-radius: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  z-index: 15;
+  transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.25s cubic-bezier(0.16, 1, 0.3, 1), transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), background 0.15s ease, border-color 0.15s ease;
+  user-select: none;
+}
+
+.log-jump-bottom-pill.visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translate(-50%, 0);
+}
+
+.log-jump-bottom-pill:hover {
+  background: rgba(var(--color-royal-blue-rgb), 0.25);
+  border-color: rgba(var(--color-royal-blue-rgb), 0.8);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.7), 0 0 20px rgba(var(--color-royal-blue-rgb), 0.4);
+}
+
+.log-jump-bottom-pill:active {
+  transform: translate(-50%, 2px);
 }
 
 .log-viewport {
   flex-grow: 1;
+  height: 100%;
   background: var(--bg-deep);
   border: 1px solid var(--border-glass);
   border-radius: 12px;

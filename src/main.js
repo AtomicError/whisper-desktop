@@ -2408,6 +2408,7 @@ async function initApp() {
     console.error("Failed to load initial logs:", e);
   }
   redrawLogsViewport();
+  setupLogsControls();
   if (typeof setupTranslationEventListeners === 'function') {
     setupTranslationEventListeners();
   }
@@ -2668,6 +2669,17 @@ window.switchView = function(viewName) {
         const viewport = document.getElementById('transcript-viewport');
         if (viewport) {
           viewport.querySelectorAll('.transcript-text-input').forEach(autoResizeTranscriptField);
+        }
+      });
+    } else if (viewName === 'logs') {
+      requestAnimationFrame(() => {
+        const viewport = document.getElementById('log-viewport');
+        const autoScroll = document.getElementById('log-autoscroll');
+        if (viewport && (!autoScroll || autoScroll.checked)) {
+          viewport.scrollTop = viewport.scrollHeight;
+        }
+        if (typeof updateLogJumpPillVisibility === 'function') {
+          updateLogJumpPillVisibility();
         }
       });
     }
@@ -3015,13 +3027,21 @@ function appendLogToViewport(payload, isBatchRedraw = false) {
     viewport.removeChild(viewport.firstElementChild);
   }
   
+  // Batch redraws handle scrolling and pill visibility once at the end of the batch
+  if (isBatchRedraw) return;
+
   // Handle Auto Scroll — debounced to avoid forced layout on every line
-  const autoScroll = document.getElementById('log-autoscroll').checked;
+  const autoScroll = document.getElementById('log-autoscroll')?.checked;
   if (autoScroll) {
     clearTimeout(viewport._scrollDebounce);
     viewport._scrollDebounce = setTimeout(() => {
       viewport.scrollTop = viewport.scrollHeight;
+      if (typeof updateLogJumpPillVisibility === 'function') {
+        updateLogJumpPillVisibility();
+      }
     }, 80);
+  } else if (typeof updateLogJumpPillVisibility === 'function') {
+    updateLogJumpPillVisibility();
   }
 }
 
@@ -5063,6 +5083,107 @@ window.copyTranscriptToClipboard = async function() {
 };
 
 // ----------------- Central Logging Center -----------------
+let _isProgrammaticBottomScroll = false;
+let _programmaticBottomScrollTimer = null;
+
+window.scrollLogsToBottom = function(smooth = false) {
+  const viewport = document.getElementById('log-viewport');
+  if (!viewport) return;
+  const pill = document.getElementById('btn-logs-jump-bottom');
+  if (pill) {
+    pill.classList.remove('visible');
+  }
+  _isProgrammaticBottomScroll = true;
+  clearTimeout(_programmaticBottomScrollTimer);
+  _programmaticBottomScrollTimer = setTimeout(() => {
+    _isProgrammaticBottomScroll = false;
+  }, smooth ? 600 : 50);
+
+  if (smooth) {
+    viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
+  } else {
+    viewport.scrollTop = viewport.scrollHeight;
+  }
+  const autoScroll = document.getElementById('log-autoscroll');
+  if (autoScroll && !autoScroll.checked) {
+    autoScroll.checked = true;
+  }
+  updateLogJumpPillVisibility();
+};
+
+window.scrollLogsToTop = function(smooth = false) {
+  const viewport = document.getElementById('log-viewport');
+  if (!viewport) return;
+  if (smooth) {
+    viewport.scrollTo({ top: 0, behavior: 'smooth' });
+  } else {
+    viewport.scrollTop = 0;
+  }
+  const autoScroll = document.getElementById('log-autoscroll');
+  if (autoScroll) {
+    autoScroll.checked = false;
+  }
+  updateLogJumpPillVisibility();
+};
+
+function updateLogJumpPillVisibility() {
+  const viewport = document.getElementById('log-viewport');
+  const pill = document.getElementById('btn-logs-jump-bottom');
+  if (!viewport || !pill) return;
+  
+  const distanceFromBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+  const isScrollable = viewport.scrollHeight > viewport.clientHeight + 60;
+  
+  if (isScrollable && distanceFromBottom > 140) {
+    pill.classList.add('visible');
+  } else {
+    pill.classList.remove('visible');
+  }
+}
+
+function setupLogsControls() {
+  const logViewport = document.getElementById('log-viewport');
+  if (logViewport && !logViewport._scrollHandlerAttached) {
+    logViewport._scrollHandlerAttached = true;
+    let scrollRaf = null;
+
+    logViewport.addEventListener('wheel', (e) => {
+      if (e.deltaY < 0) {
+        _isProgrammaticBottomScroll = false;
+        const autoScrollEl = document.getElementById('log-autoscroll');
+        if (autoScrollEl && autoScrollEl.checked) {
+          autoScrollEl.checked = false;
+        }
+      }
+    }, { passive: true });
+
+    logViewport.addEventListener('scroll', () => {
+      if (scrollRaf) return;
+      scrollRaf = requestAnimationFrame(() => {
+        scrollRaf = null;
+        const autoScrollEl = document.getElementById('log-autoscroll');
+        const distanceFromBottom = logViewport.scrollHeight - logViewport.scrollTop - logViewport.clientHeight;
+        if (!_isProgrammaticBottomScroll && distanceFromBottom > 140) {
+          if (autoScrollEl && autoScrollEl.checked) {
+            autoScrollEl.checked = false;
+          }
+        }
+        updateLogJumpPillVisibility();
+      });
+    }, { passive: true });
+  }
+
+  const autoScrollEl = document.getElementById('log-autoscroll');
+  if (autoScrollEl && !autoScrollEl._changeHandlerAttached) {
+    autoScrollEl._changeHandlerAttached = true;
+    autoScrollEl.addEventListener('change', () => {
+      if (autoScrollEl.checked) {
+        window.scrollLogsToBottom(true);
+      }
+    });
+  }
+}
+
 window.filterLogs = function(category) {
   activeLogCategory = category;
   
@@ -5118,6 +5239,15 @@ function updateLogsButtonsState() {
   const filteredLogs = getFilteredLogs();
   const hasFilteredLogs = filteredLogs.length > 0;
 
+  const btnScrollTop = document.getElementById('btn-scroll-top-logs');
+  if (btnScrollTop) {
+    btnScrollTop.disabled = !hasFilteredLogs;
+  }
+  const btnScrollBottom = document.getElementById('btn-scroll-bottom-logs');
+  if (btnScrollBottom) {
+    btnScrollBottom.disabled = !hasFilteredLogs;
+  }
+
   const btnCopy = document.getElementById('btn-copy-all-logs');
   if (btnCopy) {
     btnCopy.disabled = !hasFilteredLogs;
@@ -5164,6 +5294,16 @@ function redrawLogsViewport() {
         <div class="log-empty-text" data-i18n="${emptyKey}">${escapeHTML(t(emptyKey))}</div>
       </div>
     `;
+  }
+
+  const autoScroll = document.getElementById('log-autoscroll');
+  if (autoScroll && autoScroll.checked) {
+    requestAnimationFrame(() => {
+      viewport.scrollTop = viewport.scrollHeight;
+      updateLogJumpPillVisibility();
+    });
+  } else {
+    updateLogJumpPillVisibility();
   }
 }
 

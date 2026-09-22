@@ -894,7 +894,10 @@ export const ar: Translations = {
     filterTranslate: 'ترجمة',
     filterWhisper: 'Whisper',
     filterFfmpeg: 'FFmpeg',
-    filterHardsub: 'هاردسب'
+    filterHardsub: 'هاردسب',
+    scrollToBottom: 'التمرير للأسفل',
+    scrollToTop: 'التمرير للأعلى',
+    jumpToBottom: 'أحدث السجلات',
   },
   modals: {
     compilationErrorTitle: 'خطأ في التنفيذ',

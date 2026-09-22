@@ -901,7 +901,10 @@ export const ko: Translations = {
     filterTranslate: '번역 (Translate)',
     filterWhisper: 'Whisper',
     filterFfmpeg: 'FFmpeg',
-    filterHardsub: '자막 합성 (Hardsub)'
+    filterHardsub: '자막 합성 (Hardsub)',
+    scrollToBottom: '맨 아래로 스크롤',
+    scrollToTop: '맨 위로 스크롤',
+    jumpToBottom: '최신 로그',
   },
   modals: {
     compilationErrorTitle: '컴파일 오류',

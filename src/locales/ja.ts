@@ -894,7 +894,10 @@ export const ja: Translations = {
     filterTranslate: '翻訳',
     filterWhisper: 'Whisper',
     filterFfmpeg: 'FFmpeg',
-    filterHardsub: '字幕焼き込み'
+    filterHardsub: '字幕焼き込み',
+    scrollToBottom: '一番下までスクロール',
+    scrollToTop: '一番上までスクロール',
+    jumpToBottom: '最新ログ',
   },
   modals: {
     compilationErrorTitle: '実行エラー',

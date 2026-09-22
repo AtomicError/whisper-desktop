@@ -900,6 +900,9 @@ export const en = {
     filterWhisper: 'Whisper',
     filterFfmpeg: 'FFmpeg',
     filterHardsub: 'Hardsub',
+    scrollToBottom: 'Scroll to Bottom',
+    scrollToTop: 'Scroll to Top',
+    jumpToBottom: 'Latest Logs',
   },
   modals: {
     compilationErrorTitle: 'Compilation Error',

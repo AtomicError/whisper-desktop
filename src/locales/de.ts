@@ -894,7 +894,10 @@ export const de: Translations = {
     filterTranslate: 'Übersetzen',
     filterWhisper: 'Whisper',
     filterFfmpeg: 'FFmpeg',
-    filterHardsub: 'Hardsub'
+    filterHardsub: 'Hardsub',
+    scrollToBottom: 'Nach unten scrollen',
+    scrollToTop: 'Nach oben scrollen',
+    jumpToBottom: 'Neueste Protokolle',
   },
   modals: {
     compilationErrorTitle: 'Ausführungsfehler',

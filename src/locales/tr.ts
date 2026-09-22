@@ -901,7 +901,10 @@ export const tr: Translations = {
     filterTranslate: 'Çeviri',
     filterWhisper: 'Whisper',
     filterFfmpeg: 'FFmpeg',
-    filterHardsub: 'Hardsub'
+    filterHardsub: 'Hardsub',
+    scrollToBottom: 'Aşağı Kaydır',
+    scrollToTop: 'Yukarı Kaydır',
+    jumpToBottom: 'En Son Günlükler',
   },
   modals: {
     compilationErrorTitle: 'Derleme Hatası',

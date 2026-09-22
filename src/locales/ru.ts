@@ -894,7 +894,10 @@ export const ru: Translations = {
     filterTranslate: 'Перевод',
     filterWhisper: 'Whisper',
     filterFfmpeg: 'FFmpeg',
-    filterHardsub: 'Хардсаб'
+    filterHardsub: 'Хардсаб',
+    scrollToBottom: 'Прокрутить вниз',
+    scrollToTop: 'Прокрутить вверх',
+    jumpToBottom: 'Последние логи',
   },
   modals: {
     compilationErrorTitle: 'Ошибка выполнения',

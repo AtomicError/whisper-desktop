@@ -901,7 +901,10 @@ export const it: Translations = {
     filterTranslate: 'Traduci',
     filterWhisper: 'Whisper',
     filterFfmpeg: 'FFmpeg',
-    filterHardsub: 'Hardsub'
+    filterHardsub: 'Hardsub',
+    scrollToBottom: 'Scorri in fondo',
+    scrollToTop: 'Scorri in cima',
+    jumpToBottom: 'Ultimi log',
   },
   modals: {
     compilationErrorTitle: 'Errore di Compilazione',

@@ -902,6 +902,9 @@ export const fa: Translations = {
     filterWhisper: 'ویسپر',
     filterFfmpeg: 'FFmpeg',
     filterHardsub: 'هاردساب',
+    scrollToBottom: 'پرش به انتها',
+    scrollToTop: 'پرش به ابتدا',
+    jumpToBottom: 'آخرین گزارش‌ها',
   },
   modals: {
     compilationErrorTitle: 'خطای اجرای برنامه',

@@ -3592,13 +3592,27 @@
                     <span class="custom-checkmark"></span>
                     <span data-i18n="logs.autoScroll">Auto Scroll</span>
                   </label>
+                  <div class="logs-scroll-btns" role="group" aria-label="Log scroll controls">
+                    <button class="btn-secondary log-nav-btn" id="btn-scroll-top-logs" onclick="scrollLogsToTop(true)" data-i18n-title="logs.scrollToTop" data-i18n-aria="logs.scrollToTop" title="Scroll to Top" aria-label="Scroll to Top">
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+                    </button>
+                    <button class="btn-secondary log-nav-btn" id="btn-scroll-bottom-logs" onclick="scrollLogsToBottom(true)" data-i18n-title="logs.scrollToBottom" data-i18n-aria="logs.scrollToBottom" title="Scroll to Bottom" aria-label="Scroll to Bottom">
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
+                    </button>
+                  </div>
                   <button class="btn-secondary" id="btn-copy-all-logs" style="padding:6px 12px; font-size:0.8rem;" onclick="copyAllLogs()" aria-label="Copy all execution logs to clipboard" data-i18n="logs.copyBtn">Copy All</button>
                   <button class="btn-secondary" id="btn-clear-all-logs" style="padding:6px 12px; font-size:0.8rem; border-color:var(--color-red); color:var(--color-red);" onclick="clearLogsHistory()" data-i18n="logs.clearBtn">Clear</button>
                 </div>
               </div>
 
-              <!-- Monospace Log Viewport -->
-              <div class="log-viewport" id="log-viewport"></div>
+              <!-- Monospace Log Viewport Wrapper for Floating Button -->
+              <div class="log-viewport-wrapper">
+                <div class="log-viewport" id="log-viewport"></div>
+                <button class="log-jump-bottom-pill" id="btn-logs-jump-bottom" onclick="scrollLogsToBottom(true)" data-i18n-aria="logs.jumpToBottom" aria-label="Latest Logs">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
+                  <span data-i18n="logs.jumpToBottom">Latest Logs</span>
+                </button>
+              </div>
             </div>
           </div>
 

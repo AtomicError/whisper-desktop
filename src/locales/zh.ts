@@ -894,7 +894,10 @@ export const zh: Translations = {
     filterTranslate: '翻译',
     filterWhisper: 'Whisper',
     filterFfmpeg: 'FFmpeg',
-    filterHardsub: '视频压制'
+    filterHardsub: '视频压制',
+    scrollToBottom: '滚动到底部',
+    scrollToTop: '滚动到顶部',
+    jumpToBottom: '最新日志',
   },
   modals: {
     compilationErrorTitle: '执行编译错误',
