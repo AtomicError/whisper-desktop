@@ -764,7 +764,7 @@ jobs:
           cp ffmpeg-bins/ffprobe src-tauri/resources/
           cp src/fonts/* src-tauri/resources/fonts/ || true
           chmod +x src-tauri/resources/whisper-cli-* src-tauri/resources/ffmpeg src-tauri/resources/ffprobe 2>/dev/null || true
-          [ -f src-tauri/resources/*.so* ] && chmod +x src-tauri/resources/*.so* 2>/dev/null || true
+          find src-tauri/resources/ -name "*.so*" -exec chmod +x {} + 2>/dev/null || true
           npm run tauri build -- ${{ matrix.args }}
 
           # Normalize any space in bundle filenames

@@ -2627,6 +2627,14 @@ window.switchView = function(viewName) {
   const targetPanel = document.getElementById(`panel-${viewName}`);
   if (targetPanel) {
     targetPanel.classList.add('active');
+    if (viewName === 'transcribe') {
+      requestAnimationFrame(() => {
+        const viewport = document.getElementById('transcript-viewport');
+        if (viewport) {
+          viewport.querySelectorAll('.transcript-text-input').forEach(autoResizeTranscriptField);
+        }
+      });
+    }
   }
 
   // The player must know whether its page is authoritative before any
@@ -6253,7 +6261,9 @@ let transcriptLines = [];
 function autoResizeTranscriptField(el) {
   if (!el) return;
   el.style.height = 'auto';
-  el.style.height = `${el.scrollHeight}px`;
+  if (el.scrollHeight > 0) {
+    el.style.height = `${el.scrollHeight}px`;
+  }
 }
 window.autoResizeTranscriptField = autoResizeTranscriptField;
 
@@ -6317,7 +6327,6 @@ function appendTranscriptLine(timeRange, text) {
   textarea.value = cleanText;
   applyTextDirection(textarea);
   textarea.oninput = function() {
-    autoResizeTranscriptField(this);
     updateTranscriptLineText(lineObj.id, this.value);
   };
   textarea.onchange = function() {
@@ -6389,7 +6398,7 @@ window.loadTranscriptFromFile = async function(fullPath) {
       lineEl.innerHTML = `
         <span class="transcript-time" style="color: var(--color-text-muted); font-family: inherit; font-size: 0.75rem;">[L${idx + 1}]</span>
         <div class="transcript-text">
-          <textarea rows="1" class="transcript-text-input" oninput="autoResizeTranscriptField(this); updateTranscriptLineText(${lineObj.id}, this.value)" onchange="updateTranscriptLineText(${lineObj.id}, this.value)">${escapeHTML(lineText.trim())}</textarea>
+          <textarea rows="1" class="transcript-text-input" oninput="updateTranscriptLineText(${lineObj.id}, this.value)" onchange="updateTranscriptLineText(${lineObj.id}, this.value)">${escapeHTML(lineText.trim())}</textarea>
         </div>
       `;
       const textarea = lineEl.querySelector('.transcript-text-input');
