@@ -462,9 +462,9 @@ pub async fn check_hardware_encoders(app: tauri::AppHandle) -> HardwareEncodersS
                 }
                 o.status.success()
             }
-            Err(e) => {
+            Err(_e) => {
                 #[cfg(debug_assertions)]
-                eprintln!("QSV check spawn failed: {}", e);
+                eprintln!("QSV check spawn failed: {}", _e);
                 false
             }
         }
@@ -484,9 +484,9 @@ pub async fn check_hardware_encoders(app: tauri::AppHandle) -> HardwareEncodersS
                 }
                 o.status.success()
             }
-            Err(e) => {
+            Err(_e) => {
                 #[cfg(debug_assertions)]
-                eprintln!("NVENC check spawn failed: {}", e);
+                eprintln!("NVENC check spawn failed: {}", _e);
                 false
             }
         }
@@ -513,9 +513,9 @@ pub async fn check_hardware_encoders(app: tauri::AppHandle) -> HardwareEncodersS
                     }
                     o.status.success()
                 }
-                Err(e) => {
+                Err(_e) => {
                     #[cfg(debug_assertions)]
-                    eprintln!("VAAPI check spawn failed: {}", e);
+                    eprintln!("VAAPI check spawn failed: {}", _e);
                     false
                 }
             }
