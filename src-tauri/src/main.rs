@@ -593,35 +593,45 @@ pub(crate) fn ensure_directory_exists_if_folder(file_path: &str) {
 }
 
 #[cfg(target_os = "linux")]
+pub fn clean_ld_paths(ld_val: &str, appdir: &str) -> Option<String> {
+    let cleaned: Vec<&str> = ld_val
+        .split(':')
+        .map(|p| p.trim())
+        .filter(|part| {
+            if part.is_empty() {
+                return false;
+            }
+            if !appdir.is_empty() && part.starts_with(appdir) {
+                return false;
+            }
+            if part.contains(".mount_") {
+                return false;
+            }
+            true
+        })
+        .collect();
+
+    if !cleaned.is_empty() {
+        Some(cleaned.join(":"))
+    } else {
+        None
+    }
+}
+
+#[cfg(target_os = "linux")]
 pub fn get_clean_host_ld_library_path() -> Option<String> {
+    let appdir = std::env::var("APPDIR").unwrap_or_default();
+
     if let Ok(orig_ld) = std::env::var("LD_LIBRARY_PATH_ORIG") {
-        if !orig_ld.trim().is_empty() {
-            return Some(orig_ld);
-        } else {
-            return None;
+        if let Some(cleaned) = clean_ld_paths(&orig_ld, &appdir) {
+            return Some(cleaned);
         }
     }
+
     if let Ok(current_ld) = std::env::var("LD_LIBRARY_PATH") {
-        let appdir = std::env::var("APPDIR").unwrap_or_default();
-        let cleaned: Vec<&str> = current_ld
-            .split(':')
-            .filter(|part| {
-                if part.is_empty() {
-                    return false;
-                }
-                if !appdir.is_empty() && part.starts_with(&appdir) {
-                    return false;
-                }
-                if part.contains(".mount_") {
-                    return false;
-                }
-                true
-            })
-            .collect();
-        if !cleaned.is_empty() {
-            return Some(cleaned.join(":"));
-        }
+        return clean_ld_paths(&current_ld, &appdir);
     }
+
     None
 }
 
@@ -677,12 +687,10 @@ fn open_in_linux_file_manager(target_path: &str) -> bool {
 
         if let Ok(mut child) = cmd.spawn() {
             std::thread::sleep(std::time::Duration::from_millis(60));
-            if let Ok(Some(status)) = child.try_wait() {
-                if status.success() {
-                    return true;
-                }
-            } else {
-                return true;
+            match child.try_wait() {
+                Ok(Some(status)) if status.success() => return true,
+                Ok(None) => return true,
+                _ => {}
             }
         }
     }
@@ -714,12 +722,10 @@ fn open_in_linux_file_manager(target_path: &str) -> bool {
 
         if let Ok(mut child) = cmd.spawn() {
             std::thread::sleep(std::time::Duration::from_millis(60));
-            if let Ok(Some(status)) = child.try_wait() {
-                if status.success() {
-                    return true;
-                }
-            } else {
-                return true;
+            match child.try_wait() {
+                Ok(Some(status)) if status.success() => return true,
+                Ok(None) => return true,
+                _ => {}
             }
         }
     }
@@ -769,13 +775,6 @@ fn set_window_zoom(window: tauri::WebviewWindow, scale: f64) -> Result<(), Strin
 fn main() {
     #[cfg(target_os = "linux")]
     {
-        // Preserve original host LD_LIBRARY_PATH before AppImage modifications
-        if let Ok(orig_ld) = std::env::var("LD_LIBRARY_PATH") {
-            if std::env::var("LD_LIBRARY_PATH_ORIG").is_err() {
-                std::env::set_var("LD_LIBRARY_PATH_ORIG", orig_ld);
-            }
-        }
-
         // Prevent WebKitGTK double-DPI scaling on modern Linux distributions (e.g. Arch/Wayland)
         // when GDK_SCALE is not explicitly configured by the user.
         if std::env::var("GDK_SCALE").is_err() && std::env::var("GDK_DPI_SCALE").is_err() {
@@ -1120,5 +1119,30 @@ mod main_tests {
         assert!(temp_dir.exists() && temp_dir.is_dir());
 
         let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn test_clean_ld_paths_filters_appdir_and_mount() {
+        let appdir = "/tmp/.mount_whispe12345";
+        let raw = format!("{}/usr/lib:/usr/local/lib:{}/lib:/tmp/.mount_other/lib:/opt/custom/lib", appdir, appdir);
+        let cleaned = clean_ld_paths(&raw, appdir);
+        assert_eq!(cleaned, Some("/usr/local/lib:/opt/custom/lib".to_string()));
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn test_clean_ld_paths_returns_none_when_all_paths_are_appimage() {
+        let appdir = "/tmp/.mount_whispe12345";
+        let raw = format!("{}/usr/lib:{}/lib:/tmp/.mount_test/lib", appdir, appdir);
+        let cleaned = clean_ld_paths(&raw, appdir);
+        assert_eq!(cleaned, None);
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn test_clean_ld_paths_handles_empty_or_whitespace() {
+        assert_eq!(clean_ld_paths("", ""), None);
+        assert_eq!(clean_ld_paths("   :  : ", ""), None);
     }
 }
