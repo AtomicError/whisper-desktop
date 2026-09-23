@@ -112,4 +112,19 @@ describe('subtitle loading', () => {
     expect((controller as any).scrollThrottledTimeout).toBeNull();
     expect((controller as any).syncScrollRaf).toBeNull();
   });
+
+  it('copies pure subtitle text without timestamps or line numbers', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { clipboard: { writeText } });
+    const controller = new TranslationStudioController();
+    (controller as any).notify = vi.fn();
+    controller.state.translatedPath = '/output.srt';
+    controller.state.translatedRawText = '1\n00:00:01,000 --> 00:00:02,000\nHello World\n\n2\n00:00:02,000 --> 00:00:04,000\nSecond line';
+    controller.state.translatedCues = [
+      { id: 1, startMs: 1000, endMs: 2000, startTimeStr: '00:00:01,000', endTimeStr: '00:00:02,000', text: 'Hello World' },
+      { id: 2, startMs: 2000, endMs: 4000, startTimeStr: '00:00:02,000', endTimeStr: '00:00:04,000', text: 'Second line' },
+    ];
+    await controller.copyTranslatedText();
+    expect(writeText).toHaveBeenCalledWith('Hello World\nSecond line');
+  });
 });

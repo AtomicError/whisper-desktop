@@ -1289,9 +1289,7 @@ export class TranslationStudioController {
         }
       }
       if (this.lblMsg && payload.message) {
-        // Backend progress is one message, English around whatever file it names; an
-        // isolate keeps the order it was written in.
-        this.lblMsg.textContent = isolateDirection(payload.message);
+        this.lblMsg.textContent = this.formatProgressMessage(payload, isComplete, isCancelled);
       }
       if (this.statusBadge) {
         if (payload.active) {
@@ -1452,9 +1450,55 @@ export class TranslationStudioController {
     }
   }
 
+  private formatProgressMessage(payload: any, isComplete: boolean, isCancelled: boolean): string {
+    const raw = payload.message || '';
+    if (isCancelled || raw === 'Translation cancelled') {
+      return t('translate.statusCancelled');
+    }
+    if (isComplete || raw === 'AI translation complete') {
+      return t('translate.translationSuccess');
+    }
+    if (raw === 'Nothing to translate') {
+      return t('translate.emptyTargetTitle');
+    }
+    if (raw.startsWith('Translating with AI')) {
+      return t('translate.translating');
+    }
+    if (raw.startsWith('Translating AI')) {
+      const match = raw.match(/\((.*?)\)$/);
+      const fileName = match ? match[1] : (this.state.subtitleName || '');
+      const cur = this.state.currentLine;
+      const tot = this.state.totalLines;
+      if (payload.totalFiles && payload.totalFiles > 1 && payload.fileIndex) {
+        return t('translate.progressBatchLines', {
+          fileIdx: String(payload.fileIndex),
+          totalFiles: String(payload.totalFiles),
+          current: String(cur),
+          total: String(tot),
+          file: fileName
+        });
+      }
+      if (tot > 0) {
+        return t('translate.progressLines', {
+          current: String(cur),
+          total: String(tot),
+          file: fileName
+        });
+      }
+      return t('translate.translating');
+    }
+    if (raw.includes('could not be translated')) {
+      const countMatch = raw.match(/^(\d+)/);
+      return t('translate.untranslatedNotice', { count: countMatch ? countMatch[1] : '1' });
+    }
+    return isolateDirection(raw);
+  }
+
   public async copyTranslatedText() {
     if (!this.state.translatedPath || (!this.state.translatedRawText && this.state.translatedCues.length === 0)) return;
-    const textToCopy = this.state.translatedRawText || this.state.translatedCues.map(c => c.text).join('\n');
+    const textToCopy = this.state.translatedCues.length > 0
+      ? this.state.translatedCues.map(c => c.text).join('\n')
+      : this.state.translatedRawText;
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(textToCopy);

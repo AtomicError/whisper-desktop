@@ -100,6 +100,25 @@ describe('locale consistency for speed presets', () => {
         expect(logs[key].length).toBeGreaterThan(0);
       }
     });
+
+    it(`locale ${code} has providerCustomPromptPlaceholder`, () => {
+      const settings = (dict as any).settings;
+      expect(settings).toBeDefined();
+      expect(typeof settings.providerCustomPromptPlaceholder).toBe('string');
+      expect(settings.providerCustomPromptPlaceholder.length).toBeGreaterThan(0);
+    });
   }
+
+  it('validates fa locale translation improvements', () => {
+    expect(fa.transcribe.wizardStep3).toBe('شروع رونویسی');
+    expect(fa.settings.aiTranslatePoints).toContain('<bdi>OpenAI</bdi>، <bdi>Claude</bdi>');
+    expect(fa.settings.targetLangPoints).toContain('بیش از ۱۰۰ زبان زنده دنیا با رسم‌الخط بومی');
+    expect(fa.settings.providerCustomPromptPlaceholder).toBe('شما یک مترجم حرفه‌ای هستید...');
+    expect(fa.translate.sourceSub).toBe('زیرنویس اصلی');
+    expect(fa.translate.viewSource).toBe('فقط اصلی');
+    expect(fa.translate.sameAsSource).toBe('مشابه پوشه فایل اصلی');
+    expect(fa.hardsub.videoSection).toBe('ویدیوی اصلی');
+    expect(fa.translate.progressLines).toContain('{current}');
+  });
 });
 
