@@ -414,18 +414,7 @@ export class TranslationStudioController {
 
     this.btnBrowseSub?.addEventListener('click', () => this.browseSubtitleFile());
     this.btnClearSub?.addEventListener('click', () => this.clearLoadedSubtitle());
-    this.companionChip?.addEventListener('click', async () => {
-      try {
-        const files = await invoke<string[]>('select_files');
-        if (files && files.length > 0) {
-          const file = files[0];
-          await invoke('probe_media_file', { filePath: file });
-          this.setCompanionVideo(file);
-        }
-      } catch (err) {
-        console.warn('Failed to attach companion video:', err);
-      }
-    });
+    this.companionChip?.addEventListener('click', () => this.promptAndAttachCompanionVideo());
 
     this.targetLangSelect?.addEventListener('change', () => {
       if (this.targetLangSelect) {
@@ -875,6 +864,21 @@ export class TranslationStudioController {
     this.renderSourceCues();
     this.renderTargetCues();
     this.updateActionButtons();
+  }
+
+  public async promptAndAttachCompanionVideo() {
+    try {
+      const file = await invoke<string | null>('select_file');
+      if (file) {
+        const videoExtensions = ['.mp4', '.mkv', '.mov', '.webm', '.avi', '.m4v'];
+        if (videoExtensions.some(ext => file.toLowerCase().endsWith(ext))) {
+          await invoke('probe_media_file', { filePath: file });
+          this.setCompanionVideo(file);
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to attach companion video:', err);
+    }
   }
 
   public setCompanionVideo(candidate: string) {

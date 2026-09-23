@@ -391,9 +391,7 @@ pub fn find_vaapi_render_device() -> Option<String> {
 }
 
 #[cfg(target_os = "linux")]
-pub fn apply_linux_media_env(cmd: &mut std::process::Command) {
-    crate::sanitize_host_command(cmd);
-
+pub fn get_libva_drivers_path() -> Option<String> {
     let candidate_dri_paths = [
         "/usr/lib/x86_64-linux-gnu/dri",
         "/usr/lib64/dri",
@@ -405,62 +403,34 @@ pub fn apply_linux_media_env(cmd: &mut std::process::Command) {
         .filter(|p| std::path::Path::new(p).is_dir())
         .collect();
     if !existing.is_empty() {
-        cmd.env("LIBVA_DRIVERS_PATH", existing.join(":"));
+        Some(existing.join(":"))
+    } else {
+        None
+    }
+}
+
+#[cfg(target_os = "linux")]
+pub fn apply_linux_media_env(cmd: &mut std::process::Command) {
+    crate::sanitize_host_command(cmd);
+    if let Some(dri) = get_libva_drivers_path() {
+        cmd.env("LIBVA_DRIVERS_PATH", dri);
     }
 }
 
 #[cfg(target_os = "linux")]
 pub fn apply_linux_media_env_tokio(cmd: &mut tokio::process::Command) {
-    if let Ok(orig_ld) = std::env::var("LD_LIBRARY_PATH_ORIG") {
-        if !orig_ld.trim().is_empty() {
-            cmd.env("LD_LIBRARY_PATH", orig_ld);
-        } else {
-            cmd.env_remove("LD_LIBRARY_PATH");
-        }
-    } else if let Ok(current_ld) = std::env::var("LD_LIBRARY_PATH") {
-        let appdir = std::env::var("APPDIR").unwrap_or_default();
-        let cleaned: Vec<&str> = current_ld
-            .split(':')
-            .filter(|part| {
-                if part.is_empty() {
-                    return false;
-                }
-                if !appdir.is_empty() && part.starts_with(&appdir) {
-                    return false;
-                }
-                if part.contains(".mount_") {
-                    return false;
-                }
-                true
-            })
-            .collect();
-        if cleaned.is_empty() {
-            cmd.env_remove("LD_LIBRARY_PATH");
-        } else {
-            cmd.env("LD_LIBRARY_PATH", cleaned.join(":"));
-        }
+    if let Some(ld) = crate::get_clean_host_ld_library_path() {
+        cmd.env("LD_LIBRARY_PATH", ld);
+    } else {
+        cmd.env_remove("LD_LIBRARY_PATH");
     }
 
-    cmd.env_remove("GIO_MODULE_DIR");
-    cmd.env_remove("GSETTINGS_SCHEMA_DIR");
-    cmd.env_remove("GST_PLUGIN_SYSTEM_PATH");
-    cmd.env_remove("GST_PLUGIN_SCANNER");
-    cmd.env_remove("GST_PLUGIN_PATH");
-    cmd.env_remove("GST_PLUGIN_SYSTEM_PATH_1_0");
-    cmd.env_remove("GDK_PIXBUF_MODULE_FILE");
+    for var in crate::HOST_REMOVED_ENV_VARS {
+        cmd.env_remove(var);
+    }
 
-    let candidate_dri_paths = [
-        "/usr/lib/x86_64-linux-gnu/dri",
-        "/usr/lib64/dri",
-        "/usr/lib/dri",
-        "/usr/lib/aarch64-linux-gnu/dri",
-    ];
-    let existing: Vec<&str> = candidate_dri_paths
-        .into_iter()
-        .filter(|p| std::path::Path::new(p).is_dir())
-        .collect();
-    if !existing.is_empty() {
-        cmd.env("LIBVA_DRIVERS_PATH", existing.join(":"));
+    if let Some(dri) = get_libva_drivers_path() {
+        cmd.env("LIBVA_DRIVERS_PATH", dri);
     }
 }
 
@@ -486,12 +456,14 @@ pub async fn check_hardware_encoders(app: tauri::AppHandle) -> HardwareEncodersS
         apply_linux_media_env(&mut cmd);
         match cmd.output() {
             Ok(o) => {
+                #[cfg(debug_assertions)]
                 if !o.status.success() {
                     eprintln!("QSV check failed (status: {:?}): {}", o.status, String::from_utf8_lossy(&o.stderr));
                 }
                 o.status.success()
             }
             Err(e) => {
+                #[cfg(debug_assertions)]
                 eprintln!("QSV check spawn failed: {}", e);
                 false
             }
@@ -506,12 +478,14 @@ pub async fn check_hardware_encoders(app: tauri::AppHandle) -> HardwareEncodersS
         apply_linux_media_env(&mut cmd);
         match cmd.output() {
             Ok(o) => {
+                #[cfg(debug_assertions)]
                 if !o.status.success() {
                     eprintln!("NVENC check failed (status: {:?}): {}", o.status, String::from_utf8_lossy(&o.stderr));
                 }
                 o.status.success()
             }
             Err(e) => {
+                #[cfg(debug_assertions)]
                 eprintln!("NVENC check spawn failed: {}", e);
                 false
             }
@@ -533,12 +507,14 @@ pub async fn check_hardware_encoders(app: tauri::AppHandle) -> HardwareEncodersS
             apply_linux_media_env(&mut cmd);
             match cmd.output() {
                 Ok(o) => {
+                    #[cfg(debug_assertions)]
                     if !o.status.success() {
                         eprintln!("VAAPI check failed (status: {:?}): {}", o.status, String::from_utf8_lossy(&o.stderr));
                     }
                     o.status.success()
                 }
                 Err(e) => {
+                    #[cfg(debug_assertions)]
                     eprintln!("VAAPI check spawn failed: {}", e);
                     false
                 }

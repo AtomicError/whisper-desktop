@@ -127,4 +127,32 @@ describe('subtitle loading', () => {
     await controller.copyTranslatedText();
     expect(writeText).toHaveBeenCalledWith('Hello World\nSecond line');
   });
+
+  it('attaches video on companion chip click only for valid video extensions', async () => {
+    invoke.mockImplementation((cmd, args) => {
+      if (cmd === 'select_file') return Promise.resolve('/videos/movie.mp4');
+      if (cmd === 'probe_media_file') return Promise.resolve({ duration_sec: 120 });
+      return Promise.resolve(null);
+    });
+    const controller = new TranslationStudioController();
+    const setCompanionSpy = vi.spyOn(controller, 'setCompanionVideo');
+    await controller.promptAndAttachCompanionVideo();
+    expect(invoke).toHaveBeenCalledWith('select_file', {});
+    expect(invoke).toHaveBeenCalledWith('probe_media_file', { filePath: '/videos/movie.mp4' });
+    expect(setCompanionSpy).toHaveBeenCalledWith('/videos/movie.mp4');
+  });
+
+  it('ignores non-video file on companion chip click', async () => {
+    invoke.mockImplementation((cmd) => {
+      if (cmd === 'select_file') return Promise.resolve('/audios/track.mp3');
+      return Promise.resolve(null);
+    });
+    const controller = new TranslationStudioController();
+    const setCompanionSpy = vi.spyOn(controller, 'setCompanionVideo');
+    await controller.promptAndAttachCompanionVideo();
+    expect(invoke).toHaveBeenCalledWith('select_file', {});
+    expect(invoke).not.toHaveBeenCalledWith('probe_media_file', expect.anything());
+    expect(setCompanionSpy).not.toHaveBeenCalled();
+  });
 });
+
