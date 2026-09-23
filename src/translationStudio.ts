@@ -414,6 +414,18 @@ export class TranslationStudioController {
 
     this.btnBrowseSub?.addEventListener('click', () => this.browseSubtitleFile());
     this.btnClearSub?.addEventListener('click', () => this.clearLoadedSubtitle());
+    this.companionChip?.addEventListener('click', async () => {
+      try {
+        const files = await invoke<string[]>('select_files');
+        if (files && files.length > 0) {
+          const file = files[0];
+          await invoke('probe_media_file', { filePath: file });
+          this.setCompanionVideo(file);
+        }
+      } catch (err) {
+        console.warn('Failed to attach companion video:', err);
+      }
+    });
 
     this.targetLangSelect?.addEventListener('change', () => {
       if (this.targetLangSelect) {
@@ -865,6 +877,21 @@ export class TranslationStudioController {
     this.updateActionButtons();
   }
 
+  public setCompanionVideo(candidate: string) {
+    this.state.companionVideoPath = candidate;
+    if (this.companionChip && this.lblCompanionName) {
+      const candidateName = candidate.split(/[\/\\]/).pop() || '';
+      this.lblCompanionName.textContent = candidateName;
+      // The chip names a file the same way the card above it names one: the
+      // name reads in its own direction, with the extension last in whatever
+      // order that is, and the chip's icon stays on the interface's own side.
+      applyContentDirection(this.lblCompanionName, candidateName);
+      this.companionChip.title = isolateLtr(candidate);
+      this.companionChip.style.display = 'inline-flex';
+      this.companionChip.style.cursor = 'pointer';
+    }
+  }
+
   private async detectCompanionVideo(subtitlePath: string, loadId: number) {
     this.state.companionVideoPath = null;
     if (this.companionChip) this.companionChip.style.display = 'none';
@@ -874,11 +901,28 @@ export class TranslationStudioController {
     const baseStem = subtitlePath.substring(0, lastDot);
     const videoExtensions = ['.mp4', '.mkv', '.mov', '.webm', '.avi', '.m4v'];
 
-    // Also check if baseStem ends with a language code (e.g. movie.en or movie.fa)
+    // Also check if baseStem ends with a language code (e.g. movie.en or movie.fa) or translation suffix
+    const cleanTranslationSuffix = (stem: string) => {
+      return stem
+        .replace(/([._ -]?(translated|translation|ترجمه شده|ترجمه))+$/i, '')
+        .replace(/\.[a-zA-Z]{2,3}(-[a-zA-Z0-9]+)?$/i, '')
+        .replace(/([._ -]?(fa|en|ar|es|fr|de|ru|zh|ja|ko|it|pt|tr))+$/i, '')
+        .trim();
+    };
+
     const strippedStem = baseStem.replace(/\.[a-zA-Z]{2,3}(-[a-zA-Z0-9]+)?$/, '');
-    const candidateStems = [baseStem];
+    const candidateStems = new Set<string>();
+    candidateStems.add(baseStem);
     if (strippedStem && strippedStem !== baseStem) {
-      candidateStems.push(strippedStem);
+      candidateStems.add(strippedStem);
+    }
+    const cleanedBase = cleanTranslationSuffix(baseStem);
+    if (cleanedBase && cleanedBase !== baseStem) {
+      candidateStems.add(cleanedBase);
+    }
+    const cleanedStripped = cleanTranslationSuffix(strippedStem);
+    if (cleanedStripped && cleanedStripped !== strippedStem) {
+      candidateStems.add(cleanedStripped);
     }
 
     for (const stem of candidateStems) {
@@ -888,20 +932,30 @@ export class TranslationStudioController {
         try {
           await invoke('probe_media_file', { filePath: candidate });
           if (loadId !== this.subtitleLoadId) return;
-          this.state.companionVideoPath = candidate;
-          if (this.companionChip && this.lblCompanionName) {
-            const candidateName = candidate.split(/[\/\\]/).pop() || '';
-            this.lblCompanionName.textContent = candidateName;
-            // The chip names a file the same way the card above it names one: the
-            // name reads in its own direction, with the extension last in whatever
-            // order that is, and the chip's icon stays on the interface's own side.
-            applyContentDirection(this.lblCompanionName, candidateName);
-            this.companionChip.title = isolateLtr(candidate);
-            this.companionChip.style.display = 'inline-flex';
-          }
+          this.setCompanionVideo(candidate);
           return;
         } catch (_) {
           // Not found, continue searching
+        }
+      }
+    }
+
+    // Fallback: Check if there's an active media file in Transcription Studio that is a video
+    const win = window as any;
+    const activeMedia: string | null = (typeof win.getCurrentSourceMediaFile === 'function')
+      ? win.getCurrentSourceMediaFile()
+      : (win.selectedMediaFile || win.settingsState?.inputFile || null);
+
+    if (activeMedia && typeof activeMedia === 'string') {
+      const isVideoExt = videoExtensions.some(ext => activeMedia.toLowerCase().endsWith(ext));
+      if (isVideoExt) {
+        try {
+          await invoke('probe_media_file', { filePath: activeMedia });
+          if (loadId !== this.subtitleLoadId) return;
+          this.setCompanionVideo(activeMedia);
+          return;
+        } catch (_) {
+          // probe failed, continue
         }
       }
     }
@@ -1568,8 +1622,23 @@ export class TranslationStudioController {
       return;
     }
 
+    let videoToLoad = this.state.companionVideoPath || '';
+    if (!videoToLoad) {
+      const win = window as any;
+      const activeMedia: string | null = (typeof win.getCurrentSourceMediaFile === 'function')
+        ? win.getCurrentSourceMediaFile()
+        : (win.selectedMediaFile || win.settingsState?.inputFile || null);
+
+      if (activeMedia && typeof activeMedia === 'string') {
+        const videoExtensions = ['.mp4', '.mkv', '.mov', '.webm', '.avi', '.m4v'];
+        if (videoExtensions.some(ext => activeMedia.toLowerCase().endsWith(ext))) {
+          videoToLoad = activeMedia;
+        }
+      }
+    }
+
     if (hardsubController && typeof hardsubController.prefillFilePaths === 'function') {
-      hardsubController.prefillFilePaths(this.state.companionVideoPath || '', subToLoad);
+      hardsubController.prefillFilePaths(videoToLoad, subToLoad);
     }
 
     const win = window as any;
@@ -1577,7 +1646,9 @@ export class TranslationStudioController {
       win.switchView('hardsub');
     }
 
-    this.notify(t('translate.sendToHardsubDesc'), 'info');
+    if (videoToLoad) {
+      this.notify(t('translate.sendToHardsubDesc'), 'info');
+    }
   }
 
   public refreshLocalization() {

@@ -403,6 +403,7 @@ export const tr: Translations = {
     labelQualityCrf: 'CRF ({encoder} Sabit Oran Faktörü)',
     cuesCount: '{count} Parça',
     cuesCountZero: '0 Parça',
+    subLoadedSelectVideo: 'Altyazı başarıyla yüklendi. Lütfen hedef video dosyasını seçin.',
     cueActive: 'ETKİN',
     cuePlay: 'Oynat',
     cuePlayTooltip: 'Videoyu altyazı zamanına atlat',

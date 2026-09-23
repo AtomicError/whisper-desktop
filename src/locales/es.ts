@@ -403,6 +403,7 @@ export const es: Translations = {
     labelQualityCrf: 'CRF (Factor de Tasa Constante {encoder})',
     cuesCount: '{count} Fragmentos',
     cuesCountZero: '0 Fragmentos',
+    subLoadedSelectVideo: 'Subtítulo cargado con éxito. Por favor, selecciona el archivo de video de destino.',
     cueActive: 'ACTIVO',
     cuePlay: 'Reproducir',
     cuePlayTooltip: 'Saltar el video al tiempo de este fragmento',

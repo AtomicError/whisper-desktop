@@ -403,6 +403,7 @@ export const ko: Translations = {
     labelQualityCrf: 'CRF ({encoder} 고정 비트레이트 계수)',
     cuesCount: '{count}개 구간',
     cuesCountZero: '0개 구간',
+    subLoadedSelectVideo: '자막을 성공적으로 불러왔습니다. 대상 비디오 파일을 선택해 주세요.',
     cueActive: '활성',
     cuePlay: '재생',
     cuePlayTooltip: '비디오를 자막 시간으로 이동',

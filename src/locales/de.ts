@@ -403,6 +403,7 @@ export const de: Translations = {
     labelQualityCrf: 'CRF ({encoder} Constant Rate Factor)',
     cuesCount: '{count} Cues',
     cuesCountZero: '0 Cues',
+    subLoadedSelectVideo: 'Untertitel erfolgreich geladen. Bitte wählen Sie die gewünschte Videodatei aus.',
     cueActive: 'AKTIV',
     cuePlay: 'Abspielen',
     cuePlayTooltip: 'Video zur Cue-Zeit springen',

@@ -403,6 +403,7 @@ export const fa: Translations = {
     labelQualityCrf: 'شاخص CRF (ضریب فشرده‌سازی {encoder})',
     cuesCount: '{count} قطعه زیرنویس',
     cuesCountZero: '۰ قطعه زیرنویس',
+    subLoadedSelectVideo: 'زیرنویس با موفقیت بارگذاری شد؛ لطفاً فایل ویدیوی مورد نظر را انتخاب کنید.',
     cueActive: 'فعال',
     cuePlay: 'پخش',
     cuePlayTooltip: 'پرش ویدیو به زمان این بخش',

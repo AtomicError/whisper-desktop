@@ -2949,6 +2949,26 @@ select.select-control {
   text-overflow: ellipsis;
 }
 
+@keyframes pulse-attention-glow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(79, 140, 255, 0.45);
+    border-color: var(--color-accent);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(79, 140, 255, 0);
+    border-color: var(--color-cyan);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(79, 140, 255, 0);
+    border-color: var(--color-border);
+  }
+}
+
+.media-drop-zone.pulse-attention {
+  animation: pulse-attention-glow 1.5s ease-in-out 2;
+  border-color: var(--color-accent) !important;
+}
+
 /* The two media cards of the Hardsub page's first step. `minmax(0, 1fr)` rather than a
    bare `1fr` per column: a bare `1fr` floors each column at its own content, and these
    cards carry a nowrap browse button that is 125px wide in German, so the pair grew past

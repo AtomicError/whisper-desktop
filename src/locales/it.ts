@@ -403,6 +403,7 @@ export const it: Translations = {
     labelQualityCrf: 'CRF (Fattore Frequenza Costante {encoder})',
     cuesCount: '{count} Segmenti',
     cuesCountZero: '0 Segmenti',
+    subLoadedSelectVideo: 'Sottotitolo caricato con successo. Seleziona il file video desiderato.',
     cueActive: 'ATTIVO',
     cuePlay: 'Riproduci',
     cuePlayTooltip: 'Salta al punto del segmento nel video',

@@ -403,6 +403,7 @@ export const ja: Translations = {
     labelQualityCrf: 'CRF 固定レート係数 ({encoder})',
     cuesCount: '{count} 個の字幕',
     cuesCountZero: '0 個の字幕',
+    subLoadedSelectVideo: '字幕が正常に読み込まれました。対象の動画ファイルを選択してください。',
     cueActive: '再生中',
     cuePlay: '再生',
     cuePlayTooltip: '動画をこの字幕の時間へシーク',

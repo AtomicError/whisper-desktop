@@ -403,6 +403,7 @@ export const ar: Translations = {
     labelQualityCrf: 'CRF معامل الجودة الثابتة ({encoder})',
     cuesCount: '{count} مقطع ترجمة',
     cuesCountZero: '0 مقطع',
+    subLoadedSelectVideo: 'تم تحميل ملف الترجمة بنجاح؛ يرجى اختيار ملف الفيديو المطلوب.',
     cueActive: 'نشط حالياً',
     cuePlay: 'تشغيل',
     cuePlayTooltip: 'القفز بالفيديو إلى توقيت هذا المقطع',

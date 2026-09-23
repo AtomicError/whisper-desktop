@@ -403,6 +403,7 @@ export const ru: Translations = {
     labelQualityCrf: 'CRF ({encoder} Коэффициент постоянного качества)',
     cuesCount: '{count} реплик',
     cuesCountZero: '0 реплик',
+    subLoadedSelectVideo: 'Субтитры успешно загружены. Пожалуйста, выберите нужный видеофайл.',
     cueActive: 'ТЕКУЩАЯ',
     cuePlay: 'Воспроизвести',
     cuePlayTooltip: 'Перейти к началу реплики',

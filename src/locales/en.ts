@@ -401,6 +401,7 @@ export const en = {
     labelQualityCrf: 'CRF ({encoder} Constant Rate Factor)',
     cuesCount: '{count} Cues',
     cuesCountZero: '0 Cues',
+    subLoadedSelectVideo: 'Subtitle loaded successfully. Please select the target video file.',
     cueActive: 'ACTIVE',
     cuePlay: 'Play',
     cuePlayTooltip: 'Jump video to cue time',

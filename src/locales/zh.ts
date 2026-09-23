@@ -403,6 +403,7 @@ export const zh: Translations = {
     labelQualityCrf: 'CRF 恒定速率因子 ({encoder})',
     cuesCount: '{count} 个字幕轴块',
     cuesCountZero: '0 个字幕块',
+    subLoadedSelectVideo: '字幕加载成功，请选择目标视频文件。',
     cueActive: '当前播放',
     cuePlay: '播放',
     cuePlayTooltip: '将视频跳转至该字幕开始时间点',

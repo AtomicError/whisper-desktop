@@ -403,6 +403,7 @@ export const pt: Translations = {
     labelQualityCrf: 'CRF (Fator de Taxa Constante {encoder})',
     cuesCount: '{count} Falas',
     cuesCountZero: '0 Falas',
+    subLoadedSelectVideo: 'Legenda carregada com sucesso. Selecione o arquivo de vídeo desejado.',
     cueActive: 'ATIVO',
     cuePlay: 'Reproduzir',
     cuePlayTooltip: 'Pular vídeo para o tempo deste bloco',

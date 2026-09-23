@@ -403,6 +403,7 @@ export const fr: Translations = {
     labelQualityCrf: 'CRF (Facteur de Débit Constant {encoder})',
     cuesCount: '{count} Répliques',
     cuesCountZero: '0 Réplique',
+    subLoadedSelectVideo: 'Sous-titre chargé avec succès. Veuillez sélectionner le fichier vidéo cible.',
     cueActive: 'ACTIF',
     cuePlay: 'Lire',
     cuePlayTooltip: 'Sauter la vidéo au repère temporel',

@@ -3693,6 +3693,16 @@ export class HardsubController {
     }
     if (videoPath) {
       this.selectVideoSource(videoPath);
+    } else if (subPath) {
+      const notifyFn = (window as any).showNotification;
+      if (typeof notifyFn === 'function') {
+        notifyFn(t('hardsub.subLoadedSelectVideo'), 'info');
+      }
+      const videoZone = document.getElementById('hardsub-video-drop-zone');
+      if (videoZone) {
+        videoZone.classList.add('pulse-attention');
+        setTimeout(() => videoZone.classList.remove('pulse-attention'), 3500);
+      }
     }
   }
 

@@ -592,10 +592,99 @@ pub(crate) fn ensure_directory_exists_if_folder(file_path: &str) {
     }
 }
 
+#[cfg(target_os = "linux")]
+pub fn sanitize_host_command(cmd: &mut std::process::Command) {
+    if let Ok(orig_ld) = std::env::var("LD_LIBRARY_PATH_ORIG") {
+        if !orig_ld.trim().is_empty() {
+            cmd.env("LD_LIBRARY_PATH", orig_ld);
+        } else {
+            cmd.env_remove("LD_LIBRARY_PATH");
+        }
+    } else if let Ok(current_ld) = std::env::var("LD_LIBRARY_PATH") {
+        let appdir = std::env::var("APPDIR").unwrap_or_default();
+        let cleaned: Vec<&str> = current_ld
+            .split(':')
+            .filter(|part| {
+                if part.is_empty() {
+                    return false;
+                }
+                if !appdir.is_empty() && part.starts_with(&appdir) {
+                    return false;
+                }
+                if part.contains(".mount_") {
+                    return false;
+                }
+                true
+            })
+            .collect();
+        if cleaned.is_empty() {
+            cmd.env_remove("LD_LIBRARY_PATH");
+        } else {
+            cmd.env("LD_LIBRARY_PATH", cleaned.join(":"));
+        }
+    }
+
+    cmd.env_remove("GIO_MODULE_DIR");
+    cmd.env_remove("GSETTINGS_SCHEMA_DIR");
+    cmd.env_remove("GST_PLUGIN_SYSTEM_PATH");
+    cmd.env_remove("GST_PLUGIN_SCANNER");
+    cmd.env_remove("GST_PLUGIN_PATH");
+    cmd.env_remove("GST_PLUGIN_SYSTEM_PATH_1_0");
+    cmd.env_remove("GDK_PIXBUF_MODULE_FILE");
+}
+
+#[cfg(target_os = "linux")]
+fn open_in_linux_file_manager(target_path: &str) -> bool {
+    let p = std::path::Path::new(target_path);
+    let resolved_path = if p.is_file() {
+        p.parent().unwrap_or(p).to_string_lossy().to_string()
+    } else {
+        target_path.to_string()
+    };
+
+    let commands: &[(&str, &[&str])] = &[
+        ("xdg-open", &[&resolved_path]),
+        ("gio", &["open", &resolved_path]),
+        ("nautilus", &[&resolved_path]),
+        ("dolphin", &[&resolved_path]),
+        ("thunar", &[&resolved_path]),
+        ("pcmanfm", &[&resolved_path]),
+    ];
+
+    for (bin, args) in commands {
+        let mut cmd = std::process::Command::new(bin);
+        cmd.args(*args);
+        sanitize_host_command(&mut cmd);
+        cmd.stdin(std::process::Stdio::null());
+        cmd.stdout(std::process::Stdio::null());
+        cmd.stderr(std::process::Stdio::null());
+
+        if let Ok(mut child) = cmd.spawn() {
+            std::thread::sleep(std::time::Duration::from_millis(60));
+            if let Ok(Some(status)) = child.try_wait() {
+                if status.success() {
+                    return true;
+                }
+            } else {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 #[tauri::command]
 fn open_file_in_editor(app: AppHandle, file_path: String) -> Result<(), String> {
     use tauri_plugin_opener::OpenerExt;
     ensure_directory_exists_if_folder(&file_path);
+
+    #[cfg(target_os = "linux")]
+    {
+        if open_in_linux_file_manager(&file_path) {
+            return Ok(());
+        }
+    }
+
     app.opener()
         .open_path(&file_path, None::<&str>)
         .map_err(|e| format!("Failed to open file in editor: {}", e))
@@ -626,6 +715,13 @@ fn set_window_zoom(window: tauri::WebviewWindow, scale: f64) -> Result<(), Strin
 fn main() {
     #[cfg(target_os = "linux")]
     {
+        // Preserve original host LD_LIBRARY_PATH before AppImage modifications
+        if let Ok(orig_ld) = std::env::var("LD_LIBRARY_PATH") {
+            if std::env::var("LD_LIBRARY_PATH_ORIG").is_err() {
+                std::env::set_var("LD_LIBRARY_PATH_ORIG", orig_ld);
+            }
+        }
+
         // Prevent WebKitGTK double-DPI scaling on modern Linux distributions (e.g. Arch/Wayland)
         // when GDK_SCALE is not explicitly configured by the user.
         if std::env::var("GDK_SCALE").is_err() && std::env::var("GDK_DPI_SCALE").is_err() {
