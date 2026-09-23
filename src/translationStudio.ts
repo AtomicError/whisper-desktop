@@ -59,6 +59,11 @@ export interface TranslationStudioState {
   viewMode: 'split' | 'source' | 'target';
 }
 
+export const SUPPORTED_VIDEO_EXTENSIONS: readonly string[] = [
+  '.mp4', '.mkv', '.avi', '.mov', '.flv', '.webm', '.m4v', '.wmv',
+  '.ts', '.mts', '.m2ts', '.3gp', '.3g2', '.mpeg', '.mpg', '.vob', '.ogv', '.f4v'
+];
+
 function escapeHTML(str: string): string {
   return (str || '')
     .replace(/&/g, '&amp;')
@@ -870,8 +875,7 @@ export class TranslationStudioController {
     try {
       const file = await invoke<string | null>('select_file');
       if (file) {
-        const videoExtensions = ['.mp4', '.mkv', '.mov', '.webm', '.avi', '.m4v'];
-        if (videoExtensions.some(ext => file.toLowerCase().endsWith(ext))) {
+        if (SUPPORTED_VIDEO_EXTENSIONS.some(ext => file.toLowerCase().endsWith(ext))) {
           await invoke('probe_media_file', { filePath: file });
           this.setCompanionVideo(file);
         }
@@ -903,7 +907,6 @@ export class TranslationStudioController {
     const lastDot = subtitlePath.lastIndexOf('.');
     if (lastDot <= 0) return;
     const baseStem = subtitlePath.substring(0, lastDot);
-    const videoExtensions = ['.mp4', '.mkv', '.mov', '.webm', '.avi', '.m4v'];
 
     // Also check if baseStem ends with a language code (e.g. movie.en or movie.fa) or translation suffix
     const cleanTranslationSuffix = (stem: string) => {
@@ -930,7 +933,7 @@ export class TranslationStudioController {
     }
 
     for (const stem of candidateStems) {
-      for (const ext of videoExtensions) {
+      for (const ext of SUPPORTED_VIDEO_EXTENSIONS) {
         if (loadId !== this.subtitleLoadId) return;
         const candidate = `${stem}${ext}`;
         try {
@@ -951,7 +954,7 @@ export class TranslationStudioController {
       : (win.selectedMediaFile || win.settingsState?.inputFile || null);
 
     if (activeMedia && typeof activeMedia === 'string') {
-      const isVideoExt = videoExtensions.some(ext => activeMedia.toLowerCase().endsWith(ext));
+      const isVideoExt = SUPPORTED_VIDEO_EXTENSIONS.some(ext => activeMedia.toLowerCase().endsWith(ext));
       if (isVideoExt) {
         try {
           await invoke('probe_media_file', { filePath: activeMedia });
@@ -1634,8 +1637,7 @@ export class TranslationStudioController {
         : (win.selectedMediaFile || win.settingsState?.inputFile || null);
 
       if (activeMedia && typeof activeMedia === 'string') {
-        const videoExtensions = ['.mp4', '.mkv', '.mov', '.webm', '.avi', '.m4v'];
-        if (videoExtensions.some(ext => activeMedia.toLowerCase().endsWith(ext))) {
+        if (SUPPORTED_VIDEO_EXTENSIONS.some(ext => activeMedia.toLowerCase().endsWith(ext))) {
           videoToLoad = activeMedia;
         }
       }

@@ -154,5 +154,19 @@ describe('subtitle loading', () => {
     expect(invoke).not.toHaveBeenCalledWith('probe_media_file', expect.anything());
     expect(setCompanionSpy).not.toHaveBeenCalled();
   });
+
+  it('accepts extended video formats (.ts, .wmv, .flv, .mpeg) as valid companion videos', async () => {
+    invoke.mockImplementation((cmd, args) => {
+      if (cmd === 'select_file') return Promise.resolve('/videos/broadcast.ts');
+      if (cmd === 'probe_media_file') return Promise.resolve({ duration_sec: 45 });
+      return Promise.resolve(null);
+    });
+    const controller = new TranslationStudioController();
+    const setCompanionSpy = vi.spyOn(controller, 'setCompanionVideo');
+    await controller.promptAndAttachCompanionVideo();
+    expect(invoke).toHaveBeenCalledWith('select_file', {});
+    expect(invoke).toHaveBeenCalledWith('probe_media_file', { filePath: '/videos/broadcast.ts' });
+    expect(setCompanionSpy).toHaveBeenCalledWith('/videos/broadcast.ts');
+  });
 });
 
