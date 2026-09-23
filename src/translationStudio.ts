@@ -1146,15 +1146,22 @@ export class TranslationStudioController {
     // inside a Persian one right-to-left. Both panes take that direction from the shared
     // rule at render time (the text is written once, so it cannot be pointed at its
     // content afterwards the way an editable field is).
-    const html = this.state.sourceCues.map(cue => `
+    const html = this.state.sourceCues.map(cue => {
+      const durSec = cue.endMs > cue.startMs ? Math.max(0, Math.round((cue.endMs - cue.startMs) / 1000)) : 0;
+      const durLabel = durSec > 0 ? `${durSec}s` : '';
+      return `
       <div class="translate-cue-item" data-id="${cue.id}" id="translate-source-cue-${cue.id}" role="listitem" tabindex="0" aria-label="Cue #${cue.id}">
         <div class="translate-cue-header">
-          <span class="translate-cue-num">#${cue.id}</span>
-          ${cue.startTimeStr ? `<span class="translate-cue-time">${escapeHTML(cue.startTimeStr)}${cue.endTimeStr ? ` ➔ ${escapeHTML(cue.endTimeStr)}` : ''}</span>` : ''}
+          <div class="translate-cue-badge-wrap">
+            <span class="translate-cue-num">#${cue.id}</span>
+            ${durLabel ? `<span class="translate-cue-dur">${durLabel}</span>` : ''}
+          </div>
+          ${cue.startTimeStr ? `<span class="translate-cue-time" dir="ltr">${escapeHTML(cue.startTimeStr)}${cue.endTimeStr ? ` ➔ ${escapeHTML(cue.endTimeStr)}` : ''}</span>` : ''}
         </div>
         <div class="translate-cue-text" ${directionAttributes(cue.text)}>${escapeHTML(cue.text)}</div>
       </div>
-    `).join('');
+    `;
+    }).join('');
 
     this.sourceList.innerHTML = html;
   }
@@ -1181,15 +1188,22 @@ export class TranslationStudioController {
       return;
     }
 
-    const html = this.state.translatedCues.map(cue => `
+    const html = this.state.translatedCues.map(cue => {
+      const durSec = cue.endMs > cue.startMs ? Math.max(0, Math.round((cue.endMs - cue.startMs) / 1000)) : 0;
+      const durLabel = durSec > 0 ? `${durSec}s` : '';
+      return `
       <div class="translate-cue-item translate-cue-translated" data-id="${cue.id}" id="translate-target-cue-${cue.id}" role="listitem" tabindex="0" aria-label="Translated cue #${cue.id}">
         <div class="translate-cue-header">
-          <span class="translate-cue-num">#${cue.id}</span>
-          ${cue.startTimeStr ? `<span class="translate-cue-time">${escapeHTML(cue.startTimeStr)}${cue.endTimeStr ? ` ➔ ${escapeHTML(cue.endTimeStr)}` : ''}</span>` : ''}
+          <div class="translate-cue-badge-wrap">
+            <span class="translate-cue-num">#${cue.id}</span>
+            ${durLabel ? `<span class="translate-cue-dur">${durLabel}</span>` : ''}
+          </div>
+          ${cue.startTimeStr ? `<span class="translate-cue-time" dir="ltr">${escapeHTML(cue.startTimeStr)}${cue.endTimeStr ? ` ➔ ${escapeHTML(cue.endTimeStr)}` : ''}</span>` : ''}
         </div>
         <div class="translate-cue-text translate-cue-text-target" ${directionAttributes(cue.text)}>${escapeHTML(cue.text)}</div>
       </div>
-    `).join('');
+    `;
+    }).join('');
 
     this.targetList.innerHTML = html;
   }
