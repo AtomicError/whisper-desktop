@@ -48,6 +48,7 @@ allow = [
   "copy_to_clipboard",
   "open_file_in_editor",
   "exit_app",
-  "hide_to_tray"
+  "hide_to_tray",
+  "set_window_zoom"
 ]
 
