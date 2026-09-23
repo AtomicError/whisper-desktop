@@ -1334,6 +1334,7 @@ class CustomSelect {
       this.searchInput = document.createElement('input');
       this.searchInput.type = 'text';
       this.searchInput.className = 'custom-select-search';
+      this.searchInput.setAttribute('dir', 'auto');
       this.searchInput.autocomplete = 'off';
       this.searchInput.spellcheck = false;
       this.searchInput.setAttribute('role', 'searchbox');
@@ -1607,9 +1608,7 @@ class CustomSelect {
     });
 
     if (this.isSearchable()) {
-      this.noResultsRow.textContent = (typeof window.t === 'function')
-        ? window.t('languages.noResults')
-        : 'No matching language';
+      this.noResultsRow.textContent = this.getNoResultsText();
       this.noResultsRow.classList.add('hidden');
       frag.appendChild(this.noResultsRow);
       this.optionsContainer.classList.add('has-search');
@@ -1633,11 +1632,50 @@ class CustomSelect {
     this.syncSelectedValue();
   }
 
-  applySearchPlaceholder() {
-    if (!this.searchInput) return;
-    const placeholder = (typeof window.t === 'function')
+  isModelSelect() {
+    return Boolean(
+      this.select.hasAttribute('data-model-select') ||
+      (this.select.id && this.select.id.toLowerCase().includes('model'))
+    );
+  }
+
+  getSearchPlaceholder() {
+    if (this.select.dataset.searchPlaceholderKey && typeof window.t === 'function') {
+      return window.t(this.select.dataset.searchPlaceholderKey);
+    }
+    if (this.select.dataset.searchPlaceholder) {
+      return this.select.dataset.searchPlaceholder;
+    }
+    if (this.isModelSelect()) {
+      return (typeof window.t === 'function')
+        ? window.t('settings.searchModelsPlaceholder')
+        : 'Search models by identifier...';
+    }
+    return (typeof window.t === 'function')
       ? window.t('common.searchLanguage')
       : 'Search…';
+  }
+
+  getNoResultsText() {
+    if (this.select.dataset.searchNoResultsKey && typeof window.t === 'function') {
+      return window.t(this.select.dataset.searchNoResultsKey);
+    }
+    if (this.select.dataset.searchNoResults) {
+      return this.select.dataset.searchNoResults;
+    }
+    if (this.isModelSelect()) {
+      return (typeof window.t === 'function')
+        ? window.t('settings.noMatchingModels')
+        : 'No Matching Models Found';
+    }
+    return (typeof window.t === 'function')
+      ? window.t('languages.noResults')
+      : 'No matching language';
+  }
+
+  applySearchPlaceholder() {
+    if (!this.searchInput) return;
+    const placeholder = this.getSearchPlaceholder();
     this.searchInput.placeholder = placeholder;
     this.searchInput.setAttribute('aria-label', placeholder);
   }
@@ -1698,9 +1736,7 @@ class CustomSelect {
       }
       el.classList.toggle('hidden', !hasVisible);
     });
-    this.noResultsRow.textContent = (typeof window.t === 'function')
-      ? window.t('languages.noResults')
-      : 'No matching language';
+    this.noResultsRow.textContent = this.getNoResultsText();
     this.noResultsRow.classList.toggle('hidden', visibleCount > 0);
     this.setFocusedOptionIndex(visibleCount > 0 && this.isOpen ? 0 : -1);
   }
@@ -2526,9 +2562,10 @@ async function initApp() {
         else if (opt.value === 'CUDA') opt.textContent = t('transcribe.backendCuda');
         else if (opt.value === 'OpenVINO') opt.textContent = t('transcribe.backendOpenvino');
       });
-      if (typeof syncCustomSelects === 'function') {
-        syncCustomSelects();
-      }
+    }
+
+    if (typeof syncCustomSelects === 'function') {
+      syncCustomSelects();
     }
 
     // If in settings view, refresh models count display
@@ -4801,7 +4838,12 @@ window.runWhisperTranscription = async function() {
   transcriptLines = [];
   const viewport = document.getElementById('transcript-viewport');
   if (viewport) {
-    viewport.innerHTML = `<div data-i18n="transcribe.aiModelInitializing" style="color: var(--color-cyan); text-align: center; margin-top: 40px; font-weight: 500;">${t('transcribe.aiModelInitializing')}</div>`;
+    viewport.innerHTML = `
+      <div id="transcript-placeholder" class="transcript-initializing-state">
+        <div class="transcript-spinner"></div>
+        <div class="transcript-initializing-text" data-i18n="transcribe.aiModelInitializing">${escapeHTML(t('transcribe.aiModelInitializing'))}</div>
+      </div>
+    `;
   }
 
   try {
@@ -5743,7 +5785,12 @@ window.runBatchExtraction = async function() {
       transcriptLines = [];
       const viewport = document.getElementById('transcript-viewport');
       if (viewport) {
-        viewport.innerHTML = `<div style="color: var(--color-cyan); text-align: center; margin-top: 40px; font-weight: 500;">${t('transcribe.aiModelInitializing')}</div>`;
+        viewport.innerHTML = `
+          <div id="transcript-placeholder" class="transcript-initializing-state">
+            <div class="transcript-spinner"></div>
+            <div class="transcript-initializing-text" data-i18n="transcribe.aiModelInitializing">${escapeHTML(t('transcribe.aiModelInitializing'))}</div>
+          </div>
+        `;
       }
       
       const result = await invoke('start_transcription_task', {
@@ -6628,28 +6675,87 @@ function setupTranscriptDirection() {
   });
 }
 
+function parseTranscriptTimeRange(timeRange) {
+  if (!timeRange) return { raw: '', durLabel: '' };
+  const match = timeRange.match(/\[?(\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?)\s*(?:-->|→)\s*(\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?)\]?/);
+  if (match) {
+    const start = match[1];
+    const end = match[2];
+    const toSec = (str) => {
+      const parts = str.split(':');
+      return parseFloat(parts[0]) * 3600 + parseFloat(parts[1]) * 60 + parseFloat(parts[2]);
+    };
+    const diff = Math.max(0, Math.round(toSec(end) - toSec(start)));
+    const durLabel = diff > 0 ? `${diff}s` : '';
+    return {
+      raw: `${start} → ${end}`,
+      durLabel
+    };
+  }
+  return {
+    raw: timeRange.replace(/^\[|\]$/g, ''),
+    durLabel: ''
+  };
+}
+window.parseTranscriptTimeRange = parseTranscriptTimeRange;
+
 function appendTranscriptLine(timeRange, text) {
   const placeholder = document.getElementById('transcript-placeholder');
   if (placeholder) placeholder.remove();
   
   const viewport = document.getElementById('transcript-viewport');
+  if (!viewport) return;
+
+  const lingeringInit = viewport.querySelector('.transcript-initializing-state, [data-i18n="transcribe.aiModelInitializing"]');
+  if (lingeringInit) lingeringInit.remove();
   
   // Clean text
   const cleanText = text.trim();
   
   const lineObj = { timeRange, text: cleanText, id: transcriptLines.length };
   transcriptLines.push(lineObj);
+
+  const parsedTime = parseTranscriptTimeRange(timeRange);
   
-  const lineEl = document.createElement('div');
-  lineEl.className = 'transcript-line';
-  lineEl.dataset.id = lineObj.id;
+  const cardEl = document.createElement('div');
+  cardEl.className = 'transcript-card transcript-line';
+  cardEl.dataset.id = lineObj.id;
 
-  const timeSpan = document.createElement('span');
-  timeSpan.className = 'transcript-time';
-  timeSpan.textContent = timeRange;
+  const headerEl = document.createElement('div');
+  headerEl.className = 'transcript-card-header';
 
-  const textDiv = document.createElement('div');
-  textDiv.className = 'transcript-text';
+  const badgeWrap = document.createElement('div');
+  badgeWrap.className = 'transcript-card-badge-wrap';
+
+  const numSpan = document.createElement('span');
+  numSpan.className = 'transcript-card-num';
+  numSpan.textContent = `#${lineObj.id + 1}`;
+  badgeWrap.appendChild(numSpan);
+
+  if (parsedTime.durLabel) {
+    const durSpan = document.createElement('span');
+    durSpan.className = 'transcript-card-dur';
+    durSpan.textContent = parsedTime.durLabel;
+    badgeWrap.appendChild(durSpan);
+  }
+
+  const timeDiv = document.createElement('div');
+  timeDiv.className = 'transcript-card-time';
+  timeDiv.setAttribute('dir', 'ltr');
+  timeDiv.innerHTML = `
+    <svg class="transcript-time-icon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"></circle>
+      <polyline points="12 6 12 12 16 14"></polyline>
+    </svg>
+    <span>${escapeHTML(parsedTime.raw)}</span>
+  `;
+
+  headerEl.appendChild(badgeWrap);
+  headerEl.appendChild(timeDiv);
+
+  const bodyEl = document.createElement('div');
+  bodyEl.className = 'transcript-card-body';
+
   const textarea = document.createElement('textarea');
   textarea.rows = 1;
   textarea.className = 'transcript-text-input';
@@ -6661,11 +6767,11 @@ function appendTranscriptLine(timeRange, text) {
   textarea.onchange = function() {
     updateTranscriptLineText(lineObj.id, this.value);
   };
-  textDiv.appendChild(textarea);
+  bodyEl.appendChild(textarea);
 
-  lineEl.appendChild(timeSpan);
-  lineEl.appendChild(textDiv);
-  viewport.appendChild(lineEl);
+  cardEl.appendChild(headerEl);
+  cardEl.appendChild(bodyEl);
+  viewport.appendChild(cardEl);
 
   autoResizeTranscriptField(textarea);
 
@@ -6721,18 +6827,25 @@ window.loadTranscriptFromFile = async function(fullPath) {
       const lineObj = { timeRange: `Line ${idx + 1}`, text: lineText.trim(), id: idx };
       transcriptLines.push(lineObj);
       
-      const lineEl = document.createElement('div');
-      lineEl.className = 'transcript-line';
-      lineEl.dataset.id = lineObj.id;
-      lineEl.innerHTML = `
-        <span class="transcript-time" style="color: var(--color-text-muted); font-family: inherit; font-size: 0.75rem;">[L${idx + 1}]</span>
-        <div class="transcript-text">
+      const cardEl = document.createElement('div');
+      cardEl.className = 'transcript-card transcript-line';
+      cardEl.dataset.id = lineObj.id;
+      cardEl.innerHTML = `
+        <div class="transcript-card-header">
+          <div class="transcript-card-badge-wrap">
+            <span class="transcript-card-num">#${idx + 1}</span>
+          </div>
+          <div class="transcript-card-time" dir="ltr">
+            <span style="color: var(--color-text-dim); font-size: 0.72rem;">Line ${idx + 1}</span>
+          </div>
+        </div>
+        <div class="transcript-card-body">
           <textarea rows="1" class="transcript-text-input" oninput="updateTranscriptLineText(${lineObj.id}, this.value)" onchange="updateTranscriptLineText(${lineObj.id}, this.value)">${escapeHTML(lineText.trim())}</textarea>
         </div>
       `;
-      const textarea = lineEl.querySelector('.transcript-text-input');
+      const textarea = cardEl.querySelector('.transcript-text-input');
       applyTextDirection(textarea);
-      viewport.appendChild(lineEl);
+      viewport.appendChild(cardEl);
       autoResizeTranscriptField(textarea);
     });
     

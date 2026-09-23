@@ -874,7 +874,7 @@ export const ru: Translations = {
     vadMaxSpeechPoints: '<span class="setting-desc-point"><strong>По умолчанию:</strong> <code>30,000</code> мс (30с)</span><span class="setting-desc-point"><strong>Назначение:</strong> Соответствует окну Whisper во избежание переполнения памяти.</span>',
     vadSpeechPadPoints: '<span class="setting-desc-point"><strong>По умолчанию:</strong> <code>30</code> мс</span><span class="setting-desc-point"><strong>Назначение:</strong> Защищает от проглатывания начальных согласных и финальных гласных.</span>',
     vadOverlapPoints: '<span class="setting-desc-point"><strong>По умолчанию:</strong> <code>0.1</code> (10%)</span><span class="setting-desc-point"><strong>Назначение:</strong> Сохраняет связность фраз на стыке соседних окон.</span>',
-    aiTranslatePoints: '<span class="setting-desc-point"><strong>Поддержка:</strong> OpenAI, Claude, Gemini, Groq, локальный LM Studio, DeepSeek</span>',
+    aiTranslatePoints: '<span class="setting-desc-point"><strong>Поддержка:</strong> OpenAI, Claude, Gemini, Groq, LM Studio, DeepSeek</span>',
     targetLangPoints: '<span class="setting-desc-point"><strong>Языки:</strong> 100+ мировых языков с корректным нативным отображением шрифтов</span>',
     polishPoints: '<span class="setting-desc-point"><strong>Рекомендуется:</strong> Для живого и естественного диалогового ритма без механического подстрочника.</span>',
     modelsTip: 'Настройки моделей сохраняются мгновенно. Кликните по строке модели, чтобы назначить ее основной.',

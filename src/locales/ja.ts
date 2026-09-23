@@ -874,7 +874,7 @@ export const ja: Translations = {
     vadMaxSpeechPoints: '<span class="setting-desc-point"><strong>デフォルト:</strong> <code>30,000</code> ms (30秒)</span><span class="setting-desc-point"><strong>目的:</strong> Whisper の音響窓と同期させ、メモリ溢れを防ぎます。</span>',
     vadSpeechPadPoints: '<span class="setting-desc-point"><strong>デフォルト:</strong> <code>30</code> ms</span><span class="setting-desc-point"><strong>目的:</strong> 語頭の子音や語尾の母音が切れるのを防止します。</span>',
     vadOverlapPoints: '<span class="setting-desc-point"><strong>デフォルト:</strong> <code>0.1</code> (10%)</span><span class="setting-desc-point"><strong>目的:</strong> セグメント境界を跨ぐ文法の連続性を保ちます。</span>',
-    aiTranslatePoints: '<span class="setting-desc-point"><strong>対応プロバイダー:</strong> OpenAI, Claude, Gemini, Groq, LM Studio, DeepSeek 等</span>',
+    aiTranslatePoints: '<span class="setting-desc-point"><strong>対応プロバイダー:</strong> OpenAI、Claude、Gemini、Groq、LM Studio、DeepSeek 等</span>',
     targetLangPoints: '<span class="setting-desc-point"><strong>対応言語:</strong> ネイティブスクリプト表示に対応した世界 100 以上の言語</span>',
     polishPoints: '<span class="setting-desc-point"><strong>推奨:</strong> 機械翻訳特有の硬さを無くし、自然な字幕にするため有効化を推奨します。</span>',
     modelsTip: 'モデル設定の変更はリアルタイムで自動保存されます。行をクリックするとデフォルトモデルとして設定されます。',

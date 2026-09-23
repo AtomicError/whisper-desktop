@@ -874,7 +874,7 @@ export const pt: Translations = {
     vadMaxSpeechPoints: '<span class="setting-desc-point"><strong>Padrão:</strong> <code>30,000</code> ms (30s)</span><span class="setting-desc-point"><strong>Objetivo:</strong> Alinha com a janela acústica do Whisper para evitar sobrecarga de memória.</span>',
     vadSpeechPadPoints: '<span class="setting-desc-point"><strong>Padrão:</strong> <code>30</code> ms</span><span class="setting-desc-point"><strong>Objetivo:</strong> Evita cortar a primeira ou a última consoante das palavras.</span>',
     vadOverlapPoints: '<span class="setting-desc-point"><strong>Padrão:</strong> <code>0.1</code> (10%)</span><span class="setting-desc-point"><strong>Objetivo:</strong> Mantém a coerência gramatical entre trechos adjacentes.</span>',
-    aiTranslatePoints: '<span class="setting-desc-point"><strong>Compatibilidade:</strong> OpenAI, Claude, Gemini, Groq, LM Studio local, DeepSeek</span>',
+    aiTranslatePoints: '<span class="setting-desc-point"><strong>Compatibilidade:</strong> OpenAI, Claude, Gemini, Groq, LM Studio, DeepSeek</span>',
     targetLangPoints: '<span class="setting-desc-point"><strong>Compatibilidade:</strong> Mais de 100 idiomas mundiais com escrita nativa</span>',
     polishPoints: '<span class="setting-desc-point"><strong>Recomendado:</strong> Ativado para legendas fluídas e naturais, evitando traduções mecânicas palavra por palavra.</span>',
     modelsTip: 'As configurações de modelo são salvas em tempo real. Clique em uma linha para defini-la como modelo padrão.',

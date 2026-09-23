@@ -4343,32 +4343,100 @@ select.select-control {
 
 
 
-.transcript-line {
+/* Live Transcript Viewer - Modern Segment Cards */
+.transcript-card {
   display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--border-glass);
+  border-radius: 10px;
+  margin-bottom: 10px;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+  animation: transcriptCardFadeIn 0.22s ease-out;
+}
+
+@keyframes transcriptCardFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.transcript-card:hover {
+  background: rgba(255, 255, 255, 0.045);
+  border-color: rgba(var(--color-royal-blue-rgb), 0.35);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.transcript-card:focus-within {
+  border-color: rgba(var(--color-royal-blue-rgb), 0.65);
+  background: rgba(var(--color-royal-blue-rgb), 0.035);
+  box-shadow: 0 0 0 1px rgba(var(--color-royal-blue-rgb), 0.35), 0 4px 18px rgba(0, 0, 0, 0.3);
+}
+
+.transcript-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 12px;
-  padding: 6px 8px;
-  border-bottom: 1px solid rgba(255,255,255,0.02);
-  align-items: flex-start;
+  font-size: 0.76rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.035);
+  padding-bottom: 6px;
+  user-select: none;
 }
 
-.transcript-line:hover {
-  background: rgba(255,255,255,0.02);
+.transcript-card-badge-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.transcript-time {
+.transcript-card-num {
   font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.72rem;
   color: var(--color-cyan);
-  font-size: 0.75rem;
-  white-space: nowrap;
-  padding-top: 2px;
-  flex-shrink: 0;
-  direction: ltr;
+  background: rgba(var(--color-cyan-rgb, 45, 212, 191), 0.1);
+  padding: 1px 7px;
+  border-radius: 4px;
+  border: 1px solid rgba(var(--color-cyan-rgb, 45, 212, 191), 0.2);
 }
 
-.transcript-text {
-  flex-grow: 1;
-  min-width: 0;
-  color: var(--color-text);
+.transcript-card-dur {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--color-text-dim);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.transcript-card-time {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  letter-spacing: 0.2px;
+  direction: ltr !important;
+  unicode-bidi: isolate;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.transcript-time-icon {
+  opacity: 0.65;
+  flex-shrink: 0;
+}
+
+.transcript-card-body {
+  width: 100%;
 }
 
 .transcript-text-input {
@@ -4377,9 +4445,9 @@ select.select-control {
   border: none;
   color: var(--color-text);
   font-family: inherit;
-  font-size: inherit;
-  line-height: 1.5;
-  padding: 0;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  padding: 2px 0;
   margin: 0;
   outline: none;
   resize: none;
@@ -4395,9 +4463,56 @@ select.select-control {
 }
 
 .transcript-text-input:focus {
-  background: rgba(255,255,255,0.05);
-  border-radius: 4px;
-  padding: 0 4px;
+  outline: none;
+}
+
+/* Transcript Initializing / Loading State */
+.transcript-initializing-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 50px 16px;
+  gap: 16px;
+  text-align: center;
+  user-select: none;
+}
+
+.transcript-spinner {
+  width: 32px;
+  height: 32px;
+  border: 2.5px solid rgba(var(--color-royal-blue-rgb), 0.2);
+  border-top-color: var(--color-cyan);
+  border-radius: 50%;
+  animation: transcriptSpin 0.8s linear infinite;
+}
+
+@keyframes transcriptSpin {
+  to { transform: rotate(360deg); }
+}
+
+.transcript-initializing-text {
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--color-cyan);
+  letter-spacing: 0.2px;
+  animation: transcriptPulse 2s ease-in-out infinite;
+}
+
+@keyframes transcriptPulse {
+  0%, 100% { opacity: 0.75; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .transcript-card {
+    animation: none !important;
+    transform: none !important;
+  }
+  .transcript-spinner,
+  .transcript-initializing-text {
+    animation: none !important;
+  }
 }
 
 /* Model Architecture & Selection Guide Component */
@@ -6976,6 +7091,14 @@ select.pagination-size-select {
   border-radius: 6px;
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  unicode-bidi: plaintext;
+  text-align: start;
+}
+
+html[dir="rtl"] .custom-select-options.custom-select-ltr .custom-select-search:placeholder-shown,
+.rtl-layout .custom-select-options.custom-select-ltr .custom-select-search:placeholder-shown {
+  direction: rtl;
+  text-align: right;
 }
 
 .custom-select-search:focus {

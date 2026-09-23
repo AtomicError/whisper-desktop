@@ -874,7 +874,7 @@ export const zh: Translations = {
     vadMaxSpeechPoints: '<span class="setting-desc-point"><strong>默认数值：</strong> <code>30,000</code> 毫秒 (30秒)</span><span class="setting-desc-point"><strong>作用：</strong> 契合 Whisper 标准声学窗口，防止内存撑爆。</span>',
     vadSpeechPadPoints: '<span class="setting-desc-point"><strong>默认数值：</strong> <code>30</code> 毫秒</span><span class="setting-desc-point"><strong>作用：</strong> 消除因切片过于严丝合缝而导致的句首句尾吞音。</span>',
     vadOverlapPoints: '<span class="setting-desc-point"><strong>默认数值：</strong> <code>0.1</code> (10%)</span><span class="setting-desc-point"><strong>作用：</strong> 保障切片边缘过渡处文字语法的连贯完整。</span>',
-    aiTranslatePoints: '<span class="setting-desc-point"><strong>全面兼容：</strong> OpenAI, Claude, Gemini, Groq, 本地 LM Studio, DeepSeek 等</span>',
+    aiTranslatePoints: '<span class="setting-desc-point"><strong>全面兼容：</strong> OpenAI、Claude、Gemini、Groq、LM Studio、DeepSeek 等</span>',
     targetLangPoints: '<span class="setting-desc-point"><strong>全球通达：</strong> 支持全球 100+ 语言的高水准自然原生书写</span>',
     polishPoints: '<span class="setting-desc-point"><strong>强烈推荐：</strong> 开启后消除机翻味，字字珠玑，还原电影级字幕对白感。</span>',
     modelsTip: '模型参数的变动均会实时自动持久化。直接点击列表中的任意一行即可快速将其设为默认主力模型。',

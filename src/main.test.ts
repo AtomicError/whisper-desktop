@@ -388,3 +388,175 @@ describe('toast message multi-line rendering', () => {
     expect(parsed.text).toBe(infoMsg);
   });
 });
+
+describe('CustomSelect model search placeholder and label resolution', () => {
+  function resolveCustomSelectLabels(selectEl: {
+    hasAttribute: (attr: string) => boolean;
+    id?: string;
+    dataset?: Record<string, string>;
+  }, tFn?: (key: string) => string) {
+    const isModelSelect = Boolean(
+      selectEl.hasAttribute('data-model-select') ||
+      (selectEl.id && selectEl.id.toLowerCase().includes('model'))
+    );
+
+    const getSearchPlaceholder = () => {
+      if (selectEl.dataset?.searchPlaceholderKey && typeof tFn === 'function') {
+        return tFn(selectEl.dataset.searchPlaceholderKey);
+      }
+      if (selectEl.dataset?.searchPlaceholder) {
+        return selectEl.dataset.searchPlaceholder;
+      }
+      if (isModelSelect) {
+        return (typeof tFn === 'function')
+          ? tFn('settings.searchModelsPlaceholder')
+          : 'Search models by identifier...';
+      }
+      return (typeof tFn === 'function')
+        ? tFn('common.searchLanguage')
+        : 'Search…';
+    };
+
+    const getNoResultsText = () => {
+      if (selectEl.dataset?.searchNoResultsKey && typeof tFn === 'function') {
+        return tFn(selectEl.dataset.searchNoResultsKey);
+      }
+      if (selectEl.dataset?.searchNoResults) {
+        return selectEl.dataset.searchNoResults;
+      }
+      if (isModelSelect) {
+        return (typeof tFn === 'function')
+          ? tFn('settings.noMatchingModels')
+          : 'No Matching Models Found';
+      }
+      return (typeof tFn === 'function')
+        ? tFn('languages.noResults')
+        : 'No matching language';
+    };
+
+    return {
+      isModelSelect,
+      placeholder: getSearchPlaceholder(),
+      noResults: getNoResultsText(),
+    };
+  }
+
+  const mockT = (key: string) => {
+    const dict: Record<string, string> = {
+      'settings.searchModelsPlaceholder': 'جستجوی مدل‌ها با شناسه...',
+      'settings.noMatchingModels': 'هیچ مدل منطبقی یافت نشد',
+      'common.searchLanguage': 'جستجوی زبان...',
+      'languages.noResults': 'زبانی یافت نشد',
+    };
+    return dict[key] || key;
+  };
+
+  it('detects model select with data-model-select attribute and returns model translations', () => {
+    const el = {
+      hasAttribute: (attr: string) => attr === 'data-model-select' || attr === 'data-searchable',
+      id: 'quick-opt-model',
+    };
+    const resolved = resolveCustomSelectLabels(el, mockT);
+    expect(resolved.isModelSelect).toBe(true);
+    expect(resolved.placeholder).toBe('جستجوی مدل‌ها با شناسه...');
+    expect(resolved.noResults).toBe('هیچ مدل منطبقی یافت نشد');
+  });
+
+  it('detects translation studio model dropdown with translate-model-select ID', () => {
+    const el = {
+      hasAttribute: (attr: string) => attr === 'data-searchable',
+      id: 'translate-model-select',
+    };
+    const resolved = resolveCustomSelectLabels(el, mockT);
+    expect(resolved.isModelSelect).toBe(true);
+    expect(resolved.placeholder).toBe('جستجوی مدل‌ها با شناسه...');
+    expect(resolved.noResults).toBe('هیچ مدل منطبقی یافت نشد');
+  });
+
+  it('falls back to language placeholder and no-results for standard language dropdowns', () => {
+    const el = {
+      hasAttribute: (attr: string) => attr === 'data-searchable',
+      id: 'opt-language',
+    };
+    const resolved = resolveCustomSelectLabels(el, mockT);
+    expect(resolved.isModelSelect).toBe(false);
+    expect(resolved.placeholder).toBe('جستجوی زبان...');
+    expect(resolved.noResults).toBe('زبانی یافت نشد');
+  });
+
+  it('supports explicit custom dataset overrides', () => {
+    const el = {
+      hasAttribute: (attr: string) => attr === 'data-searchable',
+      id: 'custom-picker',
+      dataset: {
+        searchPlaceholder: 'Type to filter...',
+        searchNoResults: 'Nothing found',
+      },
+    };
+    const resolved = resolveCustomSelectLabels(el, mockT);
+    expect(resolved.isModelSelect).toBe(false);
+    expect(resolved.placeholder).toBe('Type to filter...');
+    expect(resolved.noResults).toBe('Nothing found');
+  });
+});
+
+describe('parseTranscriptTimeRange', () => {
+  function parseTranscriptTimeRange(timeRange?: string | null) {
+    if (!timeRange) return { raw: '', durLabel: '' };
+    const match = timeRange.match(/\[?(\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?)\s*(?:-->|→)\s*(\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?)\]?/);
+    if (match) {
+      const start = match[1];
+      const end = match[2];
+      const toSec = (str: string) => {
+        const parts = str.split(':');
+        return parseFloat(parts[0]) * 3600 + parseFloat(parts[1]) * 60 + parseFloat(parts[2]);
+      };
+      const diff = Math.max(0, Math.round(toSec(end) - toSec(start)));
+      const durLabel = diff > 0 ? `${diff}s` : '';
+      return {
+        raw: `${start} → ${end}`,
+        durLabel
+      };
+    }
+    return {
+      raw: timeRange.replace(/^\[|\]$/g, ''),
+      durLabel: ''
+    };
+  }
+
+  it('parses standard Whisper timestamp range with brackets and calculates duration', () => {
+    const res = parseTranscriptTimeRange('[00:00:01.000 --> 00:00:04.500]');
+    expect(res.raw).toBe('00:00:01.000 → 00:00:04.500');
+    expect(res.durLabel).toBe('4s');
+  });
+
+  it('parses short timestamps without milliseconds', () => {
+    const res = parseTranscriptTimeRange('[00:01:10 --> 00:01:25]');
+    expect(res.raw).toBe('00:01:10 → 00:01:25');
+    expect(res.durLabel).toBe('15s');
+  });
+
+  it('supports unicode arrow syntax without enclosing brackets', () => {
+    const res = parseTranscriptTimeRange('00:00:10 → 00:00:12');
+    expect(res.raw).toBe('00:00:10 → 00:00:12');
+    expect(res.durLabel).toBe('2s');
+  });
+
+  it('suppresses duration badge when duration rounds to zero seconds', () => {
+    const res = parseTranscriptTimeRange('[00:00:01.100 --> 00:00:01.400]');
+    expect(res.raw).toBe('00:00:01.100 → 00:00:01.400');
+    expect(res.durLabel).toBe('');
+  });
+
+  it('gracefully handles non-timestamp text and strips surrounding brackets', () => {
+    expect(parseTranscriptTimeRange('[L12]')).toEqual({ raw: 'L12', durLabel: '' });
+    expect(parseTranscriptTimeRange('Line 5')).toEqual({ raw: 'Line 5', durLabel: '' });
+  });
+
+  it('returns empty result for falsy or empty input', () => {
+    expect(parseTranscriptTimeRange('')).toEqual({ raw: '', durLabel: '' });
+    expect(parseTranscriptTimeRange(null)).toEqual({ raw: '', durLabel: '' });
+    expect(parseTranscriptTimeRange(undefined)).toEqual({ raw: '', durLabel: '' });
+  });
+});
+
