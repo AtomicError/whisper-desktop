@@ -3769,7 +3769,7 @@ async function refreshFFmpegStatus(sourceOverride, userInitiated = false) {
     if (info.isAvailable) {
       const verFormatted = formatFFmpegVersion(info.version);
       badgeEl.className = 'setting-status-pill ready';
-      badgeEl.innerHTML = `<span class="ffmpeg-status-dot green"></span> ${verFormatted}`;
+      badgeEl.innerHTML = `<span class="ffmpeg-status-dot blue"></span> ${verFormatted}`;
       badgeEl.title = `Source: ${info.configuredSource}\nPath: ${isolateLtr(info.resolvedPath)}\n${info.version}`;
     } else {
       badgeEl.className = 'setting-status-pill missing';
