@@ -647,6 +647,40 @@ pub const HOST_REMOVED_ENV_VARS: &[&str] = &[
 ];
 
 #[cfg(target_os = "linux")]
+pub fn trigger_gstreamer_warmup() {
+    std::thread::Builder::new()
+        .name("gst-warmup".into())
+        .spawn(|| {
+            extern "C" {
+                fn dlopen(filename: *const std::ffi::c_char, flag: std::ffi::c_int) -> *mut std::ffi::c_void;
+                fn dlsym(handle: *mut std::ffi::c_void, symbol: *const std::ffi::c_char) -> *mut std::ffi::c_void;
+                fn dlclose(handle: *mut std::ffi::c_void) -> std::ffi::c_int;
+            }
+
+            unsafe {
+                let lib_name = std::ffi::CString::new("libgstreamer-1.0.so.0").ok();
+                if let Some(c_name) = lib_name {
+                    let handle = dlopen(c_name.as_ptr(), 1); // RTLD_LAZY = 1
+                    let target_handle = if !handle.is_null() { handle } else { std::ptr::null_mut() };
+                    let sym_name = std::ffi::CString::new("gst_init").ok();
+                    if let Some(c_sym) = sym_name {
+                        let sym = dlsym(target_handle, c_sym.as_ptr());
+                        if !sym.is_null() {
+                            type GstInitFn = unsafe extern "C" fn(*mut i32, *mut *mut *mut std::ffi::c_char);
+                            let init_fn: GstInitFn = std::mem::transmute(sym);
+                            init_fn(std::ptr::null_mut(), std::ptr::null_mut());
+                        }
+                    }
+                    if !handle.is_null() {
+                        let _ = dlclose(handle);
+                    }
+                }
+            }
+        })
+        .ok();
+}
+
+#[cfg(target_os = "linux")]
 pub fn sanitize_host_command(cmd: &mut std::process::Command) {
     if let Some(ld) = get_clean_host_ld_library_path() {
         cmd.env("LD_LIBRARY_PATH", ld);
@@ -876,6 +910,10 @@ fn main() {
                         break;
                     }
                 }
+
+                // Trigger non-blocking background warm-up of the GStreamer registry so that
+                // the very first video loaded by the user in Hardsub opens instantly (0ms delay)
+                trigger_gstreamer_warmup();
             } else {
                 // If AppImage has no bundled media plugins, empty the system path to prevent symbol clashes with host
                 std::env::set_var("GST_PLUGIN_SYSTEM_PATH_1_0", "");
