@@ -68,7 +68,6 @@ jobs:
             patchelf \
             libssl-dev \
             rpm \
-            rpm-build \
             libglib2.0-dev \
             libunwind-dev \
             libgstreamer1.0-dev \
