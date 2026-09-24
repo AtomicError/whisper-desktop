@@ -77,3 +77,27 @@ export function assRunOrder<T>(
   const uniform = runs.every((run) => styleKey(run) === styleKey(runs[0]));
   return uniform ? runs : [...runs].reverse();
 }
+
+/**
+ * Protects neutral punctuation (., !, ?, :, -, (), quotes, etc.) at span boundaries in RTL text
+ * by anchoring them with Unicode Right-to-Left Marks (\u200F).
+ *
+ * In Unicode Bidirectional Algorithm (UAX #9), neutral punctuation characters at the edge
+ * of an RTL run inherit the base direction of the paragraph (which defaults to LTR in
+ * libass and standard renderers). This causes a trailing period in "شما می‌شود." to jump
+ * to the far right, rendering erroneously as ".شما می‌شود". Anchoring with \u200F
+ * enforces RTL resolution so the punctuation remains visually on the left where it belongs.
+ *
+ * LTR text is returned completely untouched.
+ */
+export function protectRtlPunctuation(text: string, direction: 'rtl' | 'ltr'): string {
+  if (direction !== 'rtl' || !text) return text;
+  let res = text;
+  if (/[\p{P}\p{S}]$/u.test(res)) {
+    res = res + '\u200F';
+  }
+  if (/^[\p{P}\p{S}]/u.test(res)) {
+    res = '\u200F' + res;
+  }
+  return res;
+}

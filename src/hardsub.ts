@@ -1,5 +1,5 @@
 import { t, firstStrongDirection, applyTextDirection, applyContentDirection, clearContentDirection, isolateDirection, isolateLtr } from './i18n/index';
-import { spanOrigins, assRunOrder } from './hardsubLayout';
+import { spanOrigins, assRunOrder, protectRtlPunctuation } from './hardsubLayout';
 
 const invoke = async <T>(cmd: string, args: Record<string, any> = {}): Promise<T> => {
   const tauri = (window as any).__TAURI__;
@@ -4021,7 +4021,8 @@ export class HardsubController {
         // interface direction, then hint the same direction to the renderer.
         const spanDirection = firstStrongDirection(span.text) ?? lineDirection;
         ctx.direction = spanDirection;
-        const spanText = spanDirection === 'rtl' ? `\u202B${span.text}\u202C` : span.text;
+        const formattedSpan = protectRtlPunctuation(span.text, spanDirection);
+        const spanText = spanDirection === 'rtl' ? `\u202B${formattedSpan}\u202C` : span.text;
         const x = spanX[i];
 
         // --- Outline (matching ASS Outline with contour expansion) ---
@@ -4322,9 +4323,10 @@ export class HardsubController {
           // assRunOrder holds the rule — it is what keeps an RTL line with a styled word
           // from burning mirrored without also mirroring a plain one.
           const lineText = lineSpans.map((span) => span.text).join('');
+          const lineDirection = detectBaseDirection(lineText);
           const orderedSpans = assRunOrder(
             lineSpans,
-            detectBaseDirection(lineText),
+            lineDirection,
             (span) => `${span.bold}|${span.italic}|${span.underline}|${span.color}`,
           );
 
@@ -4344,13 +4346,15 @@ export class HardsubController {
             }
             const cTag = `\\c&H${assColor}&`;
 
-            assLineText += `{${bTag}${iTag}${uTag}${cTag}}${span.text}`;
+            const spanDirection = firstStrongDirection(span.text) ?? lineDirection;
+            const formattedText = protectRtlPunctuation(span.text, spanDirection);
+            assLineText += `{${bTag}${iTag}${uTag}${cTag}}${formattedText}`;
           }
 
-          // No direction hint is written around the line. Wrapping it in an embedding
-          // character would assert one direction for the whole line, which is exactly
-          // what the run order above avoids relying on: libass resolves each run it
-          // keeps apart on its own, and handles a line it never splits as a whole.
+          if (lineDirection === 'rtl') {
+            assLineText = `\u200F${assLineText}\u200F`;
+          }
+
           events += `Dialogue: 1,${startStr},${endStr},TextStyle,,0,0,0,,{\\an${dialogueAlignment}}{\\pos(${X},${lineY})}${assLineText}\n`;
         });
       });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { spanOrigins, assRunOrder } from './hardsubLayout';
+import { spanOrigins, assRunOrder, protectRtlPunctuation } from './hardsubLayout';
 
 /**
  * The canvas preview draws a cue line one style run at a time, so this function
@@ -95,5 +95,40 @@ describe('assRunOrder', () => {
 
   it('handles a line with no runs', () => {
     expect(assRunOrder([], 'rtl', key)).toEqual([]);
+  });
+});
+
+describe('protectRtlPunctuation', () => {
+  it('anchors trailing period on Persian text with RLM', () => {
+    expect(protectRtlPunctuation('می‌شود.', 'rtl')).toBe('می‌شود.\u200F');
+  });
+
+  it('anchors leading dash on Persian text with RLM', () => {
+    expect(protectRtlPunctuation('- سلام بر شما', 'rtl')).toBe('\u200F- سلام بر شما');
+  });
+
+  it('anchors quotes surrounding Persian text with RLM on both sides', () => {
+    expect(protectRtlPunctuation('«سلام دنیا»', 'rtl')).toBe('\u200F«سلام دنیا»\u200F');
+  });
+
+  it('anchors exclamation mark and question mark on Persian text', () => {
+    expect(protectRtlPunctuation('خیلی عالیه!', 'rtl')).toBe('خیلی عالیه!\u200F');
+    expect(protectRtlPunctuation('آیا مطمئنی؟', 'rtl')).toBe('آیا مطمئنی؟\u200F');
+    expect(protectRtlPunctuation('چطور؟', 'rtl')).toBe('چطور؟\u200F');
+  });
+
+  it('leaves Persian text without punctuation untouched', () => {
+    expect(protectRtlPunctuation('سلام دنیا', 'rtl')).toBe('سلام دنیا');
+  });
+
+  it('never modifies left-to-right (English) text, even with punctuation', () => {
+    expect(protectRtlPunctuation('This is a test.', 'ltr')).toBe('This is a test.');
+    expect(protectRtlPunctuation('"Hello world!"', 'ltr')).toBe('"Hello world!"');
+    expect(protectRtlPunctuation('- item', 'ltr')).toBe('- item');
+  });
+
+  it('safely handles empty string', () => {
+    expect(protectRtlPunctuation('', 'rtl')).toBe('');
+    expect(protectRtlPunctuation('', 'ltr')).toBe('');
   });
 });
