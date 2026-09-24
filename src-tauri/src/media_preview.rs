@@ -462,6 +462,8 @@ async fn run_process(binary: &Path, arguments: &[std::ffi::OsString], cancel: Ca
     let mut cmd = tokio::process::Command::new(binary);
     #[cfg(target_os = "windows")]
     cmd.creation_flags(0x08000000);
+    #[cfg(target_os = "linux")]
+    crate::hardsub::apply_linux_media_env_tokio(&mut cmd);
     let mut child = cmd.args(arguments).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped()).kill_on_drop(true).spawn()
         .map_err(|e| PreviewError::new(error_code.clone(), e.to_string()))?;
     let mut stdout = child.stdout.take().expect("piped stdout");

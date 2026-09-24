@@ -211,6 +211,8 @@ pub async fn convert_to_wav(
     {
         cmd.process_group(0);
     }
+    #[cfg(target_os = "linux")]
+    crate::hardsub::apply_linux_media_env_tokio(&mut cmd);
 
     let mut child = cmd.spawn()
         .map_err(|e| format!("Failed to execute FFmpeg ({}): {}", ffmpeg_bin.display(), e))?;

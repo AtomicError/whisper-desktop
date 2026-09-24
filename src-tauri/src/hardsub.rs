@@ -443,95 +443,69 @@ pub struct HardwareEncodersStatus {
     pub has_videotoolbox: bool,
 }
 
-#[tauri::command]
-pub async fn check_hardware_encoders(app: tauri::AppHandle) -> HardwareEncodersStatus {
-    let ffmpeg_bin = crate::ffmpeg_resolver::ensure_ffmpeg_available(Some(&app))
-        .unwrap_or_else(|_| PathBuf::from("ffmpeg"));
-
-    let f1 = ffmpeg_bin.clone();
-    let qsv_task = tokio::task::spawn_blocking(move || {
-        let mut cmd = std::process::Command::new(&f1);
-        cmd.args(["-f", "lavfi", "-i", "nullsrc", "-frames:v", "1", "-c:v", "h264_qsv", "-f", "null", "-"]);
-        #[cfg(target_os = "linux")]
-        apply_linux_media_env(&mut cmd);
-        match cmd.output() {
-            Ok(o) => {
-                #[cfg(debug_assertions)]
-                if !o.status.success() {
-                    eprintln!("QSV check failed (status: {:?}): {}", o.status, String::from_utf8_lossy(&o.stderr));
-                }
-                o.status.success()
-            }
-            Err(_e) => {
-                #[cfg(debug_assertions)]
-                eprintln!("QSV check spawn failed: {}", _e);
-                false
+pub fn probe_encoder_support(bin: &Path, hw_accel: &str) -> bool {
+    let mut cmd = std::process::Command::new(bin);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    match hw_accel {
+        "qsv" => {
+            cmd.args(["-nostdin", "-f", "lavfi", "-i", "nullsrc", "-frames:v", "1", "-vf", "format=nv12", "-c:v", "h264_qsv", "-f", "null", "-"]);
+        }
+        "nvenc" => {
+            cmd.args(["-nostdin", "-f", "lavfi", "-i", "nullsrc", "-frames:v", "1", "-c:v", "h264_nvenc", "-f", "null", "-"]);
+        }
+        "vaapi" => {
+            if let Some(dev) = find_vaapi_render_device() {
+                cmd.args([
+                    "-nostdin",
+                    "-vaapi_device", &dev,
+                    "-f", "lavfi", "-i", "nullsrc", "-frames:v", "1",
+                    "-vf", "format=nv12,hwupload",
+                    "-c:v", "h264_vaapi",
+                    "-f", "null", "-",
+                ]);
+            } else {
+                return false;
             }
         }
-    });
-
-    let f2 = ffmpeg_bin.clone();
-    let nvenc_task = tokio::task::spawn_blocking(move || {
-        let mut cmd = std::process::Command::new(&f2);
-        cmd.args(["-f", "lavfi", "-i", "nullsrc", "-frames:v", "1", "-c:v", "h264_nvenc", "-f", "null", "-"]);
-        #[cfg(target_os = "linux")]
-        apply_linux_media_env(&mut cmd);
-        match cmd.output() {
-            Ok(o) => {
-                #[cfg(debug_assertions)]
-                if !o.status.success() {
-                    eprintln!("NVENC check failed (status: {:?}): {}", o.status, String::from_utf8_lossy(&o.stderr));
-                }
-                o.status.success()
-            }
-            Err(_e) => {
-                #[cfg(debug_assertions)]
-                eprintln!("NVENC check spawn failed: {}", _e);
-                false
-            }
+        "videotoolbox" => {
+            cmd.args(["-nostdin", "-f", "lavfi", "-i", "nullsrc", "-frames:v", "1", "-c:v", "h264_videotoolbox", "-f", "null", "-"]);
         }
-    });
-
-    let f3 = ffmpeg_bin.clone();
-    let vaapi_task = tokio::task::spawn_blocking(move || {
-        if let Some(dev) = find_vaapi_render_device() {
-            let mut cmd = std::process::Command::new(&f3);
-            cmd.args([
-                "-vaapi_device", &dev,
-                "-f", "lavfi", "-i", "nullsrc", "-frames:v", "1",
-                "-vf", "format=nv12,hwupload",
-                "-c:v", "h264_vaapi",
-                "-f", "null", "-",
-            ]);
-            #[cfg(target_os = "linux")]
-            apply_linux_media_env(&mut cmd);
-            match cmd.output() {
-                Ok(o) => {
-                    #[cfg(debug_assertions)]
-                    if !o.status.success() {
-                        eprintln!("VAAPI check failed (status: {:?}): {}", o.status, String::from_utf8_lossy(&o.stderr));
-                    }
-                    o.status.success()
-                }
-                Err(_e) => {
-                    #[cfg(debug_assertions)]
-                    eprintln!("VAAPI check spawn failed: {}", _e);
-                    false
-                }
+        _ => return true,
+    }
+    #[cfg(target_os = "linux")]
+    apply_linux_media_env(&mut cmd);
+    match cmd.output() {
+        Ok(o) => {
+            #[cfg(debug_assertions)]
+            if !o.status.success() {
+                eprintln!("{} check failed (status: {:?}): {}", hw_accel, o.status, String::from_utf8_lossy(&o.stderr));
             }
-        } else {
+            o.status.success()
+        }
+        Err(_e) => {
+            #[cfg(debug_assertions)]
+            eprintln!("{} check spawn failed: {}", hw_accel, _e);
             false
         }
-    });
+    }
+}
 
-    let f4 = ffmpeg_bin.clone();
-    let videotoolbox_task = tokio::task::spawn_blocking(move || {
-        std::process::Command::new(&f4)
-            .args(["-f", "lavfi", "-i", "nullsrc", "-frames:v", "1", "-c:v", "h264_videotoolbox", "-f", "null", "-"])
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false)
-    });
+async fn probe_hardware_encoders(bin: &Path) -> HardwareEncodersStatus {
+    let f1 = bin.to_path_buf();
+    let qsv_task = tokio::task::spawn_blocking(move || probe_encoder_support(&f1, "qsv"));
+
+    let f2 = bin.to_path_buf();
+    let nvenc_task = tokio::task::spawn_blocking(move || probe_encoder_support(&f2, "nvenc"));
+
+    let f3 = bin.to_path_buf();
+    let vaapi_task = tokio::task::spawn_blocking(move || probe_encoder_support(&f3, "vaapi"));
+
+    let f4 = bin.to_path_buf();
+    let videotoolbox_task = tokio::task::spawn_blocking(move || probe_encoder_support(&f4, "videotoolbox"));
 
     let (has_qsv, has_nvenc, has_vaapi, has_videotoolbox) = tokio::join!(
         async { qsv_task.await.unwrap_or(false) },
@@ -546,6 +520,30 @@ pub async fn check_hardware_encoders(app: tauri::AppHandle) -> HardwareEncodersS
         has_vaapi,
         has_videotoolbox,
     }
+}
+
+#[tauri::command]
+pub async fn check_hardware_encoders(app: tauri::AppHandle) -> HardwareEncodersStatus {
+    let primary_bin = crate::ffmpeg_resolver::ensure_ffmpeg_available(Some(&app))
+        .unwrap_or_else(|_| PathBuf::from("ffmpeg"));
+    let mut status = probe_hardware_encoders(&primary_bin).await;
+
+    // If primary binary is missing any hardware acceleration and a system binary is available,
+    // probe system FFmpeg to supplement any missing encoders.
+    let needs_fallback = !status.has_qsv || !status.has_nvenc || !status.has_vaapi || !status.has_videotoolbox;
+    if needs_fallback {
+        if let Some(sys_path) = crate::ffmpeg_resolver::find_system_binary("ffmpeg") {
+            if sys_path != primary_bin {
+                let sys_status = probe_hardware_encoders(&sys_path).await;
+                status.has_qsv = status.has_qsv || sys_status.has_qsv;
+                status.has_nvenc = status.has_nvenc || sys_status.has_nvenc;
+                status.has_vaapi = status.has_vaapi || sys_status.has_vaapi;
+                status.has_videotoolbox = status.has_videotoolbox || sys_status.has_videotoolbox;
+            }
+        }
+    }
+
+    status
 }
 
 /// Converts HTML Hex color "#RRGGBB" or "#AARRGGBB" into ASS Color format "&H(AA)BBGGRR&"
@@ -1327,7 +1325,7 @@ pub async fn run_hardsub_task(
     if normalized_rotation == 90 || normalized_rotation == 270 {
         std::mem::swap(&mut video_width, &mut video_height);
     }
-    let ffmpeg_bin = crate::ffmpeg_resolver::ensure_ffmpeg_available(Some(&app))?;
+    let ffmpeg_bin = crate::ffmpeg_resolver::resolve_ffmpeg_for_hardsub(Some(&app), &settings.hw_accel)?;
 
     logs.log(&app, "Hardsub", &format!("Probed video dimensions: {}x{} (Aspect: {:.3})", video_width, video_height, video_width as f64 / video_height as f64));
 

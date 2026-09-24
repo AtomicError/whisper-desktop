@@ -481,24 +481,24 @@ jobs:
         with:
           path: |
             ffmpeg-bins/**
-          key: ffmpeg-${{ matrix.platform }}-${{ matrix.arch }}-v3
+          key: ffmpeg-${{ matrix.platform }}-${{ matrix.arch }}-v4
 
-      - name: Download Static FFmpeg (Linux x86_64)
+      - name: Download Hardware-Accelerated FFmpeg (Linux x86_64 - BtbN GPL)
         if: matrix.platform == 'ubuntu-22.04' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p ffmpeg-bins
-          wget -q https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
-          tar -xJf ffmpeg-release-amd64-static.tar.xz --wildcards --strip-components=1 -C ffmpeg-bins/ "ffmpeg-*-amd64-static/ffmpeg" "ffmpeg-*-amd64-static/ffprobe"
-          rm -f ffmpeg-release-amd64-static.tar.xz
+          wget -q -O ffmpeg-linux.tar.xz https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz
+          tar -xJf ffmpeg-linux.tar.xz --wildcards --strip-components=2 -C ffmpeg-bins/ "*/bin/ffmpeg" "*/bin/ffprobe"
+          rm -f ffmpeg-linux.tar.xz
           chmod +x ffmpeg-bins/ffmpeg ffmpeg-bins/ffprobe
 
-      - name: Download Static FFmpeg (Linux arm64)
+      - name: Download Hardware-Accelerated FFmpeg (Linux arm64 - BtbN GPL)
         if: matrix.platform == 'ubuntu-24.04-arm' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p ffmpeg-bins
-          wget -q https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-arm64-static.tar.xz
-          tar -xJf ffmpeg-release-arm64-static.tar.xz --wildcards --strip-components=1 -C ffmpeg-bins/ "ffmpeg-*-arm64-static/ffmpeg" "ffmpeg-*-arm64-static/ffprobe"
-          rm -f ffmpeg-release-arm64-static.tar.xz
+          wget -q -O ffmpeg-linux-arm.tar.xz https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linuxarm64-gpl.tar.xz
+          tar -xJf ffmpeg-linux-arm.tar.xz --wildcards --strip-components=2 -C ffmpeg-bins/ "*/bin/ffmpeg" "*/bin/ffprobe"
+          rm -f ffmpeg-linux-arm.tar.xz
           chmod +x ffmpeg-bins/ffmpeg ffmpeg-bins/ffprobe
 
       - name: Download Static FFmpeg (Windows x64 - Full Build)
@@ -567,8 +567,8 @@ jobs:
               echo "Patching graphics libs in AppImage: $target_img"
               chmod +x "$target_img"
               "$target_img" --appimage-extract
-              rm -f squashfs-root/usr/lib/libEGL.so* squashfs-root/usr/lib/libGL.so* squashfs-root/usr/lib/libgbm.so* squashfs-root/usr/lib/libglapi.so* squashfs-root/usr/lib/libwayland-client.so*
-              rm -f squashfs-root/usr/lib/x86_64-linux-gnu/libEGL.so* squashfs-root/usr/lib/x86_64-linux-gnu/libGL.so* squashfs-root/usr/lib/x86_64-linux-gnu/libgbm.so* squashfs-root/usr/lib/x86_64-linux-gnu/libglapi.so* squashfs-root/usr/lib/x86_64-linux-gnu/libwayland-client.so*
+              rm -f squashfs-root/usr/lib/libEGL.so* squashfs-root/usr/lib/libGL.so* squashfs-root/usr/lib/libgbm.so* squashfs-root/usr/lib/libglapi.so* squashfs-root/usr/lib/libwayland-client.so* squashfs-root/usr/lib/libdrm.so*
+              rm -f squashfs-root/usr/lib/x86_64-linux-gnu/libEGL.so* squashfs-root/usr/lib/x86_64-linux-gnu/libGL.so* squashfs-root/usr/lib/x86_64-linux-gnu/libgbm.so* squashfs-root/usr/lib/x86_64-linux-gnu/libglapi.so* squashfs-root/usr/lib/x86_64-linux-gnu/libwayland-client.so* squashfs-root/usr/lib/x86_64-linux-gnu/libdrm.so*
               rm -f "$target_img"
               export ARCH=x86_64
               ./appimagetool-temp/AppRun squashfs-root "$target_img"

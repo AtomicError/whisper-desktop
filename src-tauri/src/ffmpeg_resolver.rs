@@ -115,6 +115,10 @@ fn binary_version_output(binary: &Path) -> Option<Vec<u8>> {
     let mut cmd = Command::new(binary);
     #[cfg(target_os = "windows")]
     cmd.creation_flags(0x08000000);
+    #[cfg(target_os = "linux")]
+    if binary.components().count() == 1 || !binary.to_string_lossy().contains(".mount_") {
+        crate::sanitize_host_command(&mut cmd);
+    }
     let spawned = cmd
         .arg("-version")
         .stdin(Stdio::null())
@@ -170,7 +174,7 @@ fn find_system_binary_with_version(binary_name: &str) -> Option<(PathBuf, String
 }
 
 /// Checks if a system binary is executable in PATH without extra version formatting.
-fn find_system_binary(binary_name: &str) -> Option<PathBuf> {
+pub fn find_system_binary(binary_name: &str) -> Option<PathBuf> {
     find_system_binary_with_version(binary_name).map(|(path, _)| path)
 }
 
@@ -266,6 +270,34 @@ pub fn ensure_ffmpeg_available(app: Option<&tauri::AppHandle>) -> Result<PathBuf
 
 pub fn ensure_ffprobe_available(app: Option<&tauri::AppHandle>) -> Result<PathBuf, String> {
     resolve_binary_for_execution(app, "ffprobe")
+}
+
+pub fn resolve_ffmpeg_for_hardsub(app: Option<&tauri::AppHandle>, hw_accel: &str) -> Result<PathBuf, String> {
+    let default_bin = resolve_binary_for_execution(app, "ffmpeg")?;
+    if hw_accel == "cpu" {
+        return Ok(default_bin);
+    }
+
+    // 1. If user explicitly configured system ffmpeg, use it directly
+    let settings = crate::settings::load_settings_file();
+    if settings.ffmpeg_source.to_lowercase() == "system" {
+        return Ok(default_bin);
+    }
+
+    // 2. Check if default (bundled) binary supports the requested hardware accelerator
+    if crate::hardsub::probe_encoder_support(&default_bin, hw_accel) {
+        return Ok(default_bin);
+    }
+
+    // 3. Fallback to system FFmpeg if available and capable
+    if let Some(sys_path) = find_system_binary("ffmpeg") {
+        if sys_path != default_bin && crate::hardsub::probe_encoder_support(&sys_path, hw_accel) {
+            return Ok(sys_path);
+        }
+    }
+
+    // Default to the resolved binary even if probe failed, allowing ffmpeg to report its own detailed error
+    Ok(default_bin)
 }
 
 /// Returns the live FFmpeg status for UI telemetry without executing unnecessary duplicate sub-processes.

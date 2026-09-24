@@ -781,11 +781,6 @@ fn main() {
             std::env::set_var("GDK_DPI_SCALE", "1.0");
         }
 
-        // Prevent WebKitGTK DMA-BUF renderer compositing glitches and texture ghosting on Linux / VMs
-        if std::env::var("WEBKIT_DISABLE_DMABUF_RENDERER").is_err() {
-            std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
-        }
-
         // Resolve WebKit subprocess and GStreamer dependencies inside AppImage environment.
         if let Ok(appdir) = std::env::var("APPDIR") {
             if std::env::var("WEBKIT_DISABLE_SANDBOX").is_err() {
@@ -809,7 +804,12 @@ fn main() {
 
             let joined_ld = ld_paths.join(":");
             if let Ok(existing_paths) = std::env::var("LD_LIBRARY_PATH") {
-                std::env::set_var("LD_LIBRARY_PATH", format!("{}:{}", joined_ld, existing_paths));
+                if !existing_paths.trim().is_empty() {
+                    // Append AppImage libraries after existing paths so host GPU drivers (Mesa, DRI, etc.) take priority
+                    std::env::set_var("LD_LIBRARY_PATH", format!("{}:{}", existing_paths, joined_ld));
+                } else {
+                    std::env::set_var("LD_LIBRARY_PATH", joined_ld);
+                }
             } else {
                 std::env::set_var("LD_LIBRARY_PATH", joined_ld);
             }
