@@ -1,7 +1,7 @@
 [package]
 name = "whisper-desktop"
 version = "3.0.0"
-description = "A premium, state-of-the-art, and gorgeous native Rust & Tauri GUI designed for whisper.cpp"
+description = "High-performance native desktop studio for local speech-to-text, subtitle translation, and video hardsubbing"
 authors = ["Ahmad (AtomicError)"]
 homepage = "https://github.com/AtomicError/whisper-desktop"
 repository = "https://github.com/AtomicError/whisper-desktop"

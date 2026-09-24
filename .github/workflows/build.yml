@@ -614,7 +614,7 @@ jobs:
               'Name: whisper-desktop' \
               'Version: @@VERSION@@' \
               'Release: 1' \
-              'Summary: A premium, state-of-the-art, and gorgeous native Rust & Tauri GUI designed for whisper.cpp' \
+              'Summary: High-performance native desktop studio for local speech-to-text, subtitle translation, and video hardsubbing' \
               'License: GPL-3.0-or-later' \
               'URL: https://github.com/AtomicError/whisper-desktop' \
               'AutoReqProv: no' \
@@ -622,7 +622,7 @@ jobs:
               'Provides: whisper-desktop = @@VERSION@@, whisper-desktop(x86_64) = @@VERSION@@' \
               '' \
               '%description' \
-              'A premium, state-of-the-art, and gorgeous native Rust & Tauri GUI designed for whisper.cpp' \
+              'High-performance native desktop studio for local speech-to-text, subtitle translation, and video hardsubbing' \
               '' \
               '%files' \
               '/usr/bin/whisper-desktop' \
