@@ -707,6 +707,9 @@ export class HardsubController {
   // Real Video Player & Media Controls
   private videoElement: HTMLVideoElement | null = null;
   private videoPlaceholder: HTMLElement | null = null;
+  private placeholderIdle: HTMLElement | null = null;
+  private placeholderLoading: HTMLElement | null = null;
+  private placeholderLoadingText: HTMLElement | null = null;
   private videoStatusBadge: HTMLElement | null = null;
   private videoPlayBtn: HTMLButtonElement | null = null;
   private videoIconPlay: HTMLElement | null = null;
@@ -976,6 +979,13 @@ export class HardsubController {
     this.videoElement?.pause();
     this.videoElement?.removeAttribute('src');
     this.videoElement?.load();
+    if (this.videoElement) this.videoElement.style.display = 'none';
+    if (this.videoPlaceholder) {
+      this.videoPlaceholder.style.display = 'flex';
+      this.videoPlaceholder.style.cursor = 'pointer';
+      if (this.placeholderIdle) this.placeholderIdle.style.display = 'flex';
+      if (this.placeholderLoading) this.placeholderLoading.style.display = 'none';
+    }
     if (this.videoSeekSlider) this.videoSeekSlider.value = '0';
     this.updateSeekSliderProgress(0);
     if (this.videoTimeDisplay) this.videoTimeDisplay.textContent = '00:00 / 00:00';
@@ -1155,6 +1165,9 @@ export class HardsubController {
     // Video Player & Controls
     this.videoElement = document.getElementById('hardsub-video-element') as HTMLVideoElement;
     this.videoPlaceholder = document.getElementById('hardsub-video-placeholder');
+    this.placeholderIdle = document.getElementById('hardsub-placeholder-idle');
+    this.placeholderLoading = document.getElementById('hardsub-placeholder-loading');
+    this.placeholderLoadingText = document.getElementById('hardsub-placeholder-loading-text');
     this.videoStatusBadge = document.getElementById('hardsub-video-status-badge');
     this.previewStatus = document.getElementById('hardsub-preview-status');
     this.previewStatusText = document.getElementById('hardsub-preview-status-text');
@@ -2465,6 +2478,21 @@ export class HardsubController {
     if (this.previewOriginalNote) {
       this.previewOriginalNote.hidden = this.phase !== 'preparing';
       this.previewOriginalNote.textContent = t('hardsub.previewOriginalUnchanged');
+    }
+    if (this.videoPlaceholder) {
+      if (ready) {
+        this.videoPlaceholder.style.display = 'none';
+      } else {
+        this.videoPlaceholder.style.display = 'flex';
+        this.videoPlaceholder.style.cursor = this.phase === 'idle' ? 'pointer' : 'default';
+        if (this.placeholderIdle) this.placeholderIdle.style.display = busy ? 'none' : 'flex';
+        if (this.placeholderLoading) {
+          this.placeholderLoading.style.display = busy ? 'flex' : 'none';
+          if (this.placeholderLoadingText && busy) {
+            this.placeholderLoadingText.textContent = message;
+          }
+        }
+      }
     }
   }
 

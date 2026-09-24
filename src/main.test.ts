@@ -560,3 +560,72 @@ describe('parseTranscriptTimeRange', () => {
   });
 });
 
+describe('formatFFmpegVersion', () => {
+  function formatFFmpegVersion(versionStr?: string | null): string {
+    if (!versionStr || versionStr === 'Unknown version' || versionStr === 'N/A') {
+      return 'Ready';
+    }
+    const match = versionStr.match(/version\s+([^\s]+)/i);
+    const raw = match ? match[1] : versionStr.trim();
+
+    // 1. Standard semantic version (e.g., "7.1", "7.1.1", "n7.0", "v6.0-extra", "4.4.2-0ubuntu0")
+    const semverMatch = raw.match(/^[nNvV]?(\d+(\.\d+)+)/);
+    if (semverMatch) {
+      return `v${semverMatch[1]}`;
+    }
+
+    // 2. Git daily snapshot builds with dates (e.g., "N-126826-gc0e8b139fd-20260924" or "2024-03-07-git...")
+    const dateHyphenMatch = raw.match(/(\d{4})-(\d{2})-(\d{2})/);
+    if (dateHyphenMatch) {
+      return `vGit-${dateHyphenMatch[1]}.${dateHyphenMatch[2]}`;
+    }
+    const dateCompactMatch = raw.match(/(\d{4})(\d{2})(\d{2})/);
+    if (dateCompactMatch) {
+      return `vGit-${dateCompactMatch[1]}.${dateCompactMatch[2]}`;
+    }
+
+    // 3. Git build number (e.g. "N-126826-g...")
+    const buildNumMatch = raw.match(/^[nN]-(\d+)/);
+    if (buildNumMatch) {
+      return `vGit-${buildNumMatch[1]}`;
+    }
+
+    // 4. Fallback cleanup: strip leading 'n'/'v' and trailing tags
+    let fallback = raw.split('-')[0].split('_')[0];
+    fallback = fallback.replace(/^[nNvV]/, '');
+    if (fallback && fallback.length > 0 && !isNaN(Number(fallback))) {
+      return `v${fallback}`;
+    }
+
+    return 'Ready';
+  }
+
+  it('correctly extracts date from BtbN Git snapshot build', () => {
+    const raw = 'ffmpeg version N-126826-gc0e8b139fd-20260924 Copyright (c) 2000-2026 the FFmpeg developers';
+    expect(formatFFmpegVersion(raw)).toBe('vGit-2026.09');
+  });
+
+  it('correctly extracts date from Gyan Git build with hyphens', () => {
+    const raw = 'ffmpeg version 2024-03-07-git-8287515db5-full_build-www.gyan.dev';
+    expect(formatFFmpegVersion(raw)).toBe('vGit-2024.03');
+  });
+
+  it('correctly extracts standard semantic release versions', () => {
+    expect(formatFFmpegVersion('ffmpeg version 7.1-static https://johnvansickle.com/ffmpeg/')).toBe('v7.1');
+    expect(formatFFmpegVersion('ffmpeg version 7.1.1 Copyright (c) 2000-2025')).toBe('v7.1.1');
+    expect(formatFFmpegVersion('ffmpeg version n7.0-4-g8e9124')).toBe('v7.0');
+    expect(formatFFmpegVersion('ffmpeg version 4.4.2-0ubuntu0.22.04.1')).toBe('v4.4.2');
+  });
+
+  it('correctly formats Git build number when no date is present', () => {
+    expect(formatFFmpegVersion('ffmpeg version N-112000-g12345')).toBe('vGit-112000');
+  });
+
+  it('falls back to Ready for missing or invalid version strings', () => {
+    expect(formatFFmpegVersion('')).toBe('Ready');
+    expect(formatFFmpegVersion(null)).toBe('Ready');
+    expect(formatFFmpegVersion('Unknown version')).toBe('Ready');
+    expect(formatFFmpegVersion('N/A')).toBe('Ready');
+  });
+});
+

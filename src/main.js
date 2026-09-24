@@ -3719,6 +3719,45 @@ function syncJsonConfidenceDependency() {
   }
 }
 
+function formatFFmpegVersion(versionStr) {
+  if (!versionStr || versionStr === 'Unknown version' || versionStr === 'N/A') {
+    return 'Ready';
+  }
+  const match = versionStr.match(/version\s+([^\s]+)/i);
+  const raw = match ? match[1] : versionStr.trim();
+
+  // 1. Standard semantic version (e.g., "7.1", "7.1.1", "n7.0", "v6.0-extra", "4.4.2-0ubuntu0")
+  const semverMatch = raw.match(/^[nNvV]?(\d+(\.\d+)+)/);
+  if (semverMatch) {
+    return `v${semverMatch[1]}`;
+  }
+
+  // 2. Git daily snapshot builds with dates (e.g., "N-126826-gc0e8b139fd-20260924" or "2024-03-07-git...")
+  const dateHyphenMatch = raw.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (dateHyphenMatch) {
+    return `vGit-${dateHyphenMatch[1]}.${dateHyphenMatch[2]}`;
+  }
+  const dateCompactMatch = raw.match(/(\d{4})(\d{2})(\d{2})/);
+  if (dateCompactMatch) {
+    return `vGit-${dateCompactMatch[1]}.${dateCompactMatch[2]}`;
+  }
+
+  // 3. Git build number (e.g. "N-126826-g...")
+  const buildNumMatch = raw.match(/^[nN]-(\d+)/);
+  if (buildNumMatch) {
+    return `vGit-${buildNumMatch[1]}`;
+  }
+
+  // 4. Fallback cleanup: strip leading 'n'/'v' and trailing tags
+  let fallback = raw.split('-')[0].split('_')[0];
+  fallback = fallback.replace(/^[nNvV]/, '');
+  if (fallback && fallback.length > 0 && !isNaN(Number(fallback))) {
+    return `v${fallback}`;
+  }
+
+  return 'Ready';
+}
+
 async function refreshFFmpegStatus(sourceOverride, userInitiated = false) {
   const badgeEl = document.getElementById('ffmpeg-status-badge');
   if (!badgeEl) return;
@@ -3728,21 +3767,9 @@ async function refreshFFmpegStatus(sourceOverride, userInitiated = false) {
   try {
     const info = await invoke('get_ffmpeg_status', { source: currentSource });
     if (info.isAvailable) {
-      let verFormatted = 'Ready';
-      if (info.version && info.version !== 'Unknown version' && info.version !== 'N/A') {
-        const match = info.version.match(/version\s+([^\s]+)/i);
-        let raw = match ? match[1] : info.version;
-        raw = raw.split('-')[0].split('_')[0];
-        if (raw.startsWith('n') || raw.startsWith('N')) {
-          raw = raw.substring(1);
-        }
-        if (!raw.startsWith('v') && !raw.startsWith('V')) {
-          raw = `v${raw}`;
-        }
-        verFormatted = raw;
-      }
+      const verFormatted = formatFFmpegVersion(info.version);
       badgeEl.className = 'setting-status-pill ready';
-      badgeEl.innerHTML = `<span class="ffmpeg-status-dot blue"></span> ${verFormatted}`;
+      badgeEl.innerHTML = `<span class="ffmpeg-status-dot green"></span> ${verFormatted}`;
       badgeEl.title = `Source: ${info.configuredSource}\nPath: ${isolateLtr(info.resolvedPath)}\n${info.version}`;
     } else {
       badgeEl.className = 'setting-status-pill missing';
