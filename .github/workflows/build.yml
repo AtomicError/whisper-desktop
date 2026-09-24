@@ -604,32 +604,32 @@ jobs:
             dpkg-deb -x "$deb_path" "$buildroot"
             rm -f "$buildroot/repacked.deb"
 
-            cat << 'EOF' > "$tmp_root/pkg.spec"
-%define _binary_payload w3.zstdio
-%define _build_id_links none
-%define __strip /bin/true
-%define _source_payload w3.zstdio
-%define _unpackaged_files_terminate_build 0
-
-Name: whisper-desktop
-Version: @@VERSION@@
-Release: 1
-Summary: A premium, state-of-the-art, and gorgeous native Rust & Tauri GUI designed for whisper.cpp
-License: GPL-3.0-or-later
-URL: https://github.com/AtomicError/whisper-desktop
-AutoReqProv: no
-Requires: libappindicator3.so.1()(64bit), libwebkit2gtk-4.1.so.0()(64bit), libgtk-3.so.0()(64bit)
-Provides: whisper-desktop = @@VERSION@@, whisper-desktop(x86_64) = @@VERSION@@
-
-%description
-A premium, state-of-the-art, and gorgeous native Rust & Tauri GUI designed for whisper.cpp
-
-%files
-/usr/bin/whisper-desktop
-"/usr/lib/Whisper Desktop"
-"/usr/share/applications/Whisper Desktop.desktop"
-/usr/share/icons/hicolor/*/apps/*
-EOF
+            printf '%s\n' \
+              '%define _binary_payload w3.zstdio' \
+              '%define _build_id_links none' \
+              '%define __strip /bin/true' \
+              '%define _source_payload w3.zstdio' \
+              '%define _unpackaged_files_terminate_build 0' \
+              '' \
+              'Name: whisper-desktop' \
+              'Version: @@VERSION@@' \
+              'Release: 1' \
+              'Summary: A premium, state-of-the-art, and gorgeous native Rust & Tauri GUI designed for whisper.cpp' \
+              'License: GPL-3.0-or-later' \
+              'URL: https://github.com/AtomicError/whisper-desktop' \
+              'AutoReqProv: no' \
+              'Requires: libappindicator3.so.1()(64bit), libwebkit2gtk-4.1.so.0()(64bit), libgtk-3.so.0()(64bit)' \
+              'Provides: whisper-desktop = @@VERSION@@, whisper-desktop(x86_64) = @@VERSION@@' \
+              '' \
+              '%description' \
+              'A premium, state-of-the-art, and gorgeous native Rust & Tauri GUI designed for whisper.cpp' \
+              '' \
+              '%files' \
+              '/usr/bin/whisper-desktop' \
+              '"/usr/lib/Whisper Desktop"' \
+              '"/usr/share/applications/Whisper Desktop.desktop"' \
+              '/usr/share/icons/hicolor/*/apps/*' \
+              > "$tmp_root/pkg.spec"
 
             sed -i "s/@@VERSION@@/${{ steps.app_version.outputs.version }}/g" "$tmp_root/pkg.spec"
 
