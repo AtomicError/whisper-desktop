@@ -564,11 +564,24 @@ jobs:
           fix_appimage_graphics() {
             local target_img="$1"
             if [ -f "$target_img" ]; then
-              echo "Patching graphics libs in AppImage: $target_img"
+              echo "Patching graphics and audio media libs in AppImage: $target_img"
               chmod +x "$target_img"
               "$target_img" --appimage-extract
-              rm -f squashfs-root/usr/lib/libEGL.so* squashfs-root/usr/lib/libGL.so* squashfs-root/usr/lib/libgbm.so* squashfs-root/usr/lib/libglapi.so* squashfs-root/usr/lib/libwayland-client.so* squashfs-root/usr/lib/libdrm.so*
-              rm -f squashfs-root/usr/lib/x86_64-linux-gnu/libEGL.so* squashfs-root/usr/lib/x86_64-linux-gnu/libGL.so* squashfs-root/usr/lib/x86_64-linux-gnu/libgbm.so* squashfs-root/usr/lib/x86_64-linux-gnu/libglapi.so* squashfs-root/usr/lib/x86_64-linux-gnu/libwayland-client.so* squashfs-root/usr/lib/x86_64-linux-gnu/libdrm.so*
+
+              # 1. Strip host-interfering GPU and display libraries so host Mesa/Wayland/DRI drivers work natively
+              rm -f squashfs-root/usr/lib/libEGL.so* squashfs-root/usr/lib/libGL.so* squashfs-root/usr/lib/libgbm.so* squashfs-root/usr/lib/libglapi.so* squashfs-root/usr/lib/libwayland-client.so* squashfs-root/usr/lib/libdrm.so* squashfs-root/usr/lib/libvulkan.so* squashfs-root/usr/lib/libva*.so*
+              rm -f squashfs-root/usr/lib/x86_64-linux-gnu/libEGL.so* squashfs-root/usr/lib/x86_64-linux-gnu/libGL.so* squashfs-root/usr/lib/x86_64-linux-gnu/libgbm.so* squashfs-root/usr/lib/x86_64-linux-gnu/libglapi.so* squashfs-root/usr/lib/x86_64-linux-gnu/libwayland-client.so* squashfs-root/usr/lib/x86_64-linux-gnu/libdrm.so* squashfs-root/usr/lib/x86_64-linux-gnu/libvulkan.so* squashfs-root/usr/lib/x86_64-linux-gnu/libva*.so*
+
+              # 2. Strip obsolete Ubuntu 22.04 PipeWire/JACK libraries that break on modern Linux audio hosts (undefined symbol: pw_context_get_data_loop)
+              rm -f squashfs-root/usr/lib/libpipewire-*.so* squashfs-root/usr/lib/libjack*.so*
+              rm -f squashfs-root/usr/lib/x86_64-linux-gnu/libpipewire-*.so* squashfs-root/usr/lib/x86_64-linux-gnu/libjack*.so*
+              rm -f squashfs-root/usr/lib/gstreamer-1.0/libgstpipewire.so squashfs-root/usr/lib/gstreamer-1.0/libgstjack.so squashfs-root/usr/lib/gstreamer-1.0/libgstva.so
+
+              # 3. Allow Wayland-native execution on Wayland sessions while preserving x11 fallback
+              if [ -f squashfs-root/apprun-hooks/linuxdeploy-plugin-gtk.sh ]; then
+                sed -i 's/export GDK_BACKEND=x11/export GDK_BACKEND="${GDK_BACKEND:-wayland,x11}"/' squashfs-root/apprun-hooks/linuxdeploy-plugin-gtk.sh
+              fi
+
               rm -f "$target_img"
               export ARCH=x86_64
               ./appimagetool-temp/AppRun squashfs-root "$target_img"
