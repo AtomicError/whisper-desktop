@@ -597,8 +597,8 @@ export const ja: Translations = {
     guideBtnAll: 'すべてのモデルを見る'
   },
   settings: {
-    title: 'Whisper エンジン詳細設定',
-    subtitle: '実行バックエンド、言語、デコード探索閾値、パフォーマンスパラメータの微調整',
+    title: '設定と環境設定',
+    subtitle: 'アプリケーション環境、音声認識エンジン、AI翻訳、およびパフォーマンスの詳細設定',
     catGeneral: '一般・基本設定',
     catApp: 'アプリ設定',
     catTranscription: '文字起こしコア設定',

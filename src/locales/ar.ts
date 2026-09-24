@@ -597,8 +597,8 @@ export const ar: Translations = {
     guideBtnAll: 'تصفح جميع النماذج'
   },
   settings: {
-    title: 'تكوين محرك Whisper',
-    subtitle: 'ضبط محرك التنفيذ، اللغة، عتبات فك الترميز ومتغيرات الأداء',
+    title: 'الإعدادات والتفضيلات',
+    subtitle: 'تخصيص تفضيلات التطبيق، محرك التفريغ، الترجمة الذكية وخيارات الأداء',
     catGeneral: 'الإعدادات العامة',
     catApp: 'تفضيلات البرنامج',
     catTranscription: 'نواة التفريغ',

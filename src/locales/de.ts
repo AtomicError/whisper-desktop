@@ -597,8 +597,8 @@ export const de: Translations = {
     guideBtnAll: 'Alle Modelle Durchsuchen'
   },
   settings: {
-    title: 'Whisper-Engine-Konfiguration',
-    subtitle: 'Ausführungs-Backend, Sprache, Dekodierungsschwellen und Leistungsparameter anpassen',
+    title: 'Einstellungen & Optionen',
+    subtitle: 'Anwendungspräferenzen, Transkriptions-Engine, KI-Übersetzung und Leistungsparameter konfigurieren',
     catGeneral: 'Allgemeine Einrichtung',
     catApp: 'App-Einstellungen',
     catTranscription: 'Kern-Transkription',

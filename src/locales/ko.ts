@@ -597,8 +597,8 @@ export const ko: Translations = {
     guideBtnAll: '모든 모델 둘러보기'
   },
   settings: {
-    title: 'Whisper 엔진 구성',
-    subtitle: '실행 백엔드, 언어, 디코딩 임계값 및 성능 변수를 조정합니다',
+    title: '설정 및 환경설정',
+    subtitle: '애플리케이션 환경, 전사 엔진, AI 번역 및 성능 옵션 구성',
     catGeneral: '일반 설정',
     catApp: '앱 환경설정',
     catTranscription: '핵심 음성 변환',

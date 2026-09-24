@@ -595,8 +595,8 @@ export const en = {
     guideBtnAll: 'Browse All Models',
   },
   settings: {
-    title: 'Whisper Engine Configuration',
-    subtitle: 'Adjust execution backend, language, decoding thresholds and performance variables',
+    title: 'Settings & Preferences',
+    subtitle: 'Configure application preferences, transcription engine, AI translation and performance options',
     catGeneral: 'General Setup',
     catApp: 'App Preferences',
     catTranscription: 'Core Transcription',

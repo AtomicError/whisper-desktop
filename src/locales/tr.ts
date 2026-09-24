@@ -597,8 +597,8 @@ export const tr: Translations = {
     guideBtnAll: 'Tüm Modelleri İncele'
   },
   settings: {
-    title: 'Whisper Motor Yapılandırması',
-    subtitle: 'Çalıştırma motorunu, dili, kod çözme eşiklerini ve performans parametrelerini ayarlayın',
+    title: 'Ayarlar ve Tercihler',
+    subtitle: 'Uygulama tercihlerini, transkripsiyon motorunu, yapay zeka çevirisini ve performans seçeneklerini yapılandırın',
     catGeneral: 'Genel Kurulum',
     catApp: 'Uygulama Tercihleri',
     catTranscription: 'Temel Deşifre',

@@ -597,8 +597,8 @@ export const zh: Translations = {
     guideBtnAll: '查看全部模型'
   },
   settings: {
-    title: 'Whisper 语音核心参数配置',
-    subtitle: '调优计算后端、界面语言、解码搜索阈值与系统底层性能参数',
+    title: '设置与偏好',
+    subtitle: '配置应用程序偏好、转写引擎、AI 翻译及系统底层性能参数',
     catGeneral: '通用全局配置',
     catApp: '应用行为偏好',
     catTranscription: '语音转录核心',

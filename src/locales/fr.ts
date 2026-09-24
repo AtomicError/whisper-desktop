@@ -597,8 +597,8 @@ export const fr: Translations = {
     guideBtnAll: 'Parcourir Tous les Modèles'
   },
   settings: {
-    title: 'Configuration du Moteur Whisper',
-    subtitle: 'Ajustez le moteur d\'exécution, la langue, les seuils de décodage et les variables de performance',
+    title: 'Paramètres et Préférences',
+    subtitle: 'Configurez les préférences de l\'application, le moteur de transcription, la traduction IA et les performances',
     catGeneral: 'Configuration Générale',
     catApp: 'Préférences de l\'Application',
     catTranscription: 'Transcription Principale',
