@@ -6162,7 +6162,7 @@ function formatRemainingTime(seconds) {
   return t('models.timeHourMinSec', { h, m, s });
 }
 
-function renderFamilyHeaderBanner(category) {
+function renderFamilyHeaderBanner(category, counts = { all: 0, multi: 0, en: 0, quant: 0 }) {
   let iconSvg = '';
   let title = '';
   let subtitle = '';
@@ -6229,6 +6229,63 @@ function renderFamilyHeaderBanner(category) {
 
   const specsHtml = specs ? `<div class="model-family-specs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px; height:13px; opacity:0.85;"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><span>${escapeHTML(specs)}</span></div>` : '';
 
+  let filterBarHtml = '';
+  if (category === 'vad') {
+    filterBarHtml = `
+      <div class="model-banner-filters">
+        <div class="model-filter-info-pill">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>
+          <span>${escapeHTML(t('models.badgeVadTitle'))} (${window.formatNumberForLang(counts.all)})</span>
+        </div>
+      </div>
+    `;
+  } else if (counts.all > 0) {
+    const isAll = currentModelQuickFilter === 'all' ? 'active' : '';
+    const isMulti = currentModelQuickFilter === 'multi' ? 'active' : '';
+    const isEn = currentModelQuickFilter === 'en' ? 'active' : '';
+    const isQuant = currentModelQuickFilter === 'quant' ? 'active' : '';
+
+    const labelAll = t('models.filterAll');
+    const labelMulti = t('models.filterMulti');
+    const labelEn = t('models.filterEn');
+    const labelQuant = t('models.filterQuant');
+    const enTooltip = t('models.filterEnTooltip');
+    const quantTooltip = t('models.filterQuantTooltip');
+
+    const showMulti = counts.multi > 0;
+    const showEn = counts.en > 0;
+    const showQuant = counts.quant > 0;
+
+    filterBarHtml = `
+      <div class="model-banner-filters">
+        <div class="model-segmented-control" role="tablist" aria-label="${escapeHTML(labelAll)}">
+          <button type="button" class="model-segment-btn ${isAll}" role="tab" aria-selected="${isAll ? 'true' : 'false'}" onclick="switchModelQuickFilter('all')">
+            <span>${escapeHTML(labelAll)}</span>
+            <span class="segment-count">${window.formatNumberForLang(counts.all)}</span>
+          </button>
+          ${showMulti ? `
+            <button type="button" class="model-segment-btn ${isMulti}" role="tab" aria-selected="${isMulti ? 'true' : 'false'}" onclick="switchModelQuickFilter('multi')">
+              <span>${escapeHTML(labelMulti)}</span>
+              <span class="segment-count">${window.formatNumberForLang(counts.multi)}</span>
+            </button>
+          ` : ''}
+          ${showEn ? `
+            <button type="button" class="model-segment-btn ${isEn}" role="tab" aria-selected="${isEn ? 'true' : 'false'}" onclick="switchModelQuickFilter('en')" title="${escapeHTML(enTooltip)}">
+              <span>${escapeHTML(labelEn)}</span>
+              <span class="segment-count">${window.formatNumberForLang(counts.en)}</span>
+            </button>
+          ` : ''}
+          ${showQuant ? `
+            <button type="button" class="model-segment-btn ${isQuant}" role="tab" aria-selected="${isQuant ? 'true' : 'false'}" onclick="switchModelQuickFilter('quant')" title="${escapeHTML(quantTooltip)}">
+              <span>${escapeHTML(labelQuant)}</span>
+              <span class="segment-count">${window.formatNumberForLang(counts.quant)}</span>
+            </button>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }
+
   return `
     <div class="model-family-banner">
       <div class="model-family-banner-top">
@@ -6242,64 +6299,7 @@ function renderFamilyHeaderBanner(category) {
         ${specsHtml}
       </div>
       ${body ? `<p class="model-family-body">${body}</p>` : ''}
-    </div>
-  `;
-}
-
-function renderModelFiltersBar(category, counts = { all: 0, multi: 0, en: 0, quant: 0 }) {
-  if (category === 'vad') {
-    return `
-      <div class="model-filters-wrapper">
-        <div class="model-filter-info-pill">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>
-          <span>${escapeHTML(t('models.badgeVadTitle'))} (${counts.all})</span>
-        </div>
-      </div>
-    `;
-  }
-
-  const isAll = currentModelQuickFilter === 'all' ? 'active' : '';
-  const isMulti = currentModelQuickFilter === 'multi' ? 'active' : '';
-  const isEn = currentModelQuickFilter === 'en' ? 'active' : '';
-  const isQuant = currentModelQuickFilter === 'quant' ? 'active' : '';
-
-  const labelAll = t('models.filterAll');
-  const labelMulti = t('models.filterMulti');
-  const labelEn = t('models.filterEn');
-  const labelQuant = t('models.filterQuant');
-  const enTooltip = t('models.filterEnTooltip');
-  const quantTooltip = t('models.filterQuantTooltip');
-
-  const showMulti = counts.multi > 0;
-  const showEn = counts.en > 0;
-  const showQuant = counts.quant > 0;
-
-  return `
-    <div class="model-filters-wrapper">
-      <div class="model-segmented-control" role="tablist" aria-label="${escapeHTML(labelAll)}">
-        <button type="button" class="model-segment-btn ${isAll}" role="tab" aria-selected="${isAll ? 'true' : 'false'}" onclick="switchModelQuickFilter('all')">
-          <span>${escapeHTML(labelAll)}</span>
-          <span class="segment-count">${counts.all}</span>
-        </button>
-        ${showMulti ? `
-          <button type="button" class="model-segment-btn ${isMulti}" role="tab" aria-selected="${isMulti ? 'true' : 'false'}" onclick="switchModelQuickFilter('multi')">
-            <span>${escapeHTML(labelMulti)}</span>
-            <span class="segment-count">${counts.multi}</span>
-          </button>
-        ` : ''}
-        ${showEn ? `
-          <button type="button" class="model-segment-btn ${isEn}" role="tab" aria-selected="${isEn ? 'true' : 'false'}" onclick="switchModelQuickFilter('en')" title="${escapeHTML(enTooltip)}">
-            <span>${escapeHTML(labelEn)}</span>
-            <span class="segment-count">${counts.en}</span>
-          </button>
-        ` : ''}
-        ${showQuant ? `
-          <button type="button" class="model-segment-btn ${isQuant}" role="tab" aria-selected="${isQuant ? 'true' : 'false'}" onclick="switchModelQuickFilter('quant')" title="${escapeHTML(quantTooltip)}">
-            <span>${escapeHTML(labelQuant)}</span>
-            <span class="segment-count">${counts.quant}</span>
-          </button>
-        ` : ''}
-      </div>
+      ${filterBarHtml}
     </div>
   `;
 }
@@ -6399,7 +6399,6 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
       _cachedModelStatusesTime = now;
     }
 
-    const paneHeader = document.getElementById('models-pane-header');
     const grid = document.getElementById('models-list-scroll');
     if (!grid) return;
     
@@ -6443,13 +6442,15 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
       currentModelQuickFilter = 'all';
     }
 
-    const bannerHtml = query ? '' : renderFamilyHeaderBanner(currentCategoryFilter);
-    const filterBarHtml = renderModelFiltersBar(currentCategoryFilter, counts);
-
-    if (paneHeader) {
-      paneHeader.innerHTML = bannerHtml + filterBarHtml;
-    }
     grid.innerHTML = '';
+
+    // Render integrated category banner with sub-filters as first item in scroll list
+    if (!query) {
+      const bannerHtml = renderFamilyHeaderBanner(currentCategoryFilter, counts);
+      if (bannerHtml) {
+        grid.insertAdjacentHTML('beforeend', bannerHtml);
+      }
+    }
 
     if (!grid._modelDelegate) {
       grid.addEventListener('click', function(e) {

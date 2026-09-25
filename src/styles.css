@@ -2063,7 +2063,9 @@ header {
 .settings-scroll-container {
   height: 100%;
   overflow-y: auto;
-  padding-right: 12px;
+  padding-inline-end: 10px;
+  padding-inline-start: 0;
+  scrollbar-gutter: stable;
 }
 
 .settings-group {
@@ -4614,39 +4616,21 @@ select.select-control {
   to { box-shadow: 0 0 15px rgba(var(--color-cyan-rgb), 0.3); }
 }
 
-/* Models Right Content Pane */
-.models-content-pane {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  flex-grow: 1;
-  min-height: 0;
-  height: 100%;
-  overflow: hidden;
-}
-
-/* Models Pane Pinned Header (Banner + Filters) */
-.models-pane-header {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  flex-shrink: 0;
-  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-/* Modern Compact Family Banner */
+/* Modern Integrated Family Banner */
 .model-family-banner {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.025);
   border: 1px solid rgba(var(--color-accent-rgb), 0.2);
   border-radius: 12px;
-  padding: 12px 18px;
+  padding: 16px 20px 14px 20px;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.2);
   transition: var(--transition-smooth);
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
 }
 
 .model-family-banner:hover {
@@ -4725,24 +4709,25 @@ select.select-control {
 .model-family-body {
   font-size: 0.82rem;
   color: var(--color-text-muted);
-  line-height: 1.5;
+  line-height: 1.55;
   margin: 0;
 }
 
-/* Modern Glass Segmented Filter Bar */
-.model-filters-wrapper {
+/* Banner Integrated Filters Toolbar */
+.model-banner-filters {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  justify-content: flex-start;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
   flex-wrap: wrap;
-  padding: 2px 0 4px 0;
 }
 
 .model-segmented-control {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   background: rgba(255, 255, 255, 0.035);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 9px;
@@ -4755,7 +4740,8 @@ select.select-control {
   background: transparent;
   border: none;
   border-radius: 7px;
-  padding: 5px 12px;
+  padding-block: 5px;
+  padding-inline: 12px 6px;
   font-size: 0.8rem;
   font-weight: 500;
   color: var(--color-text-muted);
@@ -4763,7 +4749,7 @@ select.select-control {
   transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   user-select: none;
   line-height: 1.2;
 }
@@ -4784,17 +4770,22 @@ select.select-control {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 1px 6px;
-  border-radius: 10px;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
   font-size: 0.72rem;
   font-weight: 600;
-  background: rgba(255, 255, 255, 0.08);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.09);
   color: var(--color-text-dim);
   transition: all 0.18s ease;
 }
 
 .model-segment-btn:hover .segment-count {
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.16);
   color: #fff;
 }
 
