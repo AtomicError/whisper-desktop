@@ -2934,7 +2934,9 @@ function setupTauriListeners() {
       let speedText = payload.phase === 'starting' ? t('models.statusConnecting') : '';
       if (!speedText) {
         if (payload.speedBps > 0) {
-          const speedMbps = ((payload.speedBps * 8) / 1e6).toFixed(1);
+          const mbps = (payload.speedBps * 8) / 1e6;
+          const speedFormatted = (mbps % 1 === 0 ? mbps.toFixed(0) : parseFloat(mbps.toFixed(1)).toString());
+          const speedMbps = window.formatNumberForLang(speedFormatted);
           speedText = `${speedMbps} Mbps`;
           if (totalKnown && payload.downloadedBytes <= payload.totalBytes) {
             const remainingSeconds = Math.round((payload.totalBytes - payload.downloadedBytes) / payload.speedBps);
@@ -2956,16 +2958,16 @@ function setupTauriListeners() {
       if (descEl) {
         const meta = getModelMetaInfo(payload.modelName);
         const liveStatus = t('models.downloadLiveProgress', {
-          size: dlMB,
+          size: window.formatNumberForLang(dlMB),
           unit: t('models.unitMB'),
-          pct: totalKnown ? pct : '...',
+          pct: totalKnown ? window.formatNumberForLang(pct) : '...',
           speedLabel: t('models.speedLabel'),
           speed: speedText
         });
         descEl.innerHTML = `
           <span class="model-badge badge-downloading">${t('models.badgeDownloading')}</span>
           <span style="color: rgba(255,255,255,0.1);">|</span>
-          <span>${t('models.expectedSize', { size: totalMB })}</span>
+          <span>${t('models.expectedSize', { size: window.formatNumberForLang(totalMB) })}</span>
           ${meta.precisionText ? `
             <span style="color: rgba(255,255,255,0.1);">|</span>
             <span>${meta.precisionText}</span>
@@ -6150,16 +6152,16 @@ let currentModelQuickFilter = 'all';
 
 function formatRemainingTime(seconds) {
   if (seconds <= 0 || !isFinite(seconds)) return t('models.timeUnknown');
-  if (seconds < 60) return t('models.timeSec', { s: seconds });
+  if (seconds < 60) return t('models.timeSec', { s: window.formatNumberForLang(seconds) });
   if (seconds < 3600) {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
-    return t('models.timeMinSec', { m, s });
+    return t('models.timeMinSec', { m: window.formatNumberForLang(m), s: window.formatNumberForLang(s) });
   }
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = seconds % 60;
-  return t('models.timeHourMinSec', { h, m, s });
+  return t('models.timeHourMinSec', { h: window.formatNumberForLang(h), m: window.formatNumberForLang(m), s: window.formatNumberForLang(s) });
 }
 
 function renderFamilyHeaderBanner(category, counts = { all: 0, multi: 0, en: 0, quant: 0 }) {
@@ -6252,9 +6254,9 @@ function renderFamilyHeaderBanner(category, counts = { all: 0, multi: 0, en: 0, 
     const enTooltip = t('models.filterEnTooltip');
     const quantTooltip = t('models.filterQuantTooltip');
 
-    const showMulti = counts.multi > 0;
-    const showEn = counts.en > 0;
-    const showQuant = counts.quant > 0;
+    const showMulti = counts.multi > 0 && counts.multi < counts.all;
+    const showEn = counts.en > 0 && counts.en < counts.all;
+    const showQuant = counts.quant > 0 && counts.quant < counts.all;
 
     filterBarHtml = `
       <div class="model-banner-filters">
@@ -6383,9 +6385,11 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
       'unknown': t('models.gpuCpuOnly')
     };
     const gpuName = gpuLabelMap[systemSpecs.gpu_type] || systemSpecs.gpu_type || t('models.gpuUnknown');
+    const ramVal = systemSpecs.total_ram_gb;
+    const ramFormatted = (ramVal % 1 === 0 ? ramVal.toFixed(0) : parseFloat(ramVal.toFixed(1)).toString());
     specsSubtitle.innerHTML = t('models.systemSpecsDetected', {
-      ram: systemSpecs.total_ram_gb.toFixed(1),
-      cores: systemSpecs.cpu_cores,
+      ram: window.formatNumberForLang(ramFormatted),
+      cores: window.formatNumberForLang(systemSpecs.cpu_cores),
       gpu: gpuName
     });
   }
@@ -6433,12 +6437,16 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
       quant: categoryModels.filter(m => m.name.includes('-q5') || m.name.includes('-q8')).length
     };
 
-    // Auto-fallback if active filter has 0 items
-    if (currentModelQuickFilter === 'en' && counts.en === 0) {
+    const showMulti = counts.multi > 0 && counts.multi < counts.all;
+    const showEn = counts.en > 0 && counts.en < counts.all;
+    const showQuant = counts.quant > 0 && counts.quant < counts.all;
+
+    // Auto-fallback if active filter has 0 items or is hidden
+    if (currentModelQuickFilter === 'en' && !showEn) {
       currentModelQuickFilter = 'all';
-    } else if (currentModelQuickFilter === 'multi' && counts.multi === 0) {
+    } else if (currentModelQuickFilter === 'multi' && !showMulti) {
       currentModelQuickFilter = 'all';
-    } else if (currentModelQuickFilter === 'quant' && counts.quant === 0) {
+    } else if (currentModelQuickFilter === 'quant' && !showQuant) {
       currentModelQuickFilter = 'all';
     }
 
@@ -6536,7 +6544,7 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
           <div class="setting-desc" style="font-size: 0.82rem; color: var(--color-text-muted); line-height: 1.4; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
             ${statusBadge}
             ${statusBadge ? '<span style="color: rgba(255,255,255,0.1);">|</span>' : ''}
-            <span>${t('models.expectedSize', { size: sizeMB })}</span>
+            <span>${t('models.expectedSize', { size: window.formatNumberForLang(sizeMB) })}</span>
             ${meta.precisionText ? `
               <span style="color: rgba(255,255,255,0.1);">|</span>
               <span>${meta.precisionText}</span>
@@ -6545,11 +6553,11 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
             <span>${meta.langText}</span>
             ${m.status === 'Downloading' ? `
               <span style="color: rgba(255,255,255,0.1);">|</span>
-              <span style="color: var(--color-cyan);">${t('models.statusInProgress', { size: dlMB, pct })}</span>
+              <span style="color: var(--color-cyan);">${t('models.statusInProgress', { size: window.formatNumberForLang(dlMB), pct: window.formatNumberForLang(pct) })}</span>
             ` : ''}
             ${m.status === 'Paused' ? `
               <span style="color: rgba(255,255,255,0.1);">|</span>
-              <span style="color: var(--color-gold);">${t('models.statusPaused', { size: dlMB, pct })}</span>
+              <span style="color: var(--color-gold);">${t('models.statusPaused', { size: window.formatNumberForLang(dlMB), pct: window.formatNumberForLang(pct) })}</span>
             ` : ''}
           </div>
           <div class="progress-bar-container" style="display: ${showProgressBlock}; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.05); overflow: hidden; margin-top: 10px; border: 1px solid rgba(255,255,255,0.02); max-width: 500px;">
