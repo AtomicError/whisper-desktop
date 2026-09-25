@@ -2958,11 +2958,7 @@
 
             <div class="settings-layout">
               <div class="settings-categories" id="model-categories-sidebar">
-                <div class="settings-cat-btn active" id="model-cat-guide" onclick="switchModelCategory('guide')">
-                  <svg class="settings-cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; margin-right:8px;"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
-                  <span data-i18n="models.catGuide">Model Guide</span>
-                </div>
-                <div class="settings-cat-btn" id="model-cat-tiny" onclick="switchModelCategory('tiny')">
+                <div class="settings-cat-btn active" id="model-cat-tiny" onclick="switchModelCategory('tiny')">
                   <svg class="settings-cat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; margin-right:8px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                   <span data-i18n="models.catTiny">Tiny Family</span>
                 </div>
@@ -2996,8 +2992,11 @@
                 </div>
               </div>
 
-              <div class="settings-scroll-container" id="models-list-scroll" style="display: flex; flex-direction: column; gap: 16px; flex-grow: 1; min-height: 0; height: 100%; overflow-y: auto;">
-                <!-- Dynamically populated model rows -->
+              <div class="models-content-pane">
+                <div class="models-pane-header" id="models-pane-header"></div>
+                <div class="settings-scroll-container" id="models-list-scroll" style="display: flex; flex-direction: column; gap: 14px; flex-grow: 1; min-height: 0; height: 100%; overflow-y: auto;">
+                  <!-- Dynamically populated model rows -->
+                </div>
               </div>
             </div>
           </div>

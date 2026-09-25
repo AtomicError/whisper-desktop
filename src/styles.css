@@ -4540,196 +4540,10 @@ select.select-control {
   }
 }
 
-/* Model Architecture & Selection Guide Component */
-.model-guide-container {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.guide-hero-card {
-  background: linear-gradient(135deg, rgba(var(--color-royal-blue-rgb), 0.12) 0%, rgba(var(--color-cyan-rgb), 0.05) 100%);
-  border: 1px solid rgba(var(--color-royal-blue-rgb), 0.25);
-  border-radius: 12px;
-  padding: 18px 22px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-}
-
-.guide-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 14px;
-}
-
-@media (min-width: 1240px) {
-  .guide-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-}
-
-@media (max-width: 640px) {
-  .guide-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.guide-card {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border-glass);
-  border-radius: 10px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-
-.guide-card-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-
-.guide-card-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-/* Model Guide Palette Accents (Theme-Harmonized) */
-.guide-card-large .guide-card-icon {
-  background: rgba(var(--color-model-large-rgb), 0.15);
-  color: var(--color-model-large);
-}
-.guide-card-large .guide-card-subtitle {
-  color: var(--color-model-large);
-}
-
-.guide-card-medium .guide-card-icon {
-  background: rgba(var(--color-model-medium-rgb), 0.15);
-  color: var(--color-model-medium);
-}
-.guide-card-medium .guide-card-subtitle {
-  color: var(--color-model-medium);
-}
-
-.guide-card-small .guide-card-icon {
-  background: rgba(var(--color-model-small-rgb), 0.15);
-  color: var(--color-model-small);
-}
-.guide-card-small .guide-card-subtitle {
-  color: var(--color-model-small);
-}
-
-.guide-card-base .guide-card-icon {
-  background: rgba(var(--color-model-base-rgb), 0.15);
-  color: var(--color-model-base);
-}
-.guide-card-base .guide-card-subtitle {
-  color: var(--color-model-base);
-}
-
-.guide-card-title {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: #fff;
-}
-
-.guide-card-body {
-  font-size: 0.82rem;
-  color: var(--color-text-muted);
-  line-height: 1.5;
-  flex-grow: 1;
-}
-
-.guide-concept-card {
-  background: rgba(255, 255, 255, 0.015);
-  border: 1px solid var(--border-glass);
-  border-radius: 10px;
-  padding: 14px 18px;
-  display: flex;
-  gap: 14px;
-  align-items: flex-start;
-}
-
-.guide-concept-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: var(--transition-smooth);
-}
-
-.guide-concept-icon svg {
-  width: 17px;
-  height: 17px;
-}
-
-/* Guide Concept Themed Accents - Royal Blue (Default) */
-.guide-concept-lang .guide-concept-icon {
-  color: var(--color-royal-blue);
-  background: rgba(var(--color-royal-blue-rgb), 0.12);
-  border: 1px solid rgba(var(--color-royal-blue-rgb), 0.22);
-}
-
-.guide-concept-quant .guide-concept-icon {
-  color: var(--color-green);
-  background: rgba(var(--color-green-rgb), 0.12);
-  border: 1px solid rgba(var(--color-green-rgb), 0.22);
-}
-
-.guide-concept-vad .guide-concept-icon {
-  color: var(--color-cyan);
-  background: rgba(var(--color-cyan-rgb), 0.12);
-  border: 1px solid rgba(var(--color-cyan-rgb), 0.22);
-}
-
-/* Guide Concept Themed Accents - Fire Orange */
-:root[data-theme="fire-orange"] .guide-concept-lang .guide-concept-icon,
-:root[data-theme="fire"] .guide-concept-lang .guide-concept-icon {
-  color: #ef4444;
-  background: rgba(239, 68, 68, 0.14);
-  border: 1px solid rgba(239, 68, 68, 0.28);
-}
-
-:root[data-theme="fire-orange"] .guide-concept-quant .guide-concept-icon,
-:root[data-theme="fire"] .guide-concept-quant .guide-concept-icon {
-  color: #ff6b00;
-  background: rgba(255, 107, 0, 0.14);
-  border: 1px solid rgba(255, 107, 0, 0.28);
-}
-
-:root[data-theme="fire-orange"] .guide-concept-vad .guide-concept-icon,
-:root[data-theme="fire"] .guide-concept-vad .guide-concept-icon {
-  color: #ff9800;
-  background: rgba(255, 152, 0, 0.14);
-  border: 1px solid rgba(255, 152, 0, 0.28);
-}
-
-/* Guide Concept Themed Accents - Carbon (Obsidian Red) */
-:root[data-theme="carbon"] .guide-concept-lang .guide-concept-icon {
-  color: #ef4444;
-  background: rgba(239, 68, 68, 0.14);
-  border: 1px solid rgba(239, 68, 68, 0.28);
-}
-
-:root[data-theme="carbon"] .guide-concept-quant .guide-concept-icon {
-  color: #f43f5e;
-  background: rgba(244, 63, 94, 0.14);
-  border: 1px solid rgba(244, 63, 94, 0.28);
-}
-
-:root[data-theme="carbon"] .guide-concept-vad .guide-concept-icon {
-  color: #fb7185;
-  background: rgba(251, 113, 133, 0.14);
-  border: 1px solid rgba(251, 113, 133, 0.28);
+/* Keyframe animation for pane transitions */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 :root[data-theme="carbon"] .model-badge-vad {
@@ -4737,11 +4551,6 @@ select.select-control {
   color: #fb7185;
 }
 
-.guide-card:focus-visible,
-.guide-concept-card:focus-visible {
-  outline: 2px solid var(--color-royal-blue);
-  outline-offset: 2px;
-}
 
 /* Models Page Styles - Matching .setting-flag aesthetic */
 .model-badge {
@@ -4804,6 +4613,215 @@ select.select-control {
   from { box-shadow: 0 0 5px rgba(var(--color-cyan-rgb), 0.1); }
   to { box-shadow: 0 0 15px rgba(var(--color-cyan-rgb), 0.3); }
 }
+
+/* Models Right Content Pane */
+.models-content-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex-grow: 1;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Models Pane Pinned Header (Banner + Filters) */
+.models-pane-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Modern Compact Family Banner */
+.model-family-banner {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(var(--color-accent-rgb), 0.2);
+  border-radius: 12px;
+  padding: 12px 18px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.2);
+  transition: var(--transition-smooth);
+}
+
+.model-family-banner:hover {
+  border-color: rgba(var(--color-accent-rgb), 0.32);
+}
+
+.model-family-banner-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.model-family-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.model-family-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(var(--color-accent-rgb), 0.16);
+  color: var(--color-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 0 10px rgba(var(--color-accent-rgb), 0.2);
+}
+
+.model-family-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.model-family-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.model-family-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.01em;
+}
+
+.model-family-subtitle {
+  font-size: 0.76rem;
+  color: var(--color-accent);
+  font-weight: 500;
+  background: rgba(var(--color-accent-rgb), 0.1);
+  padding: 2px 8px;
+  border-radius: 20px;
+  border: 1px solid rgba(var(--color-accent-rgb), 0.2);
+}
+
+.model-family-specs {
+  font-size: 0.78rem;
+  color: var(--color-text-dim, #94a3b8);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.035);
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.model-family-body {
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Modern Glass Segmented Filter Bar */
+.model-filters-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 2px 0 4px 0;
+}
+
+.model-segmented-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 9px;
+  padding: 3px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.model-segment-btn {
+  background: transparent;
+  border: none;
+  border-radius: 7px;
+  padding: 5px 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+  line-height: 1.2;
+}
+
+.model-segment-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.model-segment-btn.active {
+  background: var(--color-accent);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(var(--color-accent-rgb), 0.35);
+}
+
+.segment-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-text-dim);
+  transition: all 0.18s ease;
+}
+
+.model-segment-btn:hover .segment-count {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+.model-segment-btn.active .segment-count {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+
+/* VAD / Special Info Pill */
+.model-filter-info-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--color-accent);
+  background: rgba(var(--color-accent-rgb), 0.08);
+  border: 1px solid rgba(var(--color-accent-rgb), 0.2);
+  border-radius: 8px;
+  padding: 5px 12px;
+}
+
+.model-filter-info-pill svg {
+  width: 14px;
+  height: 14px;
+}
+
+
 
 /* Model Row Action Buttons (Modern Tonal Glass with Vibrant Hover) */
 .model-action-btn {

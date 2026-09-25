@@ -2748,14 +2748,17 @@ window.switchView = function(viewName) {
   }
 
   if (viewName === 'models') {
-    // Always reset search input and default to Model Guide tab when entering the view
+    // Always reset search input and default to Tiny Family tab when entering the view
     const searchInput = document.getElementById('model-search');
     if (searchInput) searchInput.value = '';
-    currentCategoryFilter = 'guide';
+    const clearBtn = document.getElementById('model-search-clear');
+    if (clearBtn) clearBtn.style.display = 'none';
+    currentCategoryFilter = 'tiny';
+    currentModelQuickFilter = 'all';
     const buttons = document.querySelectorAll('#model-categories-sidebar .settings-cat-btn');
     buttons.forEach(btn => btn.classList.remove('active'));
-    const guideBtn = document.getElementById('model-cat-guide');
-    if (guideBtn) guideBtn.classList.add('active');
+    const tinyBtn = document.getElementById('model-cat-tiny');
+    if (tinyBtn) tinyBtn.classList.add('active');
     loadModelStatusesGrid();
   }
 
@@ -6141,7 +6144,9 @@ async function handleDroppedFiles(files) {
 
 
 // ----------------- Models Logic -----------------
-let currentCategoryFilter = 'guide';
+// ----------------- Models Logic -----------------
+let currentCategoryFilter = 'tiny';
+let currentModelQuickFilter = 'all';
 
 function formatRemainingTime(seconds) {
   if (seconds <= 0 || !isFinite(seconds)) return t('models.timeUnknown');
@@ -6157,155 +6162,156 @@ function formatRemainingTime(seconds) {
   return t('models.timeHourMinSec', { h, m, s });
 }
 
-function renderModelGuide(grid) {
-  grid.innerHTML = `
-    <div class="model-guide-container">
-      <!-- 1. Hero Overview Card -->
-      <div class="guide-hero-card">
-        <div style="display: flex; align-items: center; gap: 14px;">
-          <div style="width: 36px; height: 36px; border-radius: 9px; background: rgba(var(--color-royal-blue-rgb), 0.2); display: flex; align-items: center; justify-content: center; color: var(--color-royal-blue); flex-shrink: 0;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width: 20px; height: 20px;"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+function renderFamilyHeaderBanner(category) {
+  let iconSvg = '';
+  let title = '';
+  let subtitle = '';
+  let body = '';
+  let specs = '';
+
+  switch (category) {
+    case 'tiny':
+      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`;
+      title = t('models.guideTinyTitle');
+      subtitle = t('models.guideTinySubtitle');
+      body = t('models.guideTinyBody');
+      specs = t('models.guideTinySpecs');
+      break;
+    case 'base':
+      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="15" x2="23" y2="15"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="15" x2="4" y2="15"/></svg>`;
+      title = t('models.guideBaseTitle');
+      subtitle = t('models.guideBaseSubtitle');
+      body = t('models.guideBaseBody');
+      specs = t('models.guideBaseSpecs');
+      break;
+    case 'small':
+      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>`;
+      title = t('models.guideSmallTitle');
+      subtitle = t('models.guideSmallSubtitle');
+      body = t('models.guideSmallBody');
+      specs = t('models.guideSmallSpecs');
+      break;
+    case 'medium':
+      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>`;
+      title = t('models.guideMediumTitle');
+      subtitle = t('models.guideMediumSubtitle');
+      body = t('models.guideMediumBody');
+      specs = t('models.guideMediumSpecs');
+      break;
+    case 'large':
+      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14v2H5z"/></svg>`;
+      title = t('models.guideLargeTitle');
+      subtitle = t('models.guideLargeSubtitle');
+      body = t('models.guideLargeBody');
+      specs = t('models.guideLargeSpecs');
+      break;
+    case 'vad':
+      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`;
+      title = t('models.badgeVadTitle');
+      subtitle = t('models.guideVadSubtitle');
+      body = t('models.guideVadBody');
+      specs = t('models.guideVadSpecs');
+      break;
+    case 'local':
+      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+      title = t('models.catLocal');
+      subtitle = t('models.catLocalSubtitle');
+      body = t('models.subtitle');
+      break;
+    case 'all':
+    default:
+      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`;
+      title = t('models.catAll');
+      subtitle = t('models.title');
+      body = t('models.subtitle');
+      break;
+  }
+
+  const specsHtml = specs ? `<div class="model-family-specs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px; height:13px; opacity:0.85;"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><span>${escapeHTML(specs)}</span></div>` : '';
+
+  return `
+    <div class="model-family-banner">
+      <div class="model-family-banner-top">
+        <div class="model-family-identity">
+          <div class="model-family-icon">${iconSvg}</div>
+          <div class="model-family-title-wrap">
+            <span class="model-family-title">${escapeHTML(title)}</span>
+            ${subtitle ? `<span class="model-family-subtitle">${escapeHTML(subtitle)}</span>` : ''}
           </div>
-          <div>
-            <h3 style="font-size: 1.15rem; font-weight: 700; color: #fff; margin: 0;">${t('models.guideHeroTitle')}</h3>
-            <p style="font-size: 0.84rem; color: var(--color-text-muted); margin: 3px 0 0 0;">${t('models.guideHeroSubtitle')}</p>
-          </div>
+        </div>
+        ${specsHtml}
+      </div>
+      ${body ? `<p class="model-family-body">${body}</p>` : ''}
+    </div>
+  `;
+}
+
+function renderModelFiltersBar(category, counts = { all: 0, multi: 0, en: 0, quant: 0 }) {
+  if (category === 'vad') {
+    return `
+      <div class="model-filters-wrapper">
+        <div class="model-filter-info-pill">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>
+          <span>${escapeHTML(t('models.badgeVadTitle'))} (${counts.all})</span>
         </div>
       </div>
+    `;
+  }
 
-      <!-- 2. Model Families Comparison Grid -->
-      <div class="guide-grid">
-        <div class="guide-card guide-card-large">
-          <div class="guide-card-header">
-            <div class="guide-card-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;"><path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14v2H5z"/></svg>
-            </div>
-            <div>
-              <div class="guide-card-title">${t('models.guideLargeTitle')}</div>
-              <div class="guide-card-subtitle" style="font-size: 0.74rem; font-weight: 500;">${t('models.guideLargeSubtitle')}</div>
-            </div>
-          </div>
-          <div class="guide-card-body">
-            ${t('models.guideLargeBody')}
-          </div>
-          <div style="margin-top: 10px; font-size: 0.76rem; color: var(--color-text-dim);">
-            ${t('models.guideLargeSpecs')}
-          </div>
-        </div>
+  const isAll = currentModelQuickFilter === 'all' ? 'active' : '';
+  const isMulti = currentModelQuickFilter === 'multi' ? 'active' : '';
+  const isEn = currentModelQuickFilter === 'en' ? 'active' : '';
+  const isQuant = currentModelQuickFilter === 'quant' ? 'active' : '';
 
-        <div class="guide-card guide-card-medium">
-          <div class="guide-card-header">
-            <div class="guide-card-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
-            </div>
-            <div>
-              <div class="guide-card-title">${t('models.guideMediumTitle')}</div>
-              <div class="guide-card-subtitle" style="font-size: 0.74rem; font-weight: 500;">${t('models.guideMediumSubtitle')}</div>
-            </div>
-          </div>
-          <div class="guide-card-body">
-            ${t('models.guideMediumBody')}
-          </div>
-          <div style="margin-top: 10px; font-size: 0.76rem; color: var(--color-text-dim);">
-            ${t('models.guideMediumSpecs')}
-          </div>
-        </div>
+  const labelAll = t('models.filterAll');
+  const labelMulti = t('models.filterMulti');
+  const labelEn = t('models.filterEn');
+  const labelQuant = t('models.filterQuant');
+  const enTooltip = t('models.filterEnTooltip');
+  const quantTooltip = t('models.filterQuantTooltip');
 
-        <div class="guide-card guide-card-small">
-          <div class="guide-card-header">
-            <div class="guide-card-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
-            </div>
-            <div>
-              <div class="guide-card-title">${t('models.guideSmallTitle')}</div>
-              <div class="guide-card-subtitle" style="font-size: 0.74rem; font-weight: 500;">${t('models.guideSmallSubtitle')}</div>
-            </div>
-          </div>
-          <div class="guide-card-body">
-            ${t('models.guideSmallBody')}
-          </div>
-          <div style="margin-top: 10px; font-size: 0.76rem; color: var(--color-text-dim);">
-            ${t('models.guideSmallSpecs')}
-          </div>
-        </div>
+  const showMulti = counts.multi > 0;
+  const showEn = counts.en > 0;
+  const showQuant = counts.quant > 0;
 
-        <div class="guide-card guide-card-base">
-          <div class="guide-card-header">
-            <div class="guide-card-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-            </div>
-            <div>
-              <div class="guide-card-title">${t('models.guideBaseTinyTitle')}</div>
-              <div class="guide-card-subtitle" style="font-size: 0.74rem; font-weight: 500;">${t('models.guideBaseTinySubtitle')}</div>
-            </div>
-          </div>
-          <div class="guide-card-body">
-            ${t('models.guideBaseTinyBody')}
-          </div>
-          <div style="margin-top: 10px; font-size: 0.76rem; color: var(--color-text-dim);">
-            ${t('models.guideBaseTinySpecs')}
-          </div>
-        </div>
-      </div>
-
-      <!-- 3. Key Concepts to Know -->
-      <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 2px;">
-        <div class="guide-concept-card guide-concept-lang">
-          <div class="guide-concept-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="2" y1="12" x2="22" y2="12"></line>
-              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-            </svg>
-          </div>
-          <div>
-            <div style="font-weight: 600; color: #fff; font-size: 0.88rem; margin-bottom: 2px;">${t('models.guideConceptEnTitle')}</div>
-            <div style="font-size: 0.82rem; color: var(--color-text-muted); line-height: 1.45;">
-              ${t('models.guideConceptEnBody')}
-            </div>
-          </div>
-        </div>
-
-        <div class="guide-concept-card guide-concept-quant">
-          <div class="guide-concept-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="4 14 10 14 10 20"></polyline>
-              <polyline points="20 10 14 10 14 4"></polyline>
-              <line x1="14" y1="10" x2="21" y2="3"></line>
-              <line x1="3" y1="21" x2="10" y2="14"></line>
-            </svg>
-          </div>
-          <div>
-            <div style="font-weight: 600; color: #fff; font-size: 0.88rem; margin-bottom: 2px;">${t('models.guideConceptQuantTitle')}</div>
-            <div style="font-size: 0.82rem; color: var(--color-text-muted); line-height: 1.45;">
-              ${t('models.guideConceptQuantBody')}
-            </div>
-          </div>
-        </div>
-
-        <div class="guide-concept-card guide-concept-vad">
-          <div class="guide-concept-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-              <line x1="12" y1="19" x2="12" y2="23"></line>
-              <line x1="8" y1="23" x2="16" y2="23"></line>
-            </svg>
-          </div>
-          <div>
-            <div style="font-weight: 600; color: #fff; font-size: 0.88rem; margin-bottom: 2px;">${t('models.guideConceptVadTitle')}</div>
-            <div style="font-size: 0.82rem; color: var(--color-text-muted); line-height: 1.45;">
-              ${t('models.guideConceptVadBody')}
-            </div>
-          </div>
-        </div>
+  return `
+    <div class="model-filters-wrapper">
+      <div class="model-segmented-control" role="tablist" aria-label="${escapeHTML(labelAll)}">
+        <button type="button" class="model-segment-btn ${isAll}" role="tab" aria-selected="${isAll ? 'true' : 'false'}" onclick="switchModelQuickFilter('all')">
+          <span>${escapeHTML(labelAll)}</span>
+          <span class="segment-count">${counts.all}</span>
+        </button>
+        ${showMulti ? `
+          <button type="button" class="model-segment-btn ${isMulti}" role="tab" aria-selected="${isMulti ? 'true' : 'false'}" onclick="switchModelQuickFilter('multi')">
+            <span>${escapeHTML(labelMulti)}</span>
+            <span class="segment-count">${counts.multi}</span>
+          </button>
+        ` : ''}
+        ${showEn ? `
+          <button type="button" class="model-segment-btn ${isEn}" role="tab" aria-selected="${isEn ? 'true' : 'false'}" onclick="switchModelQuickFilter('en')" title="${escapeHTML(enTooltip)}">
+            <span>${escapeHTML(labelEn)}</span>
+            <span class="segment-count">${counts.en}</span>
+          </button>
+        ` : ''}
+        ${showQuant ? `
+          <button type="button" class="model-segment-btn ${isQuant}" role="tab" aria-selected="${isQuant ? 'true' : 'false'}" onclick="switchModelQuickFilter('quant')" title="${escapeHTML(quantTooltip)}">
+            <span>${escapeHTML(labelQuant)}</span>
+            <span class="segment-count">${counts.quant}</span>
+          </button>
+        ` : ''}
       </div>
     </div>
   `;
 }
 
+window.switchModelQuickFilter = function(filter) {
+  currentModelQuickFilter = filter;
+  loadModelStatusesGrid(true);
+};
+
 window.switchModelCategory = function(category, clearSearch = true) {
   currentCategoryFilter = category;
+  currentModelQuickFilter = 'all'; // Always reset quick filter to 'all' on category change
   
   if (clearSearch) {
     const searchInput = document.getElementById('model-search');
@@ -6393,19 +6399,58 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
       _cachedModelStatusesTime = now;
     }
 
+    const paneHeader = document.getElementById('models-pane-header');
     const grid = document.getElementById('models-list-scroll');
     if (!grid) return;
     
     const searchInput = document.getElementById('model-search');
     const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
     
-    // Model Guide Overview Display
-    if (currentCategoryFilter === 'guide' && !query) {
-      renderModelGuide(grid);
-      return;
+    // 1. Filter models belonging to current category & search query
+    const categoryModels = statuses.filter(m => {
+      if (query) {
+        const fullName = `ggml-${m.name}.bin`;
+        const searchTarget = `${m.name} ${fullName}`.toLowerCase();
+        if (!searchTarget.includes(query)) return false;
+      }
+      if (currentCategoryFilter === 'local') {
+        return m.status === 'Downloaded';
+      } else if (!query) {
+        if (currentCategoryFilter === 'tiny') return m.name.startsWith("tiny");
+        if (currentCategoryFilter === 'base') return m.name.startsWith("base");
+        if (currentCategoryFilter === 'small') return m.name.startsWith("small");
+        if (currentCategoryFilter === 'medium') return m.name.startsWith("medium");
+        if (currentCategoryFilter === 'large') return m.name.startsWith("large");
+        if (currentCategoryFilter === 'vad') return m.name.startsWith("silero-");
+      }
+      return true;
+    });
+
+    // 2. Compute dynamic filter counts for this category
+    const counts = {
+      all: categoryModels.length,
+      multi: categoryModels.filter(m => !m.name.includes('.en') && !m.name.startsWith('silero-')).length,
+      en: categoryModels.filter(m => m.name.includes('.en')).length,
+      quant: categoryModels.filter(m => m.name.includes('-q5') || m.name.includes('-q8')).length
+    };
+
+    // Auto-fallback if active filter has 0 items
+    if (currentModelQuickFilter === 'en' && counts.en === 0) {
+      currentModelQuickFilter = 'all';
+    } else if (currentModelQuickFilter === 'multi' && counts.multi === 0) {
+      currentModelQuickFilter = 'all';
+    } else if (currentModelQuickFilter === 'quant' && counts.quant === 0) {
+      currentModelQuickFilter = 'all';
     }
 
+    const bannerHtml = query ? '' : renderFamilyHeaderBanner(currentCategoryFilter);
+    const filterBarHtml = renderModelFiltersBar(currentCategoryFilter, counts);
+
+    if (paneHeader) {
+      paneHeader.innerHTML = bannerHtml + filterBarHtml;
+    }
     grid.innerHTML = '';
+
     if (!grid._modelDelegate) {
       grid.addEventListener('click', function(e) {
         const btn = e.target.closest('button[data-action]');
@@ -6424,36 +6469,16 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
     
     let renderedCount = 0;
 
-    statuses.forEach(m => {
-      if (query) {
-        const fullName = `ggml-${m.name}.bin`;
-        const searchTarget = `${m.name} ${fullName}`.toLowerCase();
-        if (!searchTarget.includes(query)) {
-          return;
-        }
+    categoryModels.forEach(m => {
+      // Quick filter logic:
+      if (currentModelQuickFilter === 'multi') {
+        if (m.name.includes('.en') || m.name.startsWith('silero-')) return;
+      } else if (currentModelQuickFilter === 'en') {
+        if (!m.name.includes('.en')) return;
+      } else if (currentModelQuickFilter === 'quant') {
+        if (!m.name.includes('-q5') && !m.name.includes('-q8')) return;
       }
 
-      // Category Filter Logic:
-      // - "local" tab is a dedicated quick-filter showing ONLY downloaded models on disk
-      // - All family category tabs (tiny, base, small, medium, large, vad, all) show all models (downloadable & downloaded)
-      if (currentCategoryFilter === 'local') {
-        if (m.status !== 'Downloaded') return;
-      } else if (!query) {
-        if (currentCategoryFilter === 'tiny') {
-          if (!m.name.startsWith("tiny")) return;
-        } else if (currentCategoryFilter === 'base') {
-          if (!m.name.startsWith("base")) return;
-        } else if (currentCategoryFilter === 'small') {
-          if (!m.name.startsWith("small")) return;
-        } else if (currentCategoryFilter === 'medium') {
-          if (!m.name.startsWith("medium")) return;
-        } else if (currentCategoryFilter === 'large') {
-          if (!m.name.startsWith("large")) return;
-        } else if (currentCategoryFilter === 'vad') {
-          if (!m.name.startsWith("silero-")) return;
-        }
-      }
-      
       const card = document.createElement('div');
       card.className = 'setting-card';
       card.dataset.name = m.name;
@@ -6539,20 +6564,22 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
     });
 
     if (renderedCount === 0) {
-      grid.innerHTML = `
-        <div class="models-empty-state" style="padding: 48px 20px;">
-          <div class="models-empty-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <circle cx="11" cy="11" r="8"></circle>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-              <line x1="8" y1="11" x2="14" y2="11"></line>
-            </svg>
-          </div>
-          <div class="models-empty-title">${t('models.emptyTitle')}</div>
-          <div class="models-empty-desc">${query ? t('models.emptyDescQuery', { query: escapeHTML(query) }) : t('models.emptyDescCategory')}</div>
-          ${query ? `<button type="button" class="btn-secondary btn-sm" onclick="clearModelSearch()" style="margin-top: 8px;">${t('models.emptyClearSearch')}</button>` : ''}
+      const emptyDiv = document.createElement('div');
+      emptyDiv.className = 'models-empty-state';
+      emptyDiv.style.padding = '48px 20px';
+      emptyDiv.innerHTML = `
+        <div class="models-empty-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            <line x1="8" y1="11" x2="14" y2="11"></line>
+          </svg>
         </div>
+        <div class="models-empty-title">${t('models.emptyTitle')}</div>
+        <div class="models-empty-desc">${query ? t('models.emptyDescQuery', { query: escapeHTML(query) }) : t('models.emptyDescCategory')}</div>
+        ${query ? `<button type="button" class="btn-secondary btn-sm" onclick="clearModelSearch()" style="margin-top: 8px;">${t('models.emptyClearSearch')}</button>` : ''}
       `;
+      grid.appendChild(emptyDiv);
     }
     
   } catch (err) {
@@ -6571,14 +6598,6 @@ window.filterModelsGrid = function() {
   if (filterModelsGrid._timer) clearTimeout(filterModelsGrid._timer);
   filterModelsGrid._timer = setTimeout(() => {
     filterModelsGrid._timer = null;
-    // If typing a search while currently on Guide tab, automatically switch to 'all' category
-    if (query && currentCategoryFilter === 'guide') {
-      currentCategoryFilter = 'all';
-      const buttons = document.querySelectorAll('#model-categories-sidebar .settings-cat-btn');
-      buttons.forEach(btn => btn.classList.remove('active'));
-      const allBtn = document.getElementById('model-cat-all');
-      if (allBtn) allBtn.classList.add('active');
-    }
     loadModelStatusesGrid();
   }, 250);
 };
