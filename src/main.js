@@ -3,6 +3,7 @@ import { translationStudioController } from './translationStudio.ts';
 import { initI18n, t, setLanguage, getLanguage, translateDOM, isRtlLanguage, applyTextDirection, applyContentDirection, clearContentDirection, isolateDirection, isolateLtr, APP_NAME } from './i18n/index.ts';
 import { normalizeForSearch } from './languages.ts';
 import { initLanguageSelects, renderLanguageSelect } from './languageSelect.ts';
+import { recommendModelsForSystem } from './modelRecommender.ts';
 
 // Global error catcher for visual debugging in frontend
 window.onerror = function(message, source, lineno, colno, error) {
@@ -2748,17 +2749,17 @@ window.switchView = function(viewName) {
   }
 
   if (viewName === 'models') {
-    // Always reset search input and default to Tiny Family tab when entering the view
+    // Always reset search input and default to Recommended category when entering the view
     const searchInput = document.getElementById('model-search');
     if (searchInput) searchInput.value = '';
     const clearBtn = document.getElementById('model-search-clear');
     if (clearBtn) clearBtn.style.display = 'none';
-    currentCategoryFilter = 'tiny';
+    currentCategoryFilter = 'recommended';
     currentModelQuickFilter = 'all';
     const buttons = document.querySelectorAll('#model-categories-sidebar .settings-cat-btn');
     buttons.forEach(btn => btn.classList.remove('active'));
-    const tinyBtn = document.getElementById('model-cat-tiny');
-    if (tinyBtn) tinyBtn.classList.add('active');
+    const recBtn = document.getElementById('model-cat-recommended');
+    if (recBtn) recBtn.classList.add('active');
     loadModelStatusesGrid();
   }
 
@@ -6147,7 +6148,7 @@ async function handleDroppedFiles(files) {
 
 // ----------------- Models Logic -----------------
 // ----------------- Models Logic -----------------
-let currentCategoryFilter = 'tiny';
+let currentCategoryFilter = 'recommended';
 let currentModelQuickFilter = 'all';
 
 function formatRemainingTime(seconds) {
@@ -6172,6 +6173,14 @@ function renderFamilyHeaderBanner(category, counts = { all: 0, multi: 0, en: 0, 
   let specs = '';
 
   switch (category) {
+    case 'recommended': {
+      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
+      title = t('models.catRecommendedTitle');
+      subtitle = t('models.catRecommendedSubtitle');
+      body = t('models.catRecommendedBody');
+      specs = '';
+      break;
+    }
     case 'tiny':
       iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`;
       title = t('models.guideTinyTitle');
@@ -6241,7 +6250,7 @@ function renderFamilyHeaderBanner(category, counts = { all: 0, multi: 0, en: 0, 
         </div>
       </div>
     `;
-  } else if (counts.all > 0) {
+  } else if (category !== 'recommended' && counts.all > 0) {
     const isAll = currentModelQuickFilter === 'all' ? 'active' : '';
     const isMulti = currentModelQuickFilter === 'multi' ? 'active' : '';
     const isEn = currentModelQuickFilter === 'en' ? 'active' : '';
@@ -6409,6 +6418,15 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
     const searchInput = document.getElementById('model-search');
     const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
     
+    // 0. Compute system-aware model recommendations based on RAM, CPU cores, GPU architecture
+    const recResult = recommendModelsForSystem(systemSpecs);
+    const recMap = new Map();
+    if (recResult && recResult.models) {
+      recMap.set(recResult.models.balanced.modelName, recResult.models.balanced);
+      recMap.set(recResult.models.quality.modelName, recResult.models.quality);
+      recMap.set(recResult.models.fast.modelName, recResult.models.fast);
+    }
+
     // 1. Filter models belonging to current category & search query
     const categoryModels = statuses.filter(m => {
       if (query) {
@@ -6419,6 +6437,7 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
       if (currentCategoryFilter === 'local') {
         return m.status === 'Downloaded';
       } else if (!query) {
+        if (currentCategoryFilter === 'recommended') return recResult ? recResult.modelNames.includes(m.name) : false;
         if (currentCategoryFilter === 'tiny') return m.name.startsWith("tiny");
         if (currentCategoryFilter === 'base') return m.name.startsWith("base");
         if (currentCategoryFilter === 'small') return m.name.startsWith("small");
@@ -6428,6 +6447,11 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
       }
       return true;
     });
+
+    if (currentCategoryFilter === 'recommended' && !query && recResult && recResult.models) {
+      const order = [recResult.models.balanced.modelName, recResult.models.quality.modelName, recResult.models.fast.modelName];
+      categoryModels.sort((a, b) => order.indexOf(a.name) - order.indexOf(b.name));
+    }
 
     // 2. Compute dynamic filter counts for this category
     const counts = {
@@ -6535,10 +6559,33 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
         statusBadge = `<span class="model-badge badge-paused">${t('models.badgePaused')}</span>`;
       }
 
+      const recInfo = recMap.get(m.name);
+      let recBadgeHtml = '';
+      if (recInfo) {
+        const roleClass = `model-badge-rec-${recInfo.role}`;
+        const roleLabel = t(recInfo.badgeI18nKey) || recInfo.role;
+        let roleIcon = '';
+        if (recInfo.role === 'balanced') {
+          roleIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
+        } else if (recInfo.role === 'quality') {
+          roleIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>`;
+        } else if (recInfo.role === 'fast') {
+          roleIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`;
+        }
+        recBadgeHtml = `<span class="model-badge model-badge-rec ${roleClass}">${roleIcon}<span>${escapeHTML(roleLabel)}</span></span>`;
+      }
+
+      let recReasonHtml = '';
+      if (recInfo && (currentCategoryFilter === 'recommended' || !query)) {
+        const reasonText = t(recInfo.reasonI18nKey) || recInfo.reasonFallback;
+        recReasonHtml = `<div class="model-rec-description">${escapeHTML(reasonText)}</div>`;
+      }
+
       card.innerHTML = `
         <div class="setting-info" style="flex-grow: 1; padding-inline-end: 20px;">
-          <div class="setting-label-row" style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+          <div class="setting-label-row" style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap;">
             <span class="setting-title" style="font-size: 1.05rem; font-weight: 600; color: #fff;">ggml-${safeName}.bin</span>
+            ${recBadgeHtml}
             ${badgeHtml}
           </div>
           <div class="setting-desc" style="font-size: 0.82rem; color: var(--color-text-muted); line-height: 1.4; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
@@ -6560,6 +6607,7 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
               <span style="color: var(--color-gold);">${t('models.statusPaused', { size: window.formatNumberForLang(dlMB), pct: window.formatNumberForLang(pct) })}</span>
             ` : ''}
           </div>
+          ${recReasonHtml}
           <div class="progress-bar-container" style="display: ${showProgressBlock}; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.05); overflow: hidden; margin-top: 10px; border: 1px solid rgba(255,255,255,0.02); max-width: 500px;">
             <div class="progress-bar-fill" style="width: ${pct}%; height: 100%; background: ${m.status === 'Downloading' ? 'var(--color-cyan)' : 'var(--color-gold)'}; box-shadow: ${m.status === 'Downloading' ? 'var(--shadow-neon-cyan)' : 'var(--shadow-neon-gold)'}; transition: width 0.3s ease;"></div>
           </div>

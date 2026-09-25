@@ -81,11 +81,13 @@ async fn probe_media_file(app: AppHandle, file_path: String) -> Result<FileMetad
     Ok(probe_file_metadata(Some(&app), &file_path).await)
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Clone, Debug)]
 pub struct SystemSpecs {
     pub total_ram_gb: f64,
     pub cpu_cores: usize,
     pub gpu_type: String,
+    pub gpu_name: String,
+    pub is_discrete_gpu: bool,
 }
 
 #[tauri::command]
@@ -99,12 +101,16 @@ fn get_system_specs(hardware_state: State<'_, HardwareState>) -> SystemSpecs {
             total_ram_gb,
             cpu_cores,
             gpu_type: monitor.gpu_type.clone(),
+            gpu_name: monitor.gpu_name.clone(),
+            is_discrete_gpu: monitor.is_discrete_gpu,
         }
     } else {
         SystemSpecs {
             total_ram_gb: 8.0,
             cpu_cores: 4,
             gpu_type: "unknown".to_string(),
+            gpu_name: "CPU Only".to_string(),
+            is_discrete_gpu: false,
         }
     }
 }

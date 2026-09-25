@@ -4584,6 +4584,46 @@ select.select-control {
   color: var(--color-royal-blue);
 }
 
+.model-badge-rec {
+  border: none !important;
+  font-size: 0.74rem;
+  font-weight: 500;
+  padding: 2px 7px;
+  border-radius: 4px;
+  gap: 4px;
+  display: inline-flex;
+  align-items: center;
+  box-shadow: none;
+}
+
+.model-badge-rec svg {
+  width: 11px;
+  height: 11px;
+  opacity: 0.85;
+}
+
+.model-badge-rec-balanced {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+}
+
+.model-badge-rec-quality {
+  background: rgba(168, 85, 247, 0.12);
+  color: #c084fc;
+}
+
+.model-badge-rec-fast {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+}
+
+.model-rec-description {
+  margin-top: 5px;
+  font-size: 0.81rem;
+  color: rgba(255, 255, 255, 0.65);
+  line-height: 1.45;
+}
+
 .model-badge-vad {
   background: rgba(16, 185, 129, 0.08);
   color: #34d399;
