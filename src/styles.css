@@ -4617,6 +4617,16 @@ select.select-control {
   color: #34d399;
 }
 
+.model-badge-rec-english {
+  background: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
+}
+
+.model-badge-rec-quantized {
+  background: rgba(45, 212, 191, 0.12);
+  color: #2dd4bf;
+}
+
 .model-rec-description {
   margin-top: 5px;
   font-size: 0.81rem;

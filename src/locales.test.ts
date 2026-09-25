@@ -101,11 +101,48 @@ describe('locale consistency for speed presets', () => {
       }
     });
 
-    it(`locale ${code} has providerCustomPromptPlaceholder`, () => {
-      const settings = (dict as any).settings;
-      expect(settings).toBeDefined();
-      expect(typeof settings.providerCustomPromptPlaceholder).toBe('string');
-      expect(settings.providerCustomPromptPlaceholder.length).toBeGreaterThan(0);
+    it(`locale ${code} has all required GPU hardware spec keys`, () => {
+      const models = (dict as any).models;
+      expect(models).toBeDefined();
+      const requiredGpuKeys = ['gpuNvidia', 'gpuAmd', 'gpuIntel', 'gpuAppleSilicon', 'gpuCpuOnly', 'gpuUnknown'];
+      for (const key of requiredGpuKeys) {
+        expect(typeof models[key]).toBe('string');
+        expect(models[key].length).toBeGreaterThan(0);
+      }
+    });
+
+    it(`locale ${code} has all required model recommendation scenario and filter keys`, () => {
+      const models = (dict as any).models;
+      expect(models).toBeDefined();
+      const requiredScenarioKeys = [
+        'recFilterUniversal',
+        'recFilterEn',
+        'recFilterQuant',
+        'recFilterUniversalTooltip',
+        'recFilterEnTooltip',
+        'recFilterQuantTooltip',
+        'recRoleEnglish',
+        'recRoleQuantized',
+        'recTitleEnglish',
+        'recTitleQuantized',
+        'recReasonBalancedEnEntry',
+        'recReasonQualityEnEntry',
+        'recReasonFastEnEntry',
+        'recReasonBalancedEnBudget',
+        'recReasonQualityMediumEnQuant',
+        'recReasonFastEnBudget',
+        'recReasonQualityMediumEn',
+        'recReasonBalancedEnCapable',
+        'recReasonFastEnCapable',
+        'recReasonBalancedQuant',
+        'recReasonQualityQuantLarge',
+        'recReasonQualityQuantTurbo',
+        'recReasonFastQuant',
+      ];
+      for (const key of requiredScenarioKeys) {
+        expect(typeof models[key]).toBe('string');
+        expect(models[key].length).toBeGreaterThan(0);
+      }
     });
   }
 

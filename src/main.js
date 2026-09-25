@@ -6250,7 +6250,9 @@ function renderFamilyHeaderBanner(category, counts = { all: 0, multi: 0, en: 0, 
         </div>
       </div>
     `;
-  } else if (category !== 'recommended' && counts.all > 0) {
+  } else if (category === 'recommended') {
+    filterBarHtml = '';
+  } else if (counts.all > 0) {
     const isAll = currentModelQuickFilter === 'all' ? 'active' : '';
     const isMulti = currentModelQuickFilter === 'multi' ? 'active' : '';
     const isEn = currentModelQuickFilter === 'en' ? 'active' : '';
@@ -6391,6 +6393,7 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
       'nvidia': t('models.gpuNvidia'),
       'amd': t('models.gpuAmd'),
       'intel': t('models.gpuIntel'),
+      'apple_silicon': t('models.gpuAppleSilicon'),
       'unknown': t('models.gpuCpuOnly')
     };
     const gpuName = gpuLabelMap[systemSpecs.gpu_type] || systemSpecs.gpu_type || t('models.gpuUnknown');
@@ -6425,6 +6428,8 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
       recMap.set(recResult.models.balanced.modelName, recResult.models.balanced);
       recMap.set(recResult.models.quality.modelName, recResult.models.quality);
       recMap.set(recResult.models.fast.modelName, recResult.models.fast);
+      recMap.set(recResult.models.english.modelName, recResult.models.english);
+      recMap.set(recResult.models.quantized.modelName, recResult.models.quantized);
     }
 
     // 1. Filter models belonging to current category & search query
@@ -6449,7 +6454,13 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
     });
 
     if (currentCategoryFilter === 'recommended' && !query && recResult && recResult.models) {
-      const order = [recResult.models.balanced.modelName, recResult.models.quality.modelName, recResult.models.fast.modelName];
+      const order = [
+        recResult.models.balanced.modelName,
+        recResult.models.quality.modelName,
+        recResult.models.fast.modelName,
+        recResult.models.english.modelName,
+        recResult.models.quantized.modelName
+      ];
       categoryModels.sort((a, b) => order.indexOf(a.name) - order.indexOf(b.name));
     }
 
@@ -6466,12 +6477,14 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
     const showQuant = counts.quant > 0 && counts.quant < counts.all;
 
     // Auto-fallback if active filter has 0 items or is hidden
-    if (currentModelQuickFilter === 'en' && !showEn) {
-      currentModelQuickFilter = 'all';
-    } else if (currentModelQuickFilter === 'multi' && !showMulti) {
-      currentModelQuickFilter = 'all';
-    } else if (currentModelQuickFilter === 'quant' && !showQuant) {
-      currentModelQuickFilter = 'all';
+    if (currentCategoryFilter !== 'recommended') {
+      if (currentModelQuickFilter === 'en' && !showEn) {
+        currentModelQuickFilter = 'all';
+      } else if (currentModelQuickFilter === 'multi' && !showMulti) {
+        currentModelQuickFilter = 'all';
+      } else if (currentModelQuickFilter === 'quant' && !showQuant) {
+        currentModelQuickFilter = 'all';
+      }
     }
 
     grid.innerHTML = '';
@@ -6504,12 +6517,14 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
 
     categoryModels.forEach(m => {
       // Quick filter logic:
-      if (currentModelQuickFilter === 'multi') {
-        if (m.name.includes('.en') || m.name.startsWith('silero-')) return;
-      } else if (currentModelQuickFilter === 'en') {
-        if (!m.name.includes('.en')) return;
-      } else if (currentModelQuickFilter === 'quant') {
-        if (!m.name.includes('-q5') && !m.name.includes('-q8')) return;
+      if (currentCategoryFilter !== 'recommended') {
+        if (currentModelQuickFilter === 'multi') {
+          if (m.name.includes('.en') || m.name.startsWith('silero-')) return;
+        } else if (currentModelQuickFilter === 'en') {
+          if (!m.name.includes('.en')) return;
+        } else if (currentModelQuickFilter === 'quant') {
+          if (!m.name.includes('-q5') && !m.name.includes('-q8')) return;
+        }
       }
 
       const card = document.createElement('div');
@@ -6571,6 +6586,10 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
           roleIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>`;
         } else if (recInfo.role === 'fast') {
           roleIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`;
+        } else if (recInfo.role === 'english') {
+          roleIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`;
+        } else if (recInfo.role === 'quantized') {
+          roleIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>`;
         }
         recBadgeHtml = `<span class="model-badge model-badge-rec ${roleClass}">${roleIcon}<span>${escapeHTML(roleLabel)}</span></span>`;
       }

@@ -1,9 +1,16 @@
 /**
  * Intelligent Whisper Model Recommendation Engine
  * 
- * Determines the 3 optimal Whisper GGML models tailored specifically to the host
+ * Determines the 5 optimal Whisper GGML models tailored specifically to the host
  * machine's actual hardware: RAM capacity, CPU physical/logical cores, GPU architecture
  * (CUDA vs OpenVINO vs Vulkan vs Apple Silicon), and discrete vs integrated memory bus.
+ * 
+ * Recommends 5 distinct, orthogonal roles with zero ambiguity:
+ * 1. 'balanced': Everyday general driver with optimal balance of speed and accuracy.
+ * 2. 'quality': Maximum semantic intelligence and resilience against acoustic noise.
+ * 3. 'fast': Ultra-fast, near-instantaneous transcription with minimal memory consumption.
+ * 4. 'english': Dedicated English specialist utilizing the pure 51,865 English token architecture.
+ * 5. 'quantized': Ultra-efficient compressed edition slashing RAM and battery usage by 40-60%.
  */
 
 export interface SystemSpecs {
@@ -14,7 +21,13 @@ export interface SystemSpecs {
   is_discrete_gpu?: boolean;
 }
 
-export type RecommendationRole = 'balanced' | 'quality' | 'fast';
+export type RecommendationRole = 'balanced' | 'quality' | 'fast' | 'english' | 'quantized';
+
+export interface RecommendationOptions {
+  // Kept for backward compatibility
+  scenario?: string;
+  isEnglishOnly?: boolean;
+}
 
 export interface RecommendedModel {
   role: RecommendationRole;
@@ -41,23 +54,25 @@ export interface RecommendationResult {
     balanced: RecommendedModel;
     quality: RecommendedModel;
     fast: RecommendedModel;
+    english: RecommendedModel;
+    quantized: RecommendedModel;
   };
   modelNames: string[];
 }
 
 /**
- * Analyzes system specifications and returns the top 3 recommended models.
+ * Analyzes system specifications and returns the top 5 recommended models covering
+ * balanced, quality, fast, english, and quantized roles.
  */
 export function recommendModelsForSystem(
   specs: SystemSpecs | null | undefined,
-  options: { isEnglishOnly?: boolean } = {}
+  _options: RecommendationOptions = {}
 ): RecommendationResult {
   const ram = specs && typeof specs.total_ram_gb === 'number' && specs.total_ram_gb > 0 ? specs.total_ram_gb : 8.0;
   const cores = specs && typeof specs.cpu_cores === 'number' && specs.cpu_cores > 0 ? specs.cpu_cores : 4;
   const gpuType = (specs?.gpu_type || 'unknown').toLowerCase();
   const isDiscrete = !!specs?.is_discrete_gpu;
   const gpuName = specs?.gpu_name || (gpuType === 'nvidia' ? 'NVIDIA GPU' : gpuType === 'intel' ? 'Intel Graphics' : gpuType === 'amd' ? 'AMD Radeon' : 'CPU Only');
-  const en = !!options.isEnglishOnly;
 
   const isNvidiaCuda = gpuType === 'nvidia';
   const isAppleSilicon = gpuType === 'apple_silicon';
@@ -79,140 +94,164 @@ export function recommendModelsForSystem(
   let balancedModel = 'small';
   let qualityModel = 'large-v3-turbo';
   let fastModel = 'base-q8_0';
+  let englishModel = 'medium.en';
+  let quantizedModel = 'large-v3-turbo-q8_0';
 
   let balancedReasonKey = 'models.recReasonBalancedDefault';
-  let balancedReasonFallback = 'توازن عالی میان سرعت بالا و خطای رونویسی ناچیز برای استفاده روزمره.';
+  let balancedReasonFallback = 'Excellent balance between fast turnaround and low error rate for everyday use.';
 
   let qualityReasonKey = 'models.recReasonQualityDefault';
-  let qualityReasonFallback = 'بالاترین دقت معنایی و مقاوم در برابر نویز و لهجه‌ها.';
+  let qualityReasonFallback = 'Maximum semantic accuracy and resilience against acoustic noise and technical vocabulary.';
 
   let fastReasonKey = 'models.recReasonFastDefault';
-  let fastReasonFallback = 'پردازش فوری و سبک فایل‌های طولانی با حداقل مصرف باتری و منابع.';
+  let fastReasonFallback = 'Near-instantaneous, lightweight processing for long audio files with minimal resource footprint.';
 
-  // 2. Select Models based on Hardware Matrix
+  let englishReasonKey = 'models.recReasonQualityMediumEn';
+  let englishReasonFallback = 'Dedicated English architecture with 51,865 English tokens for superior recognition speed and accuracy.';
+
+  let quantizedReasonKey = 'models.recReasonBalancedQuant';
+  let quantizedReasonFallback = 'Optimized quantized edition; slashes memory consumption and battery drain by 40-60%.';
+
+  // 2. Hardware Matrix with 5 Mutually Exclusive Roles
   switch (tier) {
     case 'entry': {
-      // Memory heavily constrained (<5GB or 2-core CPU). Prevent OOM crashes.
-      balancedModel = en ? 'base.en-q8_0' : 'base-q8_0';
-      qualityModel = en ? 'small.en-q5_1' : 'small-q5_1';
-      fastModel = en ? 'tiny.en-q5_1' : 'tiny-q5_1';
+      balancedModel = 'base';
+      qualityModel = 'small-q5_1';
+      fastModel = 'tiny-q5_1';
+      englishModel = 'base.en-q8_0';
+      quantizedModel = 'base-q8_0';
 
       balancedReasonKey = 'models.recReasonBalancedEntry';
-      balancedReasonFallback = 'مصرف رم کمتر از ۲۰۰ مگابایت با دقت مناسب برای سیستم‌های اقتصادی.';
+      balancedReasonFallback = 'Standard 16-bit Base model; smooth execution and solid general accuracy for entry-level PCs.';
 
       qualityReasonKey = 'models.recReasonQualityEntry';
-      qualityReasonFallback = 'کوانتایز ۵ بیتی خانواده Small؛ ارائه هوش بالا بدون فشار آوردن به رم محدود سیستم.';
+      qualityReasonFallback = '5-bit quantized Small family; high intelligence without exhausting constrained memory.';
 
       fastReasonKey = 'models.recReasonFastEntry';
-      fastReasonFallback = 'فوق‌سبک با حجم تنها ۳۱ مگابایت؛ اجرای تضمین‌شده روی هر سیستم بدون افت سرعت.';
+      fastReasonFallback = 'Ultra-compact 31 MB file; guaranteed smooth execution on any hardware without lag.';
+
+      englishReasonKey = 'models.recReasonBalancedEnEntry';
+      englishReasonFallback = 'Under 200 MB memory footprint with high English vocabulary focus for entry-level PCs.';
+
+      quantizedReasonKey = 'models.recReasonBalancedBudget';
+      quantizedReasonFallback = '8-bit quantized Base model; cuts memory footprint in half with zero loss in recognition.';
       break;
     }
 
     case 'budget': {
-      // 6 - 9 GB RAM, typically integrated graphics / 4-6 cores
-      balancedModel = en ? 'small.en-q8_0' : 'small-q8_0';
+      balancedModel = 'small';
       qualityModel = 'large-v3-turbo-q5_0';
-      fastModel = en ? 'base.en-q8_0' : 'base-q8_0';
+      fastModel = 'base-q8_0';
+      englishModel = 'medium.en-q5_0';
+      quantizedModel = 'small-q8_0';
 
-      balancedReasonKey = 'models.recReasonBalancedBudget';
-      balancedReasonFallback = 'کوانتایز ۸ بیتی با سرعت عالی و مصرف حافظه بهینه (حدود ۵۵۰ مگابایت) برای سیستم‌های با رم محدود.';
+      balancedReasonKey = 'models.recReasonBalancedDefault';
+      balancedReasonFallback = 'Optimal everyday workhorse; provides high accuracy across all languages with modest RAM usage.';
 
       qualityReasonKey = 'models.recReasonQualityBudget';
-      qualityReasonFallback = 'نسخه فشرده توربو با مصرف تنها ۱.۱ گیگابایت حافظه و حفظ کیفیت خانواده Large.';
+      qualityReasonFallback = 'Compact turbo edition with only ~1.1 GB memory usage while preserving Large-family quality.';
 
       fastReasonKey = 'models.recReasonFastBudget';
-      fastReasonFallback = 'تبدیل سریع صوت به متن با مصرف پردازشی بسیار پایین.';
+      fastReasonFallback = 'Fast speech-to-text with minimal compute and battery impact.';
+
+      englishReasonKey = 'models.recReasonQualityMediumEnQuant';
+      englishReasonFallback = '5-bit quantized English specialist; studio-grade comprehension taking under 700 MB RAM.';
+
+      quantizedReasonKey = 'models.recReasonBalancedBudget';
+      quantizedReasonFallback = '8-bit quantization with fast execution and optimized ~550 MB memory footprint for memory-constrained systems.';
       break;
     }
 
     case 'capable': {
-      // 10 - 24 GB RAM, 8-16 cores, integrated graphics or mid-range GPUs
       if (isNvidiaCuda) {
         balancedModel = 'large-v3-turbo';
         qualityModel = 'large-v3';
-        fastModel = en ? 'small.en-q5_1' : 'small-q5_1';
+        fastModel = 'small-q5_1';
+        englishModel = 'medium.en';
+        quantizedModel = 'large-v3-q5_0';
 
         balancedReasonKey = 'models.recReasonBalancedCuda';
-        balancedReasonFallback = 'شتاب‌دهی فوق‌العاده با هسته‌های تنسور کارت گرافیک انویدیا با سرعتی خیره‌کننده.';
+        balancedReasonFallback = 'Outstanding acceleration on NVIDIA Tensor Cores with exceptional throughput.';
 
         qualityReasonKey = 'models.recReasonQualityCuda';
-        qualityReasonFallback = 'دقت کامل ۱۶ بیتی FP16 برای بالاترین درک محتوایی و مقاومت در برابر نویز.';
+        qualityReasonFallback = 'Full 16-bit FP16 precision for uncompromising recognition accuracy and noise rejection.';
 
         fastReasonKey = 'models.recReasonFastCuda';
-        fastReasonFallback = 'رونویسی آنی و با سرعت ده‌ها برابر زمان صوت روی شتاب‌دهنده CUDA.';
+        fastReasonFallback = 'Instantaneous transcription at tens of times faster than real-time audio on CUDA.';
+
+        englishReasonKey = 'models.recReasonQualityMediumEn';
+        englishReasonFallback = 'Dedicated 768M English architecture; near-Large accuracy with 2x inference speed.';
+
+        quantizedReasonKey = 'models.recReasonQualityQuantLarge';
+        quantizedReasonFallback = '5-bit quantized Large flagship; retains 99% accuracy at less than half the RAM.';
       } else if (isAppleSilicon) {
         balancedModel = 'large-v3-turbo';
         qualityModel = 'large-v3';
-        fastModel = en ? 'small.en' : 'small';
+        fastModel = 'small';
+        englishModel = 'medium.en';
+        quantizedModel = 'large-v3-q5_0';
 
         balancedReasonKey = 'models.recReasonBalancedApple';
-        balancedReasonFallback = 'پهنای باند حافظه یکپارچه Apple Silicon سرعت رونویسی فوق‌العاده‌ای فراهم می‌سازد.';
+        balancedReasonFallback = 'High unified memory bandwidth on Apple Silicon enables blazing-fast transcription.';
 
         qualityReasonKey = 'models.recReasonQualityApple';
-        qualityReasonFallback = 'دقت استودیویی با استفاده از موتور عصبی و گرافیک اپل سیلیکون.';
+        qualityReasonFallback = 'Studio-grade precision powered by the Apple Neural Engine and GPU.';
 
         fastReasonKey = 'models.recReasonFastApple';
-        fastReasonFallback = 'سرعت برق‌آسا و روان با حداقل مصرف باتری.';
+        fastReasonFallback = 'Blazing-fast transcription with minimal battery drain.';
+
+        englishReasonKey = 'models.recReasonQualityMediumEn';
+        englishReasonFallback = 'Dedicated 768M English architecture; near-Large accuracy with 2x inference speed.';
+
+        quantizedReasonKey = 'models.recReasonQualityQuantLarge';
+        quantizedReasonFallback = '5-bit quantized Large flagship; retains 99% accuracy at less than half the RAM.';
       } else {
-        // Multi-core CPU + Integrated / Standard GPU (Intel Iris/UHD, AMD Radeon, etc.)
-        balancedModel = en ? 'small.en' : 'small';
+        // CPU-only or Intel/AMD iGPU
+        balancedModel = 'small';
         qualityModel = 'large-v3-turbo';
-        fastModel = en ? 'base.en-q8_0' : 'base-q8_0';
+        fastModel = 'base-q8_0';
+        englishModel = 'medium.en-q8_0';
+        quantizedModel = 'large-v3-turbo-q8_0';
 
         balancedReasonKey = 'models.recReasonBalancedCapable';
-        balancedReasonFallback = 'بهترین توازن سرعت و دقت، بهینه‌سازی‌شده برای پردازنده‌های چند‌هسته‌ای و شتاب‌دهنده گرافیکی سیستم شما.';
+        balancedReasonFallback = 'Optimal balance of speed and accuracy, tailored for multi-core CPUs and system graphics acceleration.';
 
         qualityReasonKey = 'models.recReasonQualityTurbo';
-        qualityReasonFallback = 'معماری مدرن توربو با ۴ لایه دی‌کودر؛ ارائه دقت کامل خانواده Large با سرعتی چند برابر بیشتر.';
+        qualityReasonFallback = 'Modern turbo architecture with 4 decoder layers; delivers full Large-family accuracy at ~2x-4x speed.';
 
         fastReasonKey = 'models.recReasonFastCapable';
-        fastReasonFallback = 'رونویسی بسیار پرسرعت با مصرف ناچیز باتری و پردازنده برای پیش‌نویس‌های آنی.';
+        fastReasonFallback = 'High-speed transcription with minimal CPU and battery usage for rapid turnaround.';
+
+        englishReasonKey = 'models.recReasonQualityMediumEnQuant';
+        englishReasonFallback = 'Dedicated 768M English architecture with 8-bit quantization; runs 2x faster than Large on CPU.';
+
+        quantizedReasonKey = 'models.recReasonQualityQuantTurbo';
+        quantizedReasonFallback = '8-bit Turbo architecture; delivers Large-family accuracy with low memory footprint and zero lag.';
       }
       break;
     }
 
     case 'workstation': {
-      // 24+ GB RAM or High-end CUDA workstation / Apple Silicon Pro/Max
-      if (isNvidiaCuda) {
-        balancedModel = 'large-v3-turbo';
-        qualityModel = 'large-v3';
-        fastModel = en ? 'small.en-q5_1' : 'small-q5_1';
+      balancedModel = 'large-v3-turbo';
+      qualityModel = 'large-v3';
+      fastModel = 'small';
+      englishModel = 'medium.en';
+      quantizedModel = 'large-v3-q5_0';
 
-        balancedReasonKey = 'models.recReasonBalancedCuda';
-        balancedReasonFallback = 'بهره‌گیری کامل از توان شتاب‌دهنده انویدیا برای رونویسی سریع و دقیق.';
+      balancedReasonKey = 'models.recReasonBalancedWorkstation';
+      balancedReasonFallback = 'Ample system RAM and compute allow running the Turbo model comfortably as your daily driver.';
 
-        qualityReasonKey = 'models.recReasonQualityCuda';
-        qualityReasonFallback = 'بالاترین کیفیت مطلق بدون هیچ‌گونه مصالحه در دقت با حافظه کامل FP16.';
+      qualityReasonKey = 'models.recReasonQualityWorkstation';
+      qualityReasonFallback = 'Unrestricted execution of the flagship Whisper model on your capable hardware.';
 
-        fastReasonKey = 'models.recReasonFastCuda';
-        fastReasonFallback = 'رونویسی با سرعتی حیرت‌انگیز ده‌ها برابر زمان صوت.';
-      } else if (isAppleSilicon) {
-        balancedModel = 'large-v3-turbo';
-        qualityModel = 'large-v3';
-        fastModel = en ? 'small.en' : 'small';
+      fastReasonKey = 'models.recReasonFastWorkstation';
+      fastReasonFallback = 'Extremely fast processing with zero memory contention.';
 
-        balancedReasonKey = 'models.recReasonBalancedApple';
-        balancedReasonFallback = 'پهنای باند حافظه یکپارچه Apple Silicon سرعت رونویسی فوق‌العاده‌ای فراهم می‌سازد.';
+      englishReasonKey = 'models.recReasonQualityMediumEn';
+      englishReasonFallback = 'Dedicated 768M English architecture; near-Large accuracy with 2x inference speed.';
 
-        qualityReasonKey = 'models.recReasonQualityApple';
-        qualityReasonFallback = 'دقت استودیویی با استفاده از موتور عصبی و گرافیک اپل سیلیکون.';
-
-        fastReasonKey = 'models.recReasonFastApple';
-        fastReasonFallback = 'سرعت برق‌آسا و روان با حداقل مصرف باتری.';
-      } else {
-        balancedModel = 'large-v3-turbo';
-        qualityModel = 'large-v3';
-        fastModel = en ? 'small.en-q5_1' : 'small-q5_1';
-
-        balancedReasonKey = 'models.recReasonBalancedWorkstation';
-        balancedReasonFallback = 'ظرفیت بالای رم و پردازنده امکان اجرای روان مدل توربو را به عنوان گزینه روزمره فراهم کرده است.';
-
-        qualityReasonKey = 'models.recReasonQualityWorkstation';
-        qualityReasonFallback = 'اجرای بدون محدودیت قوی‌ترین مدل ویسپر روی سخت‌افزار توانمند شما.';
-
-        fastReasonKey = 'models.recReasonFastWorkstation';
-        fastReasonFallback = 'پردازش فوق‌العاده سریع بدون کوچک‌ترین درگیری حافظه.';
-      }
+      quantizedReasonKey = 'models.recReasonQualityQuantLarge';
+      quantizedReasonFallback = '5-bit quantized Large flagship; retains 99% accuracy at less than half the RAM.';
       break;
     }
   }
@@ -234,7 +273,13 @@ export function recommendModelsForSystem(
     'small': '~800 MB',
     'small.en': '~800 MB',
     'medium-q5_0': '~900 MB',
+    'medium-q8_0': '~1.3 GB',
+    'medium.en-q5_0': '~650 MB',
+    'medium.en-q8_0': '~850 MB',
+    'medium.en': '~1.5 GB',
+    'large-v3-q5_0': '~1.6 GB',
     'large-v3-turbo-q5_0': '~1.1 GB',
+    'large-v3-turbo-q8_0': '~1.4 GB',
     'large-v3-turbo': '~2.0 GB',
     'large-v3': '~3.8 GB',
   };
@@ -245,29 +290,48 @@ export function recommendModelsForSystem(
     'tiny-q8_0': '⚡⚡⚡ ~12x',
     'base-q8_0': '⚡⚡ ~7x',
     'base.en-q8_0': '⚡⚡ ~7x',
-    'small-q5_1': '⚡⚡ ~5x - 10x',
-    'small.en-q5_1': '⚡⚡ ~5x - 10x',
-    'small-q8_0': '⚡ ~4x - 8x',
-    'small': '⚡ ~3x - 6x',
-    'small.en': '⚡ ~3x - 6x',
-    'large-v3-turbo-q5_0': '⚡ ~3x - 5x',
-    'large-v3-turbo': '⚡ ~2x - 4x',
-    'large-v3': '~1x - 2.5x',
+    'base': '⚡⚡ ~6x',
+    'small-q5_1': '⚡⚡ ~4x',
+    'small.en-q5_1': '⚡⚡ ~4x',
+    'small-q8_0': '⚡⚡ ~3.5x',
+    'small.en-q8_0': '⚡⚡ ~3.5x',
+    'small': '⚡⚡ ~3x',
+    'small.en': '⚡⚡ ~3x',
+    'medium-q5_0': '⚡ ~2x',
+    'medium-q8_0': '⚡ ~1.8x',
+    'medium.en-q5_0': '⚡ ~2.2x',
+    'medium.en-q8_0': '⚡ ~2.0x',
+    'medium.en': '⚡ ~1.8x',
+    'large-v3-q5_0': '⚡ ~1.5x',
+    'large-v3-turbo-q5_0': '⚡⚡ ~3.5x',
+    'large-v3-turbo-q8_0': '⚡⚡ ~3.0x',
+    'large-v3-turbo': '⚡⚡ ~3.0x',
+    'large-v3': '~1.0x',
   };
 
   const modelAccuracyMap: Record<string, string> = {
-    'tiny-q5_1': 'پایه (برای پیش‌نویس)',
-    'tiny.en-q5_1': 'پایه (برای پیش‌نویس)',
-    'base-q8_0': 'متوسط و سبک',
-    'base.en-q8_0': 'متوسط و سبک',
-    'small-q5_1': 'خوب و مطمئن',
-    'small.en-q5_1': 'خوب و مطمئن',
-    'small-q8_0': 'بسیار خوب (خطای کم)',
-    'small': 'بسیار خوب (تعادل طلایی)',
-    'small.en': 'بسیار خوب (اختصاصی انگلیسی)',
-    'large-v3-turbo-q5_0': 'فوق‌العاده (نزدیک به استودیو)',
-    'large-v3-turbo': 'فوق‌العاده و سطح اول',
-    'large-v3': 'حداکثر دقت مطلق',
+    'tiny-q5_1': 'Basic & Draft Quality',
+    'tiny.en-q5_1': 'Basic & Draft Quality (English)',
+    'tiny-q8_0': 'Basic & Draft Quality',
+    'base-q8_0': 'Moderate & Lightweight',
+    'base.en-q8_0': 'Moderate & Dedicated English',
+    'base': 'Good Everyday Dictation',
+    'small-q5_1': 'High & Efficient',
+    'small.en-q5_1': 'High & Efficient (English)',
+    'small-q8_0': 'Very Good',
+    'small.en-q8_0': 'Very Good (English Dedicated)',
+    'small': 'Very Good',
+    'small.en': 'Very Good (English Dedicated)',
+    'medium-q5_0': 'Studio Precision',
+    'medium-q8_0': 'Studio Precision',
+    'medium.en-q5_0': 'Studio Precision (English Dedicated)',
+    'medium.en-q8_0': 'Studio Precision (English Dedicated)',
+    'medium.en': 'Studio Flagship (English Dedicated)',
+    'large-v3-q5_0': 'Flagship (5-bit Quantized)',
+    'large-v3-turbo-q5_0': 'Excellent (Near Studio Quality)',
+    'large-v3-turbo-q8_0': 'Flagship (8-bit Turbo)',
+    'large-v3-turbo': 'Flagship Tier & Exceptional',
+    'large-v3': 'Maximum Absolute Accuracy',
   };
 
   const balanced: RecommendedModel = {
@@ -279,7 +343,7 @@ export function recommendModelsForSystem(
     reasonFallback: balancedReasonFallback,
     ramEstimate: modelRamMap[balancedModel] || '~800 MB',
     speedEstimate: modelSpeedMap[balancedModel] || '~3x - 6x',
-    accuracyEstimate: modelAccuracyMap[balancedModel] || 'بسیار خوب',
+    accuracyEstimate: modelAccuracyMap[balancedModel] || 'Very Good',
   };
 
   const quality: RecommendedModel = {
@@ -291,7 +355,7 @@ export function recommendModelsForSystem(
     reasonFallback: qualityReasonFallback,
     ramEstimate: modelRamMap[qualityModel] || '~2.0 GB',
     speedEstimate: modelSpeedMap[qualityModel] || '~2x - 4x',
-    accuracyEstimate: modelAccuracyMap[qualityModel] || 'فوق‌العاده و سطح اول',
+    accuracyEstimate: modelAccuracyMap[qualityModel] || 'Flagship Tier & Exceptional',
   };
 
   const fast: RecommendedModel = {
@@ -303,7 +367,31 @@ export function recommendModelsForSystem(
     reasonFallback: fastReasonFallback,
     ramEstimate: modelRamMap[fastModel] || '~200 MB',
     speedEstimate: modelSpeedMap[fastModel] || '~7x',
-    accuracyEstimate: modelAccuracyMap[fastModel] || 'متوسط و سبک',
+    accuracyEstimate: modelAccuracyMap[fastModel] || 'Moderate & Lightweight',
+  };
+
+  const english: RecommendedModel = {
+    role: 'english',
+    modelName: englishModel,
+    badgeI18nKey: 'models.recRoleEnglish',
+    titleI18nKey: 'models.recTitleEnglish',
+    reasonI18nKey: englishReasonKey,
+    reasonFallback: englishReasonFallback,
+    ramEstimate: modelRamMap[englishModel] || '~800 MB',
+    speedEstimate: modelSpeedMap[englishModel] || '~3x - 8x',
+    accuracyEstimate: modelAccuracyMap[englishModel] || 'Studio Precision (English Dedicated)',
+  };
+
+  const quantized: RecommendedModel = {
+    role: 'quantized',
+    modelName: quantizedModel,
+    badgeI18nKey: 'models.recRoleQuantized',
+    titleI18nKey: 'models.recTitleQuantized',
+    reasonI18nKey: quantizedReasonKey,
+    reasonFallback: quantizedReasonFallback,
+    ramEstimate: modelRamMap[quantizedModel] || '~600 MB',
+    speedEstimate: modelSpeedMap[quantizedModel] || '~3x - 8x',
+    accuracyEstimate: modelAccuracyMap[quantizedModel] || 'High Efficiency',
   };
 
   return {
@@ -319,7 +407,9 @@ export function recommendModelsForSystem(
       balanced,
       quality,
       fast,
+      english,
+      quantized,
     },
-    modelNames: [balancedModel, qualityModel, fastModel],
+    modelNames: [balancedModel, qualityModel, fastModel, englishModel, quantizedModel],
   };
 }

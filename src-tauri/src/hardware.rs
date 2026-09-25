@@ -123,6 +123,30 @@ fn parse_lspci_line(line: &str) -> (String, String, bool) {
     }
 }
 
+fn score_gpu(info: &GpuInfo) -> i32 {
+    let mut score = 0;
+    if info.is_discrete_gpu {
+        score += 100;
+    }
+    match info.gpu_type.as_str() {
+        "nvidia" => score += 50,
+        "amd" => score += 30,
+        "intel" => {
+            if info.is_discrete_gpu {
+                score += 25; // Intel Arc
+            } else {
+                score += 10; // Intel iGPU
+            }
+        }
+        _ => {}
+    }
+    score
+}
+
+fn pick_best_gpu(candidates: Vec<GpuInfo>) -> Option<GpuInfo> {
+    candidates.into_iter().max_by_key(score_gpu)
+}
+
 pub fn detect_gpu_info() -> GpuInfo {
     // 1. Check for nvidia-smi (works on Windows & Linux)
     #[cfg(target_os = "windows")]
@@ -155,7 +179,8 @@ pub fn detect_gpu_info() -> GpuInfo {
 
     #[cfg(target_os = "linux")]
     {
-        // Check lspci
+        // Check lspci across all controllers and collect candidates
+        let mut candidates = Vec::new();
         if let Ok(output) = Command::new("lspci").output() {
             let lspci_str = String::from_utf8_lossy(&output.stdout);
             for line in lspci_str.lines() {
@@ -163,14 +188,18 @@ pub fn detect_gpu_info() -> GpuInfo {
                 if lower.contains("vga compatible") || lower.contains("3d controller") || lower.contains("display controller") {
                     let (gpu_type, gpu_name, is_discrete) = parse_lspci_line(line);
                     if gpu_type != "unknown" {
-                        return GpuInfo {
+                        candidates.push(GpuInfo {
                             gpu_type,
                             gpu_name,
                             is_discrete_gpu: is_discrete,
-                        };
+                        });
                     }
                 }
             }
+        }
+
+        if let Some(best) = pick_best_gpu(candidates) {
+            return best;
         }
 
         // Check for AMD gpu sysfs path in cards 0-2
@@ -208,33 +237,37 @@ pub fn detect_gpu_info() -> GpuInfo {
         ps_cmd.args(["-NoProfile", "-Command", "Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name"]);
         if let Ok(output) = ps_cmd.output() {
             if output.status.success() {
+                let mut candidates = Vec::new();
                 let stdout = String::from_utf8_lossy(&output.stdout);
                 for line in stdout.lines() {
                     let trimmed = line.trim();
                     if trimmed.is_empty() { continue; }
                     let lower = trimmed.to_lowercase();
                     if lower.contains("nvidia") || lower.contains("geforce") || lower.contains("rtx") || lower.contains("gtx") {
-                        return GpuInfo {
+                        candidates.push(GpuInfo {
                             gpu_type: "nvidia".to_string(),
                             gpu_name: trimmed.to_string(),
                             is_discrete_gpu: true,
-                        };
+                        });
                     } else if lower.contains("intel") {
                         let is_discrete = lower.contains("arc");
                         let display_name = clean_intel_gpu_name(trimmed);
-                        return GpuInfo {
+                        candidates.push(GpuInfo {
                             gpu_type: "intel".to_string(),
                             gpu_name: display_name,
                             is_discrete_gpu: is_discrete,
-                        };
+                        });
                     } else if lower.contains("amd") || lower.contains("radeon") {
                         let is_discrete = !lower.contains("radeon(tm) graphics");
-                        return GpuInfo {
+                        candidates.push(GpuInfo {
                             gpu_type: "amd".to_string(),
                             gpu_name: trimmed.to_string(),
                             is_discrete_gpu: is_discrete,
-                        };
+                        });
                     }
+                }
+                if let Some(best) = pick_best_gpu(candidates) {
+                    return best;
                 }
             }
         }
@@ -244,5 +277,70 @@ pub fn detect_gpu_info() -> GpuInfo {
         gpu_type: "unknown".to_string(),
         gpu_name: "CPU Only".to_string(),
         is_discrete_gpu: false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pick_best_gpu_prefers_nvidia_discrete_over_intel_igpu() {
+        let igpu = GpuInfo {
+            gpu_type: "intel".to_string(),
+            gpu_name: "Intel UHD Graphics 630".to_string(),
+            is_discrete_gpu: false,
+        };
+        let dgpu = GpuInfo {
+            gpu_type: "nvidia".to_string(),
+            gpu_name: "NVIDIA GeForce RTX 3060 Mobile".to_string(),
+            is_discrete_gpu: true,
+        };
+        let candidates = vec![igpu, dgpu];
+        let best = pick_best_gpu(candidates).unwrap();
+        assert_eq!(best.gpu_type, "nvidia");
+        assert!(best.is_discrete_gpu);
+    }
+
+    #[test]
+    fn test_pick_best_gpu_prefers_amd_discrete_over_intel_igpu() {
+        let igpu = GpuInfo {
+            gpu_type: "intel".to_string(),
+            gpu_name: "Intel Iris Xe Graphics".to_string(),
+            is_discrete_gpu: false,
+        };
+        let dgpu = GpuInfo {
+            gpu_type: "amd".to_string(),
+            gpu_name: "AMD Radeon RX 6600M".to_string(),
+            is_discrete_gpu: true,
+        };
+        let candidates = vec![igpu, dgpu];
+        let best = pick_best_gpu(candidates).unwrap();
+        assert_eq!(best.gpu_type, "amd");
+        assert!(best.is_discrete_gpu);
+    }
+
+    #[test]
+    fn test_pick_best_gpu_prefers_intel_arc_over_intel_igpu() {
+        let igpu = GpuInfo {
+            gpu_type: "intel".to_string(),
+            gpu_name: "Intel UHD Graphics".to_string(),
+            is_discrete_gpu: false,
+        };
+        let arc = GpuInfo {
+            gpu_type: "intel".to_string(),
+            gpu_name: "Intel Arc A770".to_string(),
+            is_discrete_gpu: true,
+        };
+        let candidates = vec![igpu, arc];
+        let best = pick_best_gpu(candidates).unwrap();
+        assert_eq!(best.gpu_name, "Intel Arc A770");
+        assert!(best.is_discrete_gpu);
+    }
+
+    #[test]
+    fn test_pick_best_gpu_handles_empty_candidates() {
+        let candidates: Vec<GpuInfo> = Vec::new();
+        assert!(pick_best_gpu(candidates).is_none());
     }
 }
