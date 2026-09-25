@@ -6396,13 +6396,14 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
       'apple_silicon': t('models.gpuAppleSilicon'),
       'unknown': t('models.gpuCpuOnly')
     };
-    const gpuName = gpuLabelMap[systemSpecs.gpu_type] || systemSpecs.gpu_type || t('models.gpuUnknown');
+    const hasDetailedGpuName = systemSpecs.gpu_name && systemSpecs.gpu_name !== 'CPU Only' && systemSpecs.gpu_name !== 'Unknown';
+    const gpuDisplayName = hasDetailedGpuName ? systemSpecs.gpu_name : (gpuLabelMap[systemSpecs.gpu_type] || systemSpecs.gpu_type || t('models.gpuUnknown'));
     const ramVal = systemSpecs.total_ram_gb;
     const ramFormatted = (ramVal % 1 === 0 ? ramVal.toFixed(0) : parseFloat(ramVal.toFixed(1)).toString());
     specsSubtitle.innerHTML = t('models.systemSpecsDetected', {
       ram: window.formatNumberForLang(ramFormatted),
       cores: window.formatNumberForLang(systemSpecs.cpu_cores),
-      gpu: gpuName
+      gpu: escapeHTML(gpuDisplayName)
     });
   }
   

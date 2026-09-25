@@ -84,7 +84,7 @@ export function recommendModelsForSystem(
     tier = 'entry';
   } else if (ram < 10.0 && !isNvidiaCuda && !isDiscrete) {
     tier = 'budget';
-  } else if (ram >= 24.0 || (ram >= 14.0 && isNvidiaCuda) || (ram >= 16.0 && isAppleSilicon)) {
+  } else if (ram >= 24.0 || (ram >= 14.0 && isNvidiaCuda) || (ram >= 14.0 && isAppleSilicon)) {
     tier = 'workstation';
   } else {
     // 10 - 24 GB RAM, or 8GB with discrete GPU
@@ -205,6 +205,28 @@ export function recommendModelsForSystem(
 
         quantizedReasonKey = 'models.recReasonQualityQuantLarge';
         quantizedReasonFallback = '5-bit quantized Large flagship; retains 99% accuracy at less than half the RAM.';
+      } else if (isDiscrete) {
+        // Discrete GPU (AMD Radeon RX, Intel Arc, etc.) with hardware acceleration
+        balancedModel = 'large-v3-turbo';
+        qualityModel = 'large-v3';
+        fastModel = 'small-q5_1';
+        englishModel = 'medium.en';
+        quantizedModel = 'large-v3-q5_0';
+
+        balancedReasonKey = 'models.recReasonBalancedCapable';
+        balancedReasonFallback = 'Discrete GPU acceleration enables running the modern Turbo model smoothly as your daily driver.';
+
+        qualityReasonKey = 'models.recReasonQualityWorkstation';
+        qualityReasonFallback = 'Full 16-bit FP16 precision for uncompromising recognition accuracy powered by dedicated GPU compute.';
+
+        fastReasonKey = 'models.recReasonFastWorkstation';
+        fastReasonFallback = 'High-speed transcription accelerated by dedicated GPU compute.';
+
+        englishReasonKey = 'models.recReasonQualityMediumEn';
+        englishReasonFallback = 'Dedicated 768M English architecture; near-Large accuracy with 2x inference speed.';
+
+        quantizedReasonKey = 'models.recReasonQualityQuantLarge';
+        quantizedReasonFallback = '5-bit quantized Large flagship; retains 99% accuracy at less than half the RAM.';
       } else {
         // CPU-only or Intel/AMD iGPU
         balancedModel = 'small';
@@ -238,14 +260,43 @@ export function recommendModelsForSystem(
       englishModel = 'medium.en';
       quantizedModel = 'large-v3-q5_0';
 
-      balancedReasonKey = 'models.recReasonBalancedWorkstation';
-      balancedReasonFallback = 'Ample system RAM and compute allow running the Turbo model comfortably as your daily driver.';
+      if (isNvidiaCuda) {
+        balancedReasonKey = 'models.recReasonBalancedCuda';
+        balancedReasonFallback = 'Outstanding acceleration on NVIDIA Tensor Cores with exceptional throughput.';
 
-      qualityReasonKey = 'models.recReasonQualityWorkstation';
-      qualityReasonFallback = 'Unrestricted execution of the flagship Whisper model on your capable hardware.';
+        qualityReasonKey = 'models.recReasonQualityCuda';
+        qualityReasonFallback = 'Full 16-bit FP16 precision for uncompromising recognition accuracy and noise rejection.';
 
-      fastReasonKey = 'models.recReasonFastWorkstation';
-      fastReasonFallback = 'Extremely fast processing with zero memory contention.';
+        fastReasonKey = 'models.recReasonFastCuda';
+        fastReasonFallback = 'Instantaneous transcription at tens of times faster than real-time audio on CUDA.';
+      } else if (isAppleSilicon) {
+        balancedReasonKey = 'models.recReasonBalancedApple';
+        balancedReasonFallback = 'High unified memory bandwidth on Apple Silicon enables blazing-fast transcription.';
+
+        qualityReasonKey = 'models.recReasonQualityApple';
+        qualityReasonFallback = 'Studio-grade precision powered by the Apple Neural Engine and GPU.';
+
+        fastReasonKey = 'models.recReasonFastApple';
+        fastReasonFallback = 'Blazing-fast transcription with minimal battery drain.';
+      } else if (isDiscrete) {
+        balancedReasonKey = 'models.recReasonBalancedCapable';
+        balancedReasonFallback = 'Discrete GPU acceleration enables running the modern Turbo model smoothly as your daily driver.';
+
+        qualityReasonKey = 'models.recReasonQualityWorkstation';
+        qualityReasonFallback = 'Full 16-bit FP16 precision for uncompromising recognition accuracy powered by dedicated GPU compute.';
+
+        fastReasonKey = 'models.recReasonFastWorkstation';
+        fastReasonFallback = 'High-speed transcription accelerated by dedicated GPU compute.';
+      } else {
+        balancedReasonKey = 'models.recReasonBalancedWorkstation';
+        balancedReasonFallback = 'Ample system RAM and compute allow running the Turbo model comfortably as your daily driver.';
+
+        qualityReasonKey = 'models.recReasonQualityWorkstation';
+        qualityReasonFallback = 'Unrestricted execution of the flagship Whisper model on your capable hardware.';
+
+        fastReasonKey = 'models.recReasonFastWorkstation';
+        fastReasonFallback = 'Extremely fast processing with zero memory contention.';
+      }
 
       englishReasonKey = 'models.recReasonQualityMediumEn';
       englishReasonFallback = 'Dedicated 768M English architecture; near-Large accuracy with 2x inference speed.';

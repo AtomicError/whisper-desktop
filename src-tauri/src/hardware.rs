@@ -91,6 +91,53 @@ fn clean_intel_gpu_name(raw: &str) -> String {
     }
 }
 
+fn is_amd_discrete(name: &str) -> bool {
+    let lower = name.to_lowercase();
+
+    // Obvious discrete indicators: RX series, Radeon Pro, FirePro, Radeon VII, discrete Vega (RX Vega)
+    let has_discrete_indicator = lower.contains("rx ")
+        || lower.contains("radeon rx")
+        || lower.contains("pro ")
+        || lower.contains("firepro")
+        || lower.contains("radeon vii")
+        || lower.contains("rx vega");
+
+    if has_discrete_indicator {
+        return true;
+    }
+
+    // Integrated APU indicators:
+    // "radeon graphics", "radeon(tm) graphics", discrete numbers of Vega iGPUs (Vega 3..11),
+    // RDNA2/RDNA3/RDNA3.5 mobile iGPUs (890M, 880M, 860M, 840M, 780M, 680M, 660M, 610M, 760M, 740M), or "radeon vega" in APUs.
+    let has_integrated_indicator = lower.contains("radeon graphics")
+        || lower.contains("radeon(tm) graphics")
+        || lower.contains("vega 3")
+        || lower.contains("vega 6")
+        || lower.contains("vega 7")
+        || lower.contains("vega 8")
+        || lower.contains("vega 9")
+        || lower.contains("vega 10")
+        || lower.contains("vega 11")
+        || lower.contains("radeon vega")
+        || lower.contains("890m")
+        || lower.contains("880m")
+        || lower.contains("860m")
+        || lower.contains("840m")
+        || lower.contains("780m")
+        || lower.contains("680m")
+        || lower.contains("660m")
+        || lower.contains("610m")
+        || lower.contains("760m")
+        || lower.contains("740m");
+
+    if has_integrated_indicator {
+        return false;
+    }
+
+    // If it simply contains "graphics" without discrete markers, it's integrated
+    !lower.contains("graphics")
+}
+
 #[cfg(target_os = "linux")]
 fn parse_lspci_line(line: &str) -> (String, String, bool) {
     let lower = line.to_lowercase();
@@ -116,7 +163,7 @@ fn parse_lspci_line(line: &str) -> (String, String, bool) {
         let display_name = clean_intel_gpu_name(&cleaned_name);
         ("intel".to_string(), display_name, is_discrete)
     } else if lower.contains("amd") || lower.contains("advanced micro devices") || lower.contains("radeon") {
-        let is_discrete = !lower.contains("radeon graphics") || lower.contains("rx ");
+        let is_discrete = is_amd_discrete(&cleaned_name);
         ("amd".to_string(), cleaned_name, is_discrete)
     } else {
         ("unknown".to_string(), cleaned_name, false)
@@ -258,7 +305,7 @@ pub fn detect_gpu_info() -> GpuInfo {
                             is_discrete_gpu: is_discrete,
                         });
                     } else if lower.contains("amd") || lower.contains("radeon") {
-                        let is_discrete = !lower.contains("radeon(tm) graphics");
+                        let is_discrete = is_amd_discrete(&trimmed);
                         candidates.push(GpuInfo {
                             gpu_type: "amd".to_string(),
                             gpu_name: trimmed.to_string(),
@@ -283,6 +330,29 @@ pub fn detect_gpu_info() -> GpuInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_is_amd_discrete_accurately_detects_apus_vs_discrete_cards() {
+        // Integrated APUs must be false
+        assert!(!is_amd_discrete("AMD Radeon(TM) Vega 8 Graphics"));
+        assert!(!is_amd_discrete("AMD Radeon Vega 10 Mobile Graphics"));
+        assert!(!is_amd_discrete("AMD Radeon 890M Graphics"));
+        assert!(!is_amd_discrete("AMD Radeon 880M"));
+        assert!(!is_amd_discrete("AMD Radeon 780M Graphics"));
+        assert!(!is_amd_discrete("AMD Radeon 680M Graphics"));
+        assert!(!is_amd_discrete("AMD Radeon(TM) Graphics"));
+        assert!(!is_amd_discrete("AMD Radeon Graphics"));
+        assert!(!is_amd_discrete("Advanced Micro Devices, Inc. [AMD/ATI] Cezanne [Radeon Vega Series / Radeon Vega Mobile Series]"));
+        assert!(!is_amd_discrete("Advanced Micro Devices, Inc. [AMD/ATI] Raphael [Radeon Graphics]"));
+
+        // Discrete GPUs must be true
+        assert!(is_amd_discrete("AMD Radeon RX 6700 XT"));
+        assert!(is_amd_discrete("AMD Radeon RX 7900 XTX"));
+        assert!(is_amd_discrete("AMD Radeon RX Vega 64"));
+        assert!(is_amd_discrete("AMD Radeon Pro W6600"));
+        assert!(is_amd_discrete("AMD FirePro W5100"));
+        assert!(is_amd_discrete("AMD Radeon HD 7870"));
+    }
 
     #[test]
     fn test_pick_best_gpu_prefers_nvidia_discrete_over_intel_igpu() {

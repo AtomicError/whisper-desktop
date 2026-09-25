@@ -45,7 +45,7 @@ describe('modelRecommender (5 Dedicated Roles)', () => {
       expect(res.models.quantized.modelName).toBe('small-q8_0');
     });
 
-    it('handles capable mid-tier CPU/AMD system (16GB RAM, 12 Cores)', () => {
+    it('handles capable mid-tier CPU/AMD integrated system (16GB RAM, 12 Cores, 780M iGPU)', () => {
       const specs: SystemSpecs = {
         total_ram_gb: 15.3,
         cpu_cores: 12,
@@ -64,6 +64,48 @@ describe('modelRecommender (5 Dedicated Roles)', () => {
       expect(res.models.fast.modelName).toBe('base-q8_0');
       expect(res.models.english.modelName).toBe('medium.en-q8_0');
       expect(res.models.quantized.modelName).toBe('large-v3-turbo-q8_0');
+    });
+
+    it('handles capable discrete AMD Radeon RX system (16GB RAM, discrete GPU)', () => {
+      const specs: SystemSpecs = {
+        total_ram_gb: 16.0,
+        cpu_cores: 8,
+        gpu_type: 'amd',
+        gpu_name: 'AMD Radeon RX 6700 XT',
+        is_discrete_gpu: true,
+      };
+
+      const res = recommendModelsForSystem(specs);
+      expect(res.hardwareTier).toBe('capable');
+      expect(res.modelNames).toEqual(['large-v3-turbo', 'large-v3', 'small-q5_1', 'medium.en', 'large-v3-q5_0']);
+      expect(new Set(res.modelNames).size).toBe(5);
+
+      expect(res.models.balanced.modelName).toBe('large-v3-turbo');
+      expect(res.models.quality.modelName).toBe('large-v3');
+      expect(res.models.fast.modelName).toBe('small-q5_1');
+      expect(res.models.english.modelName).toBe('medium.en');
+      expect(res.models.quantized.modelName).toBe('large-v3-q5_0');
+    });
+
+    it('handles capable discrete Intel Arc system (16GB RAM, discrete GPU)', () => {
+      const specs: SystemSpecs = {
+        total_ram_gb: 16.0,
+        cpu_cores: 12,
+        gpu_type: 'intel',
+        gpu_name: 'Intel Arc A770',
+        is_discrete_gpu: true,
+      };
+
+      const res = recommendModelsForSystem(specs);
+      expect(res.hardwareTier).toBe('capable');
+      expect(res.modelNames).toEqual(['large-v3-turbo', 'large-v3', 'small-q5_1', 'medium.en', 'large-v3-q5_0']);
+      expect(new Set(res.modelNames).size).toBe(5);
+
+      expect(res.models.balanced.modelName).toBe('large-v3-turbo');
+      expect(res.models.quality.modelName).toBe('large-v3');
+      expect(res.models.fast.modelName).toBe('small-q5_1');
+      expect(res.models.english.modelName).toBe('medium.en');
+      expect(res.models.quantized.modelName).toBe('large-v3-q5_0');
     });
 
     it('handles capable NVIDIA CUDA system (12GB RAM, discrete GPU)', () => {
@@ -102,15 +144,18 @@ describe('modelRecommender (5 Dedicated Roles)', () => {
       expect(new Set(res.modelNames).size).toBe(5);
 
       expect(res.models.balanced.modelName).toBe('large-v3-turbo');
+      expect(res.models.balanced.reasonI18nKey).toBe('models.recReasonBalancedCuda');
       expect(res.models.quality.modelName).toBe('large-v3');
+      expect(res.models.quality.reasonI18nKey).toBe('models.recReasonQualityCuda');
       expect(res.models.fast.modelName).toBe('small');
+      expect(res.models.fast.reasonI18nKey).toBe('models.recReasonFastCuda');
       expect(res.models.english.modelName).toBe('medium.en');
       expect(res.models.quantized.modelName).toBe('large-v3-q5_0');
     });
 
-    it('handles Apple Silicon unified memory (16GB RAM)', () => {
+    it('handles Apple Silicon unified memory (16GB RAM reported as 15.3GB by macOS)', () => {
       const specs: SystemSpecs = {
-        total_ram_gb: 16.0,
+        total_ram_gb: 15.3,
         cpu_cores: 10,
         gpu_type: 'apple_silicon',
         gpu_name: 'Apple M2 Pro',
@@ -121,6 +166,34 @@ describe('modelRecommender (5 Dedicated Roles)', () => {
       expect(res.hardwareTier).toBe('workstation');
       expect(res.modelNames).toEqual(['large-v3-turbo', 'large-v3', 'small', 'medium.en', 'large-v3-q5_0']);
       expect(new Set(res.modelNames).size).toBe(5);
+
+      expect(res.models.balanced.modelName).toBe('large-v3-turbo');
+      expect(res.models.balanced.reasonI18nKey).toBe('models.recReasonBalancedApple');
+      expect(res.models.quality.modelName).toBe('large-v3');
+      expect(res.models.quality.reasonI18nKey).toBe('models.recReasonQualityApple');
+      expect(res.models.fast.modelName).toBe('small');
+      expect(res.models.fast.reasonI18nKey).toBe('models.recReasonFastApple');
+      expect(res.models.english.modelName).toBe('medium.en');
+      expect(res.models.quantized.modelName).toBe('large-v3-q5_0');
+    });
+
+    it('handles high-spec CPU-only workstation (32GB RAM, 16 Cores)', () => {
+      const specs: SystemSpecs = {
+        total_ram_gb: 32.0,
+        cpu_cores: 16,
+        gpu_type: 'unknown',
+        gpu_name: 'CPU Only',
+        is_discrete_gpu: false,
+      };
+
+      const res = recommendModelsForSystem(specs);
+      expect(res.hardwareTier).toBe('workstation');
+      expect(res.modelNames).toEqual(['large-v3-turbo', 'large-v3', 'small', 'medium.en', 'large-v3-q5_0']);
+      expect(new Set(res.modelNames).size).toBe(5);
+
+      expect(res.models.balanced.reasonI18nKey).toBe('models.recReasonBalancedWorkstation');
+      expect(res.models.quality.reasonI18nKey).toBe('models.recReasonQualityWorkstation');
+      expect(res.models.fast.reasonI18nKey).toBe('models.recReasonFastWorkstation');
     });
   });
 
