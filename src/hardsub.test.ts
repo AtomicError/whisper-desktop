@@ -119,6 +119,9 @@ function fixture() {
   const volumeWrapper = new Control();
   const volumeBtn = new Control();
   const volumeSlider = new Control();
+  const btnClearVideo = new Control();
+  const btnClearSub = new Control();
+  const btnResetAll = new Control();
   doc.elements.set('hardsub-output-dir-text', outputDirText);
   doc.elements.set('btn-browse-hardsub-dir', btnBrowseDir);
   doc.elements.set('btn-reset-hardsub-dir', btnResetDir);
@@ -127,6 +130,9 @@ function fixture() {
   doc.elements.set('hardsub-volume-wrapper', volumeWrapper);
   doc.elements.set('hardsub-btn-volume', volumeBtn);
   doc.elements.set('hardsub-volume-slider', volumeSlider);
+  doc.elements.set('btn-clear-hardsub-video', btnClearVideo);
+  doc.elements.set('btn-clear-hardsub-sub', btnClearSub);
+  doc.elements.set('btn-reset-hardsub-all', btnResetAll);
 
   // Inject only event-capable DOM/media boundaries. Loading, seeking and rendering are real.
   const internal = controller as unknown as {
@@ -135,9 +141,11 @@ function fixture() {
     lblVideoName: Control; videoStatusBadge: Control; videoTimeDisplay: Control;
     previewCancelBtn: Control; previewRetryBtn: Control;
     volumeControlWrapper: Control; videoVolumeBtn: Control; videoVolumeSlider: Control;
+    btnClearVideo: Control; btnClearSub: Control; btnResetAll: Control;
     freezeCanvas: { width: number; height: number; style: Record<string, string> };
     freezeCtx: { clearRect(): void; drawImage(): void };
-    state: { videoPath: string; outputPath: string; outputDir: string };
+    state: { videoPath: string; outputPath: string; outputDir: string; subtitlePath: string };
+    subtitleCues: Array<{ text: string; startMs: number; endMs: number }>;
     outputDirText: Control;
     btnBrowseDir: Control;
     btnResetDir: Control;
@@ -157,6 +165,7 @@ function fixture() {
     videoIconPlay: iconPlay, videoIconPause: iconPause,
     outputDirText, btnBrowseDir, btnResetDir, btnOpenFolder, telemetryBox,
     volumeControlWrapper: volumeWrapper, videoVolumeBtn: volumeBtn, videoVolumeSlider: volumeSlider,
+    btnClearVideo, btnClearSub, btnResetAll,
   });
   Object.assign(internal, { previewCancelBtn: cancel, previewRetryBtn: retry });
   internal.setupVideoPlayerEvents();
@@ -167,7 +176,7 @@ function fixture() {
     if (active) controller.setPageActive(true);
     video.pause.mockClear();
   };
-  return { controller, video, slider, play, iconPlay, iconPause, label, badge, time, container, internal, load, cancel, retry, outputDirText, btnBrowseDir, btnResetDir, btnOpenFolder, telemetryBox, volumeWrapper, volumeBtn, volumeSlider };
+  return { controller, video, slider, play, iconPlay, iconPause, label, badge, time, container, internal, load, cancel, retry, outputDirText, btnBrowseDir, btnResetDir, btnOpenFolder, telemetryBox, volumeWrapper, volumeBtn, volumeSlider, btnClearVideo, btnClearSub, btnResetAll };
 }
 
 beforeAll(async () => {
@@ -904,7 +913,7 @@ describe('hardsub output directory management', () => {
 
   describe('companion subtitle detection and video switching lifecycle', () => {
     it('detects companion subtitle on first video load and also on subsequent video switches', async () => {
-      const { controller, load } = fixture();
+      const { controller, load, internal } = fixture();
       await load();
 
       const subFiles: Record<string, string> = {
@@ -927,34 +936,113 @@ describe('hardsub output directory management', () => {
       controller.prefillFilePaths('/media/episode1.mp4', '');
       await flush();
 
-      expect(controller.state.subtitlePath).toBe('/media/episode1.srt');
-      expect(controller.subtitleCues.length).toBe(1);
-      expect(controller.subtitleCues[0].text).toBe('Hello from Episode 1');
+      expect(internal.state.subtitlePath).toBe('/media/episode1.srt');
+      expect(internal.subtitleCues.length).toBe(1);
+      expect(internal.subtitleCues[0].text).toBe('Hello from Episode 1');
 
       // 2. Second video load: episode2.mp4 has episode2.vtt
       // MUST NOT retain episode1.srt! It must auto-detect episode2.vtt
       controller.prefillFilePaths('/media/episode2.mp4', '');
       await flush();
 
-      expect(controller.state.subtitlePath).toBe('/media/episode2.vtt');
-      expect(controller.subtitleCues.length).toBe(1);
-      expect(controller.subtitleCues[0].text).toBe('Hello from Episode 2');
+      expect(internal.state.subtitlePath).toBe('/media/episode2.vtt');
+      expect(internal.subtitleCues.length).toBe(1);
+      expect(internal.subtitleCues[0].text).toBe('Hello from Episode 2');
 
       // 3. Third video load: episode3.mp4 has NO companion subtitle
       // MUST cleanly clear the previous subtitle state
       controller.prefillFilePaths('/media/episode3.mp4', '');
       await flush();
 
-      expect(controller.state.subtitlePath).toBe('');
-      expect(controller.subtitleCues.length).toBe(0);
+      expect(internal.state.subtitlePath).toBe('');
+      expect(internal.subtitleCues.length).toBe(0);
 
       // 4. Explicit subtitle provided via prefillFilePaths is preserved
       controller.prefillFilePaths('/media/episode3.mp4', '/media/custom.srt');
       await flush();
 
-      expect(controller.state.subtitlePath).toBe('/media/custom.srt');
-      expect(controller.subtitleCues.length).toBe(1);
-      expect(controller.subtitleCues[0].text).toBe('Custom explicit sub');
+      expect(internal.state.subtitlePath).toBe('/media/custom.srt');
+      expect(internal.subtitleCues.length).toBe(1);
+      expect(internal.subtitleCues[0].text).toBe('Custom explicit sub');
+    });
+  });
+
+  describe('granular clear and global reset functionality', () => {
+    it('manages button visibility based on loaded media', async () => {
+      const { controller, load, internal, btnClearVideo, btnClearSub, btnResetAll } = fixture();
+      await load();
+
+      // Video is loaded from load()
+      expect(internal.state.videoPath).toBe('/video.mp4');
+      expect(btnClearVideo.style.display).toBe('inline-flex');
+      expect(btnClearSub.style.display).toBe('none');
+      expect(btnResetAll.style.display).toBe('inline-flex');
+
+      // Clear video
+      controller.clearVideoState();
+      expect(internal.state.videoPath).toBe('');
+      expect(btnClearVideo.style.display).toBe('none');
+      expect(btnResetAll.style.display).toBe('none');
+
+      // Now load only a subtitle
+      invoke.mockImplementation(async (command: string) => {
+        if (command === 'read_text_file_content') return '1\n00:00:01,000 --> 00:00:02,000\nSub line\n';
+        throw new Error('Not found');
+      });
+      controller.prefillFilePaths('', '/sub.srt');
+      await flush();
+
+      expect(internal.state.subtitlePath).toBe('/sub.srt');
+      expect(btnClearVideo.style.display).toBe('none');
+      expect(btnClearSub.style.display).toBe('inline-flex');
+      expect(btnResetAll.style.display).toBe('inline-flex');
+
+      // Clear subtitle
+      controller.clearSubtitleState();
+      expect(internal.state.subtitlePath).toBe('');
+      expect(internal.subtitleCues.length).toBe(0);
+      expect(btnClearSub.style.display).toBe('none');
+      expect(btnResetAll.style.display).toBe('none');
+    });
+
+    it('resetAllMedia clears both video and subtitle state completely', async () => {
+      const { controller, load, internal, btnClearVideo, btnClearSub, btnResetAll } = fixture();
+      await load();
+
+      invoke.mockImplementation(async (command: string) => {
+        if (command === 'read_text_file_content') return '1\n00:00:01,000 --> 00:00:02,000\nSub line\n';
+        throw new Error('Not found');
+      });
+      controller.prefillFilePaths('/video.mp4', '/sub.srt');
+      await flush();
+
+      expect(internal.state.videoPath).toBe('/video.mp4');
+      expect(internal.state.subtitlePath).toBe('/sub.srt');
+      expect(btnClearVideo.style.display).toBe('inline-flex');
+      expect(btnClearSub.style.display).toBe('inline-flex');
+      expect(btnResetAll.style.display).toBe('inline-flex');
+
+      // Reset all media
+      controller.resetAllMedia();
+      expect(internal.state.videoPath).toBe('');
+      expect(internal.state.subtitlePath).toBe('');
+      expect(internal.subtitleCues.length).toBe(0);
+      expect(btnClearVideo.style.display).toBe('none');
+      expect(btnClearSub.style.display).toBe('none');
+      expect(btnResetAll.style.display).toBe('none');
+    });
+
+    it('prevents clearing media while encoding is active', async () => {
+      const { controller, load, internal } = fixture();
+      await load();
+
+      internal.updateEncodingUIState(true);
+      controller.clearVideoState();
+      // Should not have cleared because isEncoding is true
+      expect(internal.state.videoPath).toBe('/video.mp4');
+
+      controller.resetAllMedia();
+      expect(internal.state.videoPath).toBe('/video.mp4');
     });
   });
 });

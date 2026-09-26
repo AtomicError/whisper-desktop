@@ -773,6 +773,9 @@ export class HardsubController {
   private lblVideoPath: HTMLElement | null = null;
   private lblSubName: HTMLElement | null = null;
   private lblSubPath: HTMLElement | null = null;
+  private btnClearVideo: HTMLButtonElement | null = null;
+  private btnClearSub: HTMLButtonElement | null = null;
+  private btnResetAll: HTMLButtonElement | null = null;
 
   // Telemetry HUD elements
   private progressFill: HTMLElement | null = null;
@@ -1223,6 +1226,7 @@ export class HardsubController {
     this.mediaStepIcon = document.getElementById('hardsub-media-step-icon');
     this.mediaStepChevron = document.getElementById('hardsub-media-chevron');
     this.mediaSummaryBadge = document.getElementById('hardsub-media-summary-badge');
+    this.btnResetAll = document.getElementById('btn-reset-hardsub-all') as HTMLButtonElement | null;
 
     // Dropzone Elements
     this.videoDropZone = document.getElementById('hardsub-video-drop-zone');
@@ -1231,6 +1235,8 @@ export class HardsubController {
     this.lblVideoPath = document.getElementById('lbl-hardsub-video-path');
     this.lblSubName = document.getElementById('lbl-hardsub-sub-name');
     this.lblSubPath = document.getElementById('lbl-hardsub-sub-path');
+    this.btnClearVideo = document.getElementById('btn-clear-hardsub-video') as HTMLButtonElement | null;
+    this.btnClearSub = document.getElementById('btn-clear-hardsub-sub') as HTMLButtonElement | null;
 
     // Tabs (3 Dedicated Studio Panels)
     this.tabBtnEditor = document.getElementById('hardsub-tab-btn-editor') as HTMLButtonElement;
@@ -1512,8 +1518,24 @@ export class HardsubController {
     });
 
     // Media Resource Accordion Toggle
-    this.on(this.mediaStepHeader, 'click', () => {
+    this.on(this.mediaStepHeader, 'click', (e: MouseEvent) => {
+      if ((e.target as HTMLElement)?.closest('#btn-reset-hardsub-all')) return;
       this.toggleMediaAccordion();
+    });
+
+    this.on(this.btnResetAll, 'click', (e: MouseEvent) => {
+      e.stopPropagation();
+      this.resetAllMedia();
+    });
+
+    this.on(this.btnClearVideo, 'click', (e: MouseEvent) => {
+      e.stopPropagation();
+      this.clearVideoState();
+    });
+
+    this.on(this.btnClearSub, 'click', (e: MouseEvent) => {
+      e.stopPropagation();
+      this.clearSubtitleState();
     });
 
     // Clicking placeholder in player expands the accordion and triggers browse
@@ -3412,7 +3434,9 @@ export class HardsubController {
       }
       if (this.lblVideoPath) this.lblVideoPath.textContent = t('hardsub.dropVideoPrompt');
       this.videoDropZone?.classList.remove('has-file');
+      if (this.btnClearVideo) this.btnClearVideo.style.display = 'none';
       this.updateMediaAccordionSummary();
+      this.updateResetAllButtonVisibility();
       return;
     }
 
@@ -3428,7 +3452,9 @@ export class HardsubController {
     }
     if (this.lblVideoPath) this.lblVideoPath.textContent = videoPath;
     this.videoDropZone?.classList.add('has-file');
+    if (this.btnClearVideo) this.btnClearVideo.style.display = 'inline-flex';
     this.updateMediaAccordionSummary();
+    this.updateResetAllButtonVisibility();
   }
 
   private updateSubDropzoneUI(subPath: string, cueCount?: number) {
@@ -3439,7 +3465,9 @@ export class HardsubController {
       }
       if (this.lblSubPath) this.lblSubPath.textContent = t('hardsub.dropSubPrompt');
       this.subDropZone?.classList.remove('has-file');
+      if (this.btnClearSub) this.btnClearSub.style.display = 'none';
       this.updateMediaAccordionSummary();
+      this.updateResetAllButtonVisibility();
       return;
     }
 
@@ -3457,7 +3485,9 @@ export class HardsubController {
     }
     if (this.lblSubPath) this.lblSubPath.textContent = subPath;
     this.subDropZone?.classList.add('has-file');
+    if (this.btnClearSub) this.btnClearSub.style.display = 'inline-flex';
     this.updateMediaAccordionSummary();
+    this.updateResetAllButtonVisibility();
   }
 
   private selectVideoSource(videoPath: string, explicitSubProvided = false): void {
@@ -3950,7 +3980,33 @@ export class HardsubController {
     return false;
   }
 
-  private clearSubtitleState(): void {
+  public clearVideoState(): void {
+    if (this.disposed || this.isEncoding) return;
+    this.resetVideoSource();
+    this.state.videoPath = '';
+    this.lastExportedPath = null;
+    this.lastStatusPayload = null;
+    if (this.videoPathInput) this.videoPathInput.value = '';
+    this.updateVideoDropzoneUI('');
+    if (!this.state.subtitlePath) {
+      this.state.outputPath = '';
+    }
+    this.updateComputedOutputPath();
+    this.updateOutputDirUI();
+    if (this.videoStatusBadge) {
+      this.videoStatusBadge.textContent = t('transcribe.standingBy');
+      this.videoStatusBadge.style.color = 'var(--color-royal-blue)';
+      this.videoStatusBadge.style.background = 'rgba(var(--color-royal-blue-rgb), 0.15)';
+    }
+    if (this.btnOpenFolder) {
+      this.btnOpenFolder.style.display = 'none';
+    }
+    this.updateMediaAccordionSummary();
+    this.updateResetAllButtonVisibility();
+  }
+
+  public clearSubtitleState(): void {
+    if (this.disposed || this.isEncoding) return;
     this.state.subtitlePath = '';
     if (this.subtitlePathInput) this.subtitlePathInput.value = '';
     this.subtitleCues = [];
@@ -3964,6 +4020,31 @@ export class HardsubController {
     if (this.subtitleCanvas) {
       this.canvasCtx?.clearRect(0, 0, this.subtitleCanvas.width, this.subtitleCanvas.height);
     }
+    if (!this.state.videoPath) {
+      this.state.outputPath = '';
+    }
+    this.updateComputedOutputPath();
+    this.updateOutputDirUI();
+    this.updateMediaAccordionSummary();
+    this.updateResetAllButtonVisibility();
+  }
+
+  public resetAllMedia(): void {
+    if (this.disposed || this.isEncoding) return;
+    ++this.subtitleSerial;
+    this.clearVideoState();
+    this.clearSubtitleState();
+    this.state.outputPath = '';
+    this.updateComputedOutputPath();
+    this.updateOutputDirUI();
+    this.updateMediaAccordionSummary();
+    this.updateResetAllButtonVisibility();
+  }
+
+  private updateResetAllButtonVisibility(): void {
+    if (!this.btnResetAll) return;
+    const hasAnyMedia = !!this.state.videoPath || !!this.state.subtitlePath;
+    this.btnResetAll.style.display = hasAnyMedia ? 'inline-flex' : 'none';
   }
 
   private updateColorSwatches() {
@@ -4265,6 +4346,15 @@ export class HardsubController {
     }
     if (this.btnResetDir) {
       this.btnResetDir.disabled = active;
+    }
+    if (this.btnClearVideo) {
+      this.btnClearVideo.disabled = active;
+    }
+    if (this.btnClearSub) {
+      this.btnClearSub.disabled = active;
+    }
+    if (this.btnResetAll) {
+      this.btnResetAll.disabled = active;
     }
     if (active && this.btnOpenFolder) {
       this.btnOpenFolder.style.display = 'none';

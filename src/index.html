@@ -3631,6 +3631,13 @@
                       <div class="wizard-step-title" id="hardsub-media-step-title" data-i18n="hardsub.selectResource">Select Media Resource</div>
                     </div>
                     <div style="display: flex; align-items: center; gap: 10px;">
+                      <button class="btn-secondary" id="btn-reset-hardsub-all" type="button" style="display: none; padding: 4px 10px; font-size: 0.78rem; gap: 6px; align-items: center;" data-i18n-title="hardsub.resetAll">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 13px; height: 13px;">
+                          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                          <path d="M3 3v5h5"/>
+                        </svg>
+                        <span data-i18n="hardsub.resetAll">Reset All</span>
+                      </button>
                       <span id="hardsub-media-summary-badge" style="display: none;"></span>
                       <span class="wizard-chevron" id="hardsub-media-chevron">▼</span>
                     </div>
@@ -3664,7 +3671,10 @@
                                `has-file` class, rather than here: a path elides, the prompt wraps. -->
                           <p dir="auto" style="font-size:0.75rem; color:var(--color-text-muted); margin:0;" id="lbl-hardsub-video-path" data-i18n="hardsub.dropVideoPrompt">Drag & drop video (.mp4, .mkv, .mov)</p>
                         </div>
-                        <button class="btn-secondary" id="btn-browse-video" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap;" data-i18n="hardsub.browseVideo">Browse Video</button>
+                        <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: center;">
+                          <button class="btn-secondary" id="btn-browse-video" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap;" data-i18n="hardsub.browseVideo">Browse Video</button>
+                          <button class="btn-secondary btn-clear-sub" id="btn-clear-hardsub-video" type="button" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap; display: none;" data-i18n="hardsub.clearVideo">Clear</button>
+                        </div>
                         <input type="hidden" id="hardsub-video-path" />
                       </div>
 
@@ -3679,7 +3689,10 @@
                           <p style="font-weight:600; margin-bottom:4px; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-sub-name" data-i18n="hardsub.noSubLoaded">No Subtitle Loaded</p>
                           <p dir="auto" style="font-size:0.75rem; color:var(--color-text-muted); margin:0;" id="lbl-hardsub-sub-path" data-i18n="hardsub.dropSubPrompt">Drag & drop subtitle (.srt, .vtt, .ass)</p>
                         </div>
-                        <button class="btn-secondary" id="btn-browse-sub" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap;" data-i18n="hardsub.browseSub">Browse Subtitle</button>
+                        <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: center;">
+                          <button class="btn-secondary" id="btn-browse-sub" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap;" data-i18n="hardsub.browseSub">Browse Subtitle</button>
+                          <button class="btn-secondary btn-clear-sub" id="btn-clear-hardsub-sub" type="button" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap; display: none;" data-i18n="hardsub.clearSub">Clear</button>
+                        </div>
                         <input type="hidden" id="hardsub-sub-path" />
                       </div>
 

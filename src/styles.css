@@ -9335,6 +9335,17 @@ html[dir="rtl"] .cat-match-badge {
   border-color: rgba(239, 68, 68, 0.3);
 }
 
+#btn-reset-hardsub-all {
+  color: var(--color-text-muted);
+  transition: all 0.15s ease;
+}
+
+#btn-reset-hardsub-all:hover {
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.08);
+}
+
 .translate-sub-meta-badge {
   display: inline-flex;
   align-items: center;
