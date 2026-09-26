@@ -901,6 +901,62 @@ describe('hardsub output directory management', () => {
       expect(volumeSlider.blur).toHaveBeenCalledTimes(2);
     });
   });
+
+  describe('companion subtitle detection and video switching lifecycle', () => {
+    it('detects companion subtitle on first video load and also on subsequent video switches', async () => {
+      const { controller, load } = fixture();
+      await load();
+
+      const subFiles: Record<string, string> = {
+        '/media/episode1.srt': '1\n00:00:01,000 --> 00:00:04,000\nHello from Episode 1\n',
+        '/media/episode2.vtt': 'WEBVTT\n\n00:00:02.000 --> 00:00:05.000\nHello from Episode 2\n',
+        '/media/custom.srt': '1\n00:00:00,500 --> 00:00:02,000\nCustom explicit sub\n',
+      };
+
+      invoke.mockImplementation(async (command: string, args: { filePath?: string; sourcePath?: string; requestId?: number }) => {
+        if (command === 'read_text_file_content' && args.filePath && subFiles[args.filePath]) {
+          return subFiles[args.filePath];
+        }
+        if (command === 'begin_hardsub_preview') {
+          return { requestId: args.requestId, candidateId: String(args.requestId), url: `http://localhost${args.sourcePath}`, stage: 'direct', source: null };
+        }
+        throw new Error('Not found');
+      });
+
+      // 1. First video load: episode1.mp4 has episode1.srt
+      controller.prefillFilePaths('/media/episode1.mp4', '');
+      await flush();
+
+      expect(controller.state.subtitlePath).toBe('/media/episode1.srt');
+      expect(controller.subtitleCues.length).toBe(1);
+      expect(controller.subtitleCues[0].text).toBe('Hello from Episode 1');
+
+      // 2. Second video load: episode2.mp4 has episode2.vtt
+      // MUST NOT retain episode1.srt! It must auto-detect episode2.vtt
+      controller.prefillFilePaths('/media/episode2.mp4', '');
+      await flush();
+
+      expect(controller.state.subtitlePath).toBe('/media/episode2.vtt');
+      expect(controller.subtitleCues.length).toBe(1);
+      expect(controller.subtitleCues[0].text).toBe('Hello from Episode 2');
+
+      // 3. Third video load: episode3.mp4 has NO companion subtitle
+      // MUST cleanly clear the previous subtitle state
+      controller.prefillFilePaths('/media/episode3.mp4', '');
+      await flush();
+
+      expect(controller.state.subtitlePath).toBe('');
+      expect(controller.subtitleCues.length).toBe(0);
+
+      // 4. Explicit subtitle provided via prefillFilePaths is preserved
+      controller.prefillFilePaths('/media/episode3.mp4', '/media/custom.srt');
+      await flush();
+
+      expect(controller.state.subtitlePath).toBe('/media/custom.srt');
+      expect(controller.subtitleCues.length).toBe(1);
+      expect(controller.subtitleCues[0].text).toBe('Custom explicit sub');
+    });
+  });
 });
 
 

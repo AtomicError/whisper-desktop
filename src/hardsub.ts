@@ -874,6 +874,7 @@ export class HardsubController {
   private expectedMediaUrl = '';
   private playIntent = false;
   private playSerial = 0;
+  private subtitleSerial = 0;
   private domTeardowns: Array<() => void> = [];
   private mediaTeardowns: Array<() => void> = [];
   private nativeTeardowns: Array<() => void> = [];
@@ -2953,6 +2954,16 @@ export class HardsubController {
         const lastDot = filePath.lastIndexOf('.');
         return SUPPORTED_VIDEO_EXTS.has(lastDot !== -1 ? filePath.substring(lastDot).toLowerCase() : '');
       });
+      const lastSubIndex = files.findLastIndex((filePath) => {
+        const lastDot = filePath.lastIndexOf('.');
+        return SUPPORTED_SUB_EXTS.has(lastDot !== -1 ? filePath.substring(lastDot).toLowerCase() : '');
+      });
+
+      if (lastVideoIndex !== -1 && lastSubIndex !== -1) {
+        this.prefillFilePaths(files[lastVideoIndex], files[lastSubIndex]);
+        return;
+      }
+
       files.forEach((filePath, index) => {
         const lastDot = filePath.lastIndexOf('.');
         const ext = lastDot !== -1 ? filePath.substring(lastDot).toLowerCase() : '';
@@ -3449,7 +3460,7 @@ export class HardsubController {
     this.updateMediaAccordionSummary();
   }
 
-  private selectVideoSource(videoPath: string): void {
+  private selectVideoSource(videoPath: string, explicitSubProvided = false): void {
     if (this.disposed) return;
     this.state.videoPath = videoPath;
     this.lastExportedPath = null;
@@ -3471,7 +3482,7 @@ export class HardsubController {
     }
     if (this.videoPathInput) this.videoPathInput.value = videoPath;
     this.updateVideoDropzoneUI(videoPath);
-    this.autoSuggestSubtitleAndOutput(videoPath);
+    this.autoSuggestSubtitleAndOutput(videoPath, explicitSubProvided);
     void this.loadVideoMedia(videoPath);
   }
 
@@ -3650,9 +3661,10 @@ export class HardsubController {
 
   private async loadSubtitleFile(subPath: string) {
     if (!subPath) return;
+    const serial = ++this.subtitleSerial;
     try {
       const content = await invoke<string>('read_text_file_content', { filePath: subPath });
-      if (this.disposed || this.state.subtitlePath !== subPath) return;
+      if (this.disposed || serial !== this.subtitleSerial || this.state.subtitlePath !== subPath) return;
       const lastDot = subPath.lastIndexOf('.');
       const ext = lastDot > 0 ? subPath.substring(lastDot + 1).toLowerCase() : 'srt';
       this.subtitleCues = parseSubtitleContent(content, ext);
@@ -3666,6 +3678,9 @@ export class HardsubController {
       }
     } catch (e) {
       console.warn('Failed to read subtitle file content:', e);
+      if (!this.disposed && serial === this.subtitleSerial && this.state.subtitlePath === subPath) {
+        this.clearSubtitleState();
+      }
     }
   }
 
@@ -3792,7 +3807,7 @@ export class HardsubController {
       this.loadSubtitleFile(subPath);
     }
     if (videoPath) {
-      this.selectVideoSource(videoPath);
+      this.selectVideoSource(videoPath, !!subPath);
     } else if (subPath) {
       const notifyFn = (window as any).showNotification;
       if (typeof notifyFn === 'function') {
@@ -3880,20 +3895,74 @@ export class HardsubController {
     }
   }
 
-  private autoSuggestSubtitleAndOutput(videoPath: string) {
+  private autoSuggestSubtitleAndOutput(videoPath: string, explicitSubProvided = false): void {
     const lastDot = videoPath.lastIndexOf('.');
     if (lastDot > 0) {
       const basePath = videoPath.substring(0, lastDot);
-      if (!this.state.subtitlePath) {
-        const srtPath = `${basePath}.srt`;
-        if (this.subtitlePathInput) {
-          this.subtitlePathInput.value = srtPath;
-          this.state.subtitlePath = srtPath;
-          this.loadSubtitleFile(srtPath);
-        }
+      if (!explicitSubProvided) {
+        void this.detectAndLoadCompanionSubtitle(basePath, videoPath);
       }
       this.updateComputedOutputPath();
       this.updateOutputDirUI();
+    }
+  }
+
+  private async detectAndLoadCompanionSubtitle(basePath: string, videoPath: string): Promise<boolean> {
+    const serial = ++this.subtitleSerial;
+    const candidatePaths = [
+      `${basePath}.srt`,
+      `${basePath}.vtt`,
+      `${basePath}.ass`,
+      `${basePath}.fa.srt`,
+      `${basePath}.en.srt`,
+    ];
+
+    for (const candidatePath of candidatePaths) {
+      try {
+        const content = await invoke<string>('read_text_file_content', { filePath: candidatePath });
+        if (this.disposed || serial !== this.subtitleSerial || this.state.videoPath !== videoPath) {
+          return false;
+        }
+        if (typeof content === 'string') {
+          if (this.subtitlePathInput) this.subtitlePathInput.value = candidatePath;
+          this.state.subtitlePath = candidatePath;
+          const lastDot = candidatePath.lastIndexOf('.');
+          const ext = lastDot > 0 ? candidatePath.substring(lastDot + 1).toLowerCase() : 'srt';
+          this.subtitleCues = parseSubtitleContent(content, ext);
+          this.maxCueDuration = this.subtitleCues.reduce((max, c) => Math.max(max, c.endMs - c.startMs), 0);
+          this.isSubtitlesModified = false;
+          this._lastRenderKey = '';
+          this.updateSubDropzoneUI(candidatePath, this.subtitleCues.length);
+          this.renderSubtitleCards();
+          if (this.videoElement) {
+            this.syncActiveSubtitleWithTime(this.videoElement.currentTime * 1000);
+          }
+          return true;
+        }
+      } catch {
+        // Try next candidate extension
+      }
+    }
+
+    if (!this.disposed && serial === this.subtitleSerial && this.state.videoPath === videoPath) {
+      this.clearSubtitleState();
+    }
+    return false;
+  }
+
+  private clearSubtitleState(): void {
+    this.state.subtitlePath = '';
+    if (this.subtitlePathInput) this.subtitlePathInput.value = '';
+    this.subtitleCues = [];
+    this.maxCueDuration = 0;
+    this.isSubtitlesModified = false;
+    this.activeCueId = null;
+    this.currentSubtitleText = '';
+    this._lastRenderKey = '';
+    this.updateSubDropzoneUI('', 0);
+    this.renderSubtitleCards();
+    if (this.subtitleCanvas) {
+      this.canvasCtx?.clearRect(0, 0, this.subtitleCanvas.width, this.subtitleCanvas.height);
     }
   }
 
@@ -4542,7 +4611,7 @@ ${events}`;
     }
 
     if (!this.state.outputPath) {
-      this.autoSuggestSubtitleAndOutput(originalVideoPath);
+      this.autoSuggestSubtitleAndOutput(originalVideoPath, true);
     }
 
     if (this.subtitleCues.length > 0) {
