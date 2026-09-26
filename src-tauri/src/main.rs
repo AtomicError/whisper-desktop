@@ -649,6 +649,7 @@ pub const HOST_REMOVED_ENV_VARS: &[&str] = &[
     "GST_PLUGIN_SCANNER",
     "GST_PLUGIN_PATH",
     "GST_PLUGIN_SYSTEM_PATH_1_0",
+    "GST_PLUGIN_FEATURE_RANK",
     "GDK_PIXBUF_MODULE_FILE",
 ];
 
@@ -876,6 +877,18 @@ fn main() {
                 let joined_bundled = existing_bundled_gst.join(":");
                 std::env::set_var("GST_PLUGIN_SYSTEM_PATH_1_0", &joined_bundled);
                 std::env::set_var("GST_PLUGIN_PATH_1_0", &joined_bundled);
+
+                // Prioritize ALSA sink over PulseAudio sink in AppImage environment.
+                // Under modern Linux with PipeWire, GStreamer 1.20's pulsesink encounters severe
+                // buffer preroll latency (2-3s) and pa_stream cork/uncork deadlocks when toggling
+                // playback, whereas alsasink connects directly to pipewire-alsa with instantaneous
+                // (<10ms) latency and reliable synchronous state transitions.
+                if std::env::var("GST_PLUGIN_FEATURE_RANK").is_err() {
+                    std::env::set_var("GST_PLUGIN_FEATURE_RANK", "alsasink:300,pulsesink:0");
+                }
+                if std::env::var("PIPEWIRE_LATENCY").is_err() {
+                    std::env::set_var("PIPEWIRE_LATENCY", "256/48000");
+                }
 
                 // Enable single-instance scanner reuse to avoid spawning 180+ processes over FUSE
                 std::env::set_var("GST_REGISTRY_REUSE_PLUGIN_SCANNER", "yes");
