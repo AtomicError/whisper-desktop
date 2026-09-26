@@ -1511,12 +1511,9 @@ pub async fn translate_files(
         emit_status(&app, 1.0, "Nothing to translate", false, None);
         logs.log(&app, "Translate", "Finished: no file produced a translation");
     } else {
-        let final_extras = match last_extras {
-            Some((_, total_lines, file_idx, total_files)) => {
-                Some((total_lines, total_lines, file_idx, total_files))
-            }
-            None => None,
-        };
+        let final_extras = last_extras.map(|(_, total_lines, file_idx, total_files)| {
+            (total_lines, total_lines, file_idx, total_files)
+        });
         emit_status(&app, 1.0, "AI translation complete", false, final_extras);
         logs.log(&app, "Translate", &format!(
             "Finished: {} file(s) translated successfully",

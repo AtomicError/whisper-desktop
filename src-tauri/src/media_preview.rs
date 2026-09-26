@@ -624,6 +624,7 @@ async fn capabilities_with_binary(binary: &Path, cancel: CancellationToken) -> R
     Ok(capabilities)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn prepare_artifact(
     ffmpeg: &Path, ffprobe: &Path, input: &Path, partial: &Path, finalized: &Path,
     stage: Stage, source: &ProbedSource, capabilities: &Capabilities,

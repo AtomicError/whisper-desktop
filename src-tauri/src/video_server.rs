@@ -628,7 +628,7 @@ mod tests {
         assert_eq!(body, b"0123456789");
       } else {
         assert_eq!(status, 416, "range {range}");
-        assert!(head.contains(&format!("Content-Range: bytes */10")), "{head}");
+        assert!(head.contains("Content-Range: bytes */10"), "{head}");
         assert!(body.is_empty(), "416 must have a zero body");
       }
     }
@@ -736,7 +736,7 @@ mod tests {
     let raw = format!("GET {route} HTTP/1.1\r\nHost: t\r\n\r\n");
     stream.write_all(raw.as_bytes()).await.unwrap();
     let mut chunk = [0u8; 16];
-    stream.read(&mut chunk).await.unwrap();
+    stream.read_exact(&mut chunk).await.unwrap();
 
     let revoked = tokio::spawn({
       let server = Arc::clone(&server);

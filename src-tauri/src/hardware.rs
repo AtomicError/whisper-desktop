@@ -81,7 +81,7 @@ fn clean_intel_gpu_name(raw: &str) -> String {
         if let Some(start) = raw.find("Arc") {
             let part = &raw[start..];
             let end = part.find(']').unwrap_or(part.len());
-            format!("Intel {}", &part[..end].trim())
+            format!("Intel {}", part[..end].trim())
         } else {
             "Intel Arc Graphics".to_string()
         }
