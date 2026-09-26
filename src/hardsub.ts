@@ -1022,7 +1022,10 @@ export class HardsubController {
       if (generation !== this.videoLoadGeneration || candidate !== this.candidateId) return;
       if (!this.canInteractWithVideo() || !this.playIntent) video.pause();
     }).catch(() => {
-      if (generation === this.videoLoadGeneration && candidate === this.candidateId) this.syncPlayPauseUI();
+      if (generation === this.videoLoadGeneration && candidate === this.candidateId) {
+        this.playIntent = false;
+        this.syncPlayPauseUI();
+      }
     });
   }
 
@@ -2498,7 +2501,7 @@ export class HardsubController {
   }
 
   private syncPlayPauseUI(): void {
-    const playing = this.phase === 'ready' && !!this.videoElement && !this.videoElement.paused && !this.videoElement.ended;
+    const playing = this.phase === 'ready' && !!this.videoElement && (this.playIntent || !this.videoElement.paused) && !this.videoElement.ended;
     if (this.videoIconPlay) this.videoIconPlay.style.display = playing ? 'none' : 'block';
     if (this.videoIconPause) this.videoIconPause.style.display = playing ? 'block' : 'none';
     this.renderPlayerPhase();
@@ -2569,7 +2572,10 @@ export class HardsubController {
     };
     onMedia('play', syncPlaying);
     onMedia('playing', syncPlaying);
-    onMedia('pause', () => this.syncPlayPauseUI());
+    onMedia('pause', () => {
+      this.playIntent = false;
+      this.syncPlayPauseUI();
+    });
     onMedia('ended', () => { this.playIntent = false; this.updatePlaybackTime(); this.syncPlayPauseUI(); });
     onMedia('timeupdate', () => {
       if (this.phase === 'loading' && video.readyState >= 2) ready();
@@ -2605,14 +2611,14 @@ export class HardsubController {
     this.on(this.videoSeekSlider, 'pointerdown', () => {
       if (!this.canSeek() || !this.videoElement) return;
       this.isUserSeeking = true;
-      this.wasPlayingBeforeSeek = this.wasPlayingBeforeSeek || !this.videoElement.paused;
+      this.wasPlayingBeforeSeek = this.wasPlayingBeforeSeek || !this.videoElement.paused || this.playIntent;
       this.videoElement.pause();
     });
 
     this.on(this.videoSeekSlider, 'input', () => {
       if (!this.canSeek() || !this.videoElement) return;
       if (!this.isUserSeeking) {
-        this.wasPlayingBeforeSeek = this.wasPlayingBeforeSeek || !this.videoElement.paused;
+        this.wasPlayingBeforeSeek = this.wasPlayingBeforeSeek || !this.videoElement.paused || this.playIntent;
         this.videoElement.pause();
       }
       this.isUserSeeking = true;

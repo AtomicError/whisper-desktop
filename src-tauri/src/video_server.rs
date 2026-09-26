@@ -332,8 +332,15 @@ async fn write_bytes(stream: &mut TcpStream, mut bytes: &[u8], shared: &Shared, 
 }
 
 fn response_headers(status: &str, length: u64, extra: &str) -> String {
+  let cache_control = if status.starts_with("200") || status.starts_with("206") {
+    "public, max-age=3600"
+  } else if status.starts_with("204") {
+    "public, max-age=86400"
+  } else {
+    "no-store"
+  };
   format!(
-    "HTTP/1.1 {status}\r\nContent-Length: {length}\r\nConnection: close\r\nCache-Control: public, max-age=3600\r\nAccess-Control-Max-Age: 86400\r\nX-Content-Type-Options: nosniff\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, HEAD, OPTIONS\r\nAccess-Control-Allow-Headers: Range, Content-Type, Accept, Origin, User-Agent, If-Range\r\nAccess-Control-Expose-Headers: Content-Range, Content-Length, Accept-Ranges\r\n{extra}\r\n"
+    "HTTP/1.1 {status}\r\nContent-Length: {length}\r\nConnection: close\r\nCache-Control: {cache_control}\r\nAccess-Control-Max-Age: 86400\r\nX-Content-Type-Options: nosniff\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, HEAD, OPTIONS\r\nAccess-Control-Allow-Headers: Range, Content-Type, Accept, Origin, User-Agent, If-Range\r\nAccess-Control-Expose-Headers: Content-Range, Content-Length, Accept-Ranges\r\n{extra}\r\n"
   )
 }
 
@@ -834,4 +841,24 @@ mod tests {
     assert_eq!(mime_for_path(Path::new("unknown.xyz")), "application/octet-stream");
     assert_eq!(mime_for_path(Path::new("noext")), "application/octet-stream");
   }
+
+  #[test]
+  fn cache_control_headers_are_differentiated_by_status() {
+    let ok = response_headers("200 OK", 100, "");
+    assert!(ok.contains("Cache-Control: public, max-age=3600"));
+    assert!(ok.contains("Access-Control-Max-Age: 86400"));
+
+    let partial = response_headers("206 Partial Content", 50, "");
+    assert!(partial.contains("Cache-Control: public, max-age=3600"));
+
+    let options = response_headers("204 No Content", 0, "");
+    assert!(options.contains("Cache-Control: public, max-age=86400"));
+
+    let not_found = response_headers("404 Not Found", 0, "");
+    assert!(not_found.contains("Cache-Control: no-store"));
+
+    let server_error = response_headers("500 Internal Server Error", 0, "");
+    assert!(server_error.contains("Cache-Control: no-store"));
+  }
 }
+
