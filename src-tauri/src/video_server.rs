@@ -208,6 +208,7 @@ async fn accept_connections(listener: TcpListener, shared: Arc<Shared>) {
       _ = connections.join_next(), if !connections.is_empty() => {},
       accepted = listener.accept() => match accepted {
         Ok((stream, _)) => {
+          let _ = stream.set_nodelay(true);
           let accepted_at = Instant::now();
           let Ok(permit) = Arc::clone(&permits).try_acquire_owned() else {
             drop(stream);
@@ -332,7 +333,7 @@ async fn write_bytes(stream: &mut TcpStream, mut bytes: &[u8], shared: &Shared, 
 
 fn response_headers(status: &str, length: u64, extra: &str) -> String {
   format!(
-    "HTTP/1.1 {status}\r\nContent-Length: {length}\r\nConnection: close\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, HEAD, OPTIONS\r\nAccess-Control-Allow-Headers: Range, Content-Type, Accept, Origin, User-Agent, If-Range\r\nAccess-Control-Expose-Headers: Content-Range, Content-Length, Accept-Ranges\r\n{extra}\r\n"
+    "HTTP/1.1 {status}\r\nContent-Length: {length}\r\nConnection: close\r\nCache-Control: public, max-age=3600\r\nAccess-Control-Max-Age: 86400\r\nX-Content-Type-Options: nosniff\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, HEAD, OPTIONS\r\nAccess-Control-Allow-Headers: Range, Content-Type, Accept, Origin, User-Agent, If-Range\r\nAccess-Control-Expose-Headers: Content-Range, Content-Length, Accept-Ranges\r\n{extra}\r\n"
   )
 }
 
@@ -415,7 +416,7 @@ async fn serve_file(stream: &mut TcpStream, shared: &Shared, resource: &MediaRes
     return;
   }
   let mut remaining = count;
-  let mut buffer = [0u8; 64 * 1024];
+  let mut buffer = [0u8; 256 * 1024];
   while remaining > 0 {
     let size = remaining.min(buffer.len() as u64) as usize;
     let count = match operation(shared, &resource.cancel, file.read(&mut buffer[..size])).await {

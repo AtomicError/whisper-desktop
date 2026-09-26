@@ -1017,6 +1017,7 @@ export class HardsubController {
     const generation = this.videoLoadGeneration;
     const candidate = this.candidateId;
     this.playIntent = true;
+    this.syncPlayPauseUI();
     void video.play().then(() => {
       if (generation !== this.videoLoadGeneration || candidate !== this.candidateId) return;
       if (!this.canInteractWithVideo() || !this.playIntent) video.pause();
@@ -3533,6 +3534,7 @@ export class HardsubController {
     this.expectedMediaUrl = candidate.url;
     this.attachMediaListeners(generation, candidate.candidateId, candidate.url);
     video.crossOrigin = 'anonymous';
+    video.preload = 'auto';
     video.src = candidate.url;
     video.load();
     video.style.display = 'block';

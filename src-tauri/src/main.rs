@@ -821,6 +821,13 @@ fn main() {
             std::env::set_var("GDK_DPI_SCALE", "1.0");
         }
 
+        // Enforce low-latency PulseAudio / PipeWire-Pulse buffer configuration.
+        // Prevents PipeWire-Pulse from requesting a 2-second conservative initial buffer,
+        // eliminating multi-second audio/video clock preroll latency in GStreamer/WebKit.
+        if std::env::var("PULSE_LATENCY_MSEC").is_err() {
+            std::env::set_var("PULSE_LATENCY_MSEC", "60");
+        }
+
         // Resolve WebKit subprocess and GStreamer dependencies inside AppImage environment.
         if let Ok(appdir) = std::env::var("APPDIR") {
             if std::env::var("WEBKIT_DISABLE_SANDBOX").is_err() {
