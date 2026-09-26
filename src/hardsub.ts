@@ -878,6 +878,7 @@ export class HardsubController {
   private playIntent = false;
   private playSerial = 0;
   private subtitleSerial = 0;
+  private isCompanionSubtitle = false;
   private domTeardowns: Array<() => void> = [];
   private mediaTeardowns: Array<() => void> = [];
   private nativeTeardowns: Array<() => void> = [];
@@ -3691,6 +3692,7 @@ export class HardsubController {
 
   private async loadSubtitleFile(subPath: string) {
     if (!subPath) return;
+    this.isCompanionSubtitle = false;
     const serial = ++this.subtitleSerial;
     try {
       const content = await invoke<string>('read_text_file_content', { filePath: subPath });
@@ -3956,6 +3958,7 @@ export class HardsubController {
         if (typeof content === 'string') {
           if (this.subtitlePathInput) this.subtitlePathInput.value = candidatePath;
           this.state.subtitlePath = candidatePath;
+          this.isCompanionSubtitle = true;
           const lastDot = candidatePath.lastIndexOf('.');
           const ext = lastDot > 0 ? candidatePath.substring(lastDot + 1).toLowerCase() : 'srt';
           this.subtitleCues = parseSubtitleContent(content, ext);
@@ -3975,14 +3978,20 @@ export class HardsubController {
     }
 
     if (!this.disposed && serial === this.subtitleSerial && this.state.videoPath === videoPath) {
-      this.clearSubtitleState();
+      if (this.isCompanionSubtitle) {
+        this.clearSubtitleState();
+      }
     }
     return false;
   }
 
   public clearVideoState(): void {
     if (this.disposed || this.isEncoding) return;
+    ++this.videoLoadGeneration;
+    this.phase = 'idle';
     this.resetVideoSource();
+    void this.releasePreview();
+    this.exitPreviewFullscreen();
     this.state.videoPath = '';
     this.lastExportedPath = null;
     this.lastStatusPayload = null;
@@ -3993,11 +4002,8 @@ export class HardsubController {
     }
     this.updateComputedOutputPath();
     this.updateOutputDirUI();
-    if (this.videoStatusBadge) {
-      this.videoStatusBadge.textContent = t('transcribe.standingBy');
-      this.videoStatusBadge.style.color = 'var(--color-royal-blue)';
-      this.videoStatusBadge.style.background = 'rgba(var(--color-royal-blue-rgb), 0.15)';
-    }
+    this.renderPlayerPhase();
+    this.syncPlayPauseUI();
     if (this.btnOpenFolder) {
       this.btnOpenFolder.style.display = 'none';
     }
@@ -4007,6 +4013,8 @@ export class HardsubController {
 
   public clearSubtitleState(): void {
     if (this.disposed || this.isEncoding) return;
+    ++this.subtitleSerial;
+    this.isCompanionSubtitle = false;
     this.state.subtitlePath = '';
     if (this.subtitlePathInput) this.subtitlePathInput.value = '';
     this.subtitleCues = [];

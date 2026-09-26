@@ -7994,6 +7994,7 @@ html[dir="rtl"] .cat-match-badge {
   width: 60px !important;
   opacity: 1 !important;
   pointer-events: auto !important;
+  margin-inline-start: 8px !important;
   margin-left: 8px !important;
 }
 

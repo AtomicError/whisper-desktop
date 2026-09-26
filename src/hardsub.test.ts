@@ -120,8 +120,11 @@ function fixture() {
   const volumeBtn = new Control();
   const volumeSlider = new Control();
   const btnClearVideo = new Control();
+  btnClearVideo.style.display = 'none';
   const btnClearSub = new Control();
+  btnClearSub.style.display = 'none';
   const btnResetAll = new Control();
+  btnResetAll.style.display = 'none';
   doc.elements.set('hardsub-output-dir-text', outputDirText);
   doc.elements.set('btn-browse-hardsub-dir', btnBrowseDir);
   doc.elements.set('btn-reset-hardsub-dir', btnResetDir);
@@ -157,6 +160,8 @@ function fixture() {
     resetOutputDir(): void;
     updateOutputDirUI(): void;
     openOutputFolder(): Promise<void>;
+    phase: string;
+    loadSubtitleFile(subPath: string): Promise<void>;
   };
   const iconPlay = new Control();
   const iconPause = new Control();
@@ -965,6 +970,40 @@ describe('hardsub output directory management', () => {
       expect(internal.subtitleCues.length).toBe(1);
       expect(internal.subtitleCues[0].text).toBe('Custom explicit sub');
     });
+
+    it('preserves manually loaded user subtitle when video without companion is selected', async () => {
+      const { controller, load, internal } = fixture();
+      await load();
+
+      const subFiles: Record<string, string> = {
+        '/media/user-chosen.srt': '1\n00:00:01,000 --> 00:00:04,000\nUser chosen subtitle\n',
+      };
+
+      invoke.mockImplementation(async (command: string, args: { filePath?: string; sourcePath?: string; requestId?: number }) => {
+        if (command === 'read_text_file_content' && args.filePath && subFiles[args.filePath]) {
+          return subFiles[args.filePath];
+        }
+        if (command === 'begin_hardsub_preview') {
+          return { requestId: args.requestId, candidateId: String(args.requestId), url: `http://localhost${args.sourcePath}`, stage: 'direct', source: null };
+        }
+        throw new Error('Not found');
+      });
+
+      // User manually loads a subtitle via browse / loadSubtitleFile
+      internal.state.subtitlePath = '/media/user-chosen.srt';
+      await internal.loadSubtitleFile('/media/user-chosen.srt');
+      expect(internal.state.subtitlePath).toBe('/media/user-chosen.srt');
+      expect(internal.subtitleCues.length).toBe(1);
+
+      // Now user loads a video with NO companion subtitle
+      controller.prefillFilePaths('/media/no-companion.mp4', '');
+      await flush();
+
+      // The manually chosen subtitle MUST NOT be cleared!
+      expect(internal.state.subtitlePath).toBe('/media/user-chosen.srt');
+      expect(internal.subtitleCues.length).toBe(1);
+      expect(internal.subtitleCues[0].text).toBe('User chosen subtitle');
+    });
   });
 
   describe('granular clear and global reset functionality', () => {
@@ -1043,6 +1082,85 @@ describe('hardsub output directory management', () => {
 
       controller.resetAllMedia();
       expect(internal.state.videoPath).toBe('/video.mp4');
+    });
+
+    it('clearVideoState resets phase to idle, disables controls, and releases preview backend resources', async () => {
+      const { controller, load, internal, play, slider, badge } = fixture();
+      await load();
+
+      expect(internal.phase).toBe('ready');
+      expect((play as any).disabled).toBe(false);
+      expect((slider as any).disabled).toBe(false);
+
+      controller.clearVideoState();
+      await flush();
+
+      expect(internal.phase).toBe('idle');
+      expect((play as any).disabled).toBe(true);
+      expect((slider as any).disabled).toBe(true);
+      expect(badge.textContent).toBe('No Video Loaded');
+      expect(invoke).toHaveBeenCalledWith('release_hardsub_preview', expect.anything());
+    });
+
+    it('clearVideoState invalidates in-flight video preview loads via videoLoadGeneration', async () => {
+      const { controller, internal, video } = fixture();
+      const base = invoke.getMockImplementation()!;
+
+      let finishPreview!: (res: any) => void;
+      const beginning = new Promise(resolve => { finishPreview = resolve; });
+      invoke.mockImplementation((command: string, args: any) => {
+        if (command === 'begin_hardsub_preview') {
+          return beginning;
+        }
+        return base(command, args);
+      });
+
+      // Start loading a video
+      controller.prefillFilePaths('/large-video.mp4', '');
+      await flush();
+      expect(internal.phase).toBe('loading');
+
+      // User clears video before preview resolves
+      controller.clearVideoState();
+      expect(internal.phase).toBe('idle');
+
+      // Now delayed preview resolves
+      finishPreview({ requestId: 101, candidateId: '101', url: 'http://localhost/large-video.mp4', stage: 'direct', source: null });
+      await flush();
+
+      // Must remain idle with no mounted video src
+      expect(internal.phase).toBe('idle');
+      expect(internal.state.videoPath).toBe('');
+      expect(video.src).toBe('');
+    });
+
+    it('clearSubtitleState invalidates in-flight subtitle reads via subtitleSerial', async () => {
+      const { controller, internal } = fixture();
+
+      let finishRead!: (content: string) => void;
+      invoke.mockImplementation(async (command: string) => {
+        if (command === 'read_text_file_content') {
+          return new Promise<string>(resolve => { finishRead = resolve; });
+        }
+        throw new Error('Not found');
+      });
+
+      // Start loading a slow subtitle file
+      internal.state.subtitlePath = '/slow.srt';
+      void internal.loadSubtitleFile('/slow.srt');
+
+      // User clears subtitle state while read is in-flight
+      controller.clearSubtitleState();
+      expect(internal.state.subtitlePath).toBe('');
+      expect(internal.subtitleCues.length).toBe(0);
+
+      // Slow file finishes reading
+      finishRead('1\n00:00:01,000 --> 00:00:05,000\nLate subtitle line\n');
+      await flush();
+
+      // State must remain clear
+      expect(internal.state.subtitlePath).toBe('');
+      expect(internal.subtitleCues.length).toBe(0);
     });
   });
 });
