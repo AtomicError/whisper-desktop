@@ -30,7 +30,10 @@ class Control extends EventTarget {
   classList = new ClassList();
   closest = (_selector: string): Control | null => null;
   setAttribute() {}
-  focus() {}
+  focus = vi.fn();
+  blur = vi.fn();
+  contains(_node: unknown): boolean { return false; }
+  matches(_selector: string): boolean { return false; }
   removeAttribute(_name: string) {}
 }
 class Media extends Control {
@@ -113,11 +116,17 @@ function fixture() {
   const btnResetDir = new Control();
   const btnOpenFolder = new Control();
   const telemetryBox = new Control();
+  const volumeWrapper = new Control();
+  const volumeBtn = new Control();
+  const volumeSlider = new Control();
   doc.elements.set('hardsub-output-dir-text', outputDirText);
   doc.elements.set('btn-browse-hardsub-dir', btnBrowseDir);
   doc.elements.set('btn-reset-hardsub-dir', btnResetDir);
   doc.elements.set('btn-open-hardsub-folder', btnOpenFolder);
   doc.elements.set('hardsub-telemetry-box', telemetryBox);
+  doc.elements.set('hardsub-volume-wrapper', volumeWrapper);
+  doc.elements.set('hardsub-btn-volume', volumeBtn);
+  doc.elements.set('hardsub-volume-slider', volumeSlider);
 
   // Inject only event-capable DOM/media boundaries. Loading, seeking and rendering are real.
   const internal = controller as unknown as {
@@ -125,6 +134,7 @@ function fixture() {
     videoIconPlay: Control; videoIconPause: Control;
     lblVideoName: Control; videoStatusBadge: Control; videoTimeDisplay: Control;
     previewCancelBtn: Control; previewRetryBtn: Control;
+    volumeControlWrapper: Control; videoVolumeBtn: Control; videoVolumeSlider: Control;
     freezeCanvas: { width: number; height: number; style: Record<string, string> };
     freezeCtx: { clearRect(): void; drawImage(): void };
     state: { videoPath: string; outputPath: string; outputDir: string };
@@ -145,7 +155,8 @@ function fixture() {
   Object.assign(internal, {
     videoElement: video, videoSeekSlider: slider, videoPlayBtn: play, lblVideoName: label, videoStatusBadge: badge, videoTimeDisplay: time,
     videoIconPlay: iconPlay, videoIconPause: iconPause,
-    outputDirText, btnBrowseDir, btnResetDir, btnOpenFolder, telemetryBox
+    outputDirText, btnBrowseDir, btnResetDir, btnOpenFolder, telemetryBox,
+    volumeControlWrapper: volumeWrapper, videoVolumeBtn: volumeBtn, videoVolumeSlider: volumeSlider,
   });
   Object.assign(internal, { previewCancelBtn: cancel, previewRetryBtn: retry });
   internal.setupVideoPlayerEvents();
@@ -156,7 +167,7 @@ function fixture() {
     if (active) controller.setPageActive(true);
     video.pause.mockClear();
   };
-  return { controller, video, slider, play, iconPlay, iconPause, label, badge, time, container, internal, load, cancel, retry, outputDirText, btnBrowseDir, btnResetDir, btnOpenFolder, telemetryBox };
+  return { controller, video, slider, play, iconPlay, iconPause, label, badge, time, container, internal, load, cancel, retry, outputDirText, btnBrowseDir, btnResetDir, btnOpenFolder, telemetryBox, volumeWrapper, volumeBtn, volumeSlider };
 }
 
 beforeAll(async () => {
@@ -841,6 +852,53 @@ describe('hardsub output directory management', () => {
 
       // Should automatically re-trigger playVideo once seek settles
       expect(video.play).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('volume controls collapse and lifecycle', () => {
+    it('blurs and collapses volume slider when mouse leaves wrapper if not dragging', async () => {
+      const { volumeWrapper, volumeSlider, load } = fixture();
+      await load();
+
+      // Mouse leaves wrapper while not dragging
+      volumeWrapper.dispatchEvent(new Event('mouseleave'));
+      expect(volumeSlider.blur).toHaveBeenCalled();
+    });
+
+    it('does not blur volume slider prematurely during active drag, but blurs when drag finishes outside wrapper', async () => {
+      const { volumeWrapper, volumeSlider, load } = fixture();
+      await load();
+
+      // Start drag
+      volumeSlider.dispatchEvent(new Event('pointerdown'));
+      volumeSlider.blur.mockClear();
+
+      // Mouse temporarily leaves wrapper during active drag
+      volumeWrapper.dispatchEvent(new Event('mouseleave'));
+      expect(volumeSlider.blur).not.toHaveBeenCalled();
+
+      // Wrapper is not hovered when drag ends
+      volumeWrapper.matches = (sel: string) => sel === ':hover' ? false : false;
+      window.dispatchEvent(new Event('pointerup'));
+      vi.advanceTimersByTime(10);
+      expect(volumeSlider.blur).toHaveBeenCalled();
+    });
+
+    it('blurs volume slider when clicking outside or pressing Escape', async () => {
+      const { volumeWrapper, volumeSlider, load } = fixture();
+      await load();
+
+      // Escape key
+      const escEvent = new Event('keydown');
+      Object.assign(escEvent, { key: 'Escape' });
+      volumeSlider.dispatchEvent(escEvent);
+      expect(volumeSlider.blur).toHaveBeenCalled();
+
+      // Clicking outside
+      doc.activeElement = volumeSlider;
+      volumeWrapper.contains = () => false;
+      doc.dispatchEvent(new Event('pointerdown'));
+      expect(volumeSlider.blur).toHaveBeenCalledTimes(2);
     });
   });
 });

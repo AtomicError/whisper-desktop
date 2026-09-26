@@ -3762,20 +3762,20 @@
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
                         </button>
 
+                        <!-- Scrub Slider -->
+                        <input type="range" id="hardsub-video-seek" min="0" max="100" value="0" step="0.1" class="range-slider" style="flex:1;" />
+
+                        <!-- Time Display -->
+                        <span id="hardsub-video-time" style="font-family: monospace; font-size: 0.98rem; font-weight: 600; color: var(--color-royal-blue); min-width: 120px; text-align: right;">00:00 / 00:00</span>
+
                         <!-- Volume Controls -->
-                        <div class="volume-control-wrapper">
+                        <div id="hardsub-volume-wrapper" class="volume-control-wrapper">
                           <button id="hardsub-btn-volume" class="pill-btn" style="padding: 6px 8px; height: 32px; z-index: 2;" title="Mute / Unmute">
                             <svg id="hardsub-icon-vol-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
                             <svg id="hardsub-icon-vol-mute" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px; display:none;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
                           </button>
                           <input type="range" id="hardsub-volume-slider" min="0" max="1" step="0.05" value="1" class="volume-slider" style="width: 0px; opacity: 0; pointer-events: none; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); height: 4px; margin: 0; -webkit-appearance: none; appearance: none; background: rgba(255, 255, 255, 0.1); border-radius: 2px; outline: none;" />
                         </div>
-
-                        <!-- Scrub Slider -->
-                        <input type="range" id="hardsub-video-seek" min="0" max="100" value="0" step="0.1" class="range-slider" style="flex:1;" />
-
-                        <!-- Time Display -->
-                        <span id="hardsub-video-time" style="font-family: monospace; font-size: 0.98rem; font-weight: 600; color: var(--color-royal-blue); min-width: 120px; text-align: right;">00:00 / 00:00</span>
 
                         <!-- Fullscreen Button -->
                         <button id="hardsub-btn-fullscreen" class="pill-btn" style="padding: 6px 8px; height: 32px;" title="Toggle Fullscreen">

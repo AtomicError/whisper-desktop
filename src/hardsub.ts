@@ -720,6 +720,7 @@ export class HardsubController {
   private nextCueBtn: HTMLButtonElement | null = null;
 
   // Player Volume & Fullscreen Controls
+  private volumeControlWrapper: HTMLElement | null = null;
   private videoVolumeBtn: HTMLButtonElement | null = null;
   private videoIconVolUp: HTMLElement | null = null;
   private videoIconVolMute: HTMLElement | null = null;
@@ -1196,7 +1197,11 @@ export class HardsubController {
     this.nextCueBtn = document.getElementById('hardsub-btn-next-cue') as HTMLButtonElement;
 
     // Player Volume & Fullscreen Controls
+    this.volumeControlWrapper = document.getElementById('hardsub-volume-wrapper');
     this.videoVolumeBtn = document.getElementById('hardsub-btn-volume') as HTMLButtonElement;
+    if (!this.volumeControlWrapper && this.videoVolumeBtn) {
+      this.volumeControlWrapper = this.videoVolumeBtn.closest('.volume-control-wrapper') as HTMLElement | null;
+    }
     this.videoIconVolUp = document.getElementById('hardsub-icon-vol-up');
     this.videoIconVolMute = document.getElementById('hardsub-icon-vol-mute');
     this.videoVolumeSlider = document.getElementById('hardsub-volume-slider') as HTMLInputElement;
@@ -2686,6 +2691,52 @@ export class HardsubController {
     });
 
     // Volume slider & Mute button listeners
+    let isDraggingVolume = false;
+
+    this.on(this.videoVolumeSlider, 'pointerdown', () => {
+      isDraggingVolume = true;
+    });
+
+    const endVolumeDrag = () => {
+      if (!isDraggingVolume) return;
+      isDraggingVolume = false;
+      setTimeout(() => {
+        const wrapper = this.volumeControlWrapper || (this.videoVolumeBtn?.closest('.volume-control-wrapper') as HTMLElement | null);
+        if (!wrapper?.matches(':hover')) {
+          this.videoVolumeSlider?.blur();
+        }
+      }, 0);
+    };
+
+    this.on(this.videoVolumeSlider, 'pointerup', endVolumeDrag);
+    this.on(this.videoVolumeSlider, 'lostpointercapture', endVolumeDrag);
+    this.on(window, 'pointerup', endVolumeDrag);
+
+    const wrapper = this.volumeControlWrapper || (this.videoVolumeBtn?.closest('.volume-control-wrapper') as HTMLElement | null);
+    if (wrapper) {
+      this.on(wrapper, 'mouseleave', () => {
+        if (!isDraggingVolume) {
+          this.videoVolumeSlider?.blur();
+        }
+      });
+    }
+
+    this.on(document, 'pointerdown', (e) => {
+      if (this.videoVolumeSlider && document.activeElement === this.videoVolumeSlider) {
+        const target = e.target as HTMLElement | null;
+        const currentWrapper = this.volumeControlWrapper || (this.videoVolumeBtn?.closest('.volume-control-wrapper') as HTMLElement | null);
+        if (!currentWrapper?.contains(target)) {
+          this.videoVolumeSlider.blur();
+        }
+      }
+    });
+
+    this.on(this.videoVolumeSlider, 'keydown', (e) => {
+      if ((e as KeyboardEvent).key === 'Escape') {
+        this.videoVolumeSlider?.blur();
+      }
+    });
+
     this.on(this.videoVolumeSlider, 'input', () => {
       if (this.videoElement && this.videoVolumeSlider) {
         const val = parseFloat(this.videoVolumeSlider.value);
@@ -2699,7 +2750,12 @@ export class HardsubController {
     });
 
     this.on(this.videoVolumeSlider, 'change', () => {
-      this.videoVolumeSlider?.blur();
+      setTimeout(() => {
+        const currentWrapper = this.volumeControlWrapper || (this.videoVolumeBtn?.closest('.volume-control-wrapper') as HTMLElement | null);
+        if (!currentWrapper?.matches(':hover') && !isDraggingVolume) {
+          this.videoVolumeSlider?.blur();
+        }
+      }, 0);
     });
 
     this.on(this.videoVolumeBtn, 'click', () => {
