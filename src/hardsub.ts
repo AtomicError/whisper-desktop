@@ -872,6 +872,7 @@ export class HardsubController {
   private candidateId = '';
   private expectedMediaUrl = '';
   private playIntent = false;
+  private playSerial = 0;
   private domTeardowns: Array<() => void> = [];
   private mediaTeardowns: Array<() => void> = [];
   private nativeTeardowns: Array<() => void> = [];
@@ -965,6 +966,7 @@ export class HardsubController {
     this.scrollSeekTimeout = this.clickLockTimer = this.hudTimeout = null;
     this.controlsTimeout = this.clickTimeout = this.accordionTimeout = this.seekWatchdog = null;
     ++this.seekSerial;
+    ++this.playSerial;
     this.cancelFreezeCallbacks();
     this.dismissFreezeFrame();
     if (this.volumeHud) this.volumeHud.style.display = 'none';
@@ -1016,13 +1018,14 @@ export class HardsubController {
     if (!video || !this.canInteractWithVideo()) return;
     const generation = this.videoLoadGeneration;
     const candidate = this.candidateId;
+    const serial = ++this.playSerial;
     this.playIntent = true;
     this.syncPlayPauseUI();
     void video.play().then(() => {
       if (generation !== this.videoLoadGeneration || candidate !== this.candidateId) return;
       if (!this.canInteractWithVideo() || !this.playIntent) video.pause();
     }).catch(() => {
-      if (generation === this.videoLoadGeneration && candidate === this.candidateId) {
+      if (serial === this.playSerial && generation === this.videoLoadGeneration && candidate === this.candidateId) {
         this.playIntent = false;
         this.syncPlayPauseUI();
       }
@@ -1031,11 +1034,15 @@ export class HardsubController {
 
   private togglePlayback(): void {
     if (!this.canInteractWithVideo() || !this.videoElement) return;
-    if (this.videoElement.paused || this.videoElement.ended) this.playVideo();
-    else {
+    const isPlayingOrIntended = (this.playIntent || !this.videoElement.paused) && !this.videoElement.ended;
+    if (isPlayingOrIntended) {
+      ++this.playSerial;
       this.playIntent = false;
       this.wasPlayingBeforeSeek = false;
       this.videoElement.pause();
+      this.syncPlayPauseUI();
+    } else {
+      this.playVideo();
     }
   }
 
@@ -2439,7 +2446,7 @@ export class HardsubController {
     for (const control of [this.videoPlayBtn, this.videoSeekSlider, this.prevCueBtn, this.nextCueBtn]) {
       if (control) control.disabled = !ready;
     }
-    const playing = ready && !!this.videoElement && !this.videoElement.paused && !this.videoElement.ended;
+    const playing = ready && !!this.videoElement && (this.playIntent || !this.videoElement.paused) && !this.videoElement.ended;
     const message = this.phase === 'idle' ? t('hardsub.noVideoLoaded')
       : this.phase === 'loading' ? t('hardsub.previewLoading')
       : this.phase === 'preparing' ? this.previewStage === 'remux' ? t('hardsub.previewRemuxing')
@@ -2786,8 +2793,9 @@ export class HardsubController {
         if (!this.isScrollingSeek) {
           this.isScrollingSeek = true;
           this.virtualCurrentTime = this.videoElement.currentTime;
-          if (!this.videoElement.paused) {
+          if (!this.videoElement.paused || this.playIntent) {
             this.wasPlayingBeforeSeek = true;
+            this.playIntent = false;
             this.videoElement.pause();
           }
         }

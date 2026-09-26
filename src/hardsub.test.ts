@@ -122,6 +122,7 @@ function fixture() {
   // Inject only event-capable DOM/media boundaries. Loading, seeking and rendering are real.
   const internal = controller as unknown as {
     videoElement: Media; videoSeekSlider: Control; videoPlayBtn: Control;
+    videoIconPlay: Control; videoIconPause: Control;
     lblVideoName: Control; videoStatusBadge: Control; videoTimeDisplay: Control;
     previewCancelBtn: Control; previewRetryBtn: Control;
     freezeCanvas: { width: number; height: number; style: Record<string, string> };
@@ -139,8 +140,11 @@ function fixture() {
     updateOutputDirUI(): void;
     openOutputFolder(): Promise<void>;
   };
+  const iconPlay = new Control();
+  const iconPause = new Control();
   Object.assign(internal, {
     videoElement: video, videoSeekSlider: slider, videoPlayBtn: play, lblVideoName: label, videoStatusBadge: badge, videoTimeDisplay: time,
+    videoIconPlay: iconPlay, videoIconPause: iconPause,
     outputDirText, btnBrowseDir, btnResetDir, btnOpenFolder, telemetryBox
   });
   Object.assign(internal, { previewCancelBtn: cancel, previewRetryBtn: retry });
@@ -152,7 +156,7 @@ function fixture() {
     if (active) controller.setPageActive(true);
     video.pause.mockClear();
   };
-  return { controller, video, slider, play, label, badge, time, container, internal, load, cancel, retry, outputDirText, btnBrowseDir, btnResetDir, btnOpenFolder, telemetryBox };
+  return { controller, video, slider, play, iconPlay, iconPause, label, badge, time, container, internal, load, cancel, retry, outputDirText, btnBrowseDir, btnResetDir, btnOpenFolder, telemetryBox };
 }
 
 beforeAll(async () => {
@@ -729,6 +733,114 @@ describe('hardsub output directory management', () => {
       // If maxDuration is strictly smaller than the delta, it will prune
       const pruned = findCueAtTimeBinaryFn(longCues, 35000, 10000);
       expect(pruned).toBeUndefined();
+    });
+  });
+
+  describe('optimistic playback and playIntent concurrency', () => {
+    it('provides instant optimistic play feedback and allows immediate pause during startup', async () => {
+      const { video, play, iconPlay, iconPause, badge, load } = fixture();
+      await load();
+
+      let resolvePlay!: () => void;
+      video.play.mockImplementation(() => new Promise<void>((resolve) => {
+        resolvePlay = () => { video.paused = false; resolve(); };
+      }));
+
+      // Initially paused
+      expect(iconPlay.style.display).not.toBe('none');
+      expect(iconPause.style.display).toBe('none');
+
+      // 1. User clicks Play
+      play.dispatchEvent(new Event('click'));
+
+      // Optimistic instant feedback
+      expect(iconPlay.style.display).toBe('none');
+      expect(iconPause.style.display).toBe('block');
+      expect(badge.textContent).toBe('Playing Live');
+
+      // 2. User immediately clicks again before play() resolves (wants to pause)
+      play.dispatchEvent(new Event('click'));
+
+      // Must pause and immediately flip UI back, not call playVideo() again
+      expect(video.pause).toHaveBeenCalledOnce();
+      expect(iconPlay.style.display).toBe('block');
+      expect(iconPause.style.display).toBe('none');
+      expect(badge.textContent).toBe('Paused');
+
+      // Resolving old play promise should not restart playback
+      resolvePlay();
+      await flush();
+      expect(video.paused).toBe(true);
+    });
+
+    it('isolates aborted play rejection from subsequent play request via playSerial', async () => {
+      const { video, play, iconPlay, iconPause, load } = fixture();
+      await load();
+
+      let rejectPlay1!: (err: Error) => void;
+      const play1Promise = new Promise<void>((_, reject) => { rejectPlay1 = reject; });
+
+      video.play.mockImplementationOnce(() => play1Promise);
+
+      // Start play attempt #1
+      play.dispatchEvent(new Event('click'));
+      expect(iconPlay.style.display).toBe('none');
+      expect(iconPause.style.display).toBe('block');
+
+      // Immediately cancel / pause play #1
+      play.dispatchEvent(new Event('click'));
+      expect(iconPlay.style.display).toBe('block');
+      expect(iconPause.style.display).toBe('none');
+
+      // Now start play attempt #2
+      let resolvePlay2!: () => void;
+      video.play.mockImplementationOnce(() => new Promise<void>((resolve) => {
+        resolvePlay2 = () => { video.paused = false; resolve(); };
+      }));
+      play.dispatchEvent(new Event('click'));
+      expect(iconPlay.style.display).toBe('none');
+      expect(iconPause.style.display).toBe('block');
+
+      // Play #1 rejects with AbortError asynchronously
+      rejectPlay1(new Error('AbortError'));
+      await flush();
+
+      // UI should STILL reflect active play attempt #2, not wiped by play #1 catch
+      expect(iconPlay.style.display).toBe('none');
+      expect(iconPause.style.display).toBe('block');
+
+      // Play #2 completes successfully
+      resolvePlay2();
+      await flush();
+      expect(video.paused).toBe(false);
+      expect(iconPlay.style.display).toBe('none');
+      expect(iconPause.style.display).toBe('block');
+    });
+
+    it('preserves play intent during wheel scroll seeking and resumes playback', async () => {
+      const { video, play, container, load } = fixture();
+      await load();
+
+      let resolvePlay!: () => void;
+      video.play.mockImplementation(() => new Promise<void>((resolve) => {
+        resolvePlay = () => { video.paused = false; resolve(); };
+      }));
+
+      // Click play (intent set)
+      play.dispatchEvent(new Event('click'));
+
+      // Wheel scroll horizontally while play is in-flight (video.paused is still true)
+      wheel(container, 30);
+      expect(video.pause).toHaveBeenCalled();
+
+      // Settle fast seek and scroll seek debounce
+      video.settle();
+      vi.advanceTimersByTime(150);
+      // Settle final precise seek
+      video.settle();
+
+      // Should automatically re-trigger playVideo once seek settles
+      expect(video.play).toHaveBeenCalledTimes(2);
     });
   });
 });
