@@ -405,12 +405,17 @@ interface TextSpan {
 
 const TAG_REGEX = /<\/?(?:i|b|u|font)\b[^>]*>|\{\\an[1-9]\}|\{\\[^}]+\}/gi;
 
-function parseLineToSpans(text: string, defaultColor: string): { spans: TextSpan[], alignmentOverride: number | null } {
+function parseLineToSpans(
+  text: string,
+  defaultColor: string,
+  defaultBold: boolean = false,
+  defaultItalic: boolean = false
+): { spans: TextSpan[]; alignmentOverride: number | null } {
   let alignmentOverride: number | null = null;
   const spans: TextSpan[] = [];
   
-  let bold = false;
-  let italic = false;
+  let bold = defaultBold;
+  let italic = defaultItalic;
   let underline = false;
   const colorStack: string[] = [defaultColor];
 
@@ -441,11 +446,11 @@ function parseLineToSpans(text: string, defaultColor: string): { spans: TextSpan
       if (lower.startsWith('<i>') || lower.startsWith('<i ')) {
         italic = true;
       } else if (lower === '</i>') {
-        italic = false;
+        italic = defaultItalic;
       } else if (lower.startsWith('<b>') || lower.startsWith('<b ')) {
         bold = true;
       } else if (lower === '</b>') {
-        bold = false;
+        bold = defaultBold;
       } else if (lower.startsWith('<u>') || lower.startsWith('<u ')) {
         underline = true;
       } else if (lower === '</u>') {
@@ -1714,18 +1719,20 @@ export class HardsubController {
     });
 
     // Bold Toggle
-    this.on(this.boldToggle, 'click', () => {
+    this.on(this.boldToggle, 'click', async () => {
       this.state.bold = !this.state.bold;
       this.boldToggle!.classList.toggle('active', this.state.bold);
-      this.refreshFontRenderScale();
+      this.updateLivePreview();
+      await this.refreshFontRenderScale();
       this.updateLivePreview();
     });
 
     // Italic Toggle
-    this.on(this.italicToggle, 'click', () => {
+    this.on(this.italicToggle, 'click', async () => {
       this.state.italic = !this.state.italic;
       this.italicToggle!.classList.toggle('active', this.state.italic);
-      this.refreshFontRenderScale();
+      this.updateLivePreview();
+      await this.refreshFontRenderScale();
       this.updateLivePreview();
     });
 
@@ -4175,7 +4182,9 @@ export class HardsubController {
     this.updateColorSwatches();
 
     // Ensure font is loaded before rendering on canvas
-    const fontSpec = `16px '${this.state.fontName}'`;
+    const fontStyle = this.state.italic ? 'italic' : 'normal';
+    const fontWeight = this.state.bold ? 'bold' : 'normal';
+    const fontSpec = `${fontStyle} ${fontWeight} 16px '${this.state.fontName}'`;
     const generation = this.videoLoadGeneration;
     const candidate = this.candidateId;
     document.fonts.load(fontSpec).then(() => {
@@ -4195,7 +4204,7 @@ export class HardsubController {
     if (this.disposed || this.phase !== 'ready') return;
 
     // Only update UI controls and color swatches when styling state actually changes or forced
-    const uiStateKey = `${this.state.fontSize}|${this.state.outlineSize}|${this.state.positionY}|${this.state.bgBox}|${this.state.primaryColor}|${this.state.outlineColor}|${this.state.bgBoxColor}`;
+    const uiStateKey = `${this.state.fontSize}|${this.state.outlineSize}|${this.state.positionY}|${this.state.bgBox}|${this.state.primaryColor}|${this.state.outlineColor}|${this.state.bgBoxColor}|${this.state.bold}|${this.state.italic}`;
     if (force || this._lastUIStateKey !== uiStateKey) {
       this._lastUIStateKey = uiStateKey;
       this.updateUIControlsState();
@@ -4249,7 +4258,7 @@ export class HardsubController {
 
     // --- Parse and Wrap spans ---
     const parsedLines: { spans: TextSpan[]; alignmentOverride: number | null }[] = lines.map((line) =>
-      parseLineToSpans(line, this.state.primaryColor)
+      parseLineToSpans(line, this.state.primaryColor, this.state.bold, this.state.italic)
     );
 
     // alignmentOverride from any of the parsed lines (if present)
@@ -4436,6 +4445,13 @@ export class HardsubController {
     if (outlinePicker) {
       outlinePicker.classList.toggle('control-disabled', this.state.outlineSize === 0);
     }
+
+    if (this.boldToggle) {
+      this.boldToggle.classList.toggle('active', this.state.bold);
+    }
+    if (this.italicToggle) {
+      this.italicToggle.classList.toggle('active', this.state.italic);
+    }
   }
 
   private updateEncodingUIState(active: boolean) {
@@ -4603,7 +4619,9 @@ export class HardsubController {
         const lines = cue.text.split('\n');
 
         // Parse lines to spans
-        const parsedLines = lines.map((line) => parseLineToSpans(line, this.state.primaryColor));
+        const parsedLines = lines.map((line) =>
+          parseLineToSpans(line, this.state.primaryColor, this.state.bold, this.state.italic)
+        );
 
         // Find active alignment override for the cue
         let alignmentOverride: number | null = null;

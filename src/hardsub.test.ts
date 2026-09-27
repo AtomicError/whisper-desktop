@@ -95,7 +95,17 @@ class DocumentBoundary extends EventTarget {
   getElementById = (id: string) => this.elements.get(id) ?? null;
   querySelectorAll = () => [];
   fonts = { load: async () => [] };
-  createElement = (_tag: string) => new Control();
+  createElement = (_tag: string) => {
+    const c = new Control();
+    (c as any).getContext = () => ({
+      measureText: (text: string) => ({ width: text.length * 10 }),
+      save: () => {},
+      restore: () => {},
+      textBaseline: 'alphabetic',
+      font: '',
+    });
+    return c;
+  };
 }
 let doc: DocumentBoundary;
 type PreviewArguments = { sourcePath?: string; requestId?: number; candidateId?: string };
@@ -114,6 +124,12 @@ function wheel(container: Control, deltaX = 20) {
   return event;
 }
 function fixture() {
+  const boldBtn = new Control();
+  boldBtn.classList.add('active');
+  const italicBtn = new Control();
+  doc.elements.set('hardsub-btn-bold', boldBtn);
+  doc.elements.set('hardsub-btn-italic', italicBtn);
+
   const controller = new Controller();
   controllers.push(controller);
   const video = new Media();
@@ -204,9 +220,10 @@ function fixture() {
   doc.elements.set('hardsub-hw', hwSelect);
   doc.elements.set('hardsub-codec', codecSelect);
   doc.elements.set('hardsub-font', fontSelect);
-  Object.assign(internal, { hwSelect, codecSelect, fontSelect });
+  Object.assign(internal, { hwSelect, codecSelect, fontSelect, boldToggle: boldBtn, italicToggle: italicBtn });
   Object.assign(internal, { previewCancelBtn: cancel, previewRetryBtn: retry });
   internal.setupVideoPlayerEvents();
+  (internal as any).setupEventListeners();
   const load = async (active = true) => {
     controller.prefillFilePaths('/video.mp4', '');
     await flush();
@@ -214,7 +231,7 @@ function fixture() {
     if (active) controller.setPageActive(true);
     video.pause.mockClear();
   };
-  return { controller, video, slider, play, iconPlay, iconPause, label, badge, time, container, internal, load, cancel, retry, outputDirText, btnBrowseDir, btnResetDir, btnOpenFolder, telemetryBox, volumeWrapper, volumeBtn, volumeSlider, btnClearVideo, btnClearSub, btnResetAll, fullscreenBtn, iconFsEnter, iconFsExit, fontSelect };
+  return { controller, video, slider, play, iconPlay, iconPause, label, badge, time, container, internal, load, cancel, retry, outputDirText, btnBrowseDir, btnResetDir, btnOpenFolder, telemetryBox, volumeWrapper, volumeBtn, volumeSlider, btnClearVideo, btnClearSub, btnResetAll, fullscreenBtn, iconFsEnter, iconFsExit, fontSelect, boldBtn, italicBtn };
 }
 
 beforeAll(async () => {
@@ -1430,6 +1447,83 @@ describe('hardsub output directory management', () => {
       expect(systemNames).toEqual(['Arial']);
     });
   });
+
+  describe('font style formatting (bold and italic toggles)', () => {
+    it('toggles bold and italic state and active classes when clicked', async () => {
+      const { internal, boldBtn, italicBtn } = fixture();
+      await flush();
+
+      // Bold is enabled by default
+      expect((internal.state as any).bold).toBe(true);
+      expect((internal.state as any).italic).toBe(false);
+      expect(boldBtn.classList.contains('active')).toBe(true);
+      expect(italicBtn.classList.contains('active')).toBe(false);
+
+      // Click Bold to toggle OFF
+      boldBtn.dispatchEvent(new Event('click'));
+      await flush();
+      expect((internal.state as any).bold).toBe(false);
+      expect(boldBtn.classList.contains('active')).toBe(false);
+
+      // Click Italic to toggle ON
+      italicBtn.dispatchEvent(new Event('click'));
+      await flush();
+      expect((internal.state as any).italic).toBe(true);
+      expect(italicBtn.classList.contains('active')).toBe(true);
+
+      // Click Italic again to toggle OFF
+      italicBtn.dispatchEvent(new Event('click'));
+      await flush();
+      expect((internal.state as any).italic).toBe(false);
+      expect(italicBtn.classList.contains('active')).toBe(false);
+    });
+
+    it('generates correct ASS tags for bold and italic styling', async () => {
+      const { internal } = fixture();
+      await flush();
+
+      (internal as any).directSourceGeometry = { width: 1920, height: 1080 };
+      internal.subtitleCues = [{ text: 'Hello World', startMs: 0, endMs: 2000 }];
+
+      // Default: bold=true, italic=false -> \b1 and \i0
+      (internal.state as any).bold = true;
+      (internal.state as any).italic = false;
+      let ass = (internal as any).generateAssContent();
+      expect(ass).toContain('\\b1\\i0');
+
+      // Toggled: bold=false, italic=true -> \b0 and \i1
+      (internal.state as any).bold = false;
+      (internal.state as any).italic = true;
+      ass = (internal as any).generateAssContent();
+      expect(ass).toContain('\\b0\\i1');
+
+      // Both true -> \b1 and \i1
+      (internal.state as any).bold = true;
+      (internal.state as any).italic = true;
+      ass = (internal as any).generateAssContent();
+      expect(ass).toContain('\\b1\\i1');
+
+      // Both false -> \b0 and \i0
+      (internal.state as any).bold = false;
+      (internal.state as any).italic = false;
+      ass = (internal as any).generateAssContent();
+      expect(ass).toContain('\\b0\\i0');
+    });
+
+    it('respects inline formatting tags over default style settings', async () => {
+      const { internal } = fixture();
+      await flush();
+
+      (internal as any).directSourceGeometry = { width: 1920, height: 1080 };
+      internal.subtitleCues = [{ text: 'Normal <i>italic</i> word', startMs: 0, endMs: 2000 }];
+      (internal.state as any).bold = false;
+      (internal.state as any).italic = false;
+      const ass = (internal as any).generateAssContent();
+      expect(ass).toContain('\\i1');
+      expect(ass).toContain('\\i0');
+    });
+  });
 });
+
 
 
