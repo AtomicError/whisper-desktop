@@ -210,9 +210,6 @@ export function toAssFontName(fontName: string): string {
   if (clean.toLowerCase() === 'inter') {
     return 'Inter 24pt';
   }
-  if (clean.toLowerCase() === 'montserrat') {
-    return 'Montserrat Thin';
-  }
   return clean;
 }
 

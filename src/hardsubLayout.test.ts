@@ -306,7 +306,6 @@ describe('resolveEffectiveFont', () => {
 describe('toAssFontName', () => {
   it('maps fonts with internal OpenType naming quirks to their Name ID 1 family name', () => {
     expect(toAssFontName('Inter')).toBe('Inter 24pt');
-    expect(toAssFontName('Montserrat')).toBe('Montserrat Thin');
   });
 
   it('preserves standard font names cleanly', () => {
@@ -315,10 +314,11 @@ describe('toAssFontName', () => {
     expect(toAssFontName('Roboto')).toBe('Roboto');
     expect(toAssFontName('Vazirmatn')).toBe('Vazirmatn');
     expect(toAssFontName('Lora')).toBe('Lora');
+    expect(toAssFontName('Montserrat')).toBe('Montserrat');
   });
 
   it('cleans invalid characters', () => {
-    expect(toAssFontName('"Montserrat",')).toBe('Montserrat Thin');
+    expect(toAssFontName('"Montserrat",')).toBe('Montserrat');
     expect(toAssFontName("'Inter'")).toBe('Inter 24pt');
   });
 });
