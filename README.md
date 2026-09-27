@@ -466,7 +466,7 @@ Whisper Desktop is a complete application built on these excellent open-source p
 
 * **[whisper.cpp](https://github.com/ggml-org/whisper.cpp)** (MIT) by Georgi Gerganov and contributors — the speech recognition engine, compiled per platform and backend by this project's release workflow.
 * **[FFmpeg](https://ffmpeg.org/)** — media decoding, audio extraction and video encoding. The application bundles static builds (GPL); Linux binaries from [johnvansickle.com](https://johnvansickle.com/ffmpeg/), Windows from [gyan.dev](https://www.gyan.dev/ffmpeg/builds/).
-* **Bundled fonts:** Inter, Outfit, Roboto, JetBrains Mono, Vazirmatn, Shabnam, Samim and Sahel, redistributed under their respective upstream licenses.
+* **Bundled fonts:** Inter, Roboto, Outfit, JetBrains Mono, Lora, Montserrat, Vazirmatn, Shabnam, Samim and Sahel, redistributed under their respective upstream licenses.
 
 Thanks also to everyone maintaining the model hosting on [Hugging Face](https://huggingface.co/ggerganov/whisper.cpp) that makes in-app model downloads possible.
 

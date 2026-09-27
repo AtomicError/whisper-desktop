@@ -90,15 +90,18 @@ pub struct FontItem {
 pub fn get_system_fonts(_app: AppHandle) -> Vec<FontItem> {
     let mut fonts = Vec::new();
     
-    // 1. Add bundled Persian & English fonts
+    // 1. Add bundled English & Persian fonts
     let default_fonts = [
+        ("Inter", "bundled"),
+        ("Roboto", "bundled"),
+        ("Outfit", "bundled"),
+        ("JetBrains Mono", "bundled"),
+        ("Lora", "bundled"),
+        ("Montserrat", "bundled"),
         ("Vazirmatn", "bundled"),
         ("Shabnam", "bundled"),
         ("Samim", "bundled"),
         ("Sahel", "bundled"),
-        ("Inter", "bundled"),
-        ("Roboto", "bundled"),
-        ("Outfit", "bundled"),
     ];
 
     for (font, src) in default_fonts {
@@ -284,11 +287,72 @@ fn read_font_metrics(path: &Path) -> Option<(u16, u32, u32)> {
     Some((upem, ascent, descent))
 }
 
-/// Resolves the font file libass would use: fontconfig first (mirroring libass
-/// fontselect), then the bundled fonts directory as fallback.
-/// Resolves the font file libass would use: fontconfig first (mirroring libass
-/// fontselect), then the bundled fonts directory as fallback.
+pub fn get_bundled_fonts_dir<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Option<std::path::PathBuf> {
+    // 1. In dev mode or when CARGO_MANIFEST_DIR is set, prioritize source resources/fonts
+    if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
+        let dev_path = std::path::Path::new(&manifest_dir).join("resources/fonts");
+        if dev_path.is_dir() {
+            return Some(dev_path);
+        }
+    }
+    #[cfg(debug_assertions)]
+    {
+        let compile_time_dev_path = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/resources/fonts"));
+        if compile_time_dev_path.is_dir() {
+            return Some(compile_time_dev_path.to_path_buf());
+        }
+    }
+
+    // 2. Production resource directory via Tauri BaseDirectory::Resource
+    if let Ok(p) = app.path().resolve("resources/fonts", tauri::path::BaseDirectory::Resource) {
+        if p.is_dir() {
+            return Some(p);
+        }
+    }
+
+    // 3. Portable folder next to executable
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(parent) = exe_path.parent() {
+            let portable_fonts = parent.join("resources").join("fonts");
+            if portable_fonts.is_dir() {
+                return Some(portable_fonts);
+            }
+        }
+    }
+
+    None
+}
+
+/// Resolves the font file libass would use: bundled fonts directory first (mirroring
+/// FFmpeg's :fontsdir and webview @font-face), then fontconfig/system fonts as fallback.
 fn resolve_font_file<R: tauri::Runtime>(font_name: &str, bold: bool, italic: bool, app: &tauri::AppHandle<R>) -> Option<std::path::PathBuf> {
+    // 1. Check bundled fonts FIRST. Bundled fonts must take precedence to ensure
+    // that metrics calculated in Rust match exactly what libass renders via :fontsdir.
+    if let Some(dir) = get_bundled_fonts_dir(app) {
+        let clean_name = font_name.replace(' ', "");
+        for ext in ["ttf", "otf"] {
+            let p1 = dir.join(format!("{}.{}", font_name, ext));
+            if p1.exists() {
+                return Some(p1);
+            }
+            let p2 = dir.join(format!("{}.{}", clean_name, ext));
+            if p2.exists() {
+                return Some(p2);
+            }
+        }
+        if let Ok(entries) = std::fs::read_dir(&dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                    if stem.eq_ignore_ascii_case(font_name) || stem.eq_ignore_ascii_case(&clean_name) {
+                        return Some(path);
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. If not a bundled font (e.g. system font), query fontconfig via fc-match
     let mut pattern = font_name.to_string();
     if bold {
         pattern.push_str(":bold");
@@ -313,35 +377,6 @@ fn resolve_font_file<R: tauri::Runtime>(font_name: &str, bold: bool, italic: boo
                 {
                     return Some(path.to_path_buf());
                 }
-            }
-        }
-    }
-
-    let mut resolved_dir = app.path().resolve("resources/fonts", tauri::path::BaseDirectory::Resource).ok().filter(|p| p.exists());
-    if resolved_dir.is_none() {
-        if let Ok(exe_path) = std::env::current_exe() {
-            if let Some(parent) = exe_path.parent() {
-                let portable_fonts = parent.join("resources").join("fonts");
-                if portable_fonts.exists() {
-                    resolved_dir = Some(portable_fonts);
-                }
-            }
-        }
-    }
-    if resolved_dir.is_none() {
-        if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
-            let dev_path = std::path::Path::new(&manifest_dir).join("resources/fonts");
-            if dev_path.exists() {
-                resolved_dir = Some(dev_path);
-            }
-        }
-    }
-
-    if let Some(dir) = resolved_dir {
-        for ext in ["ttf", "otf"] {
-            let p = dir.join(format!("{}.{}", font_name, ext));
-            if p.exists() {
-                return Some(p);
             }
         }
     }
@@ -1210,6 +1245,18 @@ mod tests {
     }
 
     #[test]
+    fn reads_new_bundled_fonts_metrics() {
+        let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+        for font_file in &["JetBrainsMono.ttf", "Lora.ttf", "Montserrat.ttf"] {
+            let path = manifest_dir.join("resources/fonts").join(font_file);
+            assert!(path.exists(), "font file {} must exist in resources/fonts", font_file);
+            let (upem, ascent, descent) = read_font_metrics(&path).expect(&format!("bundled {} should parse", font_file));
+            assert!(upem > 0, "upem must be positive for {}", font_file);
+            assert!(ascent + descent > 0, "total height must be positive for {}", font_file);
+        }
+    }
+
+    #[test]
     fn hex_to_ass_color_conversion() {
         assert_eq!(hex_to_ass_color("#FF0000", 0), "&H000000FF&");
         assert_eq!(hex_to_ass_color("#0000FF", 0), "&H00FF0000&");
@@ -1743,26 +1790,7 @@ pub async fn run_hardsub_task(
         margin_lr
     );
 
-    let mut resolved_fonts_dir = app.path().resolve("resources/fonts", tauri::path::BaseDirectory::Resource).ok().filter(|p| p.exists());
-    if resolved_fonts_dir.is_none() {
-        if let Ok(exe_path) = std::env::current_exe() {
-            if let Some(parent) = exe_path.parent() {
-                let portable_fonts = parent.join("resources").join("fonts");
-                if portable_fonts.exists() {
-                    resolved_fonts_dir = Some(portable_fonts);
-                }
-            }
-        }
-    }
-    if resolved_fonts_dir.is_none() {
-        if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
-            let dev_path = std::path::Path::new(&manifest_dir).join("resources/fonts");
-            if dev_path.exists() {
-                resolved_fonts_dir = Some(dev_path);
-            }
-        }
-    }
-
+    let resolved_fonts_dir = get_bundled_fonts_dir(&app);
     let fonts_dir_opt = if let Some(path) = resolved_fonts_dir {
         let escaped_fonts_dir = escape_ffmpeg_filter_path(&path.to_string_lossy());
         format!(":fontsdir='{}'", escaped_fonts_dir)

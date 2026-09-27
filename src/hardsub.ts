@@ -1,5 +1,5 @@
-import { t, firstStrongDirection, applyTextDirection, applyContentDirection, clearContentDirection, isolateDirection, isolateLtr } from './i18n/index';
-import { spanOrigins, assRunOrder, protectRtlPunctuation, calculateSubtitleBoxGeometry } from './hardsubLayout';
+import { t, getLanguage, isRtlLanguage, firstStrongDirection, applyTextDirection, applyContentDirection, clearContentDirection, isolateDirection, isolateLtr } from './i18n/index';
+import { spanOrigins, assRunOrder, protectRtlPunctuation, calculateSubtitleBoxGeometry, hasArabicScript, isArabicScriptFont, resolveEffectiveFont } from './hardsubLayout';
 
 const invoke = async <T>(cmd: string, args: Record<string, any> = {}): Promise<T> => {
   const tauri = (window as any).__TAURI__;
@@ -1066,9 +1066,21 @@ export class HardsubController {
     descentRatio: 0.22,
   };
 
+  public getSmartDefaultFont(): string {
+    try {
+      if (isRtlLanguage(getLanguage())) {
+        return 'Vazirmatn';
+      }
+    } catch {
+      // ignore
+    }
+    return 'Inter';
+  }
+
   constructor() {
     const init = () => {
       if (this.disposed) return;
+      this.state.fontName = this.getSmartDefaultFont();
       this.initDOMElements();
       [
         this.fontSizeSlider,
@@ -1297,7 +1309,9 @@ export class HardsubController {
 
         this.fontSelect.appendChild(bundledGroup);
         this.fontSelect.appendChild(systemGroup);
-        this.fontSelect.value = 'Vazirmatn';
+        const targetFont = this.state.fontName || this.getSmartDefaultFont();
+        this.state.fontName = targetFont;
+        this.fontSelect.value = targetFont;
       }
     } catch (e) {
       console.warn('Failed to load system fonts:', e);
@@ -1458,8 +1472,10 @@ export class HardsubController {
 
   private async refreshFontRenderScale() {
     try {
+      const allCuesText = this.subtitleCues ? this.subtitleCues.map((c) => c.text).join(' ') : '';
+      const targetFont = resolveEffectiveFont(this.state.fontName, allCuesText);
       this.fontMetrics = await invoke<{ scale: number; ascentRatio: number; descentRatio: number }>('get_font_render_scale', {
-        fontName: this.state.fontName,
+        fontName: targetFont,
         bold: this.state.bold,
         italic: this.state.italic,
       });
@@ -3773,6 +3789,14 @@ export class HardsubController {
       const lastDot = subPath.lastIndexOf('.');
       const ext = lastDot > 0 ? subPath.substring(lastDot + 1).toLowerCase() : 'srt';
       this.subtitleCues = parseSubtitleContent(content, ext);
+      const allText = this.subtitleCues.map((c) => c.text).join(' ');
+      if (hasArabicScript(allText) && !isArabicScriptFont(this.state.fontName)) {
+        this.state.fontName = 'Vazirmatn';
+        if (this.fontSelect) {
+          this.fontSelect.value = 'Vazirmatn';
+        }
+      }
+      await this.refreshFontRenderScale();
       this.maxCueDuration = this.subtitleCues.reduce((max, c) => Math.max(max, c.endMs - c.startMs), 0);
       this.isSubtitlesModified = false;
       this._lastRenderKey = '';
@@ -4035,6 +4059,14 @@ export class HardsubController {
           const lastDot = candidatePath.lastIndexOf('.');
           const ext = lastDot > 0 ? candidatePath.substring(lastDot + 1).toLowerCase() : 'srt';
           this.subtitleCues = parseSubtitleContent(content, ext);
+          const allText = this.subtitleCues.map((c) => c.text).join(' ');
+          if (hasArabicScript(allText) && !isArabicScriptFont(this.state.fontName)) {
+            this.state.fontName = 'Vazirmatn';
+            if (this.fontSelect) {
+              this.fontSelect.value = 'Vazirmatn';
+            }
+          }
+          await this.refreshFontRenderScale();
           this.maxCueDuration = this.subtitleCues.reduce((max, c) => Math.max(max, c.endMs - c.startMs), 0);
           this.isSubtitlesModified = false;
           this._lastRenderKey = '';
@@ -4295,6 +4327,8 @@ export class HardsubController {
         alignment: textAlignmentStr,
         bgBoxRadius: this.state.bgBoxRadius,
         scaleFactor,
+        textAscent,
+        textDescent,
       });
 
       ctx.save();
@@ -4528,7 +4562,9 @@ export class HardsubController {
     // All coordinates and sizing are written in the 288p script coordinate space (scaleFactor = 1)
     const scaleFactor = 1;
 
-    const safeFontName = this.state.fontName === 'Inter' ? 'Inter 24pt' : this.state.fontName.replace(/,/g, '').replace(/['"]/g, '');
+    const allCuesText = this.subtitleCues.map((c) => c.text).join(' ');
+    const effectiveFont = resolveEffectiveFont(this.state.fontName, allCuesText);
+    const safeFontName = effectiveFont === 'Inter' ? 'Inter 24pt' : effectiveFont.replace(/,/g, '').replace(/['"]/g, '');
     const assPrimary = hexToAssColorAndAlpha(this.state.primaryColor, 100);
     const assOutline = hexToAssColorAndAlpha(this.state.outlineColor, 100);
     const assBg = hexToAssColorAndAlpha(this.state.bgBoxColor, this.state.bgBoxOpacity);
@@ -4587,11 +4623,11 @@ export class HardsubController {
         // Wrap spans to fit within maxTextWidth
         const wrappedLines: TextSpan[][] = [];
         for (const parsed of parsedLines) {
-          const lineWrapped = wrapSpans(parsed.spans, maxTextWidth, tempCtx, this.state.fontName, this.state.fontSize);
+          const lineWrapped = wrapSpans(parsed.spans, maxTextWidth, tempCtx, effectiveFont, this.state.fontSize);
           wrappedLines.push(...lineWrapped);
         }
 
-        const lineMetrics = wrappedLines.map((line) => measureSpansWidth(tempCtx, line, this.state.fontName, this.state.fontSize));
+        const lineMetrics = wrappedLines.map((line) => measureSpansWidth(tempCtx, line, effectiveFont, this.state.fontSize));
         const maxLineWidth = Math.max(...lineMetrics, 0);
 
         let X = 0;
@@ -4633,6 +4669,8 @@ export class HardsubController {
             alignment: alignmentStr,
             bgBoxRadius: this.state.bgBoxRadius,
             scaleFactor,
+            textAscent,
+            textDescent,
           });
 
           let x = 0;

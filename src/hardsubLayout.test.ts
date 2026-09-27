@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { spanOrigins, assRunOrder, protectRtlPunctuation, calculateSubtitleBoxGeometry } from './hardsubLayout';
+import {
+  spanOrigins,
+  assRunOrder,
+  protectRtlPunctuation,
+  calculateSubtitleBoxGeometry,
+  hasArabicScript,
+  isArabicScriptFont,
+  resolveEffectiveFont,
+} from './hardsubLayout';
 
 /**
  * The canvas preview draws a cue line one style run at a time, so this function
@@ -235,5 +243,63 @@ describe('calculateSubtitleBoxGeometry', () => {
     expect(geo.radius).toBeLessThanOrEqual(geo.boxHeight / 2);
     expect(geo.radius).toBeLessThanOrEqual(geo.boxWidth / 2);
   });
+
+  it('uses precise textAscent and textDescent when provided for symmetrical padding', () => {
+    const geo = calculateSubtitleBoxGeometry({
+      firstBaselineY: 100,
+      lastBaselineY: 100,
+      maxLineWidth: 200,
+      fontSize: 16,
+      anchorX: 100,
+      alignment: 'center',
+      bgBoxRadius: 0,
+      textAscent: 17.5,
+      textDescent: 8.5,
+    });
+
+    // PaddingV is 6px by default (scaleFactor = 1)
+    expect(geo.boxY).toBe(100 - 17.5 - 6);
+    expect(geo.boxY + geo.boxHeight).toBe(100 + 8.5 + 6);
+    expect(geo.boxHeight).toBe(17.5 + 8.5 + 12);
+  });
 });
+
+describe('hasArabicScript', () => {
+  it('detects Persian and Arabic text correctly', () => {
+    expect(hasArabicScript('مواد شیمیایی آزاد می‌کند')).toBe(true);
+    expect(hasArabicScript('سلام دنیا!')).toBe(true);
+    expect(hasArabicScript('Hello world!')).toBe(false);
+    expect(hasArabicScript('12345')).toBe(false);
+    expect(hasArabicScript('')).toBe(false);
+  });
+});
+
+describe('isArabicScriptFont', () => {
+  it('correctly classifies Arabic-supporting and Latin-only fonts', () => {
+    expect(isArabicScriptFont('Vazirmatn')).toBe(true);
+    expect(isArabicScriptFont('Shabnam')).toBe(true);
+    expect(isArabicScriptFont('Samim')).toBe(true);
+    expect(isArabicScriptFont('Sahel')).toBe(true);
+    expect(isArabicScriptFont('Inter')).toBe(false);
+    expect(isArabicScriptFont('Outfit')).toBe(false);
+    expect(isArabicScriptFont('Roboto')).toBe(false);
+    expect(isArabicScriptFont('JetBrains Mono')).toBe(false);
+  });
+});
+
+describe('resolveEffectiveFont', () => {
+  it('falls back to Vazirmatn if Persian text is used with a Latin-only font', () => {
+    expect(resolveEffectiveFont('Outfit', 'مواد شیمیایی آزاد می‌کند')).toBe('Vazirmatn');
+    expect(resolveEffectiveFont('Inter', 'سلام')).toBe('Vazirmatn');
+    expect(resolveEffectiveFont('JetBrains Mono', 'تست')).toBe('Vazirmatn');
+  });
+
+  it('keeps original font if text is English or font already supports Arabic', () => {
+    expect(resolveEffectiveFont('Outfit', 'Despite what you may think')).toBe('Outfit');
+    expect(resolveEffectiveFont('JetBrains Mono', 'console.log("hello")')).toBe('JetBrains Mono');
+    expect(resolveEffectiveFont('Shabnam', 'سلام دنیا')).toBe('Shabnam');
+    expect(resolveEffectiveFont('Vazirmatn', 'سلام دنیا')).toBe('Vazirmatn');
+  });
+});
+
 

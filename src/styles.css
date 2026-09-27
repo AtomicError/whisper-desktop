@@ -57,6 +57,20 @@
   font-weight: normal;
   font-style: normal;
 }
+@font-face {
+  font-family: 'Lora';
+  src: url('./fonts/Lora.ttf') format('truetype');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Montserrat';
+  src: url('./fonts/Montserrat.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
 
 html {
   font-size: 16px;

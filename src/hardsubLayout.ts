@@ -121,6 +121,8 @@ export interface SubtitleBoxInput {
   alignment: 'left' | 'center' | 'right';
   bgBoxRadius: number;
   scaleFactor?: number;
+  textAscent?: number;
+  textDescent?: number;
 }
 
 /**
@@ -128,7 +130,7 @@ export interface SubtitleBoxInput {
  *
  * Ensures:
  * 1. Symmetrical top and bottom padding around text glyphs by anchoring to visual typography metrics
- *    (cap-height and descenders) rather than raw uncompensated font cell bounds.
+ *    (ascent and descent) rather than arbitrary uncompensated font cell bounds.
  * 2. Ample horizontal padding that dynamically clears the corner radius curve, preventing text
  *    from colliding with rounded corners.
  */
@@ -140,8 +142,10 @@ export function calculateSubtitleBoxGeometry(input: SubtitleBoxInput): SubtitleB
   const paddingH = Math.max(12 * scale, 6 * scale + radius * 0.5);
 
   const boxWidth = Math.round((input.maxLineWidth + paddingH * 2) * 100) / 100;
-  const boxTop = input.firstBaselineY - input.fontSize * 0.85 - paddingV;
-  const boxBottom = input.lastBaselineY + input.fontSize * 0.35 + paddingV;
+  const ascent = input.textAscent ?? input.fontSize * 0.85;
+  const descent = input.textDescent ?? input.fontSize * 0.35;
+  const boxTop = input.firstBaselineY - ascent - paddingV;
+  const boxBottom = input.lastBaselineY + descent + paddingV;
   const boxHeight = Math.round((boxBottom - boxTop) * 100) / 100;
   const boxY = Math.round(boxTop * 100) / 100;
 
@@ -166,5 +170,34 @@ export function calculateSubtitleBoxGeometry(input: SubtitleBoxInput): SubtitleB
     paddingH,
     paddingV,
   };
+}
+
+/**
+ * Detects if a text contains Arabic/Persian Unicode characters.
+ */
+export function hasArabicScript(text: string): boolean {
+  return /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/u.test(text);
+}
+
+/**
+ * Checks if a font name is a font designed for Arabic/Persian script.
+ */
+export function isArabicScriptFont(fontName: string): boolean {
+  const arabicFonts = ['vazirmatn', 'vazir', 'shabnam', 'samim', 'sahel'];
+  const clean = fontName.trim().toLowerCase();
+  return arabicFonts.some((f) => clean.includes(f));
+}
+
+/**
+ * Resolves the effective font for rendering and metrics calculation.
+ * If text contains Arabic/Persian script and the chosen font does not support it,
+ * automatically falls back to 'Vazirmatn' to prevent desynced background boxes
+ * caused by uncontrollable renderer fallback.
+ */
+export function resolveEffectiveFont(selectedFont: string, text: string): string {
+  if (hasArabicScript(text) && !isArabicScriptFont(selectedFont)) {
+    return 'Vazirmatn';
+  }
+  return selectedFont;
 }
 

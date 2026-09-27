@@ -200,9 +200,11 @@ function fixture() {
   });
   const hwSelect = new Control();
   const codecSelect = new Control();
+  const fontSelect = new Control();
   doc.elements.set('hardsub-hw', hwSelect);
   doc.elements.set('hardsub-codec', codecSelect);
-  Object.assign(internal, { hwSelect, codecSelect });
+  doc.elements.set('hardsub-font', fontSelect);
+  Object.assign(internal, { hwSelect, codecSelect, fontSelect });
   Object.assign(internal, { previewCancelBtn: cancel, previewRetryBtn: retry });
   internal.setupVideoPlayerEvents();
   const load = async (active = true) => {
@@ -212,7 +214,7 @@ function fixture() {
     if (active) controller.setPageActive(true);
     video.pause.mockClear();
   };
-  return { controller, video, slider, play, iconPlay, iconPause, label, badge, time, container, internal, load, cancel, retry, outputDirText, btnBrowseDir, btnResetDir, btnOpenFolder, telemetryBox, volumeWrapper, volumeBtn, volumeSlider, btnClearVideo, btnClearSub, btnResetAll, fullscreenBtn, iconFsEnter, iconFsExit };
+  return { controller, video, slider, play, iconPlay, iconPause, label, badge, time, container, internal, load, cancel, retry, outputDirText, btnBrowseDir, btnResetDir, btnOpenFolder, telemetryBox, volumeWrapper, volumeBtn, volumeSlider, btnClearVideo, btnClearSub, btnResetAll, fullscreenBtn, iconFsEnter, iconFsExit, fontSelect };
 }
 
 beforeAll(async () => {
@@ -1370,6 +1372,62 @@ describe('hardsub output directory management', () => {
 
       const codecValues = codecSelect.children.map((c: any) => c.value);
       expect(codecValues).toEqual(['h264', 'h265', 'av1', 'vp9', 'prores']);
+    });
+  });
+
+  describe('bundled fonts management and smart defaults', () => {
+    it('returns Vazirmatn for Persian/Arabic language and Inter for other languages', () => {
+      const { controller } = fixture();
+      // By default in test environment language is 'en'
+      expect(controller.getSmartDefaultFont()).toBe('Inter');
+    });
+
+    it('populates bundled fonts with English fonts first and then Persian fonts', async () => {
+      const { internal, fontSelect } = fixture();
+      const mockFonts = [
+        { name: 'Inter', source: 'bundled' },
+        { name: 'Roboto', source: 'bundled' },
+        { name: 'Outfit', source: 'bundled' },
+        { name: 'JetBrains Mono', source: 'bundled' },
+        { name: 'Lora', source: 'bundled' },
+        { name: 'Montserrat', source: 'bundled' },
+        { name: 'Vazirmatn', source: 'bundled' },
+        { name: 'Shabnam', source: 'bundled' },
+        { name: 'Samim', source: 'bundled' },
+        { name: 'Sahel', source: 'bundled' },
+        { name: 'Arial', source: 'system' },
+      ];
+
+      invoke.mockImplementation(async (command: string) => {
+        if (command === 'get_system_fonts') return mockFonts;
+        if (command === 'check_hardware_encoders') return { hasQsv: false, hasNvenc: false, hasVaapi: false, hasVideotoolbox: false };
+        if (command === 'get_font_render_scale') return { scale: 1.0, ascentRatio: 0.78, descentRatio: 0.22 };
+        return undefined;
+      });
+
+      await (internal as any).loadFontsAndHardware();
+
+      // Check optgroups
+      expect(fontSelect.children.length).toBe(2);
+      const bundledGroup = fontSelect.children[0];
+      const systemGroup = fontSelect.children[1];
+
+      const bundledNames = bundledGroup.children.map((c: any) => c.value);
+      expect(bundledNames).toEqual([
+        'Inter',
+        'Roboto',
+        'Outfit',
+        'JetBrains Mono',
+        'Lora',
+        'Montserrat',
+        'Vazirmatn',
+        'Shabnam',
+        'Samim',
+        'Sahel',
+      ]);
+
+      const systemNames = systemGroup.children.map((c: any) => c.value);
+      expect(systemNames).toEqual(['Arial']);
     });
   });
 });
