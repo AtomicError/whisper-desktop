@@ -1,5 +1,5 @@
 import { t, getLanguage, isRtlLanguage, firstStrongDirection, applyTextDirection, applyContentDirection, clearContentDirection, isolateDirection, isolateLtr } from './i18n/index';
-import { spanOrigins, assRunOrder, protectRtlPunctuation, calculateSubtitleBoxGeometry, hasArabicScript, isArabicScriptFont, resolveEffectiveFont } from './hardsubLayout';
+import { spanOrigins, assRunOrder, protectRtlPunctuation, calculateSubtitleBoxGeometry, hasArabicScript, isArabicScriptFont, resolveEffectiveFont, toAssFontName } from './hardsubLayout';
 
 const invoke = async <T>(cmd: string, args: Record<string, any> = {}): Promise<T> => {
   const tauri = (window as any).__TAURI__;
@@ -4564,7 +4564,7 @@ export class HardsubController {
 
     const allCuesText = this.subtitleCues.map((c) => c.text).join(' ');
     const effectiveFont = resolveEffectiveFont(this.state.fontName, allCuesText);
-    const safeFontName = effectiveFont === 'Inter' ? 'Inter 24pt' : effectiveFont.replace(/,/g, '').replace(/['"]/g, '');
+    const safeFontName = toAssFontName(effectiveFont);
     const assPrimary = hexToAssColorAndAlpha(this.state.primaryColor, 100);
     const assOutline = hexToAssColorAndAlpha(this.state.outlineColor, 100);
     const assBg = hexToAssColorAndAlpha(this.state.bgBoxColor, this.state.bgBoxOpacity);

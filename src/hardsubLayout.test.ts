@@ -7,6 +7,7 @@ import {
   hasArabicScript,
   isArabicScriptFont,
   resolveEffectiveFont,
+  toAssFontName,
 } from './hardsubLayout';
 
 /**
@@ -301,5 +302,26 @@ describe('resolveEffectiveFont', () => {
     expect(resolveEffectiveFont('Vazirmatn', 'سلام دنیا')).toBe('Vazirmatn');
   });
 });
+
+describe('toAssFontName', () => {
+  it('maps fonts with internal OpenType naming quirks to their Name ID 1 family name', () => {
+    expect(toAssFontName('Inter')).toBe('Inter 24pt');
+    expect(toAssFontName('Montserrat')).toBe('Montserrat Thin');
+  });
+
+  it('preserves standard font names cleanly', () => {
+    expect(toAssFontName('Outfit')).toBe('Outfit');
+    expect(toAssFontName('JetBrains Mono')).toBe('JetBrains Mono');
+    expect(toAssFontName('Roboto')).toBe('Roboto');
+    expect(toAssFontName('Vazirmatn')).toBe('Vazirmatn');
+    expect(toAssFontName('Lora')).toBe('Lora');
+  });
+
+  it('cleans invalid characters', () => {
+    expect(toAssFontName('"Montserrat",')).toBe('Montserrat Thin');
+    expect(toAssFontName("'Inter'")).toBe('Inter 24pt');
+  });
+});
+
 
 

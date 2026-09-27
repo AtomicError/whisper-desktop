@@ -201,3 +201,19 @@ export function resolveEffectiveFont(selectedFont: string, text: string): string
   return selectedFont;
 }
 
+/**
+ * Maps display font names to their internal OpenType Font Family (Name ID 1)
+ * required by libass / Fontconfig.
+ */
+export function toAssFontName(fontName: string): string {
+  const clean = fontName.replace(/,/g, '').replace(/['"]/g, '').trim();
+  if (clean.toLowerCase() === 'inter') {
+    return 'Inter 24pt';
+  }
+  if (clean.toLowerCase() === 'montserrat') {
+    return 'Montserrat Thin';
+  }
+  return clean;
+}
+
+

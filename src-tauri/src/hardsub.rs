@@ -1750,6 +1750,8 @@ pub async fn run_hardsub_task(
         "Sans".to_string()
     } else if raw_safe_font.eq_ignore_ascii_case("Inter") {
         "Inter 24pt".to_string()
+    } else if raw_safe_font.eq_ignore_ascii_case("Montserrat") {
+        "Montserrat Thin".to_string()
     } else {
         raw_safe_font
     };
