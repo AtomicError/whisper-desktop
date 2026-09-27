@@ -1,5 +1,5 @@
 import { t, firstStrongDirection, applyTextDirection, applyContentDirection, clearContentDirection, isolateDirection, isolateLtr } from './i18n/index';
-import { spanOrigins, assRunOrder, protectRtlPunctuation } from './hardsubLayout';
+import { spanOrigins, assRunOrder, protectRtlPunctuation, calculateSubtitleBoxGeometry } from './hardsubLayout';
 
 const invoke = async <T>(cmd: string, args: Record<string, any> = {}): Promise<T> => {
   const tauri = (window as any).__TAURI__;
@@ -4213,22 +4213,22 @@ export class HardsubController {
         : anchorY + ((wrappedLines.length - 1) * lineHeight) / 2;
 
     if (this.state.bgBox && maxLineWidth > 0) {
-      const padding = 6 * scaleFactor;
-      const boxWidth = maxLineWidth + padding * 2;
-      const boxHeight = (lastBaselineY - firstBaselineY) + textAscent + textDescent + padding * 2;
-      const boxX = textAlignmentStr === 'center'
-        ? anchorX - boxWidth / 2
-        : textAlignmentStr === 'right'
-          ? anchorX - boxWidth
-          : anchorX - padding;
-      const boxY = firstBaselineY - textAscent - padding;
-      const radius = Math.min(this.state.bgBoxRadius * scaleFactor, boxWidth / 2, boxHeight / 2);
+      const box = calculateSubtitleBoxGeometry({
+        firstBaselineY,
+        lastBaselineY,
+        maxLineWidth,
+        fontSize: renderedFontSize,
+        anchorX,
+        alignment: textAlignmentStr,
+        bgBoxRadius: this.state.bgBoxRadius,
+        scaleFactor,
+      });
 
       ctx.save();
       ctx.fillStyle = this.state.bgBoxColor;
       ctx.globalAlpha = this.state.bgBoxOpacity / 100;
       ctx.beginPath();
-      ctx.roundRect(boxX, boxY, boxWidth, boxHeight, radius);
+      ctx.roundRect(box.boxX, box.boxY, box.boxWidth, box.boxHeight, box.radius);
       ctx.fill();
       ctx.restore();
     }
@@ -4549,23 +4549,30 @@ export class HardsubController {
           ? anchorY + ((wrappedLines.length - 1) * lineHeight) - textAscent
           : anchorY + ((wrappedLines.length - 1) * lineHeight) / 2;
 
-        const boxY = firstBaselineY - textAscent - padding;
-
         if (this.state.bgBox && maxLineWidth > 0) {
-          const boxWidth = maxLineWidth + padding * 2;
-          const boxHeight = (lastBaselineY - firstBaselineY) + textAscent + textDescent + padding * 2;
-          
+          const alignmentStr = cueIsLeftAss ? 'left' : cueIsRightAss ? 'right' : 'center';
+          const box = calculateSubtitleBoxGeometry({
+            firstBaselineY,
+            lastBaselineY,
+            maxLineWidth,
+            fontSize: this.state.fontSize,
+            anchorX: X,
+            alignment: alignmentStr,
+            bgBoxRadius: this.state.bgBoxRadius,
+            scaleFactor,
+          });
+
           let x = 0;
           if (cueIsLeftAss) {
-            x = -padding;
+            x = -box.paddingH;
           } else if (cueIsRightAss) {
-            x = -boxWidth + padding;
+            x = -box.boxWidth + box.paddingH;
           } else {
-            x = -boxWidth / 2;
+            x = -box.boxWidth / 2;
           }
 
-          const drawingPath = generateRoundedRectASS(x, 0, boxWidth, boxHeight, this.state.bgBoxRadius * scaleFactor);
-          events += `Dialogue: 0,${startStr},${endStr},BoxStyle,,0,0,0,,{\\an7}{\\pos(${X},${boxY})}{\\p1}${drawingPath}{\\p0}\n`;
+          const drawingPath = generateRoundedRectASS(x, 0, box.boxWidth, box.boxHeight, box.radius);
+          events += `Dialogue: 0,${startStr},${endStr},BoxStyle,,0,0,0,,{\\an7}{\\pos(${X},${box.boxY})}{\\p1}${drawingPath}{\\p0}\n`;
         }
 
         wrappedLines.forEach((lineSpans, index) => {

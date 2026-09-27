@@ -101,3 +101,70 @@ export function protectRtlPunctuation(text: string, direction: 'rtl' | 'ltr'): s
   }
   return res;
 }
+
+export interface SubtitleBoxGeometry {
+  boxX: number;
+  boxY: number;
+  boxWidth: number;
+  boxHeight: number;
+  radius: number;
+  paddingH: number;
+  paddingV: number;
+}
+
+export interface SubtitleBoxInput {
+  firstBaselineY: number;
+  lastBaselineY: number;
+  maxLineWidth: number;
+  fontSize: number;
+  anchorX: number;
+  alignment: 'left' | 'center' | 'right';
+  bgBoxRadius: number;
+  scaleFactor?: number;
+}
+
+/**
+ * Computes balanced geometry for subtitle background boxes (both Canvas preview and ASS vector shape).
+ *
+ * Ensures:
+ * 1. Symmetrical top and bottom padding around text glyphs by anchoring to visual typography metrics
+ *    (cap-height and descenders) rather than raw uncompensated font cell bounds.
+ * 2. Ample horizontal padding that dynamically clears the corner radius curve, preventing text
+ *    from colliding with rounded corners.
+ */
+export function calculateSubtitleBoxGeometry(input: SubtitleBoxInput): SubtitleBoxGeometry {
+  const scale = input.scaleFactor ?? 1;
+  const paddingV = 6 * scale;
+  const radius = Math.max(0, input.bgBoxRadius * scale);
+  // Guarantee that horizontal padding always clears the corner radius curve with comfortable margin
+  const paddingH = Math.max(12 * scale, 6 * scale + radius * 0.5);
+
+  const boxWidth = Math.round((input.maxLineWidth + paddingH * 2) * 100) / 100;
+  const boxTop = input.firstBaselineY - input.fontSize * 0.85 - paddingV;
+  const boxBottom = input.lastBaselineY + input.fontSize * 0.35 + paddingV;
+  const boxHeight = Math.round((boxBottom - boxTop) * 100) / 100;
+  const boxY = Math.round(boxTop * 100) / 100;
+
+  let boxX = 0;
+  if (input.alignment === 'left') {
+    boxX = input.anchorX - paddingH;
+  } else if (input.alignment === 'right') {
+    boxX = input.anchorX - boxWidth + paddingH;
+  } else {
+    boxX = input.anchorX - boxWidth / 2;
+  }
+  boxX = Math.round(boxX * 100) / 100;
+
+  const clampedRadius = Math.min(radius, boxWidth / 2, boxHeight / 2);
+
+  return {
+    boxX,
+    boxY,
+    boxWidth,
+    boxHeight,
+    radius: clampedRadius,
+    paddingH,
+    paddingV,
+  };
+}
+

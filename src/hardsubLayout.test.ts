@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { spanOrigins, assRunOrder, protectRtlPunctuation } from './hardsubLayout';
+import { spanOrigins, assRunOrder, protectRtlPunctuation, calculateSubtitleBoxGeometry } from './hardsubLayout';
 
 /**
  * The canvas preview draws a cue line one style run at a time, so this function
@@ -132,3 +132,108 @@ describe('protectRtlPunctuation', () => {
     expect(protectRtlPunctuation('', 'ltr')).toBe('');
   });
 });
+
+describe('calculateSubtitleBoxGeometry', () => {
+  it('computes balanced top and bottom padding around text baseline', () => {
+    const geo = calculateSubtitleBoxGeometry({
+      firstBaselineY: 200,
+      lastBaselineY: 200,
+      maxLineWidth: 250,
+      fontSize: 16,
+      anchorX: 256,
+      alignment: 'center',
+      bgBoxRadius: 0,
+      scaleFactor: 1,
+    });
+
+    // boxTop = 200 - 16 * 0.85 - 6 = 200 - 13.6 - 6 = 180.4
+    expect(geo.boxY).toBe(180.4);
+    // boxBottom = 200 + 16 * 0.35 + 6 = 200 + 5.6 + 6 = 211.6
+    // boxHeight = 211.6 - 180.4 = 31.2
+    expect(geo.boxHeight).toBe(31.2);
+    // Equal clearance for cap-height (~11.5px) and descender (~3.5px)
+    expect(200 - geo.boxY).toBeCloseTo(19.6, 1);
+    expect((geo.boxY + geo.boxHeight) - 200).toBeCloseTo(11.6, 1);
+  });
+
+  it('dynamically increases horizontal padding when corner radius increases to prevent text collisions', () => {
+    const rectGeo = calculateSubtitleBoxGeometry({
+      firstBaselineY: 100,
+      lastBaselineY: 100,
+      maxLineWidth: 300,
+      fontSize: 16,
+      anchorX: 256,
+      alignment: 'center',
+      bgBoxRadius: 0,
+    });
+    // Default base horizontal padding is 12px
+    expect(rectGeo.paddingH).toBe(12);
+    expect(rectGeo.boxWidth).toBe(324);
+
+    const roundedGeo = calculateSubtitleBoxGeometry({
+      firstBaselineY: 100,
+      lastBaselineY: 100,
+      maxLineWidth: 300,
+      fontSize: 16,
+      anchorX: 256,
+      alignment: 'center',
+      bgBoxRadius: 16,
+    });
+    // 6 + 16 * 0.5 = 14px padding to guarantee text never hits the corner curve
+    expect(roundedGeo.paddingH).toBe(14);
+    expect(roundedGeo.boxWidth).toBe(328);
+    // Clamped to half of box height (31.2 / 2 = 15.6) to prevent border distortion
+    expect(roundedGeo.radius).toBe(15.6);
+  });
+
+  it('correctly aligns horizontal position for center, left, and right alignments', () => {
+    const baseInput = {
+      firstBaselineY: 100,
+      lastBaselineY: 100,
+      maxLineWidth: 200,
+      fontSize: 16,
+      anchorX: 100,
+      bgBoxRadius: 0,
+    };
+
+    const center = calculateSubtitleBoxGeometry({ ...baseInput, alignment: 'center' });
+    expect(center.boxX).toBe(100 - center.boxWidth / 2);
+
+    const left = calculateSubtitleBoxGeometry({ ...baseInput, alignment: 'left' });
+    expect(left.boxX).toBe(100 - center.paddingH);
+
+    const right = calculateSubtitleBoxGeometry({ ...baseInput, alignment: 'right' });
+    expect(right.boxX).toBe(100 - center.boxWidth + center.paddingH);
+  });
+
+  it('correctly covers multi-line captions from first baseline to last baseline', () => {
+    const geo = calculateSubtitleBoxGeometry({
+      firstBaselineY: 180,
+      lastBaselineY: 220, // 2-3 lines span 40px
+      maxLineWidth: 150,
+      fontSize: 16,
+      anchorX: 81,
+      alignment: 'center',
+      bgBoxRadius: 8,
+    });
+
+    expect(geo.boxY).toBeCloseTo(180 - 16 * 0.85 - 6, 2);
+    expect(geo.boxY + geo.boxHeight).toBeCloseTo(220 + 16 * 0.35 + 6, 2);
+  });
+
+  it('clamps corner radius so it cannot exceed half the box height or width', () => {
+    const geo = calculateSubtitleBoxGeometry({
+      firstBaselineY: 100,
+      lastBaselineY: 100,
+      maxLineWidth: 50,
+      fontSize: 10,
+      anchorX: 100,
+      alignment: 'center',
+      bgBoxRadius: 50, // excessively large radius
+    });
+
+    expect(geo.radius).toBeLessThanOrEqual(geo.boxHeight / 2);
+    expect(geo.radius).toBeLessThanOrEqual(geo.boxWidth / 2);
+  });
+});
+
