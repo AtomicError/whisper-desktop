@@ -118,7 +118,15 @@ jobs:
           sudo gpg --dearmor -o /usr/share/keyrings/intel-openvino.gpg GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
           echo "deb [signed-by=/usr/share/keyrings/intel-openvino.gpg] https://apt.repos.intel.com/openvino ubuntu22 main" | sudo tee /etc/apt/sources.list.d/intel-openvino.list
           sudo apt-get update
-          sudo apt-get install -y libopenvino-dev-2024.2.0
+          sudo apt-get install -y \
+            libopenvino-dev-2024.2.0 \
+            libopenvino-intel-cpu-plugin-2024.2.0 \
+            libopenvino-intel-gpu-plugin-2024.2.0 \
+            libopenvino-intel-npu-plugin-2024.2.0 \
+            libopenvino-auto-plugin-2024.2.0 \
+            libopenvino-auto-batch-plugin-2024.2.0 \
+            libopenvino-hetero-plugin-2024.2.0 \
+            ocl-icd-libopencl1
 
       - name: Install Linux dependencies (Ubuntu ARM64)
         if: matrix.platform == 'ubuntu-24.04-arm'
@@ -179,7 +187,7 @@ jobs:
             openvino-libs/**
             cuda-dlls/**
             cuda-libs/**
-          key: whisper-bin-${{ matrix.platform }}-${{ matrix.arch }}-${{ steps.whisper_tag.outputs.tag }}-v7
+          key: whisper-bin-${{ matrix.platform }}-${{ matrix.arch }}-${{ steps.whisper_tag.outputs.tag }}-v8
 
       - name: Clone whisper.cpp
         if: steps.whisper-cache.outputs.cache-hit != 'true'
@@ -249,6 +257,7 @@ jobs:
 
           # Harvest OpenVINO runtime shared libraries from system
           find /usr/lib -name "libopenvino*.so*" -exec cp -d {} openvino-libs/ \; 2>/dev/null || true
+          find /usr/lib -name "cache.json" -exec cp -d {} openvino-libs/ \; 2>/dev/null || true
           find /usr/lib -name "libtbb*.so*" -exec cp -d {} openvino-libs/ \; 2>/dev/null || true
 
           # Harvest CUDA runtime shared libraries from system (cudart, cublas, cublasLt, nvJitLink)
@@ -268,6 +277,7 @@ jobs:
           cp -d whisper.cpp-src/build-vulkan/bin/libggml-vulkan.so whisper-bins/universal/ 2>/dev/null || true
           cp -d whisper.cpp-src/build-openvino/bin/libwhisper.so* whisper-bins/universal/ 2>/dev/null || true
           cp -d openvino-libs/*.so* whisper-bins/universal/ 2>/dev/null || true
+          cp -d openvino-libs/cache.json whisper-bins/universal/ 2>/dev/null || true
 
           # Populate CUDA Edition folder (CPU + Vulkan + CUDA)
           cp whisper.cpp-src/build-standard/bin/whisper-cli whisper-bins/cuda/whisper-cli-standard
@@ -372,6 +382,7 @@ jobs:
 
           # Copy OpenVINO & TBB runtime DLLs to dedicated cache folder
           Get-ChildItem -Path "$($openvinoDir.FullName)/runtime/bin/intel64/Release/*.dll" | Copy-Item -Destination openvino-dlls/ -Force
+          Get-ChildItem -Path "$($openvinoDir.FullName)/runtime/bin/intel64/Release/cache.json" -ErrorAction SilentlyContinue | Copy-Item -Destination openvino-dlls/ -Force
           Get-ChildItem -Path "$($openvinoDir.FullName)/runtime/3rdparty/tbb/bin/*.dll" -ErrorAction SilentlyContinue | Copy-Item -Destination openvino-dlls/ -Force
           Remove-Item -Recurse -Force "openvino.zip", "openvino-extracted"
 
