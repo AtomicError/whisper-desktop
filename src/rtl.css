@@ -512,3 +512,9 @@ html[dir="rtl"] .toast-tech-detail {
   direction: ltr !important;
 }
 
+html[dir="rtl"] .toast-tech-detail.toast-msg-rtl {
+  text-align: right !important;
+  direction: rtl !important;
+  font-family: inherit !important;
+}
+

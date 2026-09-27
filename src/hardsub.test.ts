@@ -1232,6 +1232,54 @@ describe('hardsub output directory management', () => {
       expect(container.classList.contains('player-fullscreen')).toBe(false);
       expect(doc.body.classList.contains('hardsub-fullscreen-active')).toBe(false);
     });
+
+    it('formatHardsubErrorMessage correctly translates structured error payloads', async () => {
+      const { internal } = fixture();
+
+      // Hardware unsupported
+      const hwErr = JSON.stringify({ errorType: 'hw_unsupported', codec: 'av1', hwAccel: 'qsv', exitCode: 218 });
+      const hwMsg = (internal as any).formatHardsubErrorMessage(hwErr);
+      expect(hwMsg).toContain('AV1');
+
+      // Disk full
+      const diskErr = JSON.stringify({ errorType: 'disk_full' });
+      const diskMsg = (internal as any).formatHardsubErrorMessage(diskErr);
+      expect(diskMsg.length).toBeGreaterThan(0);
+
+      // Permission denied
+      const permErr = JSON.stringify({ errorType: 'permission_denied' });
+      const permMsg = (internal as any).formatHardsubErrorMessage(permErr);
+      expect(permMsg.length).toBeGreaterThan(0);
+
+      // Corrupt input
+      const corruptErr = JSON.stringify({ errorType: 'corrupt_input' });
+      const corruptMsg = (internal as any).formatHardsubErrorMessage(corruptErr);
+      expect(corruptMsg.length).toBeGreaterThan(0);
+
+      // Subtitle filter
+      const subErr = JSON.stringify({ errorType: 'subtitle_filter' });
+      const subMsg = (internal as any).formatHardsubErrorMessage(subErr);
+      expect(subMsg.length).toBeGreaterThan(0);
+
+      // Out of memory
+      const oomErr = JSON.stringify({ errorType: 'out_of_memory' });
+      const oomMsg = (internal as any).formatHardsubErrorMessage(oomErr);
+      expect(oomMsg.length).toBeGreaterThan(0);
+
+      // Signal
+      const sigErr = JSON.stringify({ errorType: 'signal' });
+      const sigMsg = (internal as any).formatHardsubErrorMessage(sigErr);
+      expect(sigMsg.length).toBeGreaterThan(0);
+
+      // Generic error with code
+      const genErr = JSON.stringify({ errorType: 'generic', exitCode: 42 });
+      const genMsg = (internal as any).formatHardsubErrorMessage(genErr);
+      expect(genMsg).toContain('42');
+
+      // Fallback for non-JSON string
+      const plainMsg = (internal as any).formatHardsubErrorMessage('Simple plain error');
+      expect(plainMsg).toBe('Simple plain error');
+    });
   });
 });
 

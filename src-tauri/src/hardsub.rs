@@ -913,6 +913,155 @@ pub fn build_audio_encoder_flags(settings: &HardsubSettings) -> Vec<String> {
     args
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct HardsubErrorPayload {
+    pub error_type: String, // "hw_unsupported" | "disk_full" | "permission_denied" | "corrupt_input" | "subtitle_filter" | "out_of_memory" | "signal" | "generic"
+    pub codec: Option<String>,
+    pub hw_accel: Option<String>,
+    pub exit_code: Option<i32>,
+}
+
+/// Classifies FFmpeg failures into structured categories for localized UI messaging
+pub fn classify_ffmpeg_error(
+    exit_code: Option<i32>,
+    stderr_tail: &[String],
+    settings: &HardsubSettings,
+) -> HardsubErrorPayload {
+    let combined_stderr = stderr_tail.join(" ").to_lowercase();
+
+    // 1. Hardware acceleration unsupported
+    let is_hw_unsupported = settings.hw_accel != "cpu" && (
+        exit_code == Some(218) // -38 ENOSYS (Function not implemented) on Linux (e.g. av1_qsv / av1_vaapi)
+        || combined_stderr.contains("not supported by the qsv runtime")
+        || combined_stderr.contains("no usable encoding entrypoint")
+        || combined_stderr.contains("error while opening encoder")
+        || combined_stderr.contains("could not open encoder")
+        || combined_stderr.contains("device creation failed")
+        || combined_stderr.contains("failed to create vaapi device")
+        || combined_stderr.contains("unknown encoder")
+        || combined_stderr.contains("cannot open encoder")
+        || combined_stderr.contains("selected ratecontrol mode is unsupported")
+        || (combined_stderr.contains("unsupported") && combined_stderr.contains("encoder"))
+        || (combined_stderr.contains("function not implemented") && settings.hw_accel != "cpu")
+        || (combined_stderr.contains("failed to initialize") && settings.hw_accel != "cpu")
+        || combined_stderr.contains("driver does not support")
+        || combined_stderr.contains("no va display found")
+    );
+
+    if is_hw_unsupported {
+        return HardsubErrorPayload {
+            error_type: "hw_unsupported".to_string(),
+            codec: Some(settings.video_codec.clone()),
+            hw_accel: Some(settings.hw_accel.clone()),
+            exit_code,
+        };
+    }
+
+    // 2. Out of disk space
+    if combined_stderr.contains("no space left on device")
+        || combined_stderr.contains("disk full")
+        || combined_stderr.contains("not enough space")
+    {
+        return HardsubErrorPayload {
+            error_type: "disk_full".to_string(),
+            codec: None,
+            hw_accel: None,
+            exit_code,
+        };
+    }
+
+    // 3. Permission denied
+    if combined_stderr.contains("permission denied")
+        || combined_stderr.contains("access is denied")
+        || combined_stderr.contains("operation not permitted")
+    {
+        return HardsubErrorPayload {
+            error_type: "permission_denied".to_string(),
+            codec: None,
+            hw_accel: None,
+            exit_code,
+        };
+    }
+
+    // 4. Corrupt or invalid input video
+    if combined_stderr.contains("invalid data found when processing input")
+        || combined_stderr.contains("moov atom not found")
+        || combined_stderr.contains("ebml header parsing failed")
+        || combined_stderr.contains("could not find codec parameters")
+        || combined_stderr.contains("error while decoding stream")
+    {
+        return HardsubErrorPayload {
+            error_type: "corrupt_input".to_string(),
+            codec: None,
+            hw_accel: None,
+            exit_code,
+        };
+    }
+
+    // 5. Subtitle filter / Font rendering error
+    if combined_stderr.contains("fontconfig error")
+        || combined_stderr.contains("could not initialize libass")
+        || combined_stderr.contains("cannot load default config file")
+        || combined_stderr.contains("error initializing filter 'subtitles'")
+        || combined_stderr.contains("error initializing filter 'ass'")
+        || combined_stderr.contains("no fonts found")
+    {
+        return HardsubErrorPayload {
+            error_type: "subtitle_filter".to_string(),
+            codec: None,
+            hw_accel: None,
+            exit_code,
+        };
+    }
+
+    // 6. Out of memory
+    if combined_stderr.contains("cannot allocate memory")
+        || combined_stderr.contains("out of memory")
+        || exit_code == Some(137)
+    {
+        return HardsubErrorPayload {
+            error_type: "out_of_memory".to_string(),
+            codec: None,
+            hw_accel: None,
+            exit_code,
+        };
+    }
+
+    // 7. Terminated by signal (exit_code is None)
+    if exit_code.is_none() {
+        return HardsubErrorPayload {
+            error_type: "signal".to_string(),
+            codec: None,
+            hw_accel: None,
+            exit_code: None,
+        };
+    }
+
+    // 8. Generic FFmpeg failure
+    HardsubErrorPayload {
+        error_type: "generic".to_string(),
+        codec: None,
+        hw_accel: None,
+        exit_code,
+    }
+}
+
+/// Formats a classified JSON error payload from the FFmpeg stderr tail and process status
+pub fn format_ffmpeg_error(
+    exit_code: Option<i32>,
+    stderr_tail: &[String],
+    settings: &HardsubSettings,
+) -> String {
+    let payload = classify_ffmpeg_error(exit_code, stderr_tail, settings);
+    serde_json::to_string(&payload).unwrap_or_else(|_| {
+        format!(
+            "{{\"errorType\":\"generic\",\"exitCode\":{}}}",
+            exit_code.map(|c| c.to_string()).unwrap_or_else(|| "null".to_string())
+        )
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1129,6 +1278,85 @@ mod tests {
 
         settings.audio_codec = "copy".to_string();
         assert_eq!(build_audio_encoder_flags(&settings), vec!["-c:a", "copy"]);
+    }
+
+    #[test]
+    fn test_classify_ffmpeg_error_all_categories() {
+        let mut settings = HardsubSettings {
+            video_path: "test.mp4".to_string(),
+            subtitle_path: "test.ass".to_string(),
+            output_path: "out.mp4".to_string(),
+            output_format: "mp4".to_string(),
+            video_codec: "av1".to_string(),
+            hw_accel: "qsv".to_string(),
+            video_quality_mode: "preset".to_string(),
+            video_quality_preset: "balanced".to_string(),
+            video_quality_value: 28,
+            video_preset_speed: "medium".to_string(),
+            resolution_scale: "original".to_string(),
+            font_name: "Vazirmatn".to_string(),
+            font_size: 24,
+            primary_color: "#FFFFFF".to_string(),
+            outline_color: "#000000".to_string(),
+            outline_size: 2,
+            bg_box: false,
+            bg_box_color: "#000000".to_string(),
+            bg_box_opacity: 50,
+            bg_box_radius: 0,
+            position_y: 30,
+            width_margin: 90,
+            bold: true,
+            italic: false,
+            alignment: 2,
+            audio_codec: "aac".to_string(),
+            audio_bitrate: "192k".to_string(),
+        };
+
+        // 1. Hardware unsupported (QSV AV1)
+        let stderr_qsv = vec![
+            "[av1_qsv @ 0x123] some encoding parameters are not supported by the QSV runtime.".to_string(),
+            "[enc:av1_qsv @ 0x123] Error while opening encoder".to_string(),
+        ];
+        let p_hw = classify_ffmpeg_error(Some(218), &stderr_qsv, &settings);
+        assert_eq!(p_hw.error_type, "hw_unsupported");
+        assert_eq!(p_hw.codec.as_deref(), Some("av1"));
+        assert_eq!(p_hw.hw_accel.as_deref(), Some("qsv"));
+
+        let json_hw = format_ffmpeg_error(Some(218), &stderr_qsv, &settings);
+        assert!(json_hw.contains("\"errorType\":\"hw_unsupported\""));
+
+        // Switch to CPU for general errors
+        settings.hw_accel = "cpu".to_string();
+        settings.video_codec = "h264".to_string();
+
+        // 2. Out of disk space
+        let p_disk = classify_ffmpeg_error(Some(1), &["No space left on device".to_string()], &settings);
+        assert_eq!(p_disk.error_type, "disk_full");
+
+        // 3. Permission denied
+        let p_perm = classify_ffmpeg_error(Some(1), &["Permission denied: output.mp4".to_string()], &settings);
+        assert_eq!(p_perm.error_type, "permission_denied");
+
+        // 4. Corrupt input
+        let p_corrupt = classify_ffmpeg_error(Some(1), &["Invalid data found when processing input".to_string()], &settings);
+        assert_eq!(p_corrupt.error_type, "corrupt_input");
+
+        // 5. Subtitle filter / font error
+        let p_sub = classify_ffmpeg_error(Some(1), &["Fontconfig error: Cannot load default config file".to_string()], &settings);
+        assert_eq!(p_sub.error_type, "subtitle_filter");
+
+        // 6. Out of memory
+        let p_oom = classify_ffmpeg_error(Some(137), &["Cannot allocate memory".to_string()], &settings);
+        assert_eq!(p_oom.error_type, "out_of_memory");
+
+        // 7. Signal termination
+        let p_sig = classify_ffmpeg_error(None, &[], &settings);
+        assert_eq!(p_sig.error_type, "signal");
+
+        // 8. Generic error
+        let p_gen = classify_ffmpeg_error(Some(42), &["Unknown failure occurred".to_string()], &settings);
+        assert_eq!(p_gen.error_type, "generic");
+        assert_eq!(p_gen.exit_code, Some(42));
     }
 }
 
@@ -1575,6 +1803,7 @@ pub async fn run_hardsub_task(
 
     let mut stdout_done = false;
     let mut stderr_done = false;
+    let mut stderr_tail: std::collections::VecDeque<String> = std::collections::VecDeque::with_capacity(35);
 
     let mut current_speed = String::new();
     let mut current_fps = String::new();
@@ -1694,6 +1923,10 @@ pub async fn run_hardsub_task(
             res = crate::transcribe::next_line_lossy(&mut stderr_reader), if !stderr_done => {
                 match res {
                     Some(line) => {
+                        if stderr_tail.len() >= 30 {
+                            stderr_tail.pop_front();
+                        }
+                        stderr_tail.push_back(line.clone());
                         logs.log(&app, "FFmpeg", &line);
                     }
                     None => stderr_done = true,
@@ -1733,6 +1966,10 @@ pub async fn run_hardsub_task(
             return Err("Hardsubbing cancelled by user.".to_string());
         }
 
+        let stderr_lines: Vec<String> = stderr_tail.into_iter().collect();
+        let error_detail = format_ffmpeg_error(status.code(), &stderr_lines, &settings);
+        logs.log(&app, "Hardsub", &format!("Hardsub encoding failed: {}", error_detail));
+
         let _ = app.emit("hardsub-status", HardsubProgress {
             progress: 0.0,
             message: "Hardsubbing encoding failed.".to_string(),
@@ -1741,7 +1978,7 @@ pub async fn run_hardsub_task(
             speed: None,
             fps: None,
         });
-        return Err(format!("FFmpeg failed with exit code: {:?}", status.code()));
+        return Err(error_detail);
     }
 
     let duration_ms = start_time.elapsed().as_millis() as u64;

@@ -122,7 +122,13 @@ window.showNotification = function(message, type = 'info', customDuration = null
 
       const techDiv = document.createElement('div');
       techDiv.className = 'toast-tech-detail';
-      techDiv.setAttribute('dir', 'ltr');
+      const isRtl = /[\u0600-\u06FF]/.test(technical);
+      if (isRtl) {
+        techDiv.setAttribute('dir', 'rtl');
+        techDiv.classList.add('toast-msg-rtl');
+      } else {
+        techDiv.setAttribute('dir', 'ltr');
+      }
       techDiv.textContent = technical;
 
       msgEl.appendChild(titleDiv);

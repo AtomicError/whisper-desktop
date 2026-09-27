@@ -4866,18 +4866,56 @@ ${events}`;
           this.progressStatusText.textContent = t('hardsub.statusEncodingCancelled');
         }
       } else {
+        const errorText = this.formatHardsubErrorMessage(e);
         if ((window as any).showNotification) {
-          (window as any).showNotification(t('hardsub.encodingFailed', { error: String(e) }), "error");
+          (window as any).showNotification(t('hardsub.encodingFailed', { error: errorText }), "error");
         } else {
-          alert(t('hardsub.encodingFailed', { error: String(e) }));
+          alert(t('hardsub.encodingFailed', { error: errorText }));
         }
         if (this.progressStatusText) {
-          this.progressStatusText.textContent = t('hardsub.statusEncodingError', { error: String(e) });
+          this.progressStatusText.textContent = t('hardsub.statusEncodingError', { error: errorText });
         }
       }
     } finally {
       this.updateEncodingUIState(false);
     }
+  }
+
+  private formatHardsubErrorMessage(e: any): string {
+    const raw = String(e || '').trim();
+    try {
+      const payload = JSON.parse(raw);
+      if (payload && typeof payload === 'object' && payload.errorType) {
+        const codecLabel = (payload.codec || this.state.videoCodec || '').toUpperCase();
+        let hwLabel = payload.hwAccel || this.state.hwAccel || 'Hardware';
+        if (hwLabel === 'qsv') hwLabel = t('hardsub.hwQsv');
+        else if (hwLabel === 'nvenc') hwLabel = t('hardsub.hwNvenc');
+        else if (hwLabel === 'vaapi') hwLabel = t('hardsub.hwVaapi');
+        else if (hwLabel === 'videotoolbox') hwLabel = t('hardsub.hwVt');
+
+        switch (payload.errorType) {
+          case 'hw_unsupported':
+            return t('hardsub.errHwUnsupported', { codec: codecLabel, hw: hwLabel });
+          case 'disk_full':
+            return t('hardsub.errDiskFull');
+          case 'permission_denied':
+            return t('hardsub.errPermissionDenied');
+          case 'corrupt_input':
+            return t('hardsub.errCorruptInput');
+          case 'subtitle_filter':
+            return t('hardsub.errSubtitleFilter');
+          case 'out_of_memory':
+            return t('hardsub.errOutOfMemory');
+          case 'signal':
+            return t('hardsub.errSignalTerminated');
+          case 'generic':
+            return t('hardsub.errGenericEncode', { code: payload.exitCode ?? '?' });
+        }
+      }
+    } catch {
+      // Not JSON, continue with raw message
+    }
+    return raw;
   }
 }
 

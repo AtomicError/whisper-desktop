@@ -4047,6 +4047,14 @@ select.select-control {
   word-break: break-all;
 }
 
+.toast-tech-detail.toast-msg-rtl {
+  direction: rtl !important;
+  text-align: right !important;
+  font-family: inherit !important;
+  line-height: 1.6;
+  word-break: normal;
+}
+
 .toast-close-btn {
   background: transparent;
   border: none;
