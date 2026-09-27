@@ -8084,7 +8084,14 @@ html[dir="rtl"] .cat-match-badge {
 
 /* In fullscreen mode, isolate layout completely, remove heavy shadows, and scale video cleanly */
 #hardsub-player-container:fullscreen,
-#hardsub-player-container:-webkit-full-screen {
+#hardsub-player-container:-webkit-full-screen,
+#hardsub-player-container.player-fullscreen {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 999999 !important;
   border: none !important;
   border-radius: 0 !important;
   box-shadow: none !important;
@@ -8097,11 +8104,34 @@ html[dir="rtl"] .cat-match-badge {
 }
 
 #hardsub-player-container:fullscreen #hardsub-video-element,
-#hardsub-player-container:-webkit-full-screen #hardsub-video-element {
+#hardsub-player-container:-webkit-full-screen #hardsub-video-element,
+#hardsub-player-container.player-fullscreen #hardsub-video-element {
   max-height: 100% !important;
   max-width: 100% !important;
   width: 100% !important;
   height: 100% !important;
+}
+
+#hardsub-player-container:fullscreen #hardsub-video-placeholder,
+#hardsub-player-container:-webkit-full-screen #hardsub-video-placeholder,
+#hardsub-player-container.player-fullscreen #hardsub-video-placeholder {
+  max-height: 100% !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Hide titlebar and sidebar during hardsub in-app player fullscreen */
+body.hardsub-fullscreen-active .titlebar,
+body.hardsub-fullscreen-active sidebar {
+  display: none !important;
+}
+
+body.hardsub-fullscreen-active #app-container {
+  height: 100vh !important;
+  width: 100vw !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
 #hardsub-video-controls {

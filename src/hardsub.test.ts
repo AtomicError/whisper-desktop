@@ -77,6 +77,7 @@ class Media extends Control {
 class DocumentBoundary extends EventTarget {
   readyState = 'loading';
   activeElement: Control | null = null;
+  body = new Control();
   elements = new Map<string, Control>();
   getElementById = (id: string) => this.elements.get(id) ?? null;
   querySelectorAll = () => [];
@@ -136,6 +137,12 @@ function fixture() {
   doc.elements.set('btn-clear-hardsub-video', btnClearVideo);
   doc.elements.set('btn-clear-hardsub-sub', btnClearSub);
   doc.elements.set('btn-reset-hardsub-all', btnResetAll);
+  const fullscreenBtn = new Control();
+  const iconFsEnter = new Control();
+  const iconFsExit = new Control();
+  doc.elements.set('hardsub-btn-fullscreen', fullscreenBtn);
+  doc.elements.set('hardsub-icon-fs-enter', iconFsEnter);
+  doc.elements.set('hardsub-icon-fs-exit', iconFsExit);
 
   // Inject only event-capable DOM/media boundaries. Loading, seeking and rendering are real.
   const internal = controller as unknown as {
@@ -144,6 +151,7 @@ function fixture() {
     lblVideoName: Control; videoStatusBadge: Control; videoTimeDisplay: Control;
     previewCancelBtn: Control; previewRetryBtn: Control;
     volumeControlWrapper: Control; videoVolumeBtn: Control; videoVolumeSlider: Control;
+    videoFullscreenBtn: Control; videoIconFsEnter: Control; videoIconFsExit: Control;
     btnClearVideo: Control; btnClearSub: Control; btnResetAll: Control;
     freezeCanvas: { width: number; height: number; style: Record<string, string> };
     freezeCtx: { clearRect(): void; drawImage(): void };
@@ -162,6 +170,9 @@ function fixture() {
     openOutputFolder(): Promise<void>;
     phase: string;
     loadSubtitleFile(subPath: string): Promise<void>;
+    isPlayerFullscreen: boolean;
+    toggleFullscreen(): void;
+    exitPreviewFullscreen(): void;
   };
   const iconPlay = new Control();
   const iconPause = new Control();
@@ -170,6 +181,7 @@ function fixture() {
     videoIconPlay: iconPlay, videoIconPause: iconPause,
     outputDirText, btnBrowseDir, btnResetDir, btnOpenFolder, telemetryBox,
     volumeControlWrapper: volumeWrapper, videoVolumeBtn: volumeBtn, videoVolumeSlider: volumeSlider,
+    videoFullscreenBtn: fullscreenBtn, videoIconFsEnter: iconFsEnter, videoIconFsExit: iconFsExit,
     btnClearVideo, btnClearSub, btnResetAll,
   });
   Object.assign(internal, { previewCancelBtn: cancel, previewRetryBtn: retry });
@@ -181,7 +193,7 @@ function fixture() {
     if (active) controller.setPageActive(true);
     video.pause.mockClear();
   };
-  return { controller, video, slider, play, iconPlay, iconPause, label, badge, time, container, internal, load, cancel, retry, outputDirText, btnBrowseDir, btnResetDir, btnOpenFolder, telemetryBox, volumeWrapper, volumeBtn, volumeSlider, btnClearVideo, btnClearSub, btnResetAll };
+  return { controller, video, slider, play, iconPlay, iconPause, label, badge, time, container, internal, load, cancel, retry, outputDirText, btnBrowseDir, btnResetDir, btnOpenFolder, telemetryBox, volumeWrapper, volumeBtn, volumeSlider, btnClearVideo, btnClearSub, btnResetAll, fullscreenBtn, iconFsEnter, iconFsExit };
 }
 
 beforeAll(async () => {
@@ -1161,6 +1173,64 @@ describe('hardsub output directory management', () => {
       // State must remain clear
       expect(internal.state.subtitlePath).toBe('');
       expect(internal.subtitleCues.length).toBe(0);
+    });
+
+    it('toggles in-app player fullscreen and updates classes and icons', async () => {
+      const { controller, internal, container, fullscreenBtn, iconFsEnter, iconFsExit, load } = fixture();
+      await load();
+
+      // Before fullscreen
+      expect(internal.isPlayerFullscreen).toBe(false);
+      expect(container.classList.contains('player-fullscreen')).toBe(false);
+      expect(doc.body.classList.contains('hardsub-fullscreen-active')).toBe(false);
+
+      // Trigger fullscreen toggle
+      fullscreenBtn.dispatchEvent(new Event('click'));
+      expect(internal.isPlayerFullscreen).toBe(true);
+      expect(container.classList.contains('player-fullscreen')).toBe(true);
+      expect(doc.body.classList.contains('hardsub-fullscreen-active')).toBe(true);
+      expect(iconFsEnter.style.display).toBe('none');
+      expect(iconFsExit.style.display).toBe('block');
+
+      // Toggle again to exit
+      fullscreenBtn.dispatchEvent(new Event('click'));
+      expect(internal.isPlayerFullscreen).toBe(false);
+      expect(container.classList.contains('player-fullscreen')).toBe(false);
+      expect(doc.body.classList.contains('hardsub-fullscreen-active')).toBe(false);
+      expect(iconFsEnter.style.display).toBe('block');
+      expect(iconFsExit.style.display).toBe('none');
+    });
+
+    it('exits in-app player fullscreen when Escape key is pressed', async () => {
+      const { internal, container, fullscreenBtn, iconFsEnter, iconFsExit, load } = fixture();
+      await load();
+
+      fullscreenBtn.dispatchEvent(new Event('click'));
+      expect(internal.isPlayerFullscreen).toBe(true);
+      expect(container.classList.contains('player-fullscreen')).toBe(true);
+      expect(doc.body.classList.contains('hardsub-fullscreen-active')).toBe(true);
+
+      // Press Escape
+      key('Escape');
+      expect(internal.isPlayerFullscreen).toBe(false);
+      expect(container.classList.contains('player-fullscreen')).toBe(false);
+      expect(doc.body.classList.contains('hardsub-fullscreen-active')).toBe(false);
+      expect(iconFsEnter.style.display).toBe('block');
+      expect(iconFsExit.style.display).toBe('none');
+    });
+
+    it('exitPreviewFullscreen cleanly cleans up fullscreen state', async () => {
+      const { internal, container, fullscreenBtn, load } = fixture();
+      await load();
+
+      fullscreenBtn.dispatchEvent(new Event('click'));
+      expect(internal.isPlayerFullscreen).toBe(true);
+      expect(doc.body.classList.contains('hardsub-fullscreen-active')).toBe(true);
+
+      internal.exitPreviewFullscreen();
+      expect(internal.isPlayerFullscreen).toBe(false);
+      expect(container.classList.contains('player-fullscreen')).toBe(false);
+      expect(doc.body.classList.contains('hardsub-fullscreen-active')).toBe(false);
     });
   });
 });

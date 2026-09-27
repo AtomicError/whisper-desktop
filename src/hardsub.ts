@@ -728,6 +728,7 @@ export class HardsubController {
   private videoFullscreenBtn: HTMLButtonElement | null = null;
   private videoIconFsEnter: HTMLElement | null = null;
   private videoIconFsExit: HTMLElement | null = null;
+  private isPlayerFullscreen: boolean = false;
   private lastVolume: number = 1.0;
 
   // Player Volume HUD & Custom Viewport Controls
@@ -2471,7 +2472,7 @@ export class HardsubController {
     const ready = this.phase === 'ready';
     const busy = this.phase === 'loading' || this.phase === 'preparing';
     const recovery = this.phase === 'error' || this.phase === 'cancelled';
-    const actionsVisible = document.fullscreenElement?.id !== 'hardsub-player-container';
+    const actionsVisible = !this.isFullscreen();
     for (const control of [this.videoPlayBtn, this.videoSeekSlider, this.prevCueBtn, this.nextCueBtn]) {
       if (control) control.disabled = !ready;
     }
@@ -2811,14 +2812,14 @@ export class HardsubController {
 
     // Listen to Fullscreen changes
     this.on(document, 'fullscreenchange', () => {
-      const isFs = !!document.fullscreenElement;
-      if (this.videoIconFsEnter) this.videoIconFsEnter.style.display = isFs ? 'none' : 'block';
-      if (this.videoIconFsExit) this.videoIconFsExit.style.display = isFs ? 'block' : 'none';
-      this.renderPlayerPhase();
-      this.updateVideoPreviewOverlayBounds(false);
-      setTimeout(() => {
-        if (!this.disposed) this.updateVideoPreviewOverlayBounds(true);
-      }, 100);
+      this.onFullscreenStateChanged(this.isFullscreen());
+    });
+
+    // Support Escape key to exit player fullscreen
+    this.on(document, 'keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && this.isFullscreen()) {
+        this.exitPreviewFullscreen();
+      }
     });
 
     // Auto-hide controls inside player container on mouse inactivity (especially for fullscreen)
@@ -2835,7 +2836,7 @@ export class HardsubController {
         const isHoveringControls = controls.matches(':hover');
         if (this.videoElement && !this.videoElement.paused && !isHoveringControls) {
           controls.classList.remove('show-controls');
-          if (document.fullscreenElement && container) {
+          if (this.isFullscreen() && container) {
             container.style.cursor = 'none';
           }
         }
@@ -3287,18 +3288,48 @@ export class HardsubController {
     }
   }
 
+  private isFullscreen(): boolean {
+    return this.isPlayerFullscreen || !!document.fullscreenElement;
+  }
+
   private toggleFullscreen() {
     if (!this.canInteractWithVideo()) return;
     const container = document.getElementById('hardsub-player-container');
     if (!container) return;
 
-    if (!document.fullscreenElement) {
-      container.requestFullscreen().catch((err) => {
-        console.warn('Error entering fullscreen:', err);
-      });
+    if (!this.isFullscreen()) {
+      this.isPlayerFullscreen = true;
+      container.classList.add('player-fullscreen');
+      document.body?.classList.add('hardsub-fullscreen-active');
+
+      try {
+        const tauri = (window as any).__TAURI__;
+        if (tauri && tauri.window && tauri.window.getCurrentWindow) {
+          void tauri.window.getCurrentWindow().setFullscreen(true).catch((err: unknown) => {
+            console.warn('Tauri window setFullscreen failed:', err);
+          });
+        }
+      } catch (err) {
+        console.warn('Tauri window setFullscreen error:', err);
+      }
+
+      this.onFullscreenStateChanged(true);
     } else {
-      document.exitFullscreen();
+      this.exitPreviewFullscreen();
     }
+  }
+
+  private onFullscreenStateChanged(isFs: boolean): void {
+    if (this.videoIconFsEnter) this.videoIconFsEnter.style.display = isFs ? 'none' : 'block';
+    if (this.videoIconFsExit) this.videoIconFsExit.style.display = isFs ? 'block' : 'none';
+    this.renderPlayerPhase();
+    this.updateVideoPreviewOverlayBounds(false);
+    setTimeout(() => {
+      if (!this.disposed) this.updateVideoPreviewOverlayBounds(true);
+    }, 50);
+    setTimeout(() => {
+      if (!this.disposed) this.updateVideoPreviewOverlayBounds(true);
+    }, 150);
   }
 
   private showVolumeHUD(volume: number, muted: boolean) {
@@ -3536,11 +3567,34 @@ export class HardsubController {
   }
 
   private exitPreviewFullscreen(): void {
-    if (document.fullscreenElement?.id === 'hardsub-player-container') {
-      void document.exitFullscreen().then(() => {
-        if (!this.disposed) this.renderPlayerPhase();
-      }).catch(() => {});
+    const container = document.getElementById('hardsub-player-container');
+    const wasFs = this.isFullscreen();
+    if (!wasFs && (!container || !container.classList.contains('player-fullscreen'))) return;
+
+    this.isPlayerFullscreen = false;
+    if (container) {
+      container.classList.remove('player-fullscreen');
     }
+    document.body?.classList.remove('hardsub-fullscreen-active');
+
+    try {
+      const tauri = (window as any).__TAURI__;
+      if (tauri && tauri.window && tauri.window.getCurrentWindow) {
+        void tauri.window.getCurrentWindow().setFullscreen(false).catch((err: unknown) => {
+          console.warn('Tauri window restore setFullscreen failed:', err);
+        });
+      }
+    } catch (err) {
+      console.warn('Tauri window restore setFullscreen error:', err);
+    }
+
+    if (document.fullscreenElement) {
+      try {
+        void document.exitFullscreen().catch(() => {});
+      } catch (_) {}
+    }
+
+    this.onFullscreenStateChanged(false);
   }
 
   private async releasePreview(): Promise<void> {
