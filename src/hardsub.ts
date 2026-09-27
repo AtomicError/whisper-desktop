@@ -57,6 +57,10 @@ export interface HardwareStatus {
   hasNvenc: boolean;
   hasVaapi: boolean;
   hasVideotoolbox: boolean;
+  qsvCodecs?: string[];
+  nvencCodecs?: string[];
+  vaapiCodecs?: string[];
+  videotoolboxCodecs?: string[];
 }
 
 export interface HardsubSettings {
@@ -1417,7 +1421,22 @@ export class HardsubController {
       ],
     };
 
-    const options = codecDefinitions[hw] || codecDefinitions.cpu;
+    let options = codecDefinitions[hw] || codecDefinitions.cpu;
+    if (this.cachedHwStatus && hw !== 'cpu') {
+      let allowedCodecs: string[] | undefined;
+      if (hw === 'qsv') allowedCodecs = this.cachedHwStatus.qsvCodecs;
+      else if (hw === 'nvenc') allowedCodecs = this.cachedHwStatus.nvencCodecs;
+      else if (hw === 'vaapi') allowedCodecs = this.cachedHwStatus.vaapiCodecs;
+      else if (hw === 'videotoolbox') allowedCodecs = this.cachedHwStatus.videotoolboxCodecs;
+
+      if (allowedCodecs && allowedCodecs.length > 0) {
+        const filtered = options.filter((opt) => allowedCodecs!.includes(opt.value));
+        if (filtered.length > 0) {
+          options = filtered;
+        }
+      }
+    }
+
     const currentCodec = this.state.videoCodec;
 
     this.codecSelect.innerHTML = '';

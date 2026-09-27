@@ -434,30 +434,50 @@ pub fn apply_linux_media_env_tokio(cmd: &mut tokio::process::Command) {
     }
 }
 
-#[derive(serde::Serialize, Clone, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, Default, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct HardwareEncodersStatus {
     pub has_qsv: bool,
     pub has_nvenc: bool,
     pub has_vaapi: bool,
     pub has_videotoolbox: bool,
+    #[serde(default)]
+    pub qsv_codecs: Vec<String>,
+    #[serde(default)]
+    pub nvenc_codecs: Vec<String>,
+    #[serde(default)]
+    pub vaapi_codecs: Vec<String>,
+    #[serde(default)]
+    pub videotoolbox_codecs: Vec<String>,
 }
 
-pub fn probe_encoder_support(bin: &Path, hw_accel: &str) -> bool {
+pub fn probe_single_encoder(bin: &Path, hw_accel: &str, codec: &str) -> bool {
     let mut cmd = std::process::Command::new(bin);
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
         cmd.creation_flags(0x08000000);
     }
-    match hw_accel {
-        "qsv" => {
+    match (hw_accel, codec) {
+        ("qsv", "h264") => {
             cmd.args(["-nostdin", "-f", "lavfi", "-i", "nullsrc", "-frames:v", "1", "-vf", "format=nv12", "-c:v", "h264_qsv", "-f", "null", "-"]);
         }
-        "nvenc" => {
+        ("qsv", "h265") => {
+            cmd.args(["-nostdin", "-f", "lavfi", "-i", "nullsrc", "-frames:v", "1", "-vf", "format=nv12", "-c:v", "hevc_qsv", "-f", "null", "-"]);
+        }
+        ("qsv", "av1") => {
+            cmd.args(["-nostdin", "-f", "lavfi", "-i", "nullsrc", "-frames:v", "1", "-vf", "format=nv12", "-c:v", "av1_qsv", "-f", "null", "-"]);
+        }
+        ("nvenc", "h264") => {
             cmd.args(["-nostdin", "-f", "lavfi", "-i", "nullsrc", "-frames:v", "1", "-c:v", "h264_nvenc", "-f", "null", "-"]);
         }
-        "vaapi" => {
+        ("nvenc", "h265") => {
+            cmd.args(["-nostdin", "-f", "lavfi", "-i", "nullsrc", "-frames:v", "1", "-c:v", "hevc_nvenc", "-f", "null", "-"]);
+        }
+        ("nvenc", "av1") => {
+            cmd.args(["-nostdin", "-f", "lavfi", "-i", "nullsrc", "-frames:v", "1", "-c:v", "av1_nvenc", "-f", "null", "-"]);
+        }
+        ("vaapi", "h264") => {
             if let Some(dev) = find_vaapi_render_device() {
                 cmd.args([
                     "-nostdin",
@@ -471,10 +491,44 @@ pub fn probe_encoder_support(bin: &Path, hw_accel: &str) -> bool {
                 return false;
             }
         }
-        "videotoolbox" => {
+        ("vaapi", "h265") => {
+            if let Some(dev) = find_vaapi_render_device() {
+                cmd.args([
+                    "-nostdin",
+                    "-vaapi_device", &dev,
+                    "-f", "lavfi", "-i", "nullsrc", "-frames:v", "1",
+                    "-vf", "format=nv12,hwupload",
+                    "-c:v", "hevc_vaapi",
+                    "-f", "null", "-",
+                ]);
+            } else {
+                return false;
+            }
+        }
+        ("vaapi", "av1") => {
+            if let Some(dev) = find_vaapi_render_device() {
+                cmd.args([
+                    "-nostdin",
+                    "-vaapi_device", &dev,
+                    "-f", "lavfi", "-i", "nullsrc", "-frames:v", "1",
+                    "-vf", "format=nv12,hwupload",
+                    "-c:v", "av1_vaapi",
+                    "-f", "null", "-",
+                ]);
+            } else {
+                return false;
+            }
+        }
+        ("videotoolbox", "h264") => {
             cmd.args(["-nostdin", "-f", "lavfi", "-i", "nullsrc", "-frames:v", "1", "-c:v", "h264_videotoolbox", "-f", "null", "-"]);
         }
-        _ => return true,
+        ("videotoolbox", "h265") => {
+            cmd.args(["-nostdin", "-f", "lavfi", "-i", "nullsrc", "-frames:v", "1", "-c:v", "hevc_videotoolbox", "-f", "null", "-"]);
+        }
+        ("videotoolbox", "prores") => {
+            cmd.args(["-nostdin", "-f", "lavfi", "-i", "nullsrc", "-frames:v", "1", "-c:v", "prores_videotoolbox", "-f", "null", "-"]);
+        }
+        _ => return false,
     }
     #[cfg(target_os = "linux")]
     apply_linux_media_env(&mut cmd);
@@ -482,43 +536,86 @@ pub fn probe_encoder_support(bin: &Path, hw_accel: &str) -> bool {
         Ok(o) => {
             #[cfg(debug_assertions)]
             if !o.status.success() {
-                eprintln!("{} check failed (status: {:?}): {}", hw_accel, o.status, String::from_utf8_lossy(&o.stderr));
+                eprintln!("{}_{} check failed (status: {:?}): {}", hw_accel, codec, o.status, String::from_utf8_lossy(&o.stderr));
             }
             o.status.success()
         }
         Err(_e) => {
             #[cfg(debug_assertions)]
-            eprintln!("{} check spawn failed: {}", hw_accel, _e);
+            eprintln!("{}_{} check spawn failed: {}", hw_accel, codec, _e);
             false
+        }
+    }
+}
+
+pub fn probe_encoder_support(bin: &Path, hw_accel: &str) -> bool {
+    probe_single_encoder(bin, hw_accel, "h264")
+}
+
+pub fn probe_accelerator_codecs(bin: &Path, hw_accel: &str) -> Vec<String> {
+    if !probe_single_encoder(bin, hw_accel, "h264") {
+        return Vec::new();
+    }
+    let mut supported = vec!["h264".to_string()];
+    match hw_accel {
+        "qsv" | "nvenc" | "vaapi" => {
+            if probe_single_encoder(bin, hw_accel, "h265") {
+                supported.push("h265".to_string());
+            }
+            if probe_single_encoder(bin, hw_accel, "av1") {
+                supported.push("av1".to_string());
+            }
+        }
+        "videotoolbox" => {
+            if probe_single_encoder(bin, hw_accel, "h265") {
+                supported.push("h265".to_string());
+            }
+            if probe_single_encoder(bin, hw_accel, "prores") {
+                supported.push("prores".to_string());
+            }
+        }
+        _ => {}
+    }
+    supported
+}
+
+pub fn merge_codecs(target: &mut Vec<String>, extra: Vec<String>) {
+    for c in extra {
+        if !target.contains(&c) {
+            target.push(c);
         }
     }
 }
 
 async fn probe_hardware_encoders(bin: &Path) -> HardwareEncodersStatus {
     let f1 = bin.to_path_buf();
-    let qsv_task = tokio::task::spawn_blocking(move || probe_encoder_support(&f1, "qsv"));
+    let qsv_task = tokio::task::spawn_blocking(move || probe_accelerator_codecs(&f1, "qsv"));
 
     let f2 = bin.to_path_buf();
-    let nvenc_task = tokio::task::spawn_blocking(move || probe_encoder_support(&f2, "nvenc"));
+    let nvenc_task = tokio::task::spawn_blocking(move || probe_accelerator_codecs(&f2, "nvenc"));
 
     let f3 = bin.to_path_buf();
-    let vaapi_task = tokio::task::spawn_blocking(move || probe_encoder_support(&f3, "vaapi"));
+    let vaapi_task = tokio::task::spawn_blocking(move || probe_accelerator_codecs(&f3, "vaapi"));
 
     let f4 = bin.to_path_buf();
-    let videotoolbox_task = tokio::task::spawn_blocking(move || probe_encoder_support(&f4, "videotoolbox"));
+    let videotoolbox_task = tokio::task::spawn_blocking(move || probe_accelerator_codecs(&f4, "videotoolbox"));
 
-    let (has_qsv, has_nvenc, has_vaapi, has_videotoolbox) = tokio::join!(
-        async { qsv_task.await.unwrap_or(false) },
-        async { nvenc_task.await.unwrap_or(false) },
-        async { vaapi_task.await.unwrap_or(false) },
-        async { videotoolbox_task.await.unwrap_or(false) },
+    let (qsv_codecs, nvenc_codecs, vaapi_codecs, videotoolbox_codecs) = tokio::join!(
+        async { qsv_task.await.unwrap_or_default() },
+        async { nvenc_task.await.unwrap_or_default() },
+        async { vaapi_task.await.unwrap_or_default() },
+        async { videotoolbox_task.await.unwrap_or_default() },
     );
 
     HardwareEncodersStatus {
-        has_qsv,
-        has_nvenc,
-        has_vaapi,
-        has_videotoolbox,
+        has_qsv: !qsv_codecs.is_empty(),
+        has_nvenc: !nvenc_codecs.is_empty(),
+        has_vaapi: !vaapi_codecs.is_empty(),
+        has_videotoolbox: !videotoolbox_codecs.is_empty(),
+        qsv_codecs,
+        nvenc_codecs,
+        vaapi_codecs,
+        videotoolbox_codecs,
     }
 }
 
@@ -535,10 +632,14 @@ pub async fn check_hardware_encoders(app: tauri::AppHandle) -> HardwareEncodersS
         if let Some(sys_path) = crate::ffmpeg_resolver::find_system_binary("ffmpeg") {
             if sys_path != primary_bin {
                 let sys_status = probe_hardware_encoders(&sys_path).await;
-                status.has_qsv = status.has_qsv || sys_status.has_qsv;
-                status.has_nvenc = status.has_nvenc || sys_status.has_nvenc;
-                status.has_vaapi = status.has_vaapi || sys_status.has_vaapi;
-                status.has_videotoolbox = status.has_videotoolbox || sys_status.has_videotoolbox;
+                merge_codecs(&mut status.qsv_codecs, sys_status.qsv_codecs);
+                merge_codecs(&mut status.nvenc_codecs, sys_status.nvenc_codecs);
+                merge_codecs(&mut status.vaapi_codecs, sys_status.vaapi_codecs);
+                merge_codecs(&mut status.videotoolbox_codecs, sys_status.videotoolbox_codecs);
+                status.has_qsv = !status.qsv_codecs.is_empty();
+                status.has_nvenc = !status.nvenc_codecs.is_empty();
+                status.has_vaapi = !status.vaapi_codecs.is_empty();
+                status.has_videotoolbox = !status.videotoolbox_codecs.is_empty();
             }
         }
     }
@@ -1357,6 +1458,34 @@ mod tests {
         let p_gen = classify_ffmpeg_error(Some(42), &["Unknown failure occurred".to_string()], &settings);
         assert_eq!(p_gen.error_type, "generic");
         assert_eq!(p_gen.exit_code, Some(42));
+    }
+
+    #[test]
+    fn test_hardware_encoders_status_serde_and_merge() {
+        let mut status = HardwareEncodersStatus {
+            has_qsv: true,
+            has_nvenc: false,
+            has_vaapi: true,
+            has_videotoolbox: false,
+            qsv_codecs: vec!["h264".to_string(), "h265".to_string()],
+            nvenc_codecs: vec![],
+            vaapi_codecs: vec!["h264".to_string()],
+            videotoolbox_codecs: vec![],
+        };
+
+        // Test JSON serialization (camelCase)
+        let json = serde_json::to_string(&status).unwrap();
+        assert!(json.contains("\"qsvCodecs\":[\"h264\",\"h265\"]"));
+        assert!(json.contains("\"hasQsv\":true"));
+        assert!(json.contains("\"hasNvenc\":false"));
+
+        // Test deserialization
+        let deserialized: HardwareEncodersStatus = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized, status);
+
+        // Test merge_codecs
+        merge_codecs(&mut status.vaapi_codecs, vec!["h264".to_string(), "h265".to_string(), "av1".to_string()]);
+        assert_eq!(status.vaapi_codecs, vec!["h264".to_string(), "h265".to_string(), "av1".to_string()]);
     }
 }
 

@@ -28,6 +28,8 @@ class Control extends EventTarget {
   title = '';
   style: Record<string, string> = {};
   classList = new ClassList();
+  children: Control[] = [];
+  selectedIndex = 0;
   closest = (_selector: string): Control | null => null;
   setAttribute() {}
   focus = vi.fn();
@@ -35,6 +37,17 @@ class Control extends EventTarget {
   contains(_node: unknown): boolean { return false; }
   matches(_selector: string): boolean { return false; }
   removeAttribute(_name: string) {}
+  appendChild(child: Control) { this.children.push(child); return child; }
+  get innerHTML() { return ''; }
+  set innerHTML(_v: string) { this.children = []; }
+  get options() { return this.children; }
+  querySelector(selector: string): Control | null {
+    const match = selector.match(/value="([^"]+)"/);
+    if (match) {
+      return this.children.find(c => c.value === match[1]) ?? null;
+    }
+    return null;
+  }
 }
 class Media extends Control {
   paused = true;
@@ -82,6 +95,7 @@ class DocumentBoundary extends EventTarget {
   getElementById = (id: string) => this.elements.get(id) ?? null;
   querySelectorAll = () => [];
   fonts = { load: async () => [] };
+  createElement = (_tag: string) => new Control();
 }
 let doc: DocumentBoundary;
 type PreviewArguments = { sourcePath?: string; requestId?: number; candidateId?: string };
@@ -184,6 +198,11 @@ function fixture() {
     videoFullscreenBtn: fullscreenBtn, videoIconFsEnter: iconFsEnter, videoIconFsExit: iconFsExit,
     btnClearVideo, btnClearSub, btnResetAll,
   });
+  const hwSelect = new Control();
+  const codecSelect = new Control();
+  doc.elements.set('hardsub-hw', hwSelect);
+  doc.elements.set('hardsub-codec', codecSelect);
+  Object.assign(internal, { hwSelect, codecSelect });
   Object.assign(internal, { previewCancelBtn: cancel, previewRetryBtn: retry });
   internal.setupVideoPlayerEvents();
   const load = async (active = true) => {
@@ -1279,6 +1298,78 @@ describe('hardsub output directory management', () => {
       // Fallback for non-JSON string
       const plainMsg = (internal as any).formatHardsubErrorMessage('Simple plain error');
       expect(plainMsg).toBe('Simple plain error');
+    });
+  });
+
+  describe('hardware codecs filtering', () => {
+    it('filters out unsupported codecs like AV1 on QSV when not supported by hardware', () => {
+      const { internal } = fixture();
+      const hwSelect = (internal as any).hwSelect;
+      const codecSelect = (internal as any).codecSelect;
+
+      const hwStatus = {
+        hasQsv: true,
+        hasNvenc: false,
+        hasVaapi: false,
+        hasVideotoolbox: false,
+        qsvCodecs: ['h264', 'h265'], // AV1 is missing!
+      };
+
+      (internal as any).cachedHwStatus = hwStatus;
+      (internal as any).populateHardwareDropdown(hwStatus);
+
+      // Verify hwSelect has cpu and qsv
+      const hwValues = hwSelect.children.map((c: any) => c.value);
+      expect(hwValues).toContain('cpu');
+      expect(hwValues).toContain('qsv');
+
+      // Switch to QSV
+      (internal as any).state.hwAccel = 'qsv';
+      (internal as any).updateSupportedCodecs();
+
+      // Check codec options: should only have h264 and h265, NOT av1
+      const codecValues = codecSelect.children.map((c: any) => c.value);
+      expect(codecValues).toEqual(['h264', 'h265']);
+      expect(codecValues).not.toContain('av1');
+    });
+
+    it('automatically falls back to h264 if previously selected codec is not supported by new accelerator', () => {
+      const { internal } = fixture();
+      const codecSelect = (internal as any).codecSelect;
+
+      const hwStatus = {
+        hasQsv: true,
+        hasNvenc: true,
+        hasVaapi: false,
+        hasVideotoolbox: false,
+        qsvCodecs: ['h264', 'h265'],
+        nvencCodecs: ['h264', 'h265', 'av1'],
+      };
+
+      (internal as any).cachedHwStatus = hwStatus;
+
+      // Select NVENC and AV1
+      (internal as any).state.hwAccel = 'nvenc';
+      (internal as any).state.videoCodec = 'av1';
+      (internal as any).updateSupportedCodecs();
+      expect((internal as any).state.videoCodec).toBe('av1');
+
+      // Switch to QSV which does NOT have AV1
+      (internal as any).state.hwAccel = 'qsv';
+      (internal as any).updateSupportedCodecs();
+      expect((internal as any).state.videoCodec).toBe('h264');
+      expect(codecSelect.value).toBe('h264');
+    });
+
+    it('provides all software codecs when CPU is selected', () => {
+      const { internal } = fixture();
+      const codecSelect = (internal as any).codecSelect;
+
+      (internal as any).state.hwAccel = 'cpu';
+      (internal as any).updateSupportedCodecs();
+
+      const codecValues = codecSelect.children.map((c: any) => c.value);
+      expect(codecValues).toEqual(['h264', 'h265', 'av1', 'vp9', 'prores']);
     });
   });
 });
