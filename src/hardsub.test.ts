@@ -1003,25 +1003,32 @@ describe('hardsub output directory management', () => {
   });
 
   describe('subtitle cards rendering and auto-resize', () => {
-    it('auto-resizes cue textarea based on scrollHeight within bounds', () => {
+    it('auto-resizes cue textarea based on scrollHeight and border offset', () => {
       const { internal } = fixture();
       const mockTextarea = {
         style: {} as Record<string, string>,
         scrollHeight: 120,
+        offsetHeight: 122,
+        clientHeight: 120,
       } as unknown as HTMLTextAreaElement;
 
       (internal as any).autoResizeCueTextarea(mockTextarea);
-      expect(mockTextarea.style.height).toBe('120px');
+      // scrollHeight (120) + border (122 - 120 = 2) = 122px
+      expect(mockTextarea.style.height).toBe('122px');
 
-      // Clamps to max 240px
+      // Accurately fits larger content without artificial cutoff
       Object.defineProperty(mockTextarea, 'scrollHeight', { value: 350, configurable: true });
+      Object.defineProperty(mockTextarea, 'offsetHeight', { value: 352, configurable: true });
+      Object.defineProperty(mockTextarea, 'clientHeight', { value: 350, configurable: true });
       (internal as any).autoResizeCueTextarea(mockTextarea);
-      expect(mockTextarea.style.height).toBe('240px');
+      expect(mockTextarea.style.height).toBe('352px');
 
-      // Clamps to min 48px
-      Object.defineProperty(mockTextarea, 'scrollHeight', { value: 20, configurable: true });
+      // Correctly resizes shorter content without clipping
+      Object.defineProperty(mockTextarea, 'scrollHeight', { value: 36, configurable: true });
+      Object.defineProperty(mockTextarea, 'offsetHeight', { value: 38, configurable: true });
+      Object.defineProperty(mockTextarea, 'clientHeight', { value: 36, configurable: true });
       (internal as any).autoResizeCueTextarea(mockTextarea);
-      expect(mockTextarea.style.height).toBe('48px');
+      expect(mockTextarea.style.height).toBe('38px');
     });
   });
 

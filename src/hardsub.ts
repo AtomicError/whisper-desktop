@@ -1113,6 +1113,7 @@ export class HardsubController {
       this.updateVolumeIcons(1.0, false);
 
       let resizeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+      let lastSubtitleContainerWidth = 0;
       const container = document.getElementById('hardsub-player-container');
       if (container) {
         this.resizeObserver = new ResizeObserver(() => {
@@ -1121,10 +1122,26 @@ export class HardsubController {
             this.resizeFrame = null;
             if (!this.disposed) {
               this.updateVideoPreviewOverlayBounds(false);
+              if (this.subtitleListContainer) {
+                const curW = this.subtitleListContainer.clientWidth;
+                if (curW > 0 && Math.abs(curW - lastSubtitleContainerWidth) > 1) {
+                  lastSubtitleContainerWidth = curW;
+                  this.resizeAllCueTextareas();
+                }
+              }
               if (resizeDebounceTimer !== null) clearTimeout(resizeDebounceTimer);
               resizeDebounceTimer = setTimeout(() => {
                 resizeDebounceTimer = null;
-                if (!this.disposed) this.updateVideoPreviewOverlayBounds(true);
+                if (!this.disposed) {
+                  this.updateVideoPreviewOverlayBounds(true);
+                  if (this.subtitleListContainer) {
+                    const curW = this.subtitleListContainer.clientWidth;
+                    if (curW > 0 && Math.abs(curW - lastSubtitleContainerWidth) > 1) {
+                      lastSubtitleContainerWidth = curW;
+                      this.resizeAllCueTextareas();
+                    }
+                  }
+                }
               }, 60);
             }
           });
@@ -1132,6 +1149,9 @@ export class HardsubController {
         this.resizeObserver.observe(container);
         if (this.videoElement) {
           this.resizeObserver.observe(this.videoElement);
+        }
+        if (this.subtitleListContainer) {
+          this.resizeObserver.observe(this.subtitleListContainer);
         }
       }
     };
@@ -3851,16 +3871,26 @@ export class HardsubController {
     });
 
     this.subtitleListContainer.appendChild(frag);
+    this.resizeAllCueTextareas();
+    requestAnimationFrame(() => {
+      if (!this.disposed && this.subtitleListContainer) {
+        this.resizeAllCueTextareas();
+      }
+    });
+  }
+
+  public resizeAllCueTextareas(): void {
+    if (!this.subtitleListContainer) return;
     const cueFields = this.subtitleListContainer.querySelectorAll<HTMLTextAreaElement>('textarea.subtitle-cue-textarea');
     cueFields.forEach((cf) => this.autoResizeCueTextarea(cf));
   }
 
   private autoResizeCueTextarea(textarea: HTMLTextAreaElement): void {
     textarea.style.height = 'auto';
+    const border = (textarea.offsetHeight || 0) - (textarea.clientHeight || 0);
     const scrollHeight = textarea.scrollHeight;
     if (scrollHeight > 0) {
-      const targetHeight = Math.min(240, Math.max(48, scrollHeight));
-      textarea.style.height = `${targetHeight}px`;
+      textarea.style.height = `${scrollHeight + Math.max(0, border)}px`;
     }
   }
 

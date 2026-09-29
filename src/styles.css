@@ -3284,7 +3284,7 @@ select.select-control {
   background: var(--bg-card);
   border-color: var(--border-glass);
   box-shadow: var(--shadow-glass);
-  transform: none;
+  transform: translateZ(0);
 }
 
 /* Hardsub Action Deck & Progressive Telemetry HUD */
@@ -7896,11 +7896,10 @@ html[dir="rtl"] .cat-match-badge {
   font-size: 0.88rem;
   line-height: 1.45;
   padding: 8px 10px;
-  resize: vertical;
-  min-height: 48px;
-  max-height: 240px;
+  resize: none;
+  min-height: 38px;
   field-sizing: content;
-  overflow-y: auto;
+  overflow-y: hidden;
   box-sizing: border-box;
   outline: none;
   transition: border-color 0.2s ease, background 0.2s ease;
