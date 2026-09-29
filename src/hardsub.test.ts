@@ -150,6 +150,7 @@ function fixture() {
   const volumeWrapper = new Control();
   const volumeBtn = new Control();
   const volumeSlider = new Control();
+  volumeSlider.value = '1';
   const btnClearVideo = new Control();
   btnClearVideo.style.display = 'none';
   const btnClearSub = new Control();
@@ -566,6 +567,34 @@ describe('compatible preview recovery', () => {
     expect(internal.state.videoPath).toBe('/video.mp4');
     expect(invoke).toHaveBeenCalledWith('release_hardsub_preview', { requestId });
   });
+
+  it('automatically advances direct preview to conversion when direct playback times out', async () => {
+    const { controller, video } = fixture();
+    const base = invoke.getMockImplementation()!;
+    invoke.mockImplementation((command: string, args: PreviewArguments) => {
+      if (command === 'advance_hardsub_preview') {
+        return Promise.resolve({
+          requestId: args.requestId,
+          candidateId: 'remuxed',
+          url: 'http://localhost/remuxed.mp4',
+          stage: 'remux',
+          source: null,
+        });
+      }
+      return base(command, args);
+    });
+
+    controller.prefillFilePaths('/video.mp4', '');
+    await flush();
+
+    // Advance timers by direct timeout (6000ms) without calling video.ready()
+    vi.advanceTimersByTime(6000);
+    await flush();
+
+    const advances = invoke.mock.calls.filter(([command]) => command === 'advance_hardsub_preview');
+    expect(advances.length).toBeGreaterThanOrEqual(1);
+    expect(video.src).toBe('http://localhost/remuxed.mp4');
+  });
 });
 
 describe('hardsub path utilities', () => {
@@ -919,50 +948,57 @@ describe('hardsub output directory management', () => {
     });
   });
 
-  describe('volume controls collapse and lifecycle', () => {
-    it('blurs and collapses volume slider when mouse leaves wrapper if not dragging', async () => {
-      const { volumeWrapper, volumeSlider, load } = fixture();
+  describe('volume controls lifecycle', () => {
+    it('updates video volume on slider input', async () => {
+      const { video, volumeSlider, load } = fixture();
       await load();
 
-      // Mouse leaves wrapper while not dragging
-      volumeWrapper.dispatchEvent(new Event('mouseleave'));
-      expect(volumeSlider.blur).toHaveBeenCalled();
+      volumeSlider.value = '0.6';
+      volumeSlider.dispatchEvent(new Event('input'));
+      expect(video.volume).toBe(0.6);
+      expect(video.muted).toBe(false);
     });
 
-    it('does not blur volume slider prematurely during active drag, but blurs when drag finishes outside wrapper', async () => {
-      const { volumeWrapper, volumeSlider, load } = fixture();
+    it('toggles mute on button click and restores previous volume', async () => {
+      const { video, volumeBtn, volumeSlider, load } = fixture();
       await load();
 
-      // Start drag
-      volumeSlider.dispatchEvent(new Event('pointerdown'));
-      volumeSlider.blur.mockClear();
+      volumeSlider.value = '0.75';
+      volumeSlider.dispatchEvent(new Event('input'));
+      expect(video.volume).toBe(0.75);
 
-      // Mouse temporarily leaves wrapper during active drag
-      volumeWrapper.dispatchEvent(new Event('mouseleave'));
-      expect(volumeSlider.blur).not.toHaveBeenCalled();
+      // Click mute
+      volumeBtn.dispatchEvent(new Event('click'));
+      expect(video.muted).toBe(true);
+      expect(volumeSlider.value).toBe('0');
 
-      // Wrapper is not hovered when drag ends
-      volumeWrapper.matches = (sel: string) => sel === ':hover' ? false : false;
-      window.dispatchEvent(new Event('pointerup'));
-      vi.advanceTimersByTime(10);
-      expect(volumeSlider.blur).toHaveBeenCalled();
+      // Click unmute
+      volumeBtn.dispatchEvent(new Event('click'));
+      expect(video.muted).toBe(false);
+      expect(video.volume).toBe(0.75);
     });
 
-    it('blurs volume slider when clicking outside or pressing Escape', async () => {
-      const { volumeWrapper, volumeSlider, load } = fixture();
+    it('preserves muted state across playVideo calls without auto-unmuting', async () => {
+      const { video, volumeBtn, load, internal } = fixture();
       await load();
 
-      // Escape key
+      // Mute the video
+      volumeBtn.dispatchEvent(new Event('click'));
+      expect(video.muted).toBe(true);
+
+      // Trigger playVideo
+      (internal as any).playVideo();
+      expect(video.muted).toBe(true);
+    });
+
+    it('blurs volume slider when pressing Escape', async () => {
+      const { volumeSlider, load } = fixture();
+      await load();
+
       const escEvent = new Event('keydown');
       Object.assign(escEvent, { key: 'Escape' });
       volumeSlider.dispatchEvent(escEvent);
       expect(volumeSlider.blur).toHaveBeenCalled();
-
-      // Clicking outside
-      doc.activeElement = volumeSlider;
-      volumeWrapper.contains = () => false;
-      doc.dispatchEvent(new Event('pointerdown'));
-      expect(volumeSlider.blur).toHaveBeenCalledTimes(2);
     });
   });
 

@@ -8012,14 +8012,19 @@ html[dir="rtl"] .cat-match-badge {
 }
 
 .volume-control-wrapper #hardsub-btn-volume {
-  padding: 6px 4px !important;
+  padding: 6px 6px;
+  height: 32px;
+  z-index: 2;
 }
 
 /* Custom styling for the volume slider to make its thumb smaller and elegant */
 .volume-slider {
   width: 64px;
-  background: rgba(255, 255, 255, 0.1);
   height: 4px;
+  margin: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 2px;
   outline: none;
   cursor: pointer;

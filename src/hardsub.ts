@@ -1032,12 +1032,6 @@ export class HardsubController {
   private playVideo(): void {
     const video = this.videoElement;
     if (!video || !this.canInteractWithVideo()) return;
-    const targetVolume = this.lastVolume > 0 ? this.lastVolume : (this.videoVolumeSlider ? parseFloat(this.videoVolumeSlider.value) : 1);
-    if (video.volume !== targetVolume || video.muted !== (targetVolume === 0)) {
-      video.volume = Math.max(0, Math.min(1, targetVolume));
-      video.muted = (video.volume === 0);
-      this.updateVolumeIcons(video.volume, video.muted);
-    }
     const generation = this.videoLoadGeneration;
     const candidate = this.candidateId;
     const serial = ++this.playSerial;
@@ -2622,10 +2616,11 @@ export class HardsubController {
         this.directSourceGeometry = { width: video.videoWidth, height: video.videoHeight };
       }
       this.phase = 'ready';
-      const targetVolume = this.lastVolume > 0 ? this.lastVolume : (this.videoVolumeSlider ? parseFloat(this.videoVolumeSlider.value) : 1);
+      const isMuted = video.muted || (this.videoVolumeSlider ? parseFloat(this.videoVolumeSlider.value) === 0 : false);
+      const targetVolume = isMuted ? 0 : (this.videoVolumeSlider ? parseFloat(this.videoVolumeSlider.value) : (this.lastVolume > 0 ? this.lastVolume : 1));
       video.volume = Math.max(0, Math.min(1, targetVolume));
-      video.muted = (targetVolume === 0);
-      this.updateVolumeIcons(video.volume, video.muted);
+      video.muted = isMuted;
+      this.updateVolumeIcons(isMuted ? 0 : video.volume, isMuted);
       this.updateVideoPreviewOverlayBounds();
       this.updatePlaybackTime();
       this.syncPlayPauseUI();
@@ -2648,7 +2643,7 @@ export class HardsubController {
     onMedia('canplay', ready);
     onMedia('canplaythrough', ready);
     onMedia('progress', () => {
-      if (this.phase === 'loading') {
+      if (this.phase === 'loading' && this.previewCandidateStage !== 'direct') {
         this.resetLoadingTimeout(generation, candidate, 45_000);
       }
     });
@@ -2776,46 +2771,6 @@ export class HardsubController {
     });
 
     // Volume slider & Mute button listeners
-    let isDraggingVolume = false;
-
-    this.on(this.videoVolumeSlider, 'pointerdown', () => {
-      isDraggingVolume = true;
-    });
-
-    const endVolumeDrag = () => {
-      if (!isDraggingVolume) return;
-      isDraggingVolume = false;
-      setTimeout(() => {
-        const wrapper = this.volumeControlWrapper || (this.videoVolumeBtn?.closest('.volume-control-wrapper') as HTMLElement | null);
-        if (!wrapper?.matches(':hover')) {
-          this.videoVolumeSlider?.blur();
-        }
-      }, 0);
-    };
-
-    this.on(this.videoVolumeSlider, 'pointerup', endVolumeDrag);
-    this.on(this.videoVolumeSlider, 'lostpointercapture', endVolumeDrag);
-    this.on(window, 'pointerup', endVolumeDrag);
-
-    const wrapper = this.volumeControlWrapper || (this.videoVolumeBtn?.closest('.volume-control-wrapper') as HTMLElement | null);
-    if (wrapper) {
-      this.on(wrapper, 'mouseleave', () => {
-        if (!isDraggingVolume) {
-          this.videoVolumeSlider?.blur();
-        }
-      });
-    }
-
-    this.on(document, 'pointerdown', (e) => {
-      if (this.videoVolumeSlider && document.activeElement === this.videoVolumeSlider) {
-        const target = e.target as HTMLElement | null;
-        const currentWrapper = this.volumeControlWrapper || (this.videoVolumeBtn?.closest('.volume-control-wrapper') as HTMLElement | null);
-        if (!currentWrapper?.contains(target)) {
-          this.videoVolumeSlider.blur();
-        }
-      }
-    });
-
     this.on(this.videoVolumeSlider, 'keydown', (e) => {
       if ((e as KeyboardEvent).key === 'Escape') {
         this.videoVolumeSlider?.blur();
@@ -2832,15 +2787,6 @@ export class HardsubController {
           this.lastVolume = val;
         }
       }
-    });
-
-    this.on(this.videoVolumeSlider, 'change', () => {
-      setTimeout(() => {
-        const currentWrapper = this.volumeControlWrapper || (this.videoVolumeBtn?.closest('.volume-control-wrapper') as HTMLElement | null);
-        if (!currentWrapper?.matches(':hover') && !isDraggingVolume) {
-          this.videoVolumeSlider?.blur();
-        }
-      }, 0);
     });
 
     this.on(this.videoVolumeBtn, 'click', () => {
@@ -3621,7 +3567,11 @@ export class HardsubController {
     this.clearLoadingTimeout();
     this.loadingTimeout = setTimeout(() => {
       if (generation === this.videoLoadGeneration && this.candidateId === candidateId && this.phase === 'loading') {
-        this.failPlayback('timeout');
+        if (this.previewCandidateStage === 'direct') {
+          void this.advancePreview(generation, candidateId);
+        } else {
+          this.failPlayback('timeout');
+        }
       }
     }, durationMs);
   }
@@ -3768,7 +3718,8 @@ export class HardsubController {
     if (this.subtitleCanvas) this.subtitleCanvas.style.display = 'block';
     this.syncPlayPauseUI();
     this.updateVideoPreviewOverlayBounds();
-    this.resetLoadingTimeout(generation, candidate.candidateId, 45_000);
+    const timeoutMs = candidate.stage === 'direct' ? 6_000 : 45_000;
+    this.resetLoadingTimeout(generation, candidate.candidateId, timeoutMs);
     this.accordionTimeout = setTimeout(() => {
       if (generation !== this.videoLoadGeneration || this.candidateId !== candidate.candidateId || !this.pageActive) return;
       this.toggleMediaAccordion(false);

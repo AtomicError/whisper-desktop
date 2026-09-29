@@ -645,8 +645,22 @@ fn stages_for(source: &ProbedSource, mp4: bool, webm: bool) -> Vec<Stage> {
     let mut stages = Vec::with_capacity(3);
     let s = &source.source;
     let fits = (s.width <= 3840 && s.height <= 2160) || (s.width <= 2160 && s.height <= 3840);
-    if mp4 && source.video_codec == "h264" && matches!(source.pixel_format.as_str(), "yuv420p" | "yuvj420p") && !is_hdr(source)
-        && source.field_order == "progressive" && matches!(source.profile.as_str(), "Baseline" | "Constrained Baseline" | "Main" | "High") && source.level > 0 && source.level <= 52 && fits {
+    let is_progressive = matches!(source.field_order.as_str(), "progressive" | "unknown" | "");
+    let is_yuv420 = matches!(source.pixel_format.as_str(), "yuv420p" | "yuvj420p");
+    let is_h264_remux = source.video_codec == "h264"
+        && is_yuv420
+        && !is_hdr(source)
+        && is_progressive
+        && matches!(source.profile.as_str(), "Baseline" | "Constrained Baseline" | "Main" | "High")
+        && source.level > 0 && source.level <= 52
+        && fits;
+    let is_hevc_remux = matches!(source.video_codec.as_str(), "hevc" | "h265")
+        && is_yuv420
+        && !is_hdr(source)
+        && is_progressive
+        && matches!(source.profile.as_str(), "Main" | "Main 10")
+        && fits;
+    if mp4 && (is_h264_remux || is_hevc_remux) {
         stages.push(Stage::Remux);
     }
     if mp4 { stages.push(Stage::Mp4); }
@@ -662,7 +676,12 @@ fn conversion_arguments(input: &Path, output: &Path, stage: Stage, source: &Prob
     let mut options = vec!["-map".to_owned(), format!("0:{}", source.source.video_stream_index)];
     if let Some(index) = source.source.audio_stream_index { options.extend(["-map".into(), format!("0:{index}")]); }
     options.extend(["-sn".into(), "-dn".into()]);
-    if stage == Stage::Remux { options.extend(["-c:v".into(), "copy".into()]); }
+    if stage == Stage::Remux {
+        options.extend(["-c:v".into(), "copy".into()]);
+        if matches!(source.video_codec.as_str(), "hevc" | "h265") {
+            options.extend(["-tag:v".into(), "hvc1".into()]);
+        }
+    }
     else {
         let s = &source.source;
         let (max_w, max_h): (f64, f64) = if s.display_width >= s.display_height { (1280.0, 720.0) } else { (720.0, 1280.0) };
