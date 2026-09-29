@@ -8004,29 +8004,22 @@ html[dir="rtl"] .cat-match-badge {
   border-color: rgba(255, 255, 255, 0.2) !important;
 }
 
-/* Hover-to-expand Volume Controller */
+/* Always-visible Volume Controller */
 .volume-control-wrapper {
   display: flex;
   align-items: center;
-  transition: width 0.2s ease;
-}
-
-.volume-control-wrapper:hover .volume-slider,
-.volume-control-wrapper:focus-within .volume-slider {
-  width: 60px !important;
-  opacity: 1 !important;
-  pointer-events: auto !important;
-  margin-inline-start: 8px !important;
-  margin-left: 8px !important;
+  gap: 8px;
 }
 
 /* Custom styling for the volume slider to make its thumb smaller and elegant */
 .volume-slider {
+  width: 64px;
   background: rgba(255, 255, 255, 0.1);
   height: 4px;
   border-radius: 2px;
   outline: none;
-  transition: background 0.15s ease, width 0.25s ease, opacity 0.25s ease;
+  cursor: pointer;
+  transition: background 0.15s ease;
 }
 
 .volume-slider::-webkit-slider-thumb {
