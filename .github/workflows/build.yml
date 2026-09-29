@@ -593,6 +593,13 @@ jobs:
                 sed -i 's/export GDK_BACKEND=x11/export GDK_BACKEND="${GDK_BACKEND:-wayland,x11}"/' squashfs-root/apprun-hooks/linuxdeploy-plugin-gtk.sh
               fi
 
+              # 4. Enforce POSIX standard execution and read permissions across all files and entrypoints
+              # Guarantees compatibility with unprivileged sandbox environments (Firejail, bubblewrap)
+              chmod -R a+rX squashfs-root
+              chmod a+x squashfs-root/AppRun squashfs-root/AppRun.wrapped 2>/dev/null || true
+              find squashfs-root/usr/bin -type f -exec chmod a+x {} + 2>/dev/null || true
+              find squashfs-root/apprun-hooks -type f -exec chmod a+rx {} + 2>/dev/null || true
+
               rm -f "$target_img"
               export ARCH=x86_64
               ./appimagetool-temp/AppRun squashfs-root "$target_img"
