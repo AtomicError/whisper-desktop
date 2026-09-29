@@ -1023,12 +1023,12 @@ describe('hardsub output directory management', () => {
       (internal as any).autoResizeCueTextarea(mockTextarea);
       expect(mockTextarea.style.height).toBe('352px');
 
-      // Correctly resizes shorter content without clipping
+      // Enforces ergonomic 48px floor for short single-line content
       Object.defineProperty(mockTextarea, 'scrollHeight', { value: 36, configurable: true });
       Object.defineProperty(mockTextarea, 'offsetHeight', { value: 38, configurable: true });
       Object.defineProperty(mockTextarea, 'clientHeight', { value: 36, configurable: true });
       (internal as any).autoResizeCueTextarea(mockTextarea);
-      expect(mockTextarea.style.height).toBe('38px');
+      expect(mockTextarea.style.height).toBe('48px');
     });
   });
 

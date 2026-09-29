@@ -3890,7 +3890,8 @@ export class HardsubController {
     const border = (textarea.offsetHeight || 0) - (textarea.clientHeight || 0);
     const scrollHeight = textarea.scrollHeight;
     if (scrollHeight > 0) {
-      textarea.style.height = `${scrollHeight + Math.max(0, border)}px`;
+      const targetHeight = Math.max(48, scrollHeight + Math.max(0, border));
+      textarea.style.height = `${targetHeight}px`;
     }
   }
 

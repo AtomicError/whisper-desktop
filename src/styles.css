@@ -7897,7 +7897,7 @@ html[dir="rtl"] .cat-match-badge {
   line-height: 1.45;
   padding: 8px 10px;
   resize: none;
-  min-height: 38px;
+  min-height: 48px;
   field-sizing: content;
   overflow-y: hidden;
   box-sizing: border-box;
