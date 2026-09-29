@@ -999,7 +999,7 @@ pub async fn translate_files(
                 return None;
             }
             let r = m.reasoning.trim().to_lowercase();
-            if r == "minimal" || r == "low" || r == "medium" || r == "high" || r == "xhigh" || r == "max" {
+            if r == "minimal" || r == "low" || r == "medium" || r == "high" || r == "xhigh" || r == "max" || r == "ultra" {
                 Some(m.reasoning.clone())
             } else {
                 None

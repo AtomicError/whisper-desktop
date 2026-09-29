@@ -632,10 +632,10 @@ window.addEventListener('whisper:languageChanged', () => {
   if (typeof window.updateFilterCounts === 'function') {
     window.updateFilterCounts();
   }
-  if (typeof window.renderProvidersGrid === 'function') {
+  if (settingsState && typeof window.renderProvidersGrid === 'function') {
     window.renderProvidersGrid();
   }
-  if (typeof window.applyModelsFilterAndRender === 'function' && typeof currentProviderModels !== 'undefined' && currentProviderModels && currentProviderModels.length > 0) {
+  if (settingsState && typeof window.applyModelsFilterAndRender === 'function' && typeof currentProviderModels !== 'undefined' && currentProviderModels && currentProviderModels.length > 0) {
     window.applyModelsFilterAndRender(0);
   }
   if (typeof probedMetadata !== 'undefined' && probedMetadata && probedMetadata.exists) {
@@ -7064,7 +7064,7 @@ window.populateProvidersDropdown = function() {
   
   let providers = [];
   try {
-    providers = JSON.parse(settingsState.translateAiProviders || '[]');
+    providers = JSON.parse((settingsState && settingsState.translateAiProviders) || '[]');
   } catch (e) {
     console.error(e);
   }
@@ -7076,11 +7076,11 @@ window.populateProvidersDropdown = function() {
     select.appendChild(opt);
   });
   
-  if (providers.length > 0 && !settingsState.translateAiProvider) {
+  if (settingsState && providers.length > 0 && !settingsState.translateAiProvider) {
     settingsState.translateAiProvider = providers[0].name;
   }
   
-  select.value = settingsState.translateAiProvider || '';
+  select.value = (settingsState && settingsState.translateAiProvider) || '';
   
   // Render the tiles grid
   renderProvidersGrid(providers);
@@ -7093,18 +7093,20 @@ window.populateProvidersDropdown = function() {
 window.renderProvidersGrid = function(providers = null) {
   const grid = document.getElementById('providers-tiles-grid');
   if (!grid) return;
+  if (providers === null && !settingsState) return;
+
   grid.innerHTML = '';
   
   if (providers === null) {
     try {
-      providers = JSON.parse(settingsState.translateAiProviders || '[]');
+      providers = JSON.parse((settingsState && settingsState.translateAiProviders) || '[]');
     } catch (e) {
       console.error(e);
       providers = [];
     }
   }
   
-  const activeName = settingsState.translateAiProvider || '';
+  const activeName = (settingsState && settingsState.translateAiProvider) || '';
   
   providers.forEach(p => {
     const tile = document.createElement('div');
@@ -7112,14 +7114,7 @@ window.renderProvidersGrid = function(providers = null) {
     tile.className = `provider-tile${isActive ? ' active' : ''}`;
     
     const rawFormat = p.apiFormat || p.api_format || 'Chat completions';
-    let formatLabel = rawFormat;
-    if (rawFormat === 'Chat completions') {
-      formatLabel = t('settings.formatChatCompletions');
-    } else if (rawFormat === 'Anthropic messages') {
-      formatLabel = t('settings.formatAnthropicMessages');
-    } else if (rawFormat === 'Responses') {
-      formatLabel = t('settings.formatResponses');
-    }
+    const formatLabel = rawFormat;
 
     let iconSvg = '';
     let brandClass = '';
@@ -7145,7 +7140,7 @@ window.renderProvidersGrid = function(providers = null) {
         </div>
         <div class="provider-tile-meta">
           <div class="provider-tile-name" dir="auto" title="${escapeHTML(p.name)}">${escapeHTML(p.name)}</div>
-          <div class="provider-tile-format" title="${escapeHTML(formatLabel)}">${escapeHTML(formatLabel)}</div>
+          <div class="provider-tile-format" dir="ltr" title="${escapeHTML(formatLabel)}">${escapeHTML(formatLabel)}</div>
         </div>
       </div>
       <div class="provider-tile-footer">
@@ -8117,7 +8112,8 @@ window.applyModelsFilterAndRender = function(delay = 0) {
             'medium': 3,
             'high': 4,
             'xhigh': 5,
-            'max': 6
+            'max': 6,
+            'ultra': 7
           };
           const aRank = rank[(a.reasoning || '').toLowerCase()] ?? 0;
           const bRank = rank[(b.reasoning || '').toLowerCase()] ?? 0;
@@ -8393,6 +8389,7 @@ function createModelRowElement(modelObj, isActive, index = 0) {
           <option value="High" ${curReasoningLower === 'high' ? 'selected' : ''}>High</option>
           <option value="XHigh" ${curReasoningLower === 'xhigh' ? 'selected' : ''}>XHigh</option>
           <option value="Max" ${curReasoningLower === 'max' ? 'selected' : ''}>Max</option>
+          <option value="Ultra" ${curReasoningLower === 'ultra' ? 'selected' : ''}>Ultra</option>
         </select>
       ` : `
         <span class="reasoning-none-dash" title="${t('settings.reasoningNotSupported')}" aria-label="${t('settings.reasoningNotSupported')}">—</span>

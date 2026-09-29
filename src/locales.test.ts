@@ -152,9 +152,6 @@ describe('locale consistency for speed presets', () => {
         'addProvider',
         'activeBadge',
         'inactiveBadge',
-        'formatChatCompletions',
-        'formatAnthropicMessages',
-        'formatResponses',
         'clearSearch'
       ];
       for (const key of requiredSettingsKeys) {
@@ -172,7 +169,6 @@ describe('locale consistency for speed presets', () => {
     expect(fa.settings.addProvider).toBe('افزودن ارائه‌دهنده');
     expect(fa.settings.activeBadge).toBe('فعال');
     expect(fa.settings.inactiveBadge).toBe('غیرفعال');
-    expect(fa.settings.formatChatCompletions).toBe('تکمیل گفتگو (OpenAI)');
     expect(fa.translate.sourceSub).toBe('زیرنویس اصلی');
     expect(fa.translate.viewSource).toBe('فقط اصلی');
     expect(fa.translate.sameAsSource).toBe('مشابه پوشه فایل اصلی');

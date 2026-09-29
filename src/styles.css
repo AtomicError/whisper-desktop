@@ -6627,7 +6627,7 @@ select.select-control {
   background: transparent !important;
   border: 1px solid transparent !important;
   border-radius: 6px !important;
-  padding: 0 14px !important;
+  padding: 0 20px !important;
   font-family: var(--font-sans) !important;
   font-size: 0.82rem !important;
   font-weight: 500 !important;
@@ -6645,7 +6645,8 @@ select.select-control {
 
 .td-reasoning .custom-select-trigger .custom-select-value {
   width: 100%;
-  text-align: center;
+  text-align: center !important;
+  direction: ltr !important;
   font-size: 0.82rem;
   letter-spacing: -0.01em;
   white-space: nowrap;
@@ -6656,6 +6657,7 @@ select.select-control {
 .td-reasoning .custom-select-arrow {
   position: absolute !important;
   right: 8px !important;
+  left: auto !important;
   top: 50% !important;
   transform: translateY(-50%) !important;
   width: 12px !important;
@@ -6667,8 +6669,8 @@ select.select-control {
 }
 
 [dir="rtl"] .td-reasoning .custom-select-arrow {
-  right: auto !important;
-  left: 8px !important;
+  right: 8px !important;
+  left: auto !important;
 }
 
 /* Hover / Open: Subtle Glass Pill Highlight with Soft Halo */
@@ -6694,7 +6696,7 @@ select.select-control {
   transform: translateY(-50%) rotate(180deg) !important;
 }
 
-/* Active Reasoning (Minimal / Low / Medium / High / XHigh / Max): Subtle Lavender Glow */
+/* Active Reasoning (Minimal / Low / Medium / High / XHigh / Max / Ultra): Subtle Lavender Glow */
 .td-reasoning .custom-select-container.reasoning-active .custom-select-trigger {
   color: #c084fc !important;
   font-weight: 600 !important;
