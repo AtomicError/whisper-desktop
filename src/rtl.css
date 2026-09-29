@@ -484,6 +484,7 @@ html[dir="rtl"] #translation-test-modal .modal-title-row {
    The range inputs are already forced LTR in section 6; this keeps their parent
    consistent with them. The bar itself is positioned with left/right and an auto
    width, which direction does not affect. */
+html[dir="rtl"] #hardsub-player-container,
 html[dir="rtl"] #hardsub-video-controls,
 html[dir="rtl"] #hardsub-volume-hud,
 html[dir="rtl"] .volume-control-wrapper {

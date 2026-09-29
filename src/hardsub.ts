@@ -1130,6 +1130,9 @@ export class HardsubController {
           });
         });
         this.resizeObserver.observe(container);
+        if (this.videoElement) {
+          this.resizeObserver.observe(this.videoElement);
+        }
       }
     };
 
@@ -2616,6 +2619,11 @@ export class HardsubController {
       this.updateVideoPreviewOverlayBounds();
       this.updatePlaybackTime();
       this.syncPlayPauseUI();
+      requestAnimationFrame(() => {
+        if (current() && this.phase === 'ready') {
+          this.updateVideoPreviewOverlayBounds();
+        }
+      });
     };
     onMedia('loadedmetadata', () => {
       if (this.previewCandidateStage === 'direct' && video.videoWidth > 0 && video.videoHeight > 0) {
@@ -3809,6 +3817,7 @@ export class HardsubController {
       this._lastRenderKey = '';
       this.updateSubDropzoneUI(subPath, this.subtitleCues.length);
       this.renderSubtitleCards();
+      this.updateVideoPreviewOverlayBounds();
       if (this.videoElement) {
         this.syncActiveSubtitleWithTime(this.videoElement.currentTime * 1000);
       }
@@ -4079,6 +4088,7 @@ export class HardsubController {
           this._lastRenderKey = '';
           this.updateSubDropzoneUI(candidatePath, this.subtitleCues.length);
           this.renderSubtitleCards();
+          this.updateVideoPreviewOverlayBounds();
           if (this.videoElement) {
             this.syncActiveSubtitleWithTime(this.videoElement.currentTime * 1000);
           }
