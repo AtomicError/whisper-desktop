@@ -8008,7 +8008,11 @@ html[dir="rtl"] .cat-match-badge {
 .volume-control-wrapper {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
+}
+
+.volume-control-wrapper #hardsub-btn-volume {
+  padding: 6px 4px !important;
 }
 
 /* Custom styling for the volume slider to make its thumb smaller and elegant */

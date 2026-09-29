@@ -1032,6 +1032,12 @@ export class HardsubController {
   private playVideo(): void {
     const video = this.videoElement;
     if (!video || !this.canInteractWithVideo()) return;
+    const targetVolume = this.lastVolume > 0 ? this.lastVolume : (this.videoVolumeSlider ? parseFloat(this.videoVolumeSlider.value) : 1);
+    if (video.volume !== targetVolume || video.muted !== (targetVolume === 0)) {
+      video.volume = Math.max(0, Math.min(1, targetVolume));
+      video.muted = (video.volume === 0);
+      this.updateVolumeIcons(video.volume, video.muted);
+    }
     const generation = this.videoLoadGeneration;
     const candidate = this.candidateId;
     const serial = ++this.playSerial;
@@ -2616,6 +2622,10 @@ export class HardsubController {
         this.directSourceGeometry = { width: video.videoWidth, height: video.videoHeight };
       }
       this.phase = 'ready';
+      const targetVolume = this.lastVolume > 0 ? this.lastVolume : (this.videoVolumeSlider ? parseFloat(this.videoVolumeSlider.value) : 1);
+      video.volume = Math.max(0, Math.min(1, targetVolume));
+      video.muted = (targetVolume === 0);
+      this.updateVolumeIcons(video.volume, video.muted);
       this.updateVideoPreviewOverlayBounds();
       this.updatePlaybackTime();
       this.syncPlayPauseUI();
