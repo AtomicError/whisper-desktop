@@ -144,6 +144,24 @@ describe('locale consistency for speed presets', () => {
         expect(models[key].length).toBeGreaterThan(0);
       }
     });
+
+    it(`locale ${code} has all required provider and format keys`, () => {
+      const settings = (dict as any).settings;
+      expect(settings).toBeDefined();
+      const requiredSettingsKeys = [
+        'addProvider',
+        'activeBadge',
+        'inactiveBadge',
+        'formatChatCompletions',
+        'formatAnthropicMessages',
+        'formatResponses',
+        'clearSearch'
+      ];
+      for (const key of requiredSettingsKeys) {
+        expect(typeof settings[key]).toBe('string');
+        expect(settings[key].length).toBeGreaterThan(0);
+      }
+    });
   }
 
   it('validates fa locale translation improvements', () => {
@@ -151,6 +169,10 @@ describe('locale consistency for speed presets', () => {
     expect(fa.settings.aiTranslatePoints).toContain('<bdi>OpenAI</bdi>، <bdi>Claude</bdi>');
     expect(fa.settings.targetLangPoints).toContain('بیش از ۱۰۰ زبان زنده دنیا با رسم‌الخط بومی');
     expect(fa.settings.providerCustomPromptPlaceholder).toBe('شما یک مترجم حرفه‌ای هستید...');
+    expect(fa.settings.addProvider).toBe('افزودن ارائه‌دهنده');
+    expect(fa.settings.activeBadge).toBe('فعال');
+    expect(fa.settings.inactiveBadge).toBe('غیرفعال');
+    expect(fa.settings.formatChatCompletions).toBe('تکمیل گفتگو (OpenAI)');
     expect(fa.translate.sourceSub).toBe('زیرنویس اصلی');
     expect(fa.translate.viewSource).toBe('فقط اصلی');
     expect(fa.translate.sameAsSource).toBe('مشابه پوشه فایل اصلی');

@@ -2750,9 +2750,9 @@
                           <div class="provider-field">
                             <label data-i18n="settings.apiFormat">API Format</label>
                             <select class="select-control" id="mgr-provider-format">
-                              <option value="Chat completions">Chat completions (/chat/completions)</option>
-                              <option value="Anthropic messages">Anthropic messages (/v1/messages)</option>
-                              <option value="Responses">Responses (Gemini)</option>
+                              <option value="Chat completions" data-i18n="settings.formatChatCompletions">Chat completions</option>
+                              <option value="Anthropic messages" data-i18n="settings.formatAnthropicMessages">Anthropic messages</option>
+                              <option value="Responses" data-i18n="settings.formatResponses">Responses (Gemini)</option>
                             </select>
                           </div>
                         </div>
@@ -2804,7 +2804,7 @@
                               <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                             </svg>
                             <input class="text-input models-search-input" id="mgr-models-search" type="text" placeholder="Search models by identifier..." data-i18n-placeholder="settings.searchModelsPlaceholder" oninput="filterModelsTable()" />
-                            <button type="button" class="models-search-clear" id="mgr-models-search-clear" onclick="clearModelsSearch()" style="display: none;" title="Clear Search">
+                            <button type="button" class="models-search-clear" id="mgr-models-search-clear" onclick="clearModelsSearch()" style="display: none;" title="Clear Search" data-i18n-title="settings.clearSearch">
                               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <line x1="18" y1="6" x2="6" y2="18"></line>
                                 <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -3908,7 +3908,7 @@
                   </div>
 
                   <!-- Subtitle Cue Blocks Scrollable List -->
-                  <div id="hardsub-subtitle-list" style="flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-inline-end: 4px;">
+                  <div id="hardsub-subtitle-list" style="flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;">
                     <div id="hardsub-empty-cue-notice" style="text-align: center; padding: 40px 20px; color: var(--color-text-muted); display: flex; flex-direction: column; align-items: center; gap: 10px;">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width: 40px; height: 40px; opacity: 0.5;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                       <span style="font-size: 0.88rem;" data-i18n-html="hardsub.noSubLoadedNotice">No subtitle loaded.<br>Select a subtitle file above to edit block cues.</span>
@@ -4329,9 +4329,9 @@
             <div style="display: flex; flex-direction: column; gap: 6px;">
               <label for="provider-format" style="font-size: 0.85rem; color: var(--color-text-muted);" data-i18n="modals.apiFormat">API Format</label>
               <select class="select-control" id="provider-format" style="width: 100%;">
-                <option value="Chat completions">Chat completions (/chat/completions)</option>
-                <option value="Anthropic messages">Anthropic messages (/v1/messages)</option>
-                <option value="Responses">Responses (Gemini)</option>
+                <option value="Chat completions" data-i18n="settings.formatChatCompletions">Chat completions</option>
+                <option value="Anthropic messages" data-i18n="settings.formatAnthropicMessages">Anthropic messages</option>
+                <option value="Responses" data-i18n="settings.formatResponses">Responses (Gemini)</option>
               </select>
             </div>
           </div>

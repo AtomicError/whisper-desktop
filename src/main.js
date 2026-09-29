@@ -632,6 +632,9 @@ window.addEventListener('whisper:languageChanged', () => {
   if (typeof window.updateFilterCounts === 'function') {
     window.updateFilterCounts();
   }
+  if (typeof window.renderProvidersGrid === 'function') {
+    window.renderProvidersGrid();
+  }
   if (typeof window.applyModelsFilterAndRender === 'function' && typeof currentProviderModels !== 'undefined' && currentProviderModels && currentProviderModels.length > 0) {
     window.applyModelsFilterAndRender(0);
   }
@@ -7108,17 +7111,26 @@ window.renderProvidersGrid = function(providers = null) {
     const isActive = p.name === activeName;
     tile.className = `provider-tile${isActive ? ' active' : ''}`;
     
-    const formatStr = p.apiFormat || p.api_format || 'Chat completions';
+    const rawFormat = p.apiFormat || p.api_format || 'Chat completions';
+    let formatLabel = rawFormat;
+    if (rawFormat === 'Chat completions') {
+      formatLabel = t('settings.formatChatCompletions');
+    } else if (rawFormat === 'Anthropic messages') {
+      formatLabel = t('settings.formatAnthropicMessages');
+    } else if (rawFormat === 'Responses') {
+      formatLabel = t('settings.formatResponses');
+    }
+
     let iconSvg = '';
     let brandClass = '';
     
-    if (formatStr === 'Chat completions') {
+    if (rawFormat === 'Chat completions') {
       brandClass = 'format-openai';
       iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 20px; height: 20px; color: #10b981;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`;
-    } else if (formatStr === 'Anthropic messages') {
+    } else if (rawFormat === 'Anthropic messages') {
       brandClass = 'format-anthropic';
       iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 20px; height: 20px; color: #8b5cf6;"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>`;
-    } else if (formatStr === 'Responses') {
+    } else if (rawFormat === 'Responses') {
       brandClass = 'format-gemini';
       iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 20px; height: 20px; color: #06b6d4;"><path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6l2.1 2.1M5.6 18.4l2.1-2.1m8.6-8.6l2.1-2.1M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/></svg>`;
     } else {
@@ -7132,15 +7144,15 @@ window.renderProvidersGrid = function(providers = null) {
           ${iconSvg}
         </div>
         <div class="provider-tile-meta">
-          <div class="provider-tile-name" title="${escapeHTML(p.name)}">${escapeHTML(p.name)}</div>
-          <div class="provider-tile-format" title="${escapeHTML(formatStr)}">${escapeHTML(formatStr)}</div>
+          <div class="provider-tile-name" dir="auto" title="${escapeHTML(p.name)}">${escapeHTML(p.name)}</div>
+          <div class="provider-tile-format" title="${escapeHTML(formatLabel)}">${escapeHTML(formatLabel)}</div>
         </div>
       </div>
       <div class="provider-tile-footer">
         <span class="provider-tile-badge ${isActive ? 'active' : ''}">
-          ${isActive ? '<span class="pulse-dot"></span>ACTIVE' : 'INACTIVE'}
+          ${isActive ? `<span class="pulse-dot"></span>${t('settings.activeBadge')}` : t('settings.inactiveBadge')}
         </span>
-        <button class="provider-tile-delete" title="Delete Provider">
+        <button class="provider-tile-delete" title="${t('settings.deleteProvider')}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
             <polyline points="3 6 5 6 21 6"></polyline>
             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -7178,7 +7190,7 @@ window.renderProvidersGrid = function(providers = null) {
       <line x1="12" y1="5" x2="12" y2="19"/>
       <line x1="5" y1="12" x2="19" y2="12"/>
     </svg>
-    <span style="font-size: 0.88rem; font-weight: 500;">Add Provider</span>
+    <span style="font-size: 0.88rem; font-weight: 500;">${t('settings.addProvider')}</span>
   `;
   addTile.onclick = () => openAddProviderModal();
   grid.appendChild(addTile);

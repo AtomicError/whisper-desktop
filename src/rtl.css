@@ -519,3 +519,18 @@ html[dir="rtl"] .toast-tech-detail.toast-msg-rtl {
   font-family: inherit !important;
 }
 
+/* 12. Provider Cards & AI Translation in RTL */
+html[dir="rtl"] .provider-tile-name {
+  text-align: right;
+}
+
+html[dir="rtl"] .provider-tile-meta {
+  align-items: flex-start;
+}
+
+/* 13. Hardsub Subtitle List Scrollbar & Cards Gutter in RTL */
+html[dir="rtl"] #hardsub-subtitle-list {
+  scrollbar-gutter: stable;
+  padding: 4px 10px 10px 10px;
+}
+

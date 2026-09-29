@@ -5900,11 +5900,24 @@ select.select-control {
 }
 
 .provider-tile-format {
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   color: var(--color-text-muted);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 1px 7px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  width: fit-content;
+  max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  box-sizing: border-box;
+}
+
+.provider-tile.active .provider-tile-format {
+  color: var(--color-cyan);
+  background: rgba(var(--color-cyan-rgb), 0.08);
+  border-color: rgba(var(--color-cyan-rgb), 0.2);
 }
 
 .provider-tile-footer {
@@ -7927,23 +7940,27 @@ html[dir="rtl"] .cat-match-badge {
 }
 
 #hardsub-subtitle-list {
+  scrollbar-gutter: stable;
+  padding: 4px 10px 10px 10px;
+  box-sizing: border-box;
   --scrollbar-thumb: rgba(255, 255, 255, 0.2);
-  --scrollbar-track: rgba(0, 0, 0, 0.2);
-  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  --scrollbar-track: transparent;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
   scrollbar-width: thin;
 }
 
-@supports not (scrollbar-color: auto) {
-  #hardsub-subtitle-list::-webkit-scrollbar {
-    width: 6px;
-  }
-  #hardsub-subtitle-list::-webkit-scrollbar-thumb {
-    background: var(--scrollbar-thumb);
-    border-radius: 3px;
-  }
-  #hardsub-subtitle-list::-webkit-scrollbar-track {
-    background: var(--scrollbar-track);
-  }
+#hardsub-subtitle-list::-webkit-scrollbar {
+  width: 6px;
+}
+#hardsub-subtitle-list::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 3px;
+}
+#hardsub-subtitle-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+#hardsub-subtitle-list::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .reset-link-btn {
