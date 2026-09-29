@@ -2749,10 +2749,11 @@ select.select-control {
 /* 4. Transcribe File View */
 .transcribe-layout {
   display: grid;
-  grid-template-columns: 1.2fr 0.8fr; /* Balanced dual-pane layout */
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr); /* Balanced dual-pane layout with locked proportional tracks */
   gap: 16px;
   flex-grow: 1;
   min-height: 0;
+  width: 100%;
 }
 
 .transcribe-left-panel {
@@ -2760,6 +2761,7 @@ select.select-control {
   flex-direction: column;
   gap: 16px;
   height: 100%;
+  min-width: 0;
   overflow-y: auto;
   scrollbar-gutter: stable;
   padding-inline-end: 8px;
@@ -2770,8 +2772,10 @@ select.select-control {
   flex-direction: column;
   gap: 20px;
   height: 100%;
+  min-width: 0;
   min-height: 0;
   overflow: hidden;
+  contain: layout;
 }
 
 /* Wizard Accordion Styles */
@@ -3272,8 +3276,8 @@ select.select-control {
   box-shadow: var(--shadow-glass);
   height: fit-content;
   position: relative;
-  overflow: visible;
-  transform: none;
+  overflow: hidden;
+  transform: translateZ(0);
 }
 
 .telemetry-hud:hover {
@@ -7890,9 +7894,13 @@ html[dir="rtl"] .cat-match-badge {
   color: #fff;
   font-family: inherit;
   font-size: 0.88rem;
-  padding: 6px 10px;
+  line-height: 1.45;
+  padding: 8px 10px;
   resize: vertical;
   min-height: 48px;
+  max-height: 240px;
+  field-sizing: content;
+  overflow-y: auto;
   box-sizing: border-box;
   outline: none;
   transition: border-color 0.2s ease, background 0.2s ease;

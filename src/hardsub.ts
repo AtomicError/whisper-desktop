@@ -1546,6 +1546,7 @@ export class HardsubController {
     this.on(this.subtitleListContainer, 'input', (e) => {
       const textarea = (e.target as HTMLElement).closest('textarea.subtitle-cue-textarea') as HTMLTextAreaElement;
       if (textarea) {
+        this.autoResizeCueTextarea(textarea);
         const cueId = parseInt(textarea.dataset.cueId || '0', 10);
         const cue = this.subtitleCues.find((c) => c.id === cueId);
         if (cue) {
@@ -3850,6 +3851,17 @@ export class HardsubController {
     });
 
     this.subtitleListContainer.appendChild(frag);
+    const cueFields = this.subtitleListContainer.querySelectorAll<HTMLTextAreaElement>('textarea.subtitle-cue-textarea');
+    cueFields.forEach((cf) => this.autoResizeCueTextarea(cf));
+  }
+
+  private autoResizeCueTextarea(textarea: HTMLTextAreaElement): void {
+    textarea.style.height = 'auto';
+    const scrollHeight = textarea.scrollHeight;
+    if (scrollHeight > 0) {
+      const targetHeight = Math.min(240, Math.max(48, scrollHeight));
+      textarea.style.height = `${targetHeight}px`;
+    }
   }
 
   private syncActiveSubtitleWithTime(curMs: number) {

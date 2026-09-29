@@ -1002,6 +1002,29 @@ describe('hardsub output directory management', () => {
     });
   });
 
+  describe('subtitle cards rendering and auto-resize', () => {
+    it('auto-resizes cue textarea based on scrollHeight within bounds', () => {
+      const { internal } = fixture();
+      const mockTextarea = {
+        style: {} as Record<string, string>,
+        scrollHeight: 120,
+      } as unknown as HTMLTextAreaElement;
+
+      (internal as any).autoResizeCueTextarea(mockTextarea);
+      expect(mockTextarea.style.height).toBe('120px');
+
+      // Clamps to max 240px
+      Object.defineProperty(mockTextarea, 'scrollHeight', { value: 350, configurable: true });
+      (internal as any).autoResizeCueTextarea(mockTextarea);
+      expect(mockTextarea.style.height).toBe('240px');
+
+      // Clamps to min 48px
+      Object.defineProperty(mockTextarea, 'scrollHeight', { value: 20, configurable: true });
+      (internal as any).autoResizeCueTextarea(mockTextarea);
+      expect(mockTextarea.style.height).toBe('48px');
+    });
+  });
+
   describe('companion subtitle detection and video switching lifecycle', () => {
     it('detects companion subtitle on first video load and also on subsequent video switches', async () => {
       const { controller, load, internal } = fixture();
