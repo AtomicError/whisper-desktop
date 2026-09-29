@@ -3734,13 +3734,13 @@
                             </defs>
                           </svg>
                         </div>
-                        <span class="hardsub-placeholder-hint" data-i18n="hardsub.selectVideoNotice">Select a video file above to enable the live preview</span>
+                        <span class="hardsub-placeholder-hint" dir="auto" data-i18n="hardsub.selectVideoNotice">Select a video file above to enable the live preview</span>
                       </div>
                       <div id="hardsub-placeholder-loading" class="hardsub-placeholder-content" style="display: none;">
                         <div class="hardsub-player-spinner-wrapper">
                           <div class="hardsub-player-spinner"></div>
                         </div>
-                        <span id="hardsub-placeholder-loading-text" class="hardsub-placeholder-loading-label"></span>
+                        <span id="hardsub-placeholder-loading-text" class="hardsub-placeholder-loading-label" dir="auto"></span>
                       </div>
                     </div>
 
@@ -3798,15 +3798,22 @@
                       </div>
                     </div>
                   </div>
-                  <div id="hardsub-preview-status" style="display: none; flex-direction: column; gap: 8px;">
-                    <p id="hardsub-preview-status-text" role="status" aria-live="polite" style="margin: 0;"></p>
-                    <progress id="hardsub-preview-progress" max="1" aria-labelledby="hardsub-preview-status-text" style="width: 100%;" hidden></progress>
-                    <p id="hardsub-preview-detail" dir="auto" style="margin: 0; overflow-wrap: anywhere; white-space: pre-wrap;" hidden></p>
-                    <p id="hardsub-preview-original-note" style="margin: 0; color: var(--color-text-muted);" hidden></p>
-                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                      <button type="button" id="btn-cancel-hardsub-preview" class="pill-btn" hidden></button>
-                      <button type="button" id="btn-retry-hardsub-preview" class="pill-btn" hidden></button>
+                  <div id="hardsub-preview-status" class="hardsub-preview-banner" style="display: none;">
+                    <div class="hardsub-preview-main-row">
+                      <div class="hardsub-preview-info">
+                        <div class="hardsub-preview-mini-spinner" aria-hidden="true"></div>
+                        <p id="hardsub-preview-status-text" role="status" aria-live="polite"></p>
+                      </div>
+                      <div class="hardsub-preview-progress-wrapper" hidden>
+                        <progress id="hardsub-preview-progress" max="1" aria-labelledby="hardsub-preview-status-text" hidden></progress>
+                      </div>
+                      <div class="hardsub-preview-actions">
+                        <button type="button" id="btn-cancel-hardsub-preview" class="pill-btn hardsub-preview-action-btn" hidden></button>
+                        <button type="button" id="btn-retry-hardsub-preview" class="pill-btn hardsub-preview-action-btn" hidden></button>
+                      </div>
                     </div>
+                    <p id="hardsub-preview-original-note" class="hardsub-preview-note" hidden></p>
+                    <p id="hardsub-preview-detail" dir="auto" class="hardsub-preview-detail-text" hidden></p>
                   </div>
                 </div>
 

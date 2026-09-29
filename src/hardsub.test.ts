@@ -587,8 +587,8 @@ describe('compatible preview recovery', () => {
     controller.prefillFilePaths('/video.mp4', '');
     await flush();
 
-    // Advance timers by direct timeout (6000ms) without calling video.ready()
-    vi.advanceTimersByTime(6000);
+    // Advance timers by direct timeout (3000ms) without calling video.ready()
+    vi.advanceTimersByTime(3000);
     await flush();
 
     const advances = invoke.mock.calls.filter(([command]) => command === 'advance_hardsub_preview');

@@ -8222,15 +8222,21 @@ body.hardsub-fullscreen-active #app-container {
 
 /* Hardsub Video Viewport Loading & Idle States */
 .hardsub-placeholder-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 40px;
   text-align: center;
-  width: 100%;
-  height: 100%;
-  min-height: 240px;
+  z-index: 4;
+  box-sizing: border-box;
 }
 
 .hardsub-placeholder-content {
@@ -8239,14 +8245,18 @@ body.hardsub-fullscreen-active #app-container {
   align-items: center;
   justify-content: center;
   gap: 14px;
+  width: 100%;
+  max-width: 420px;
+  text-align: center;
 }
 
 .hardsub-placeholder-hint {
   font-size: 0.85rem;
   color: var(--color-text-muted);
   font-weight: 500;
-  max-width: 260px;
+  max-width: 280px;
   line-height: 1.45;
+  text-align: center;
 }
 
 .hardsub-player-spinner-wrapper {
@@ -8275,43 +8285,86 @@ body.hardsub-fullscreen-active #app-container {
   color: var(--color-cyan, #06b6d4);
   letter-spacing: 0.2px;
   animation: transcriptPulse 2s ease-in-out infinite;
+  text-align: center;
 }
 
 /* Hardsub Preview Status Card & Progress Bar */
 #hardsub-preview-status {
   background: rgba(255, 255, 255, 0.035);
-  border: 1px solid rgba(var(--color-royal-blue-rgb), 0.2);
-  border-radius: 12px;
-  padding: 12px 16px;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  border: 1px solid rgba(var(--color-royal-blue-rgb), 0.25);
+  border-radius: 10px;
+  padding: 8px 14px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
   animation: fadeIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-direction: column;
+  gap: 6px;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+#hardsub-preview-status.is-error {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.hardsub-preview-main-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.hardsub-preview-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.hardsub-preview-mini-spinner {
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(6, 182, 212, 0.2);
+  border-top-color: var(--color-cyan, #06b6d4);
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+  flex-shrink: 0;
+}
+
+#hardsub-preview-status:not(.is-busy) .hardsub-preview-mini-spinner {
+  display: none;
 }
 
 #hardsub-preview-status-text {
-  font-size: 0.88rem;
+  font-size: 0.82rem;
   font-weight: 600;
   color: var(--color-text-main, #e2e8f0);
+  margin: 0;
+  line-height: 1.2;
 }
 
-#hardsub-preview-detail {
-  font-size: 0.8rem;
-  color: var(--color-text-muted, #94a3b8);
-  background: rgba(0, 0, 0, 0.25);
-  padding: 8px 12px;
-  border-radius: 6px;
-  border-inline-start: 3px solid #ef4444;
+#hardsub-preview-status.is-error #hardsub-preview-status-text {
+  color: #f87171;
 }
 
-#hardsub-preview-original-note {
-  font-size: 0.78rem;
+.hardsub-preview-progress-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 60px;
+}
+
+.hardsub-preview-progress-wrapper[hidden],
+.hardsub-preview-progress-wrapper:has(#hardsub-preview-progress[hidden]) {
+  display: none;
 }
 
 #hardsub-preview-progress {
   width: 100%;
-  height: 6px;
-  border-radius: 3px;
+  height: 4px;
+  border-radius: 2px;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.08);
   border: none;
@@ -8323,20 +8376,86 @@ body.hardsub-fullscreen-active #app-container {
 
 #hardsub-preview-progress::-webkit-progress-bar {
   background: rgba(255, 255, 255, 0.08);
-  border-radius: 3px;
+  border-radius: 2px;
 }
 
 #hardsub-preview-progress::-webkit-progress-value {
   background: linear-gradient(90deg, var(--color-royal-blue), var(--color-cyan, #06b6d4));
-  border-radius: 3px;
-  box-shadow: 0 0 8px rgba(6, 182, 212, 0.4);
+  border-radius: 2px;
+  box-shadow: 0 0 6px rgba(6, 182, 212, 0.4);
   transition: width 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   will-change: width;
 }
 
 #hardsub-preview-progress::-moz-progress-bar {
   background: linear-gradient(90deg, var(--color-royal-blue), var(--color-cyan, #06b6d4));
-  border-radius: 3px;
+  border-radius: 2px;
+}
+
+.hardsub-preview-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.hardsub-preview-action-btn {
+  height: 26px;
+  padding: 3px 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.hardsub-preview-action-btn[hidden] {
+  display: none !important;
+}
+
+#btn-cancel-hardsub-preview {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--color-text-muted, #94a3b8);
+}
+
+#btn-cancel-hardsub-preview:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+}
+
+#btn-retry-hardsub-preview {
+  background: rgba(var(--color-royal-blue-rgb), 0.2);
+  border: 1px solid var(--color-royal-blue);
+  color: #fff;
+}
+
+#btn-retry-hardsub-preview:hover {
+  background: var(--color-royal-blue);
+  color: #fff;
+}
+
+.hardsub-preview-note {
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #94a3b8);
+  margin: 0;
+  line-height: 1.3;
+}
+
+.hardsub-preview-detail-text {
+  font-size: 0.78rem;
+  color: var(--color-text-muted, #94a3b8);
+  background: rgba(0, 0, 0, 0.25);
+  padding: 6px 10px;
+  border-radius: 6px;
+  border-inline-start: 3px solid #ef4444;
+  margin: 2px 0 0 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 /* Indeterminate dynamic wave for progress bar */

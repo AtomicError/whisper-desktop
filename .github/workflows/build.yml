@@ -435,6 +435,7 @@ jobs:
           Get-ChildItem -Path "whisper.cpp-src/build-vulkan/bin/Release/*.dll" | Copy-Item -Destination "whisper-bins/universal/" -Force
           Get-ChildItem -Path "whisper.cpp-src/build-openvino/bin/Release/*.dll" | Copy-Item -Destination "whisper-bins/universal/" -Force
           Get-ChildItem -Path "openvino-dlls/*.dll" -ErrorAction SilentlyContinue | Copy-Item -Destination "whisper-bins/universal/" -Force
+          if (Test-Path "openvino-dlls/cache.json") { Copy-Item "openvino-dlls/cache.json" "whisper-bins/universal/" -Force }
           if ($vcompDll) { Copy-Item $vcompDll.FullName "whisper-bins/universal/" -Force }
           if (Test-Path "whisper-bins/vulkan-1.dll") { Copy-Item "whisper-bins/vulkan-1.dll" "whisper-bins/universal/" -Force }
 

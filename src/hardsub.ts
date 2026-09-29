@@ -2540,7 +2540,12 @@ export class HardsubController {
       this.videoStatusBadge.style.color = this.phase === 'error' ? '#EF4444' : playing ? '#10B981' : 'var(--color-royal-blue)';
     }
     const showPreviewCard = busy || recovery;
-    if (this.previewStatus) this.previewStatus.style.display = showPreviewCard ? 'flex' : 'none';
+    if (this.previewStatus) {
+      this.previewStatus.style.display = showPreviewCard ? 'flex' : 'none';
+      this.previewStatus.classList.toggle('is-busy', busy);
+      this.previewStatus.classList.toggle('is-error', this.phase === 'error');
+      this.previewStatus.classList.toggle('is-cancelled', this.phase === 'cancelled');
+    }
     if (this.previewStatusText && this.previewStatusText.textContent !== message) this.previewStatusText.textContent = message;
     if (this.previewCancelBtn) {
       this.previewCancelBtn.hidden = !busy || !actionsVisible;
@@ -2554,6 +2559,10 @@ export class HardsubController {
     }
     if (this.previewProgressElement) {
       this.previewProgressElement.hidden = !busy;
+      const progressWrapper = this.previewProgressElement.parentElement;
+      if (progressWrapper?.classList.contains('hardsub-preview-progress-wrapper')) {
+        progressWrapper.hidden = !busy;
+      }
       if (this.previewProgress === null) this.previewProgressElement.removeAttribute('value');
       else this.previewProgressElement.value = this.previewProgress;
     }
@@ -3718,7 +3727,7 @@ export class HardsubController {
     if (this.subtitleCanvas) this.subtitleCanvas.style.display = 'block';
     this.syncPlayPauseUI();
     this.updateVideoPreviewOverlayBounds();
-    const timeoutMs = candidate.stage === 'direct' ? 6_000 : 45_000;
+    const timeoutMs = candidate.stage === 'direct' ? 3_000 : 45_000;
     this.resetLoadingTimeout(generation, candidate.candidateId, timeoutMs);
     this.accordionTimeout = setTimeout(() => {
       if (generation !== this.videoLoadGeneration || this.candidateId !== candidate.candidateId || !this.pageActive) return;
