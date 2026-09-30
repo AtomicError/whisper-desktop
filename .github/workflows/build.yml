@@ -117,16 +117,20 @@ jobs:
           wget -q https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
           sudo gpg --dearmor -o /usr/share/keyrings/intel-openvino.gpg GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
           echo "deb [signed-by=/usr/share/keyrings/intel-openvino.gpg] https://apt.repos.intel.com/openvino ubuntu22 main" | sudo tee /etc/apt/sources.list.d/intel-openvino.list
+
+          wget -qO - https://repositories.intel.com/gpu/intel-graphics.key | sudo gpg --yes --dearmor -o /usr/share/keyrings/intel-graphics.gpg
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/gpu/ubuntu jammy client" | sudo tee /etc/apt/sources.list.d/intel-gpu-jammy.list
+
           sudo apt-get update
           sudo apt-get install -y \
             libopenvino-dev-2024.2.0 \
             libopenvino-intel-cpu-plugin-2024.2.0 \
             libopenvino-intel-gpu-plugin-2024.2.0 \
-            libopenvino-intel-npu-plugin-2024.2.0 \
             libopenvino-auto-plugin-2024.2.0 \
             libopenvino-auto-batch-plugin-2024.2.0 \
             libopenvino-hetero-plugin-2024.2.0 \
-            ocl-icd-libopencl1
+            ocl-icd-libopencl1 \
+            libze1
 
       - name: Install Linux dependencies (Ubuntu ARM64)
         if: matrix.platform == 'ubuntu-24.04-arm'
@@ -259,6 +263,7 @@ jobs:
           find /usr/lib -name "libopenvino*.so*" -exec cp -d {} openvino-libs/ \; 2>/dev/null || true
           find /usr/lib -name "cache.json" -exec cp -d {} openvino-libs/ \; 2>/dev/null || true
           find /usr/lib -name "libtbb*.so*" -exec cp -d {} openvino-libs/ \; 2>/dev/null || true
+          find openvino-libs -xtype l -delete 2>/dev/null || true
 
           # Harvest CUDA runtime shared libraries from system (cudart, cublas, cublasLt, nvJitLink)
           find /usr/local/cuda* -name "libcudart.so*" -exec cp -d {} cuda-libs/ \; 2>/dev/null || true
@@ -691,9 +696,10 @@ jobs:
           cp ffmpeg-bins/ffmpeg src-tauri/resources/
           cp ffmpeg-bins/ffprobe src-tauri/resources/
           cp src/fonts/* src-tauri/resources/fonts/ || true
+          find src-tauri/resources -xtype l -delete 2>/dev/null || true
           chmod +x src-tauri/resources/whisper-cli-* src-tauri/resources/*.so* src-tauri/resources/ffmpeg src-tauri/resources/ffprobe 2>/dev/null || true
 
-          npm run tauri build -- -b deb,appimage
+          npm run tauri build -- -b deb,appimage --verbose
 
           UNIVERSAL_APPIMAGE=$(find src-tauri/target/release/bundle/appimage/ -name "*.AppImage" | head -n 1)
           fix_appimage_graphics "$UNIVERSAL_APPIMAGE"
@@ -717,12 +723,13 @@ jobs:
           cp ffmpeg-bins/ffmpeg src-tauri/resources/
           cp ffmpeg-bins/ffprobe src-tauri/resources/
           cp src/fonts/* src-tauri/resources/fonts/ || true
+          find src-tauri/resources -xtype l -delete 2>/dev/null || true
           chmod +x src-tauri/resources/whisper-cli-* src-tauri/resources/*.so* src-tauri/resources/ffmpeg src-tauri/resources/ffprobe 2>/dev/null || true
 
           # Clean previous build artifacts before second pass
           rm -rf src-tauri/target/release/bundle/appimage/* src-tauri/target/release/bundle/deb/* src-tauri/target/release/bundle/rpm/*
 
-          npm run tauri build -- -b deb,appimage
+          npm run tauri build -- -b deb,appimage --verbose
 
           CUDA_APPIMAGE=$(find src-tauri/target/release/bundle/appimage/ -name "*.AppImage" | head -n 1)
           fix_appimage_graphics "$CUDA_APPIMAGE"
