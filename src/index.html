@@ -3835,13 +3835,19 @@
                   </div>
 
                   <!-- 2. Primary Actions Row -->
-                  <div style="display: flex; gap: 10px; align-items: center;">
-                    <button class="btn-primary" id="btn-start-hardsub" style="flex: 1; justify-content: center; padding: 12px 18px; font-size: 0.95rem; font-weight: 600; gap: 10px;">
+                  <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <button class="btn-primary" id="btn-start-hardsub" style="flex: 1; min-width: 200px; justify-content: center; padding: 12px 18px; font-size: 0.95rem; font-weight: 600; gap: 10px;">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width: 18px; height: 18px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                       <span data-i18n="hardsub.exportHardsubVideo">Export Hardsub Video</span>
                     </button>
                     <button class="btn-secondary" id="btn-cancel-hardsub" style="display: none; padding: 12px 18px; border-color: rgba(239, 68, 68, 0.4); color: #ef4444; background: rgba(239, 68, 68, 0.1); font-weight: 600;">
                       <span data-i18n="common.cancel">Cancel</span>
+                    </button>
+                    <button class="btn-secondary" id="btn-play-hardsub-video" style="display: none; padding: 12px 18px; align-items: center; gap: 6px; font-weight: 600;" type="button" title="Play Video" data-i18n-title="hardsub.playVideo">
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                        <polygon points="6 4 20 12 6 20 6 4"/>
+                      </svg>
+                      <span data-i18n="hardsub.playVideo">Play Video</span>
                     </button>
                     <button class="btn-secondary" id="btn-open-hardsub-folder" style="display: none; padding: 12px 18px; align-items: center; gap: 6px; font-weight: 600;" type="button" title="Open Output Folder" data-i18n-title="hardsub.openOutputFolder">
                       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

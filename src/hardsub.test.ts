@@ -146,6 +146,7 @@ function fixture() {
   const btnBrowseDir = new Control();
   const btnResetDir = new Control();
   const btnOpenFolder = new Control();
+  const btnPlayVideo = new Control();
   const telemetryBox = new Control();
   const volumeWrapper = new Control();
   const volumeBtn = new Control();
@@ -161,6 +162,7 @@ function fixture() {
   doc.elements.set('btn-browse-hardsub-dir', btnBrowseDir);
   doc.elements.set('btn-reset-hardsub-dir', btnResetDir);
   doc.elements.set('btn-open-hardsub-folder', btnOpenFolder);
+  doc.elements.set('btn-play-hardsub-video', btnPlayVideo);
   doc.elements.set('hardsub-telemetry-box', telemetryBox);
   doc.elements.set('hardsub-volume-wrapper', volumeWrapper);
   doc.elements.set('hardsub-btn-volume', volumeBtn);
@@ -192,6 +194,7 @@ function fixture() {
     btnBrowseDir: Control;
     btnResetDir: Control;
     btnOpenFolder: Control;
+    btnPlayVideo: Control;
     telemetryBox: Control;
     updateEncodingUIState(active: boolean): void;
     setupVideoPlayerEvents(): void;
@@ -199,6 +202,7 @@ function fixture() {
     resetOutputDir(): void;
     updateOutputDirUI(): void;
     openOutputFolder(): Promise<void>;
+    openExportedVideo(): Promise<void>;
     phase: string;
     loadSubtitleFile(subPath: string): Promise<void>;
     isPlayerFullscreen: boolean;
@@ -210,7 +214,7 @@ function fixture() {
   Object.assign(internal, {
     videoElement: video, videoSeekSlider: slider, videoPlayBtn: play, lblVideoName: label, videoStatusBadge: badge, videoTimeDisplay: time,
     videoIconPlay: iconPlay, videoIconPause: iconPause,
-    outputDirText, btnBrowseDir, btnResetDir, btnOpenFolder, telemetryBox,
+    outputDirText, btnBrowseDir, btnResetDir, btnOpenFolder, btnPlayVideo, telemetryBox,
     volumeControlWrapper: volumeWrapper, videoVolumeBtn: volumeBtn, videoVolumeSlider: volumeSlider,
     videoFullscreenBtn: fullscreenBtn, videoIconFsEnter: iconFsEnter, videoIconFsExit: iconFsExit,
     btnClearVideo, btnClearSub, btnResetAll,
@@ -232,7 +236,7 @@ function fixture() {
     if (active) controller.setPageActive(true);
     video.pause.mockClear();
   };
-  return { controller, video, slider, play, iconPlay, iconPause, label, badge, time, container, internal, load, cancel, retry, outputDirText, btnBrowseDir, btnResetDir, btnOpenFolder, telemetryBox, volumeWrapper, volumeBtn, volumeSlider, btnClearVideo, btnClearSub, btnResetAll, fullscreenBtn, iconFsEnter, iconFsExit, fontSelect, boldBtn, italicBtn };
+  return { controller, video, slider, play, iconPlay, iconPause, label, badge, time, container, internal, load, cancel, retry, outputDirText, btnBrowseDir, btnResetDir, btnOpenFolder, btnPlayVideo, telemetryBox, volumeWrapper, volumeBtn, volumeSlider, btnClearVideo, btnClearSub, btnResetAll, fullscreenBtn, iconFsEnter, iconFsExit, fontSelect, boldBtn, italicBtn };
 }
 
 beforeAll(async () => {
@@ -740,15 +744,24 @@ describe('hardsub output directory management', () => {
     expect(invoke).toHaveBeenCalledWith('open_file_in_editor', { filePath: '/media/movies' });
   });
 
-  it('clears lastExportedPath and hides open folder button when new video is selected', async () => {
-    const { controller, internal, btnOpenFolder } = fixture();
+  it('openExportedVideo invokes open_file_in_editor with target video file', async () => {
+    const { internal } = fixture();
+    internal.state.outputPath = '/media/movies/intro_hardsub.mp4';
+    await internal.openExportedVideo();
+    expect(invoke).toHaveBeenCalledWith('open_file_in_editor', { filePath: '/media/movies/intro_hardsub.mp4' });
+  });
+
+  it('clears lastExportedPath and hides open folder and play video buttons when new video is selected', async () => {
+    const { controller, internal, btnOpenFolder, btnPlayVideo } = fixture();
     btnOpenFolder.style.display = 'inline-flex';
+    btnPlayVideo.style.display = 'inline-flex';
     (internal as any).lastExportedPath = '/media/movies/old_hardsub.mp4';
 
     controller.prefillFilePaths('/media/movies/new_video.mp4', '');
     await flush();
 
     expect(btnOpenFolder.style.display).toBe('none');
+    expect(btnPlayVideo.style.display).toBe('none');
     expect((internal as any).lastExportedPath).toBeNull();
   });
 

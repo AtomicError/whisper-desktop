@@ -27,6 +27,12 @@ describe('locale consistency for speed presets', () => {
       expect(hardsub.speedPresetMedium.length).toBeGreaterThan(0);
       expect(typeof hardsub.speedPresetSlow).toBe('string');
       expect(hardsub.speedPresetSlow.length).toBeGreaterThan(0);
+      expect(typeof hardsub.playVideo).toBe('string');
+      expect(hardsub.playVideo.length).toBeGreaterThan(0);
+      const toasts = (dict as any).toasts;
+      expect(toasts).toBeDefined();
+      expect(typeof toasts.openVideoError).toBe('string');
+      expect(toasts.openVideoError.length).toBeGreaterThan(0);
     });
 
     it(`locale ${code} has all media metadata specification keys`, () => {
@@ -173,6 +179,7 @@ describe('locale consistency for speed presets', () => {
     expect(fa.translate.viewSource).toBe('فقط اصلی');
     expect(fa.translate.sameAsSource).toBe('مشابه پوشه فایل اصلی');
     expect(fa.hardsub.videoSection).toBe('ویدیوی اصلی');
+    expect(fa.hardsub.playVideo).toBe('پخش ویدیو');
     expect(fa.translate.progressLines).toContain('{current}');
   });
 });

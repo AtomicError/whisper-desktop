@@ -814,6 +814,7 @@ export class HardsubController {
   private btnBrowseDir: HTMLButtonElement | null = null;
   private btnResetDir: HTMLButtonElement | null = null;
   private btnOpenFolder: HTMLButtonElement | null = null;
+  private btnPlayVideo: HTMLButtonElement | null = null;
   private lastExportedPath: string | null = null;
   private lastStatusPayload: {
     progress: number;
@@ -1310,6 +1311,7 @@ export class HardsubController {
     this.btnBrowseDir = document.getElementById('btn-browse-hardsub-dir') as HTMLButtonElement;
     this.btnResetDir = document.getElementById('btn-reset-hardsub-dir') as HTMLButtonElement;
     this.btnOpenFolder = document.getElementById('btn-open-hardsub-folder') as HTMLButtonElement;
+    this.btnPlayVideo = document.getElementById('btn-play-hardsub-video') as HTMLButtonElement;
   }
 
   private async loadFontsAndHardware() {
@@ -1875,6 +1877,10 @@ export class HardsubController {
 
     this.on(this.btnOpenFolder, 'click', () => {
       this.openOutputFolder();
+    });
+
+    this.on(this.btnPlayVideo, 'click', () => {
+      this.openExportedVideo();
     });
   }
 
@@ -3566,6 +3572,9 @@ export class HardsubController {
     if (this.btnOpenFolder) {
       this.btnOpenFolder.style.display = 'none';
     }
+    if (this.btnPlayVideo) {
+      this.btnPlayVideo.style.display = 'none';
+    }
     if (this.telemetryBox) {
       this.telemetryBox.style.display = 'none';
     }
@@ -4048,7 +4057,26 @@ export class HardsubController {
       console.error('Failed to open folder:', err);
       const notifyFn = (window as any).showNotification;
       if (typeof notifyFn === 'function') {
-        notifyFn(String(err || 'Failed to open output directory'), 'error');
+        notifyFn(t('toasts.openFolderError', { error: String(err) }) || String(err), 'error');
+      }
+    }
+  }
+
+  public async openExportedVideo() {
+    const targetPath = this.lastExportedPath || this.state.outputPath;
+    if (!targetPath) return;
+    try {
+      const win = window as any;
+      if (typeof win.openFileInEditor === 'function') {
+        await win.openFileInEditor(targetPath);
+        return;
+      }
+      await invoke('open_file_in_editor', { filePath: targetPath });
+    } catch (err) {
+      console.error('Failed to open exported video:', err);
+      const notifyFn = (window as any).showNotification;
+      if (typeof notifyFn === 'function') {
+        notifyFn(t('toasts.openVideoError', { error: String(err) }) || String(err), 'error');
       }
     }
   }
@@ -4142,6 +4170,9 @@ export class HardsubController {
     if (this.btnOpenFolder) {
       this.btnOpenFolder.style.display = 'none';
     }
+    if (this.btnPlayVideo) {
+      this.btnPlayVideo.style.display = 'none';
+    }
     this.updateMediaAccordionSummary();
     this.updateResetAllButtonVisibility();
   }
@@ -4151,6 +4182,7 @@ export class HardsubController {
     ++this.subtitleSerial;
     this.isCompanionSubtitle = false;
     this.state.subtitlePath = '';
+    this.lastExportedPath = null;
     if (this.subtitlePathInput) this.subtitlePathInput.value = '';
     this.subtitleCues = [];
     this.maxCueDuration = 0;
@@ -4168,6 +4200,12 @@ export class HardsubController {
     }
     this.updateComputedOutputPath();
     this.updateOutputDirUI();
+    if (this.btnOpenFolder) {
+      this.btnOpenFolder.style.display = 'none';
+    }
+    if (this.btnPlayVideo) {
+      this.btnPlayVideo.style.display = 'none';
+    }
     this.updateMediaAccordionSummary();
     this.updateResetAllButtonVisibility();
   }
@@ -4513,6 +4551,9 @@ export class HardsubController {
     if (active && this.btnOpenFolder) {
       this.btnOpenFolder.style.display = 'none';
     }
+    if (active && this.btnPlayVideo) {
+      this.btnPlayVideo.style.display = 'none';
+    }
 
     if (this.telemetryBox) {
       if (active) {
@@ -4582,6 +4623,9 @@ export class HardsubController {
         }
         if (this.btnOpenFolder) {
           this.btnOpenFolder.style.display = 'inline-flex';
+        }
+        if (this.btnPlayVideo) {
+          this.btnPlayVideo.style.display = 'inline-flex';
         }
       }
 
@@ -4932,6 +4976,9 @@ ${events}`;
       if (this.btnOpenFolder) {
         this.btnOpenFolder.style.display = 'none';
       }
+      if (this.btnPlayVideo) {
+        this.btnPlayVideo.style.display = 'none';
+      }
       if (this.telemetryBox) {
         this.telemetryBox.style.display = 'flex';
       }
@@ -4952,6 +4999,9 @@ ${events}`;
       }
       if (this.btnOpenFolder) {
         this.btnOpenFolder.style.display = 'inline-flex';
+      }
+      if (this.btnPlayVideo) {
+        this.btnPlayVideo.style.display = 'inline-flex';
       }
       if (this.progressStatusText) {
         this.progressStatusText.textContent = t('hardsub.statusExportSuccess');
