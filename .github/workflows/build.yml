@@ -339,7 +339,7 @@ jobs:
             -DGGML_CPU_ALL_VARIANTS=ON `
             -DGGML_NATIVE=OFF `
             -DBUILD_SHARED_LIBS=ON
-          cmake --build whisper.cpp-src/build-standard --config Release --target whisper-cli
+          cmake --build whisper.cpp-src/build-standard -j --config Release --target whisper-cli
 
           # 2. Vulkan Backend
           Write-Host "Building Vulkan backend for Windows..."
@@ -350,7 +350,7 @@ jobs:
             -DGGML_CPU_ALL_VARIANTS=ON `
             -DGGML_NATIVE=OFF `
             -DBUILD_SHARED_LIBS=ON
-          cmake --build whisper.cpp-src/build-vulkan --config Release --target whisper-cli
+          cmake --build whisper.cpp-src/build-vulkan -j --config Release --target whisper-cli
 
           # Copy Vulkan Runtime Loader DLL
           if ($env:VULKAN_SDK -and (Test-Path "$env:VULKAN_SDK\Bin\vulkan-1.dll")) {
@@ -378,7 +378,7 @@ jobs:
             -DGGML_CPU_ALL_VARIANTS=ON `
             -DGGML_NATIVE=OFF `
             -DBUILD_SHARED_LIBS=ON
-          cmake --build whisper.cpp-src/build-openvino --config Release --target whisper-cli
+          cmake --build whisper.cpp-src/build-openvino -j --config Release --target whisper-cli
 
           # Copy OpenVINO & TBB runtime DLLs to dedicated cache folder
           Get-ChildItem -Path "$($openvinoDir.FullName)/runtime/bin/intel64/Release/*.dll" | Copy-Item -Destination openvino-dlls/ -Force
@@ -414,7 +414,7 @@ jobs:
             -DGGML_CPU_ALL_VARIANTS=ON `
             -DGGML_NATIVE=OFF `
             -DBUILD_SHARED_LIBS=ON
-          cmake --build whisper.cpp-src/build-cuda --config Release --target whisper-cli
+          cmake --build whisper.cpp-src/build-cuda -j --config Release --target whisper-cli
 
           # 5. CUDA runtime DLLs
           if ($env:CUDA_PATH) {
