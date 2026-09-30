@@ -573,26 +573,60 @@ html.theme-transitioning .batch-queue-panel {
 }
 
 /* ==========================================================================
-   EXCLUSIVE BLUE FLOATING THUMB (ONLY FONT SELECT & AI TRANSLATION MODELS)
+   THEMED FLOATING SCROLLBAR THUMB (ADAPTIVE TO ACTIVE THEME ACROSS APP)
    ========================================================================== */
-.options-for-hardsub-font::-webkit-scrollbar,
-.options-for-opt-translateAiModel::-webkit-scrollbar,
+
+/* 1. Track & Dimensions (Sleek 8px Floating Pill) */
+#transcript-viewport::-webkit-scrollbar,
+.log-viewport::-webkit-scrollbar,
+.translate-cues-list::-webkit-scrollbar,
+#hardsub-subtitle-list::-webkit-scrollbar,
+.models-table-body::-webkit-scrollbar,
+#mgr-models-tbody::-webkit-scrollbar,
 #models-list-scroll::-webkit-scrollbar,
 .providers-table-wrapper::-webkit-scrollbar,
 #provider-tab-models::-webkit-scrollbar,
-.custom-select-options::-webkit-scrollbar {
+#provider-tab-providers::-webkit-scrollbar,
+.provider-grid::-webkit-scrollbar,
+.batch-table-wrapper::-webkit-scrollbar,
+.transcribe-left-panel::-webkit-scrollbar,
+.translate-left-panel::-webkit-scrollbar,
+.hardsub-left-panel::-webkit-scrollbar,
+#hardsub-tab-view-style::-webkit-scrollbar,
+#hardsub-tab-view-export::-webkit-scrollbar,
+.modal-card::-webkit-scrollbar,
+.modal-details-box::-webkit-scrollbar,
+.about-modal-card::-webkit-scrollbar,
+.custom-select-options::-webkit-scrollbar,
+[class*="options-for-"]::-webkit-scrollbar {
   width: 8px !important;
   height: 8px !important;
   background: transparent !important;
   background-color: transparent !important;
 }
 
-.options-for-hardsub-font::-webkit-scrollbar-track,
-.options-for-opt-translateAiModel::-webkit-scrollbar-track,
+#transcript-viewport::-webkit-scrollbar-track,
+.log-viewport::-webkit-scrollbar-track,
+.translate-cues-list::-webkit-scrollbar-track,
+#hardsub-subtitle-list::-webkit-scrollbar-track,
+.models-table-body::-webkit-scrollbar-track,
+#mgr-models-tbody::-webkit-scrollbar-track,
 #models-list-scroll::-webkit-scrollbar-track,
 .providers-table-wrapper::-webkit-scrollbar-track,
 #provider-tab-models::-webkit-scrollbar-track,
-.custom-select-options::-webkit-scrollbar-track {
+#provider-tab-providers::-webkit-scrollbar-track,
+.provider-grid::-webkit-scrollbar-track,
+.batch-table-wrapper::-webkit-scrollbar-track,
+.transcribe-left-panel::-webkit-scrollbar-track,
+.translate-left-panel::-webkit-scrollbar-track,
+.hardsub-left-panel::-webkit-scrollbar-track,
+#hardsub-tab-view-style::-webkit-scrollbar-track,
+#hardsub-tab-view-export::-webkit-scrollbar-track,
+.modal-card::-webkit-scrollbar-track,
+.modal-details-box::-webkit-scrollbar-track,
+.about-modal-card::-webkit-scrollbar-track,
+.custom-select-options::-webkit-scrollbar-track,
+[class*="options-for-"]::-webkit-scrollbar-track {
   background: transparent !important;
   background-color: transparent !important;
   border: none !important;
@@ -600,55 +634,161 @@ html.theme-transitioning .batch-queue-panel {
   box-shadow: none !important;
 }
 
-.options-for-hardsub-font::-webkit-scrollbar-thumb,
-.options-for-opt-translateAiModel::-webkit-scrollbar-thumb,
-#custom-select-hardsub-font .custom-select-options::-webkit-scrollbar-thumb,
-#custom-select-opt-translateAiModel .custom-select-options::-webkit-scrollbar-thumb,
-#hardsub-font::-webkit-scrollbar-thumb,
-#opt-translateAiModel::-webkit-scrollbar-thumb,
+/* 2. Resting Thumb (Discoverable, Refined 0.35 Opacity with Active Theme Color) */
+#transcript-viewport::-webkit-scrollbar-thumb,
+.log-viewport::-webkit-scrollbar-thumb,
+.translate-cues-list::-webkit-scrollbar-thumb,
+#hardsub-subtitle-list::-webkit-scrollbar-thumb,
+.models-table-body::-webkit-scrollbar-thumb,
+#mgr-models-tbody::-webkit-scrollbar-thumb,
 #models-list-scroll::-webkit-scrollbar-thumb,
 .providers-table-wrapper::-webkit-scrollbar-thumb,
 #provider-tab-models::-webkit-scrollbar-thumb,
 #provider-tab-providers::-webkit-scrollbar-thumb,
 .provider-grid::-webkit-scrollbar-thumb,
-.custom-select-options::-webkit-scrollbar-thumb {
-  background: var(--color-royal-blue) !important;
+.batch-table-wrapper::-webkit-scrollbar-thumb,
+.transcribe-left-panel::-webkit-scrollbar-thumb,
+.translate-left-panel::-webkit-scrollbar-thumb,
+.hardsub-left-panel::-webkit-scrollbar-thumb,
+#hardsub-tab-view-style::-webkit-scrollbar-thumb,
+#hardsub-tab-view-export::-webkit-scrollbar-thumb,
+.modal-card::-webkit-scrollbar-thumb,
+.modal-details-box::-webkit-scrollbar-thumb,
+.about-modal-card::-webkit-scrollbar-thumb,
+.custom-select-options::-webkit-scrollbar-thumb,
+[class*="options-for-"]::-webkit-scrollbar-thumb {
+  background: var(--color-accent) !important;
   border-radius: 9999px !important;
   border: 2px solid transparent !important;
   background-clip: padding-box !important;
-  opacity: 0 !important;
-  transition: opacity 0.3s ease, background 0.3s ease;
+  opacity: 0.35 !important;
+  transition: opacity 0.25s ease, background 0.25s ease, box-shadow 0.25s ease;
 }
 
+/* 3. Active Scrolling & Container Hover State (Elevated 0.75 Opacity) */
 .scrolling-active::-webkit-scrollbar-thumb,
-#custom-select-hardsub-font .custom-select-options:hover::-webkit-scrollbar-thumb,
-#custom-select-opt-translateAiModel .custom-select-options:hover::-webkit-scrollbar-thumb,
-.custom-select-options:hover::-webkit-scrollbar-thumb {
-  background: var(--color-royal-blue) !important;
+#transcript-viewport.scrolling-active::-webkit-scrollbar-thumb,
+#transcript-viewport:hover::-webkit-scrollbar-thumb,
+.log-viewport.scrolling-active::-webkit-scrollbar-thumb,
+.log-viewport:hover::-webkit-scrollbar-thumb,
+.translate-cues-list.scrolling-active::-webkit-scrollbar-thumb,
+.translate-cues-list:hover::-webkit-scrollbar-thumb,
+#hardsub-subtitle-list.scrolling-active::-webkit-scrollbar-thumb,
+#hardsub-subtitle-list:hover::-webkit-scrollbar-thumb,
+.models-table-body.scrolling-active::-webkit-scrollbar-thumb,
+.models-table-body:hover::-webkit-scrollbar-thumb,
+#mgr-models-tbody.scrolling-active::-webkit-scrollbar-thumb,
+#mgr-models-tbody:hover::-webkit-scrollbar-thumb,
+#models-list-scroll.scrolling-active::-webkit-scrollbar-thumb,
+#models-list-scroll:hover::-webkit-scrollbar-thumb,
+.providers-table-wrapper.scrolling-active::-webkit-scrollbar-thumb,
+.providers-table-wrapper:hover::-webkit-scrollbar-thumb,
+#provider-tab-models.scrolling-active::-webkit-scrollbar-thumb,
+#provider-tab-models:hover::-webkit-scrollbar-thumb,
+#provider-tab-providers.scrolling-active::-webkit-scrollbar-thumb,
+#provider-tab-providers:hover::-webkit-scrollbar-thumb,
+.provider-grid.scrolling-active::-webkit-scrollbar-thumb,
+.provider-grid:hover::-webkit-scrollbar-thumb,
+.batch-table-wrapper.scrolling-active::-webkit-scrollbar-thumb,
+.batch-table-wrapper:hover::-webkit-scrollbar-thumb,
+.transcribe-left-panel.scrolling-active::-webkit-scrollbar-thumb,
+.transcribe-left-panel:hover::-webkit-scrollbar-thumb,
+.translate-left-panel.scrolling-active::-webkit-scrollbar-thumb,
+.translate-left-panel:hover::-webkit-scrollbar-thumb,
+.hardsub-left-panel.scrolling-active::-webkit-scrollbar-thumb,
+.hardsub-left-panel:hover::-webkit-scrollbar-thumb,
+#hardsub-tab-view-style.scrolling-active::-webkit-scrollbar-thumb,
+#hardsub-tab-view-style:hover::-webkit-scrollbar-thumb,
+#hardsub-tab-view-export.scrolling-active::-webkit-scrollbar-thumb,
+#hardsub-tab-view-export:hover::-webkit-scrollbar-thumb,
+.modal-card.scrolling-active::-webkit-scrollbar-thumb,
+.modal-card:hover::-webkit-scrollbar-thumb,
+.modal-details-box.scrolling-active::-webkit-scrollbar-thumb,
+.modal-details-box:hover::-webkit-scrollbar-thumb,
+.about-modal-card.scrolling-active::-webkit-scrollbar-thumb,
+.about-modal-card:hover::-webkit-scrollbar-thumb,
+.custom-select-options.scrolling-active::-webkit-scrollbar-thumb,
+.custom-select-options:hover::-webkit-scrollbar-thumb,
+[class*="options-for-"]:hover::-webkit-scrollbar-thumb {
+  background: var(--color-accent) !important;
   border-radius: 9999px !important;
   border: 2px solid transparent !important;
   background-clip: padding-box !important;
-  opacity: 0.5 !important;
+  opacity: 0.75 !important;
 }
 
-.options-for-hardsub-font::-webkit-scrollbar-thumb:hover,
-.options-for-opt-translateAiModel::-webkit-scrollbar-thumb:hover,
-#custom-select-hardsub-font .custom-select-options::-webkit-scrollbar-thumb:hover,
-#custom-select-opt-translateAiModel .custom-select-options::-webkit-scrollbar-thumb:hover,
-#hardsub-font::-webkit-scrollbar-thumb:hover,
-#opt-translateAiModel::-webkit-scrollbar-thumb:hover,
+/* 4. Direct Thumb Hover & Dragging Interaction (Full 1.0 Opacity + Neon Aura) */
+#transcript-viewport::-webkit-scrollbar-thumb:hover,
+#transcript-viewport::-webkit-scrollbar-thumb:active,
+.log-viewport::-webkit-scrollbar-thumb:hover,
+.log-viewport::-webkit-scrollbar-thumb:active,
+.translate-cues-list::-webkit-scrollbar-thumb:hover,
+.translate-cues-list::-webkit-scrollbar-thumb:active,
+#hardsub-subtitle-list::-webkit-scrollbar-thumb:hover,
+#hardsub-subtitle-list::-webkit-scrollbar-thumb:active,
+.models-table-body::-webkit-scrollbar-thumb:hover,
+.models-table-body::-webkit-scrollbar-thumb:active,
+#mgr-models-tbody::-webkit-scrollbar-thumb:hover,
+#mgr-models-tbody::-webkit-scrollbar-thumb:active,
 #models-list-scroll::-webkit-scrollbar-thumb:hover,
+#models-list-scroll::-webkit-scrollbar-thumb:active,
 .providers-table-wrapper::-webkit-scrollbar-thumb:hover,
+.providers-table-wrapper::-webkit-scrollbar-thumb:active,
 #provider-tab-models::-webkit-scrollbar-thumb:hover,
+#provider-tab-models::-webkit-scrollbar-thumb:active,
 #provider-tab-providers::-webkit-scrollbar-thumb:hover,
+#provider-tab-providers::-webkit-scrollbar-thumb:active,
 .provider-grid::-webkit-scrollbar-thumb:hover,
-.custom-select-options::-webkit-scrollbar-thumb:hover {
-  background: var(--color-royal-blue) !important;
+.provider-grid::-webkit-scrollbar-thumb:active,
+.batch-table-wrapper::-webkit-scrollbar-thumb:hover,
+.batch-table-wrapper::-webkit-scrollbar-thumb:active,
+.transcribe-left-panel::-webkit-scrollbar-thumb:hover,
+.transcribe-left-panel::-webkit-scrollbar-thumb:active,
+.translate-left-panel::-webkit-scrollbar-thumb:hover,
+.translate-left-panel::-webkit-scrollbar-thumb:active,
+.hardsub-left-panel::-webkit-scrollbar-thumb:hover,
+.hardsub-left-panel::-webkit-scrollbar-thumb:active,
+#hardsub-tab-view-style::-webkit-scrollbar-thumb:hover,
+#hardsub-tab-view-style::-webkit-scrollbar-thumb:active,
+#hardsub-tab-view-export::-webkit-scrollbar-thumb:hover,
+#hardsub-tab-view-export::-webkit-scrollbar-thumb:active,
+.modal-card::-webkit-scrollbar-thumb:hover,
+.modal-card::-webkit-scrollbar-thumb:active,
+.modal-details-box::-webkit-scrollbar-thumb:hover,
+.modal-details-box::-webkit-scrollbar-thumb:active,
+.about-modal-card::-webkit-scrollbar-thumb:hover,
+.about-modal-card::-webkit-scrollbar-thumb:active,
+.custom-select-options::-webkit-scrollbar-thumb:hover,
+.custom-select-options::-webkit-scrollbar-thumb:active,
+[class*="options-for-"]::-webkit-scrollbar-thumb:hover,
+[class*="options-for-"]::-webkit-scrollbar-thumb:active {
+  background: var(--color-accent) !important;
   border-radius: 9999px !important;
   border: 2px solid transparent !important;
   background-clip: padding-box !important;
-  opacity: 0.85 !important;
-  box-shadow: 0 0 8px var(--shadow-neon-royal-blue) !important;
+  opacity: 1 !important;
+  box-shadow: 0 0 10px var(--shadow-neon-accent) !important;
+}
+
+/* Settings View: Completely Invisible & Clean Scrollbars */
+.settings-scroll-container,
+.settings-categories {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.settings-scroll-container::-webkit-scrollbar,
+.settings-categories::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
+.settings-scroll-container::-webkit-scrollbar-thumb,
+.settings-categories::-webkit-scrollbar-thumb {
+  display: none !important;
+  background: transparent !important;
 }
 
 html, body {
@@ -5900,24 +6040,11 @@ select.select-control {
 }
 
 .provider-tile-format {
-  font-size: 0.72rem;
+  font-size: 0.74rem;
   color: var(--color-text-muted);
-  background: rgba(255, 255, 255, 0.04);
-  padding: 1px 7px;
-  border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  width: fit-content;
-  max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  box-sizing: border-box;
-}
-
-.provider-tile.active .provider-tile-format {
-  color: var(--color-cyan);
-  background: rgba(var(--color-cyan-rgb), 0.08);
-  border-color: rgba(var(--color-cyan-rgb), 0.2);
 }
 
 .provider-tile-footer {
@@ -6609,9 +6736,9 @@ select.select-control {
 }
 
 .td-reasoning .custom-select-container {
-  width: auto !important;
-  min-width: 106px;
-  max-width: 124px;
+  width: 110px !important;
+  min-width: 110px !important;
+  max-width: 110px !important;
   height: 30px !important;
   min-height: 30px !important;
   margin: 0 auto;
@@ -6619,8 +6746,8 @@ select.select-control {
 
 .td-reasoning .custom-select-trigger {
   width: 100% !important;
-  min-width: 106px;
-  max-width: 124px;
+  min-width: 110px !important;
+  max-width: 110px !important;
   height: 30px !important;
   min-height: 30px !important;
   max-height: 30px !important;
@@ -6715,12 +6842,15 @@ select.select-control {
   box-shadow: 0 0 8px rgba(168, 85, 247, 0.18) !important;
 }
 
-/* Reasoning dropdown options list styling - ensure no text truncation */
+/* Reasoning dropdown options list styling - ensure exact same width and clean display */
 .custom-select-options[class*="options-for-model-reasoning"],
 [class*="options-for-model-reasoning"] {
-  min-width: 136px !important;
-  width: max-content !important;
+  min-width: 110px !important;
+  width: 110px !important;
+  max-width: 110px !important;
+  max-height: 290px !important;
   padding: 4px 0 !important;
+  box-sizing: border-box !important;
 }
 
 [class*="options-for-model-reasoning"] .custom-select-option {
@@ -7364,12 +7494,13 @@ html[dir="rtl"] .custom-select-options:not(.custom-select-ltr) .custom-select-op
   background: linear-gradient(270deg, rgba(var(--color-royal-blue-rgb), 0.12) 0%, transparent 100%) !important;
 }
 
-/* High-specificity override for reasoning dropdown in both LTR and RTL to permanently eliminate truncation */
+/* High-specificity override for reasoning dropdown in both LTR and RTL to match button width */
 html[dir="rtl"] .custom-select-options[class*="options-for-model-reasoning"],
 .rtl-layout .custom-select-options[class*="options-for-model-reasoning"],
 .custom-select-options[class*="options-for-model-reasoning"] {
-  min-width: 136px !important;
-  width: max-content !important;
+  min-width: 110px !important;
+  width: 110px !important;
+  max-width: 110px !important;
 }
 
 html[dir="rtl"] .custom-select-options[class*="options-for-model-reasoning"] .custom-select-option,
@@ -7945,24 +8076,6 @@ html[dir="rtl"] .cat-match-badge {
   scrollbar-gutter: stable;
   padding: 4px 10px 10px 10px;
   box-sizing: border-box;
-  --scrollbar-thumb: rgba(255, 255, 255, 0.2);
-  --scrollbar-track: transparent;
-  scrollbar-color: var(--scrollbar-thumb) transparent;
-  scrollbar-width: thin;
-}
-
-#hardsub-subtitle-list::-webkit-scrollbar {
-  width: 6px;
-}
-#hardsub-subtitle-list::-webkit-scrollbar-thumb {
-  background: var(--scrollbar-thumb);
-  border-radius: 3px;
-}
-#hardsub-subtitle-list::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.35);
-}
-#hardsub-subtitle-list::-webkit-scrollbar-track {
-  background: transparent;
 }
 
 .reset-link-btn {
@@ -8773,22 +8886,7 @@ body.hardsub-fullscreen-active #app-container {
   opacity: 1;
 }
 
-.about-modal-card::-webkit-scrollbar {
-  width: 5px;
-}
 
-.about-modal-card::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.about-modal-card::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 4px;
-}
-
-.about-modal-card::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.28);
-}
 
 .about-modal-close-btn {
   position: absolute;

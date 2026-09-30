@@ -1819,11 +1819,11 @@ class CustomSelect {
     const triggerWidth = Math.round(normalizedRect.width);
     const isReasoning = this.select && this.select.classList.contains('model-reasoning-select');
     const isPaginationSize = this.select && this.select.classList.contains('pagination-size-select');
-    const minDropdownWidth = isReasoning ? 136 : (isPaginationSize ? 70 : 118);
+    const minDropdownWidth = isReasoning ? triggerWidth : (isPaginationSize ? 70 : 118);
     const targetWidth = Math.max(triggerWidth, minDropdownWidth);
-    this.optionsContainer.style.width = isReasoning ? 'max-content' : 'auto';
+    this.optionsContainer.style.width = isReasoning ? `${triggerWidth}px` : 'auto';
     this.optionsContainer.style.minWidth = `${targetWidth}px`;
-    this.optionsContainer.style.maxWidth = `${Math.max(targetWidth, 280)}px`;
+    this.optionsContainer.style.maxWidth = isReasoning ? `${triggerWidth}px` : `${Math.max(targetWidth, 280)}px`;
 
     const measuredWidth = (this.optionsContainer.getBoundingClientRect().width / cssZoom) || targetWidth;
     const effectiveWidth = Math.max(targetWidth, Math.round(measuredWidth));
@@ -1831,7 +1831,9 @@ class CustomSelect {
                   document.documentElement.dir === 'rtl' ||
                   document.body.dir === 'rtl';
 
-    const leftPos = isRtl ? Math.round(normalizedRect.right - effectiveWidth) : Math.round(normalizedRect.left);
+    const leftPos = isReasoning
+      ? Math.round(normalizedRect.left)
+      : (isRtl ? Math.round(normalizedRect.right - effectiveWidth) : Math.round(normalizedRect.left));
     const maxLeft = Math.max(8, viewportWidth - effectiveWidth - 8);
     this.optionsContainer.style.left = `${Math.max(8, Math.min(leftPos, maxLeft))}px`;
     this.optionsContainer.style.right = 'auto';
@@ -2392,10 +2394,10 @@ async function initApp() {
   // Setup custom CSD titlebar controls
   setupTitlebar();
 
-  // Setup capturing scroll activity listener for target scrollbar containers (Font & AI Models)
+  // Setup capturing scroll activity listener for all scrollable containers across the application
   document.addEventListener('scroll', (e) => {
     const target = e.target;
-    if (target && target.matches && target.matches('#models-list-scroll, .providers-table-wrapper, #provider-tab-models, #provider-tab-providers, .provider-grid, #hardsub-font, #opt-translateAiModel')) {
+    if (target && target.classList && typeof target.classList.add === 'function') {
       target.classList.add('scrolling-active');
       clearTimeout(target._scrollTimer);
       target._scrollTimer = setTimeout(() => {
