@@ -592,6 +592,8 @@ html.theme-transitioning .batch-queue-panel {
 .transcribe-left-panel::-webkit-scrollbar,
 .translate-left-panel::-webkit-scrollbar,
 .hardsub-left-panel::-webkit-scrollbar,
+#panel-transcribe::-webkit-scrollbar,
+#panel-hardsub::-webkit-scrollbar,
 #hardsub-tab-view-style::-webkit-scrollbar,
 #hardsub-tab-view-export::-webkit-scrollbar,
 .modal-card::-webkit-scrollbar,
@@ -620,6 +622,8 @@ html.theme-transitioning .batch-queue-panel {
 .transcribe-left-panel::-webkit-scrollbar-track,
 .translate-left-panel::-webkit-scrollbar-track,
 .hardsub-left-panel::-webkit-scrollbar-track,
+#panel-transcribe::-webkit-scrollbar-track,
+#panel-hardsub::-webkit-scrollbar-track,
 #hardsub-tab-view-style::-webkit-scrollbar-track,
 #hardsub-tab-view-export::-webkit-scrollbar-track,
 .modal-card::-webkit-scrollbar-track,
@@ -650,6 +654,8 @@ html.theme-transitioning .batch-queue-panel {
 .transcribe-left-panel::-webkit-scrollbar-thumb,
 .translate-left-panel::-webkit-scrollbar-thumb,
 .hardsub-left-panel::-webkit-scrollbar-thumb,
+#panel-transcribe::-webkit-scrollbar-thumb,
+#panel-hardsub::-webkit-scrollbar-thumb,
 #hardsub-tab-view-style::-webkit-scrollbar-thumb,
 #hardsub-tab-view-export::-webkit-scrollbar-thumb,
 .modal-card::-webkit-scrollbar-thumb,
@@ -697,6 +703,10 @@ html.theme-transitioning .batch-queue-panel {
 .translate-left-panel:hover::-webkit-scrollbar-thumb,
 .hardsub-left-panel.scrolling-active::-webkit-scrollbar-thumb,
 .hardsub-left-panel:hover::-webkit-scrollbar-thumb,
+#panel-transcribe.scrolling-active::-webkit-scrollbar-thumb,
+#panel-transcribe:hover::-webkit-scrollbar-thumb,
+#panel-hardsub.scrolling-active::-webkit-scrollbar-thumb,
+#panel-hardsub:hover::-webkit-scrollbar-thumb,
 #hardsub-tab-view-style.scrolling-active::-webkit-scrollbar-thumb,
 #hardsub-tab-view-style:hover::-webkit-scrollbar-thumb,
 #hardsub-tab-view-export.scrolling-active::-webkit-scrollbar-thumb,
@@ -748,6 +758,10 @@ html.theme-transitioning .batch-queue-panel {
 .translate-left-panel::-webkit-scrollbar-thumb:active,
 .hardsub-left-panel::-webkit-scrollbar-thumb:hover,
 .hardsub-left-panel::-webkit-scrollbar-thumb:active,
+#panel-transcribe::-webkit-scrollbar-thumb:hover,
+#panel-transcribe::-webkit-scrollbar-thumb:active,
+#panel-hardsub::-webkit-scrollbar-thumb:hover,
+#panel-hardsub::-webkit-scrollbar-thumb:active,
 #hardsub-tab-view-style::-webkit-scrollbar-thumb:hover,
 #hardsub-tab-view-style::-webkit-scrollbar-thumb:active,
 #hardsub-tab-view-export::-webkit-scrollbar-thumb:hover,
@@ -7715,24 +7729,42 @@ html[dir="rtl"] .cat-match-badge {
   #panel-transcribe {
     overflow-y: auto !important;
     overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch;
   }
   .transcribe-layout {
     display: flex !important;
     flex-direction: column !important;
     grid-template-columns: none !important;
-    gap: 20px !important;
+    height: auto !important;
+    min-height: min-content !important;
     overflow: visible !important;
+    gap: 20px !important;
+    flex: none !important;
   }
   .transcribe-left-panel {
     height: auto !important;
+    min-height: min-content !important;
     padding-right: 0 !important;
+    padding-inline-end: 0 !important;
     overflow: visible !important;
+    flex: none !important;
   }
   .transcribe-right-panel {
+    height: auto !important;
+    min-height: min-content !important;
     overflow: visible !important;
+    contain: none !important;
+    flex: none !important;
   }
   .transcript-viewer-card {
-    min-height: 300px !important;
+    height: auto !important;
+    min-height: 320px !important;
+    overflow: visible !important;
+    flex: none !important;
+  }
+  #transcript-viewport {
+    min-height: 220px !important;
+    max-height: 440px !important;
   }
 }
 
