@@ -41,7 +41,8 @@
       "resources/ffmpeg*",
       "resources/ffprobe*",
       "resources/fonts/*",
-      "resources/*.so*"
+      "resources/*.so*",
+      "resources/openvino/*"
     ],
 
     "category": "Utility",

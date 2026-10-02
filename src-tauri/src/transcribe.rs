@@ -311,6 +311,39 @@ pub(crate) fn resolve_model_subpath(root: &Path, rel_or_abs: &str) -> PathBuf {
     resolved
 }
 
+pub(crate) fn compute_bin_candidate_rel_paths(backend: &str, exe_ext: &str) -> Vec<PathBuf> {
+    let backend_name = backend.to_lowercase();
+    let bin_name = format!("whisper-cli-{}{}", backend_name, exe_ext);
+    if backend_name == "openvino" {
+        vec![PathBuf::from("openvino").join(&bin_name), PathBuf::from(&bin_name)]
+    } else {
+        vec![PathBuf::from(&bin_name)]
+    }
+}
+
+#[cfg(unix)]
+fn copy_companion_shared_libs(src_dir: &Path, dst_dir: &Path) {
+    if let Ok(entries) = std::fs::read_dir(src_dir) {
+        for entry in entries.flatten() {
+            let src_file = entry.path();
+            if let Some(name) = src_file.file_name() {
+                let name_str = name.to_string_lossy();
+                if name_str.ends_with(".so") || name_str.contains(".so.") {
+                    let dst_file = dst_dir.join(name);
+                    let copy_so = if let (Ok(s_meta), Ok(d_meta)) = (std::fs::metadata(&src_file), std::fs::metadata(&dst_file)) {
+                        s_meta.len() != d_meta.len()
+                    } else {
+                        true
+                    };
+                    if copy_so {
+                        let _ = std::fs::copy(&src_file, &dst_file);
+                    }
+                }
+            }
+        }
+    }
+}
+
 pub async fn run_transcription(
     app: AppHandle,
     logs: std::sync::Arc<AppLogs>,
@@ -345,51 +378,54 @@ pub async fn run_transcription(
     let exe_ext = std::env::consts::EXE_SUFFIX;
     let bin_name = format!("whisper-cli-{}{}", backend_name, exe_ext);
 
-    
     use tauri::Manager;
     let mut resolved_bin: Option<std::path::PathBuf> = None;
+    let candidates = compute_bin_candidate_rel_paths(&settings.selected_backend, exe_ext);
 
-    // 1. Tauri BaseDirectory::Resource
-    if let Ok(p) = app.path().resolve(format!("resources/{}", bin_name), tauri::path::BaseDirectory::Resource) {
-        if p.exists() {
-            resolved_bin = Some(p);
-        }
-    }
-    if resolved_bin.is_none() {
-        if let Ok(p) = app.path().resolve(&bin_name, tauri::path::BaseDirectory::Resource) {
+    for candidate in &candidates {
+        let cand_str = candidate.to_string_lossy();
+        // 1. Tauri BaseDirectory::Resource
+        if let Ok(p) = app.path().resolve(format!("resources/{}", cand_str), tauri::path::BaseDirectory::Resource) {
             if p.exists() {
                 resolved_bin = Some(p);
+                break;
             }
         }
-    }
+        if let Ok(p) = app.path().resolve(&*cand_str, tauri::path::BaseDirectory::Resource) {
+            if p.exists() {
+                resolved_bin = Some(p);
+                break;
+            }
+        }
 
-    // 2. Next to running executable (Portable / Standalone mode)
-    if resolved_bin.is_none() {
+        // 2. Next to running executable (Portable / Standalone mode)
         if let Ok(exe_path) = std::env::current_exe() {
             if let Some(parent) = exe_path.parent() {
-                let res_sub = parent.join("resources").join(&bin_name);
+                let res_sub = parent.join("resources").join(candidate);
                 if res_sub.exists() {
                     resolved_bin = Some(res_sub);
+                    break;
                 } else {
-                    let next_to_exe = parent.join(&bin_name);
+                    let next_to_exe = parent.join(candidate);
                     if next_to_exe.exists() {
                         resolved_bin = Some(next_to_exe);
+                        break;
                     }
                 }
             }
         }
-    }
 
-    // 3. Dev environment paths
-    if resolved_bin.is_none() {
+        // 3. Dev environment paths
         if let Ok(cwd) = std::env::current_dir() {
-            let dev_sub = cwd.join("src-tauri").join("resources").join(&bin_name);
+            let dev_sub = cwd.join("src-tauri").join("resources").join(candidate);
             if dev_sub.exists() {
                 resolved_bin = Some(dev_sub);
+                break;
             } else {
-                let dev_direct = cwd.join("resources").join(&bin_name);
+                let dev_direct = cwd.join("resources").join(candidate);
                 if dev_direct.exists() {
                     resolved_bin = Some(dev_direct);
+                    break;
                 }
             }
         }
@@ -443,8 +479,16 @@ pub async fn run_transcription(
         
         if needs_copy {
             if let Ok(cache_dir) = app.path().app_cache_dir() {
-                let cached_bin = cache_dir.join(&bin_name);
-                let _ = std::fs::create_dir_all(&cache_dir);
+                let is_openvino_sub = bin_path.parent().and_then(|p| p.file_name()).map(|n| n == "openvino").unwrap_or(false);
+                let target_dir = if is_openvino_sub {
+                    let sub = cache_dir.join("openvino");
+                    let _ = std::fs::create_dir_all(&sub);
+                    sub
+                } else {
+                    let _ = std::fs::create_dir_all(&cache_dir);
+                    cache_dir.clone()
+                };
+                let cached_bin = target_dir.join(&bin_name);
                 
                 let should_copy = if let (Ok(src_meta), Ok(dst_meta)) = (std::fs::metadata(&bin_path), std::fs::metadata(&cached_bin)) {
                     src_meta.len() != dst_meta.len()
@@ -460,25 +504,12 @@ pub async fn run_transcription(
                     }
                 }
 
-                // Copy companion shared libraries (.so / .so.*) from original directory to cache_dir
+                // Copy companion shared libraries (.so / .so.*) from original directory to target_dir
                 if let Some(ref orig_dir) = orig_bin_dir {
-                    if let Ok(entries) = std::fs::read_dir(orig_dir) {
-                        for entry in entries.flatten() {
-                            let src_file = entry.path();
-                            if let Some(name) = src_file.file_name() {
-                                let name_str = name.to_string_lossy();
-                                if name_str.ends_with(".so") || name_str.contains(".so.") {
-                                    let dst_file = cache_dir.join(name);
-                                    let copy_so = if let (Ok(s_meta), Ok(d_meta)) = (std::fs::metadata(&src_file), std::fs::metadata(&dst_file)) {
-                                        s_meta.len() != d_meta.len()
-                                    } else {
-                                        true
-                                    };
-                                    if copy_so {
-                                        let _ = std::fs::copy(&src_file, &dst_file);
-                                    }
-                                }
-                            }
+                    copy_companion_shared_libs(orig_dir, &target_dir);
+                    if is_openvino_sub {
+                        if let Some(parent) = orig_dir.parent() {
+                            copy_companion_shared_libs(parent, &cache_dir);
                         }
                     }
                 }
@@ -657,6 +688,11 @@ pub async fn run_transcription(
             if let Some(old_path) = std::env::var_os("PATH") {
                 let mut paths = std::env::split_paths(&old_path).collect::<Vec<_>>();
                 paths.insert(0, bin_dir.to_path_buf());
+                if let Some(parent) = bin_dir.parent() {
+                    if !paths.contains(&parent.to_path_buf()) {
+                        paths.insert(1, parent.to_path_buf());
+                    }
+                }
                 if let Ok(new_path) = std::env::join_paths(paths) {
                     cmd.env("PATH", new_path);
                 }
@@ -667,9 +703,19 @@ pub async fn run_transcription(
         {
             let mut paths = Vec::new();
             paths.push(bin_dir.to_path_buf());
+            if let Some(parent) = bin_dir.parent() {
+                if !paths.contains(&parent.to_path_buf()) {
+                    paths.push(parent.to_path_buf());
+                }
+            }
             if let Some(ref orig) = orig_bin_dir {
                 if !paths.contains(orig) {
                     paths.push(orig.clone());
+                }
+                if let Some(orig_parent) = orig.parent() {
+                    if !paths.contains(&orig_parent.to_path_buf()) {
+                        paths.push(orig_parent.to_path_buf());
+                    }
                 }
             }
             if let Some(old_ld) = std::env::var_os("LD_LIBRARY_PATH") {
@@ -689,6 +735,11 @@ pub async fn run_transcription(
             if let Some(old_dyld) = std::env::var_os("DYLD_LIBRARY_PATH") {
                 let mut dyld_paths = std::env::split_paths(&old_dyld).collect::<Vec<_>>();
                 dyld_paths.insert(0, bin_dir.to_path_buf());
+                if let Some(parent) = bin_dir.parent() {
+                    if !dyld_paths.contains(&parent.to_path_buf()) {
+                        dyld_paths.insert(1, parent.to_path_buf());
+                    }
+                }
                 if let Ok(new_dyld) = std::env::join_paths(dyld_paths) {
                     cmd.env("DYLD_LIBRARY_PATH", new_dyld);
                 }
@@ -1169,6 +1220,27 @@ mod tests {
 
         let path_traversal = resolve_model_subpath(root, "../../etc/passwd");
         assert_eq!(path_traversal, root.join("etc").join("passwd"));
+    }
+
+    #[test]
+    fn test_compute_bin_candidate_rel_paths() {
+        let openvino_cands = compute_bin_candidate_rel_paths("openvino", "");
+        assert_eq!(
+            openvino_cands,
+            vec![
+                PathBuf::from("openvino").join("whisper-cli-openvino"),
+                PathBuf::from("whisper-cli-openvino")
+            ]
+        );
+
+        let vulkan_cands = compute_bin_candidate_rel_paths("vulkan", ".exe");
+        assert_eq!(vulkan_cands, vec![PathBuf::from("whisper-cli-vulkan.exe")]);
+
+        let standard_cands = compute_bin_candidate_rel_paths("standard", "");
+        assert_eq!(standard_cands, vec![PathBuf::from("whisper-cli-standard")]);
+
+        let cuda_cands = compute_bin_candidate_rel_paths("cuda", "");
+        assert_eq!(cuda_cands, vec![PathBuf::from("whisper-cli-cuda")]);
     }
 }
 

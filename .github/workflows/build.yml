@@ -241,7 +241,7 @@ jobs:
             -DGGML_CPU_ALL_VARIANTS=ON \
             -DGGML_NATIVE=OFF \
             -DBUILD_SHARED_LIBS=ON \
-            -DCMAKE_INSTALL_RPATH='$ORIGIN' \
+            -DCMAKE_INSTALL_RPATH='$ORIGIN:$ORIGIN/..' \
             -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON
           cmake --build whisper.cpp-src/build-openvino -j$(nproc) --config Release --target whisper-cli
 
@@ -275,14 +275,16 @@ jobs:
           done
 
           # Populate Universal Edition folder (CPU + Vulkan + OpenVINO)
+          mkdir -p whisper-bins/universal/openvino
           cp whisper.cpp-src/build-standard/bin/whisper-cli whisper-bins/universal/whisper-cli-standard
           cp whisper.cpp-src/build-vulkan/bin/whisper-cli whisper-bins/universal/whisper-cli-vulkan
-          cp whisper.cpp-src/build-openvino/bin/whisper-cli whisper-bins/universal/whisper-cli-openvino
+          cp whisper.cpp-src/build-openvino/bin/whisper-cli whisper-bins/universal/openvino/whisper-cli-openvino
           cp -d whisper.cpp-src/build-standard/bin/*.so* whisper-bins/universal/
           cp -d whisper.cpp-src/build-vulkan/bin/libggml-vulkan.so whisper-bins/universal/ 2>/dev/null || true
-          cp -d whisper.cpp-src/build-openvino/bin/libwhisper.so* whisper-bins/universal/ 2>/dev/null || true
-          cp -d openvino-libs/*.so* whisper-bins/universal/ 2>/dev/null || true
-          cp -d openvino-libs/cache.json whisper-bins/universal/ 2>/dev/null || true
+          # Isolated OpenVINO runtime & dedicated libwhisper with OpenVINO module
+          cp -d whisper.cpp-src/build-openvino/bin/libwhisper.so* whisper-bins/universal/openvino/ 2>/dev/null || true
+          cp -d openvino-libs/*.so* whisper-bins/universal/openvino/ 2>/dev/null || true
+          cp -d openvino-libs/cache.json whisper-bins/universal/openvino/ 2>/dev/null || true
 
           # Populate CUDA Edition folder (CPU + Vulkan + CUDA)
           cp whisper.cpp-src/build-standard/bin/whisper-cli whisper-bins/cuda/whisper-cli-standard
@@ -296,7 +298,7 @@ jobs:
           cp -d whisper.cpp-src/build-standard/bin/libwhisper.so* whisper-bins/cuda/ 2>/dev/null || true
 
           # Top-level whisper-bins fallback population
-          cp -d whisper-bins/universal/* whisper-bins/ 2>/dev/null || true
+          cp -dr whisper-bins/universal/* whisper-bins/ 2>/dev/null || true
           cp -d whisper-bins/cuda/whisper-cli-cuda whisper-bins/ 2>/dev/null || true
           cp -d whisper-bins/cuda/libggml-cuda.so whisper-bins/ 2>/dev/null || true
           cp -d whisper-bins/cuda/*cuda*.so* whisper-bins/ 2>/dev/null || true
@@ -433,14 +435,20 @@ jobs:
           $vcompDll = Get-ChildItem -Path "$env:ProgramFiles/Microsoft Visual Studio" -Filter "vcomp140.dll" -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match "x64" } | Select-Object -First 1
 
           # Populate Universal Edition folder (CPU + Vulkan + OpenVINO)
+          New-Item -ItemType Directory -Force -Path "whisper-bins/universal/openvino"
           Copy-Item "whisper.cpp-src/build-standard/bin/Release/whisper-cli.exe" "whisper-bins/universal/whisper-cli-standard.exe" -Force
           Copy-Item "whisper.cpp-src/build-vulkan/bin/Release/whisper-cli.exe" "whisper-bins/universal/whisper-cli-vulkan.exe" -Force
-          Copy-Item "whisper.cpp-src/build-openvino/bin/Release/whisper-cli.exe" "whisper-bins/universal/whisper-cli-openvino.exe" -Force
+          Copy-Item "whisper.cpp-src/build-openvino/bin/Release/whisper-cli.exe" "whisper-bins/universal/openvino/whisper-cli-openvino.exe" -Force
           Get-ChildItem -Path "whisper.cpp-src/build-standard/bin/Release/*.dll" | Copy-Item -Destination "whisper-bins/universal/" -Force
           Get-ChildItem -Path "whisper.cpp-src/build-vulkan/bin/Release/*.dll" | Copy-Item -Destination "whisper-bins/universal/" -Force
-          Get-ChildItem -Path "whisper.cpp-src/build-openvino/bin/Release/*.dll" | Copy-Item -Destination "whisper-bins/universal/" -Force
-          Get-ChildItem -Path "openvino-dlls/*.dll" -ErrorAction SilentlyContinue | Copy-Item -Destination "whisper-bins/universal/" -Force
-          if (Test-Path "openvino-dlls/cache.json") { Copy-Item "openvino-dlls/cache.json" "whisper-bins/universal/" -Force }
+          # Isolated OpenVINO runtime & dedicated whisper.dll with OpenVINO module
+          Get-ChildItem -Path "whisper.cpp-src/build-openvino/bin/Release/*.dll" | Copy-Item -Destination "whisper-bins/universal/openvino/" -Force
+          Get-ChildItem -Path "openvino-dlls/*.dll" -ErrorAction SilentlyContinue | Copy-Item -Destination "whisper-bins/universal/openvino/" -Force
+          if (Test-Path "openvino-dlls/cache.json") { Copy-Item "openvino-dlls/cache.json" "whisper-bins/universal/openvino/" -Force }
+          # Guarantee standard whisper.dll (clean non-OpenVINO linkage) in universal root
+          if (Test-Path "whisper.cpp-src/build-standard/bin/Release/whisper.dll") {
+            Copy-Item "whisper.cpp-src/build-standard/bin/Release/whisper.dll" "whisper-bins/universal/whisper.dll" -Force
+          }
           if ($vcompDll) { Copy-Item $vcompDll.FullName "whisper-bins/universal/" -Force }
           if (Test-Path "whisper-bins/vulkan-1.dll") { Copy-Item "whisper-bins/vulkan-1.dll" "whisper-bins/universal/" -Force }
 
@@ -692,12 +700,12 @@ jobs:
           echo "=== 1/2: Building Linux Universal Edition (CPU + Vulkan + OpenVINO) ==="
           rm -rf src-tauri/resources/*
           mkdir -p src-tauri/resources/fonts
-          cp -d whisper-bins/universal/* src-tauri/resources/
+          cp -dr whisper-bins/universal/* src-tauri/resources/
           cp ffmpeg-bins/ffmpeg src-tauri/resources/
           cp ffmpeg-bins/ffprobe src-tauri/resources/
           cp src/fonts/* src-tauri/resources/fonts/ || true
           find src-tauri/resources -xtype l -delete 2>/dev/null || true
-          chmod +x src-tauri/resources/whisper-cli-* src-tauri/resources/*.so* src-tauri/resources/ffmpeg src-tauri/resources/ffprobe 2>/dev/null || true
+          chmod +x src-tauri/resources/whisper-cli-* src-tauri/resources/*.so* src-tauri/resources/openvino/* src-tauri/resources/ffmpeg src-tauri/resources/ffprobe 2>/dev/null || true
 
           npm run tauri build -- -b deb,appimage --verbose
 
@@ -787,7 +795,6 @@ jobs:
           Remove-Item -Path "src-tauri/resources/*" -Recurse -Force -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Force -Path src-tauri/resources/fonts
           Copy-Item "whisper-bins/universal/*" "src-tauri/resources/" -Recurse -Force
-          Copy-Item "openvino-dlls/*.dll" "src-tauri/resources/" -ErrorAction SilentlyContinue -Force
           Copy-Item "ffmpeg-bins/ffmpeg.exe" "src-tauri/resources/"
           Copy-Item "ffmpeg-bins/ffprobe.exe" "src-tauri/resources/"
           Copy-Item "vc_redist.x64.exe" "src-tauri/resources/" -Force

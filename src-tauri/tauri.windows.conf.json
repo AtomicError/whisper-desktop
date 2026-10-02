@@ -7,6 +7,7 @@
       "resources/ffprobe*",
       "resources/fonts/*",
       "resources/*.dll",
+      "resources/openvino/*",
       "resources/vc_redist*.exe"
     ],
     "windows": {
