@@ -330,7 +330,9 @@ fn walk_models_dir(
                 }
             } else if is_file {
                 let filename = path.file_name().unwrap_or_default().to_string_lossy();
-                if filename.ends_with(".bin") && (filename.contains("ggml-") || filename.contains("silero")) {
+                let is_bin = filename.ends_with(".bin");
+                let is_gguf = filename.ends_with(".gguf");
+                if is_bin || is_gguf {
                     let rel_path = path.strip_prefix(root)
                         .unwrap_or(&path)
                         .to_string_lossy()
@@ -340,7 +342,11 @@ fn walk_models_dir(
                         vad_models.push(rel_path);
                     } else if !filename.contains("-openvino.bin") {
                         if backend == "OpenVINO" {
-                            let base_name = filename.strip_suffix(".bin").unwrap_or(&filename);
+                            let base_name = if is_bin {
+                                filename.strip_suffix(".bin").unwrap_or(&filename)
+                            } else {
+                                filename.strip_suffix(".gguf").unwrap_or(&filename)
+                            };
                             let ov_encoder_name = format!("{}-encoder-openvino.bin", base_name);
                             if let Some(parent) = path.parent() {
                                 let ov_encoder_path = parent.join(ov_encoder_name);
@@ -1214,5 +1220,64 @@ mod main_tests {
     fn test_clean_ld_paths_handles_empty_or_whitespace() {
         assert_eq!(clean_ld_paths("", ""), None);
         assert_eq!(clean_ld_paths("   :  : ", ""), None);
+    }
+
+    #[test]
+    fn test_walk_models_dir_discovers_custom_and_standard_models() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let temp_dir = std::env::temp_dir().join(format!("whisper_models_test_{}", nonce));
+        let nested_dir = temp_dir.join("nested");
+        std::fs::create_dir_all(&nested_dir).unwrap();
+
+        // Create various test model files
+        let files = [
+            "ggml-base.bin",
+            "whisper-persian-v4.bin",
+            "custom-finetune.gguf",
+            "ggml-silero-v6.2.0.bin",
+            "ggml-base-encoder-openvino.bin",
+            "downloading.bin.tmp",
+            "notes.txt",
+        ];
+        for f in &files {
+            std::fs::write(temp_dir.join(f), b"test").unwrap();
+        }
+        std::fs::write(nested_dir.join("whisper-persian-v3.bin"), b"test").unwrap();
+
+        let mut visited = std::collections::HashSet::new();
+        let mut trans_models = Vec::new();
+        let mut vad_models = Vec::new();
+
+        walk_models_dir(
+            &temp_dir,
+            &temp_dir,
+            "Standard",
+            0,
+            &mut visited,
+            &mut trans_models,
+            &mut vad_models,
+        );
+
+        trans_models.sort();
+        vad_models.sort();
+
+        assert_eq!(
+            trans_models,
+            vec![
+                "custom-finetune.gguf".to_string(),
+                "ggml-base.bin".to_string(),
+                "nested/whisper-persian-v3.bin".to_string(),
+                "whisper-persian-v4.bin".to_string(),
+            ]
+        );
+        assert_eq!(
+            vad_models,
+            vec!["ggml-silero-v6.2.0.bin".to_string()]
+        );
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 }
