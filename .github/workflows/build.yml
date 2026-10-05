@@ -191,7 +191,7 @@ jobs:
             openvino-libs/**
             cuda-dlls/**
             cuda-libs/**
-          key: whisper-bin-${{ matrix.platform }}-${{ matrix.arch }}-${{ steps.whisper_tag.outputs.tag }}-v8
+          key: whisper-bin-${{ matrix.platform }}-${{ matrix.arch }}-${{ steps.whisper_tag.outputs.tag }}-v9
 
       - name: Clone whisper.cpp
         if: steps.whisper-cache.outputs.cache-hit != 'true'
@@ -699,7 +699,8 @@ jobs:
           # 1. Build Universal Edition (Standard CPU + Vulkan + OpenVINO)
           echo "=== 1/2: Building Linux Universal Edition (CPU + Vulkan + OpenVINO) ==="
           rm -rf src-tauri/resources/*
-          mkdir -p src-tauri/resources/fonts
+          mkdir -p src-tauri/resources/fonts src-tauri/resources/openvino
+          touch src-tauri/resources/openvino/.keep
           cp -dr whisper-bins/universal/* src-tauri/resources/
           cp ffmpeg-bins/ffmpeg src-tauri/resources/
           cp ffmpeg-bins/ffprobe src-tauri/resources/
@@ -726,7 +727,8 @@ jobs:
           # 2. Build NVIDIA CUDA Edition (Standard CPU + Vulkan + CUDA)
           echo "=== 2/2: Building Linux NVIDIA CUDA Edition (CPU + Vulkan + CUDA) ==="
           rm -rf src-tauri/resources/*
-          mkdir -p src-tauri/resources/fonts
+          mkdir -p src-tauri/resources/fonts src-tauri/resources/openvino
+          touch src-tauri/resources/openvino/.keep
           cp -d whisper-bins/cuda/* src-tauri/resources/
           cp ffmpeg-bins/ffmpeg src-tauri/resources/
           cp ffmpeg-bins/ffprobe src-tauri/resources/
@@ -886,7 +888,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NO_STRIP: true
         run: |
-          mkdir -p src-tauri/resources/fonts
+          mkdir -p src-tauri/resources/fonts src-tauri/resources/openvino
+          touch src-tauri/resources/openvino/.keep
           if [ "$(uname)" = "Darwin" ]; then
             cp -R whisper-bins/whisper-cli-* src-tauri/resources/
           else
