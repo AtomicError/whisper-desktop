@@ -1348,12 +1348,19 @@ class CustomSelect {
       this.searchInput = document.createElement('input');
       this.searchInput.type = 'text';
       this.searchInput.className = 'custom-select-search';
-      this.searchInput.setAttribute('dir', 'auto');
       this.searchInput.autocomplete = 'off';
       this.searchInput.spellcheck = false;
       this.searchInput.setAttribute('role', 'searchbox');
       this.applySearchPlaceholder();
-      this.searchInput.addEventListener('input', () => this.applyFilter(this.searchInput.value));
+      if (typeof applyTextDirection === 'function') {
+        applyTextDirection(this.searchInput);
+      }
+      this.searchInput.addEventListener('input', () => {
+        if (typeof applyTextDirection === 'function') {
+          applyTextDirection(this.searchInput);
+        }
+        this.applyFilter(this.searchInput.value);
+      });
       this.searchInput.addEventListener('keydown', (e) => this.handleSearchKeydown(e));
       this.searchRow.appendChild(this.searchInput);
 
@@ -1692,6 +1699,9 @@ class CustomSelect {
     const placeholder = this.getSearchPlaceholder();
     this.searchInput.placeholder = placeholder;
     this.searchInput.setAttribute('aria-label', placeholder);
+    if (typeof applyTextDirection === 'function') {
+      applyTextDirection(this.searchInput);
+    }
   }
 
   handleSearchKeydown(e) {
@@ -1758,6 +1768,9 @@ class CustomSelect {
   clearFilter() {
     if (this.searchInput) {
       this.searchInput.value = '';
+      if (typeof applyTextDirection === 'function') {
+        applyTextDirection(this.searchInput);
+      }
     }
     this.applyFilter('');
   }
@@ -1905,6 +1918,9 @@ class CustomSelect {
 
     // Searchable dropdowns put the caret in the filter box
     if (this.isSearchable()) {
+      if (typeof applyTextDirection === 'function' && this.searchInput) {
+        applyTextDirection(this.searchInput);
+      }
       requestAnimationFrame(() => {
         if (this.isOpen && this.searchInput) {
           this.searchInput.focus();
@@ -2578,11 +2594,23 @@ async function initApp() {
       updateTranscribeUIConfigs();
     }
 
-    // Maintain content-based direction on prompt input independent of UI language
+    // Maintain content-based direction on prompt and search inputs independent of UI language
     const promptInput = document.getElementById('opt-prompt');
     if (promptInput) {
       applyDynamicDirection(promptInput);
     }
+    const appSearchIds = [
+      'settings-search-input',
+      'mgr-models-search',
+      'model-search',
+      'transcript-search',
+      'log-search',
+      'hardsub-search-input'
+    ];
+    appSearchIds.forEach(id => {
+      const input = document.getElementById(id);
+      if (input) applyDynamicDirection(input);
+    });
 
     // Update backend options labels on opt-selectedBackend in settings if present
     const settingsBackendSelect = document.getElementById('opt-selectedBackend');
@@ -2667,6 +2695,26 @@ async function initApp() {
       promptInput.addEventListener('input', () => applyDynamicDirection(promptInput));
     }
   }
+
+  // Wire up dynamic content direction on all search inputs across the application
+  const appSearchIds = [
+    'settings-search-input',
+    'mgr-models-search',
+    'model-search',
+    'transcript-search',
+    'log-search',
+    'hardsub-search-input'
+  ];
+  appSearchIds.forEach(id => {
+    const input = document.getElementById(id);
+    if (input) {
+      applyDynamicDirection(input);
+      if (!input._hasDynamicDirListener) {
+        input._hasDynamicDirListener = true;
+        input.addEventListener('input', () => applyDynamicDirection(input));
+      }
+    }
+  });
 
   // Trigger initial synchronization of dynamic components for startup language
   const isRtl = typeof isRtlLanguage === 'function' ? isRtlLanguage(getLanguage()) : (getLanguage() === 'fa' || getLanguage() === 'ar');

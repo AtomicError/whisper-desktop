@@ -7366,10 +7366,33 @@ select.pagination-size-select {
   text-align: start;
 }
 
-html[dir="rtl"] .custom-select-options.custom-select-ltr .custom-select-search:placeholder-shown,
-.rtl-layout .custom-select-options.custom-select-ltr .custom-select-search:placeholder-shown {
-  direction: rtl;
-  text-align: right;
+html[dir="rtl"] .custom-select-search,
+.rtl-layout .custom-select-search,
+html[dir="rtl"] .custom-select-options .custom-select-search,
+.rtl-layout .custom-select-options .custom-select-search,
+html[dir="rtl"] .custom-select-options.custom-select-ltr .custom-select-search,
+.rtl-layout .custom-select-options.custom-select-ltr .custom-select-search {
+  direction: rtl !important;
+  text-align: right !important;
+  unicode-bidi: normal !important;
+}
+
+html[dir="rtl"] .custom-select-search::placeholder,
+.rtl-layout .custom-select-search::placeholder,
+html[dir="rtl"] .custom-select-options .custom-select-search::placeholder,
+.rtl-layout .custom-select-options .custom-select-search::placeholder,
+html[dir="rtl"] .custom-select-options.custom-select-ltr .custom-select-search::placeholder,
+.rtl-layout .custom-select-options.custom-select-ltr .custom-select-search::placeholder {
+  direction: rtl !important;
+  text-align: right !important;
+}
+
+.custom-select-search[dir="ltr"],
+html[dir="rtl"] .custom-select-search[dir="ltr"],
+.rtl-layout .custom-select-search[dir="ltr"] {
+  direction: ltr !important;
+  text-align: left !important;
+  unicode-bidi: plaintext !important;
 }
 
 .custom-select-search:focus {
@@ -7578,24 +7601,101 @@ html[dir="rtl"] .custom-select-options[class*="options-for-models-page-size-sele
   padding: 5px 12px !important;
 }
 
-/* Search Inputs RTL overrides (Settings & Models) */
+/* Search Inputs RTL overrides (Settings & Models & All App Search Fields) */
 html[dir="rtl"] .settings-search-icon,
-html[dir="rtl"] .models-search-icon {
-  left: auto;
-  right: 12px;
+html[dir="rtl"] .models-search-icon,
+.rtl-layout .settings-search-icon,
+.rtl-layout .models-search-icon {
+  left: auto !important;
+  right: 12px !important;
 }
 
 html[dir="rtl"] .settings-search-clear,
-html[dir="rtl"] .models-search-clear {
-  right: auto;
-  left: 10px;
+html[dir="rtl"] .models-search-clear,
+.rtl-layout .settings-search-clear,
+.rtl-layout .models-search-clear {
+  right: auto !important;
+  left: 10px !important;
 }
 
 html[dir="rtl"] .settings-search-input,
-html[dir="rtl"] .models-search-input {
+.rtl-layout .settings-search-input,
+html[dir="rtl"] .models-search-input,
+.rtl-layout .models-search-input {
   padding-left: 36px !important;
   padding-right: 38px !important;
+  direction: rtl !important;
   text-align: right !important;
+  unicode-bidi: normal !important;
+}
+
+html[dir="rtl"] .settings-search-input::placeholder,
+.rtl-layout .settings-search-input::placeholder,
+html[dir="rtl"] .models-search-input::placeholder,
+.rtl-layout .models-search-input::placeholder {
+  direction: rtl !important;
+  text-align: right !important;
+}
+
+/* Activity Logs Search RTL */
+html[dir="rtl"] .log-search-input,
+.rtl-layout .log-search-input {
+  direction: rtl !important;
+  text-align: right !important;
+  unicode-bidi: normal !important;
+}
+
+html[dir="rtl"] .log-search-input::placeholder,
+.rtl-layout .log-search-input::placeholder {
+  direction: rtl !important;
+  text-align: right !important;
+}
+
+/* Live Transcript Search RTL */
+html[dir="rtl"] #transcript-search,
+.rtl-layout #transcript-search {
+  direction: rtl !important;
+  text-align: right !important;
+  unicode-bidi: normal !important;
+}
+
+html[dir="rtl"] #transcript-search::placeholder,
+.rtl-layout #transcript-search::placeholder {
+  direction: rtl !important;
+  text-align: right !important;
+}
+
+/* Hardsub Studio Cue Search RTL */
+html[dir="rtl"] #hardsub-tab-view-editor input#hardsub-search-input,
+.rtl-layout #hardsub-tab-view-editor input#hardsub-search-input {
+  direction: rtl !important;
+  text-align: right !important;
+  unicode-bidi: normal !important;
+  padding-left: 12px !important;
+  padding-right: 34px !important;
+}
+
+html[dir="rtl"] #hardsub-tab-view-editor input#hardsub-search-input::placeholder,
+.rtl-layout #hardsub-tab-view-editor input#hardsub-search-input::placeholder {
+  direction: rtl !important;
+  text-align: right !important;
+}
+
+html[dir="rtl"] #hardsub-tab-view-editor input#hardsub-search-input + svg,
+.rtl-layout #hardsub-tab-view-editor input#hardsub-search-input + svg {
+  left: auto !important;
+  right: 10px !important;
+}
+
+/* Dynamic LTR when search inputs contain Latin/LTR text */
+.settings-search-input[dir="ltr"],
+.models-search-input[dir="ltr"],
+.log-search-input[dir="ltr"],
+#transcript-search[dir="ltr"],
+#hardsub-search-input[dir="ltr"] {
+  direction: ltr !important;
+  text-align: left !important;
+  unicode-bidi: plaintext !important;
 }
 
 html[dir="rtl"] .cat-match-badge {

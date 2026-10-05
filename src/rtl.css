@@ -154,6 +154,23 @@ html[dir="rtl"] select {
   direction: rtl;
 }
 
+/* Placeholders in RTL mode: right-aligned with RTL direction */
+html[dir="rtl"] input:not(.readonly-path-input):not(.mono):not([dir="ltr"]):placeholder-shown,
+html[dir="rtl"] textarea:not(.mono):not([dir="ltr"]):placeholder-shown,
+.rtl-layout input:not(.readonly-path-input):not(.mono):not([dir="ltr"]):placeholder-shown,
+.rtl-layout textarea:not(.mono):not([dir="ltr"]):placeholder-shown {
+  direction: rtl;
+  text-align: right;
+}
+
+html[dir="rtl"] input:not(.readonly-path-input):not(.mono):not([dir="ltr"])::placeholder,
+html[dir="rtl"] textarea:not(.mono):not([dir="ltr"])::placeholder,
+.rtl-layout input:not(.readonly-path-input):not(.mono):not([dir="ltr"])::placeholder,
+.rtl-layout textarea:not(.mono):not([dir="ltr"])::placeholder {
+  direction: rtl;
+  text-align: right;
+}
+
 html[dir="rtl"] select.select-control,
 html[dir="rtl"] .select-control {
   padding: 10px 14px 10px 36px;
