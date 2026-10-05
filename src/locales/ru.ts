@@ -62,6 +62,7 @@ export const ru: Translations = {
     loading: 'Загрузка...',
     search: 'Поиск...',
     searchLanguage: 'Поиск языка...',
+    select: 'Выбрать...',
     error: 'Ошибка',
     success: 'Успешно',
     info: 'Информация',

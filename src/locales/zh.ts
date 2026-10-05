@@ -62,6 +62,7 @@ export const zh: Translations = {
     loading: '加载中...',
     search: '搜索...',
     searchLanguage: '搜索语言...',
+    select: '选择...',
     error: '错误',
     success: '成功',
     info: '提示',

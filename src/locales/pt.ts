@@ -62,6 +62,7 @@ export const pt: Translations = {
     loading: 'Carregando...',
     search: 'Pesquisar...',
     searchLanguage: 'Pesquisar idioma...',
+    select: 'Selecionar...',
     error: 'Erro',
     success: 'Sucesso',
     info: 'Informação',

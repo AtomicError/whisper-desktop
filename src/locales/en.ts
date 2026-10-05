@@ -60,6 +60,7 @@ export const en = {
     loading: 'Loading...',
     search: 'Search...',
     searchLanguage: 'Search language...',
+    select: 'Select...',
     error: 'Error',
     success: 'Success',
     info: 'Information',

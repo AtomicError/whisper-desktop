@@ -62,6 +62,7 @@ export const fa: Translations = {
     loading: 'در حال بارگذاری...',
     search: 'جستجو...',
     searchLanguage: 'جستجوی زبان...',
+    select: 'انتخاب...',
     error: 'خطا',
     success: 'موفقیت',
     info: 'اطلاعات',

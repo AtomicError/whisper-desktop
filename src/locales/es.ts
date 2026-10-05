@@ -62,6 +62,7 @@ export const es: Translations = {
     loading: 'Cargando...',
     search: 'Buscar...',
     searchLanguage: 'Buscar idioma...',
+    select: 'Seleccionar...',
     error: 'Error',
     success: 'Éxito',
     info: 'Información',

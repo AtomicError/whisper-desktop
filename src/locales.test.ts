@@ -165,9 +165,16 @@ describe('locale consistency for speed presets', () => {
         expect(settings[key].length).toBeGreaterThan(0);
       }
     });
+    it(`locale ${code} has common.select defined`, () => {
+      const common = (dict as any).common;
+      expect(common).toBeDefined();
+      expect(typeof common.select).toBe('string');
+      expect(common.select.length).toBeGreaterThan(0);
+    });
   }
 
   it('validates fa locale translation improvements', () => {
+    expect(fa.common.select).toBe('انتخاب...');
     expect(fa.transcribe.wizardStep3).toBe('شروع رونویسی');
     expect(fa.settings.aiTranslatePoints).toContain('<bdi>OpenAI</bdi>، <bdi>Claude</bdi>');
     expect(fa.settings.targetLangPoints).toContain('بیش از ۱۰۰ زبان زنده دنیا با رسم‌الخط بومی');

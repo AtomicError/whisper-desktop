@@ -62,6 +62,7 @@ export const ar: Translations = {
     loading: 'جارٍ التحميل...',
     search: 'بحث...',
     searchLanguage: 'البحث عن لغة...',
+    select: 'تحديد...',
     error: 'خطأ',
     success: 'نجاح',
     info: 'معلومات',

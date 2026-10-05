@@ -62,6 +62,7 @@ export const ja: Translations = {
     loading: '読み込み中...',
     search: '検索...',
     searchLanguage: '言語を検索...',
+    select: '選択...',
     error: 'エラー',
     success: '成功',
     info: '情報',

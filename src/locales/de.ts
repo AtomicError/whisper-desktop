@@ -62,6 +62,7 @@ export const de: Translations = {
     loading: 'Wird geladen...',
     search: 'Suchen...',
     searchLanguage: 'Sprache suchen...',
+    select: 'Auswählen...',
     error: 'Fehler',
     success: 'Erfolg',
     info: 'Information',

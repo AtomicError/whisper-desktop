@@ -1766,10 +1766,25 @@ class CustomSelect {
     return Boolean(this.searchable && this.searchRow && this.searchInput && this.noResultsRow);
   }
 
+  getPlaceholder() {
+    if (this.select.dataset.placeholderKey && typeof window.t === 'function') {
+      return window.t(this.select.dataset.placeholderKey);
+    }
+    if (this.select.dataset.placeholder) {
+      return this.select.dataset.placeholder;
+    }
+    if (this.select.placeholder) {
+      return this.select.placeholder;
+    }
+    return (typeof window.t === 'function')
+      ? window.t('common.select')
+      : 'Select...';
+  }
+
   syncSelectedValue() {
     if (!this.select || !this.trigger || !this.optionsContainer) return;
     const selectedOpt = this.select.options ? this.select.options[this.select.selectedIndex] : null;
-    const valText = selectedOpt ? selectedOpt.textContent : (this.select.placeholder || 'Select...');
+    const valText = (selectedOpt && selectedOpt.textContent) ? selectedOpt.textContent : this.getPlaceholder();
     const valEl = this.trigger.querySelector('.custom-select-value');
     if (valEl) {
       valEl.textContent = valText;
@@ -4248,6 +4263,9 @@ async function scanAndPopulateModels() {
     }
   } catch (e) {
     console.error("Failed to scan models directory:", e);
+    if (window.syncCustomSelects) {
+      window.syncCustomSelects();
+    }
   }
 }
 

@@ -62,6 +62,7 @@ export const tr: Translations = {
     loading: 'Yükleniyor...',
     search: 'Ara...',
     searchLanguage: 'Dil ara...',
+    select: 'Seçiniz...',
     error: 'Hata',
     success: 'Başarılı',
     info: 'Bilgi',

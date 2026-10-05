@@ -62,6 +62,7 @@ export const ko: Translations = {
     loading: '로딩 중...',
     search: '검색...',
     searchLanguage: '언어 검색...',
+    select: '선택...',
     error: '오류',
     success: '성공',
     info: '정보',

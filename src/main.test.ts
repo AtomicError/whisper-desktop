@@ -434,10 +434,26 @@ describe('CustomSelect model search placeholder and label resolution', () => {
         : 'No matching language';
     };
 
+    const getPlaceholder = () => {
+      if (selectEl.dataset?.placeholderKey && typeof tFn === 'function') {
+        return tFn(selectEl.dataset.placeholderKey);
+      }
+      if (selectEl.dataset?.placeholder) {
+        return selectEl.dataset.placeholder;
+      }
+      if ((selectEl as any).placeholder) {
+        return (selectEl as any).placeholder;
+      }
+      return (typeof tFn === 'function')
+        ? tFn('common.select')
+        : 'Select...';
+    };
+
     return {
       isModelSelect,
       placeholder: getSearchPlaceholder(),
       noResults: getNoResultsText(),
+      defaultPlaceholder: getPlaceholder(),
     };
   }
 
@@ -447,6 +463,7 @@ describe('CustomSelect model search placeholder and label resolution', () => {
       'settings.noMatchingModels': 'هیچ مدل منطبقی یافت نشد',
       'common.searchLanguage': 'جستجوی زبان...',
       'languages.noResults': 'زبانی یافت نشد',
+      'common.select': 'انتخاب...',
     };
     return dict[key] || key;
   };
@@ -497,6 +514,21 @@ describe('CustomSelect model search placeholder and label resolution', () => {
     expect(resolved.isModelSelect).toBe(false);
     expect(resolved.placeholder).toBe('Type to filter...');
     expect(resolved.noResults).toBe('Nothing found');
+    expect(resolved.defaultPlaceholder).toBe('انتخاب...');
+  });
+
+  it('supports custom placeholderKey or placeholder attributes for default trigger value', () => {
+    const elWithKey = {
+      hasAttribute: () => false,
+      dataset: { placeholderKey: 'common.select' },
+    };
+    expect(resolveCustomSelectLabels(elWithKey, mockT).defaultPlaceholder).toBe('انتخاب...');
+
+    const elWithCustom = {
+      hasAttribute: () => false,
+      dataset: { placeholder: 'Custom Value' },
+    };
+    expect(resolveCustomSelectLabels(elWithCustom, mockT).defaultPlaceholder).toBe('Custom Value');
   });
 });
 
