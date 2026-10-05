@@ -308,6 +308,16 @@ html[dir="rtl"] .text-input.mono {
   font-family: var(--font-mono) !important;
 }
 
+html[dir="rtl"] #provider-name::placeholder {
+  direction: ltr;
+  text-align: left;
+}
+
+html[dir="rtl"] #provider-name::-webkit-input-placeholder {
+  direction: ltr;
+  text-align: left;
+}
+
 html[dir="rtl"] .modal-card {
   direction: rtl;
   text-align: right;
