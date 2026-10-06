@@ -249,7 +249,7 @@ impl WhisperSettings {
             vad_thold: 0.50,
             vad_min_speech: 250,
             vad_min_sil: 100,
-            vad_max_speech: 30000.0,
+            vad_max_speech: 30.0,
             vad_speech_pad: 30,
             vad_overlap: 0.10,
             translate_ai_enabled: false,
@@ -304,6 +304,9 @@ impl WhisperSettings {
         self.offset_t = self.offset_t.max(0);
         self.duration = self.duration.max(0);
         self.max_len = self.max_len.max(0);
+        if self.max_context < -1 {
+            self.max_context = -1;
+        }
         self.audio_ctx = self.audio_ctx.max(0);
         self.device_id = self.device_id.max(0);
 
@@ -314,8 +317,10 @@ impl WhisperSettings {
         if self.vad_min_sil < 0 {
             self.vad_min_sil = 100;
         }
-        if self.vad_max_speech < 0.0 {
-            self.vad_max_speech = 30000.0;
+        if self.vad_max_speech <= 0.0 || self.vad_max_speech >= 1000.0 {
+            self.vad_max_speech = 30.0;
+        } else {
+            self.vad_max_speech = self.vad_max_speech.clamp(1.0, 300.0);
         }
         if self.vad_speech_pad < 0 {
             self.vad_speech_pad = 30;

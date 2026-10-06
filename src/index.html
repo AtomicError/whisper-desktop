@@ -2541,6 +2541,26 @@
                       </select>
                     </div>
                   </div>
+
+                  <div class="setting-card" data-search-tags="-fa --flash-attn -nfa --no-flash-attn">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.flashAttnTitle">Flash Attention</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.flashAttnDesc">Optimized multi-head attention acceleration for modern GPU and CPU architectures.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.flashAttnPoints">
+                          <span class="setting-desc-point"><strong>Default:</strong> Enabled</span>
+                          <span class="setting-desc-point"><strong>Note:</strong> Automatically disabled when DTW word-level timestamps are enabled.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <label class="switch">
+                        <input type="checkbox" id="opt-flashAttn" />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
                 </div>
 
                 <div class="settings-group" id="group-vad">
@@ -2635,17 +2655,17 @@
                   <div class="setting-card" data-search-tags="-vmsd --vad-max-speech">
                     <div class="setting-info">
                       <div class="setting-label-row">
-                        <span class="setting-title" data-i18n="settings.vadMaxSpeechTitle">VAD Max Speech (ms)</span>
+                        <span class="setting-title" data-i18n="settings.vadMaxSpeechTitle">VAD Max Speech (s)</span>
                       </div>
                       <div class="setting-desc"><span data-i18n="settings.vadMaxSpeechDesc">Maximum continuous speech segment duration sent to Whisper in one chunk.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.vadMaxSpeechPoints">
-                          <span class="setting-desc-point"><strong>Default:</strong> <code>30,000</code> ms (30s)</span>
+                          <span class="setting-desc-point"><strong>Default:</strong> <code>30</code> s</span>
                           <span class="setting-desc-point"><strong>Purpose:</strong> Matches Whisper's acoustic window to prevent memory overflow.</span>
                         </div>
                       </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" type="number" id="opt-vadMaxSpeech" />
+                      <input class="text-input" type="number" min="1" max="300" step="1" id="opt-vadMaxSpeech" />
                     </div>
                   </div>
 

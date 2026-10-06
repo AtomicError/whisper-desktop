@@ -192,6 +192,8 @@ pub async fn convert_to_wav(
         return Err("WAV conversion was cancelled by the user.".to_string());
     }
 
+    let settings = crate::settings::load_settings_file();
+    let audio_channels = if settings.diarize { "2" } else { "1" };
     let mut cmd = Command::new(&ffmpeg_bin);
     #[cfg(target_os = "windows")]
     cmd.creation_flags(0x08000000);
@@ -199,7 +201,7 @@ pub async fn convert_to_wav(
         "-y",
         "-i", &safe_input,
         "-ar", "16000",
-        "-ac", "1",
+        "-ac", audio_channels,
         "-c:a", "pcm_s16le",
         &tmp_wav_str,
     ])
@@ -286,7 +288,8 @@ pub async fn convert_to_wav(
         return Err(format!("FFmpeg failed with exit code: {:?}", status.code()));
     }
     
-    logs.log(&app, "FFmpeg", "WAV conversion finished successfully! Format: PCM 16-bit, 16kHz, Mono.");
+    let channel_desc = if audio_channels == "2" { "Stereo" } else { "Mono" };
+    logs.log(&app, "FFmpeg", &format!("WAV conversion finished successfully! Format: PCM 16-bit, 16kHz, {}.", channel_desc));
     let _ = app.emit("transcribe-status", TranscribeProgress {
         progress: 1.0,
         message: "Conversion complete! Ready to transcribe.".to_string(),
@@ -950,7 +953,7 @@ fn dtw_token_for_model(model_path: &str) -> Option<&'static str> {
         .and_then(|n| n.to_str())
         .unwrap_or("");
 
-    let name = filename
+    let mut name = filename
         .strip_prefix("ggml-")
         .or_else(|| filename.strip_prefix("gguf-"))
         .unwrap_or(filename)
@@ -958,12 +961,23 @@ fn dtw_token_for_model(model_path: &str) -> Option<&'static str> {
         .or_else(|| filename.strip_suffix(".gguf"))
         .unwrap_or(filename);
 
+    for quant in &["-q4_0", "-q4_1", "-q5_0", "-q5_1", "-q8_0", ".fp16", ".fp32"] {
+        if let Some(stripped) = name.strip_suffix(quant) {
+            name = stripped;
+            break;
+        }
+    }
+
     match name {
-        "tiny" | "tiny.en" => Some("tiny"),
-        "base" | "base.en" => Some("base"),
-        "small" | "small.en" => Some("small"),
-        "medium" | "medium.en" => Some("medium"),
-        "large-v1" => Some("large.v1"),
+        "tiny" => Some("tiny"),
+        "tiny.en" => Some("tiny.en"),
+        "base" => Some("base"),
+        "base.en" => Some("base.en"),
+        "small" => Some("small"),
+        "small.en" => Some("small.en"),
+        "medium" => Some("medium"),
+        "medium.en" => Some("medium.en"),
+        "large" | "large-v1" => Some("large.v1"),
         "large-v2" => Some("large.v2"),
         "large-v3" => Some("large.v3"),
         "large-v3-turbo" => Some("large.v3.turbo"),
@@ -1241,6 +1255,19 @@ mod tests {
 
         let cuda_cands = compute_bin_candidate_rel_paths("cuda", "");
         assert_eq!(cuda_cands, vec![PathBuf::from("whisper-cli-cuda")]);
+    }
+
+    #[test]
+    fn test_dtw_token_for_model_quantized_and_standard() {
+        assert_eq!(dtw_token_for_model("ggml-large-v3-q5_0.bin"), Some("large.v3"));
+        assert_eq!(dtw_token_for_model("large-v3-turbo-q8_0"), Some("large.v3.turbo"));
+        assert_eq!(dtw_token_for_model("ggml-large-v2.fp16.bin"), Some("large.v2"));
+        assert_eq!(dtw_token_for_model("large-v1"), Some("large.v1"));
+        assert_eq!(dtw_token_for_model("large"), Some("large.v1"));
+        assert_eq!(dtw_token_for_model("medium.en-q4_0"), Some("medium.en"));
+        assert_eq!(dtw_token_for_model("ggml-base.bin"), Some("base"));
+        assert_eq!(dtw_token_for_model("tiny"), Some("tiny"));
+        assert_eq!(dtw_token_for_model("unknown_custom_model"), None);
     }
 }
 

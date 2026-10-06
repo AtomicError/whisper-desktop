@@ -912,7 +912,7 @@ const invoke = async function(cmd, args = {}) {
       vadThold: 0.50,
       vadMinSpeech: 250,
       vadMinSil: 100,
-      vadMaxSpeech: 30000.0,
+      vadMaxSpeech: 30.0,
       vadSpeechPad: 30,
       vadOverlap: 0.10
     };
@@ -3828,14 +3828,23 @@ function bindSettingsToDOM() {
           let val = el.value;
           if (INT_SETTING_KEYS.has(key)) {
             val = parseInt(el.value);
-            if (isNaN(val)) val = 0;
+            if (isNaN(val)) val = (key === 'maxContext') ? -1 : 0;
             if (key === 'bestOf' || key === 'beamSize') {
               val = Math.max(1, Math.min(8, val));
               el.value = val;
             }
           } else if (FLOAT_SETTING_KEYS.has(key)) {
             val = parseFloat(el.value);
-            if (isNaN(val)) val = 0.0;
+            if (isNaN(val)) {
+              val = (key === 'vadMaxSpeech') ? 30.0 : 0.0;
+            } else if (key === 'vadMaxSpeech') {
+              if (val <= 0.0 || val >= 1000.0) {
+                val = 30.0;
+              } else {
+                val = Math.max(1.0, Math.min(300.0, val));
+              }
+              el.value = val;
+            }
           }
           if (key === 'uiScale') {
             const numVal = parseFloat(val) || 1.0;
@@ -4043,9 +4052,11 @@ async function saveCurrentSettings(immediate = false) {
   // Ensure local state numeric values are strictly typed
   for (const key of Object.keys(settingsState)) {
     if (INT_SETTING_KEYS.has(key) && typeof settingsState[key] === 'string') {
-      settingsState[key] = parseInt(settingsState[key]) || 0;
+      const parsed = parseInt(settingsState[key]);
+      settingsState[key] = isNaN(parsed) ? (key === 'maxContext' ? -1 : 0) : parsed;
     } else if (FLOAT_SETTING_KEYS.has(key) && typeof settingsState[key] === 'string') {
-      settingsState[key] = parseFloat(settingsState[key]) || 0.0;
+      const parsed = parseFloat(settingsState[key]);
+      settingsState[key] = isNaN(parsed) ? (key === 'vadMaxSpeech' ? 30.0 : 0.0) : parsed;
     }
   }
 
