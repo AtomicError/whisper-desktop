@@ -171,10 +171,20 @@ describe('locale consistency for speed presets', () => {
       expect(typeof common.select).toBe('string');
       expect(common.select.length).toBeGreaterThan(0);
     });
+    it(`locale ${code} has models.speedUnitMB and models.speedUnitKB defined`, () => {
+      const models = (dict as any).models;
+      expect(models).toBeDefined();
+      expect(typeof models.speedUnitMB).toBe('string');
+      expect(models.speedUnitMB.length).toBeGreaterThan(0);
+      expect(typeof models.speedUnitKB).toBe('string');
+      expect(models.speedUnitKB.length).toBeGreaterThan(0);
+    });
   }
 
   it('validates fa locale translation improvements', () => {
     expect(fa.common.select).toBe('انتخاب...');
+    expect(fa.models.speedUnitMB).toBe('مگابایت بر ثانیه');
+    expect(fa.models.speedUnitKB).toBe('کیلوبایت بر ثانیه');
     expect(fa.transcribe.wizardStep3).toBe('شروع رونویسی');
     expect(fa.settings.aiTranslatePoints).toContain('<bdi>OpenAI</bdi>، <bdi>Claude</bdi>');
     expect(fa.settings.targetLangPoints).toContain('بیش از ۱۰۰ زبان زنده دنیا با رسم‌الخط بومی');

@@ -553,6 +553,8 @@ export const ko: Translations = {
     timeMinSec: '{m}분 {s}초',
     timeHourMinSec: '{h}시간 {m}분 {s}초',
     unitMB: 'MB',
+    speedUnitMB: 'MB/s',
+    speedUnitKB: 'KB/s',
     downloadLiveProgress: '{size} {unit} ({pct}%) • {speedLabel}: {speed}',
     ariaDeleteModel: 'ggml-{name}.bin 모델 삭제',
     ariaPauseDownload: 'ggml-{name}.bin 다운로드 일시정지',

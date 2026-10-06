@@ -553,6 +553,8 @@ export const tr: Translations = {
     timeMinSec: '{m} dk {s} sn',
     timeHourMinSec: '{h} sa {m} dk {s} sn',
     unitMB: 'MB',
+    speedUnitMB: 'MB/s',
+    speedUnitKB: 'KB/s',
     downloadLiveProgress: '{size} {unit} (%{pct}) • {speedLabel}: {speed}',
     ariaDeleteModel: 'ggml-{name}.bin modelini sil',
     ariaPauseDownload: 'ggml-{name}.bin indirmesini duraklat',

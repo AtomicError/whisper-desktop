@@ -553,6 +553,8 @@ export const zh: Translations = {
     timeMinSec: '{m}分 {s}秒',
     timeHourMinSec: '{h}小时 {m}分 {s}秒',
     unitMB: 'MB',
+    speedUnitMB: 'MB/s',
+    speedUnitKB: 'KB/s',
     downloadLiveProgress: '{size} {unit} ({pct}%) • {speedLabel}: {speed}',
     ariaDeleteModel: '删除模型文件 ggml-{name}.bin',
     ariaPauseDownload: '暂停下载 ggml-{name}.bin',

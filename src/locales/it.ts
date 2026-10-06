@@ -553,6 +553,8 @@ export const it: Translations = {
     timeMinSec: '{m}m {s}s',
     timeHourMinSec: '{h}h {m}m {s}s',
     unitMB: 'MB',
+    speedUnitMB: 'MB/s',
+    speedUnitKB: 'KB/s',
     downloadLiveProgress: '{size} {unit} ({pct}%) • {speedLabel}: {speed}',
     ariaDeleteModel: 'Elimina modello ggml-{name}.bin',
     ariaPauseDownload: 'Sospendi download di ggml-{name}.bin',

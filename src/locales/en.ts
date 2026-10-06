@@ -551,6 +551,8 @@ export const en = {
     timeMinSec: '{m}m {s}s',
     timeHourMinSec: '{h}h {m}m {s}s',
     unitMB: 'MB',
+    speedUnitMB: 'MB/s',
+    speedUnitKB: 'KB/s',
     downloadLiveProgress: '{size} {unit} ({pct}%) • {speedLabel}: {speed}',
     ariaDeleteModel: 'Delete model ggml-{name}.bin',
     ariaPauseDownload: 'Pause downloading ggml-{name}.bin',

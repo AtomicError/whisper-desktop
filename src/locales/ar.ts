@@ -553,6 +553,8 @@ export const ar: Translations = {
     timeMinSec: '{m} دقيقة و {s} ثانية',
     timeHourMinSec: '{h} ساعة و {m} دقيقة و {s} ثانية',
     unitMB: 'ميغابايت',
+    speedUnitMB: 'ميجابايت في الثانية',
+    speedUnitKB: 'كيلوبايت في الثانية',
     downloadLiveProgress: '{size} {unit} ({pct}%) • {speedLabel}: {speed}',
     ariaDeleteModel: 'حذف النموذج ggml-{name}.bin',
     ariaPauseDownload: 'إيقاف تنزيل ggml-{name}.bin مؤقتاً',

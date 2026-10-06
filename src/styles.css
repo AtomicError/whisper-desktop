@@ -5160,6 +5160,26 @@ select.select-control {
   }
 }
 
+/* Model Card Download Progress */
+.model-progress-block {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-glass);
+  width: 100%;
+  max-width: 750px;
+}
+
+.model-progress-status {
+  font-size: 0.82rem;
+  margin-bottom: 6px;
+  line-height: 1.4;
+  color: var(--color-cyan);
+}
+
+.model-progress-status.status-paused {
+  color: var(--color-gold);
+}
+
 /* Custom Styled Cyber-Neon Checkbox Nodes */
 .backend-checkbox {
   appearance: none;

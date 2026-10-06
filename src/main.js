@@ -3005,52 +3005,90 @@ function setupTauriListeners() {
       const totalMB = ((payload.totalBytes || 0) / 1048576).toFixed(0);
       const totalKnown = payload.totalBytes > 0;
 
-      // Backend speed is authoritative — no client-side delta math.
-      let speedText = payload.phase === 'starting' ? t('models.statusConnecting') : '';
-      if (!speedText) {
-        if (payload.speedBps > 0) {
-          const mbps = (payload.speedBps * 8) / 1e6;
-          const speedFormatted = (mbps % 1 === 0 ? mbps.toFixed(0) : parseFloat(mbps.toFixed(1)).toString());
-          const speedMbps = window.formatNumberForLang(speedFormatted);
-          speedText = `${speedMbps} Mbps`;
-          if (totalKnown && payload.downloadedBytes <= payload.totalBytes) {
-            const remainingSeconds = Math.round((payload.totalBytes - payload.downloadedBytes) / payload.speedBps);
-            speedText += ` • ${t('models.etaLabel', { time: formatRemainingTime(remainingSeconds) })}`;
-          }
-        } else {
-          speedText = (payload.downloadedBytes || 0) > 0 ? '...' : t('models.statusStarting');
-        }
-      }
-
-      // 1. Progress bar fill in-place
+      // 1. Progress bar & status display in-place
+      const progressBlock = card.querySelector('.model-progress-block');
+      if (progressBlock) progressBlock.style.display = 'block';
       const barContainer = card.querySelector('.progress-bar-container');
       if (barContainer) barContainer.style.display = 'block';
       const barFill = card.querySelector('.progress-bar-fill');
-      if (barFill) barFill.style.width = `${pct}%`;
+      if (barFill) {
+        barFill.style.width = `${pct}%`;
+        barFill.style.background = 'var(--color-cyan)';
+        barFill.style.boxShadow = 'var(--shadow-neon-cyan)';
+      }
 
-      // 2. Description text inline without DOM recreation
-      const descEl = card.querySelector('.setting-desc');
-      if (descEl) {
-        const meta = getModelMetaInfo(payload.modelName);
-        const liveStatus = t('models.downloadLiveProgress', {
+      // 2. Status text above progress bar
+      let liveStatus = '';
+      if (payload.speedBps > 0) {
+        let speedText = '';
+        if (payload.speedBps >= 1048576) {
+          const mbVal = payload.speedBps / 1048576;
+          const speedFormatted = (mbVal >= 100 || mbVal % 1 === 0 ? mbVal.toFixed(0) : parseFloat(mbVal.toFixed(1)).toString());
+          const speedVal = window.formatNumberForLang(speedFormatted);
+          speedText = `${speedVal} ${t('models.speedUnitMB')}`;
+        } else {
+          const kbVal = Math.max(1, Math.round(payload.speedBps / 1024));
+          const speedVal = window.formatNumberForLang(kbVal);
+          speedText = `${speedVal} ${t('models.speedUnitKB')}`;
+        }
+
+        liveStatus = t('models.downloadLiveProgress', {
           size: window.formatNumberForLang(dlMB),
           unit: t('models.unitMB'),
           pct: totalKnown ? window.formatNumberForLang(pct) : '...',
           speedLabel: t('models.speedLabel'),
           speed: speedText
         });
+
+        if (totalKnown && payload.downloadedBytes <= payload.totalBytes) {
+          const remainingSeconds = Math.round((payload.totalBytes - payload.downloadedBytes) / payload.speedBps);
+          if (remainingSeconds > 0 && isFinite(remainingSeconds)) {
+            const etaText = t('models.etaLabel', { time: formatRemainingTime(remainingSeconds) });
+            liveStatus += ` • ${isolateDirection(etaText)}`;
+          }
+        }
+      } else {
+        const initialPhase = payload.phase === 'starting' ? t('models.statusConnecting') : t('models.statusStarting');
+        const pctFormatted = totalKnown ? window.formatNumberForLang(pct) : '...';
+        const inProgressTemplate = t('models.statusInProgress', {
+          size: window.formatNumberForLang(dlMB),
+          pct: pctFormatted
+        });
+        const parts = inProgressTemplate.split('•');
+        if (parts.length >= 2) {
+          liveStatus = `${parts[0].trim()} • ${initialPhase}`;
+        } else {
+          liveStatus = `${window.formatNumberForLang(dlMB)} ${t('models.unitMB')} (${pctFormatted}%) • ${initialPhase}`;
+        }
+      }
+      let statusEl = card.querySelector('.model-progress-status');
+      if (!statusEl && barContainer) {
+        statusEl = document.createElement('div');
+        statusEl.className = 'model-progress-status status-downloading';
+        barContainer.parentNode.insertBefore(statusEl, barContainer);
+      }
+      if (statusEl) {
+        statusEl.innerHTML = liveStatus;
+        statusEl.classList.remove('status-paused');
+        statusEl.classList.add('status-downloading');
+        statusEl.style.color = '';
+      }
+
+      // 3. Keep description metadata clean without dynamic metrics
+      const descEl = card.querySelector('.setting-desc');
+      if (descEl && (!descEl.querySelector('.badge-downloading') || descEl.querySelector('span[style*="var(--color-cyan)"]'))) {
+        const meta = getModelMetaInfo(payload.modelName);
+        const displayedSizeMB = totalKnown ? totalMB : (card.dataset.sizeMb || totalMB);
         descEl.innerHTML = `
           <span class="model-badge badge-downloading">${t('models.badgeDownloading')}</span>
           <span style="color: rgba(255,255,255,0.1);">|</span>
-          <span>${t('models.expectedSize', { size: window.formatNumberForLang(totalMB) })}</span>
+          <span>${t('models.expectedSize', { size: window.formatNumberForLang(displayedSizeMB) })}</span>
           ${meta.precisionText ? `
             <span style="color: rgba(255,255,255,0.1);">|</span>
             <span>${meta.precisionText}</span>
           ` : ''}
           <span style="color: rgba(255,255,255,0.1);">|</span>
           <span>${meta.langText}</span>
-          <span style="color: rgba(255,255,255,0.1);">|</span>
-          <span style="color: var(--color-cyan);">${liveStatus}</span>
         `;
       }
 
@@ -6609,8 +6647,8 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
       card.className = 'setting-card';
       card.dataset.name = m.name;
       card.setAttribute('data-model', m.name);
-      
       const sizeMB = (m.sizeBytes / 1024 / 1024).toFixed(0);
+      card.dataset.sizeMb = sizeMB;
       const dlMB = (m.downloadedBytes / 1024 / 1024).toFixed(0);
       const pct = Math.round((m.progress || 0) * 100);
       const safeName = escapeHTML(m.name);
@@ -6695,18 +6733,16 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
             ` : ''}
             <span style="color: rgba(255,255,255,0.1);">|</span>
             <span>${meta.langText}</span>
-            ${m.status === 'Downloading' ? `
-              <span style="color: rgba(255,255,255,0.1);">|</span>
-              <span style="color: var(--color-cyan);">${t('models.statusInProgress', { size: window.formatNumberForLang(dlMB), pct: window.formatNumberForLang(pct) })}</span>
-            ` : ''}
-            ${m.status === 'Paused' ? `
-              <span style="color: rgba(255,255,255,0.1);">|</span>
-              <span style="color: var(--color-gold);">${t('models.statusPaused', { size: window.formatNumberForLang(dlMB), pct: window.formatNumberForLang(pct) })}</span>
-            ` : ''}
           </div>
           ${recReasonHtml}
-          <div class="progress-bar-container" style="display: ${showProgressBlock}; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.05); overflow: hidden; margin-top: 10px; border: 1px solid rgba(255,255,255,0.02); max-width: 500px;">
-            <div class="progress-bar-fill" style="width: ${pct}%; height: 100%; background: ${m.status === 'Downloading' ? 'var(--color-cyan)' : 'var(--color-gold)'}; box-shadow: ${m.status === 'Downloading' ? 'var(--shadow-neon-cyan)' : 'var(--shadow-neon-gold)'}; transition: width 0.3s ease;"></div>
+          <div class="model-progress-block" style="display: ${showProgressBlock};">
+            <div class="model-progress-status ${m.status === 'Paused' ? 'status-paused' : 'status-downloading'}">
+              ${m.status === 'Downloading' ? t('models.statusInProgress', { size: window.formatNumberForLang(dlMB), pct: window.formatNumberForLang(pct) }) : ''}
+              ${m.status === 'Paused' ? t('models.statusPaused', { size: window.formatNumberForLang(dlMB), pct: window.formatNumberForLang(pct) }) : ''}
+            </div>
+            <div class="progress-bar-container" style="height: 6px; border-radius: 3px; background: rgba(255,255,255,0.05); overflow: hidden; border: 1px solid rgba(255,255,255,0.02);">
+              <div class="progress-bar-fill" style="width: ${pct}%; height: 100%; background: ${m.status === 'Downloading' ? 'var(--color-cyan)' : 'var(--color-gold)'}; box-shadow: ${m.status === 'Downloading' ? 'var(--shadow-neon-cyan)' : 'var(--shadow-neon-gold)'}; transition: width 0.3s ease;"></div>
+            </div>
           </div>
         </div>
         <div class="setting-control" style="display: flex; gap: 8px; align-items: center; justify-content: flex-end; flex-shrink: 0; min-width: 160px;">
@@ -6770,7 +6806,23 @@ window.downloadModelClick = async function(name) {
     if (card) {
       const ctrlEl = card.querySelector('.setting-control');
       if (ctrlEl) {
-        ctrlEl.innerHTML = `<button class="model-action-btn model-btn-pause" data-action="pause" aria-label="Pause downloading ggml-${escapeHTML(name)}.bin">${MODEL_ICON_PAUSE}<span>Pause</span></button>`;
+        ctrlEl.innerHTML = `<button class="model-action-btn model-btn-pause" data-action="pause" aria-label="${t('models.ariaPauseDownload', { name: escapeHTML(name) })}">${MODEL_ICON_PAUSE}<span>${t('models.actionPause')}</span></button>`;
+      }
+      const progressBlock = card.querySelector('.model-progress-block');
+      if (progressBlock) progressBlock.style.display = 'block';
+      const statusEl = card.querySelector('.model-progress-status');
+      if (statusEl) {
+        if (!statusEl.textContent.trim()) {
+          statusEl.textContent = t('models.statusStarting');
+        }
+        statusEl.classList.remove('status-paused');
+        statusEl.classList.add('status-downloading');
+        statusEl.style.color = '';
+      }
+      const barFill = card.querySelector('.progress-bar-fill');
+      if (barFill) {
+        barFill.style.background = 'var(--color-cyan)';
+        barFill.style.boxShadow = 'var(--shadow-neon-cyan)';
       }
     }
 

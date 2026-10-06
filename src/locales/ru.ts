@@ -553,6 +553,8 @@ export const ru: Translations = {
     timeMinSec: '{m}м {s}с',
     timeHourMinSec: '{h}ч {m}м {s}с',
     unitMB: 'МБ',
+    speedUnitMB: 'МБ/с',
+    speedUnitKB: 'КБ/с',
     downloadLiveProgress: '{size} {unit} ({pct}%) • {speedLabel}: {speed}',
     ariaDeleteModel: 'Удалить модель ggml-{name}.bin',
     ariaPauseDownload: 'Приостановить скачивание ggml-{name}.bin',

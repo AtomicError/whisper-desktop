@@ -553,6 +553,8 @@ export const fa: Translations = {
     timeMinSec: '{m} دقیقه و {s} ثانیه',
     timeHourMinSec: '{h} ساعت و {m} دقیقه و {s} ثانیه',
     unitMB: 'مگابایت',
+    speedUnitMB: 'مگابایت بر ثانیه',
+    speedUnitKB: 'کیلوبایت بر ثانیه',
     downloadLiveProgress: '{size} {unit} ({pct}٪) • {speedLabel}: {speed}',
     ariaDeleteModel: 'حذف مدل ggml-{name}.bin',
     ariaPauseDownload: 'توقف موقت دانلود ggml-{name}.bin',
