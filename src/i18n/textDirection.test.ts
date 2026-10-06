@@ -179,6 +179,34 @@ describe('applyTextDirection', () => {
     expect(directionFor('سلام', 'en', 'ltr').dir).toBe('rtl');
   });
 
+  it('correctly adapts search field direction between English queries and Persian queries', () => {
+    setLanguage('fa');
+    const searchField = new FakeField('');
+
+    // Empty search field in Persian interface starts as RTL with neutral flag
+    applyTextDirection(asField(searchField));
+    expect(searchField.attributes.get('dir')).toBe('rtl');
+    expect(searchField.hasAttribute('data-no-strong-char')).toBe(true);
+
+    // Typing English search query like 'vmsd' or 'whisper-large-v3' dynamically switches to LTR
+    searchField.value = 'vmsd';
+    applyTextDirection(asField(searchField));
+    expect(searchField.attributes.get('dir')).toBe('ltr');
+    expect(searchField.hasAttribute('data-no-strong-char')).toBe(false);
+
+    // Typing Persian query switches to RTL
+    searchField.value = 'مدل پایه';
+    applyTextDirection(asField(searchField));
+    expect(searchField.attributes.get('dir')).toBe('rtl');
+    expect(searchField.hasAttribute('data-no-strong-char')).toBe(false);
+
+    // Clearing the query restores interface direction (RTL in Persian)
+    searchField.value = '';
+    applyTextDirection(asField(searchField));
+    expect(searchField.attributes.get('dir')).toBe('rtl');
+    expect(searchField.hasAttribute('data-no-strong-char')).toBe(true);
+  });
+
   it('ignores a missing element instead of throwing', () => {
     expect(() => applyTextDirection(null)).not.toThrow();
   });

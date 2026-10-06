@@ -2901,7 +2901,10 @@ window.switchView = function(viewName) {
   if (viewName === 'models') {
     // Always reset search input and default to Recommended category when entering the view
     const searchInput = document.getElementById('model-search');
-    if (searchInput) searchInput.value = '';
+    if (searchInput) {
+      searchInput.value = '';
+      applyDynamicDirection(searchInput);
+    }
     const clearBtn = document.getElementById('model-search-clear');
     if (clearBtn) clearBtn.style.display = 'none';
     currentCategoryFilter = 'recommended';
@@ -3479,6 +3482,7 @@ window.switchSettingsCategory = function(catName) {
     }
     // If the selected category had no matches, clear search to reveal the full category.
     searchInput.value = '';
+    applyDynamicDirection(searchInput);
     const clearBtn = document.getElementById('settings-search-clear');
     if (clearBtn) clearBtn.style.display = 'none';
   }
@@ -3538,6 +3542,7 @@ window.clearSettingsSearch = function() {
   const searchInput = document.getElementById('settings-search-input');
   if (searchInput) {
     searchInput.value = '';
+    applyDynamicDirection(searchInput);
     window.filterSettings('', true);
     searchInput.focus();
   }
@@ -3696,6 +3701,10 @@ function executeFilterSettings(query) {
 }
 
 window.filterSettings = function(query, immediate = false) {
+  const searchInput = document.getElementById('settings-search-input');
+  if (searchInput) {
+    applyDynamicDirection(searchInput);
+  }
   if (filterSettings._timer) {
     clearTimeout(filterSettings._timer);
     filterSettings._timer = null;
@@ -5486,10 +5495,11 @@ window.filterLogs = function(category) {
 };
 
 window.handleLogSearch = function() {
+  const searchInput = document.getElementById('log-search');
+  if (searchInput) applyDynamicDirection(searchInput);
   if (window.handleLogSearch._timer) clearTimeout(window.handleLogSearch._timer);
   window.handleLogSearch._timer = setTimeout(() => {
     window.handleLogSearch._timer = null;
-    const searchInput = document.getElementById('log-search');
     logSearchQuery = searchInput ? searchInput.value.toLowerCase().trim() : '';
     redrawLogsViewport();
   }, 120);
@@ -6535,7 +6545,10 @@ window.switchModelCategory = function(category, clearSearch = true) {
   
   if (clearSearch) {
     const searchInput = document.getElementById('model-search');
-    if (searchInput) searchInput.value = '';
+    if (searchInput) {
+      searchInput.value = '';
+      applyDynamicDirection(searchInput);
+    }
     const clearBtn = document.getElementById('model-search-clear');
     if (clearBtn) clearBtn.style.display = 'none';
   }
@@ -6564,6 +6577,7 @@ window.clearModelSearch = function() {
   if (clearBtn) clearBtn.style.display = 'none';
   if (searchInput) {
     searchInput.value = '';
+    applyDynamicDirection(searchInput);
     searchInput.focus();
   }
   loadModelStatusesGrid();
@@ -6871,6 +6885,7 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
 
 window.filterModelsGrid = function() {
   const searchInput = document.getElementById('model-search');
+  if (searchInput) applyDynamicDirection(searchInput);
   const clearBtn = document.getElementById('model-search-clear');
   const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
   if (clearBtn) clearBtn.style.display = query ? 'flex' : 'none';
@@ -7144,7 +7159,9 @@ window.updateTranscriptLineText = function(id, value) {
 };
 
 window.filterTranscriptLines = function() {
-  const query = document.getElementById('transcript-search').value.toLowerCase();
+  const searchInput = document.getElementById('transcript-search');
+  if (searchInput) applyDynamicDirection(searchInput);
+  const query = searchInput ? searchInput.value.toLowerCase() : '';
   const lines = document.querySelectorAll('.transcript-line');
   lines.forEach(lineEl => {
     const textInput = lineEl.querySelector('.transcript-text-input');
@@ -8076,7 +8093,10 @@ window.updateFilterCountsFromDOM = window.updateFilterCounts;
 window.clearModelsSearch = function() {
   const searchInput = document.getElementById('mgr-models-search');
   const clearBtn = document.getElementById('mgr-models-search-clear');
-  if (searchInput) searchInput.value = '';
+  if (searchInput) {
+    searchInput.value = '';
+    applyDynamicDirection(searchInput);
+  }
   if (clearBtn) clearBtn.style.display = 'none';
   currentModelsPage = 1;
   window.filterModelsStatus('all', 0);
@@ -8280,6 +8300,7 @@ window.applyModelsFilterAndRender = function(delay = 0) {
   clearTimeout(filterTimeout);
   const execute = () => {
     const searchEl = document.getElementById('mgr-models-search');
+    if (searchEl) applyDynamicDirection(searchEl);
     const query = searchEl ? searchEl.value.trim().toLowerCase() : '';
     const clearBtn = document.getElementById('mgr-models-search-clear');
     if (clearBtn) {

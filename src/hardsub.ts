@@ -1841,6 +1841,7 @@ export class HardsubController {
 
     // Subtitle Search Input
     this.on(this.searchInput, 'input', () => {
+      if (this.searchInput) applyTextDirection(this.searchInput);
       // Debounced: a full cue-list rebuild per keystroke is far too heavy for
       // feature-length subtitle files (1-2k cues).
       this.searchFilterQuery = this.searchInput!.value.trim().toLowerCase();

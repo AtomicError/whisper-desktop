@@ -7719,12 +7719,20 @@ html[dir="rtl"] .models-search-clear,
   left: 10px !important;
 }
 
+/* Base RTL padding preserves spacing around right-hand search icon and left-hand clear button */
 html[dir="rtl"] .settings-search-input,
 .rtl-layout .settings-search-input,
 html[dir="rtl"] .models-search-input,
 .rtl-layout .models-search-input {
   padding-left: 36px !important;
   padding-right: 38px !important;
+}
+
+/* Default / RTL text direction when input does not have dir="ltr" */
+html[dir="rtl"] .settings-search-input:not([dir="ltr"]),
+.rtl-layout .settings-search-input:not([dir="ltr"]),
+html[dir="rtl"] .models-search-input:not([dir="ltr"]),
+.rtl-layout .models-search-input:not([dir="ltr"]) {
   direction: rtl !important;
   text-align: right !important;
   unicode-bidi: normal !important;
@@ -7739,8 +7747,8 @@ html[dir="rtl"] .models-search-input::placeholder,
 }
 
 /* Activity Logs Search RTL */
-html[dir="rtl"] .log-search-input,
-.rtl-layout .log-search-input {
+html[dir="rtl"] .log-search-input:not([dir="ltr"]),
+.rtl-layout .log-search-input:not([dir="ltr"]) {
   direction: rtl !important;
   text-align: right !important;
   unicode-bidi: normal !important;
@@ -7753,8 +7761,8 @@ html[dir="rtl"] .log-search-input::placeholder,
 }
 
 /* Live Transcript Search RTL */
-html[dir="rtl"] #transcript-search,
-.rtl-layout #transcript-search {
+html[dir="rtl"] #transcript-search:not([dir="ltr"]),
+.rtl-layout #transcript-search:not([dir="ltr"]) {
   direction: rtl !important;
   text-align: right !important;
   unicode-bidi: normal !important;
@@ -7769,11 +7777,15 @@ html[dir="rtl"] #transcript-search::placeholder,
 /* Hardsub Studio Cue Search RTL */
 html[dir="rtl"] #hardsub-tab-view-editor input#hardsub-search-input,
 .rtl-layout #hardsub-tab-view-editor input#hardsub-search-input {
+  padding-left: 12px !important;
+  padding-right: 34px !important;
+}
+
+html[dir="rtl"] #hardsub-tab-view-editor input#hardsub-search-input:not([dir="ltr"]),
+.rtl-layout #hardsub-tab-view-editor input#hardsub-search-input:not([dir="ltr"]) {
   direction: rtl !important;
   text-align: right !important;
   unicode-bidi: normal !important;
-  padding-left: 12px !important;
-  padding-right: 34px !important;
 }
 
 html[dir="rtl"] #hardsub-tab-view-editor input#hardsub-search-input::placeholder,
@@ -7789,6 +7801,18 @@ html[dir="rtl"] #hardsub-tab-view-editor input#hardsub-search-input + svg,
 }
 
 /* Dynamic LTR when search inputs contain Latin/LTR text */
+html[dir="rtl"] .settings-search-input[dir="ltr"],
+.rtl-layout .settings-search-input[dir="ltr"],
+html[dir="rtl"] .models-search-input[dir="ltr"],
+.rtl-layout .models-search-input[dir="ltr"],
+html[dir="rtl"] .log-search-input[dir="ltr"],
+.rtl-layout .log-search-input[dir="ltr"],
+html[dir="rtl"] #transcript-search[dir="ltr"],
+.rtl-layout #transcript-search[dir="ltr"],
+html[dir="rtl"] #hardsub-search-input[dir="ltr"],
+.rtl-layout #hardsub-search-input[dir="ltr"],
+html[dir="rtl"] #hardsub-tab-view-editor input#hardsub-search-input[dir="ltr"],
+.rtl-layout #hardsub-tab-view-editor input#hardsub-search-input[dir="ltr"],
 .settings-search-input[dir="ltr"],
 .models-search-input[dir="ltr"],
 .log-search-input[dir="ltr"],
@@ -7796,6 +7820,22 @@ html[dir="rtl"] #hardsub-tab-view-editor input#hardsub-search-input + svg,
 #hardsub-search-input[dir="ltr"] {
   direction: ltr !important;
   text-align: left !important;
+  unicode-bidi: plaintext !important;
+}
+
+/* Dynamic RTL when search inputs contain Persian/Arabic/RTL text in LTR mode */
+html:not([dir="rtl"]) .settings-search-input[dir="rtl"],
+html:not([dir="rtl"]) .models-search-input[dir="rtl"],
+html:not([dir="rtl"]) .log-search-input[dir="rtl"],
+html:not([dir="rtl"]) #transcript-search[dir="rtl"],
+html:not([dir="rtl"]) #hardsub-search-input[dir="rtl"],
+.settings-search-input[dir="rtl"],
+.models-search-input[dir="rtl"],
+.log-search-input[dir="rtl"],
+#transcript-search[dir="rtl"],
+#hardsub-search-input[dir="rtl"] {
+  direction: rtl !important;
+  text-align: right !important;
   unicode-bidi: plaintext !important;
 }
 
