@@ -413,7 +413,7 @@ pub async fn preview_translate_first_lines(
     log_state: tauri::State<'_, crate::LogState>,
     settings: WhisperSettings,
     file_content: String,
-) -> Result<String, String> {
+) -> Result<Vec<translator::PreviewLine>, String> {
     translator::preview_translate(app, log_state.0.clone(), settings, file_content).await
 }
 

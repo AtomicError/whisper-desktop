@@ -1031,7 +1031,10 @@ export const fr: Translations = {
     connectionCancelled: 'Test de Connexion Annulé',
     connectionCancelledDesc: 'Le test de connexion a été interrompu par l\'utilisateur.',
     connectionTimeout: 'Délai d\'Attente Dépassé pour la Connexion',
-    connectionTimeoutDesc: 'La requête a expiré après {seconds} secondes. Vérifiez votre réseau ou votre proxy/VPN.\n\nRemarque : Si vous utilisez un modèle gratuit (:free) ou très volumineux, la file publique du fournisseur peut être occupée. Testez avec un modèle plus léger.'
+    connectionTimeoutDesc: 'La requête a expiré après {seconds} secondes. Vérifiez votre réseau ou votre proxy/VPN.\n\nRemarque : Si vous utilisez un modèle gratuit (:free) ou très volumineux, la file publique du fournisseur peut être occupée. Testez avec un modèle plus léger.',
+    previewOriginal: 'Original',
+    previewTranslated: 'Traduit',
+    previewNotTranslated: 'non traduit'
   },
   toasts: {
     testCancelled: 'Test de connexion annulé.',

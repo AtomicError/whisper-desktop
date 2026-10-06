@@ -1031,7 +1031,10 @@ export const ar: Translations = {
     connectionCancelled: 'تم إلغاء اختبار الاتصال',
     connectionCancelledDesc: 'قام المستخدم بإلغاء اختبار الاتصال.',
     connectionTimeout: 'انتهت مهلة انتظار اختبار الاتصال',
-    connectionTimeoutDesc: 'تجاوز الطلب مهلة الانتظار بعد {seconds} ثانية. يرجى فحص اتصال الإنترنت أو خادم البروكسي/VPN.\n\nملاحظة: إذا كنت تستخدم نموذجاً مجانياً (:free) أو كبيراً، فقد تكون قائمة الانتظار العامة للمزود مزدحمة.'
+    connectionTimeoutDesc: 'تجاوز الطلب مهلة الانتظار بعد {seconds} ثانية. يرجى فحص اتصال الإنترنت أو خادم البروكسي/VPN.\n\nملاحظة: إذا كنت تستخدم نموذجاً مجانياً (:free) أو كبيراً، فقد تكون قائمة الانتظار العامة للمزود مزدحمة.',
+    previewOriginal: 'النص الأصلي',
+    previewTranslated: 'الترجمة',
+    previewNotTranslated: 'غير مترجم'
   },
   toasts: {
     testCancelled: 'تم إلغاء اختبار الاتصال.',

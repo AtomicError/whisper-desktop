@@ -1036,7 +1036,10 @@ export const en = {
     connectionCancelled: 'Connection Test Cancelled',
     connectionCancelledDesc: 'The connection test was cancelled by the user.',
     connectionTimeout: 'Connection Test Timed Out',
-    connectionTimeoutDesc: 'The request timed out after {seconds} seconds. Please check your network connection or proxy/VPN.\n\nNote: If you are using a free-tier (:free) or very heavy model, the provider\'s public queue may be busy and take longer to respond. Consider testing with a lighter or faster model.'
+    connectionTimeoutDesc: 'The request timed out after {seconds} seconds. Please check your network connection or proxy/VPN.\n\nNote: If you are using a free-tier (:free) or very heavy model, the provider\'s public queue may be busy and take longer to respond. Consider testing with a lighter or faster model.',
+    previewOriginal: 'Original',
+    previewTranslated: 'Translated',
+    previewNotTranslated: 'not translated'
   },
   toasts: {
     testCancelled: 'Connection test cancelled.',

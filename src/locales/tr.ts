@@ -1038,7 +1038,10 @@ export const tr: Translations = {
     connectionCancelled: 'Bağlantı Sınaması İptal Edildi',
     connectionCancelledDesc: 'Bağlantı sınaması kullanıcı tarafından iptal edildi.',
     connectionTimeout: 'Bağlantı Sınaması Zaman Aşımına Uğradı',
-    connectionTimeoutDesc: 'İstek {seconds} saniye sonra zaman aşımına uğradı. Lütfen ağ bağlantınızı veya vekil sunucu/VPN ayarlarınızı kontrol edin.\n\nNot: Ücretsiz (:free) veya çok ağır bir model kullanıyorsanız, sağlayıcının genel kuyruğu meşgul olabilir.'
+    connectionTimeoutDesc: 'İstek {seconds} saniye sonra zaman aşımına uğradı. Lütfen ağ bağlantınızı veya vekil sunucu/VPN ayarlarınızı kontrol edin.\n\nNot: Ücretsiz (:free) veya çok ağır bir model kullanıyorsanız, sağlayıcının genel kuyruğu meşgul olabilir.',
+    previewOriginal: 'Orijinal',
+    previewTranslated: 'Çevrilmiş',
+    previewNotTranslated: 'çevrilmedi'
   },
   toasts: {
     testCancelled: 'Bağlantı testi iptal edildi.',

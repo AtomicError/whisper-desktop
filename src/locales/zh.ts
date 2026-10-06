@@ -1031,7 +1031,10 @@ export const zh: Translations = {
     connectionCancelled: '已取消连接测试',
     connectionCancelledDesc: '用户主动中止了本次连接测试。',
     connectionTimeout: 'API 连接响应超时',
-    connectionTimeoutDesc: '请求在等待 {seconds} 秒后超时。请检查网络通畅度或代理与科学上网环境。\n\n提示：如果您正在测试免费额度 (:free) 或参数极大的模型，服务商公用队列可能排队过长，建议换用更轻快的模型进行测试。'
+    connectionTimeoutDesc: '请求在等待 {seconds} 秒后超时。请检查网络通畅度或代理与科学上网环境。\n\n提示：如果您正在测试免费额度 (:free) 或参数极大的模型，服务商公用队列可能排队过长，建议换用更轻快的模型进行测试。',
+    previewOriginal: '原文',
+    previewTranslated: '译文',
+    previewNotTranslated: '未翻译'
   },
   toasts: {
     testCancelled: '已取消连接测试。',

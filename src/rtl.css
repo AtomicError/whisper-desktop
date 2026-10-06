@@ -312,7 +312,6 @@ html[dir="rtl"] .icon-flip-rtl {
 /* 10. Technical Inputs, Hardsub & Modal RTL Polish */
 html[dir="rtl"] #hardsub-ffmpeg-cmd-preview,
 html[dir="rtl"] #hardsub-cli-args-preview,
-html[dir="rtl"] #test-modal-result,
 html[dir="rtl"] #app-modal-details,
 html[dir="rtl"] #provider-url,
 html[dir="rtl"] #provider-key,

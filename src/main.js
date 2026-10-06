@@ -1,6 +1,6 @@
 import { hardsubController } from './hardsub.ts';
 import { translationStudioController } from './translationStudio.ts';
-import { initI18n, t, setLanguage, getLanguage, translateDOM, isRtlLanguage, applyTextDirection, applyContentDirection, clearContentDirection, isolateDirection, isolateLtr, APP_NAME } from './i18n/index.ts';
+import { initI18n, t, setLanguage, getLanguage, translateDOM, isRtlLanguage, firstStrongDirection, applyTextDirection, applyContentDirection, clearContentDirection, isolateDirection, isolateLtr, APP_NAME } from './i18n/index.ts';
 import { normalizeForSearch } from './languages.ts';
 import { initLanguageSelects, renderLanguageSelect } from './languageSelect.ts';
 import { recommendModelsForSystem } from './modelRecommender.ts';
@@ -9351,6 +9351,87 @@ window.closeTestModal = function() {
   }
 };
 
+function renderPreviewTranslationResult(resultEl, response) {
+  if (!resultEl) return;
+  resultEl.innerHTML = '';
+
+  const currentLang = getLanguage();
+  const uiIsRtl = isRtlLanguage(currentLang);
+
+  if (Array.isArray(response) && response.length > 0) {
+    const container = document.createElement('div');
+    container.className = 'test-preview-container';
+
+    const origLabelText = t('modals.previewOriginal') || 'Original';
+    const transLabelText = t('modals.previewTranslated') || 'Translated';
+    const notTransText = t('modals.previewNotTranslated') || 'not translated';
+
+    response.forEach(item => {
+      const entryEl = document.createElement('div');
+      entryEl.className = 'test-preview-entry';
+
+      // Original section
+      const origField = document.createElement('div');
+      origField.className = 'test-preview-field';
+
+      const origLabel = document.createElement('div');
+      origLabel.className = 'test-preview-label original';
+      origLabel.setAttribute('dir', uiIsRtl ? 'rtl' : 'ltr');
+      const localizedIndex = formatLocalizedNumber(item.index, currentLang, 0) || item.index;
+      origLabel.textContent = `${origLabelText} (${localizedIndex}):`;
+
+      const origText = document.createElement('div');
+      origText.className = 'test-preview-text';
+      const origDir = firstStrongDirection(item.original) || (uiIsRtl ? 'rtl' : 'ltr');
+      origText.setAttribute('dir', origDir);
+      origText.textContent = item.original;
+
+      origField.appendChild(origLabel);
+      origField.appendChild(origText);
+      entryEl.appendChild(origField);
+
+      // Translated section
+      const transField = document.createElement('div');
+      transField.className = 'test-preview-field';
+
+      const transLabel = document.createElement('div');
+      transLabel.className = 'test-preview-label translated';
+      transLabel.setAttribute('dir', uiIsRtl ? 'rtl' : 'ltr');
+      transLabel.textContent = `${transLabelText}:`;
+
+      if (item.is_fallback) {
+        const fallbackBadge = document.createElement('span');
+        fallbackBadge.className = 'test-preview-badge-fallback';
+        fallbackBadge.textContent = `(${notTransText})`;
+        transLabel.appendChild(fallbackBadge);
+      }
+
+      const transText = document.createElement('div');
+      transText.className = 'test-preview-text';
+      const transDir = firstStrongDirection(item.translated) || (uiIsRtl ? 'rtl' : 'ltr');
+      transText.setAttribute('dir', transDir);
+      transText.textContent = item.translated;
+
+      transField.appendChild(transLabel);
+      transField.appendChild(transText);
+      entryEl.appendChild(transField);
+
+      container.appendChild(entryEl);
+    });
+
+    resultEl.appendChild(container);
+  } else if (typeof response === 'string') {
+    const textEl = document.createElement('div');
+    textEl.className = 'test-preview-text';
+    const dir = firstStrongDirection(response) || (uiIsRtl ? 'rtl' : 'ltr');
+    textEl.setAttribute('dir', dir);
+    textEl.textContent = response;
+    resultEl.appendChild(textEl);
+  } else {
+    resultEl.textContent = JSON.stringify(response, null, 2);
+  }
+}
+
 window.testTranslationConnection = async function() {
   const providerSelect = document.getElementById('opt-translateAiProvider');
   if (!providerSelect) return;
@@ -9401,7 +9482,12 @@ window.testTranslationConnection = async function() {
   
   statusEl.textContent = t('modals.testingConnection');
   statusEl.style.color = 'var(--color-cyan)';
-  resultEl.textContent = t('modals.waitingApiResponse');
+  resultEl.innerHTML = '';
+  const waitingEl = document.createElement('div');
+  waitingEl.className = 'test-preview-waiting';
+  waitingEl.setAttribute('dir', isRtlLanguage(getLanguage()) ? 'rtl' : 'ltr');
+  waitingEl.textContent = t('modals.waitingApiResponse');
+  resultEl.appendChild(waitingEl);
   
   if (cancelBtn) cancelBtn.style.display = 'inline-flex';
   if (okBtn) okBtn.style.display = 'none';
@@ -9436,7 +9522,7 @@ window.testTranslationConnection = async function() {
 
     statusEl.textContent = t('modals.connectionSuccess');
     statusEl.style.color = 'var(--color-green)';
-    resultEl.textContent = response;
+    renderPreviewTranslationResult(resultEl, response);
   } catch (err) {
     if (timerId) clearTimeout(timerId);
     if (currentTestId !== previewTestId || !isPreviewTesting) return;
@@ -9445,7 +9531,12 @@ window.testTranslationConnection = async function() {
     const isTimeout = errStr.toLowerCase().includes('timeout') || errStr.toLowerCase().includes('timed out') || errStr.includes('تایم‌اوت');
     statusEl.textContent = isTimeout ? (t('modals.connectionTimeout') || t('modals.connectionFailed')) : t('modals.connectionFailed');
     statusEl.style.color = 'var(--color-red)';
-    resultEl.textContent = errStr;
+    resultEl.innerHTML = '';
+    const errDiv = document.createElement('div');
+    errDiv.className = 'test-preview-error';
+    errDiv.setAttribute('dir', firstStrongDirection(errStr) || (isRtlLanguage(getLanguage()) ? 'rtl' : 'ltr'));
+    errDiv.textContent = errStr;
+    resultEl.appendChild(errDiv);
   } finally {
     if (timerId) clearTimeout(timerId);
     if (currentTestId === previewTestId) {

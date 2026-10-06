@@ -1038,7 +1038,10 @@ export const ko: Translations = {
     connectionCancelled: '연결 테스트 취소됨',
     connectionCancelledDesc: '사용자에 의해 연결 테스트가 취소되었습니다.',
     connectionTimeout: '연결 테스트 시간 초과',
-    connectionTimeoutDesc: '{seconds}초 후 요청 시간이 초과되었습니다. 네트워크 연결 또는 프록시/VPN을 확인하세요.\n\n참고: 무료 티어(:free) 또는 대형 모델을 사용하는 경우 제공자의 공개 대기열이 혼잡할 수 있습니다.'
+    connectionTimeoutDesc: '{seconds}초 후 요청 시간이 초과되었습니다. 네트워크 연결 또는 프록시/VPN을 확인하세요.\n\n참고: 무료 티어(:free) 또는 대형 모델을 사용하는 경우 제공자의 공개 대기열이 혼잡할 수 있습니다.',
+    previewOriginal: '원문',
+    previewTranslated: '번역',
+    previewNotTranslated: '번역되지 않음'
   },
   toasts: {
     testCancelled: '연결 테스트가 취소되었습니다.',

@@ -1031,7 +1031,10 @@ export const de: Translations = {
     connectionCancelled: 'Verbindungstest Abgebrochen',
     connectionCancelledDesc: 'Der Verbindungstest wurde vom Benutzer abgebrochen.',
     connectionTimeout: 'Verbindungstest Zeitüberschreitung',
-    connectionTimeoutDesc: 'Die Anfrage wurde nach {seconds} Sekunden wegen Zeitüberschreitung abgebrochen. Bitte prüfen Sie Netzwerk oder Proxy/VPN.\n\nHinweis: Bei kostenlosen (:free) oder sehr großen Modellen kann die öffentliche Warteschlange überlastet sein.'
+    connectionTimeoutDesc: 'Die Anfrage wurde nach {seconds} Sekunden wegen Zeitüberschreitung abgebrochen. Bitte prüfen Sie Netzwerk oder Proxy/VPN.\n\nHinweis: Bei kostenlosen (:free) oder sehr großen Modellen kann die öffentliche Warteschlange überlastet sein.',
+    previewOriginal: 'Original',
+    previewTranslated: 'Übersetzt',
+    previewNotTranslated: 'nicht übersetzt'
   },
   toasts: {
     testCancelled: 'Verbindungstest abgebrochen.',

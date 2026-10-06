@@ -1031,7 +1031,10 @@ export const ja: Translations = {
     connectionCancelled: '接続テストがキャンセルされました',
     connectionCancelledDesc: '接続テストはユーザーによってキャンセルされました。',
     connectionTimeout: '接続テストがタイムアウトしました',
-    connectionTimeoutDesc: '{seconds} 秒間応答がなかったためタイムアウトしました。ネットワークやプロキシ/VPN を確認してください。\n\nヒント: 無料枠 (:free) や大型モデルの場合、サーバー側のキューが混み合っている可能性があります。'
+    connectionTimeoutDesc: '{seconds} 秒間応答がなかったためタイムアウトしました。ネットワークやプロキシ/VPN を確認してください。\n\nヒント: 無料枠 (:free) や大型モデルの場合、サーバー側のキューが混み合っている可能性があります。',
+    previewOriginal: '原文',
+    previewTranslated: '翻訳',
+    previewNotTranslated: '未翻訳'
   },
   toasts: {
     testCancelled: '接続テストがキャンセルされました。',

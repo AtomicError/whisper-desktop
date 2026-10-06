@@ -1038,7 +1038,10 @@ export const it: Translations = {
     connectionCancelled: 'Test di Connessione Annullato',
     connectionCancelledDesc: 'Il test di connessione è stato annullato dall\'utente.',
     connectionTimeout: 'Test di Connessione Scaduto',
-    connectionTimeoutDesc: 'La richiesta è scaduta dopo {seconds} secondi. Controlla la connessione di rete o proxy/VPN.\n\nNota: Se utilizzi un modello gratuito (:free) o molto pesante, la coda pubblica del provider potrebbe richiedere più tempo per rispondere.'
+    connectionTimeoutDesc: 'La richiesta è scaduta dopo {seconds} secondi. Controlla la connessione di rete o proxy/VPN.\n\nNota: Se utilizzi un modello gratuito (:free) o molto pesante, la coda pubblica del provider potrebbe richiedere più tempo per rispondere.',
+    previewOriginal: 'Originale',
+    previewTranslated: 'Tradotto',
+    previewNotTranslated: 'non tradotto'
   },
   toasts: {
     testCancelled: 'Test di connessione annullato.',

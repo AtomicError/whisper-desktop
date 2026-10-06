@@ -1537,14 +1537,24 @@ fn compute_progress(file_idx: usize, total_files: usize, done_lines: usize, tota
 }
 
 /// Translates first 3 lines for testing/preview. Strict mode: unlike the main
-/// pipeline there is no fallback-to-original masking here, because this path
-/// exists precisely to detect broken configurations.
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct PreviewLine {
+    pub index: usize,
+    pub original: String,
+    pub translated: String,
+    pub is_fallback: bool,
+}
+
+/// Run a quick test translation on the first few cues of a subtitle file.
+///
+/// Unlike the full subtitle translation pipeline, this directly returns errors
+/// encountered during translation so the user can verify their API configuration.
 pub async fn preview_translate(
     app: AppHandle,
     logs: Arc<AppLogs>,
     settings: WhisperSettings,
     file_content: String,
-) -> Result<String, String> {
+) -> Result<Vec<PreviewLine>, String> {
     PREVIEW_CANCELLED.store(false, Ordering::SeqCst);
 
     let providers_list: Vec<AiProvider> = serde_json::from_str(&settings.translate_ai_providers)
@@ -1765,17 +1775,19 @@ pub async fn preview_translate(
 
     let mut preview_lines = Vec::new();
     for entry in &original_entries {
-        let (translated, marker) = match chunk_translations.get(&entry.0) {
-            Some(t) if !t.is_empty() && t != &entry.1 => (t.clone(), ""),
-            _ => (entry.1.clone(), "  [not translated]"),
+        let (translated, is_fallback) = match chunk_translations.get(&entry.0) {
+            Some(t) if !t.is_empty() && t != &entry.1 => (t.clone(), false),
+            _ => (entry.1.clone(), true),
         };
-        preview_lines.push(format!(
-            "Original ({}): {}\nTranslated: {}{}",
-            entry.0, entry.1, translated, marker
-        ));
+        preview_lines.push(PreviewLine {
+            index: entry.0,
+            original: entry.1.clone(),
+            translated,
+            is_fallback,
+        });
     }
 
-    Ok(preview_lines.join("\n\n"))
+    Ok(preview_lines)
 }
 
 fn context_limit_patterns() -> &'static [regex::Regex] {

@@ -1031,7 +1031,10 @@ export const ru: Translations = {
     connectionCancelled: 'Тест подключения отменен',
     connectionCancelledDesc: 'Проверка подключения была прервана пользователем.',
     connectionTimeout: 'Время ожидания подключения истекло',
-    connectionTimeoutDesc: 'Запрос превысил таймаут в {seconds} секунд. Проверьте интернет-соединение или прокси/VPN.\n\nПримечание: Бесплатные (:free) или тяжелые модели могут требовать больше времени в пиковые часы.'
+    connectionTimeoutDesc: 'Запрос превысил таймаут в {seconds} секунд. Проверьте интернет-соединение или прокси/VPN.\n\nПримечание: Бесплатные (:free) или тяжелые модели могут требовать больше времени в пиковые часы.',
+    previewOriginal: 'Оригинал',
+    previewTranslated: 'Перевод',
+    previewNotTranslated: 'не переведено'
   },
   toasts: {
     testCancelled: 'Проверка подключения отменена.',

@@ -1031,7 +1031,10 @@ export const es: Translations = {
     connectionCancelled: 'Prueba de Conexión Cancelada',
     connectionCancelledDesc: 'La prueba de conexión fue cancelada por el usuario.',
     connectionTimeout: 'Tiempo de Espera Agotado en la Prueba',
-    connectionTimeoutDesc: 'La solicitud superó el límite de tiempo tras {seconds} segundos. Por favor, revisa tu conexión o proxy/VPN.\n\nNota: Si utilizas modelos gratuitos (:free) o de gran tamaño, la cola pública del proveedor puede demorar más. Prueba con un modelo más ligero.'
+    connectionTimeoutDesc: 'La solicitud superó el límite de tiempo tras {seconds} segundos. Por favor, revisa tu conexión o proxy/VPN.\n\nNota: Si utilizas modelos gratuitos (:free) o de gran tamaño, la cola pública del proveedor puede demorar más. Prueba con un modelo más ligero.',
+    previewOriginal: 'Original',
+    previewTranslated: 'Traducido',
+    previewNotTranslated: 'no traducido'
   },
   toasts: {
     testCancelled: 'Prueba de conexión cancelada.',
