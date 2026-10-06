@@ -19,7 +19,7 @@ export const de: Translations = {
     tagline: 'Hochmoderne Workstation für Spracherkennung & Untertitel',
     description: 'Leistungsstarke Offline-Audio- & Video-Transkription, Untertitelerstellung und Video-Hardsubbing.',
     engineLabel: 'Engine',
-    engineValue: 'whisper.cpp (C/C++)',
+    engineValue: 'whisper.cpp',
     platformLabel: 'Plattform',
     platformValue: 'Tauri v2 (Native 64-Bit)',
     licenseLabel: 'Lizenz',

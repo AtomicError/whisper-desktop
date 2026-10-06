@@ -19,7 +19,7 @@ export const ja: Translations = {
     tagline: '最先端の音声認識＆字幕制作ワークステーション',
     description: '高性能オフライン音声・動画文字起こし、字幕自動生成、および GPU 高速字幕焼き込み。',
     engineLabel: 'エンジン',
-    engineValue: 'whisper.cpp (C/C++)',
+    engineValue: 'whisper.cpp',
     platformLabel: 'プラットフォーム',
     platformValue: 'Tauri v2 (ネイティブ 64-bit)',
     licenseLabel: 'ライセンス',

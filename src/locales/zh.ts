@@ -19,7 +19,7 @@ export const zh: Translations = {
     tagline: '先进的离线语音识别与字幕制作工作站',
     description: '高性能离线音视频转录、自动字幕生成与 GPU 视频字幕压制工作站。',
     engineLabel: '核心引擎',
-    engineValue: 'whisper.cpp (C/C++)',
+    engineValue: 'whisper.cpp',
     platformLabel: '运行平台',
     platformValue: 'Tauri v2 (原生 64位)',
     licenseLabel: '开源协议',

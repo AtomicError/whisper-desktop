@@ -19,7 +19,7 @@ export const fr: Translations = {
     tagline: 'Station de travail avancée de reconnaissance vocale et de sous-titrage',
     description: 'Transcription audio et vidéo hors ligne haute performance, génération automatique de sous-titres et incrustation vidéo.',
     engineLabel: 'Moteur',
-    engineValue: 'whisper.cpp (C/C++)',
+    engineValue: 'whisper.cpp',
     platformLabel: 'Plateforme',
     platformValue: 'Tauri v2 (Natif 64 bits)',
     licenseLabel: 'Licence',

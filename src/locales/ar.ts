@@ -19,7 +19,7 @@ export const ar: Translations = {
     tagline: 'محطة العمل المتقدمة للتعرف على الصوت وصناعة الترجمة',
     description: 'تفريغ صوتي ومرئي عالي الأداء دون اتصال بالإنترنت، وتوليد الترجمات، ودمج النصوص في الفيديو بتسريع العتاد.',
     engineLabel: 'المحرك',
-    engineValue: 'whisper.cpp (C/C++)',
+    engineValue: 'whisper.cpp',
     platformLabel: 'المنصة',
     platformValue: 'توري v2 (أصلي 64-بت)',
     licenseLabel: 'الترخيص',

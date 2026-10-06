@@ -652,11 +652,16 @@ window.addEventListener('whisper:languageChanged', () => {
 
 function syncAppVersionUI() {
   try {
-    const ver = __APP_VERSION__;
+    const ver = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '';
     const sidebarVer = document.getElementById('sidebar-about-version-text');
     if (sidebarVer && ver) sidebarVer.textContent = ver.startsWith('v') ? ver : `v${ver}`;
     const modalVer = document.getElementById('about-modal-version-text');
     if (modalVer && ver) modalVer.textContent = ver.startsWith('v') ? ver : `v${ver}`;
+
+    const whisperVer = typeof __WHISPER_CPP_VERSION__ !== 'undefined' ? __WHISPER_CPP_VERSION__ : 'v1.7.4';
+    const whisperEl = document.getElementById('about-whisper-version-text');
+    if (whisperEl && whisperVer) whisperEl.textContent = whisperVer.startsWith('v') ? whisperVer : `v${whisperVer}`;
+
     renderUpdateCheckerUI();
   } catch (_) {}
 }

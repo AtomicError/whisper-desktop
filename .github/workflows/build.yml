@@ -179,6 +179,7 @@ jobs:
             LATEST_TAG="v1.7.4"
           fi
           echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+          echo "WHISPER_CPP_VERSION=$LATEST_TAG" >> $GITHUB_ENV
           echo "Detected whisper.cpp tag: $LATEST_TAG"
 
       - name: Cache Whisper Binaries

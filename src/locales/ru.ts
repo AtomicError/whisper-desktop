@@ -19,7 +19,7 @@ export const ru: Translations = {
     tagline: 'Передовая рабочая станция распознавания речи и создания субтитров',
     description: 'Высокопроизводительная офлайн-транскрипция аудио и видео, генерация субтитров и вшивание хардсаба с ускорением GPU.',
     engineLabel: 'Движок',
-    engineValue: 'whisper.cpp (C/C++)',
+    engineValue: 'whisper.cpp',
     platformLabel: 'Платформа',
     platformValue: 'Tauri v2 (Native 64-bit)',
     licenseLabel: 'Лицензия',

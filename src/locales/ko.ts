@@ -19,7 +19,7 @@ export const ko: Translations = {
     tagline: '최첨단 음성 인식 및 자막 제작 워크스테이션',
     description: '고성능 오프라인 오디오 및 비디오 음성 변환, 자막 생성 및 비디오 자막 합성 지원.',
     engineLabel: '엔진',
-    engineValue: 'whisper.cpp (C/C++)',
+    engineValue: 'whisper.cpp',
     platformLabel: '플랫폼',
     platformValue: 'Tauri v2 (네이티브 64비트)',
     licenseLabel: '라이선스',

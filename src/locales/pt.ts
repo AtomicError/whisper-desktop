@@ -19,7 +19,7 @@ export const pt: Translations = {
     tagline: 'Estação de trabalho avançada de reconhecimento de fala e legendagem',
     description: 'Transcrição de áudio e vídeo offline de alto desempenho, geração automática de legendas e embutimento em vídeo.',
     engineLabel: 'Motor',
-    engineValue: 'whisper.cpp (C/C++)',
+    engineValue: 'whisper.cpp',
     platformLabel: 'Plataforma',
     platformValue: 'Tauri v2 (Nativo 64-bit)',
     licenseLabel: 'Licença',

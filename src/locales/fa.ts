@@ -19,7 +19,7 @@ export const fa: Translations = {
     tagline: 'استودیوی هوشمند پیاده‌سازی گفتار و ساخت زیرنویس',
     description: 'تبدیل پرسرعت و آفلاین صوت و ویدیو به متن، تولید خودکار زیرنویس و چسباندن دائمی زیرنویس به ویدیو.',
     engineLabel: 'موتور پردازش',
-    engineValue: 'whisper.cpp (C/C++)',
+    engineValue: 'whisper.cpp',
     platformLabel: 'پلتفرم',
     platformValue: 'تائوری ۲ (بومی ۶۴ بیتی)',
     licenseLabel: 'مجوز نرم‌افزار',

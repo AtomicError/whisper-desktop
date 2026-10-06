@@ -9261,6 +9261,28 @@ body.hardsub-fullscreen-active #app-container {
   text-overflow: ellipsis;
 }
 
+.about-engine-spec {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+}
+
+.about-engine-version-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1.5px 6.5px;
+  background: rgba(var(--color-royal-blue-rgb), 0.12);
+  border: 1px solid rgba(var(--color-royal-blue-rgb), 0.28);
+  border-radius: 5px;
+  font-size: 0.70rem;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--color-royal-blue);
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+}
+
 /* Update Checker Card */
 .about-update-card {
   width: 100%;

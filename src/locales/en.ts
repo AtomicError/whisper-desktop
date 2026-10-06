@@ -17,7 +17,7 @@ export const en = {
     tagline: 'State-of-the-art speech recognition & subtitle workstation',
     description: 'High-performance offline audio & video transcription, subtitle generation, and video hardsubbing.',
     engineLabel: 'Engine',
-    engineValue: 'whisper.cpp (C/C++)',
+    engineValue: 'whisper.cpp',
     platformLabel: 'Platform',
     platformValue: 'Tauri v2 (Native 64-bit)',
     licenseLabel: 'License',

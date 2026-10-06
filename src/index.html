@@ -4989,7 +4989,12 @@
           <div class="about-specs-table">
             <div class="about-spec-row">
               <span class="about-spec-label" data-i18n="about.engineLabel">Engine</span>
-              <span class="about-spec-value"><bdi data-i18n="about.engineValue">whisper.cpp (C/C++)</bdi></span>
+              <span class="about-spec-value">
+                <bdi class="about-engine-spec">
+                  <span data-i18n="about.engineValue">whisper.cpp</span>
+                  <span class="about-engine-version-chip" id="about-whisper-version-text">__WHISPER_CPP_VERSION__</span>
+                </bdi>
+              </span>
             </div>
             <div class="about-spec-row">
               <span class="about-spec-label" data-i18n="about.platformLabel">Platform</span>

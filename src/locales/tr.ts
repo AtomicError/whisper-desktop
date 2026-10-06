@@ -19,7 +19,7 @@ export const tr: Translations = {
     tagline: 'Gelişmiş konuşma tanıma ve altyazı iş istasyonu',
     description: 'Yüksek performanslı çevrimdışı ses ve video deşifresi, altyazı oluşturma ve videoya altyazı gömme.',
     engineLabel: 'Motor',
-    engineValue: 'whisper.cpp (C/C++)',
+    engineValue: 'whisper.cpp',
     platformLabel: 'Platform',
     platformValue: 'Tauri v2 (Yerel 64-bit)',
     licenseLabel: 'Lisans',
