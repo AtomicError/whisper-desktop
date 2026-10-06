@@ -694,6 +694,9 @@ export const fa: Translations = {
     // General
     themeTitle: 'پوستهٔ برنامه',
     themeDesc: 'پوسته و زبان بصری کل رابط کاربری نرم‌افزار را انتخاب کنید.',
+    monochromeCanvasTitle: 'پس‌زمینهٔ مونوکروم (بدون تینت رنگی)',
+    monochromeCanvasDesc: 'حذف ته‌رنگ‌های اشباع از پس‌زمینه، سایدبار و پنل‌ها و اعمال بوم زغالی مات استودیویی با حفظ کامل رنگ اصلی تم.',
+    monochromeCanvasPoints: '<span class="setting-desc-point"><strong>پیش‌فرض:</strong> غیرفعال (استفاده از پس‌زمینهٔ دارای ته‌رنگ پوسته)</span>',
     languageSettingTitle: 'زبان رابط کاربری',
     languageSettingDesc: 'زبان نمایش منوها، دکمه‌ها و پنجره‌های برنامه را انتخاب کنید.',
     langEn: 'English',

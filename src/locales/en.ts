@@ -692,6 +692,9 @@ export const en = {
     // General
     themeTitle: 'Application Theme',
     themeDesc: 'Choose the visual theme for the entire application interface.',
+    monochromeCanvasTitle: 'Monochrome Canvas (Tint-Free)',
+    monochromeCanvasDesc: 'Removes saturated color casts from backgrounds, panels, and sidebars, providing a clean studio charcoal canvas while preserving theme accent colors.',
+    monochromeCanvasPoints: '<span class="setting-desc-point"><strong>Default:</strong> Disabled (standard tinted canvas)</span>',
     languageSettingTitle: 'Interface Language',
     languageSettingDesc: 'Select the display language for the application interface and menus.',
     langEn: 'English',

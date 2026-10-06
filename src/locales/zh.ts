@@ -693,6 +693,9 @@ export const zh: Translations = {
 
     themeTitle: '界面配色主题',
     themeDesc: '选择符合您视觉习惯的软件全局设计主题。',
+    monochromeCanvasTitle: '单色画布（去除色调）',
+    monochromeCanvasDesc: '消除背景、面板和侧边栏的饱和色调，在保留主题重点强调色的同时呈现纯净的磨砂木炭色工作室画布。',
+    monochromeCanvasPoints: '<span class="setting-desc-point"><strong>默认：</strong> 已禁用（标准色调画布）</span>',
     languageSettingTitle: '软件显示语言',
     languageSettingDesc: '选择软件界面、各级菜单及提示信息的显示语言。',
     langEn: 'English',

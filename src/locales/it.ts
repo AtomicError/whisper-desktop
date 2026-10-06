@@ -694,6 +694,9 @@ export const it: Translations = {
     // General
     themeTitle: 'Tema dell\'Applicazione',
     themeDesc: 'Scegli il tema visivo per l\'intera interfaccia dell\'applicazione.',
+    monochromeCanvasTitle: 'Sfondo monocromatico (senza tinta)',
+    monochromeCanvasDesc: 'Rimuove le tinte sature da sfondi, pannelli e barra laterale, fornendo uno sfondo antracite opaco da studio mantenendo i colori di accento del tema.',
+    monochromeCanvasPoints: '<span class="setting-desc-point"><strong>Predefinito:</strong> Disattivato (sfondo colorato standard)</span>',
     languageSettingTitle: 'Lingua dell\'Interfaccia',
     languageSettingDesc: 'Seleziona la lingua visualizzata per i menu e l\'interfaccia dell\'applicazione.',
     langEn: 'English',

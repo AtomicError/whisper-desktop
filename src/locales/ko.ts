@@ -694,6 +694,9 @@ export const ko: Translations = {
     // General
     themeTitle: '애플리케이션 테마',
     themeDesc: '애플리케이션 전체 인터페이스의 시각적 테마를 선택합니다.',
+    monochromeCanvasTitle: '모노크롬 캔버스 (틴트 제거)',
+    monochromeCanvasDesc: '배경, 패널, 사이드바에서 채도 높은 색조를 제거하여 테마 강조 색상을 유지하면서 깔끔한 스튜디오 매트 차콜 캔버스를 제공합니다.',
+    monochromeCanvasPoints: '<span class="setting-desc-point"><strong>기본값:</strong> 비활성화 (표준 틴트 배경)</span>',
     languageSettingTitle: '인터페이스 언어',
     languageSettingDesc: '애플리케이션 인터페이스 및 메뉴의 표시 언어를 선택합니다.',
     langEn: 'English',

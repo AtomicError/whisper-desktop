@@ -20,6 +20,13 @@
           }
 
           const cachedTheme = localStorage.getItem('whisper_theme_cache') || 'royal-blue';
+          const isMonochrome = localStorage.getItem('whisper_monochrome_canvas') === 'true';
+          if (isMonochrome) {
+            document.documentElement.setAttribute('data-canvas', 'monochrome');
+          } else {
+            document.documentElement.removeAttribute('data-canvas');
+          }
+
           const themeMetaMap = {
             'royal-blue': '#070913',
             'royal': '#070913',
@@ -28,6 +35,15 @@
             'fire-orange': '#0c0a09',
             'fire': '#0c0a09',
             'emerald': '#060e0a'
+          };
+          const themeMetaMapMonochrome = {
+            'royal-blue': '#101114',
+            'royal': '#101114',
+            'cyber-blue': '#101114',
+            'carbon': '#121214',
+            'fire-orange': '#121111',
+            'fire': '#121111',
+            'emerald': '#101211'
           };
           const themeCardIdMap = {
             'royal-blue': 'theme-card-royal',
@@ -46,7 +62,9 @@
             document.documentElement.removeAttribute('data-theme');
           }
 
-          const bg = themeMetaMap[cachedTheme] || '#070913';
+          const bg = isMonochrome
+            ? (themeMetaMapMonochrome[cachedTheme] || '#101114')
+            : (themeMetaMap[cachedTheme] || '#070913');
           document.documentElement.style.setProperty('--bg-space', bg);
           const meta = document.querySelector('meta[name="theme-color"]');
           if (meta) meta.setAttribute('content', bg);
@@ -61,6 +79,10 @@
                 card.setAttribute('aria-checked', isActive ? 'true' : 'false');
               }
             });
+            const monoCheck = document.getElementById('opt-monochromeCanvas');
+            if (monoCheck) {
+              monoCheck.checked = isMonochrome;
+            }
           };
           if (document.readyState !== 'loading') {
             updateInitialThemeCards();
@@ -1636,6 +1658,26 @@
                           <p class="theme-card-desc" data-i18n="theme.emeraldDesc">Obsidian studio canvas with cyber mint and relaxing emerald accents</p>
                         </div>
                       </button>
+                    </div>
+                  </div>
+
+                  <!-- Monochrome / Tint-Free Canvas Card -->
+                  <div class="setting-card" data-search-tags="theme monochrome canvas tint free neutral charcoal dark matte پس زمینه مونوکروم تینت مات زغالی خنثی پوسته استودیویی">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.monochromeCanvasTitle">Monochrome Canvas (Tint-Free)</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.monochromeCanvasDesc">Removes saturated tints from background surfaces and sidebars, applying a neutral matte studio canvas while preserving all accent colors.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.monochromeCanvasPoints">
+                          <span class="setting-desc-point"><strong>Default:</strong> Disabled (standard tinted canvas)</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <label class="switch">
+                        <input type="checkbox" id="opt-monochromeCanvas" />
+                        <span class="slider"></span>
+                      </label>
                     </div>
                   </div>
 

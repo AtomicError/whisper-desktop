@@ -693,6 +693,9 @@ export const ja: Translations = {
 
     themeTitle: 'テーマ・外観',
     themeDesc: 'アプリケーション全体の視覚テーマを選択します。',
+    monochromeCanvasTitle: 'モノクロキャンバス（色味除去）',
+    monochromeCanvasDesc: '背景、パネル、サイドバーから彩度のある色味を除去し、テーマのアクセントカラーを維持しながらスタジオマットなチャコール背景を適用します。',
+    monochromeCanvasPoints: '<span class="setting-desc-point"><strong>デフォルト:</strong> 無効（標準のティント付き背景）</span>',
     languageSettingTitle: '表示言語',
     languageSettingDesc: 'メニューおよびインターフェースの表示言語を選択します。',
     langEn: 'English',

@@ -693,6 +693,9 @@ export const ar: Translations = {
 
     themeTitle: 'مظهر البرنامج',
     themeDesc: 'اختر السمة والنمط البصري لواجهة التطبيق بالكامل.',
+    monochromeCanvasTitle: 'لوحة أحادية اللون (خالية من الصبغة)',
+    monochromeCanvasDesc: 'يزيل تدرجات الألوان المشبعة من الخلفيات والألواح والشريط الجانبي، مما يوفر خلفية فحمية غير لامعة مع الحفاظ على ألوان السمة المميزة.',
+    monochromeCanvasPoints: '<span class="setting-desc-point"><strong>الافتراضي:</strong> معطل (لوحة قياسية ذات صبغة)</span>',
     languageSettingTitle: 'لغة الواجهة',
     languageSettingDesc: 'حدد لغة عرض القوائم والنصوص في واجهة البرنامج.',
     langEn: 'English',

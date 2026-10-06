@@ -693,6 +693,9 @@ export const ru: Translations = {
 
     themeTitle: 'Тема оформления',
     themeDesc: 'Выберите визуальную цветовую тему для интерфейса приложения.',
+    monochromeCanvasTitle: 'Монохромный фон (без оттенка)',
+    monochromeCanvasDesc: 'Убирает насыщенные цветовые оттенки с фона, панелей и боковой панели, создавая матовый студийный угольный фон с сохранением акцентных цветов темы.',
+    monochromeCanvasPoints: '<span class="setting-desc-point"><strong>По умолчанию:</strong> Отключено (стандартный фон с оттенком)</span>',
     languageSettingTitle: 'Язык интерфейса',
     languageSettingDesc: 'Выберите язык отображения меню, кнопок и диалогов.',
     langEn: 'English',

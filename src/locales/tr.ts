@@ -694,6 +694,9 @@ export const tr: Translations = {
     // General
     themeTitle: 'Uygulama Teması',
     themeDesc: 'Uygulama arayüzünün genel görsel temasını seçin.',
+    monochromeCanvasTitle: 'Monokrom Tuval (Renk Tontsuz)',
+    monochromeCanvasDesc: 'Arka planlardan, panellerden ve kenar çubuğundan doygun renk tonlarını kaldırarak tema vurgu renklerini korurken stüdyo mat kömür tuvali sağlar.',
+    monochromeCanvasPoints: '<span class="setting-desc-point"><strong>Varsayılan:</strong> Devre Dışı (standart renk tonlu tuval)</span>',
     languageSettingTitle: 'Arayüz Dili',
     languageSettingDesc: 'Uygulama menüleri ve ekranları için görüntüleme dilini seçin.',
     langEn: 'English',

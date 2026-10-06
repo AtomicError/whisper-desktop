@@ -693,6 +693,9 @@ export const fr: Translations = {
 
     themeTitle: 'Thème de l\'Application',
     themeDesc: 'Choisissez le thème visuel pour l\'ensemble de l\'interface logicielle.',
+    monochromeCanvasTitle: 'Canevas monochrome (sans teinte)',
+    monochromeCanvasDesc: 'Supprime les teintes saturées des arrière-plans, panneaux et barres latérales, offrant un canevas anthracite mat de studio tout en préservant les couleurs d’accentuation.',
+    monochromeCanvasPoints: '<span class="setting-desc-point"><strong>Par défaut :</strong> Désactivé (canevas teinté standard)</span>',
     languageSettingTitle: 'Langue de l\'Interface',
     languageSettingDesc: 'Sélectionnez la langue d\'affichage des menus et de l\'interface.',
     langEn: 'English',

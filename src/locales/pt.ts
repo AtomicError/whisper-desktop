@@ -693,6 +693,9 @@ export const pt: Translations = {
 
     themeTitle: 'Tema Visual do Aplicativo',
     themeDesc: 'Escolha o tema visual para toda a interface do software.',
+    monochromeCanvasTitle: 'Tela Monocromática (Sem Tonalidade)',
+    monochromeCanvasDesc: 'Remove tonalidades saturadas de fundos, painéis e barra lateral, fornecendo uma tela de carvão fosca de estúdio enquanto preserva as cores de destaque do tema.',
+    monochromeCanvasPoints: '<span class="setting-desc-point"><strong>Padrão:</strong> Desativado (tela colorida padrão)</span>',
     languageSettingTitle: 'Idioma da Interface',
     languageSettingDesc: 'Selecione o idioma de exibição para os menus e janelas.',
     langEn: 'English',

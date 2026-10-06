@@ -693,6 +693,9 @@ export const de: Translations = {
 
     themeTitle: 'Erscheinungsbild / Design',
     themeDesc: 'Wählen Sie das visuelle Farbthema für die Benutzeroberfläche.',
+    monochromeCanvasTitle: 'Monochromer Hintergrund (Farbstichfrei)',
+    monochromeCanvasDesc: 'Entfernt gesättigte Farbstiche von Hintergründen, Panels und der Seitenleiste für eine matte Studio-Graphitfläche unter Beibehaltung der Akzentfarben.',
+    monochromeCanvasPoints: '<span class="setting-desc-point"><strong>Standard:</strong> Deaktiviert (Standardmäßig getönter Hintergrund)</span>',
     languageSettingTitle: 'Oberflächensprache',
     languageSettingDesc: 'Wählen Sie die Anzeigesprache für Menüs und die Programmoberfläche.',
     langEn: 'English',

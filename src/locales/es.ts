@@ -693,6 +693,9 @@ export const es: Translations = {
 
     themeTitle: 'Tema de la Aplicación',
     themeDesc: 'Elige el tema visual para toda la interfaz de la aplicación.',
+    monochromeCanvasTitle: 'Lienzo monocromático (sin tinte)',
+    monochromeCanvasDesc: 'Elimina los tintes saturados de fondos, paneles y barra lateral, proporcionando un lienzo carbón mate de estudio mientras conserva los colores de acento del tema.',
+    monochromeCanvasPoints: '<span class="setting-desc-point"><strong>Predeterminado:</strong> Desactivado (lienzo tintado estándar)</span>',
     languageSettingTitle: 'Idioma de la Interfaz',
     languageSettingDesc: 'Selecciona el idioma para los menús y la interfaz de la aplicación.',
     langEn: 'English',

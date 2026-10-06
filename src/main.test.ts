@@ -661,3 +661,53 @@ describe('formatFFmpegVersion', () => {
   });
 });
 
+describe('Monochrome Canvas Engine', () => {
+  const MONOCHROME_META_COLORS = {
+    'royal-blue': '#101114',
+    'cyber-blue': '#101114',
+    'carbon': '#121214',
+    'fire-orange': '#121111',
+    'fire': '#121111',
+    'emerald': '#101211'
+  };
+
+  it('provides distinct, dedicated monochrome surfaces for each theme', () => {
+    expect(MONOCHROME_META_COLORS['royal-blue']).toBe('#101114');
+    expect(MONOCHROME_META_COLORS['carbon']).toBe('#121214');
+    expect(MONOCHROME_META_COLORS['fire-orange']).toBe('#121111');
+    expect(MONOCHROME_META_COLORS['emerald']).toBe('#101211');
+
+    // Royal Blue and Fire Orange have distinct surface hues
+    expect(MONOCHROME_META_COLORS['royal-blue']).not.toBe(MONOCHROME_META_COLORS['fire-orange']);
+    // Royal Blue and Emerald have distinct surface hues
+    expect(MONOCHROME_META_COLORS['royal-blue']).not.toBe(MONOCHROME_META_COLORS['emerald']);
+  });
+
+  it('updates DOM attributes and localStorage correctly when toggling', () => {
+    const store: Record<string, string> = {};
+    const mockLocalStorage = {
+      getItem: (key: string) => store[key] ?? null,
+      setItem: (key: string, val: string) => { store[key] = val; }
+    };
+    const mockRoot = new MockElement('HTML');
+
+    function applyCanvas(isMono: boolean) {
+      if (isMono) {
+        mockRoot.setAttribute('data-canvas', 'monochrome');
+      } else {
+        (mockRoot as any).attributes.delete('data-canvas');
+      }
+      mockLocalStorage.setItem('whisper_monochrome_canvas', isMono ? 'true' : 'false');
+    }
+
+    applyCanvas(true);
+    expect(mockRoot.getAttribute('data-canvas')).toBe('monochrome');
+    expect(mockLocalStorage.getItem('whisper_monochrome_canvas')).toBe('true');
+
+    applyCanvas(false);
+    expect(mockRoot.getAttribute('data-canvas')).toBeNull();
+    expect(mockLocalStorage.getItem('whisper_monochrome_canvas')).toBe('false');
+  });
+});
+
+

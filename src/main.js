@@ -2235,16 +2235,82 @@ function resolveThemeConfig(themeName) {
   return THEME_REGISTRY[themeName] || THEME_REGISTRY['royal-blue'];
 }
 
+const MONOCHROME_META_COLORS = {
+  'royal-blue': '#101114',
+  'cyber-blue': '#101114',
+  'carbon': '#121214',
+  'fire-orange': '#121111',
+  'fire': '#121111',
+  'emerald': '#101211'
+};
+
+function isMonochromeCanvasActive() {
+  return document.documentElement.getAttribute('data-canvas') === 'monochrome';
+}
+
+function applyMonochromeCanvas(isMonochrome, persist = true) {
+  const root = document.documentElement;
+  if (isMonochrome) {
+    root.setAttribute('data-canvas', 'monochrome');
+  } else {
+    root.removeAttribute('data-canvas');
+  }
+
+  if (persist) {
+    try {
+      localStorage.setItem('whisper_monochrome_canvas', isMonochrome ? 'true' : 'false');
+    } catch (_) {}
+  }
+
+  const monoCheck = document.getElementById('opt-monochromeCanvas');
+  if (monoCheck && monoCheck.checked !== !!isMonochrome) {
+    monoCheck.checked = !!isMonochrome;
+  }
+
+  // Sync active theme's background space and meta color
+  const currentThemeId = (window.settingsState && window.settingsState.theme)
+    ? window.settingsState.theme
+    : (localStorage.getItem('whisper_theme_cache') || 'royal-blue');
+  const config = resolveThemeConfig(currentThemeId);
+
+  if (isMonochrome) {
+    const monoBg = MONOCHROME_META_COLORS[config.id] || '#101114';
+    root.style.setProperty('--bg-space', monoBg);
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) metaTheme.setAttribute('content', monoBg);
+  } else {
+    if (config.id === 'royal-blue') {
+      root.style.removeProperty('--bg-space');
+    } else if (config.metaColor) {
+      root.style.setProperty('--bg-space', config.metaColor);
+    }
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme && config.metaColor) {
+      metaTheme.setAttribute('content', config.metaColor);
+    }
+  }
+}
+
+window.applyMonochromeCanvas = applyMonochromeCanvas;
+window.isMonochromeCanvasActive = isMonochromeCanvasActive;
+
 function applyTheme(themeName) {
   const root = document.documentElement;
   const config = resolveThemeConfig(themeName);
+  const isMonochrome = isMonochromeCanvasActive();
 
   if (config.id === 'royal-blue') {
     root.removeAttribute('data-theme');
-    root.style.removeProperty('--bg-space');
+    if (isMonochrome) {
+      root.style.setProperty('--bg-space', MONOCHROME_META_COLORS['royal-blue'] || '#101114');
+    } else {
+      root.style.removeProperty('--bg-space');
+    }
   } else {
     root.setAttribute('data-theme', config.dataTheme || config.id);
-    if (config.metaColor) {
+    if (isMonochrome) {
+      root.style.setProperty('--bg-space', MONOCHROME_META_COLORS[config.id] || '#101114');
+    } else if (config.metaColor) {
       root.style.setProperty('--bg-space', config.metaColor);
     }
   }
@@ -2256,8 +2322,13 @@ function applyTheme(themeName) {
 
   // Update theme meta color tag
   const metaTheme = document.querySelector('meta[name="theme-color"]');
-  if (metaTheme && config.metaColor) {
-    metaTheme.setAttribute('content', config.metaColor);
+  if (metaTheme) {
+    const effectiveColor = isMonochrome
+      ? (MONOCHROME_META_COLORS[config.id] || '#101114')
+      : config.metaColor;
+    if (effectiveColor) {
+      metaTheme.setAttribute('content', effectiveColor);
+    }
   }
 
   // Update theme picker cards in Settings -> App Preferences
@@ -3649,6 +3720,12 @@ async function refreshSettings() {
       applyUiZoom(settingsState.uiScale, false, false);
     }
 
+    // Apply Monochrome Canvas from loaded settings (or localStorage cache)
+    const isMonochrome = (settingsState && typeof settingsState.monochromeCanvas === 'boolean')
+      ? settingsState.monochromeCanvas
+      : (localStorage.getItem('whisper_monochrome_canvas') === 'true');
+    applyMonochromeCanvas(isMonochrome, true);
+
     // Apply Color Theme from loaded settings and sync localStorage cache
     const currentTheme = (settingsState && settingsState.theme) ? settingsState.theme : 'royal-blue';
     applyTheme(currentTheme);
@@ -3718,6 +3795,9 @@ function bindSettingsToDOM() {
         el.checked = settingsState[key];
         el.onchange = () => {
           settingsState[key] = el.checked;
+          if (key === 'monochromeCanvas') {
+            applyMonochromeCanvas(el.checked, true);
+          }
           saveCurrentSettings();
           if (key === 'translateAiPolish' && window.translationStudioController) {
             window.translationStudioController.syncFromGlobalSettings();

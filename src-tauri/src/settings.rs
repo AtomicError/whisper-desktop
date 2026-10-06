@@ -114,6 +114,8 @@ pub struct WhisperSettings {
     #[serde(default = "default_theme")]
     pub theme: String,
     #[serde(default)]
+    pub monochrome_canvas: bool,
+    #[serde(default)]
     pub close_to_tray: bool,
     #[serde(default = "default_ui_language")]
     pub ui_language: String,
@@ -262,6 +264,7 @@ impl WhisperSettings {
             output_dir_path: "".to_string(),
             ui_scale: 1.0,
             theme: "royal-blue".to_string(),
+            monochrome_canvas: false,
             close_to_tray: false,
             ui_language: "en".to_string(),
             recent_spoken_languages: Vec::new(),
@@ -1050,6 +1053,21 @@ mod tests {
 
         let loaded = load_settings_from_path(&temp_path);
         assert_eq!(loaded.ui_language, "ar");
+
+        let _ = fs::remove_file(&temp_path);
+    }
+
+    #[test]
+    fn test_monochrome_canvas_sanitization_and_persistence() {
+        let mut settings = WhisperSettings::default_settings();
+        assert!(!settings.monochrome_canvas);
+
+        let temp_path = temp_test_file("monochrome_canvas_test");
+        settings.monochrome_canvas = true;
+        save_settings_to_path(&temp_path, &settings).unwrap();
+
+        let loaded = load_settings_from_path(&temp_path);
+        assert!(loaded.monochrome_canvas);
 
         let _ = fs::remove_file(&temp_path);
     }

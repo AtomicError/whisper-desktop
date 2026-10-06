@@ -477,6 +477,87 @@ html {
 }
 
 /* ==========================================================================
+   MONOCHROME CANVAS ENGINE (TINT-FREE STUDIO SURFACES)
+   Subtle studio matte charcoal surfaces with full preservation of
+   theme accent colors, typography, buttons, and semantic states.
+   ========================================================================== */
+
+/* 1. Base & Royal Blue with Monochrome Canvas (Deep studio graphite with zero navy/cyan cast) */
+:root[data-canvas="monochrome"],
+:root[data-theme="royal-blue"][data-canvas="monochrome"],
+:root[data-theme="cyber-blue"][data-canvas="monochrome"] {
+  --bg-space: #101114;
+  --bg-deep: #16171b;
+  --bg-card: rgba(26, 27, 32, 0.72);
+  --bg-card-hover: rgba(36, 37, 44, 0.85);
+  --bg-input: #151619;
+  --bg-dropdown: #1b1c20;
+  --bg-titlebar: rgba(16, 17, 20, 0.98);
+  --bg-table-head: #16171a;
+  --bg-table-body: rgba(18, 19, 23, 0.85);
+  --bg-glass-card: rgba(26, 27, 32, 0.72);
+  --border-glass: rgba(255, 255, 255, 0.07);
+
+  --bg-radial-1: rgba(255, 255, 255, 0.015);
+  --bg-radial-2: rgba(255, 255, 255, 0.01);
+}
+
+/* 2. Fiery Orange with Monochrome Canvas (Volcanic obsidian matte with zero muddy brown cast) */
+:root[data-theme="fire-orange"][data-canvas="monochrome"],
+:root[data-theme="fire"][data-canvas="monochrome"] {
+  --bg-space: #121111;
+  --bg-deep: #171515;
+  --bg-card: rgba(30, 26, 26, 0.72);
+  --bg-card-hover: rgba(40, 35, 35, 0.85);
+  --bg-input: #171515;
+  --bg-dropdown: #1d1a1a;
+  --bg-titlebar: rgba(18, 17, 17, 0.98);
+  --bg-table-head: #181616;
+  --bg-table-body: rgba(20, 18, 18, 0.85);
+  --bg-glass-card: rgba(30, 26, 26, 0.72);
+  --border-glass: rgba(255, 255, 255, 0.07);
+
+  --bg-radial-1: rgba(255, 255, 255, 0.015);
+  --bg-radial-2: rgba(255, 255, 255, 0.01);
+}
+
+/* 3. Emerald with Monochrome Canvas (Titanium charcoal matte with zero marshy green cast) */
+:root[data-theme="emerald"][data-canvas="monochrome"] {
+  --bg-space: #101211;
+  --bg-deep: #151816;
+  --bg-card: rgba(24, 29, 26, 0.72);
+  --bg-card-hover: rgba(34, 40, 36, 0.85);
+  --bg-input: #141715;
+  --bg-dropdown: #1a1e1c;
+  --bg-titlebar: rgba(16, 18, 17, 0.98);
+  --bg-table-head: #151917;
+  --bg-table-body: rgba(18, 22, 20, 0.85);
+  --bg-glass-card: rgba(24, 29, 26, 0.72);
+  --border-glass: rgba(255, 255, 255, 0.07);
+
+  --bg-radial-1: rgba(255, 255, 255, 0.015);
+  --bg-radial-2: rgba(255, 255, 255, 0.01);
+}
+
+/* 4. Carbon with Monochrome Canvas (Maintains native neutral obsidian surfaces) */
+:root[data-theme="carbon"][data-canvas="monochrome"] {
+  --bg-space: #121214;
+  --bg-deep: #18181b;
+  --bg-card: rgba(28, 28, 32, 0.75);
+  --bg-card-hover: rgba(38, 38, 44, 0.88);
+  --bg-input: #161619;
+  --bg-dropdown: #1c1c20;
+  --bg-titlebar: rgba(18, 18, 20, 0.98);
+  --bg-table-head: #17171a;
+  --bg-table-body: rgba(20, 20, 23, 0.85);
+  --bg-glass-card: rgba(28, 28, 32, 0.75);
+  --border-glass: rgba(255, 255, 255, 0.08);
+
+  --bg-radial-1: rgba(255, 255, 255, 0.015);
+  --bg-radial-2: rgba(255, 255, 255, 0.01);
+}
+
+/* ==========================================================================
    SMOOTH DESKTOP THEME TRANSITIONS (GPU ACCELERATED VIEW TRANSITIONS)
    ========================================================================== */
 ::view-transition-old(root),
