@@ -288,11 +288,11 @@ The app probes each hardware encoder with a one-frame test encode before offerin
 
 Download, inspect and manage the GGML models the transcription engine loads.
 
-* **34 Whisper models** — tiny, base, small, medium, large-v1/v2/v3, `large-v3-turbo`, the English-only `.en` variants, and `q5_1`/`q8_0` quantizations, plus `small.en-tdrz` for tiny diarization — and **2 Silero VAD** models (`v5.1.2`, `v6.2.0`). The smallest is `tiny-q5_1` at 32 MB; the largest is `large-v3` at 3.1 GB.
+* **34 Whisper models** — tiny, base, small, medium, large-v1/v2/v3, `large-v3-turbo`, the English-only `.en` variants, and `q5_1`/`q8_0` quantizations, plus `small.en-tdrz` for tiny diarization — and **3 Silero VAD** models (`v5.1.2`, `v6.2.0`, `v6.2.3`). The smallest is `tiny-q5_1` at 32 MB; the largest is `large-v3` at 3.1 GB.
 * Each entry shows disk size, expected RAM/VRAM, relative speed, accuracy, precision (16-bit / 8-bit / 5-bit) and language coverage, with a model-selection guide grouped by family.
 * The app detects your RAM, CPU core count and GPU type (`NVIDIA (CUDA)`, `AMD (Vulkan)`, `Intel (OpenVINO & Vulkan)`, or CPU-only) and recommends accordingly.
 * Search and category filters (Tiny / Base / Small / Medium / Large / Silero VAD / Downloaded), plus the ability to mark a model as the default.
-* Downloads show live percentage, speed and ETA, and can be **paused, resumed or discarded**. Models are fetched from the official `ggerganov/whisper.cpp` and `ggml-org/whisper-vad` repositories on Hugging Face — plus `akashmjn/tinydiarize-whisper.cpp` for `small.en-tdrz`, which upstream does not publish — and verified against a pinned size and SHA-256 checksum. Deleting a model removes it from disk.
+* Downloads show live percentage, speed and ETA, and can be **paused, resumed or discarded**. Models are fetched from the official `ggerganov/whisper.cpp` and `ggml-org/whisper-vad` repositories on Hugging Face — plus `akashmjn/tinydiarize-whisper.cpp` for `small.en-tdrz` and `ahnad0502/ggml-silero-vad-v6.2.3` for `silero-vad-v6.2.3` — and verified against a pinned size and SHA-256 checksum. Deleting a model removes it from disk.
 
 Models live in a folder you control (see [Files, folders and where your data lives](#files-folders-and-where-your-data-lives)) and are re-scanned on startup, so models you downloaded with the `whisper.cpp` CLI are picked up too.
 

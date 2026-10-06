@@ -14,6 +14,7 @@ use tokio::io::{AsyncWriteExt, BufWriter};
 
 const HF_WHISPER_BASE: &str = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main";
 const HF_VAD_BASE: &str = "https://huggingface.co/ggml-org/whisper-vad/resolve/main";
+const HF_SILERO_V623_BASE: &str = "https://huggingface.co/ahnad0502/ggml-silero-vad-v6.2.3/resolve/main";
 /// tinydiarize builds live in their own repository — upstream whisper.cpp never
 /// published a `tdrz` model. Used for `small.en-tdrz`.
 const HF_TDRZ_BASE: &str = "https://huggingface.co/akashmjn/tinydiarize-whisper.cpp/resolve/main";
@@ -73,6 +74,7 @@ fn model_catalog(name: &str) -> Option<(u64, &'static str)> {
         "large-v3-turbo-q8_0" => (874188075, "317eb69c11673c9de1e1f0d459b253999804ec71ac4c23c17ecf5fbe24e259a1"),
         "silero-v5.1.2" => (885098, "29940d98d42b91fbd05ce489f3ecf7c72f0a42f027e4875919a28fb4c04ea2cf"),
         "silero-v6.2.0" => (885098, "2aa269b785eeb53a82983a20501ddf7c1d9c48e33ab63a41391ac6c9f7fb6987"),
+        "silero-vad-v6.2.3" => (885098, "abd79739d3ff4bc37fa1d24f1fca8244f2e31ec9f0bb7ea6244b185bfaa0b8e6"),
         _ => return None,
     };
     Some(entry)
@@ -87,7 +89,7 @@ pub fn get_models_list() -> Vec<&'static str> {
         "medium", "medium-q5_0", "medium-q8_0", "medium.en", "medium.en-q5_0", "medium.en-q8_0",
         "large-v1", "large-v2", "large-v2-q5_0", "large-v2-q8_0",
         "large-v3", "large-v3-q5_0", "large-v3-turbo", "large-v3-turbo-q5_0", "large-v3-turbo-q8_0",
-        "silero-v5.1.2", "silero-v6.2.0",
+        "silero-v5.1.2", "silero-v6.2.0", "silero-vad-v6.2.3",
     ]
 }
 
@@ -111,7 +113,9 @@ fn is_safe_model_name(name: &str) -> bool {
 }
 
 fn model_url(clean_name: &str) -> String {
-    if clean_name.starts_with("silero-") {
+    if clean_name == "silero-vad-v6.2.3" {
+        format!("{HF_SILERO_V623_BASE}/ggml-{clean_name}.bin?download=true")
+    } else if clean_name.starts_with("silero-") {
         format!("{HF_VAD_BASE}/ggml-{clean_name}.bin?download=true")
     } else if clean_name.ends_with("-tdrz") {
         format!("{HF_TDRZ_BASE}/ggml-{clean_name}.bin?download=true")
@@ -1071,6 +1075,10 @@ mod tests {
         assert_eq!(
             model_url("silero-v6.2.0"),
             "https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v6.2.0.bin?download=true"
+        );
+        assert_eq!(
+            model_url("silero-vad-v6.2.3"),
+            "https://huggingface.co/ahnad0502/ggml-silero-vad-v6.2.3/resolve/main/ggml-silero-vad-v6.2.3.bin?download=true"
         );
     }
 
