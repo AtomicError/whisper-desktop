@@ -2064,7 +2064,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" type="number" id="opt-offsetT" />
+                      <input class="text-input" type="number" min="0" step="1000" id="opt-offsetT" />
                     </div>
                   </div>
 
@@ -2081,7 +2081,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" type="number" id="opt-duration" />
+                      <input class="text-input" type="number" min="0" step="1000" id="opt-duration" />
                     </div>
                   </div>
 
@@ -2200,7 +2200,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" type="number" id="opt-audioCtx" />
+                      <input class="text-input" type="number" min="0" step="1" id="opt-audioCtx" />
                     </div>
                   </div>
 
@@ -2217,7 +2217,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" type="number" step="0.01" id="opt-wordThold" />
+                      <input class="text-input" type="number" min="0" max="1" step="0.01" id="opt-wordThold" />
                     </div>
                   </div>
 
@@ -2234,7 +2234,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" type="number" step="0.1" id="opt-entropyThold" />
+                      <input class="text-input" type="number" min="0" step="0.1" id="opt-entropyThold" />
                     </div>
                   </div>
 
@@ -2251,7 +2251,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" type="number" step="0.1" id="opt-logprobThold" />
+                      <input class="text-input" type="number" max="0" step="0.1" id="opt-logprobThold" />
                     </div>
                   </div>
 
@@ -2268,7 +2268,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" type="number" step="0.05" id="opt-noSpeechThold" />
+                      <input class="text-input" type="number" min="0" max="1" step="0.05" id="opt-noSpeechThold" />
                     </div>
                   </div>
 
@@ -2285,7 +2285,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" type="number" step="0.05" id="opt-temperature" />
+                      <input class="text-input" type="number" min="0" max="2" step="0.05" id="opt-temperature" />
                     </div>
                   </div>
 
@@ -2302,7 +2302,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" type="number" step="0.05" id="opt-temperatureInc" />
+                      <input class="text-input" type="number" min="0" max="2" step="0.05" id="opt-temperatureInc" />
                     </div>
                   </div>
 
@@ -2614,7 +2614,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" type="number" step="0.05" id="opt-vadThold" />
+                      <input class="text-input" type="number" min="0" max="1" step="0.05" id="opt-vadThold" />
                     </div>
                   </div>
 
@@ -2631,7 +2631,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" type="number" id="opt-vadMinSpeech" />
+                      <input class="text-input" type="number" min="0" step="10" id="opt-vadMinSpeech" />
                     </div>
                   </div>
 
@@ -2648,7 +2648,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" type="number" id="opt-vadMinSil" />
+                      <input class="text-input" type="number" min="0" step="10" id="opt-vadMinSil" />
                     </div>
                   </div>
 
@@ -2682,7 +2682,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" type="number" id="opt-vadSpeechPad" />
+                      <input class="text-input" type="number" min="0" step="5" id="opt-vadSpeechPad" />
                     </div>
                   </div>
 
@@ -2691,15 +2691,15 @@
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.vadOverlapTitle">VAD Segment Overlap</span>
                       </div>
-                      <div class="setting-desc"><span data-i18n="settings.vadOverlapDesc">Contextual overlap ratio between consecutive speech segments.</span>
+                      <div class="setting-desc"><span data-i18n="settings.vadOverlapDesc">Contextual overlap duration between consecutive speech segments.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.vadOverlapPoints">
-                          <span class="setting-desc-point"><strong>Default:</strong> <code>0.1</code> (10%)</span>
+                          <span class="setting-desc-point"><strong>Default:</strong> <code>0.1</code> s (100 ms)</span>
                           <span class="setting-desc-point"><strong>Purpose:</strong> Preserves grammatical continuity across segment boundaries.</span>
                         </div>
                       </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" type="number" step="0.05" id="opt-vadOverlap" />
+                      <input class="text-input" type="number" min="0" max="1" step="0.05" id="opt-vadOverlap" />
                     </div>
                   </div>
                 </div>

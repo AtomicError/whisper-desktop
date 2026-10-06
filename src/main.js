@@ -4032,10 +4032,10 @@ function sanitizeSettingsPayload(state) {
   for (const key of Object.keys(clean)) {
     if (INT_SETTING_KEYS.has(key)) {
       const parsed = parseInt(clean[key]);
-      clean[key] = isNaN(parsed) ? 0 : parsed;
+      clean[key] = isNaN(parsed) ? (key === 'maxContext' ? -1 : 0) : parsed;
     } else if (FLOAT_SETTING_KEYS.has(key)) {
       const parsed = parseFloat(clean[key]);
-      clean[key] = isNaN(parsed) ? 0.0 : parsed;
+      clean[key] = isNaN(parsed) ? (key === 'vadMaxSpeech' ? 30.0 : 0.0) : parsed;
     }
   }
   return clean;
@@ -4156,7 +4156,7 @@ function updateAllStepperButtons() {
 
 function clampNumberSetting(inputId, val) {
   let num = parseInt(val);
-  if (isNaN(num)) num = 0;
+  if (isNaN(num)) num = (inputId === 'opt-maxContext' ? -1 : 0);
   
   const { min, max } = getStepperBounds(inputId);
   if (num < min) num = min;
@@ -4168,7 +4168,7 @@ window.incrementNumber = function(inputId, step = 1, immediate = false) {
   const el = document.getElementById(inputId);
   if (el) {
     let currentVal = parseInt(el.value);
-    if (isNaN(currentVal)) currentVal = 0;
+    if (isNaN(currentVal)) currentVal = (inputId === 'opt-maxContext' ? -1 : 0);
     const nextVal = clampNumberSetting(inputId, currentVal + step);
     el.value = nextVal;
     updateStepperButtonStates(el);
@@ -4185,7 +4185,7 @@ window.decrementNumber = function(inputId, step = 1, immediate = false) {
   const el = document.getElementById(inputId);
   if (el) {
     let currentVal = parseInt(el.value);
-    if (isNaN(currentVal)) currentVal = 0;
+    if (isNaN(currentVal)) currentVal = (inputId === 'opt-maxContext' ? -1 : 0);
     const nextVal = clampNumberSetting(inputId, currentVal - step);
     el.value = nextVal;
     updateStepperButtonStates(el);
