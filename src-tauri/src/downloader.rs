@@ -439,6 +439,7 @@ async fn download_inner(
         let mut last_emit = Instant::now();
         let mut window_start = last_emit;
         let mut window_bytes: u64 = 0;
+        let mut smoothed_speed: f64 = 0.0;
         let mut network_error: Option<String> = None;
 
         while let Some(item) = stream.next().await {
@@ -465,8 +466,14 @@ async fn download_inner(
             let now = Instant::now();
             if now.duration_since(last_emit) >= EMIT_INTERVAL {
                 let elapsed = now.duration_since(window_start).as_secs_f64();
-                let speed = if elapsed > 0.0 { window_bytes as f64 / elapsed } else { 0.0 };
-                emit_progress(app, make_payload(clean_name, Phase::Downloading, downloaded, total_bytes, speed, None));
+                let instant_speed = if elapsed > 0.0 { window_bytes as f64 / elapsed } else { 0.0 };
+                smoothed_speed = if smoothed_speed <= 0.0 {
+                    instant_speed
+                } else {
+                    // Exponential moving average: 25% weight to instantaneous delta, 75% to historical speed
+                    0.25 * instant_speed + 0.75 * smoothed_speed
+                };
+                emit_progress(app, make_payload(clean_name, Phase::Downloading, downloaded, total_bytes, smoothed_speed, None));
                 last_emit = now;
                 window_start = now;
                 window_bytes = 0;

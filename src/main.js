@@ -3067,11 +3067,18 @@ function setupTauriListeners() {
         statusEl.className = 'model-progress-status status-downloading';
         barContainer.parentNode.insertBefore(statusEl, barContainer);
       }
-      if (statusEl) {
-        statusEl.innerHTML = liveStatus;
-        statusEl.classList.remove('status-paused');
-        statusEl.classList.add('status-downloading');
-        statusEl.style.color = '';
+      const nowTime = Date.now();
+      const lastTextUpdate = card._lastStatusTextUpdate || 0;
+      const isPhaseChange = card._lastPhase !== payload.phase;
+      if (nowTime - lastTextUpdate >= 650 || isPhaseChange) {
+        card._lastStatusTextUpdate = nowTime;
+        card._lastPhase = payload.phase;
+        if (statusEl) {
+          statusEl.innerHTML = liveStatus;
+          statusEl.classList.remove('status-paused');
+          statusEl.classList.add('status-downloading');
+          statusEl.style.color = '';
+        }
       }
 
       // 3. Keep description metadata clean without dynamic metrics
