@@ -326,6 +326,7 @@ pub(crate) fn compute_bin_candidate_rel_paths(backend: &str, exe_ext: &str) -> V
 
 #[cfg(unix)]
 fn copy_companion_shared_libs(src_dir: &Path, dst_dir: &Path) {
+    use std::os::unix::fs::PermissionsExt;
     if let Ok(entries) = std::fs::read_dir(src_dir) {
         for entry in entries.flatten() {
             let src_file = entry.path();
@@ -338,12 +339,129 @@ fn copy_companion_shared_libs(src_dir: &Path, dst_dir: &Path) {
                     } else {
                         true
                     };
-                    if copy_so {
-                        let _ = std::fs::copy(&src_file, &dst_file);
+                    if copy_so && std::fs::copy(&src_file, &dst_file).is_ok() {
+                        if let Ok(meta) = std::fs::metadata(&dst_file) {
+                            let mut perms = meta.permissions();
+                            perms.set_mode(perms.mode() | 0o755);
+                            let _ = std::fs::set_permissions(&dst_file, perms);
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+#[cfg(unix)]
+fn sync_cached_binaries(
+    cache_dir: &Path,
+    bin_path: &Path,
+    bin_name: &str,
+    orig_bin_dir: Option<&Path>,
+    is_openvino_sub: bool,
+) -> PathBuf {
+    use std::os::unix::fs::PermissionsExt;
+
+    let target_dir = if is_openvino_sub {
+        let sub = cache_dir.join("openvino");
+        let _ = std::fs::create_dir_all(&sub);
+        sub
+    } else {
+        let _ = std::fs::create_dir_all(cache_dir);
+        cache_dir.to_path_buf()
+    };
+    let cached_bin = target_dir.join(bin_name);
+
+    let appimage_path = std::env::var("APPIMAGE").ok();
+    let appimage_mtime = appimage_path
+        .as_ref()
+        .and_then(|p| std::fs::metadata(p).ok())
+        .and_then(|m| m.modified().ok())
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+
+    let src_bin_mtime = std::fs::metadata(bin_path)
+        .ok()
+        .and_then(|m| m.modified().ok())
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+
+    let current_stamp = format!(
+        "pkg={}:ai={}:{}:bin_mtime={}",
+        env!("CARGO_PKG_VERSION"),
+        appimage_path.as_deref().unwrap_or(""),
+        appimage_mtime,
+        src_bin_mtime
+    );
+
+    let stamp_file = cache_dir.join(".whisper_bin_version");
+    let needs_invalidation = match std::fs::read_to_string(&stamp_file) {
+        Ok(prev_stamp) => prev_stamp.trim() != current_stamp.trim(),
+        Err(_) => true,
+    };
+
+    if needs_invalidation {
+        // Purge legacy/stale binaries and companion shared libraries to eliminate ABI mismatch
+        let _ = std::fs::remove_dir_all(cache_dir.join("openvino"));
+        if let Ok(entries) = std::fs::read_dir(cache_dir) {
+            for entry in entries.flatten() {
+                let p = entry.path();
+                if p.is_file() {
+                    let name = p.file_name().unwrap_or_default().to_string_lossy();
+                    if name.starts_with("whisper-cli-")
+                        || name.starts_with("libggml")
+                        || name.starts_with("libwhisper")
+                        || name.starts_with("libopenvino")
+                        || name.starts_with("libtbb")
+                        || name.ends_with(".so")
+                        || name.contains(".so.")
+                    {
+                        let _ = std::fs::remove_file(&p);
+                    }
+                }
+            }
+        }
+        if is_openvino_sub {
+            let _ = std::fs::create_dir_all(&target_dir);
+        }
+    }
+
+    let should_copy = if needs_invalidation || !cached_bin.exists() {
+        true
+    } else if let (Ok(src_meta), Ok(dst_meta)) = (std::fs::metadata(bin_path), std::fs::metadata(&cached_bin)) {
+        src_meta.len() != dst_meta.len()
+    } else {
+        true
+    };
+
+    if should_copy && std::fs::copy(bin_path, &cached_bin).is_ok() {
+        if let Ok(meta) = std::fs::metadata(&cached_bin) {
+            let mut perms = meta.permissions();
+            perms.set_mode(perms.mode() | 0o755);
+            let _ = std::fs::set_permissions(&cached_bin, perms);
+        }
+    }
+
+    // Copy companion shared libraries (.so / .so.*) from original directory to target_dir
+    if let Some(orig_dir) = orig_bin_dir {
+        copy_companion_shared_libs(orig_dir, &target_dir);
+        if is_openvino_sub {
+            if let Some(parent) = orig_dir.parent() {
+                copy_companion_shared_libs(parent, cache_dir);
+            }
+        }
+    }
+
+    if needs_invalidation {
+        let _ = std::fs::write(&stamp_file, &current_stamp);
+    }
+
+    if cached_bin.exists() {
+        cached_bin
+    } else {
+        bin_path.to_path_buf()
     }
 }
 
@@ -483,43 +601,13 @@ pub async fn run_transcription(
         if needs_copy {
             if let Ok(cache_dir) = app.path().app_cache_dir() {
                 let is_openvino_sub = bin_path.parent().and_then(|p| p.file_name()).map(|n| n == "openvino").unwrap_or(false);
-                let target_dir = if is_openvino_sub {
-                    let sub = cache_dir.join("openvino");
-                    let _ = std::fs::create_dir_all(&sub);
-                    sub
-                } else {
-                    let _ = std::fs::create_dir_all(&cache_dir);
-                    cache_dir.clone()
-                };
-                let cached_bin = target_dir.join(&bin_name);
-                
-                let should_copy = if let (Ok(src_meta), Ok(dst_meta)) = (std::fs::metadata(&bin_path), std::fs::metadata(&cached_bin)) {
-                    src_meta.len() != dst_meta.len()
-                } else {
-                    true
-                };
-                
-                if should_copy && std::fs::copy(&bin_path, &cached_bin).is_ok() {
-                    if let Ok(meta) = std::fs::metadata(&cached_bin) {
-                        let mut perms = meta.permissions();
-                        perms.set_mode(perms.mode() | 0o111);
-                        let _ = std::fs::set_permissions(&cached_bin, perms);
-                    }
-                }
-
-                // Copy companion shared libraries (.so / .so.*) from original directory to target_dir
-                if let Some(ref orig_dir) = orig_bin_dir {
-                    copy_companion_shared_libs(orig_dir, &target_dir);
-                    if is_openvino_sub {
-                        if let Some(parent) = orig_dir.parent() {
-                            copy_companion_shared_libs(parent, &cache_dir);
-                        }
-                    }
-                }
-                
-                if cached_bin.exists() {
-                    bin_path = cached_bin;
-                }
+                bin_path = sync_cached_binaries(
+                    &cache_dir,
+                    &bin_path,
+                    &bin_name,
+                    orig_bin_dir.as_deref(),
+                    is_openvino_sub,
+                );
             }
         }
     }
@@ -1268,6 +1356,71 @@ mod tests {
         assert_eq!(dtw_token_for_model("ggml-base.bin"), Some("base"));
         assert_eq!(dtw_token_for_model("tiny"), Some("tiny"));
         assert_eq!(dtw_token_for_model("unknown_custom_model"), None);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_sync_cached_binaries_invalidation_and_cleanup() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let cache_dir = temp_dir.path().join("cache");
+        let src_dir = temp_dir.path().join("resources");
+        std::fs::create_dir_all(&cache_dir).unwrap();
+        std::fs::create_dir_all(&src_dir).unwrap();
+
+        // 1. Simulate legacy stale cache files from older version
+        let stale_lib = cache_dir.join("libggml.so.0.23.0");
+        let stale_openvino_dir = cache_dir.join("openvino");
+        std::fs::create_dir_all(&stale_openvino_dir).unwrap();
+        let stale_ov_lib = stale_openvino_dir.join("libopenvino.so");
+        std::fs::write(&stale_lib, b"stale_lib").unwrap();
+        std::fs::write(&stale_ov_lib, b"stale_ov").unwrap();
+
+        // Put an outdated stamp
+        let stamp_file = cache_dir.join(".whisper_bin_version");
+        std::fs::write(&stamp_file, "old_version_stamp").unwrap();
+
+        // 2. Prepare new source files
+        let src_bin = src_dir.join("whisper-cli-vulkan");
+        std::fs::write(&src_bin, b"new_vulkan_binary").unwrap();
+        let src_lib = src_dir.join("libggml.so.0.26.0");
+        std::fs::write(&src_lib, b"new_ggml_lib").unwrap();
+
+        // 3. Call sync_cached_binaries
+        let synced = sync_cached_binaries(
+            &cache_dir,
+            &src_bin,
+            "whisper-cli-vulkan",
+            Some(&src_dir),
+            false,
+        );
+
+        assert_eq!(synced, cache_dir.join("whisper-cli-vulkan"));
+        assert!(synced.exists());
+        assert_eq!(std::fs::read(&synced).unwrap(), b"new_vulkan_binary");
+
+        // Stale files must have been cleaned up
+        assert!(!stale_lib.exists(), "Legacy stale lib should be deleted on invalidation");
+        assert!(!stale_ov_lib.exists(), "Legacy OpenVINO dir should be purged");
+
+        // Companion lib must be copied
+        assert!(cache_dir.join("libggml.so.0.26.0").exists());
+        assert_eq!(std::fs::read(cache_dir.join("libggml.so.0.26.0")).unwrap(), b"new_ggml_lib");
+
+        // Stamp file must now exist with updated stamp
+        let updated_stamp = std::fs::read_to_string(&stamp_file).unwrap();
+        assert_ne!(updated_stamp.trim(), "old_version_stamp");
+        assert!(updated_stamp.contains(env!("CARGO_PKG_VERSION")));
+
+        // Calling a second time should not delete anything
+        let synced2 = sync_cached_binaries(
+            &cache_dir,
+            &src_bin,
+            "whisper-cli-vulkan",
+            Some(&src_dir),
+            false,
+        );
+        assert_eq!(synced2, synced);
+        assert!(cache_dir.join("libggml.so.0.26.0").exists());
     }
 }
 
