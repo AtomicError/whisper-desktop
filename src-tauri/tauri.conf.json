@@ -42,7 +42,10 @@
       "resources/ffprobe*",
       "resources/fonts/*",
       "resources/*.so*",
-      "resources/openvino/*"
+      "resources/standard/*",
+      "resources/vulkan/*",
+      "resources/openvino/*",
+      "resources/cuda/*"
     ],
 
     "category": "Utility",

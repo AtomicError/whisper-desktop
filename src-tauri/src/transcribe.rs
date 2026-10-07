@@ -317,8 +317,11 @@ pub(crate) fn resolve_model_subpath(root: &Path, rel_or_abs: &str) -> PathBuf {
 pub(crate) fn compute_bin_candidate_rel_paths(backend: &str, exe_ext: &str) -> Vec<PathBuf> {
     let backend_name = backend.to_lowercase();
     let bin_name = format!("whisper-cli-{}{}", backend_name, exe_ext);
-    if backend_name == "openvino" {
-        vec![PathBuf::from("openvino").join(&bin_name), PathBuf::from(&bin_name)]
+    if !backend_name.is_empty() {
+        vec![
+            PathBuf::from(&backend_name).join(&bin_name),
+            PathBuf::from(&bin_name),
+        ]
     } else {
         vec![PathBuf::from(&bin_name)]
     }
@@ -330,20 +333,25 @@ fn copy_companion_shared_libs(src_dir: &Path, dst_dir: &Path) {
     if let Ok(entries) = std::fs::read_dir(src_dir) {
         for entry in entries.flatten() {
             let src_file = entry.path();
-            if let Some(name) = src_file.file_name() {
-                let name_str = name.to_string_lossy();
-                if name_str.ends_with(".so") || name_str.contains(".so.") {
-                    let dst_file = dst_dir.join(name);
-                    let copy_so = if let (Ok(s_meta), Ok(d_meta)) = (std::fs::metadata(&src_file), std::fs::metadata(&dst_file)) {
-                        s_meta.len() != d_meta.len()
-                    } else {
-                        true
-                    };
-                    if copy_so && std::fs::copy(&src_file, &dst_file).is_ok() {
-                        if let Ok(meta) = std::fs::metadata(&dst_file) {
-                            let mut perms = meta.permissions();
-                            perms.set_mode(perms.mode() | 0o755);
-                            let _ = std::fs::set_permissions(&dst_file, perms);
+            if src_file.is_file() {
+                if let Some(name) = src_file.file_name() {
+                    let name_str = name.to_string_lossy();
+                    let is_lib = name_str.ends_with(".so") || name_str.contains(".so.");
+                    let is_config = name_str == "cache.json" || name_str.ends_with(".xml") || name_str.ends_with(".json");
+                    if is_lib || is_config {
+                        let dst_file = dst_dir.join(name);
+                        let should_copy = if let (Ok(s_meta), Ok(d_meta)) = (std::fs::metadata(&src_file), std::fs::metadata(&dst_file)) {
+                            s_meta.len() != d_meta.len()
+                        } else {
+                            true
+                        };
+                        let copy_ok = !should_copy || std::fs::copy(&src_file, &dst_file).is_ok();
+                        if copy_ok && is_lib {
+                            if let Ok(meta) = std::fs::metadata(&dst_file) {
+                                let mut perms = meta.permissions();
+                                perms.set_mode(perms.mode() | 0o755);
+                                let _ = std::fs::set_permissions(&dst_file, perms);
+                            }
                         }
                     }
                 }
@@ -358,14 +366,14 @@ fn sync_cached_binaries(
     bin_path: &Path,
     bin_name: &str,
     orig_bin_dir: Option<&Path>,
-    is_openvino_sub: bool,
+    sub_folder: Option<&str>,
 ) -> PathBuf {
     use std::os::unix::fs::PermissionsExt;
 
-    let target_dir = if is_openvino_sub {
-        let sub = cache_dir.join("openvino");
-        let _ = std::fs::create_dir_all(&sub);
-        sub
+    let target_dir = if let Some(sub) = sub_folder {
+        let dir = cache_dir.join(sub);
+        let _ = std::fs::create_dir_all(&dir);
+        dir
     } else {
         let _ = std::fs::create_dir_all(cache_dir);
         cache_dir.to_path_buf()
@@ -388,23 +396,24 @@ fn sync_cached_binaries(
         .map(|d| d.as_secs())
         .unwrap_or(0);
 
-    let current_stamp = format!(
-        "pkg={}:ai={}:{}:bin_mtime={}",
+    let global_stamp = format!(
+        "pkg={}:ai={}:{}",
         env!("CARGO_PKG_VERSION"),
         appimage_path.as_deref().unwrap_or(""),
-        appimage_mtime,
-        src_bin_mtime
+        appimage_mtime
     );
 
     let stamp_file = cache_dir.join(".whisper_bin_version");
-    let needs_invalidation = match std::fs::read_to_string(&stamp_file) {
-        Ok(prev_stamp) => prev_stamp.trim() != current_stamp.trim(),
+    let global_needs_invalidation = match std::fs::read_to_string(&stamp_file) {
+        Ok(prev_stamp) => prev_stamp.trim() != global_stamp.trim(),
         Err(_) => true,
     };
 
-    if needs_invalidation {
-        // Purge legacy/stale binaries and companion shared libraries to eliminate ABI mismatch
-        let _ = std::fs::remove_dir_all(cache_dir.join("openvino"));
+    if global_needs_invalidation {
+        // Purge legacy/stale binaries and companion shared libraries across all backends to eliminate ABI mismatch on version upgrade
+        for sub in &["standard", "vulkan", "openvino", "cuda"] {
+            let _ = std::fs::remove_dir_all(cache_dir.join(sub));
+        }
         if let Ok(entries) = std::fs::read_dir(cache_dir) {
             for entry in entries.flatten() {
                 let p = entry.path();
@@ -415,6 +424,9 @@ fn sync_cached_binaries(
                         || name.starts_with("libwhisper")
                         || name.starts_with("libopenvino")
                         || name.starts_with("libtbb")
+                        || name.starts_with("libcudart")
+                        || name.starts_with("libcublas")
+                        || name.starts_with("libnvJitLink")
                         || name.ends_with(".so")
                         || name.contains(".so.")
                     {
@@ -423,15 +435,20 @@ fn sync_cached_binaries(
                 }
             }
         }
-        if is_openvino_sub {
-            let _ = std::fs::create_dir_all(&target_dir);
-        }
+        let _ = std::fs::create_dir_all(&target_dir);
+        let _ = std::fs::write(&stamp_file, &global_stamp);
     }
 
-    let should_copy = if needs_invalidation || !cached_bin.exists() {
+    let should_copy = if global_needs_invalidation || !cached_bin.exists() {
         true
     } else if let (Ok(src_meta), Ok(dst_meta)) = (std::fs::metadata(bin_path), std::fs::metadata(&cached_bin)) {
-        src_meta.len() != dst_meta.len()
+        let dst_bin_mtime = dst_meta
+            .modified()
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        src_meta.len() != dst_meta.len() || src_bin_mtime > dst_bin_mtime
     } else {
         true
     };
@@ -444,18 +461,14 @@ fn sync_cached_binaries(
         }
     }
 
-    // Copy companion shared libraries (.so / .so.*) from original directory to target_dir
+    // Copy companion shared libraries (.so / .so.*) and configs from original directory to target_dir
     if let Some(orig_dir) = orig_bin_dir {
         copy_companion_shared_libs(orig_dir, &target_dir);
-        if is_openvino_sub {
+        if sub_folder.is_some() {
             if let Some(parent) = orig_dir.parent() {
                 copy_companion_shared_libs(parent, cache_dir);
             }
         }
-    }
-
-    if needs_invalidation {
-        let _ = std::fs::write(&stamp_file, &current_stamp);
     }
 
     if cached_bin.exists() {
@@ -600,13 +613,17 @@ pub async fn run_transcription(
         
         if needs_copy {
             if let Ok(cache_dir) = app.path().app_cache_dir() {
-                let is_openvino_sub = bin_path.parent().and_then(|p| p.file_name()).map(|n| n == "openvino").unwrap_or(false);
+                let sub_folder_str = bin_path
+                    .parent()
+                    .and_then(|p| p.file_name())
+                    .map(|n| n.to_string_lossy().to_string())
+                    .filter(|name| !name.eq_ignore_ascii_case("resources") && !name.eq_ignore_ascii_case("bin"));
                 bin_path = sync_cached_binaries(
                     &cache_dir,
                     &bin_path,
                     &bin_name,
                     orig_bin_dir.as_deref(),
-                    is_openvino_sub,
+                    sub_folder_str.as_deref(),
                 );
             }
         }
@@ -1336,13 +1353,34 @@ mod tests {
         );
 
         let vulkan_cands = compute_bin_candidate_rel_paths("vulkan", ".exe");
-        assert_eq!(vulkan_cands, vec![PathBuf::from("whisper-cli-vulkan.exe")]);
+        assert_eq!(
+            vulkan_cands,
+            vec![
+                PathBuf::from("vulkan").join("whisper-cli-vulkan.exe"),
+                PathBuf::from("whisper-cli-vulkan.exe")
+            ]
+        );
 
         let standard_cands = compute_bin_candidate_rel_paths("standard", "");
-        assert_eq!(standard_cands, vec![PathBuf::from("whisper-cli-standard")]);
+        assert_eq!(
+            standard_cands,
+            vec![
+                PathBuf::from("standard").join("whisper-cli-standard"),
+                PathBuf::from("whisper-cli-standard")
+            ]
+        );
 
         let cuda_cands = compute_bin_candidate_rel_paths("cuda", "");
-        assert_eq!(cuda_cands, vec![PathBuf::from("whisper-cli-cuda")]);
+        assert_eq!(
+            cuda_cands,
+            vec![
+                PathBuf::from("cuda").join("whisper-cli-cuda"),
+                PathBuf::from("whisper-cli-cuda")
+            ]
+        );
+
+        let empty_cands = compute_bin_candidate_rel_paths("", "");
+        assert_eq!(empty_cands, vec![PathBuf::from("whisper-cli-")]);
     }
 
     #[test]
@@ -1379,48 +1417,78 @@ mod tests {
         let stamp_file = cache_dir.join(".whisper_bin_version");
         std::fs::write(&stamp_file, "old_version_stamp").unwrap();
 
-        // 2. Prepare new source files
-        let src_bin = src_dir.join("whisper-cli-vulkan");
-        std::fs::write(&src_bin, b"new_vulkan_binary").unwrap();
-        let src_lib = src_dir.join("libggml.so.0.26.0");
-        std::fs::write(&src_lib, b"new_ggml_lib").unwrap();
+        // 2. Prepare new source files in subfolder (e.g. cuda)
+        let cuda_src_dir = src_dir.join("cuda");
+        std::fs::create_dir_all(&cuda_src_dir).unwrap();
+        let src_bin = cuda_src_dir.join("whisper-cli-cuda");
+        std::fs::write(&src_bin, b"new_cuda_binary").unwrap();
+        let src_lib = cuda_src_dir.join("libggml-cuda.so");
+        std::fs::write(&src_lib, b"new_cuda_lib").unwrap();
+        let src_config = cuda_src_dir.join("cache.json");
+        std::fs::write(&src_config, b"{\"test\":true}").unwrap();
 
-        // 3. Call sync_cached_binaries
+        // 3. Call sync_cached_binaries with sub_folder Some("cuda")
         let synced = sync_cached_binaries(
             &cache_dir,
             &src_bin,
-            "whisper-cli-vulkan",
-            Some(&src_dir),
-            false,
+            "whisper-cli-cuda",
+            Some(&cuda_src_dir),
+            Some("cuda"),
         );
 
-        assert_eq!(synced, cache_dir.join("whisper-cli-vulkan"));
+        assert_eq!(synced, cache_dir.join("cuda").join("whisper-cli-cuda"));
         assert!(synced.exists());
-        assert_eq!(std::fs::read(&synced).unwrap(), b"new_vulkan_binary");
+        assert_eq!(std::fs::read(&synced).unwrap(), b"new_cuda_binary");
 
         // Stale files must have been cleaned up
         assert!(!stale_lib.exists(), "Legacy stale lib should be deleted on invalidation");
         assert!(!stale_ov_lib.exists(), "Legacy OpenVINO dir should be purged");
 
-        // Companion lib must be copied
-        assert!(cache_dir.join("libggml.so.0.26.0").exists());
-        assert_eq!(std::fs::read(cache_dir.join("libggml.so.0.26.0")).unwrap(), b"new_ggml_lib");
+        // Companion lib and config must be copied into cuda subfolder
+        assert!(cache_dir.join("cuda").join("libggml-cuda.so").exists());
+        assert_eq!(std::fs::read(cache_dir.join("cuda").join("libggml-cuda.so")).unwrap(), b"new_cuda_lib");
+        assert!(cache_dir.join("cuda").join("cache.json").exists());
+        assert_eq!(std::fs::read(cache_dir.join("cuda").join("cache.json")).unwrap(), b"{\"test\":true}");
 
         // Stamp file must now exist with updated stamp
         let updated_stamp = std::fs::read_to_string(&stamp_file).unwrap();
         assert_ne!(updated_stamp.trim(), "old_version_stamp");
         assert!(updated_stamp.contains(env!("CARGO_PKG_VERSION")));
 
-        // Calling a second time should not delete anything
+        // Calling a second time for CUDA should preserve everything
         let synced2 = sync_cached_binaries(
             &cache_dir,
             &src_bin,
-            "whisper-cli-vulkan",
-            Some(&src_dir),
-            false,
+            "whisper-cli-cuda",
+            Some(&cuda_src_dir),
+            Some("cuda"),
         );
         assert_eq!(synced2, synced);
-        assert!(cache_dir.join("libggml.so.0.26.0").exists());
+        assert!(cache_dir.join("cuda").join("libggml-cuda.so").exists());
+
+        // 4. Now sync another backend (e.g. vulkan). This MUST NOT purge CUDA!
+        let vulkan_src_dir = src_dir.join("vulkan");
+        std::fs::create_dir_all(&vulkan_src_dir).unwrap();
+        let vulkan_bin = vulkan_src_dir.join("whisper-cli-vulkan");
+        std::fs::write(&vulkan_bin, b"new_vulkan_binary").unwrap();
+        let vulkan_lib = vulkan_src_dir.join("libggml-vulkan.so");
+        std::fs::write(&vulkan_lib, b"new_vulkan_lib").unwrap();
+
+        let synced_vulkan = sync_cached_binaries(
+            &cache_dir,
+            &vulkan_bin,
+            "whisper-cli-vulkan",
+            Some(&vulkan_src_dir),
+            Some("vulkan"),
+        );
+        assert_eq!(synced_vulkan, cache_dir.join("vulkan").join("whisper-cli-vulkan"));
+        assert!(synced_vulkan.exists());
+        assert!(cache_dir.join("vulkan").join("libggml-vulkan.so").exists());
+
+        // CRUCIAL: CUDA backend MUST still exist and NOT be purged when switching backends
+        assert!(cache_dir.join("cuda").join("whisper-cli-cuda").exists(), "CUDA binary must remain cached");
+        assert!(cache_dir.join("cuda").join("libggml-cuda.so").exists(), "CUDA companion library must remain cached");
+        assert!(cache_dir.join("cuda").join("cache.json").exists(), "CUDA companion config must remain cached");
     }
 }
 

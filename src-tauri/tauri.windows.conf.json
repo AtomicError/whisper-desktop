@@ -7,7 +7,10 @@
       "resources/ffprobe*",
       "resources/fonts/*",
       "resources/*.dll",
+      "resources/standard/*",
+      "resources/vulkan/*",
       "resources/openvino/*",
+      "resources/cuda/*",
       "resources/vc_redist*.exe"
     ],
     "windows": {

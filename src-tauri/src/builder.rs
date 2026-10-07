@@ -3,6 +3,8 @@ use std::io::Read;
 use std::path::Path;
 use tauri::{AppHandle, Manager};
 
+use crate::transcribe::compute_bin_candidate_rel_paths;
+
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
@@ -83,48 +85,65 @@ pub fn is_valid_executable(path: &Path) -> bool {
 }
 
 pub fn check_build_exists(app: &AppHandle, backend: &str) -> bool {
-    let dir_name = backend.to_lowercase();
     let exe_ext = std::env::consts::EXE_SUFFIX;
-    let bin_name = format!("whisper-cli-{}{}", dir_name, exe_ext);
+    let candidates = compute_bin_candidate_rel_paths(backend, exe_ext);
 
-    // 1. Check in Tauri resource directory
-    if app
-        .path()
-        .resolve(format!("resources/{}", bin_name), tauri::path::BaseDirectory::Resource)
-        .is_ok_and(|path| is_valid_executable(&path))
-    {
-        return true;
-    }
-    if app
-        .path()
-        .resolve(&bin_name, tauri::path::BaseDirectory::Resource)
-        .is_ok_and(|path| is_valid_executable(&path))
-    {
-        return true;
-    }
+    for candidate in &candidates {
+        let cand_str = candidate.to_string_lossy();
 
-    // 2. Check in dev directory (both root and src-tauri relative)
-    if let Ok(cwd) = std::env::current_dir() {
-        let dev_path_sub = cwd.join("src-tauri").join("resources").join(&bin_name);
-        if is_valid_executable(&dev_path_sub) {
+        // 1. Check in Tauri resource directory
+        if app
+            .path()
+            .resolve(format!("resources/{}", cand_str), tauri::path::BaseDirectory::Resource)
+            .is_ok_and(|path| is_valid_executable(&path))
+        {
             return true;
         }
-        let dev_path_direct = cwd.join("resources").join(&bin_name);
-        if is_valid_executable(&dev_path_direct) {
+        if app
+            .path()
+            .resolve(&*cand_str, tauri::path::BaseDirectory::Resource)
+            .is_ok_and(|path| is_valid_executable(&path))
+        {
             return true;
         }
-    }
 
-    // 3. Check next to running executable
-    if let Ok(exe_path) = std::env::current_exe() {
-        if let Some(parent) = exe_path.parent() {
-            let next_to_exe = parent.join(&bin_name);
-            if is_valid_executable(&next_to_exe) {
+        // 2. Check next to running executable (Portable / Standalone mode)
+        if let Ok(exe_path) = std::env::current_exe() {
+            if let Some(parent) = exe_path.parent() {
+                let res_sub = parent.join("resources").join(candidate);
+                if is_valid_executable(&res_sub) {
+                    return true;
+                }
+                let next_to_exe = parent.join(candidate);
+                if is_valid_executable(&next_to_exe) {
+                    return true;
+                }
+            }
+        }
+
+        // 3. Check in dev directory (both root and src-tauri relative)
+        if let Ok(cwd) = std::env::current_dir() {
+            let dev_path_sub = cwd.join("src-tauri").join("resources").join(candidate);
+            if is_valid_executable(&dev_path_sub) {
                 return true;
             }
-            let res_sub = parent.join("resources").join(&bin_name);
-            if is_valid_executable(&res_sub) {
+            let dev_path_direct = cwd.join("resources").join(candidate);
+            if is_valid_executable(&dev_path_direct) {
                 return true;
+            }
+        }
+
+        // 4. Check cached binary in app_cache_dir (e.g. Linux / AppImage)
+        if let Ok(cache_dir) = app.path().app_cache_dir() {
+            let cached_sub = cache_dir.join(candidate);
+            if is_valid_executable(&cached_sub) {
+                return true;
+            }
+            if let Some(file_name) = candidate.file_name() {
+                let cached_flat = cache_dir.join(file_name);
+                if is_valid_executable(&cached_flat) {
+                    return true;
+                }
             }
         }
     }
