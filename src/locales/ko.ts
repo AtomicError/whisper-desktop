@@ -622,7 +622,6 @@ export const ko: Translations = {
     guideBtnLarge: 'Large 패밀리 탐색',
     guideBtnAll: '모든 모델 둘러보기',
     catRecommendedTitle: '시스템 맞춤 추천 모델',
-    catRecommendedSubtitle: '시스템 하드웨어 맞춤형',
     catRecommendedBody: '일상 작업, 스튜디오급 정밀도, 초고속 응답, 영어 음성 전사, 저전력 양자화 실행에 맞춰 현재 시스템에 가장 적합한 5가지 모델을 선별했습니다.',
     catRecommendedSpecs: '',
     recRoleBalanced: '균형형',

@@ -622,7 +622,6 @@ export const fa: Translations = {
     guideBtnLarge: 'مشاهده خانوادهٔ Large',
     guideBtnAll: 'مشاهده تمام مدل‌ها',
     catRecommendedTitle: 'مدل‌های پیشنهادی متناسب با سیستم شما',
-    catRecommendedSubtitle: 'پیشنهاد هوشمند سیستم',
     catRecommendedBody: 'این ۵ مدل با ارزیابی دقیق توان پردازشی و حافظه در دسترس سیستم شما انتخاب شده‌اند تا برای کاربرد روزمره، بالاترین دقت، سرعت فوق‌العاده، صوت‌های انگلیسی و اجرای بهینهٔ کم‌مصرف، بهترین گزینه‌ها را داشته باشید.',
     catRecommendedSpecs: '',
     recRoleBalanced: 'متوازن',

@@ -622,7 +622,6 @@ export const fr: Translations = {
     guideBtnLarge: 'Explorer la Famille Large',
     guideBtnAll: 'Parcourir Tous les Modèles',
     catRecommendedTitle: 'Modèles recommandés pour votre système',
-    catRecommendedSubtitle: 'Adapté à votre matériel',
     catRecommendedBody: 'Ces 5 modèles ont été soigneusement sélectionnés pour offrir le meilleur compromis entre équilibre quotidien, précision studio, rapidité, transcription en anglais et exécution quantifiée économe en mémoire.',
     catRecommendedSpecs: '',
     recRoleBalanced: 'Équilibré',

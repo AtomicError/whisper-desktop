@@ -622,7 +622,6 @@ export const tr: Translations = {
     guideBtnLarge: 'Large Ailesini Keşfet',
     guideBtnAll: 'Tüm Modelleri İncele',
     catRecommendedTitle: 'Sisteminiz İçin Önerilen Modeller',
-    catRecommendedSubtitle: 'Donanımınıza Özel',
     catRecommendedBody: 'Bu 5 model; günlük denge, stüdyo doğruluğu, hızlı işleme, İngilizce deşifre ve kuantize enerji tasarrufu sağlamak üzere sisteminize özel olarak seçilmiştir.',
     catRecommendedSpecs: '',
     recRoleBalanced: 'Dengeli',

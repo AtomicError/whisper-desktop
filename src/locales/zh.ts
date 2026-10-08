@@ -622,7 +622,6 @@ export const zh: Translations = {
     guideBtnLarge: '查看 Large 家族',
     guideBtnAll: '查看全部模型',
     catRecommendedTitle: '为您的设备智能推荐的模型',
-    catRecommendedSubtitle: '专为您的硬件定制',
     catRecommendedBody: '精选以下 5 款模型，分别覆盖日常均衡、录音室级精度、极速响应、英文特化与量化低功耗，为您设备带来最佳综合表现。',
     catRecommendedSpecs: '',
     recRoleBalanced: '日常均衡',

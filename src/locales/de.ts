@@ -622,7 +622,6 @@ export const de: Translations = {
     guideBtnLarge: 'Large-Familie Erkunden',
     guideBtnAll: 'Alle Modelle Durchsuchen',
     catRecommendedTitle: 'Empfohlene Modelle für Ihr System',
-    catRecommendedSubtitle: 'Auf Ihre Hardware abgestimmt',
     catRecommendedBody: 'Diese 5 Modelle wurden sorgfältig ausgewählt, um die beste Wahl für Alltagsbalance, maximale Genauigkeit, Schnelligkeit, englische Transkription und ressourcenschonende Ausführung auf Ihrem System zu bieten.',
     catRecommendedSpecs: '',
     recRoleBalanced: 'Ausgewogen',

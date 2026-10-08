@@ -622,7 +622,6 @@ export const ru: Translations = {
     guideBtnLarge: 'Семейство Large',
     guideBtnAll: 'Все модели',
     catRecommendedTitle: 'Модели, рекомендованные для вашей системы',
-    catRecommendedSubtitle: 'Подобрано под ваше оборудование',
     catRecommendedBody: 'Эти 5 моделей тщательно подобраны для обеспечения наилучшего баланса скорости, студийной точности, распознавания английской речи и квантованного энергоэффективного режима на вашем компьютере.',
     catRecommendedSpecs: '',
     recRoleBalanced: 'Баланс',

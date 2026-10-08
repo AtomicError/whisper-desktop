@@ -622,7 +622,6 @@ export const ar: Translations = {
     guideBtnLarge: 'استكشاف عائلة Large',
     guideBtnAll: 'تصفح جميع النماذج',
     catRecommendedTitle: 'النماذج الموصى بها لنظامك',
-    catRecommendedSubtitle: 'مخصص لمواصفات جهازك',
     catRecommendedBody: 'تم اختيار هذه النماذج الخمسة بعناية لتحقيق أفضل خيار للاستخدام اليومي، أعلى دقة، سرعة فائقة، تفريغ الإنجليزية، والتشغيل المكمم الموفر للذاكرة على جهازك.',
     catRecommendedSpecs: '',
     recRoleBalanced: 'متوازن',

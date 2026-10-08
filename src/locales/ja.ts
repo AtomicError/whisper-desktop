@@ -622,7 +622,6 @@ export const ja: Translations = {
     guideBtnLarge: 'Large ファミリーを見る',
     guideBtnAll: 'すべてのモデルを見る',
     catRecommendedTitle: 'お使いのシステムに推奨されるモデル',
-    catRecommendedSubtitle: 'ハードウェアに最適化',
     catRecommendedBody: '日常利用、スタジオ級精度、超高速応答、英語音声特化、省電力な量子化実行の各用途に合わせて、お使いの環境で最も優れた 5 つのモデルを厳選しました。',
     catRecommendedSpecs: '',
     recRoleBalanced: 'バランス型',

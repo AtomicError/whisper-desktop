@@ -622,7 +622,6 @@ export const it: Translations = {
     guideBtnLarge: 'Esplora la Famiglia Large',
     guideBtnAll: 'Sfoglia Tutti i Modelli',
     catRecommendedTitle: 'Modelli consigliati per il tuo sistema',
-    catRecommendedSubtitle: 'Ottimizzato per il tuo hardware',
     catRecommendedBody: 'Questi 5 modelli sono stati scelti accuratamente per garantire la scelta ottimale tra bilanciamento quotidiano, massima precisione, rapidità, trascrizione in inglese ed esecuzione quantizzata a basso consumo.',
     catRecommendedSpecs: '',
     recRoleBalanced: 'Bilanciato',

@@ -620,7 +620,6 @@ export const en = {
     guideBtnLarge: 'Explore Large Family',
     guideBtnAll: 'Browse All Models',
     catRecommendedTitle: 'Models Recommended for Your System',
-    catRecommendedSubtitle: 'Tailored for Your Hardware',
     catRecommendedBody: 'These 5 models are carefully selected to provide the best choice for everyday balance, maximum accuracy, ultra-fast speed, dedicated English transcription, and memory-efficient quantized execution on your system.',
     catRecommendedSpecs: '',
     recRoleBalanced: 'Balanced',
