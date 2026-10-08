@@ -710,4 +710,26 @@ describe('Monochrome Canvas Engine', () => {
   });
 });
 
+describe('Model Hub Card Size Display', () => {
+  it('correctly uses installedSize for Downloaded models and expectedSize for non-downloaded models', () => {
+    const formatSizeText = (m: { status: string }, sizeMB: string, t: (k: string, p?: any) => string) => {
+      return m.status === 'Downloaded'
+        ? (t('models.installedSize', { size: sizeMB }) || `${sizeMB} MB`)
+        : t('models.expectedSize', { size: sizeMB });
+    };
+
+    const mockT = (key: string, params?: { size: string }) => {
+      if (key === 'models.installedSize') return `Size: ${params?.size} MB`;
+      if (key === 'models.expectedSize') return `Expected Size: ${params?.size} MB`;
+      return '';
+    };
+
+    const installedModel = { status: 'Downloaded' };
+    const pendingModel = { status: 'Pending' };
+
+    expect(formatSizeText(installedModel, '42', mockT)).toBe('Size: 42 MB');
+    expect(formatSizeText(pendingModel, '42', mockT)).toBe('Expected Size: 42 MB');
+  });
+});
+
 

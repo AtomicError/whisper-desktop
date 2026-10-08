@@ -531,7 +531,7 @@ export const ar: Translations = {
     badgeVad: 'Silero VAD',
     badgeVadTitle: 'كشف النشاط الصوتي (Silero VAD)',
     expectedSize: 'الحجم المتوقع: {size} ميغابايت',
-    installedSize: 'الحجم على القرص: {size} م.ب',
+    installedSize: 'الحجم: {size} ميغابايت',
     prec16: 'دقة كاملة 16-بت (FP16)',
     prec8: 'تكميم 8-بت',
     prec5: 'تكميم 5-بت',

@@ -531,7 +531,7 @@ export const tr: Translations = {
     badgeVad: 'Silero VAD',
     badgeVadTitle: 'Ses Etkinliği Algılama (Silero)',
     expectedSize: 'Beklenen Boyut: {size} MB',
-    installedSize: 'Disk Boyutu: {size} MB',
+    installedSize: 'Boyut: {size} MB',
     prec16: '16-bit Tam Duyarlık',
     prec8: '8-bit Kuantize',
     prec5: '5-bit Kuantize',

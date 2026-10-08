@@ -531,7 +531,7 @@ export const ko: Translations = {
     badgeVad: 'Silero VAD',
     badgeVadTitle: '음성 활동 감지 (Silero)',
     expectedSize: '예상 크기: {size} MB',
-    installedSize: '디스크 크기: {size} MB',
+    installedSize: '크기: {size} MB',
     prec16: '16비트 전체 정밀도',
     prec8: '8비트 양자화',
     prec5: '5비트 양자화',

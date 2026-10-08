@@ -531,7 +531,7 @@ export const pt: Translations = {
     badgeVad: 'Silero VAD',
     badgeVadTitle: 'Detecção de Atividade de Voz (Silero VAD)',
     expectedSize: 'Tamanho estimado: {size} MB',
-    installedSize: 'Tamanho no disco: {size} MB',
+    installedSize: 'Tamanho: {size} MB',
     prec16: 'Precisão Total 16-bit (FP16)',
     prec8: 'Quantizado 8-bit',
     prec5: 'Quantizado 5-bit',

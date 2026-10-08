@@ -531,7 +531,7 @@ export const ru: Translations = {
     badgeVad: 'Silero VAD',
     badgeVadTitle: 'Определение голосовой активности (Silero VAD)',
     expectedSize: 'Примерный размер: {size} МБ',
-    installedSize: 'Размер на диске: {size} МБ',
+    installedSize: 'Размер: {size} МБ',
     prec16: '16-бит Полная точность (FP16)',
     prec8: '8-бит Квантование',
     prec5: '5-бит Квантование',

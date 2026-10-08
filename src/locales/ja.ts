@@ -531,7 +531,7 @@ export const ja: Translations = {
     badgeVad: 'Silero VAD',
     badgeVadTitle: '音声活動検出 (Silero VAD)',
     expectedSize: '予想サイズ: {size} MB',
-    installedSize: 'ディスクサイズ: {size} MB',
+    installedSize: 'サイズ: {size} MB',
     prec16: '16-bit 完全精度 (FP16)',
     prec8: '8-bit 量子化',
     prec5: '5-bit 量子化',

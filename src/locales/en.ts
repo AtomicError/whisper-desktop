@@ -529,7 +529,7 @@ export const en = {
     badgeVad: 'Silero VAD',
     badgeVadTitle: 'Voice Activity Detection (Silero)',
     expectedSize: 'Expected Size: {size} MB',
-    installedSize: 'Disk Size: {size} MB',
+    installedSize: 'Size: {size} MB',
     prec16: '16-bit Full Precision',
     prec8: '8-bit Quantized',
     prec5: '5-bit Quantized',

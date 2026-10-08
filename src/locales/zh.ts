@@ -531,7 +531,7 @@ export const zh: Translations = {
     badgeVad: 'Silero VAD',
     badgeVadTitle: 'Silero 神经语音活动检测',
     expectedSize: '预期大小: {size} MB',
-    installedSize: '占用磁盘空间：{size} MB',
+    installedSize: '大小: {size} MB',
     prec16: '16位全精度 (FP16)',
     prec8: '8位量化 (Q8_0 高保真)',
     prec5: '5位量化 (Q5_0 轻量极速)',
