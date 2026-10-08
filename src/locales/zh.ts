@@ -672,6 +672,7 @@ export const zh: Translations = {
     recReasonQualityMediumEn: '专属 768M 英文架构；接近 Large 级精度且拥有 2 倍推理速度。',
     recReasonBalancedEnCapable: '毫不妥协的英语听写精度，针对多核 CPU 深度优化且负载极轻。',
     recReasonFastEnCapable: '轻量极速生成英文草稿，兼顾电池续航与处理吞吐。',
+    recReasonBalancedBaseQuant: '8 位量化 Base 模型；在不损失识别精度的前提下将内存占用降低一半。',
     recReasonBalancedQuant: '8 位量化日常首选；运行极度平稳流畅，系统资源消耗极低。',
     recReasonQualityQuantLarge: '5 位量化 Large 旗舰；消耗不足一半内存即可保留 99% 的顶尖精度。',
     recReasonQualityQuantTurbo: '8 位 Turbo 架构；低内存占用下提供 Large 级听写质量且无延迟。',

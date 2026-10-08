@@ -672,6 +672,7 @@ export const ar: Translations = {
     recReasonQualityMediumEn: 'معمارية 768M مخصصة للإنجليزية؛ دقة تقارب Large بضعف سرعة الأداء.',
     recReasonBalancedEnCapable: 'دقة عالية في الإنجليزية، محسنة للمعالجات متعددة الأنوية بعبء معالجة خفيف.',
     recReasonFastEnCapable: 'تفريغ مسودات إنجليزية سريع جداً مع استهلاك ضئيل للبطارية والمعالج.',
+    recReasonBalancedBaseQuant: 'نموذج Base مكمم بدقة 8 بت؛ يقلل استهلاك الذاكرة إلى النصف دون أي فقدان في دقة التعرف.',
     recReasonBalancedQuant: 'خيار يومي مكمم بدقة 8-بت؛ تشغيل سلس بأقل ضغط على موارد النظام.',
     recReasonQualityQuantLarge: 'النموذج الرائد Large مكمم بدقة 5-بت؛ يحتفظ بـ 99% من الدقة مع نصف استهلاك الذاكرة.',
     recReasonQualityQuantTurbo: 'معمارية Turbo بدقة 8-بت؛ توفر دقة فئة Large باستهلاك ذاكرة منخفض ودون تأخير.',

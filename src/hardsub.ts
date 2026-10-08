@@ -4546,6 +4546,15 @@ export class HardsubController {
       }
       startBtn.style.opacity = canStart ? '1' : '0.5';
       startBtn.style.cursor = canStart ? 'pointer' : 'not-allowed';
+      if (!this.state.videoPath) {
+        startBtn.title = t('hardsub.selectVideoFirst');
+      } else if (!this.state.subtitlePath) {
+        startBtn.title = t('hardsub.selectSubFirst');
+      } else if (active) {
+        startBtn.title = t('hardsub.exportingVideo');
+      } else {
+        startBtn.title = t('hardsub.exportHardsubVideo');
+      }
     }
 
     if (this.cancelBtn) {

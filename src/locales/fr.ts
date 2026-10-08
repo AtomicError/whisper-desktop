@@ -672,6 +672,7 @@ export const fr: Translations = {
     recReasonQualityMediumEn: 'Architecture 768M dédiée à l\'anglais; précision proche de Large avec une vitesse doublée.',
     recReasonBalancedEnCapable: 'Précision anglaise sans compromis, optimisée pour processeurs multi-cœurs sans surcharge.',
     recReasonFastEnCapable: 'Transcription rapide de brouillons anglais avec une charge minimale sur la batterie et le CPU.',
+    recReasonBalancedBaseQuant: 'Modèle Base quantifié 8-bit ; divise la mémoire par deux sans perte de précision pour les systèmes d\'entrée de gamme.',
     recReasonBalancedQuant: 'Option quotidienne optimisée en 8 bits; exécution ultra-fluide avec une pression minimale sur le système.',
     recReasonQualityQuantLarge: 'Modèle phare Large quantifié en 5 bits; préserve 99% de précision pour moins de la moitié de RAM.',
     recReasonQualityQuantTurbo: 'Architecture Turbo en 8 bits; précision de la famille Large avec une faible empreinte mémoire et sans latence.',

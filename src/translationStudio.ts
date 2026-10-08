@@ -1275,6 +1275,15 @@ export class TranslationStudioController {
 
     if (this.btnStart) {
       this.btnStart.disabled = !hasSub || isTranslating || !this.state.activeModel;
+      if (!hasSub) {
+        this.btnStart.title = t('translate.noSubSelectedError');
+      } else if (!this.state.activeModel) {
+        this.btnStart.title = t('translate.noModelError');
+      } else if (isTranslating) {
+        this.btnStart.title = t('translate.translating');
+      } else {
+        this.btnStart.title = t('translate.startTranslate');
+      }
     }
     if (this.btnStartText) {
       this.btnStartText.textContent = isTranslating ? t('translate.translating') : t('translate.startTranslate');

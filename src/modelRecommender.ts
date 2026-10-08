@@ -133,7 +133,7 @@ export function recommendModelsForSystem(
       englishReasonKey = 'models.recReasonBalancedEnEntry';
       englishReasonFallback = 'Under 200 MB memory footprint with high English vocabulary focus for entry-level PCs.';
 
-      quantizedReasonKey = 'models.recReasonBalancedBudget';
+      quantizedReasonKey = 'models.recReasonBalancedBaseQuant';
       quantizedReasonFallback = '8-bit quantized Base model; cuts memory footprint in half with zero loss in recognition.';
       break;
     }

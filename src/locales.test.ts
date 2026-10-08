@@ -141,6 +141,7 @@ describe('locale consistency for speed presets', () => {
         'recReasonQualityMediumEn',
         'recReasonBalancedEnCapable',
         'recReasonFastEnCapable',
+        'recReasonBalancedBaseQuant',
         'recReasonBalancedQuant',
         'recReasonQualityQuantLarge',
         'recReasonQualityQuantTurbo',

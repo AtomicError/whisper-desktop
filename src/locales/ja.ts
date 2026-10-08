@@ -672,6 +672,7 @@ export const ja: Translations = {
     recReasonQualityMediumEn: '768M専用英語アーキテクチャ；Large級の精度を2倍の推論速度で実現。',
     recReasonBalancedEnCapable: 'マルチコアCPUに最適化され、低負荷で妥協のない英語精度を発揮。',
     recReasonFastEnCapable: 'CPUとバッテリー消費を抑えながら高速に英語下書きを作成。',
+    recReasonBalancedBaseQuant: '8-bit 量子化 Base モデル。認識精度を損なうことなくメモリ使用量を半減させます。',
     recReasonBalancedQuant: '最適化された8ビット日常用モデル；システム負荷を抑え極めて滑らかに動作。',
     recReasonQualityQuantLarge: '5ビット量子化Largeフラッグシップ；半分以下のRAMで99%の精度を維持。',
     recReasonQualityQuantTurbo: '8ビットTurboアーキテクチャ；低メモリかつ遅延なしでLarge級の品質を実現。',

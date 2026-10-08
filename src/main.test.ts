@@ -732,4 +732,52 @@ describe('Model Hub Card Size Display', () => {
   });
 });
 
+describe('Model Dropdown Population and Fallback Sync', () => {
+  it('clears settingsState.modelPath when no valid models are installed', () => {
+    const settingsState = { modelPath: '/models/ggml-base.bin' };
+    const validModels: string[] = [];
+
+    const syncModels = (models: string[], state: { modelPath: string }) => {
+      let modelMatched = false;
+      if (models.length === 0) {
+        if (state.modelPath) {
+          state.modelPath = '';
+        }
+      } else {
+        modelMatched = models.includes(state.modelPath);
+        if (!modelMatched) {
+          state.modelPath = models[0];
+        }
+      }
+      return modelMatched;
+    };
+
+    const matched = syncModels(validModels, settingsState);
+    expect(matched).toBe(false);
+    expect(settingsState.modelPath).toBe('');
+  });
+
+  it('auto-selects first available model when currently selected model is deleted', () => {
+    const settingsState = { modelPath: '/models/ggml-medium.bin' };
+    const validModels = ['/models/ggml-base.bin', '/models/ggml-small.bin'];
+
+    const syncModels = (models: string[], state: { modelPath: string }) => {
+      let modelMatched = false;
+      if (models.length === 0) {
+        if (state.modelPath) state.modelPath = '';
+      } else {
+        modelMatched = models.includes(state.modelPath);
+        if (!modelMatched) {
+          state.modelPath = models[0];
+        }
+      }
+      return modelMatched;
+    };
+
+    const matched = syncModels(validModels, settingsState);
+    expect(matched).toBe(false);
+    expect(settingsState.modelPath).toBe('/models/ggml-base.bin');
+  });
+});
+
 

@@ -670,6 +670,7 @@ export const en = {
     recReasonQualityMediumEn: 'Dedicated 768M English architecture; near-Large accuracy with 2x inference speed.',
     recReasonBalancedEnCapable: 'Uncompromising English precision, optimized for multi-core CPUs with negligible resource strain.',
     recReasonFastEnCapable: 'High-speed English draft transcription with minimal CPU and battery usage.',
+    recReasonBalancedBaseQuant: '8-bit quantized Base model; cuts memory footprint in half with zero loss in recognition.',
     recReasonBalancedQuant: 'Optimized 8-bit daily driver; ultra-smooth execution with minimal system resource pressure.',
     recReasonQualityQuantLarge: '5-bit quantized Large flagship; retains 99% accuracy at less than half the RAM.',
     recReasonQualityQuantTurbo: '8-bit Turbo architecture; delivers Large-family accuracy with low memory footprint and zero lag.',

@@ -672,6 +672,7 @@ export const ko: Translations = {
     recReasonQualityMediumEn: '768M 전용 영어 아키텍처; 2배 빠른 추론 속도로 Large급 정확도 제공.',
     recReasonBalancedEnCapable: '멀티코어 CPU에 최적화되어 시스템 부담 없이 타협 없는 영어 정확도 발휘.',
     recReasonFastEnCapable: '최소한의 리소스 소모로 신속한 영어 초안 전사 지원.',
+    recReasonBalancedBaseQuant: '8비트 양자화 Base 모델; 인식 손실 없이 메모리 사용량을 절반으로 줄입니다.',
     recReasonBalancedQuant: '최적화된 8비트 일상용 모델; 시스템 부담을 최소화하며 매우 부드럽게 실행.',
     recReasonQualityQuantLarge: '5비트 양자화 Large 플래그십; 절반 이하의 RAM으로 99%의 정확도 유지.',
     recReasonQualityQuantTurbo: '8비트 Turbo 아키텍처; 적은 메모리 사용과 지연 없는 Large급 품질 제공.',

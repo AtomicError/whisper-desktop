@@ -672,6 +672,7 @@ export const es: Translations = {
     recReasonQualityMediumEn: 'Arquitectura dedicada de 768M en inglés; precisión cercana a Large con el doble de velocidad.',
     recReasonBalancedEnCapable: 'Precisión impecable en inglés, optimizado para CPUs multinúcleo con mínima sobrecarga.',
     recReasonFastEnCapable: 'Transcripción veloz de borradores en inglés con mínimo uso de batería y CPU.',
+    recReasonBalancedBaseQuant: 'Modelo Base cuantizado a 8 bits; reduce a la mitad el consumo de memoria sin pérdida de precisión.',
     recReasonBalancedQuant: 'Opción diaria optimizada en 8 bits; ejecución ultrasuave con mínimo impacto en el sistema.',
     recReasonQualityQuantLarge: 'Modelo insignia Large cuantizado en 5 bits; conserva el 99% de precisión con menos de la mitad de RAM.',
     recReasonQualityQuantTurbo: 'Arquitectura Turbo en 8 bits; precisión de la familia Large con bajo consumo de memoria y sin lag.',

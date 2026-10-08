@@ -168,5 +168,38 @@ describe('subtitle loading', () => {
     expect(invoke).toHaveBeenCalledWith('probe_media_file', { filePath: '/videos/broadcast.ts' });
     expect(setCompanionSpy).toHaveBeenCalledWith('/videos/broadcast.ts');
   });
+
+  it('updates start button disabled state and tooltip title based on subtitle, model, and translating readiness', () => {
+    const controller = new TranslationStudioController();
+    const btnStart = { disabled: false, title: '' } as unknown as HTMLButtonElement;
+    (controller as any).btnStart = btnStart;
+
+    // Initially no subtitle
+    controller.state.subtitlePath = '';
+    controller.state.activeModel = 'gpt-4o';
+    controller.state.isTranslating = false;
+    (controller as any).updateActionButtons();
+    expect(btnStart.disabled).toBe(true);
+    expect(btnStart.title).toBe('Please select a subtitle file first.');
+
+    // Subtitle loaded but no active model
+    controller.state.subtitlePath = '/sub.srt';
+    controller.state.activeModel = '';
+    (controller as any).updateActionButtons();
+    expect(btnStart.disabled).toBe(true);
+    expect(btnStart.title).toBe('No active translation model selected. Please configure a provider and model.');
+
+    // Both ready
+    controller.state.activeModel = 'gpt-4o';
+    (controller as any).updateActionButtons();
+    expect(btnStart.disabled).toBe(false);
+    expect(btnStart.title).toBe('Translate Subtitle');
+
+    // In translation progress
+    controller.state.isTranslating = true;
+    (controller as any).updateActionButtons();
+    expect(btnStart.disabled).toBe(true);
+    expect(btnStart.title).toBe('Translating with AI...');
+  });
 });
 

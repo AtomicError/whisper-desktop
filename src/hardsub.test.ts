@@ -158,6 +158,8 @@ function fixture() {
   btnClearSub.style.display = 'none';
   const btnResetAll = new Control();
   btnResetAll.style.display = 'none';
+  const startBtn = new Control();
+  doc.elements.set('btn-start-hardsub', startBtn);
   doc.elements.set('hardsub-output-dir-text', outputDirText);
   doc.elements.set('btn-browse-hardsub-dir', btnBrowseDir);
   doc.elements.set('btn-reset-hardsub-dir', btnResetDir);
@@ -236,7 +238,7 @@ function fixture() {
     if (active) controller.setPageActive(true);
     video.pause.mockClear();
   };
-  return { controller, video, slider, play, iconPlay, iconPause, label, badge, time, container, internal, load, cancel, retry, outputDirText, btnBrowseDir, btnResetDir, btnOpenFolder, btnPlayVideo, telemetryBox, volumeWrapper, volumeBtn, volumeSlider, btnClearVideo, btnClearSub, btnResetAll, fullscreenBtn, iconFsEnter, iconFsExit, fontSelect, boldBtn, italicBtn };
+  return { controller, video, slider, play, iconPlay, iconPause, label, badge, time, container, internal, load, cancel, retry, outputDirText, btnBrowseDir, btnResetDir, btnOpenFolder, btnPlayVideo, telemetryBox, volumeWrapper, volumeBtn, volumeSlider, btnClearVideo, btnClearSub, btnResetAll, fullscreenBtn, iconFsEnter, iconFsExit, fontSelect, boldBtn, italicBtn, startBtn };
 }
 
 beforeAll(async () => {
@@ -1229,6 +1231,30 @@ describe('hardsub output directory management', () => {
       expect((slider as any).disabled).toBe(true);
       expect(badge.textContent).toBe('No Video Loaded');
       expect(invoke).toHaveBeenCalledWith('release_hardsub_preview', expect.anything());
+    });
+
+    it('updates start button disabled state and tooltip title based on video, subtitle, and encoding readiness', async () => {
+      const { load, internal, startBtn } = fixture();
+      internal.state.videoPath = '';
+      internal.state.subtitlePath = '';
+      internal.updateEncodingUIState(false);
+      expect((startBtn as any).disabled).toBe(true);
+      expect((startBtn as any).title).toBe('Please select a video file first.');
+
+      await load();
+      internal.state.subtitlePath = '';
+      internal.updateEncodingUIState(false);
+      expect((startBtn as any).disabled).toBe(true);
+      expect((startBtn as any).title).toBe('Please select a subtitle file first.');
+
+      internal.state.subtitlePath = '/sub.srt';
+      internal.updateEncodingUIState(false);
+      expect((startBtn as any).disabled).toBe(false);
+      expect((startBtn as any).title).toBe('Export Hardsub Video');
+
+      internal.updateEncodingUIState(true);
+      expect((startBtn as any).disabled).toBe(true);
+      expect((startBtn as any).title).toBe('Exporting Hardsub Video...');
     });
 
     it('clearVideoState invalidates in-flight video preview loads via videoLoadGeneration', async () => {

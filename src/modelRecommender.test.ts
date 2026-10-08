@@ -22,6 +22,7 @@ describe('modelRecommender (5 Dedicated Roles)', () => {
       expect(res.models.fast.modelName).toBe('tiny-q5_1');
       expect(res.models.english.modelName).toBe('base.en-q8_0');
       expect(res.models.quantized.modelName).toBe('base-q8_0');
+      expect(res.models.quantized.reasonI18nKey).toBe('models.recReasonBalancedBaseQuant');
     });
 
     it('handles budget 8GB systems with integrated GPU', () => {

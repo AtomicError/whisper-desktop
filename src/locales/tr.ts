@@ -672,6 +672,7 @@ export const tr: Translations = {
     recReasonQualityMediumEn: 'Özel 768M İngilizce mimarisi; 2 kat hızla Large modeline yakın doğruluk.',
     recReasonBalancedEnCapable: 'Çok çekirdekli işlemciler için optimize edilmiş, tavizsiz İngilizce hassasiyeti.',
     recReasonFastEnCapable: 'Minimum sistem yüküyle hızlı İngilizce taslak transkripsiyonu.',
+    recReasonBalancedBaseQuant: '8-bit kuantize Base modeli; giriş seviyesi sistemlerde tanıma kaybı olmadan bellek kullanımını yarıya indirir.',
     recReasonBalancedQuant: 'Optimize edilmiş 8-bit günlük kullanım seçeneği; minimum sistem baskısıyla akıcı çalışma.',
     recReasonQualityQuantLarge: '5-bit kuantize Large amiral gemisi; yarıdan az RAM ile %99 doğruluğu korur.',
     recReasonQualityQuantTurbo: '8-bit Turbo mimarisi; düşük bellek ayak iziyle ve gecikmesiz Large kalitesi sunar.',

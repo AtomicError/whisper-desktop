@@ -4349,6 +4349,9 @@ async function scanAndPopulateModels() {
         emptyOpt.textContent = t('transcribe.noModelsFoundDropdown');
         quickSelect.appendChild(emptyOpt);
       }
+      if (settingsState.modelPath) {
+        settingsState.modelPath = '';
+      }
     } else {
       validModels.forEach(m => {
         const name = getBasename(m);
@@ -4448,8 +4451,8 @@ async function scanAndPopulateModels() {
       }
     }
 
-    // Save state if auto-selected
-    if ((!modelMatched && transSelect && transSelect.options.length > 0 && transSelect.value) || (!vadMatched && validVadModels.length > 0)) {
+    // Save state if auto-selected or cleared
+    if ((!modelMatched && transSelect && transSelect.options.length > 0 && transSelect.value) || (!vadMatched && validVadModels.length > 0) || (validModels.length === 0 && !modelMatched)) {
       await saveCurrentSettings();
     }
     
