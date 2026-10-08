@@ -244,7 +244,7 @@ export function recommendModelsForSystem(
         fastReasonKey = 'models.recReasonFastCapable';
         fastReasonFallback = 'High-speed transcription with minimal CPU and battery usage for rapid turnaround.';
 
-        englishReasonKey = 'models.recReasonQualityMediumEnQuant';
+        englishReasonKey = 'models.recReasonQualityMediumEnQ8';
         englishReasonFallback = 'Dedicated 768M English architecture with 8-bit quantization; runs 2x faster than Large on CPU.';
 
         quantizedReasonKey = 'models.recReasonQualityQuantTurbo';

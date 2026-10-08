@@ -6843,7 +6843,7 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
           <div class="setting-desc" style="font-size: 0.82rem; color: var(--color-text-muted); line-height: 1.4; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
             ${statusBadge}
             ${statusBadge ? '<span style="color: rgba(255,255,255,0.1);">|</span>' : ''}
-            <span>${t('models.expectedSize', { size: window.formatNumberForLang(sizeMB) })}</span>
+            <span>${m.installed ? (t('models.installedSize', { size: window.formatNumberForLang(sizeMB) }) || `${sizeMB} MB`) : t('models.expectedSize', { size: window.formatNumberForLang(sizeMB) })}</span>
             ${meta.precisionText ? `
               <span style="color: rgba(255,255,255,0.1);">|</span>
               <span>${meta.precisionText}</span>

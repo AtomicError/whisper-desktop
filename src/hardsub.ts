@@ -3835,12 +3835,27 @@ export class HardsubController {
 
     if (this.subtitleCues.length === 0) {
       this.subtitleListContainer.innerHTML = '';
-      if (this.emptyCueNotice) this.emptyCueNotice.style.display = 'flex';
+      if (!this.emptyCueNotice) {
+        this.emptyCueNotice = document.createElement('div');
+        this.emptyCueNotice.id = 'hardsub-empty-cue-notice';
+        this.emptyCueNotice.style.cssText = 'text-align: center; padding: 40px 20px; color: var(--color-text-muted); display: flex; flex-direction: column; align-items: center; gap: 10px;';
+        this.emptyCueNotice.innerHTML = `
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width: 40px; height: 40px; opacity: 0.5;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <span style="font-size: 0.88rem;">${t('hardsub.noSubLoadedNotice')}</span>
+        `;
+      } else {
+        const textSpan = this.emptyCueNotice.querySelector('span');
+        if (textSpan) textSpan.innerHTML = t('hardsub.noSubLoadedNotice');
+      }
+      this.emptyCueNotice.style.display = 'flex';
+      this.subtitleListContainer.appendChild(this.emptyCueNotice);
       if (this.subtitleCountBadge) this.subtitleCountBadge.textContent = t('hardsub.cuesCountZero');
       return;
     }
 
-    if (this.emptyCueNotice) this.emptyCueNotice.style.display = 'none';
+    if (this.emptyCueNotice && this.emptyCueNotice.parentNode === this.subtitleListContainer) {
+      this.emptyCueNotice.remove();
+    }
 
     const filtered = this.subtitleCues.filter((cue) => {
       if (!this.searchFilterQuery) return true;
@@ -4224,9 +4239,11 @@ export class HardsubController {
   }
 
   private updateResetAllButtonVisibility(): void {
-    if (!this.btnResetAll) return;
-    const hasAnyMedia = !!this.state.videoPath || !!this.state.subtitlePath;
-    this.btnResetAll.style.display = hasAnyMedia ? 'inline-flex' : 'none';
+    if (this.btnResetAll) {
+      const hasAnyMedia = !!this.state.videoPath || !!this.state.subtitlePath;
+      this.btnResetAll.style.display = hasAnyMedia ? 'inline-flex' : 'none';
+    }
+    this.updateEncodingUIState(this.isEncoding);
   }
 
   private updateColorSwatches() {
@@ -4522,12 +4539,13 @@ export class HardsubController {
     const startBtn = document.getElementById('btn-start-hardsub') as HTMLButtonElement;
     const startBtnSpan = startBtn?.querySelector('span');
     if (startBtn) {
-      startBtn.disabled = active;
+      const canStart = !active && !!this.state.videoPath && !!this.state.subtitlePath;
+      startBtn.disabled = !canStart;
       if (startBtnSpan) {
         startBtnSpan.textContent = active ? t('hardsub.exportingVideo') : t('hardsub.exportHardsubVideo');
       }
-      startBtn.style.opacity = active ? '0.7' : '1';
-      startBtn.style.cursor = active ? 'not-allowed' : 'pointer';
+      startBtn.style.opacity = canStart ? '1' : '0.5';
+      startBtn.style.cursor = canStart ? 'pointer' : 'not-allowed';
     }
 
     if (this.cancelBtn) {

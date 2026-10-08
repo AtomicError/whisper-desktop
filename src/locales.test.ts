@@ -136,6 +136,7 @@ describe('locale consistency for speed presets', () => {
         'recReasonFastEnEntry',
         'recReasonBalancedEnBudget',
         'recReasonQualityMediumEnQuant',
+        'recReasonQualityMediumEnQ8',
         'recReasonFastEnBudget',
         'recReasonQualityMediumEn',
         'recReasonBalancedEnCapable',
@@ -178,6 +179,19 @@ describe('locale consistency for speed presets', () => {
       expect(models.speedUnitMB.length).toBeGreaterThan(0);
       expect(typeof models.speedUnitKB).toBe('string');
       expect(models.speedUnitKB.length).toBeGreaterThan(0);
+    });
+
+    it(`locale ${code} has models.installedSize and translate.deckTitle defined`, () => {
+      const models = (dict as any).models;
+      expect(models).toBeDefined();
+      expect(typeof models.installedSize).toBe('string');
+      expect(models.installedSize.length).toBeGreaterThan(0);
+      expect(models.installedSize).toContain('{size}');
+
+      const translate = (dict as any).translate;
+      expect(translate).toBeDefined();
+      expect(typeof translate.deckTitle).toBe('string');
+      expect(translate.deckTitle.length).toBeGreaterThan(0);
     });
   }
 

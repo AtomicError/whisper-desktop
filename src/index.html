@@ -3387,7 +3387,7 @@
                         <circle cx="12" cy="12" r="3"/>
                         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
                       </svg>
-                      <span class="translate-deck-title" data-i18n="translate.title">Translation Studio</span>
+                      <span class="translate-deck-title" data-i18n="translate.deckTitle">Translation Setup</span>
                     </div>
                     <button type="button" class="btn-link-settings" id="btn-translate-manage-providers" title="Configure providers and API keys in Settings" data-i18n-title="translate.manageInSettings">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px; height:12px;">
@@ -3689,7 +3689,7 @@
                   <div class="wizard-step-header" id="hardsub-media-step-header">
                     <div style="display:flex; align-items:center; gap:12px;">
                       <div class="wizard-step-icon" id="hardsub-media-step-icon">1</div>
-                      <div class="wizard-step-title" id="hardsub-media-step-title" data-i18n="hardsub.selectResource">Select Media Resource</div>
+                      <div class="wizard-step-title" id="hardsub-media-step-title" data-i18n="hardsub.selectResource">Select Video &amp; Subtitle</div>
                     </div>
                     <div style="display: flex; align-items: center; gap: 10px;">
                       <button class="btn-secondary" id="btn-reset-hardsub-all" type="button" style="display: none; padding: 4px 10px; font-size: 0.78rem; gap: 6px; align-items: center;" data-i18n-title="hardsub.resetAll">
@@ -3897,7 +3897,7 @@
 
                   <!-- 2. Primary Actions Row -->
                   <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                    <button class="btn-primary" id="btn-start-hardsub" style="flex: 1; min-width: 200px; justify-content: center; padding: 12px 18px; font-size: 0.95rem; font-weight: 600; gap: 10px;">
+                    <button class="btn-primary" id="btn-start-hardsub" disabled style="flex: 1; min-width: 200px; justify-content: center; padding: 12px 18px; font-size: 0.95rem; font-weight: 600; gap: 10px; opacity: 0.5; cursor: not-allowed;">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width: 18px; height: 18px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                       <span data-i18n="hardsub.exportHardsubVideo">Export Hardsub Video</span>
                     </button>
