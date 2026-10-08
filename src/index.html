@@ -3073,7 +3073,7 @@
                   <div class="wizard-step-header" onclick="toggleWizardAccordion(1)">
                     <div style="display:flex; align-items:center; gap:12px;">
                       <div class="wizard-step-icon" id="wizard-icon-1">1</div>
-                      <div class="wizard-step-title" data-i18n="transcribe.wizardStep1">Select Media Resource</div>
+                      <div class="wizard-step-title" data-i18n="transcribe.wizardStep1">Select Media File</div>
                     </div>
                     <span class="wizard-chevron" id="wizard-chevron-1">▼</span>
                   </div>
@@ -3152,7 +3152,7 @@
                   <div class="wizard-step-header" onclick="toggleWizardAccordion(2)">
                     <div style="display:flex; align-items:center; gap:12px;">
                       <div class="wizard-step-icon" id="wizard-icon-2">2</div>
-                      <div class="wizard-step-title" data-i18n="transcribe.wizardStep2">Media Specifications</div>
+                      <div class="wizard-step-title" data-i18n="transcribe.wizardStep2">Media Details</div>
                     </div>
                     <span class="wizard-chevron" id="wizard-chevron-2">▼</span>
                   </div>
@@ -3175,7 +3175,7 @@
                         <div class="meta-value" style="color:var(--color-cyan);" data-i18n="transcribe.targetFormatVal">16kHz Mono Target</div>
                       </div>
                       <div class="meta-item" style="grid-column: span 2;">
-                        <div class="meta-label" data-i18n="transcribe.activeExtractor">Active Extraction Engine</div>
+                        <div class="meta-label" data-i18n="transcribe.activeExtractor">Active Processing Engine</div>
                         <div class="meta-value" id="meta-recommendation" style="font-size:0.8rem; line-height:1.4; color:var(--color-royal-blue);">-</div>
                       </div>
                     </div>
@@ -3183,7 +3183,7 @@
                     <div class="glass-card" id="batch-specs-box" style="display:none; padding:16px; margin-bottom:16px; border:1px solid var(--border-glass);">
                       <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px;color:var(--color-cyan);"><path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2" ry="2"/></svg>
-                        <span style="font-weight:600; font-size:0.9rem; color:var(--color-cyan);" data-i18n="transcribe.batchModeActive">Batch Extraction Mode Active</span>
+                        <span style="font-weight:600; font-size:0.9rem; color:var(--color-cyan);" data-i18n="transcribe.batchModeActive">Batch Processing Mode Active</span>
                       </div>
                       <div style="font-size:0.85rem; color:var(--color-text-muted); line-height:1.6;">
                         <p style="margin-bottom:6px;"><strong style="color:#fff;" id="batch-files-count">0</strong> <span data-i18n="transcribe.batchLoadedDesc">media files are loaded in the queue.</span></p>
@@ -3202,7 +3202,7 @@
                   <div class="wizard-step-header" onclick="toggleWizardAccordion(3)">
                     <div style="display:flex; align-items:center; gap:12px;">
                       <div class="wizard-step-icon" id="wizard-icon-3">3</div>
-                      <div class="wizard-step-title" data-i18n="transcribe.wizardStep3">Execute Whisper Transcription</div>
+                      <div class="wizard-step-title" data-i18n="transcribe.wizardStep3">Run Transcription</div>
                     </div>
                     <span class="wizard-chevron" id="wizard-chevron-3">▼</span>
                   </div>
@@ -3260,7 +3260,7 @@
                     <div style="display:flex; gap:12px;">
                       <button class="btn-primary" id="btn-run-transcribe" style="flex:2;" onclick="runWhisperTranscription()">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:18px;height:18px;margin-inline-end:8px;"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
-                        <span data-i18n="transcribe.startAiExtraction">Start AI Extraction</span>
+                        <span data-i18n="transcribe.startAiExtraction">Start Transcription</span>
                       </button>
                       <button class="btn-secondary" id="btn-cancel-transcribe" style="display:none; flex:1; border-color:var(--color-red); color:var(--color-red); font-weight:600; text-align:center; justify-content:center;" onclick="abortTranscription()">
                         <span data-i18n="common.cancel">Cancel</span>
@@ -3269,12 +3269,12 @@
                     <!-- Batch Control Panel (hidden by default) -->
                     <div id="batch-controls-box" style="display:none; width:100%; margin-top: 16px;">
                       <div class="step-details-row" style="margin-bottom: 16px;">
-                        <span data-i18n="transcribe.automatedPipeline">Automated Pipeline</span> | <span data-i18n="transcribe.pipelineDesc">FFmpeg Convert & Whisper Extraction Sequentially</span>
+                        <span data-i18n="transcribe.automatedPipeline">Automated Pipeline</span> | <span data-i18n="transcribe.pipelineDesc">FFmpeg Conversion & Whisper Transcription</span>
                       </div>
                       <div style="display:flex; gap:12px;">
                         <button class="btn-primary" id="btn-run-batch" style="flex:2;" onclick="runBatchExtraction()">
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:18px;height:18px;margin-inline-end:8px;"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
-                          <span data-i18n="transcribe.startBatchAiExtraction">Start Batch AI Extraction</span>
+                          <span data-i18n="transcribe.startBatchAiExtraction">Start Batch Transcription</span>
                         </button>
                         <button class="btn-secondary" id="btn-cancel-batch" style="display:none; flex:1; border-color:var(--color-red); color:var(--color-red); font-weight:600; text-align:center; justify-content:center;" onclick="abortBatchExtraction()">
                           <span data-i18n="common.cancel">Cancel</span>
@@ -3290,7 +3290,7 @@
                 <div class="glass-card telemetry-hud" id="telemetry-hud-card" style="margin-bottom: 0;">
                   <div class="hud-header-row" onclick="toggleTelemetryHudCollapse()" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; user-select:none; margin-bottom:12px; border-bottom:1px solid var(--border-glass); padding-bottom:10px;">
                     <div style="display:flex; align-items:center; gap:8px;">
-                      <h3 style="font-weight:600; font-size:0.95rem; margin:0;" data-i18n="transcribe.liveStatusTitle">Live Extraction Status</h3>
+                      <h3 style="font-weight:600; font-size:0.95rem; margin:0;" data-i18n="transcribe.liveStatusTitle">Live Transcription Status</h3>
                       <span id="hud-status-badge" class="hud-status-badge" style="font-size:0.75rem; padding:2px 8px; border-radius:12px; background:rgba(6,182,212,0.1); color:var(--color-cyan); display:none;" data-i18n="transcribe.standingBy">Standing By</span>
                     </div>
                     <button type="button" class="hud-collapse-btn" id="hud-collapse-btn" aria-label="Toggle telemetry collapse" style="background:none; border:none; color:var(--color-text-dim); cursor:pointer; padding:4px; display:flex; align-items:center; transition:transform 0.25s ease;">
