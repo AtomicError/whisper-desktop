@@ -194,6 +194,39 @@ describe('locale consistency for speed presets', () => {
       expect(typeof translate.deckTitle).toBe('string');
       expect(translate.deckTitle.length).toBeGreaterThan(0);
     });
+
+    it(`locale ${code} uses clean transcription terminology without generic Whisper branding`, () => {
+      const models = (dict as any).models;
+      const transcribe = (dict as any).transcribe;
+      const settings = (dict as any).settings;
+
+      expect(models.title).not.toMatch(/\bwhisper\b/i);
+      expect(models.title).not.toContain('ویسپر');
+
+      expect(transcribe.modelLabel).not.toMatch(/\bwhisper\b/i);
+      expect(transcribe.modelLabel).not.toContain('ویسپر');
+
+      expect(transcribe.taskLabel).not.toMatch(/\bwhisper\b/i);
+      expect(transcribe.taskLabel).not.toContain('ویسپر');
+
+      expect(transcribe.progressTranscribe).not.toMatch(/\bwhisper\b/i);
+      expect(transcribe.progressTranscribe).not.toContain('ویسپر');
+
+      expect(transcribe.pipelineDesc).not.toMatch(/\bwhisper\b/i);
+      expect(transcribe.pipelineDesc).not.toContain('ویسپر');
+
+      expect(settings.modelSelectDesc).not.toMatch(/\bwhisper\b/i);
+      expect(settings.modelSelectDesc).not.toContain('ویسپر');
+
+      expect(settings.backendDesc).not.toMatch(/\bwhisper\b/i);
+      expect(settings.backendDesc).not.toContain('ویسپر');
+
+      expect(settings.threadsDesc).not.toMatch(/\bwhisper\b/i);
+      expect(settings.threadsDesc).not.toContain('ویسپر');
+
+      expect(settings.resetDesc).not.toMatch(/\bwhisper\b/i);
+      expect(settings.resetDesc).not.toContain('ویسپر');
+    });
   }
 
   it('validates fa locale translation improvements', () => {
@@ -201,6 +234,12 @@ describe('locale consistency for speed presets', () => {
     expect(fa.models.speedUnitMB).toBe('مگابایت بر ثانیه');
     expect(fa.models.speedUnitKB).toBe('کیلوبایت بر ثانیه');
     expect(fa.transcribe.wizardStep3).toBe('شروع رونویسی');
+    expect(fa.models.title).toBe('مرکز مدل‌های رونویسی');
+    expect(fa.transcribe.modelLabel).toBe('مدل رونویسی');
+    expect(fa.transcribe.taskLabel).toBe('نوع عملیات');
+    expect(fa.transcribe.taskTranslate).toBe('ترجمه به انگلیسی (موتور صوتی داخلی)');
+    expect(fa.transcribe.progressTranscribe).toBe('در حال تبدیل گفتار به متن...');
+    expect(fa.settings.printSpecialDesc).not.toContain('ویسپر');
     expect(fa.settings.aiTranslatePoints).toContain('<bdi>OpenAI</bdi>، <bdi>Claude</bdi>');
     expect(fa.settings.targetLangPoints).toContain('بیش از ۱۰۰ زبان زنده دنیا با رسم‌الخط بومی');
     expect(fa.settings.providerCustomPromptPlaceholder).toBe('شما یک مترجم حرفه‌ای هستید...');
@@ -213,6 +252,17 @@ describe('locale consistency for speed presets', () => {
     expect(fa.hardsub.videoSection).toBe('ویدیوی اصلی');
     expect(fa.hardsub.playVideo).toBe('پخش ویدیو');
     expect(fa.translate.progressLines).toContain('{current}');
+  });
+
+  it('validates en locale terminology improvements', () => {
+    expect(en.models.title).toBe('Model Hub');
+    expect(en.transcribe.modelLabel).toBe('Transcription Model');
+    expect(en.transcribe.modelPlaceholder).toBe('Select a transcription model...');
+    expect(en.transcribe.taskLabel).toBe('Task Type');
+    expect(en.transcribe.taskTranslate).toBe('Translate to English (Built-in Engine)');
+    expect(en.transcribe.progressTranscribe).toBe('Transcribing speech...');
+    expect(en.transcribe.pipelineDesc).toBe('FFmpeg Conversion & Audio Transcription');
+    expect(en.models.guideHeroTitle).toBe('Transcription Model Architecture & Selection Guide');
   });
 });
 

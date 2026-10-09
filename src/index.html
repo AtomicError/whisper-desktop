@@ -1540,7 +1540,7 @@
                   <div class="settings-cat-btn" id="cat-btn-translation" onclick="switchSettingsCategory('translation')" data-i18n="settings.catTranslation">AI Translation</div>
                 </div>
                 <div class="settings-sidebar-footer">
-                  <button type="button" class="btn-settings-reset-engine" id="btn-reset-whisper-engine" onclick="confirmResetWhisperEngine()" data-i18n-title="settings.resetEngineTooltip" title="Reset Whisper engine parameters to factory defaults">
+                  <button type="button" class="btn-settings-reset-engine" id="btn-reset-whisper-engine" onclick="confirmResetWhisperEngine()" data-i18n-title="settings.resetEngineTooltip" title="Reset transcription parameters to defaults">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-reset-icon" aria-hidden="true">
                       <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
                       <path d="M3 3v5h5"></path>
@@ -1839,7 +1839,7 @@
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.modelSelectTitle">Model Selection</span>
                       </div>
-                      <div class="setting-desc"><span data-i18n="settings.modelSelectDesc">Active Whisper GGML speech recognition model.</span>
+                      <div class="setting-desc"><span data-i18n="settings.modelSelectDesc">Active speech recognition and transcription model.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.modelSelectPoints">
                           <span class="setting-desc-point"><strong>Fast &amp; Low RAM:</strong> <code>tiny</code>, <code>base</code>, <code>small</code></span>
                           <span class="setting-desc-point"><strong>High Accuracy:</strong> <code>medium</code>, <code>large-v3</code></span>
@@ -1857,7 +1857,7 @@
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.backendTitle">Active Backend</span>
                       </div>
-                      <div class="setting-desc"><span data-i18n="settings.backendDesc">Execution backend for Whisper model inference.</span>
+                      <div class="setting-desc"><span data-i18n="settings.backendDesc">Execution backend for transcription model inference.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.backendPoints">
                           <span class="setting-desc-point"><strong>Standard:</strong> Universal CPU-only compatibility</span>
                           <span class="setting-desc-point"><strong>Vulkan:</strong> Universal GPU acceleration (AMD, Intel, or NVIDIA)</span>
@@ -2577,7 +2577,7 @@
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.vadEnableTitle">Enable Voice Activity Detection</span>
                       </div>
-                      <div class="setting-desc"><span data-i18n="settings.vadEnableDesc">Pre-filters audio using Silero VAD to detect and remove silent and non-speech sections before Whisper decoding.</span>
+                      <div class="setting-desc"><span data-i18n="settings.vadEnableDesc">Pre-filters audio using Silero VAD to detect and remove silent and non-speech sections before transcription decoding.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.vadEnablePoints">
                           <span class="setting-desc-point"><strong>Benefits:</strong> Speeds up processing up to 3x and prevents silence hallucinations.</span>
                           <span class="setting-desc-point"><strong>Recommended:</strong> Keep enabled for podcasts, interviews, and long videos with pauses.</span>
@@ -2665,7 +2665,7 @@
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.vadMaxSpeechTitle">VAD Max Speech (s)</span>
                       </div>
-                      <div class="setting-desc"><span data-i18n="settings.vadMaxSpeechDesc">Maximum continuous speech segment duration sent to Whisper in one chunk.</span>
+                      <div class="setting-desc"><span data-i18n="settings.vadMaxSpeechDesc">Maximum continuous speech segment before forcing a split.</span>
                         <div class="setting-desc-points" data-i18n-html="settings.vadMaxSpeechPoints">
                           <span class="setting-desc-point"><strong>Default:</strong> <code>30</code> s</span>
                           <span class="setting-desc-point"><strong>Purpose:</strong> Matches Whisper's acoustic window to prevent memory overflow.</span>
@@ -3011,8 +3011,8 @@
           <div class="view-panel fixed-layout-panel" id="panel-models" role="tabpanel" aria-labelledby="nav-tab-models" tabindex="0">
             <div class="glass-card" style="margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
               <div>
-                <h3 style="font-size: 1.25rem; margin-bottom: 4px;" data-i18n="models.title">Whisper Model Hub</h3>
-                <p id="model-specs-subtitle" style="font-size: 0.85rem; color: var(--color-text-muted);" data-i18n="models.subtitle">Download, configure, and manage GGML models inside the models directory.</p>
+                <h3 style="font-size: 1.25rem; margin-bottom: 4px;" data-i18n="models.title">Model Hub</h3>
+                <p id="model-specs-subtitle" style="font-size: 0.85rem; color: var(--color-text-muted);" data-i18n="models.subtitle">Download, inspect and configure speech recognition and transcription models.</p>
               </div>
               <div class="models-search-wrapper" style="flex: 0 0 260px; min-width: 240px;">
                 <svg class="models-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -3278,7 +3278,7 @@
                     <!-- Batch Control Panel (hidden by default) -->
                     <div id="batch-controls-box" style="display:none; width:100%; margin-top: 16px;">
                       <div class="step-details-row" style="margin-bottom: 16px;">
-                        <span data-i18n="transcribe.automatedPipeline">Automated Pipeline</span> | <span data-i18n="transcribe.pipelineDesc">FFmpeg Conversion & Whisper Transcription</span>
+                        <span data-i18n="transcribe.automatedPipeline">Automated Pipeline</span> | <span data-i18n="transcribe.pipelineDesc">FFmpeg Conversion & Audio Transcription</span>
                       </div>
                       <div style="display:flex; gap:12px;">
                         <button class="btn-primary" id="btn-run-batch" style="flex:2;" onclick="runBatchExtraction()">
