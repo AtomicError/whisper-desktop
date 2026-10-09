@@ -2893,10 +2893,6 @@ window.switchView = function(viewName) {
       titleEl.style.opacity = '1';
     });
   }
-  const titlebarEl = document.getElementById('titlebar-view-title');
-  if (titlebarEl) {
-    titlebarEl.textContent = localizedViewTitle;
-  }
 
   if (viewName === 'models') {
     // Always reset search input and default to Recommended category when entering the view
@@ -3096,50 +3092,61 @@ function setupTauriListeners() {
         barFill.style.boxShadow = 'var(--shadow-neon-cyan)';
       }
 
-      // 2. Status text above progress bar
-      let liveStatus = '';
-      if (payload.speedBps > 0) {
-        let speedText = '';
-        if (payload.speedBps >= 1048576) {
-          const mbVal = payload.speedBps / 1048576;
-          const speedFormatted = (mbVal >= 100 || mbVal % 1 === 0 ? mbVal.toFixed(0) : parseFloat(mbVal.toFixed(1)).toString());
-          const speedVal = window.formatNumberForLang(speedFormatted);
-          speedText = `${speedVal} ${t('models.speedUnitMB')}`;
-        } else {
-          const kbVal = Math.max(1, Math.round(payload.speedBps / 1024));
-          const speedVal = window.formatNumberForLang(kbVal);
-          speedText = `${speedVal} ${t('models.speedUnitKB')}`;
-        }
+      // 2. Status text above progress bar (clean progress + smooth ETA without speed noise)
+      const pctFormatted = totalKnown ? window.formatNumberForLang(pct) : '...';
+      const inProgressTemplate = t('models.statusInProgress', {
+        size: window.formatNumberForLang(dlMB),
+        pct: pctFormatted
+      });
+      const parts = inProgressTemplate.split('•');
+      const prefix = parts.length >= 2
+        ? parts[0].trim()
+        : `${window.formatNumberForLang(dlMB)} ${t('models.unitMB')} (${pctFormatted}%)`;
 
-        liveStatus = t('models.downloadLiveProgress', {
-          size: window.formatNumberForLang(dlMB),
-          unit: t('models.unitMB'),
-          pct: totalKnown ? window.formatNumberForLang(pct) : '...',
-          speedLabel: t('models.speedLabel'),
-          speed: speedText
-        });
+      const isConnecting = payload.phase === 'starting' || payload.speedBps <= 0;
 
-        if (totalKnown && payload.downloadedBytes <= payload.totalBytes) {
-          const remainingSeconds = Math.round((payload.totalBytes - payload.downloadedBytes) / payload.speedBps);
-          if (remainingSeconds > 0 && isFinite(remainingSeconds)) {
-            const etaText = t('models.etaLabel', { time: formatRemainingTime(remainingSeconds) });
-            liveStatus += ` • ${isolateDirection(etaText)}`;
+      if (!isConnecting && totalKnown && payload.downloadedBytes <= payload.totalBytes) {
+        const rawSeconds = (payload.totalBytes - payload.downloadedBytes) / payload.speedBps;
+        if (rawSeconds > 0 && isFinite(rawSeconds)) {
+          if (!card._smoothedEtaSeconds || card._smoothedEtaSeconds <= 0) {
+            card._smoothedEtaSeconds = rawSeconds;
+          } else {
+            // Exponential moving average: 85% previous smoothed, 15% new sample to eliminate jitter
+            card._smoothedEtaSeconds = 0.85 * card._smoothedEtaSeconds + 0.15 * rawSeconds;
           }
         }
-      } else {
-        const initialPhase = payload.phase === 'starting' ? t('models.statusConnecting') : t('models.statusStarting');
-        const pctFormatted = totalKnown ? window.formatNumberForLang(pct) : '...';
-        const inProgressTemplate = t('models.statusInProgress', {
-          size: window.formatNumberForLang(dlMB),
-          pct: pctFormatted
-        });
-        const parts = inProgressTemplate.split('•');
-        if (parts.length >= 2) {
-          liveStatus = `${parts[0].trim()} • ${initialPhase}`;
-        } else {
-          liveStatus = `${window.formatNumberForLang(dlMB)} ${t('models.unitMB')} (${pctFormatted}%) • ${initialPhase}`;
-        }
       }
+
+      let liveStatus = '';
+      if (isConnecting) {
+        card._smoothedEtaSeconds = null;
+        liveStatus = `${prefix} • ${t('models.statusConnecting')}`;
+      } else if (card._smoothedEtaSeconds && card._smoothedEtaSeconds > 0) {
+        const etaText = t('models.etaLabel', { time: formatRemainingTime(card._smoothedEtaSeconds) });
+        liveStatus = `${prefix} • ${isolateDirection(etaText)}`;
+      } else {
+        liveStatus = `${prefix} • ${parts.length >= 2 ? parts[1].trim() : t('models.statusConnecting')}`;
+      }
+
+      // Manage stall detection watchdog (switches to connecting state if stream stalls for >= 3s)
+      window._modelStallTimers = window._modelStallTimers || {};
+      if (window._modelStallTimers[payload.modelName]) {
+        clearTimeout(window._modelStallTimers[payload.modelName]);
+        delete window._modelStallTimers[payload.modelName];
+      }
+      if (!isConnecting && payload.phase === 'downloading') {
+        window._modelStallTimers[payload.modelName] = setTimeout(() => {
+          const targetCard = document.querySelector(`[data-model="${CSS.escape(payload.modelName)}"]`);
+          if (targetCard && targetCard.querySelector('.model-btn-pause')) {
+            const statusEl = targetCard.querySelector('.model-progress-status');
+            if (statusEl) {
+              targetCard._smoothedEtaSeconds = null;
+              statusEl.innerHTML = `${prefix} • ${t('models.statusConnecting')}`;
+            }
+          }
+        }, 3000);
+      }
+
       let statusEl = card.querySelector('.model-progress-status');
       if (!statusEl && barContainer) {
         statusEl = document.createElement('div');
@@ -3148,10 +3155,11 @@ function setupTauriListeners() {
       }
       const nowTime = Date.now();
       const lastTextUpdate = card._lastStatusTextUpdate || 0;
-      const isPhaseChange = card._lastPhase !== payload.phase;
+      const isPhaseChange = card._lastPhase !== payload.phase || card._lastIsConnecting !== isConnecting;
       if (nowTime - lastTextUpdate >= 650 || isPhaseChange) {
         card._lastStatusTextUpdate = nowTime;
         card._lastPhase = payload.phase;
+        card._lastIsConnecting = isConnecting;
         if (statusEl) {
           statusEl.innerHTML = liveStatus;
           statusEl.classList.remove('status-paused');
@@ -3185,6 +3193,10 @@ function setupTauriListeners() {
       }
       // If card is NOT in current view/tab, do NOTHING to prevent tab re-rendering!
     } else {
+      if (window._modelStallTimers && window._modelStallTimers[payload.modelName]) {
+        clearTimeout(window._modelStallTimers[payload.modelName]);
+        delete window._modelStallTimers[payload.modelName];
+      }
       window.isDownloadingModelRunning = false;
       if (typeof window.updateTaskbarProgress === 'function') {
         window.updateTaskbarProgress(0, false, payload.phase === 'failed' ? 'error' : 'normal');
@@ -6384,16 +6396,25 @@ let currentModelQuickFilter = 'all';
 
 function formatRemainingTime(seconds) {
   if (seconds <= 0 || !isFinite(seconds)) return t('models.timeUnknown');
-  if (seconds < 60) return t('models.timeSec', { s: window.formatNumberForLang(seconds) });
-  if (seconds < 3600) {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return t('models.timeMinSec', { m: window.formatNumberForLang(m), s: window.formatNumberForLang(s) });
+  const totalSeconds = Math.round(seconds);
+  if (totalSeconds < 60) {
+    return t('models.timeSec', { s: window.formatNumberForLang(Math.max(1, totalSeconds)) });
   }
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  return t('models.timeHourMinSec', { h: window.formatNumberForLang(h), m: window.formatNumberForLang(m), s: window.formatNumberForLang(s) });
+
+  const totalMinutes = Math.round(totalSeconds / 60);
+  if (totalMinutes < 60) {
+    return t('models.timeMin', { m: window.formatNumberForLang(Math.max(1, totalMinutes)) });
+  }
+
+  const hours = Math.floor(totalMinutes / 60);
+  const remainingMinutes = totalMinutes % 60;
+  if (remainingMinutes === 0) {
+    return t('models.timeHour', { h: window.formatNumberForLang(hours) });
+  }
+  return t('models.timeHourMin', {
+    h: window.formatNumberForLang(hours),
+    m: window.formatNumberForLang(remainingMinutes),
+  });
 }
 
 function renderFamilyHeaderBanner(category, counts = { all: 0, multi: 0, en: 0, quant: 0 }) {

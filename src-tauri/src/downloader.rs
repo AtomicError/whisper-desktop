@@ -399,6 +399,7 @@ async fn download_inner(
                 if consecutive_failures >= MAX_RETRIES {
                     return Err(format!("Network connection failed after {consecutive_failures} attempts: {e}"));
                 }
+                emit_progress(app, make_payload(clean_name, Phase::Starting, downloaded, expected_size, 0.0, None));
                 tokio::time::sleep(RETRY_BASE_DELAY * consecutive_failures).await;
                 continue;
             }
@@ -419,6 +420,7 @@ async fn download_inner(
                         "Server rejected resume at {attempted_offset} bytes and retry limit reached."
                     ));
                 }
+                emit_progress(app, make_payload(clean_name, Phase::Starting, 0, expected_size, 0.0, None));
                 tokio::time::sleep(RETRY_BASE_DELAY * consecutive_failures).await;
                 continue;
             }
@@ -494,6 +496,7 @@ async fn download_inner(
             if consecutive_failures >= MAX_RETRIES {
                 return Err(format!("Network stream interrupted after {consecutive_failures} attempts: {e}"));
             }
+            emit_progress(app, make_payload(clean_name, Phase::Starting, downloaded, total_bytes, 0.0, None));
             tokio::time::sleep(RETRY_BASE_DELAY * consecutive_failures).await;
             continue;
         }
