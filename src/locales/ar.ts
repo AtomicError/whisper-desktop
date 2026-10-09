@@ -1054,6 +1054,7 @@ export const ar: Translations = {
     settingsReset: 'تمت استعادة كافة الإعدادات إلى القيم الافتراضية.',
     engineSettingsReset: 'تمت استعادة إعدادات النسخ إلى القيم الافتراضية.',
     engineSettingsResetError: 'فشل في استعادة إعدادات النسخ:\n{error}',
+    taskRunningWarning: 'هناك عملية قيد التشغيل حالياً. يرجى الانتظار حتى تكتمل أو إلغاؤها أولاً.',
     langChanged: 'تم تحديث لغة الواجهة بنجاح.',
     modelDownloadStarted: 'بدأ تنزيل النموذج: {name}',
     modelDownloadSuccess: 'تم تنزيل النموذج {name} بنجاح!',

@@ -1054,6 +1054,7 @@ export const ja: Translations = {
     settingsReset: 'すべての設定を出荷時デフォルトに戻しました。',
     engineSettingsReset: '文字起こし設定をデフォルト値に復元しました。',
     engineSettingsResetError: '文字起こし設定のリセットに失敗しました:\n{error}',
+    taskRunningWarning: 'タスクが現在実行中です。完了するまで待つか、先にキャンセルしてください。',
     langChanged: '表示言語が正常に更新されました。',
     modelDownloadStarted: 'モデルのダウンロードを開始しました: {name}',
     modelDownloadSuccess: 'モデル {name} のダウンロードが完了しました！',

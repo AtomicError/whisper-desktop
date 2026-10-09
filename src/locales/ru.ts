@@ -1054,6 +1054,7 @@ export const ru: Translations = {
     settingsReset: 'Все параметры сброшены до заводских значений по умолчанию.',
     engineSettingsReset: 'Настройки транскрипции сброшены до значений по умолчанию.',
     engineSettingsResetError: 'Не удалось сбросить настройки транскрипции:\n{error}',
+    taskRunningWarning: 'В данный момент выполняется задача. Пожалуйста, дождитесь завершения или отмените её.',
     langChanged: 'Язык интерфейса успешно обновлен.',
     modelDownloadStarted: 'Начата загрузка модели: {name}',
     modelDownloadSuccess: 'Модель {name} успешно загружена!',

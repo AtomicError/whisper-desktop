@@ -1049,6 +1049,7 @@ export const es: Translations = {
     settingsReset: 'Todos los ajustes se han restablecido a los valores de fábrica.',
     engineSettingsReset: 'Ajustes de transcripción restablecidos a los valores por defecto.',
     engineSettingsResetError: 'Error al restablecer los ajustes de transcripción:\n{error}',
+    taskRunningWarning: 'Hay una tarea en curso. Por favor espere a que termine o cancélela primero.',
     langChanged: 'Idioma actualizado con éxito.',
     modelDownloadStarted: 'Iniciando descarga del modelo: {name}',
     modelDownloadSuccess: '¡Modelo {name} descargado con éxito!',

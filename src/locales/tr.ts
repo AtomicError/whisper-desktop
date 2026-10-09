@@ -1056,6 +1056,7 @@ export const tr: Translations = {
     settingsReset: 'Tüm ayarlar fabrika varsayılanlarına sıfırlandı.',
     engineSettingsReset: 'Transkripsiyon ayarları varsayılanlara geri yüklendi.',
     engineSettingsResetError: 'Transkripsiyon ayarları sıfırlanamadı:\n{error}',
+    taskRunningWarning: 'Şu anda çalışan bir işlem var. Lütfen tamamlanmasını bekleyin veya önce iptal edin.',
     langChanged: 'Arayüz dili başarıyla güncellendi.',
     modelDownloadStarted: 'Model indirilmeye başlandı: {name}',
     modelDownloadSuccess: '{name} modeli başarıyla indirildi!',

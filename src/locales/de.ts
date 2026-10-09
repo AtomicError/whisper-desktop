@@ -1054,6 +1054,7 @@ export const de: Translations = {
     settingsReset: 'Alle Einstellungen wurden auf die Werkseinstellungen zurückgesetzt.',
     engineSettingsReset: 'Transkriptionseinstellungen auf Standardwerte zurückgesetzt.',
     engineSettingsResetError: 'Fehler beim Zurücksetzen der Transkriptionseinstellungen:\n{error}',
+    taskRunningWarning: 'Ein Vorgang wird derzeit ausgeführt. Bitte warten Sie oder brechen Sie ihn zuerst ab.',
     langChanged: 'Sprache erfolgreich aktualisiert.',
     modelDownloadStarted: 'Modell-Download gestartet: {name}',
     modelDownloadSuccess: 'Modell {name} erfolgreich heruntergeladen!',

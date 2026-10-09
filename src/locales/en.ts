@@ -1054,6 +1054,7 @@ export const en = {
     settingsReset: 'All settings have been restored to factory defaults.',
     engineSettingsReset: 'Transcription settings restored to defaults.',
     engineSettingsResetError: 'Failed to reset transcription settings:\n{error}',
+    taskRunningWarning: 'A task is currently running. Please wait for it to finish or cancel it first.',
     langChanged: 'Language updated successfully.',
     modelDownloadStarted: 'Started downloading model: {name}',
     modelDownloadSuccess: 'Model {name} downloaded successfully!',

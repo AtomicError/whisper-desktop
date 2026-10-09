@@ -1049,6 +1049,7 @@ export const pt: Translations = {
     settingsReset: 'Todas as configurações foram restauradas para os padrões de fábrica.',
     engineSettingsReset: 'Configurações de transcrição restauradas para os valores padrão.',
     engineSettingsResetError: 'Falha ao redefinir configurações de transcrição:\n{error}',
+    taskRunningWarning: 'Uma tarefa está em andamento. Aguarde a conclusão ou cancele-a primeiro.',
     langChanged: 'Idioma atualizado com sucesso.',
     modelDownloadStarted: 'Download do modelo iniciado: {name}',
     modelDownloadSuccess: 'Modelo {name} baixado com sucesso!',

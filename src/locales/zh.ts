@@ -1049,6 +1049,7 @@ export const zh: Translations = {
     settingsReset: '所有设置已恢复至出厂默认值。',
     engineSettingsReset: '转录设置已恢复为默认值。',
     engineSettingsResetError: '重置转录设置失败：\n{error}',
+    taskRunningWarning: '当前有正在运行的任务。请等待其完成或先将其取消。',
     langChanged: '界面语言已更新。',
     modelDownloadStarted: '已开启模型下载任务: {name}',
     modelDownloadSuccess: '模型 {name} 已顺利下载完成！',

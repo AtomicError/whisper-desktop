@@ -1056,6 +1056,7 @@ export const ko: Translations = {
     settingsReset: '모든 설정이 공장 기본값으로 복원되었습니다.',
     engineSettingsReset: '전사 설정이 기본값으로 복원되었습니다.',
     engineSettingsResetError: '전사 설정 초기화 실패:\n{error}',
+    taskRunningWarning: '현재 작업이 진행 중입니다. 완료될 때까지 기다리거나 먼저 취소해 주세요.',
     langChanged: '인터페이스 언어가 업데이트되었습니다.',
     modelDownloadStarted: '모델 다운로드 시작됨: {name}',
     modelDownloadSuccess: '{name} 모델 다운로드가 완료되었습니다!',

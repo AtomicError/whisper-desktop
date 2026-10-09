@@ -1056,6 +1056,7 @@ export const fa: Translations = {
     settingsReset: 'تمام تنظیمات به حالت پیش‌فرض کارخانه بازگردانده شد.',
     engineSettingsReset: 'تنظیمات رونویسی به مقادیر پیش‌فرض بازگردانده شد.',
     engineSettingsResetError: 'خطا در بازنشانی تنظیمات رونویسی:\n{error}',
+    taskRunningWarning: 'یک عملیات در حال اجرا است. لطفاً ابتدا منتظر بمانید یا آن را لغو کنید.',
     langChanged: 'زبان رابط کاربری با موفقیت به‌روزرسانی شد.',
     modelDownloadStarted: 'دانلود مدل {name} آغاز شد.',
     modelDownloadSuccess: 'مدل {name} با موفقیت دانلود شد!',

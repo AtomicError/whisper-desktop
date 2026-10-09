@@ -91,6 +91,18 @@ html[dir="rtl"] .theme-card-desc {
 }
 
 /* 3. Settings & Model Categories */
+html[dir="rtl"] .settings-sidebar {
+  padding-right: 0;
+  padding-left: 16px;
+  border-right: none;
+  border-left: 1px solid var(--border-glass);
+}
+
+html[dir="rtl"] .settings-sidebar .settings-categories {
+  border-left: none;
+  padding-left: 0;
+}
+
 html[dir="rtl"] .settings-categories {
   padding-right: 0;
   padding-left: 16px;
@@ -99,6 +111,10 @@ html[dir="rtl"] .settings-categories {
 }
 
 @media (max-width: 960px) {
+  html[dir="rtl"] .settings-sidebar {
+    border-left: none !important;
+    padding-left: 0 !important;
+  }
   html[dir="rtl"] .settings-categories {
     border-left: none !important;
     border-bottom: 1px solid var(--border-glass) !important;
@@ -125,8 +141,22 @@ html[dir="rtl"] .settings-cat-icon {
   margin-left: 8px !important;
 }
 
-html[dir="rtl"] .btn-settings-reset-engine:hover:not(:disabled) svg.btn-reset-icon {
+
+html[dir="rtl"] .btn-settings-reset-engine:hover:not(:disabled) svg.btn-reset-icon:not(.is-spinning) {
   transform: rotate(60deg);
+}
+
+html[dir="rtl"] .btn-settings-reset-engine svg.btn-reset-icon.is-spinning {
+  animation-name: reset-spin-rtl;
+}
+
+@keyframes reset-spin-rtl {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 html[dir="rtl"] .setting-info {

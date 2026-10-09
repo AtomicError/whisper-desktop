@@ -1056,6 +1056,7 @@ export const it: Translations = {
     settingsReset: 'Tutte le impostazioni sono state ripristinate ai valori di fabbrica.',
     engineSettingsReset: 'Impostazioni di trascrizione ripristinate ai valori predefiniti.',
     engineSettingsResetError: 'Impossibile ripristinare le impostazioni di trascrizione:\n{error}',
+    taskRunningWarning: 'Un\'operazione è attualmente in corso. Attendi il completamento o annullala prima.',
     langChanged: 'Lingua aggiornata con successo.',
     modelDownloadStarted: 'Download del modello avviato: {name}',
     modelDownloadSuccess: 'Modello {name} scaricato con successo!',

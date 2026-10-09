@@ -4182,7 +4182,7 @@ window.confirmResetWhisperEngine = async function() {
   const cancelBtn = document.getElementById('btn-cancel-transcribe');
   const isBusy = (cancelBtn && cancelBtn.style.display !== 'none' && cancelBtn.style.display !== '') || window.isBatchTranscribing;
   if (isBusy) {
-    showNotification(t('modals.confirmExitDesc') ? t('modals.confirmExitTitle') : 'A task is currently running. Please wait or cancel it first.', 'warning');
+    showNotification(t('toasts.taskRunningWarning'), 'warning');
     return;
   }
 
@@ -4194,7 +4194,9 @@ window.confirmResetWhisperEngine = async function() {
   if (!confirmed) return;
 
   const resetBtn = document.getElementById('btn-reset-whisper-engine');
+  const resetIcon = resetBtn ? resetBtn.querySelector('.btn-reset-icon') : null;
   if (resetBtn) resetBtn.disabled = true;
+  if (resetIcon) resetIcon.classList.add('is-spinning');
 
   try {
     const updated = await invoke('reset_whisper_core_settings');
@@ -4213,7 +4215,18 @@ window.confirmResetWhisperEngine = async function() {
     console.error('Failed to reset whisper engine settings:', err);
     showNotification(t('toasts.engineSettingsResetError', { error: String(err) }), 'error');
   } finally {
-    if (resetBtn) resetBtn.disabled = false;
+    if (resetIcon) {
+      const cleanupSpin = () => {
+        resetIcon.classList.remove('is-spinning');
+        if (resetBtn) resetBtn.disabled = false;
+        resetIcon.removeEventListener('animationend', cleanupSpin);
+      };
+      resetIcon.addEventListener('animationend', cleanupSpin);
+      // Fallback timer for reduced motion or tab-switching edge cases
+      setTimeout(cleanupSpin, 700);
+    } else if (resetBtn) {
+      resetBtn.disabled = false;
+    }
   }
 };
 

@@ -1049,6 +1049,7 @@ export const fr: Translations = {
     settingsReset: 'Tous les paramètres ont été réinitialisés aux valeurs d\'usine.',
     engineSettingsReset: 'Paramètres de transcription rétablis aux valeurs par défaut.',
     engineSettingsResetError: 'Échec de la réinitialisation des paramètres de transcription :\n{error}',
+    taskRunningWarning: 'Une tâche est actuellement en cours. Veuillez patienter ou l\'annuler d\'abord.',
     langChanged: 'Langue mise à jour avec succès.',
     modelDownloadStarted: 'Téléchargement du modèle démarré : {name}',
     modelDownloadSuccess: 'Modèle {name} téléchargé avec succès !',
