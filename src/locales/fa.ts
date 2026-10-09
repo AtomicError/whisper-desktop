@@ -692,6 +692,8 @@ export const fa: Translations = {
     catGpu: 'پردازش کارت گرافیک',
     catVad: 'تشخیص صوت Silero VAD',
     catTranslation: 'ترجمه با هوش مصنوعی',
+    resetEngineBtn: 'بازنشانی تنظیمات رونویسی',
+    resetEngineTooltip: 'بازنشانی تنظیمات رونویسی به مقادیر پیش‌فرض',
     searchPlaceholder: 'جستجو...',
     searchNoResults: 'تنظیمی یافت نشد',
     searchNoResultsDesc: 'هیچ گزینه‌ای با عبارت «{query}» همخوانی ندارد.',
@@ -1042,13 +1044,18 @@ export const fa: Translations = {
     connectionTimeoutDesc: 'درخواست پس از {seconds} ثانیه با تایم‌اوت مواجه شد. لطفاً اتصال اینترنت یا پروکسی/VPN را بررسی کنید.\n\nنکته: اگر از مدل‌های رایگان (:free) یا مدل‌های بسیار سنگین استفاده می‌کنید، صف ترافیک عمومی ارائه‌دهنده ممکن است شلوغ باشد و به زمان بیشتری نیاز داشته باشد؛ پیشنهاد می‌شود یک مدل سبک‌تر یا سریع‌تر را برای تست انتخاب کنید.',
     previewOriginal: 'متن اصلی',
     previewTranslated: 'ترجمه',
-    previewNotTranslated: 'ترجمه‌نشده'
+    previewNotTranslated: 'ترجمه‌نشده',
+    confirmResetEngineTitle: 'بازنشانی تنظیمات رونویسی',
+    confirmResetEngineDesc: 'آیا از بازنشانی تنظیمات رونویسی به مقادیر پیش‌فرض اطمینان دارید؟\n(تنظیمات عمومی برنامه، مدل‌ها و هوش مصنوعی حفظ خواهند شد.)',
+    confirmResetEngineBtn: 'بازنشانی به پیش‌فرض'
   },
   toasts: {
     testCancelled: 'آزمون اتصال لغو شد.',
     settingsSaved: 'تنظیمات با موفقیت ذخیره شد.',
     settingsSaveError: 'خطا در ذخیره‌سازی تنظیمات. دسترسی و فضای دیسک را بررسی کنید.',
     settingsReset: 'تمام تنظیمات به حالت پیش‌فرض کارخانه بازگردانده شد.',
+    engineSettingsReset: 'تنظیمات رونویسی به مقادیر پیش‌فرض بازگردانده شد.',
+    engineSettingsResetError: 'خطا در بازنشانی تنظیمات رونویسی:\n{error}',
     langChanged: 'زبان رابط کاربری با موفقیت به‌روزرسانی شد.',
     modelDownloadStarted: 'دانلود مدل {name} آغاز شد.',
     modelDownloadSuccess: 'مدل {name} با موفقیت دانلود شد!',

@@ -692,6 +692,8 @@ export const es: Translations = {
     catGpu: 'Ejecución en GPU',
     catVad: 'Silero VAD',
     catTranslation: 'Traducción con IA',
+    resetEngineBtn: 'Restablecer ajustes de transcripción',
+    resetEngineTooltip: 'Restablecer parámetros de transcripción a valores predeterminados',
     searchPlaceholder: 'Buscar ajustes...',
     searchNoResults: 'No se encontraron ajustes',
     searchNoResultsDesc: 'Ninguna opción de configuración coincide con "{query}".',
@@ -1035,13 +1037,18 @@ export const es: Translations = {
     connectionTimeoutDesc: 'La solicitud superó el límite de tiempo tras {seconds} segundos. Por favor, revisa tu conexión o proxy/VPN.\n\nNota: Si utilizas modelos gratuitos (:free) o de gran tamaño, la cola pública del proveedor puede demorar más. Prueba con un modelo más ligero.',
     previewOriginal: 'Original',
     previewTranslated: 'Traducido',
-    previewNotTranslated: 'no traducido'
+    previewNotTranslated: 'no traducido',
+    confirmResetEngineTitle: 'Restablecer ajustes de transcripción',
+    confirmResetEngineDesc: '¿Está seguro de que desea restablecer todos los parámetros de transcripción a los valores predeterminados?\n(Las preferencias generales de la aplicación, modelos y traducción IA se mantendrán.)',
+    confirmResetEngineBtn: 'Restablecer a valores por defecto'
   },
   toasts: {
     testCancelled: 'Prueba de conexión cancelada.',
     settingsSaved: 'Configuración guardada con éxito.',
     settingsSaveError: 'Error al guardar la configuración. Revisa el espacio en disco y permisos.',
     settingsReset: 'Todos los ajustes se han restablecido a los valores de fábrica.',
+    engineSettingsReset: 'Ajustes de transcripción restablecidos a los valores por defecto.',
+    engineSettingsResetError: 'Error al restablecer los ajustes de transcripción:\n{error}',
     langChanged: 'Idioma actualizado con éxito.',
     modelDownloadStarted: 'Iniciando descarga del modelo: {name}',
     modelDownloadSuccess: '¡Modelo {name} descargado con éxito!',

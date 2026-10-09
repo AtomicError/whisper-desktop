@@ -272,6 +272,73 @@ impl WhisperSettings {
         }
     }
 
+    /// Resets all Whisper.cpp core engine, computation, decoding, output format,
+    /// and Silero VAD parameters to factory defaults while preserving general
+    /// app preferences (models_dir, output directories, UI theme/language/scale,
+    /// and AI translation providers/credentials).
+    pub fn reset_whisper_core_settings(&mut self) {
+        let defaults = Self::default_settings();
+
+        // Transcription & Decoding Strategy
+        self.language = defaults.language;
+        self.prompt = defaults.prompt;
+        self.carry_prompt = defaults.carry_prompt;
+        self.temperature = defaults.temperature;
+        self.temperature_inc = defaults.temperature_inc;
+        self.no_fallback = defaults.no_fallback;
+        self.debug_mode = defaults.debug_mode;
+        self.translate = defaults.translate;
+        self.diarize = defaults.diarize;
+        self.tiny_diarize = defaults.tiny_diarize;
+
+        // Computation
+        self.threads = defaults.threads;
+        self.processors = defaults.processors;
+        self.offset_t = defaults.offset_t;
+        self.duration = defaults.duration;
+        self.max_context = defaults.max_context;
+        self.max_len = defaults.max_len;
+        self.split_word = defaults.split_word;
+        self.best_of = defaults.best_of;
+        self.beam_size = defaults.beam_size;
+        self.audio_ctx = defaults.audio_ctx;
+        self.word_thold = defaults.word_thold;
+        self.entropy_thold = defaults.entropy_thold;
+        self.logprob_thold = defaults.logprob_thold;
+        self.no_speech_thold = defaults.no_speech_thold;
+        self.dtw_enabled = defaults.dtw_enabled;
+        self.log_score = defaults.log_score;
+
+        // Outputs & Logs
+        self.output_txt = defaults.output_txt;
+        self.output_vtt = defaults.output_vtt;
+        self.output_srt = defaults.output_srt;
+        self.output_lrc = defaults.output_lrc;
+        self.output_csv = defaults.output_csv;
+        self.output_json = defaults.output_json;
+        self.output_json_full = defaults.output_json_full;
+        self.no_prints = defaults.no_prints;
+        self.print_colors = defaults.print_colors;
+        self.print_confidence = defaults.print_confidence;
+        self.print_progress = defaults.print_progress;
+
+        // GPU Execution & Acceleration
+        self.selected_backend = defaults.selected_backend;
+        self.flash_attn = defaults.flash_attn;
+        self.device_id = defaults.device_id;
+        self.ov_device = defaults.ov_device;
+
+        // Silero VAD
+        self.vad = defaults.vad;
+        self.vad_model = defaults.vad_model;
+        self.vad_thold = defaults.vad_thold;
+        self.vad_min_speech = defaults.vad_min_speech;
+        self.vad_min_sil = defaults.vad_min_sil;
+        self.vad_max_speech = defaults.vad_max_speech;
+        self.vad_speech_pad = defaults.vad_speech_pad;
+        self.vad_overlap = defaults.vad_overlap;
+    }
+
     /// Symmetric validation and sanitization executed on BOTH load and save
     pub fn sanitize_and_validate(&mut self) {
         self.theme = match self.theme.as_str() {
@@ -1126,6 +1193,51 @@ mod tests {
         ];
         let sanitized_targets = sanitize_recent_list(&raw_targets, false);
         assert_eq!(sanitized_targets, vec!["Persian", "English", "German"]);
+    }
+
+    #[test]
+    fn test_reset_whisper_core_settings_preserves_user_preferences() {
+        let mut settings = WhisperSettings::default_settings();
+        // Modify user preferences
+        settings.models_dir = "/custom/models/path".to_string();
+        settings.theme = "carbon".to_string();
+        settings.ui_language = "fa".to_string();
+        settings.ui_scale = 1.25;
+        settings.output_dir_path = "/custom/output".to_string();
+        settings.translate_ai_providers = "[{\"name\":\"custom-ai\",\"apiKey\":\"secret\"}]".to_string();
+        settings.translate_ai_provider = "custom-ai".to_string();
+        settings.model_path = "ggml-medium.bin".to_string();
+
+        // Modify engine parameters
+        settings.threads = 12;
+        settings.beam_size = 8;
+        settings.temperature = 0.8;
+        settings.vad_thold = 0.9;
+        settings.output_srt = false;
+        settings.output_json = true;
+        settings.selected_backend = "CUDA".to_string();
+
+        // Perform reset
+        settings.reset_whisper_core_settings();
+
+        // Engine settings are back to defaults
+        assert_eq!(settings.threads, 4);
+        assert_eq!(settings.beam_size, 5);
+        assert_eq!(settings.temperature, 0.0);
+        assert_eq!(settings.vad_thold, 0.5);
+        assert_eq!(settings.output_srt, true);
+        assert_eq!(settings.output_json, false);
+        assert_eq!(settings.selected_backend, "Standard");
+
+        // User preferences and credentials remain intact!
+        assert_eq!(settings.models_dir, "/custom/models/path");
+        assert_eq!(settings.theme, "carbon");
+        assert_eq!(settings.ui_language, "fa");
+        assert_eq!(settings.ui_scale, 1.25);
+        assert_eq!(settings.output_dir_path, "/custom/output");
+        assert_eq!(settings.translate_ai_providers, "[{\"name\":\"custom-ai\",\"apiKey\":\"secret\"}]");
+        assert_eq!(settings.translate_ai_provider, "custom-ai");
+        assert_eq!(settings.model_path, "ggml-medium.bin");
     }
 }
 

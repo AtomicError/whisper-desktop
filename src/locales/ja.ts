@@ -692,6 +692,8 @@ export const ja: Translations = {
     catGpu: 'GPU 高速化',
     catVad: 'Silero VAD フィルター',
     catTranslation: 'AI 字幕翻訳',
+    resetEngineBtn: '文字起こし設定をリセット',
+    resetEngineTooltip: '文字起こしパラメータをデフォルト値に戻す',
     searchPlaceholder: '設定項目を検索...',
     searchNoResults: '設定が見つかりません',
     searchNoResultsDesc: '"{query}" に一致する設定オプションはありません。',
@@ -1040,13 +1042,18 @@ export const ja: Translations = {
     connectionTimeoutDesc: '{seconds} 秒間応答がなかったためタイムアウトしました。ネットワークやプロキシ/VPN を確認してください。\n\nヒント: 無料枠 (:free) や大型モデルの場合、サーバー側のキューが混み合っている可能性があります。',
     previewOriginal: '原文',
     previewTranslated: '翻訳',
-    previewNotTranslated: '未翻訳'
+    previewNotTranslated: '未翻訳',
+    confirmResetEngineTitle: '文字起こし設定をリセット',
+    confirmResetEngineDesc: 'すべての文字起こしパラメータをデフォルト値に戻しますか？\n（アプリの基本設定、モデル、AI翻訳設定は保持されます。）',
+    confirmResetEngineBtn: 'デフォルトに戻す'
   },
   toasts: {
     testCancelled: '接続テストがキャンセルされました。',
     settingsSaved: '設定が正常に保存されました。',
     settingsSaveError: '設定の保存に失敗しました。ディスク容量と権限を確認してください。',
     settingsReset: 'すべての設定を出荷時デフォルトに戻しました。',
+    engineSettingsReset: '文字起こし設定をデフォルト値に復元しました。',
+    engineSettingsResetError: '文字起こし設定のリセットに失敗しました:\n{error}',
     langChanged: '表示言語が正常に更新されました。',
     modelDownloadStarted: 'モデルのダウンロードを開始しました: {name}',
     modelDownloadSuccess: 'モデル {name} のダウンロードが完了しました！',

@@ -692,6 +692,8 @@ export const ko: Translations = {
     catGpu: 'GPU 실행',
     catVad: 'Silero VAD',
     catTranslation: 'AI 번역',
+    resetEngineBtn: '전사 설정 초기화',
+    resetEngineTooltip: '전사 매개변수를 기본값으로 복원',
     searchPlaceholder: '설정 검색...',
     searchNoResults: '설정을 찾을 수 없음',
     searchNoResultsDesc: '"{query}"와 일치하는 구성 옵션이 없습니다.',
@@ -1042,13 +1044,18 @@ export const ko: Translations = {
     connectionTimeoutDesc: '{seconds}초 후 요청 시간이 초과되었습니다. 네트워크 연결 또는 프록시/VPN을 확인하세요.\n\n참고: 무료 티어(:free) 또는 대형 모델을 사용하는 경우 제공자의 공개 대기열이 혼잡할 수 있습니다.',
     previewOriginal: '원문',
     previewTranslated: '번역',
-    previewNotTranslated: '번역되지 않음'
+    previewNotTranslated: '번역되지 않음',
+    confirmResetEngineTitle: '전사 설정 초기화',
+    confirmResetEngineDesc: '모든 전사 매개변수를 기본값으로 복원하시겠습니까?\n(일반 앱 설정, 모델 및 AI 번역 설정은 유지됩니다.)',
+    confirmResetEngineBtn: '기본값으로 초기화'
   },
   toasts: {
     testCancelled: '연결 테스트가 취소되었습니다.',
     settingsSaved: '설정이 성공적으로 저장되었습니다.',
     settingsSaveError: '설정을 저장하지 못했습니다. 디스크 여유 공간과 권한을 확인하세요.',
     settingsReset: '모든 설정이 공장 기본값으로 복원되었습니다.',
+    engineSettingsReset: '전사 설정이 기본값으로 복원되었습니다.',
+    engineSettingsResetError: '전사 설정 초기화 실패:\n{error}',
     langChanged: '인터페이스 언어가 업데이트되었습니다.',
     modelDownloadStarted: '모델 다운로드 시작됨: {name}',
     modelDownloadSuccess: '{name} 모델 다운로드가 완료되었습니다!',

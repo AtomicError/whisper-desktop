@@ -692,6 +692,8 @@ export const tr: Translations = {
     catGpu: 'GPU ile Çalıştırma',
     catVad: 'Silero VAD',
     catTranslation: 'Yapay Zeka Çevirisi',
+    resetEngineBtn: 'Transkripsiyon Ayarlarını Sıfırla',
+    resetEngineTooltip: 'Transkripsiyon parametrelerini varsayılan değerlere sıfırla',
     searchPlaceholder: 'Ayar ara...',
     searchNoResults: 'Ayar bulunamadı',
     searchNoResultsDesc: '"{query}" ile eşleşen bir yapılandırma seçeneği bulunamadı.',
@@ -1042,13 +1044,18 @@ export const tr: Translations = {
     connectionTimeoutDesc: 'İstek {seconds} saniye sonra zaman aşımına uğradı. Lütfen ağ bağlantınızı veya vekil sunucu/VPN ayarlarınızı kontrol edin.\n\nNot: Ücretsiz (:free) veya çok ağır bir model kullanıyorsanız, sağlayıcının genel kuyruğu meşgul olabilir.',
     previewOriginal: 'Orijinal',
     previewTranslated: 'Çevrilmiş',
-    previewNotTranslated: 'çevrilmedi'
+    previewNotTranslated: 'çevrilmedi',
+    confirmResetEngineTitle: 'Transkripsiyon Ayarlarını Sıfırla',
+    confirmResetEngineDesc: 'Tüm transkripsiyon parametrelerini varsayılan değerlere sıfırlamak istediğinizden emin misiniz?\n(Genel uygulama tercihleri, modeller ve yapay zeka çevirisi korunacaktır.)',
+    confirmResetEngineBtn: 'Varsayılanlara Sıfırla'
   },
   toasts: {
     testCancelled: 'Bağlantı testi iptal edildi.',
     settingsSaved: 'Ayarlar başarıyla kaydedildi.',
     settingsSaveError: 'Ayarlar kaydedilemedi. Disk alanını ve izinleri kontrol edin.',
     settingsReset: 'Tüm ayarlar fabrika varsayılanlarına sıfırlandı.',
+    engineSettingsReset: 'Transkripsiyon ayarları varsayılanlara geri yüklendi.',
+    engineSettingsResetError: 'Transkripsiyon ayarları sıfırlanamadı:\n{error}',
     langChanged: 'Arayüz dili başarıyla güncellendi.',
     modelDownloadStarted: 'Model indirilmeye başlandı: {name}',
     modelDownloadSuccess: '{name} modeli başarıyla indirildi!',

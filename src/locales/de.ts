@@ -692,6 +692,8 @@ export const de: Translations = {
     catGpu: 'GPU-Ausführung',
     catVad: 'Silero VAD',
     catTranslation: 'KI-Übersetzung',
+    resetEngineBtn: 'Transkriptionseinstellungen zurücksetzen',
+    resetEngineTooltip: 'Transkriptionsparameter auf Standardwerte zurücksetzen',
     searchPlaceholder: 'Einstellungen suchen...',
     searchNoResults: 'Keine Einstellungen gefunden',
     searchNoResultsDesc: 'Keine Konfigurationsoptionen entsprechen "{query}".',
@@ -1040,13 +1042,18 @@ export const de: Translations = {
     connectionTimeoutDesc: 'Die Anfrage wurde nach {seconds} Sekunden wegen Zeitüberschreitung abgebrochen. Bitte prüfen Sie Netzwerk oder Proxy/VPN.\n\nHinweis: Bei kostenlosen (:free) oder sehr großen Modellen kann die öffentliche Warteschlange überlastet sein.',
     previewOriginal: 'Original',
     previewTranslated: 'Übersetzt',
-    previewNotTranslated: 'nicht übersetzt'
+    previewNotTranslated: 'nicht übersetzt',
+    confirmResetEngineTitle: 'Transkriptionseinstellungen zurücksetzen',
+    confirmResetEngineDesc: 'Möchten Sie wirklich alle Transkriptionsparameter auf die Standardwerte zurücksetzen?\n(Allgemeine App-Einstellungen, Modelle und KI-Übersetzung bleiben erhalten.)',
+    confirmResetEngineBtn: 'Auf Standard zurücksetzen'
   },
   toasts: {
     testCancelled: 'Verbindungstest abgebrochen.',
     settingsSaved: 'Einstellungen erfolgreich gespeichert.',
     settingsSaveError: 'Fehler beim Speichern der Einstellungen. Speicherplatz und Rechte prüfen.',
     settingsReset: 'Alle Einstellungen wurden auf die Werkseinstellungen zurückgesetzt.',
+    engineSettingsReset: 'Transkriptionseinstellungen auf Standardwerte zurückgesetzt.',
+    engineSettingsResetError: 'Fehler beim Zurücksetzen der Transkriptionseinstellungen:\n{error}',
     langChanged: 'Sprache erfolgreich aktualisiert.',
     modelDownloadStarted: 'Modell-Download gestartet: {name}',
     modelDownloadSuccess: 'Modell {name} erfolgreich heruntergeladen!',

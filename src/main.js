@@ -917,6 +917,60 @@ const invoke = async function(cmd, args = {}) {
       vadOverlap: 0.10
     };
   }
+  if (cmd === 'reset_whisper_core_settings') {
+    const defaults = {
+      language: "auto",
+      prompt: "",
+      carryPrompt: false,
+      temperature: 0.0,
+      temperatureInc: 0.2,
+      noFallback: false,
+      debugMode: false,
+      translate: false,
+      diarize: false,
+      tinyDiarize: false,
+      threads: 4,
+      processors: 1,
+      offsetT: 0,
+      duration: 0,
+      maxContext: -1,
+      maxLen: 0,
+      splitWord: false,
+      bestOf: 5,
+      beamSize: 5,
+      audioCtx: 0,
+      wordThold: 0.01,
+      entropyThold: 2.4,
+      logprobThold: -1.0,
+      noSpeechThold: 0.6,
+      dtwEnabled: false,
+      logScore: false,
+      outputTxt: false,
+      outputVtt: false,
+      outputSrt: true,
+      outputLrc: false,
+      outputCsv: false,
+      outputJson: false,
+      outputJsonFull: false,
+      noPrints: false,
+      printColors: false,
+      printConfidence: false,
+      printProgress: false,
+      selectedBackend: 'Standard',
+      flashAttn: true,
+      deviceId: 0,
+      ovDevice: "CPU",
+      vad: false,
+      vadModel: "ggml-silero-v6.2.0.bin",
+      vadThold: 0.50,
+      vadMinSpeech: 250,
+      vadMinSil: 100,
+      vadMaxSpeech: 30.0,
+      vadSpeechPad: 30,
+      vadOverlap: 0.10
+    };
+    return Object.assign({}, settingsState || {}, defaults);
+  }
   if (cmd === 'check_build') {
     return true;
   }
@@ -4123,6 +4177,45 @@ window.addEventListener('pagehide', () => {
     window.hardsubController.dispose();
   }
 });
+
+window.confirmResetWhisperEngine = async function() {
+  const cancelBtn = document.getElementById('btn-cancel-transcribe');
+  const isBusy = (cancelBtn && cancelBtn.style.display !== 'none' && cancelBtn.style.display !== '') || window.isBatchTranscribing;
+  if (isBusy) {
+    showNotification(t('modals.confirmExitDesc') ? t('modals.confirmExitTitle') : 'A task is currently running. Please wait or cancel it first.', 'warning');
+    return;
+  }
+
+  const confirmed = await showConfirmModal(
+    t('modals.confirmResetEngineTitle'),
+    t('modals.confirmResetEngineDesc'),
+    t('modals.confirmResetEngineBtn')
+  );
+  if (!confirmed) return;
+
+  const resetBtn = document.getElementById('btn-reset-whisper-engine');
+  if (resetBtn) resetBtn.disabled = true;
+
+  try {
+    const updated = await invoke('reset_whisper_core_settings');
+    if (updated) {
+      settingsState = updated;
+      window.settingsState = updated;
+    }
+    // Synchronize all settings DOM inputs, selects, and stepper states
+    bindSettingsToDOM();
+    updateTranscribeUIConfigs();
+    if (typeof refreshBuildStatuses === 'function') {
+      refreshBuildStatuses();
+    }
+    showNotification(t('toasts.engineSettingsReset'), 'success');
+  } catch (err) {
+    console.error('Failed to reset whisper engine settings:', err);
+    showNotification(t('toasts.engineSettingsResetError', { error: String(err) }), 'error');
+  } finally {
+    if (resetBtn) resetBtn.disabled = false;
+  }
+};
 
 function getStepperBounds(inputId) {
   let min = -Infinity;

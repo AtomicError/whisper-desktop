@@ -692,6 +692,8 @@ export const ar: Translations = {
     catGpu: 'معالجة كرت الشاشة (GPU)',
     catVad: 'كاشف الصوت Silero VAD',
     catTranslation: 'الترجمة بالذكاء الاصطناعي',
+    resetEngineBtn: 'إعادة ضبط إعدادات النسخ',
+    resetEngineTooltip: 'إعادة ضبط معلمات النسخ الصوتي إلى الإعدادات الافتراضية',
     searchPlaceholder: 'بحث في الإعدادات...',
     searchNoResults: 'لم يتم العثور على إعدادات',
     searchNoResultsDesc: 'لا توجد خيارات مطابقة لـ "{query}".',
@@ -1040,13 +1042,18 @@ export const ar: Translations = {
     connectionTimeoutDesc: 'تجاوز الطلب مهلة الانتظار بعد {seconds} ثانية. يرجى فحص اتصال الإنترنت أو خادم البروكسي/VPN.\n\nملاحظة: إذا كنت تستخدم نموذجاً مجانياً (:free) أو كبيراً، فقد تكون قائمة الانتظار العامة للمزود مزدحمة.',
     previewOriginal: 'النص الأصلي',
     previewTranslated: 'الترجمة',
-    previewNotTranslated: 'غير مترجم'
+    previewNotTranslated: 'غير مترجم',
+    confirmResetEngineTitle: 'إعادة ضبط إعدادات النسخ',
+    confirmResetEngineDesc: 'هل أنت متأكد من رغبتك في استعادة كافة معلمات النسخ إلى الإعدادات الافتراضية؟\n(ستبقى تفضيلات التطبيق العامة ومسارات النماذج وموفرو الترجمة الذكية محفوظة.)',
+    confirmResetEngineBtn: 'استعادة الافتراضيات'
   },
   toasts: {
     testCancelled: 'تم إلغاء اختبار الاتصال.',
     settingsSaved: 'تم حفظ الإعدادات بنجاح.',
     settingsSaveError: 'فشل حفظ الإعدادات. تحقق من سعة القرص والصلاحيات.',
     settingsReset: 'تمت استعادة كافة الإعدادات إلى القيم الافتراضية.',
+    engineSettingsReset: 'تمت استعادة إعدادات النسخ إلى القيم الافتراضية.',
+    engineSettingsResetError: 'فشل في استعادة إعدادات النسخ:\n{error}',
     langChanged: 'تم تحديث لغة الواجهة بنجاح.',
     modelDownloadStarted: 'بدأ تنزيل النموذج: {name}',
     modelDownloadSuccess: 'تم تنزيل النموذج {name} بنجاح!',

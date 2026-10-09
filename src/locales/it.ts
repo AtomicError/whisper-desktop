@@ -692,6 +692,8 @@ export const it: Translations = {
     catGpu: 'Esecuzione GPU',
     catVad: 'Silero VAD',
     catTranslation: 'Traduzione AI',
+    resetEngineBtn: 'Ripristina impostazioni trascrizione',
+    resetEngineTooltip: 'Ripristina i parametri di trascrizione ai valori predefiniti',
     searchPlaceholder: 'Cerca impostazioni...',
     searchNoResults: 'Nessuna impostazione trovata',
     searchNoResultsDesc: 'Nessuna opzione di configurazione corrisponde a "{query}".',
@@ -1042,13 +1044,18 @@ export const it: Translations = {
     connectionTimeoutDesc: 'La richiesta è scaduta dopo {seconds} secondi. Controlla la connessione di rete o proxy/VPN.\n\nNota: Se utilizzi un modello gratuito (:free) o molto pesante, la coda pubblica del provider potrebbe richiedere più tempo per rispondere.',
     previewOriginal: 'Originale',
     previewTranslated: 'Tradotto',
-    previewNotTranslated: 'non tradotto'
+    previewNotTranslated: 'non tradotto',
+    confirmResetEngineTitle: 'Ripristina impostazioni trascrizione',
+    confirmResetEngineDesc: 'Sei sicuro di voler ripristinare tutti i parametri di trascrizione ai valori predefiniti?\n(Le preferenze generali dell\'app, i modelli e la traduzione IA rimarranno invariati.)',
+    confirmResetEngineBtn: 'Ripristina ai valori predefiniti'
   },
   toasts: {
     testCancelled: 'Test di connessione annullato.',
     settingsSaved: 'Impostazioni salvate con successo.',
     settingsSaveError: 'Impossibile salvare le impostazioni. Controlla spazio su disco e permessi.',
     settingsReset: 'Tutte le impostazioni sono state ripristinate ai valori di fabbrica.',
+    engineSettingsReset: 'Impostazioni di trascrizione ripristinate ai valori predefiniti.',
+    engineSettingsResetError: 'Impossibile ripristinare le impostazioni di trascrizione:\n{error}',
     langChanged: 'Lingua aggiornata con successo.',
     modelDownloadStarted: 'Download del modello avviato: {name}',
     modelDownloadSuccess: 'Modello {name} scaricato con successo!',

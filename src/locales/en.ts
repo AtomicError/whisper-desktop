@@ -690,6 +690,8 @@ export const en = {
     catGpu: 'GPU Execution',
     catVad: 'Silero VAD',
     catTranslation: 'AI Translation',
+    resetEngineBtn: 'Reset Transcription Settings',
+    resetEngineTooltip: 'Reset transcription parameters to defaults',
     searchPlaceholder: 'Search...',
     searchNoResults: 'No settings found',
     searchNoResultsDesc: 'No configuration options match "{query}".',
@@ -1040,13 +1042,18 @@ export const en = {
     connectionTimeoutDesc: 'The request timed out after {seconds} seconds. Please check your network connection or proxy/VPN.\n\nNote: If you are using a free-tier (:free) or very heavy model, the provider\'s public queue may be busy and take longer to respond. Consider testing with a lighter or faster model.',
     previewOriginal: 'Original',
     previewTranslated: 'Translated',
-    previewNotTranslated: 'not translated'
+    previewNotTranslated: 'not translated',
+    confirmResetEngineTitle: 'Reset Transcription Settings',
+    confirmResetEngineDesc: 'Are you sure you want to reset transcription settings to defaults?\n(General app preferences, models, and AI translation will be preserved.)',
+    confirmResetEngineBtn: 'Reset to Defaults'
   },
   toasts: {
     testCancelled: 'Connection test cancelled.',
     settingsSaved: 'Settings saved successfully.',
     settingsSaveError: 'Failed to save settings. Check disk space and permissions.',
     settingsReset: 'All settings have been restored to factory defaults.',
+    engineSettingsReset: 'Transcription settings restored to defaults.',
+    engineSettingsResetError: 'Failed to reset transcription settings:\n{error}',
     langChanged: 'Language updated successfully.',
     modelDownloadStarted: 'Started downloading model: {name}',
     modelDownloadSuccess: 'Model {name} downloaded successfully!',

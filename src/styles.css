@@ -2156,6 +2156,59 @@ header {
   flex-shrink: 0;
 }
 
+.settings-categories-footer {
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-glass);
+  display: flex;
+  flex-direction: column;
+}
+
+.btn-settings-reset-engine {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-glass);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.btn-settings-reset-engine:hover:not(:disabled) {
+  color: var(--color-red, #ff5555);
+  border-color: rgba(var(--color-red-rgb, 255, 85, 85), 0.35);
+  background: rgba(var(--color-red-rgb, 255, 85, 85), 0.08);
+  box-shadow: 0 2px 8px rgba(var(--color-red-rgb, 255, 85, 85), 0.15);
+}
+
+.btn-settings-reset-engine:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn-settings-reset-engine:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-settings-reset-engine svg.btn-reset-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  transition: transform 0.3s ease;
+}
+
+.btn-settings-reset-engine:hover:not(:disabled) svg.btn-reset-icon {
+  transform: rotate(-60deg);
+}
+
 .presets-container {
   display: flex;
   align-items: center;

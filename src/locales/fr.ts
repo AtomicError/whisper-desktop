@@ -692,6 +692,8 @@ export const fr: Translations = {
     catGpu: 'Exécution GPU',
     catVad: 'Silero VAD',
     catTranslation: 'Traduction par IA',
+    resetEngineBtn: 'Réinitialiser les paramètres de transcription',
+    resetEngineTooltip: 'Réinitialiser les paramètres de transcription aux valeurs par défaut',
     searchPlaceholder: 'Rechercher des paramètres...',
     searchNoResults: 'Aucun paramètre trouvé',
     searchNoResultsDesc: 'Aucune option de configuration ne correspond à "{query}".',
@@ -1035,13 +1037,18 @@ export const fr: Translations = {
     connectionTimeoutDesc: 'La requête a expiré après {seconds} secondes. Vérifiez votre réseau ou votre proxy/VPN.\n\nRemarque : Si vous utilisez un modèle gratuit (:free) ou très volumineux, la file publique du fournisseur peut être occupée. Testez avec un modèle plus léger.',
     previewOriginal: 'Original',
     previewTranslated: 'Traduit',
-    previewNotTranslated: 'non traduit'
+    previewNotTranslated: 'non traduit',
+    confirmResetEngineTitle: 'Réinitialiser les paramètres de transcription',
+    confirmResetEngineDesc: 'Voulez-vous vraiment restaurer tous les paramètres de transcription aux valeurs par défaut ?\n(Les préférences générales de l\'application, les modèles et la traduction IA seront conservés.)',
+    confirmResetEngineBtn: 'Rétablir les valeurs par défaut'
   },
   toasts: {
     testCancelled: 'Test de connexion annulé.',
     settingsSaved: 'Paramètres enregistrés avec succès.',
     settingsSaveError: 'Échec de l\'enregistrement des paramètres. Vérifiez l\'espace disque et les permissions.',
     settingsReset: 'Tous les paramètres ont été réinitialisés aux valeurs d\'usine.',
+    engineSettingsReset: 'Paramètres de transcription rétablis aux valeurs par défaut.',
+    engineSettingsResetError: 'Échec de la réinitialisation des paramètres de transcription :\n{error}',
     langChanged: 'Langue mise à jour avec succès.',
     modelDownloadStarted: 'Téléchargement du modèle démarré : {name}',
     modelDownloadSuccess: 'Modèle {name} téléchargé avec succès !',

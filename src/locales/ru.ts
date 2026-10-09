@@ -692,6 +692,8 @@ export const ru: Translations = {
     catGpu: 'GPU-ускорение',
     catVad: 'Silero VAD',
     catTranslation: 'AI-перевод',
+    resetEngineBtn: 'Сбросить настройки транскрипции',
+    resetEngineTooltip: 'Сбросить параметры транскрипции до значений по умолчанию',
     searchPlaceholder: 'Поиск настроек...',
     searchNoResults: 'Настройки не найдены',
     searchNoResultsDesc: 'Нет параметров, соответствующих "{query}".',
@@ -1040,13 +1042,18 @@ export const ru: Translations = {
     connectionTimeoutDesc: 'Запрос превысил таймаут в {seconds} секунд. Проверьте интернет-соединение или прокси/VPN.\n\nПримечание: Бесплатные (:free) или тяжелые модели могут требовать больше времени в пиковые часы.',
     previewOriginal: 'Оригинал',
     previewTranslated: 'Перевод',
-    previewNotTranslated: 'не переведено'
+    previewNotTranslated: 'не переведено',
+    confirmResetEngineTitle: 'Сбросить настройки транскрипции',
+    confirmResetEngineDesc: 'Вы уверены, что хотите сбросить все параметры транскрипции до значений по умолчанию?\n(Общие настройки приложения, модели и ИИ-перевод останутся без изменений.)',
+    confirmResetEngineBtn: 'Сбросить к значениям по умолчанию'
   },
   toasts: {
     testCancelled: 'Проверка подключения отменена.',
     settingsSaved: 'Настройки успешно сохранены.',
     settingsSaveError: 'Не удалось сохранить настройки. Проверьте свободное место на диске и права доступа.',
     settingsReset: 'Все параметры сброшены до заводских значений по умолчанию.',
+    engineSettingsReset: 'Настройки транскрипции сброшены до значений по умолчанию.',
+    engineSettingsResetError: 'Не удалось сбросить настройки транскрипции:\n{error}',
     langChanged: 'Язык интерфейса успешно обновлен.',
     modelDownloadStarted: 'Начата загрузка модели: {name}',
     modelDownloadSuccess: 'Модель {name} успешно загружена!',

@@ -692,6 +692,8 @@ export const zh: Translations = {
     catGpu: 'GPU 加速执行',
     catVad: 'Silero VAD 检测',
     catTranslation: 'AI 字幕翻译',
+    resetEngineBtn: '重置转录设置',
+    resetEngineTooltip: '将转录参数恢复为默认值',
     searchPlaceholder: '搜索设置项...',
     searchNoResults: '未找到匹配的设置',
     searchNoResultsDesc: '没有找到与 "{query}" 相关的配置项。',
@@ -1035,13 +1037,18 @@ export const zh: Translations = {
     connectionTimeoutDesc: '请求在等待 {seconds} 秒后超时。请检查网络通畅度或代理与科学上网环境。\n\n提示：如果您正在测试免费额度 (:free) 或参数极大的模型，服务商公用队列可能排队过长，建议换用更轻快的模型进行测试。',
     previewOriginal: '原文',
     previewTranslated: '译文',
-    previewNotTranslated: '未翻译'
+    previewNotTranslated: '未翻译',
+    confirmResetEngineTitle: '重置转录设置',
+    confirmResetEngineDesc: '确定要将所有转录参数恢复为默认值吗？\n（常规应用程序偏好、模型和 AI 翻译设置将保持不变。）',
+    confirmResetEngineBtn: '恢复默认值'
   },
   toasts: {
     testCancelled: '已取消连接测试。',
     settingsSaved: '系统配置已成功保存。',
     settingsSaveError: '配置保存失败。请检查磁盘空间及写入权限。',
     settingsReset: '所有设置已恢复至出厂默认值。',
+    engineSettingsReset: '转录设置已恢复为默认值。',
+    engineSettingsResetError: '重置转录设置失败：\n{error}',
     langChanged: '界面语言已更新。',
     modelDownloadStarted: '已开启模型下载任务: {name}',
     modelDownloadSuccess: '模型 {name} 已顺利下载完成！',

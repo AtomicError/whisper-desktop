@@ -692,6 +692,8 @@ export const pt: Translations = {
     catGpu: 'Execução em GPU',
     catVad: 'Silero VAD',
     catTranslation: 'Tradução por IA',
+    resetEngineBtn: 'Redefinir configurações de transcrição',
+    resetEngineTooltip: 'Redefinir parâmetros de transcrição para os valores padrão',
     searchPlaceholder: 'Pesquisar configurações...',
     searchNoResults: 'Nenhuma configuração encontrada',
     searchNoResultsDesc: 'Nenhuma opção corresponde a "{query}".',
@@ -1035,13 +1037,18 @@ export const pt: Translations = {
     connectionTimeoutDesc: 'A solicitação excedeu o tempo limite de {seconds} segundos. Verifique sua conexão com a internet ou proxy/VPN.\n\nNota: Se você estiver usando modelos gratuitos (:free) ou muito grandes, a fila pública do provedor pode estar congestionada.',
     previewOriginal: 'Original',
     previewTranslated: 'Traduzido',
-    previewNotTranslated: 'não traduzido'
+    previewNotTranslated: 'não traduzido',
+    confirmResetEngineTitle: 'Redefinir configurações de transcrição',
+    confirmResetEngineDesc: 'Tem certeza de que deseja restaurar todos os parâmetros de transcrição para os valores padrão?\n(As preferências gerais do aplicativo, modelos e tradução por IA serão mantidos.)',
+    confirmResetEngineBtn: 'Redefinir para padrões'
   },
   toasts: {
     testCancelled: 'Teste de conexão cancelado.',
     settingsSaved: 'Configurações salvas com sucesso.',
     settingsSaveError: 'Falha ao salvar configurações. Verifique o espaço em disco e permissões.',
     settingsReset: 'Todas as configurações foram restauradas para os padrões de fábrica.',
+    engineSettingsReset: 'Configurações de transcrição restauradas para os valores padrão.',
+    engineSettingsResetError: 'Falha ao redefinir configurações de transcrição:\n{error}',
     langChanged: 'Idioma atualizado com sucesso.',
     modelDownloadStarted: 'Download do modelo iniciado: {name}',
     modelDownloadSuccess: 'Modelo {name} baixado com sucesso!',

@@ -72,6 +72,14 @@ fn save_settings(settings: WhisperSettings) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn reset_whisper_core_settings() -> Result<WhisperSettings, String> {
+    settings::update_settings_locked(|settings| {
+        settings.reset_whisper_core_settings();
+        Ok::<_, String>(settings.clone())
+    })
+}
+
+#[tauri::command]
 fn check_build(app: AppHandle, backend: String) -> bool {
     check_build_exists(&app, &backend)
 }
@@ -1110,6 +1118,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             load_settings,
             save_settings,
+            reset_whisper_core_settings,
             check_build,
             probe_media_file,
             convert_media_file,
