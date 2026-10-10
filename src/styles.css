@@ -173,7 +173,7 @@ html {
   --bg-table-head: #0d1021;
   --bg-table-body: rgba(9, 12, 24, 0.85);
   --bg-glass-card: rgba(15, 20, 38, 0.65);
-  --border-glass: rgba(255, 255, 255, 0.12);
+  --border-glass: rgba(255, 255, 255, 0.06);
   --border-glass-active: rgba(45, 127, 255, 0.4);
   
   --color-accent: #2d7fff;
@@ -254,7 +254,7 @@ html {
   --bg-table-head: #16110d;
   --bg-table-body: rgba(22, 17, 13, 0.85);
   --bg-glass-card: rgba(28, 20, 16, 0.70);
-  --border-glass: rgba(255, 255, 255, 0.12);
+  --border-glass: rgba(255, 255, 255, 0.07);
   --border-glass-active: rgba(255, 107, 0, 0.45);
   
   --color-accent: #ff6b00;
@@ -327,7 +327,7 @@ html {
   --bg-glass-card: rgba(28, 28, 32, 0.75);
 
   /* Borders & Dividers */
-  --border-glass: rgba(255, 255, 255, 0.12);
+  --border-glass: rgba(255, 255, 255, 0.08);
   --border-glass-active: rgba(239, 68, 68, 0.50);
 
   /* Actionable Crimson / Racing Red Accent */
@@ -411,7 +411,7 @@ html {
   --bg-table-body: rgba(10, 24, 17, 0.85);
   --bg-glass-card: rgba(12, 28, 20, 0.65);
 
-  --border-glass: rgba(255, 255, 255, 0.12);
+  --border-glass: rgba(255, 255, 255, 0.07);
   --border-glass-active: rgba(16, 185, 129, 0.45);
 
   --color-accent: #10b981;
@@ -496,7 +496,7 @@ html {
   --bg-table-head: #16171a;
   --bg-table-body: rgba(18, 19, 23, 0.85);
   --bg-glass-card: rgba(26, 27, 32, 0.72);
-  --border-glass: rgba(255, 255, 255, 0.12);
+  --border-glass: rgba(255, 255, 255, 0.07);
 
   --bg-radial-1: rgba(255, 255, 255, 0.015);
   --bg-radial-2: rgba(255, 255, 255, 0.01);
@@ -515,7 +515,7 @@ html {
   --bg-table-head: #181616;
   --bg-table-body: rgba(20, 18, 18, 0.85);
   --bg-glass-card: rgba(30, 26, 26, 0.72);
-  --border-glass: rgba(255, 255, 255, 0.12);
+  --border-glass: rgba(255, 255, 255, 0.07);
 
   --bg-radial-1: rgba(255, 255, 255, 0.015);
   --bg-radial-2: rgba(255, 255, 255, 0.01);
@@ -533,7 +533,7 @@ html {
   --bg-table-head: #151917;
   --bg-table-body: rgba(18, 22, 20, 0.85);
   --bg-glass-card: rgba(24, 29, 26, 0.72);
-  --border-glass: rgba(255, 255, 255, 0.12);
+  --border-glass: rgba(255, 255, 255, 0.07);
 
   --bg-radial-1: rgba(255, 255, 255, 0.015);
   --bg-radial-2: rgba(255, 255, 255, 0.01);
@@ -551,7 +551,7 @@ html {
   --bg-table-head: #17171a;
   --bg-table-body: rgba(20, 20, 23, 0.85);
   --bg-glass-card: rgba(28, 28, 32, 0.75);
-  --border-glass: rgba(255, 255, 255, 0.12);
+  --border-glass: rgba(255, 255, 255, 0.08);
 
   --bg-radial-1: rgba(255, 255, 255, 0.015);
   --bg-radial-2: rgba(255, 255, 255, 0.01);
