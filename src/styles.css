@@ -3861,6 +3861,66 @@ select.select-control {
   flex-shrink: 0;
 }
 
+/* Transcribe Output Folder Row (Matching Translation Studio) */
+.transcribe-output-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.transcribe-output-display {
+  flex: 1;
+  min-width: 0;
+  display: block;
+  height: 38px;
+  min-height: 38px;
+  line-height: 36px;
+  padding: 0 10px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-glass);
+  border-radius: 8px;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+.transcribe-output-display.has-custom-path {
+  color: var(--color-text);
+  direction: ltr;
+  text-align: left;
+}
+
+.transcribe-output-row .btn-secondary,
+.transcribe-output-row button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 38px;
+  min-height: 38px;
+  padding: 0 12px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  border-radius: 8px;
+  border: 1px solid var(--border-glass);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--color-text);
+  box-sizing: border-box;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.transcribe-output-row .btn-secondary:hover:not(:disabled),
+.transcribe-output-row button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(var(--color-royal-blue-rgb), 0.35);
+}
+
 /* Transcribe Actions Section */
 .transcribe-actions-section {
   display: flex;
@@ -3931,11 +3991,112 @@ select.select-control {
   transform: scale(0.97);
 }
 
+/* Integrated Transcribe Telemetry HUD (Inside Left Deck) */
+.transcribe-telemetry {
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border-glass);
+  border-radius: 8px;
+  margin-top: 4px;
+}
+
+.transcribe-telemetry-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  gap: 8px;
+  min-width: 0;
+}
+
+.transcribe-telemetry-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.transcribe-status-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.transcribe-status-badge.active {
+  background: rgba(var(--color-royal-blue-rgb), 0.2);
+  color: var(--color-royal-blue);
+}
+
+.transcribe-status-badge.complete {
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+}
+
+.transcribe-status-badge.cancelled {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.transcribe-telemetry-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.74rem;
+  font-family: monospace;
+  direction: ltr;
+}
+
+.transcribe-telemetry-pct {
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-family: monospace;
+  color: var(--color-cyan);
+  direction: ltr;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.transcribe-linear-track {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  margin-bottom: 6px;
+  contain: layout paint;
+}
+
+.transcribe-linear-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--color-royal-blue), var(--color-cyan));
+  transition: width 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: width;
+}
+
+.transcribe-linear-fill.indeterminate {
+  animation: indeterminate-pulse 1.5s ease-in-out infinite;
+}
+
+.transcribe-telemetry-msg {
+  font-size: 0.75rem;
+  color: var(--color-text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Live Transcript Viewer */
 .transcript-viewer-card {
   display: flex;
   flex-direction: column;
   flex: 1;
+  height: 100%;
   min-height: 0;
   padding: 18px 20px;
   gap: 12px;
@@ -3974,6 +4135,16 @@ select.select-control {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+.transcript-viewer-actions button {
+  height: 28px;
+  min-height: 28px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 6px;
+  box-sizing: border-box;
 }
 
 .btn-export-transcript {

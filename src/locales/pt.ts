@@ -273,7 +273,17 @@ export const pt: Translations = {
     noModelsFound: 'Nenhum modelo encontrado',
     noModelsFoundDropdown: 'Nenhum modelo encontrado (Baixe na Central de Modelos)',
     aiModelInitializing: 'O modelo de IA está inicializando...',
-    copied: 'Copiado!'
+    copied: 'Copiado!',
+    outputFolder: 'Pasta de destino',
+    sameAsSource: 'Mesma pasta do arquivo original',
+    changeFolder: 'Alterar...',
+    resetFolder: 'Redefinir',
+    sendToTranslation: 'Enviar para o Estúdio de Tradução',
+    sendToTranslationDesc: 'Legenda gerada carregada no Estúdio de Tradução.',
+    sendToHardsub: 'Enviar para o Hardsub Studio',
+    sendToHardsubDesc: 'Embuta estas legendas diretamente no vídeo com tipografia personalizada e aceleração GPU.',
+    noSubGeneratedYet: 'Nenhuma legenda gerada ainda',
+    noOutputDirYet: 'Nenhuma pasta de saída disponível ainda'
   },
   translate: {
     title: 'Estúdio de Tradução',

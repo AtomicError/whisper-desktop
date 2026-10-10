@@ -273,7 +273,17 @@ export const ja: Translations = {
     noModelsFound: 'モデルが見つかりません',
     noModelsFoundDropdown: 'モデルが見つかりません (モデルハブからダウンロードしてください)',
     aiModelInitializing: 'AI モデルを初期化中...',
-    copied: 'コピーしました！'
+    copied: 'コピーしました！',
+    outputFolder: '出力フォルダ',
+    sameAsSource: '元ファイルと同じフォルダ',
+    changeFolder: '変更...',
+    resetFolder: 'リセット',
+    sendToTranslation: '翻訳スタジオへ送る',
+    sendToTranslationDesc: '生成された字幕が翻訳スタジオに読み込まれました。',
+    sendToHardsub: 'ハードサブスタジオへ送る',
+    sendToHardsubDesc: 'カスタムフォントスタイルと GPU 高速エンコードで、この字幕を動画に直接焼き込みます。',
+    noSubGeneratedYet: '生成された字幕がまだありません',
+    noOutputDirYet: '出力フォルダーがまだ利用できません'
   },
   translate: {
     title: '字幕翻訳スタジオ',

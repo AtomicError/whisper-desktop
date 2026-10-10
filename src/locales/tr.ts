@@ -273,7 +273,17 @@ export const tr: Translations = {
     noModelsFound: 'Model bulunamadı',
     noModelsFoundDropdown: 'Model bulunamadı (Model Merkezinden İndirin)',
     aiModelInitializing: 'Yapay zeka modeli başlatılıyor...',
-    copied: 'Kopyalandı!'
+    copied: 'Kopyalandı!',
+    outputFolder: 'Çıktı Klasörü',
+    sameAsSource: 'Kaynak dosya klasörüyle aynı',
+    changeFolder: 'Değiştir...',
+    resetFolder: 'Sıfırla',
+    sendToTranslation: 'Çeviri Stüdyosuna Gönder',
+    sendToTranslationDesc: 'Oluşturulan altyazı Çeviri Stüdyosuna yüklendi.',
+    sendToHardsub: 'Hardsub Stüdyosuna Gönder',
+    sendToHardsubDesc: 'Bu altyazıyı özel tipografi, stil ve GPU kodlamasıyla doğrudan videoya kalıcı olarak gömün.',
+    noSubGeneratedYet: 'Henüz altyazı oluşturulmadı',
+    noOutputDirYet: 'Henüz çıktı klasörü mevcut değil'
   },
   translate: {
     title: 'Çeviri Stüdyosu',

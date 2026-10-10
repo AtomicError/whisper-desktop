@@ -273,7 +273,17 @@ export const fa: Translations = {
     noModelsFound: 'مدلی یافت نشد',
     noModelsFoundDropdown: 'مدلی یافت نشد (از مرکز مدل‌ها دانلود کنید)',
     aiModelInitializing: 'مدل هوش مصنوعی در حال آماده‌سازی است...',
-    copied: 'کپی شد!'
+    copied: 'کپی شد!',
+    outputFolder: 'پوشه خروجی',
+    sameAsSource: 'مشابه پوشه فایل اصلی',
+    changeFolder: 'تغییر...',
+    resetFolder: 'بازنشانی',
+    sendToTranslation: 'ارسال به استودیو ترجمه',
+    sendToTranslationDesc: 'زیرنویس استخراج‌شده در استودیو ترجمه بارگذاری شد.',
+    sendToHardsub: 'ارسال به استودیو هاردساب',
+    sendToHardsubDesc: 'چسباندن مستقیم این زیرنویس به ویدیو با فونت‌های دلخواه، استایل سفارشی و شتاب‌دهنده گرافیکی.',
+    noSubGeneratedYet: 'هنوز زیرنویسی استخراج نشده است',
+    noOutputDirYet: 'هنوز پوشه خروجی در دسترس نیست'
   },
   translate: {
     title: 'استودیو ترجمه',

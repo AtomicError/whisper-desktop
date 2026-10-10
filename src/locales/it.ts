@@ -273,7 +273,17 @@ export const it: Translations = {
     noModelsFound: 'Nessun modello trovato',
     noModelsFoundDropdown: 'Nessun modello trovato (Scarica nel Centro Modelli)',
     aiModelInitializing: 'Inizializzazione modello AI in corso...',
-    copied: 'Copiato!'
+    copied: 'Copiato!',
+    outputFolder: 'Cartella di destinazione',
+    sameAsSource: 'Stessa cartella del file sorgente',
+    changeFolder: 'Modifica...',
+    resetFolder: 'Reimposta',
+    sendToTranslation: 'Invia a Studio di traduzione',
+    sendToTranslationDesc: 'Sottotitolo generato caricato in Studio di traduzione.',
+    sendToHardsub: 'Invia a Hardsub Studio',
+    sendToHardsubDesc: 'Inserisci questi sottotitoli direttamente nel video con tipografia personalizzata, stili e codifica GPU.',
+    noSubGeneratedYet: 'Nessun sottotitolo ancora generato',
+    noOutputDirYet: 'Nessuna cartella di destinazione ancora disponibile'
   },
   translate: {
     title: 'Studio di Traduzione',

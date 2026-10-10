@@ -273,7 +273,17 @@ export const ru: Translations = {
     noModelsFound: 'Модели не найдены',
     noModelsFoundDropdown: 'Модели не найдены (Скачайте в Центре моделей)',
     aiModelInitializing: 'Инициализация модели...',
-    copied: 'Скопировано!'
+    copied: 'Скопировано!',
+    outputFolder: 'Папка сохранения',
+    sameAsSource: 'В папку исходного файла',
+    changeFolder: 'Изменить...',
+    resetFolder: 'Сброс',
+    sendToTranslation: 'Отправить в студию перевода',
+    sendToTranslationDesc: 'Сгенерированные субтитры загружены в студию перевода.',
+    sendToHardsub: 'Отправить в студию хардсаба',
+    sendToHardsubDesc: 'Вшейте субтитры прямо в видео с настраиваемыми шрифтами и GPU-ускорением.',
+    noSubGeneratedYet: 'Субтитры еще не сгенерированы',
+    noOutputDirYet: 'Папка вывода пока недоступна'
   },
   translate: {
     title: 'Студия перевода',

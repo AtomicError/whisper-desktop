@@ -271,7 +271,17 @@ export const en = {
     noModelsFound: 'No models found',
     noModelsFoundDropdown: 'No models found (Download in Model Hub)',
     aiModelInitializing: 'AI model is initializing...',
-    copied: 'Copied!'
+    copied: 'Copied!',
+    outputFolder: 'Output Folder',
+    sameAsSource: 'Same as source file folder',
+    changeFolder: 'Change...',
+    resetFolder: 'Reset',
+    sendToTranslation: 'Send to Translation Studio',
+    sendToTranslationDesc: 'Generated subtitle loaded into Translation Studio.',
+    sendToHardsub: 'Send to Hardsub Studio',
+    sendToHardsubDesc: 'Burn this subtitle directly onto your video with custom typography, styling, and GPU encoding.',
+    noSubGeneratedYet: 'No generated subtitle yet',
+    noOutputDirYet: 'No output folder available yet'
   },
   translate: {
     title: 'Translation Studio',

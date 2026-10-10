@@ -273,7 +273,17 @@ export const es: Translations = {
     noModelsFound: 'No se encontraron modelos',
     noModelsFoundDropdown: 'No se encontraron modelos (Descárgalos en el Centro de Modelos)',
     aiModelInitializing: 'El modelo IA se está inicializando...',
-    copied: '¡Copiado!'
+    copied: '¡Copiado!',
+    outputFolder: 'Carpeta de salida',
+    sameAsSource: 'Misma carpeta que el archivo origen',
+    changeFolder: 'Cambiar...',
+    resetFolder: 'Restablecer',
+    sendToTranslation: 'Enviar a Estudio de Traducción',
+    sendToTranslationDesc: 'Subtítulo generado cargado en el Estudio de Traducción.',
+    sendToHardsub: 'Enviar a Hardsub Studio',
+    sendToHardsubDesc: 'Incrusta estos subtítulos directamente en tu video con tipografía personalizada y codificación GPU.',
+    noSubGeneratedYet: 'Aún no se ha generado ningún subtítulo',
+    noOutputDirYet: 'Aún no hay carpeta de salida disponible'
   },
   translate: {
     title: 'Estudio de Traducción',

@@ -273,7 +273,17 @@ export const de: Translations = {
     noModelsFound: 'Keine Modelle gefunden',
     noModelsFoundDropdown: 'Keine Modelle gefunden (Im Modell-Hub herunterladen)',
     aiModelInitializing: 'KI-Modell wird initialisiert...',
-    copied: 'Kopiert!'
+    copied: 'Kopiert!',
+    outputFolder: 'Ausgabeordner',
+    sameAsSource: 'Gleicher Ordner wie Quelldatei',
+    changeFolder: 'Ändern...',
+    resetFolder: 'Zurücksetzen',
+    sendToTranslation: 'An Übersetzungsstudio senden',
+    sendToTranslationDesc: 'Generierte Untertitel in das Übersetzungsstudio geladen.',
+    sendToHardsub: 'An Hardsub-Studio senden',
+    sendToHardsubDesc: 'Brennen Sie diese Untertitel mit individueller Typografie und GPU-Beschleunigung direkt ins Video ein.',
+    noSubGeneratedYet: 'Noch keine Untertiteldatei generiert',
+    noOutputDirYet: 'Noch kein Ausgabeordner verfügbar'
   },
   translate: {
     title: 'Übersetzungs-Studio',

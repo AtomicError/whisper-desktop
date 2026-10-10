@@ -3290,6 +3290,21 @@
                       </div>
                     </div>
 
+                    <!-- 8. Output Folder Row (Matching Translation Studio) -->
+                    <div class="transcribe-field-group">
+                      <label>
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                        </svg>
+                        <span data-i18n="transcribe.outputFolder">Output Folder</span>
+                      </label>
+                      <div class="transcribe-output-row">
+                        <div class="transcribe-output-display" id="transcribe-output-dir-text" data-i18n="transcribe.sameAsSource">Same as source file folder</div>
+                        <button class="btn-secondary btn-sm" id="btn-browse-transcribe-dir" data-i18n="transcribe.changeFolder" type="button" onclick="browseTranscribeOutputDir()">Change...</button>
+                        <button class="btn-secondary btn-sm" id="btn-reset-transcribe-dir" data-i18n="transcribe.resetFolder" type="button" style="display:none;" onclick="resetTranscribeOutputDir()">Reset</button>
+                      </div>
+                    </div>
+
                     <!-- Hidden legacy fallback button for backwards compatibility -->
                     <button id="btn-next-step-2" style="display:none;" type="button"></button>
 
@@ -3322,79 +3337,43 @@
                           </button>
                         </div>
                       </div>
+
+                      <!-- Telemetry HUD in Left Deck (Matching Translation Studio) -->
+                      <div class="transcribe-telemetry" id="telemetry-hud-card" style="display:none;">
+                        <div class="transcribe-telemetry-header">
+                          <div class="transcribe-telemetry-status">
+                            <span class="transcribe-status-badge" id="hud-status-badge" data-i18n="transcribe.standingBy">Standing By</span>
+                            <div class="hud-pulse-dot" id="hud-pulse-dot"></div>
+                            <div class="transcribe-telemetry-stats" id="transcribe-metrics" style="display:none;">
+                              <span class="chip-val" id="analytic-time">0s</span>
+                              <span class="chip-divider" style="color:var(--color-text-dim);">•</span>
+                              <span class="chip-val" style="color:var(--color-green);" id="analytic-speed">0.0x</span>
+                            </div>
+                          </div>
+                          <div class="transcribe-telemetry-pct" id="lbl-radial-pct">0%</div>
+                        </div>
+                        <div class="transcribe-linear-track">
+                          <div class="transcribe-linear-fill progress-linear-fill" id="progress-linear-fill" style="width: 0%;">
+                            <div class="progress-linear-glow"></div>
+                          </div>
+                        </div>
+                        <div class="transcribe-telemetry-msg" id="lbl-radial-msg" data-i18n="transcribe.standingBy">Standing By</div>
+
+                        <!-- Results Analytics File Outputs -->
+                        <div class="analytics-box compact-analytics" id="analytics-box" style="display:none; width:100%; margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.06);">
+                          <div class="analytics-files-row" style="display:flex; align-items:center; gap:8px;">
+                            <span class="analytics-files-label" data-i18n="transcribe.filesLabel" style="font-size:0.75rem; color:var(--color-text-dim);">Files:</span>
+                            <div class="outputs-row compact-outputs" id="badge-outputs-row" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <!-- Cyber-Neon Progress & Telemetry HUD (Right Panel wrapper) -->
+              <!-- Dedicated Transcript Viewer Workspace (Right Panel) -->
               <div class="transcribe-right-panel">
-                <div class="glass-card telemetry-hud" id="telemetry-hud-card" style="margin-bottom: 0;">
-                  <div class="hud-header-row" onclick="toggleTelemetryHudCollapse()" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; user-select:none; margin-bottom:12px; border-bottom:1px solid var(--border-glass); padding-bottom:10px;">
-                    <div style="display:flex; align-items:center; gap:8px;">
-                      <h3 style="font-weight:600; font-size:0.95rem; margin:0;" data-i18n="transcribe.liveStatusTitle">Live Transcription Status</h3>
-                      <span id="hud-status-badge" class="hud-status-badge" style="font-size:0.75rem; padding:2px 8px; border-radius:12px; background:rgba(6,182,212,0.1); color:var(--color-cyan); display:none;" data-i18n="transcribe.standingBy">Standing By</span>
-                    </div>
-                    <button type="button" class="hud-collapse-btn" id="hud-collapse-btn" aria-label="Toggle telemetry collapse" style="background:none; border:none; color:var(--color-text-dim); cursor:pointer; padding:4px; display:flex; align-items:center; transition:transform 0.25s ease;">
-                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-                    </button>
-                  </div>
-                  
-                  <div class="hud-body-wrapper" id="telemetry-hud-body">
-                    <div class="hud-body-content">
-                      <div class="progress-linear-wrapper" id="progress-linear-wrapper">
-                        <div class="hud-stats-row">
-                          <span class="hud-stat-label" data-i18n="transcribe.completion">COMPLETION</span>
-                          <span class="radial-pct" id="lbl-radial-pct">0%</span>
-                        </div>
-                        
-                        <div class="progress-linear-track">
-                          <div class="progress-linear-fill" id="progress-linear-fill" style="width: 0%;">
-                            <div class="progress-linear-glow"></div>
-                            <div class="progress-linear-scanner"></div>
-                          </div>
-                        </div>
-                        
-                        <div class="hud-status-subtitle">
-                          <div class="hud-pulse-dot" id="hud-pulse-dot"></div>
-                          <span class="radial-msg" id="lbl-radial-msg" data-i18n="transcribe.standingBy">Standing By</span>
-                        </div>
-                      </div>
-                      
-                      <!-- Results Analytics details (Royal Blue Cyber-Glass Structured Layout) -->
-                      <div class="analytics-box compact-analytics" id="analytics-box" style="display:none; width:100%;">
-                        <div class="analytics-top-row">
-                          <div class="analytics-metrics-col">
-                            <div class="analytic-chip" title="Total processing time">
-                              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--color-cyan);"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                              <span class="chip-label" data-i18n="transcribe.timeLabel">Time:</span>
-                              <span class="chip-val" id="analytic-time">0s</span>
-                            </div>
-                            <div class="analytic-chip" title="Speed factor relative to real-time audio">
-                              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--color-green);"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                              <span class="chip-label" data-i18n="transcribe.speedLabel">Speed:</span>
-                              <span class="chip-val" style="color:var(--color-green);" id="analytic-speed">0.0x</span>
-                            </div>
-                          </div>
-                          
-                          <div class="analytics-actions-col">
-                            <button class="btn-primary compact-copy-btn" id="btn-open-output-folder" onclick="openOutputFolder()" aria-label="Open output folder in file manager">
-                              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="margin-inline-end:5px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-                              <span data-i18n="transcribe.openFolder">Open Folder</span>
-                            </button>
-                          </div>
-                        </div>
-
-                        <div class="analytics-files-row">
-                          <span class="analytics-files-label" data-i18n="transcribe.filesLabel">Files:</span>
-                          <div class="outputs-row compact-outputs" id="badge-outputs-row"></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Live Transcript Viewer -->
                 <div class="glass-card transcript-viewer-card" id="transcribe-viewer-card">
                   <div class="transcript-viewer-header">
                     <div class="transcript-viewer-title-group">
@@ -3422,6 +3401,25 @@
                           <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
                         </svg>
                         <span data-i18n="transcribe.copyLiveTranscript">Copy</span>
+                      </button>
+                      <button class="btn-secondary btn-icon-text" id="btn-open-output-folder" onclick="openOutputFolder()" aria-label="Open output folder in file manager" disabled data-i18n-title="transcribe.noOutputDirYet" title="No output folder available yet">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="margin-inline-end: 4px;">
+                          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                        </svg>
+                        <span data-i18n="transcribe.openFolder">Open Folder</span>
+                      </button>
+                      <button class="btn-secondary btn-icon-text" id="btn-send-to-translation" type="button" disabled data-i18n-title="transcribe.noSubGeneratedYet" title="No generated subtitle yet" onclick="sendTranscribeToTranslationStudio()">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="margin-inline-end: 4px;">
+                          <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                        </svg>
+                        <span data-i18n="transcribe.sendToTranslation">Send to Translation Studio</span>
+                      </button>
+                      <button class="btn-secondary btn-icon-text btn-toolbar-hardsub" id="btn-transcribe-send-to-hardsub" type="button" disabled data-i18n-title="transcribe.noSubGeneratedYet" title="No generated subtitle yet" onclick="sendTranscribeToHardsubStudio()">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="margin-inline-end: 4px;">
+                          <polygon points="23 7 16 12 23 17 23 7"/>
+                          <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                        </svg>
+                        <span data-i18n="transcribe.sendToHardsub">Send to Hardsub Studio</span>
                       </button>
                     </div>
                   </div>

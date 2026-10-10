@@ -273,7 +273,17 @@ export const ar: Translations = {
     noModelsFound: 'لم يتم العثور على نماذج',
     noModelsFoundDropdown: 'لم يتم العثور على نماذج (قم بتنزيلها من مركز النماذج)',
     aiModelInitializing: 'جارٍ تهيئة نموذج الذكاء الاصطناعي...',
-    copied: 'تم النسخ!'
+    copied: 'تم النسخ!',
+    outputFolder: 'مجلد الإخراج',
+    sameAsSource: 'نفس مجلد الملف المصدر',
+    changeFolder: 'تغيير...',
+    resetFolder: 'إعادة ضبط',
+    sendToTranslation: 'إرسال إلى استوديو الترجمة',
+    sendToTranslationDesc: 'تم تحميل ملف الترجمة المُستخرج في استوديو الترجمة.',
+    sendToHardsub: 'إرسال إلى استودیو هاردسب',
+    sendToHardsubDesc: 'دمج ملف الترجمة مباشرة في الفيديو مع خطوط مخصصة وتسريع كرت الشاشة.',
+    noSubGeneratedYet: 'لم يتم استخراج ملف ترجمة بعد',
+    noOutputDirYet: 'مجلد الإخراج غير متوفر بعد'
   },
   translate: {
     title: 'استوديو الترجمة',

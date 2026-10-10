@@ -273,7 +273,17 @@ export const zh: Translations = {
     noModelsFound: '未检测到模型文件',
     noModelsFoundDropdown: '未检测到模型 (请前往模型中心下载)',
     aiModelInitializing: '神经网络模型初始化中...',
-    copied: '已复制！'
+    copied: '已复制！',
+    outputFolder: '输出文件夹',
+    sameAsSource: '保存至与源文件同目录',
+    changeFolder: '更改...',
+    resetFolder: '重置',
+    sendToTranslation: '发送到翻译工作室',
+    sendToTranslationDesc: '已将生成的字幕加载到翻译工作室。',
+    sendToHardsub: '发送到压制字幕工作室',
+    sendToHardsubDesc: '使用自定义样式字体与 GPU 高速编码，将此字幕永久烧录进视频。',
+    noSubGeneratedYet: '尚未生成字幕文件',
+    noOutputDirYet: '输出文件夹尚不可用'
   },
   translate: {
     title: '字幕翻译工作室',

@@ -273,7 +273,17 @@ export const ko: Translations = {
     noModelsFound: '모델을 찾을 수 없음',
     noModelsFoundDropdown: '모델을 찾을 수 없음 (모델 허브에서 다운로드)',
     aiModelInitializing: 'AI 모델을 초기화하는 중...',
-    copied: '복사됨!'
+    copied: '복사됨!',
+    outputFolder: '출력 폴더',
+    sameAsSource: '원본 파일 폴더와 동일',
+    changeFolder: '변경...',
+    resetFolder: '초기화',
+    sendToTranslation: '번역 스튜디오로 보내기',
+    sendToTranslationDesc: '생성된 자막이 번역 스튜디오에 로드되었습니다.',
+    sendToHardsub: '하드서브 스튜디오로 보내기',
+    sendToHardsubDesc: '사용자 정의 글꼴, 스타일 및 GPU 인코딩을 적용하여 자막을 비디오에 직접 합성합니다.',
+    noSubGeneratedYet: '아직 생성된 자막이 없습니다',
+    noOutputDirYet: '사용 가능한 출력 폴더가 아직 없습니다'
   },
   translate: {
     title: '번역 스튜디오',
