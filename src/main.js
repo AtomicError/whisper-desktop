@@ -5231,6 +5231,9 @@ function updateTranscribeUIConfigs() {
   const quickVadBtn = document.getElementById('quick-toggle-vad');
   const quickVadText = document.getElementById('quick-vad-status-text');
   if (quickVadBtn && quickVadText) {
+    if ('checked' in quickVadBtn) {
+      quickVadBtn.checked = vadActive;
+    }
     if (vadActive) {
       quickVadBtn.classList.add('active');
       quickVadText.textContent = t('transcribe.vadActiveStatus');
@@ -5273,6 +5276,9 @@ function updateTranscribeUIConfigs() {
   const quickDiarizeText = document.getElementById('quick-diarize-status-text');
   if (quickDiarizeBtn && quickDiarizeText && settingsState) {
     const diarizeActive = Boolean(settingsState.diarize);
+    if ('checked' in quickDiarizeBtn) {
+      quickDiarizeBtn.checked = diarizeActive;
+    }
     if (diarizeActive) {
       quickDiarizeBtn.classList.add('active');
       quickDiarizeText.textContent = t('transcribe.vadActiveStatus') || 'Active';
@@ -5310,12 +5316,16 @@ window.onQuickTaskChanged = function(task) {
   updateTranscribeUIConfigs();
 };
 
-window.toggleQuickDiarize = function() {
+window.toggleQuickDiarize = function(forceVal) {
   if (!settingsState) return;
-  settingsState.diarize = !settingsState.diarize;
+  settingsState.diarize = (typeof forceVal === 'boolean') ? forceVal : !settingsState.diarize;
   const optDiarize = document.getElementById('opt-diarize');
   if (optDiarize) {
     optDiarize.checked = settingsState.diarize;
+  }
+  const quickDiarize = document.getElementById('quick-toggle-diarize');
+  if (quickDiarize) {
+    quickDiarize.checked = settingsState.diarize;
   }
   saveCurrentSettings();
   updateTranscribeUIConfigs();
@@ -5366,14 +5376,16 @@ function setupQuickConfigDeckEventListeners() {
   }
 }
 
-window.toggleQuickVad = function() {
+window.toggleQuickVad = function(forceVal) {
   if (!settingsState) return;
   
-  const willEnable = !settingsState.vad;
+  const willEnable = (typeof forceVal === 'boolean') ? forceVal : !settingsState.vad;
   if (willEnable) {
     const hasVadModel = Boolean(localScannedVadModels && localScannedVadModels.length > 0 && settingsState.vadModel);
     if (!hasVadModel) {
       showNotification(t('toasts.noVadFound'), "warning");
+      const quickVadInput = document.getElementById('quick-toggle-vad');
+      if (quickVadInput) quickVadInput.checked = false;
       return;
     }
   }
@@ -5382,6 +5394,10 @@ window.toggleQuickVad = function() {
   const cfgVadCheckbox = document.getElementById('opt-vad');
   if (cfgVadCheckbox) {
     cfgVadCheckbox.checked = settingsState.vad;
+  }
+  const quickVadInput = document.getElementById('quick-toggle-vad');
+  if (quickVadInput) {
+    quickVadInput.checked = settingsState.vad;
   }
   saveCurrentSettings();
   updateTranscribeUIConfigs();

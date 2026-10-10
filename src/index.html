@@ -3264,9 +3264,10 @@
                           </span>
                           <span class="transcribe-switch-desc" id="quick-vad-status-text" data-i18n="transcribe.vadDisabledStatus">VAD Disabled</span>
                         </div>
-                        <button type="button" class="quick-vad-toggle-btn" id="quick-toggle-vad" onclick="toggleQuickVad()" title="Toggle Silero Voice Activity Detection">
-                          <span class="quick-vad-dot"></span>
-                        </button>
+                        <label class="switch">
+                          <input type="checkbox" id="quick-toggle-vad" onchange="toggleQuickVad(this.checked)" title="Toggle Silero Voice Activity Detection" />
+                          <span class="slider"></span>
+                        </label>
                       </div>
                     </div>
 
@@ -3282,9 +3283,10 @@
                           </span>
                           <span class="transcribe-switch-desc" id="quick-diarize-status-text">Diarization Disabled</span>
                         </div>
-                        <button type="button" class="quick-vad-toggle-btn" id="quick-toggle-diarize" onclick="toggleQuickDiarize()" title="Toggle Speaker Diarization">
-                          <span class="quick-vad-dot"></span>
-                        </button>
+                        <label class="switch">
+                          <input type="checkbox" id="quick-toggle-diarize" onchange="toggleQuickDiarize(this.checked)" title="Toggle Speaker Diarization" />
+                          <span class="slider"></span>
+                        </label>
                       </div>
                     </div>
 
