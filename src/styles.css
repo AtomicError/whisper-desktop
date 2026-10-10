@@ -3074,33 +3074,34 @@ select.select-control {
 /* 4. Transcribe File View */
 .transcribe-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr); /* Balanced dual-pane layout with locked proportional tracks */
+  grid-template-columns: minmax(380px, 440px) 1fr;
   gap: 16px;
   flex-grow: 1;
   min-height: 0;
+  height: 100%;
   width: 100%;
 }
 
 .transcribe-left-panel {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
   height: 100%;
-  min-width: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   scrollbar-gutter: stable;
-  padding-inline-end: 8px;
+  padding-inline-end: 4px;
+  min-width: 0;
 }
 
 .transcribe-right-panel {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 14px;
   height: 100%;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  contain: layout;
 }
 
 /* Wizard Accordion Styles */
@@ -3525,6 +3526,591 @@ select.select-control {
 .quick-vad-toggle-btn.active .quick-vad-dot {
   background: var(--color-gold);
   box-shadow: 0 0 8px var(--color-gold);
+}
+
+/* ==========================================================================
+   TRANSCRIBE STUDIO UNIFIED DECK & VIEWER STYLES
+   ========================================================================== */
+
+.transcribe-unified-deck {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  height: auto;
+  flex-shrink: 0;
+  padding: 18px 20px;
+  border-radius: 12px;
+  background: var(--bg-glass-card, rgba(20, 24, 39, 0.65));
+  border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.08));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.transcribe-deck-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-glass, rgba(255, 255, 255, 0.08));
+  flex-shrink: 0;
+}
+
+.transcribe-deck-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.transcribe-deck-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--color-cyan);
+  flex-shrink: 0;
+}
+
+.transcribe-deck-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.transcribe-deck-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+}
+
+.transcribe-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+.transcribe-field-group label {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: none;
+}
+
+.transcribe-field-group label svg {
+  flex-shrink: 0;
+}
+
+.transcribe-field-group select.select-control {
+  font-size: 0.84rem;
+  height: 38px;
+  min-height: 38px;
+  padding-inline-start: 12px;
+  padding-inline-end: 28px;
+  width: 100%;
+}
+
+/* 1. Smart Media Dropzone Card */
+#transcribe-drop-zone.transcribe-dropzone-card {
+  border: 1.5px dashed rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.2);
+  text-align: start;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-sizing: border-box;
+}
+
+#transcribe-drop-zone.transcribe-dropzone-card:hover {
+  border-color: rgba(var(--color-royal-blue-rgb), 0.45);
+  background: rgba(var(--color-royal-blue-rgb), 0.04);
+}
+
+#transcribe-drop-zone.transcribe-dropzone-card.drag-over {
+  border-color: var(--color-cyan) !important;
+  background: rgba(var(--color-cyan-rgb), 0.08) !important;
+  box-shadow: 0 0 16px rgba(var(--color-cyan-rgb), 0.15) !important;
+}
+
+.transcribe-dropzone-main-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.transcribe-dropzone-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.transcribe-dropzone-card .transcribe-media-icon {
+  width: 22px;
+  height: 22px;
+  color: var(--color-royal-blue);
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.transcribe-media-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.transcribe-dropzone-card .transcribe-media-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.transcribe-dropzone-card .transcribe-media-prompt {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin: 0;
+  width: 100%;
+  white-space: normal;
+  text-wrap: pretty;
+}
+
+.transcribe-dropzone-card .transcribe-dropzone-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.transcribe-dropzone-card .btn-media-browse {
+  padding: 6px 14px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border-radius: 6px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.transcribe-dropzone-card .btn-clear-media {
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 6px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  transition: all 0.15s ease;
+}
+
+.transcribe-dropzone-card .btn-clear-media:hover {
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* Loaded file state */
+#transcribe-drop-zone.transcribe-dropzone-card.has-file {
+  border-style: solid;
+  border-color: rgba(var(--color-royal-blue-rgb), 0.35);
+  background: rgba(var(--color-royal-blue-rgb), 0.08);
+  cursor: default;
+}
+
+#transcribe-drop-zone.transcribe-dropzone-card.has-file:hover {
+  border-color: rgba(var(--color-royal-blue-rgb), 0.55);
+  background: rgba(var(--color-royal-blue-rgb), 0.12);
+}
+
+#transcribe-drop-zone.transcribe-dropzone-card.has-file .transcribe-media-icon {
+  color: var(--color-cyan);
+}
+
+#transcribe-drop-zone.transcribe-dropzone-card.has-file .transcribe-media-prompt {
+  display: none !important;
+}
+
+#transcribe-drop-zone.transcribe-dropzone-card.has-file .transcribe-media-name {
+  text-align: left;
+}
+
+#transcribe-drop-zone.transcribe-dropzone-card.has-file .btn-media-browse {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 0.75rem;
+}
+
+/* Embedded metadata badges row */
+.transcribe-meta-badges-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  width: 100%;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.transcribe-meta-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2.5px 8px;
+  border-radius: 5px;
+  white-space: nowrap;
+  unicode-bidi: isolate;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-glass);
+  color: var(--color-text-muted);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.transcribe-meta-badge.pill-type {
+  color: var(--color-cyan);
+  background: rgba(var(--color-cyan-rgb), 0.12);
+  border-color: rgba(var(--color-cyan-rgb), 0.25);
+}
+
+.transcribe-meta-badge.pill-duration {
+  color: var(--color-gold);
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.25);
+  font-variant-numeric: tabular-nums;
+}
+
+.transcribe-meta-badge.pill-size {
+  color: var(--color-text);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+  font-variant-numeric: tabular-nums;
+}
+
+.transcribe-meta-badge.pill-target {
+  color: var(--color-cyan);
+  background: rgba(var(--color-cyan-rgb), 0.12);
+  border-color: rgba(var(--color-cyan-rgb), 0.25);
+  font-variant-numeric: tabular-nums;
+}
+
+.transcribe-meta-badge.pill-engine {
+  color: var(--color-sky);
+  background: rgba(var(--color-royal-blue-rgb), 0.15);
+  border-color: rgba(var(--color-royal-blue-rgb), 0.3);
+}
+
+/* Batch Specs Box */
+.batch-specs-box {
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-glass);
+}
+
+.batch-specs-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.batch-specs-icon {
+  width: 15px;
+  height: 15px;
+  color: var(--color-cyan);
+  flex-shrink: 0;
+}
+
+.batch-specs-title {
+  font-weight: 600;
+  font-size: 0.82rem;
+  color: var(--color-cyan);
+}
+
+.batch-specs-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.batch-stat-divider {
+  color: var(--color-text-dim);
+}
+
+/* Silero VAD Switch Row */
+.transcribe-switch-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-glass);
+  border-radius: 8px;
+  gap: 12px;
+  transition: border-color 0.2s ease;
+}
+
+.transcribe-switch-row:hover {
+  border-color: rgba(var(--color-royal-blue-rgb), 0.35);
+}
+
+.transcribe-switch-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.transcribe-switch-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text);
+  line-height: 1.3;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.transcribe-switch-title svg {
+  flex-shrink: 0;
+}
+
+.transcribe-switch-desc {
+  font-size: 0.72rem;
+  color: var(--color-text-dim);
+  line-height: 1.35;
+  white-space: normal;
+}
+
+/* Transcribe Actions Section */
+.transcribe-actions-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-glass, rgba(255, 255, 255, 0.08));
+}
+
+.transcribe-actions-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.btn-start-transcription {
+  flex: 1;
+  min-width: 0;
+  height: 38px;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  font-weight: 600;
+  font-size: 0.88rem;
+  border-radius: 8px;
+  transition-property: transform, box-shadow, filter;
+  transition-duration: 0.15s;
+  transition-timing-function: ease;
+  white-space: nowrap;
+}
+
+.btn-start-transcription:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.btn-cancel-transcription {
+  flex: 1;
+  min-width: 0;
+  height: 38px;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 14px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  border-radius: 8px;
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.05);
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.btn-cancel-transcription:hover {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: #ef4444;
+}
+
+.btn-cancel-transcription:active {
+  transform: scale(0.97);
+}
+
+/* Live Transcript Viewer */
+.transcript-viewer-card {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  padding: 18px 20px;
+  gap: 12px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.transcript-viewer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-glass);
+  padding-bottom: 10px;
+  flex-shrink: 0;
+}
+
+.transcript-viewer-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.transcript-viewer-icon {
+  color: var(--color-cyan);
+  flex-shrink: 0;
+}
+
+.transcript-viewer-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin: 0;
+  color: var(--color-text);
+}
+
+.transcript-viewer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-export-transcript {
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 6px;
+  margin: 0;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text);
+  border: 1px solid var(--border-glass);
+  background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.btn-export-transcript:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(var(--color-cyan-rgb), 0.4);
+}
+
+.btn-copy-transcript {
+  padding: 4px 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 6px;
+  margin: 0;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.transcript-search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.transcript-search-icon {
+  position: absolute;
+  inset-inline-start: 10px;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.transcript-search-input {
+  width: 100%;
+  padding: 6px 12px;
+  padding-inline-start: 32px;
+  font-size: 0.8rem;
+  margin: 0;
+  border-radius: 8px;
+}
+
+.transcript-viewport {
+  flex-grow: 1;
+  min-height: 0;
+  overflow-y: auto;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  line-height: 1.6;
+  padding: 14px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  user-select: text;
+}
+
+.transcript-placeholder {
+  color: var(--color-text-dim);
+  text-align: center;
+  margin-top: 40px;
 }
 
 /* Minimal IDE-Style Configuration Status Bar in Step 3 */
@@ -10772,20 +11358,24 @@ body.hardsub-fullscreen-active #app-container {
 }
 
 @media (max-width: 1024px) {
-  .translate-layout {
+  .translate-layout,
+  .transcribe-layout {
     grid-template-columns: 1fr;
     height: auto;
     overflow-y: auto;
   }
-  .translate-left-panel {
+  .translate-left-panel,
+  .transcribe-left-panel {
     height: auto;
     overflow: visible;
   }
-  .translate-right-panel {
+  .translate-right-panel,
+  .transcribe-right-panel {
     height: auto;
     min-height: 480px;
   }
-  .translate-preview-card {
+  .translate-preview-card,
+  .transcript-viewer-card {
     height: 100%;
     min-height: 480px;
   }

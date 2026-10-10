@@ -451,6 +451,14 @@ html[dir="rtl"] #translate-drop-zone.has-file .translate-sub-name {
   text-align: right;
 }
 
+html[dir="rtl"] #transcribe-drop-zone.has-file .transcribe-media-name {
+  text-align: right;
+}
+
+html[dir="rtl"] .transcribe-switch-info {
+  text-align: right;
+}
+
 
 /* The output folder is a path wherever it is shown, so it reads left to right and in the
    mono face. The drop-zone's own path line was styled alongside it until now, though

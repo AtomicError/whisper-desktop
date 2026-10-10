@@ -4768,6 +4768,84 @@ function setWizardStepCompleted(stepNum, isCompleted) {
   }
 }
 
+window.clearSingleMediaFile = function() {
+  selectedMediaFile = null;
+  selectedMediaFiles = [];
+  wavPathForTranscription = null;
+  probedMetadata = null;
+  isBatchMode = false;
+
+  const dropZone = document.getElementById('transcribe-drop-zone');
+  if (dropZone) dropZone.classList.remove('has-file');
+
+  const fileNameEl = document.getElementById('lbl-file-name');
+  if (fileNameEl) {
+    updateMediaCardName(null);
+  }
+  const filePathEl = document.getElementById('lbl-file-path');
+  if (filePathEl) {
+    filePathEl.textContent = t('transcribe.selectFilePrompt');
+    filePathEl.style.display = 'block';
+    filePathEl.removeAttribute('title');
+  }
+
+  const clearBtn = document.getElementById('btn-clear-media');
+  if (clearBtn) clearBtn.style.display = 'none';
+
+  const metaBox = document.getElementById('media-meta-box');
+  if (metaBox) metaBox.style.display = 'none';
+
+  const batchSpecsBox = document.getElementById('batch-specs-box');
+  if (batchSpecsBox) batchSpecsBox.style.display = 'none';
+
+  const batchQueueContainer = document.getElementById('batch-queue-container');
+  if (batchQueueContainer) batchQueueContainer.style.display = 'none';
+
+  const batchControlsBox = document.getElementById('batch-controls-box');
+  if (batchControlsBox) batchControlsBox.style.display = 'none';
+
+  const singleActions = document.getElementById('single-transcribe-actions');
+  if (singleActions) singleActions.style.display = 'flex';
+
+  const btnRun = document.getElementById('btn-run-transcribe');
+  if (btnRun) btnRun.style.display = 'inline-flex';
+  const btnCancel = document.getElementById('btn-cancel-transcribe');
+  if (btnCancel) btnCancel.style.display = 'none';
+
+  const typeEl = document.getElementById('meta-type');
+  if (typeEl) typeEl.textContent = '-';
+  const sizeEl = document.getElementById('meta-size');
+  if (sizeEl) sizeEl.textContent = '-';
+  const durEl = document.getElementById('meta-duration');
+  if (durEl) {
+    durEl.textContent = '-';
+    durEl.removeAttribute('title');
+  }
+  const recEl = document.getElementById('meta-recommendation');
+  if (recEl) recEl.textContent = '-';
+
+  if (settingsState) {
+    settingsState.inputFile = '';
+    saveCurrentSettings();
+  }
+
+  const fillBar = document.getElementById('progress-linear-fill');
+  if (fillBar) fillBar.style.width = '0%';
+  const pctEl = document.getElementById('lbl-radial-pct');
+  if (pctEl) {
+    pctEl.removeAttribute('data-i18n');
+    pctEl.textContent = '0%';
+  }
+  const msgEl = document.getElementById('lbl-radial-msg');
+  if (msgEl) {
+    msgEl.setAttribute('data-i18n', 'transcribe.standingBy');
+    msgEl.textContent = t('transcribe.standingBy');
+  }
+
+  const analyticsBox = document.getElementById('analytics-box');
+  if (analyticsBox) analyticsBox.style.display = 'none';
+};
+
 window.browseMediaFile = async function() {
   const startBtn = document.getElementById('btn-run-batch');
   if (startBtn && startBtn.disabled) {
@@ -4782,22 +4860,45 @@ window.browseMediaFile = async function() {
       isBatchMode = false;
       selectedMediaFile = files[0];
       
+      const dropZone = document.getElementById('transcribe-drop-zone');
+      if (dropZone) dropZone.classList.add('has-file');
+
       // Update UI for Single-file Mode
-      document.getElementById('lbl-file-name').style.display = 'block';
-      document.getElementById('lbl-file-path').style.display = 'block';
+      const fileNameEl = document.getElementById('lbl-file-name');
+      const filePathEl = document.getElementById('lbl-file-path');
+      if (fileNameEl) fileNameEl.style.display = 'block';
+      if (filePathEl) filePathEl.style.display = 'block';
       updateMediaCardName(selectedMediaFile);
-      document.getElementById('lbl-file-path').textContent = selectedMediaFile;
-      document.getElementById('batch-queue-container').style.display = 'none';
+      if (filePathEl) {
+        filePathEl.textContent = selectedMediaFile;
+        filePathEl.title = isolateLtr(selectedMediaFile);
+      }
+
+      const clearBtn = document.getElementById('btn-clear-media');
+      if (clearBtn) clearBtn.style.display = 'inline-flex';
+
+      const batchQueueContainer = document.getElementById('batch-queue-container');
+      if (batchQueueContainer) batchQueueContainer.style.display = 'none';
       
-      document.getElementById('media-meta-box').style.display = 'grid';
-      document.getElementById('batch-specs-box').style.display = 'none';
-      document.getElementById('btn-next-step-2').textContent = t('transcribe.continueToTranscription');
+      const metaBox = document.getElementById('media-meta-box');
+      if (metaBox) metaBox.style.display = 'flex';
+      const batchSpecsBox = document.getElementById('batch-specs-box');
+      if (batchSpecsBox) batchSpecsBox.style.display = 'none';
       
+      const nextStepBtn = document.getElementById('btn-next-step-2');
+      if (nextStepBtn) nextStepBtn.textContent = t('transcribe.continueToTranscription');
       
-      document.getElementById('batch-controls-box').style.display = 'none';
-      document.getElementById('btn-run-transcribe').style.display = 'inline-flex';
-      document.getElementById('btn-cancel-transcribe').style.display = 'none';
-      document.getElementById('wizard-step-3').style.display = 'block';
+      const batchControlsBox = document.getElementById('batch-controls-box');
+      if (batchControlsBox) batchControlsBox.style.display = 'none';
+      const singleActions = document.getElementById('single-transcribe-actions');
+      if (singleActions) singleActions.style.display = 'flex';
+      const runBtn = document.getElementById('btn-run-transcribe');
+      if (runBtn) runBtn.style.display = 'inline-flex';
+      const cancelBtn = document.getElementById('btn-cancel-transcribe');
+      if (cancelBtn) cancelBtn.style.display = 'none';
+      
+      const wizardStep3 = document.getElementById('wizard-step-3');
+      if (wizardStep3) wizardStep3.style.display = 'block';
       
       wavPathForTranscription = null;
       
@@ -4812,10 +4913,23 @@ window.browseMediaFile = async function() {
       isBatchMode = true;
       selectedMediaFile = null; // Clear single-file state
       
+      const dropZone = document.getElementById('transcribe-drop-zone');
+      if (dropZone) dropZone.classList.add('has-file');
+
       // Update UI for Batch Mode
-      document.getElementById('lbl-file-name').style.display = 'none';
-      document.getElementById('lbl-file-path').style.display = 'none';
-      document.getElementById('batch-queue-container').style.display = 'block';
+      const fileNameEl = document.getElementById('lbl-file-name');
+      const filePathEl = document.getElementById('lbl-file-path');
+      if (fileNameEl) {
+        fileNameEl.style.display = 'block';
+        fileNameEl.textContent = `${files.length} ${t('transcribe.queueFiles')}`;
+      }
+      if (filePathEl) filePathEl.style.display = 'none';
+
+      const clearBtn = document.getElementById('btn-clear-media');
+      if (clearBtn) clearBtn.style.display = 'none';
+
+      const batchQueueContainer = document.getElementById('batch-queue-container');
+      if (batchQueueContainer) batchQueueContainer.style.display = 'block';
       
       // Populate batch table state
       batchItems = files.map(filePath => ({
@@ -4833,15 +4947,24 @@ window.browseMediaFile = async function() {
       updateBatchSpecs();
       
       // Setup specs details for batch
-      document.getElementById('media-meta-box').style.display = 'none';
-      document.getElementById('batch-specs-box').style.display = 'block';
-      document.getElementById('batch-files-count').textContent = files.length;
-      document.getElementById('btn-next-step-2').textContent = t('transcribe.continueToBatchSetup');
+      const metaBox = document.getElementById('media-meta-box');
+      if (metaBox) metaBox.style.display = 'none';
+      const batchSpecsBox = document.getElementById('batch-specs-box');
+      if (batchSpecsBox) batchSpecsBox.style.display = 'block';
+      const countEl = document.getElementById('batch-files-count');
+      if (countEl) countEl.textContent = files.length;
+
+      const nextStepBtn = document.getElementById('btn-next-step-2');
+      if (nextStepBtn) nextStepBtn.textContent = t('transcribe.continueToBatchSetup');
       
-      
-      document.getElementById('batch-controls-box').style.display = 'block';
-      document.getElementById('btn-run-transcribe').style.display = 'none';
-      document.getElementById('btn-cancel-transcribe').style.display = 'none';
+      const singleActions = document.getElementById('single-transcribe-actions');
+      if (singleActions) singleActions.style.display = 'none';
+      const batchControlsBox = document.getElementById('batch-controls-box');
+      if (batchControlsBox) batchControlsBox.style.display = 'block';
+      const runBatchBtn = document.getElementById('btn-run-batch');
+      if (runBatchBtn) runBatchBtn.style.display = 'inline-flex';
+      const cancelBatchBtn = document.getElementById('btn-cancel-batch');
+      if (cancelBatchBtn) cancelBatchBtn.style.display = 'none';
       
       setWizardStepCompleted(1, true);
       setWizardStepCompleted(2, true);
@@ -4862,10 +4985,6 @@ window.browseMediaFile = async function() {
         renderBatchQueueTable();
         updateBatchSpecs();
       })();
-      
-      setTimeout(() => {
-        openWizardStep(2);
-      }, 500);
     }
   }
 };
@@ -4983,7 +5102,8 @@ async function probeSelectedFile() {
     probedMetadata = await invoke('probe_media_file', { filePath: selectedMediaFile });
     
     if (probedMetadata.exists) {
-      document.getElementById('media-meta-box').style.display = 'grid';
+      const metaBox = document.getElementById('media-meta-box');
+      if (metaBox) metaBox.style.display = 'flex';
       renderMediaMetadata(probedMetadata);
       
       setWizardStepCompleted(2, true);
@@ -5142,11 +5262,66 @@ function updateTranscribeUIConfigs() {
     transCfgTranslation.className = translationEnabled ? 'val-green' : 'val-muted';
   }
 
+  // 5. Sync Quick Task Select (Transcribe vs Translate)
+  const quickTaskSelect = document.getElementById('quick-opt-task');
+  if (quickTaskSelect && settingsState) {
+    quickTaskSelect.value = settingsState.translate ? 'translate' : 'transcribe';
+  }
+
+  // 6. Sync Quick Diarize Button & Status
+  const quickDiarizeBtn = document.getElementById('quick-toggle-diarize');
+  const quickDiarizeText = document.getElementById('quick-diarize-status-text');
+  if (quickDiarizeBtn && quickDiarizeText && settingsState) {
+    const diarizeActive = Boolean(settingsState.diarize);
+    if (diarizeActive) {
+      quickDiarizeBtn.classList.add('active');
+      quickDiarizeText.textContent = t('transcribe.vadActiveStatus') || 'Active';
+      quickDiarizeBtn.title = 'Speaker Diarization Active - Click to disable';
+    } else {
+      quickDiarizeBtn.classList.remove('active');
+      quickDiarizeText.textContent = t('transcribe.vadDisabledStatus') || 'Disabled';
+      quickDiarizeBtn.title = 'Speaker Diarization Disabled - Click to enable';
+    }
+  }
+
   // Sync custom dropdown visuals
   if (window.syncCustomSelects) {
     window.syncCustomSelects();
   }
 }
+
+window.openTranscriptionSettings = function() {
+  if (typeof window.switchView === 'function') {
+    window.switchView('settings');
+    if (typeof window.switchSettingsCategory === 'function') {
+      window.switchSettingsCategory('transcription');
+    }
+  }
+};
+
+window.onQuickTaskChanged = function(task) {
+  if (!settingsState) return;
+  settingsState.translate = (task === 'translate');
+  const optTranslate = document.getElementById('opt-translate');
+  if (optTranslate) {
+    optTranslate.checked = settingsState.translate;
+  }
+  saveCurrentSettings();
+  updateTranscribeUIConfigs();
+};
+
+window.toggleQuickDiarize = function() {
+  if (!settingsState) return;
+  settingsState.diarize = !settingsState.diarize;
+  const optDiarize = document.getElementById('opt-diarize');
+  if (optDiarize) {
+    optDiarize.checked = settingsState.diarize;
+  }
+  saveCurrentSettings();
+  updateTranscribeUIConfigs();
+  const msg = settingsState.diarize ? 'Speaker Diarization Active' : 'Speaker Diarization Disabled';
+  showNotification(msg, 'info');
+};
 
 function setupQuickConfigDeckEventListeners() {
   // 1. Quick Language Selection Listener
@@ -5854,19 +6029,46 @@ window.clearBatchQueue = function() {
   selectedMediaFile = null;
   
   // Revert UI to initial empty single-file state
-  document.getElementById('lbl-file-name').style.display = 'block';
-  document.getElementById('lbl-file-path').style.display = 'block';
-  updateMediaCardName(null);
-  document.getElementById('lbl-file-path').textContent = t('transcribe.selectFilePrompt');
-  document.getElementById('batch-queue-container').style.display = 'none';
+  const dropZone = document.getElementById('transcribe-drop-zone');
+  if (dropZone) dropZone.classList.remove('has-file');
+
+  const fileNameEl = document.getElementById('lbl-file-name');
+  if (fileNameEl) {
+    fileNameEl.style.display = 'block';
+    updateMediaCardName(null);
+  }
+  const filePathEl = document.getElementById('lbl-file-path');
+  if (filePathEl) {
+    filePathEl.style.display = 'block';
+    filePathEl.textContent = t('transcribe.selectFilePrompt');
+    filePathEl.removeAttribute('title');
+  }
+
+  const clearBtn = document.getElementById('btn-clear-media');
+  if (clearBtn) clearBtn.style.display = 'none';
+
+  const batchQueueContainer = document.getElementById('batch-queue-container');
+  if (batchQueueContainer) batchQueueContainer.style.display = 'none';
   
-  document.getElementById('media-meta-box').style.display = 'grid';
-  document.getElementById('batch-specs-box').style.display = 'none';
-  document.getElementById('btn-next-step-2').textContent = t('transcribe.continueToTranscription');
+  const metaBox = document.getElementById('media-meta-box');
+  if (metaBox) metaBox.style.display = 'none';
+  const batchSpecsBox = document.getElementById('batch-specs-box');
+  if (batchSpecsBox) batchSpecsBox.style.display = 'none';
+
+  const nextStepBtn = document.getElementById('btn-next-step-2');
+  if (nextStepBtn) nextStepBtn.textContent = t('transcribe.continueToTranscription');
   
-  
-  document.getElementById('batch-controls-box').style.display = 'none';
-  document.getElementById('wizard-step-3').style.display = 'block';
+  const batchControlsBox = document.getElementById('batch-controls-box');
+  if (batchControlsBox) batchControlsBox.style.display = 'none';
+  const singleActions = document.getElementById('single-transcribe-actions');
+  if (singleActions) singleActions.style.display = 'flex';
+  const runBtn = document.getElementById('btn-run-transcribe');
+  if (runBtn) runBtn.style.display = 'inline-flex';
+  const cancelBtn = document.getElementById('btn-cancel-transcribe');
+  if (cancelBtn) cancelBtn.style.display = 'none';
+
+  const wizardStep3 = document.getElementById('wizard-step-3');
+  if (wizardStep3) wizardStep3.style.display = 'block';
   
   // Set steps 1, 2, 3 as incomplete
   setWizardStepCompleted(1, false);
@@ -6359,6 +6561,12 @@ function setupTranscribeDragAndDrop() {
   const transZone = document.getElementById('transcribe-drop-zone');
   if (!transZone) return;
 
+  transZone.addEventListener('click', (e) => {
+    if (selectedMediaFile || (isBatchMode && batchItems && batchItems.length > 0)) return;
+    if (e.target && e.target.closest && e.target.closest('button')) return;
+    browseMediaFile();
+  });
+
   // HTML5 Standard drag-drop events
   transZone.addEventListener('dragover', (e) => {
     e.preventDefault();
@@ -6441,18 +6649,46 @@ async function handleDroppedFiles(files) {
     isBatchMode = false;
     selectedMediaFile = files[0];
     
-    document.getElementById('lbl-file-name').style.display = 'block';
-    document.getElementById('lbl-file-path').style.display = 'block';
+    const dropZone = document.getElementById('transcribe-drop-zone');
+    if (dropZone) dropZone.classList.add('has-file');
+
+    const fileNameEl = document.getElementById('lbl-file-name');
+    const filePathEl = document.getElementById('lbl-file-path');
+    if (fileNameEl) fileNameEl.style.display = 'block';
+    if (filePathEl) filePathEl.style.display = 'block';
     updateMediaCardName(selectedMediaFile);
-    document.getElementById('lbl-file-path').textContent = selectedMediaFile;
-    document.getElementById('batch-queue-container').style.display = 'none';
+    if (filePathEl) {
+      filePathEl.textContent = selectedMediaFile;
+      filePathEl.title = isolateLtr(selectedMediaFile);
+    }
+
+    const clearBtn = document.getElementById('btn-clear-media');
+    if (clearBtn) clearBtn.style.display = 'inline-flex';
+
+    const batchQueueContainer = document.getElementById('batch-queue-container');
+    if (batchQueueContainer) batchQueueContainer.style.display = 'none';
     
-    document.getElementById('media-meta-box').style.display = 'grid';
-    document.getElementById('batch-specs-box').style.display = 'none';
-    document.getElementById('btn-next-step-2').textContent = t('transcribe.continueToTranscription');
+    const metaBox = document.getElementById('media-meta-box');
+    if (metaBox) metaBox.style.display = 'flex';
+    const batchSpecsBox = document.getElementById('batch-specs-box');
+    if (batchSpecsBox) batchSpecsBox.style.display = 'none';
+
+    const nextStepBtn = document.getElementById('btn-next-step-2');
+    if (nextStepBtn) nextStepBtn.textContent = t('transcribe.continueToTranscription');
     
-    document.getElementById('batch-controls-box').style.display = 'none';
-    document.getElementById('wizard-step-3').style.display = 'block';
+    const batchControlsBox = document.getElementById('batch-controls-box');
+    if (batchControlsBox) batchControlsBox.style.display = 'none';
+    const singleActions = document.getElementById('single-transcribe-actions');
+    if (singleActions) singleActions.style.display = 'flex';
+    const runBtn = document.getElementById('btn-run-transcribe');
+    if (runBtn) runBtn.style.display = 'inline-flex';
+    const cancelBtn = document.getElementById('btn-cancel-transcribe');
+    if (cancelBtn) cancelBtn.style.display = 'none';
+    
+    const wizardStep3 = document.getElementById('wizard-step-3');
+    if (wizardStep3) wizardStep3.style.display = 'block';
+    
+    wavPathForTranscription = null;
     
     if (settingsState) {
       settingsState.inputFile = selectedMediaFile;
@@ -6465,9 +6701,22 @@ async function handleDroppedFiles(files) {
     isBatchMode = true;
     selectedMediaFile = null;
     
-    document.getElementById('lbl-file-name').style.display = 'none';
-    document.getElementById('lbl-file-path').style.display = 'none';
-    document.getElementById('batch-queue-container').style.display = 'block';
+    const dropZone = document.getElementById('transcribe-drop-zone');
+    if (dropZone) dropZone.classList.add('has-file');
+
+    const fileNameEl = document.getElementById('lbl-file-name');
+    const filePathEl = document.getElementById('lbl-file-path');
+    if (fileNameEl) {
+      fileNameEl.style.display = 'block';
+      fileNameEl.textContent = `${files.length} ${t('transcribe.queueFiles')}`;
+    }
+    if (filePathEl) filePathEl.style.display = 'none';
+
+    const clearBtn = document.getElementById('btn-clear-media');
+    if (clearBtn) clearBtn.style.display = 'none';
+
+    const batchQueueContainer = document.getElementById('batch-queue-container');
+    if (batchQueueContainer) batchQueueContainer.style.display = 'block';
     
     batchItems = files.map(filePath => ({
       path: filePath,
@@ -6483,14 +6732,23 @@ async function handleDroppedFiles(files) {
     renderBatchQueueTable();
     updateBatchSpecs();
     
-    document.getElementById('media-meta-box').style.display = 'none';
-    document.getElementById('batch-specs-box').style.display = 'block';
-    document.getElementById('batch-files-count').textContent = files.length;
-    document.getElementById('btn-next-step-2').textContent = t('transcribe.continueToBatchSetup');
+    const metaBox = document.getElementById('media-meta-box');
+    if (metaBox) metaBox.style.display = 'none';
+    const batchSpecsBox = document.getElementById('batch-specs-box');
+    if (batchSpecsBox) batchSpecsBox.style.display = 'block';
+    const batchCountEl = document.getElementById('batch-files-count');
+    if (batchCountEl) batchCountEl.textContent = files.length;
+    const nextStepBtn = document.getElementById('btn-next-step-2');
+    if (nextStepBtn) nextStepBtn.textContent = t('transcribe.continueToBatchSetup');
     
-    document.getElementById('batch-controls-box').style.display = 'block';
-    document.getElementById('btn-run-transcribe').style.display = 'none';
-    document.getElementById('btn-cancel-transcribe').style.display = 'none';
+    const singleActions = document.getElementById('single-transcribe-actions');
+    if (singleActions) singleActions.style.display = 'none';
+    const batchControlsBox = document.getElementById('batch-controls-box');
+    if (batchControlsBox) batchControlsBox.style.display = 'block';
+    const runBatchBtn = document.getElementById('btn-run-batch');
+    if (runBatchBtn) runBatchBtn.style.display = 'inline-flex';
+    const cancelBatchBtn = document.getElementById('btn-cancel-batch');
+    if (cancelBatchBtn) cancelBatchBtn.style.display = 'none';
     
     setWizardStepCompleted(1, true);
     setWizardStepCompleted(2, true);
@@ -7450,17 +7708,32 @@ window.copyLiveTranscriptToClipboard = async function() {
   const btn = document.getElementById('btn-copy-transcript');
   const triggerBtnFeedback = () => {
     if (btn) {
-      if (!btn._origText) {
-        btn._origText = btn.textContent;
-      }
-      btn.textContent = t('transcribe.copied');
-      clearTimeout(btn._copyFeedbackTimer);
-      btn._copyFeedbackTimer = setTimeout(() => {
-        if (btn && btn._origText) {
-          btn.textContent = btn._origText;
-          btn._origText = null;
+      const span = btn.querySelector('span');
+      if (span) {
+        if (!span._origText) {
+          span._origText = span.textContent;
         }
-      }, 2000);
+        span.textContent = t('transcribe.copied');
+        clearTimeout(btn._copyFeedbackTimer);
+        btn._copyFeedbackTimer = setTimeout(() => {
+          if (span && span._origText) {
+            span.textContent = span._origText;
+            span._origText = null;
+          }
+        }, 2000);
+      } else {
+        if (!btn._origText) {
+          btn._origText = btn.textContent;
+        }
+        btn.textContent = t('transcribe.copied');
+        clearTimeout(btn._copyFeedbackTimer);
+        btn._copyFeedbackTimer = setTimeout(() => {
+          if (btn && btn._origText) {
+            btn.textContent = btn._origText;
+            btn._origText = null;
+          }
+        }, 2000);
+      }
     }
   };
 
@@ -7504,6 +7777,48 @@ window.copyLiveTranscriptToClipboard = async function() {
     await window.copyMainTranscriptToClipboard();
   } else {
     showNotification(t('toasts.noTranscriptToCopy'), "info");
+  }
+};
+
+window.exportLiveTranscript = function() {
+  let textToExport = '';
+  if (transcriptLines && transcriptLines.length > 0) {
+    textToExport = transcriptLines.map(l => l.text).join('\n');
+  } else {
+    const viewport = document.getElementById('transcript-viewport');
+    if (viewport && viewport.innerText && !viewport.innerText.includes("Start transcription to stream")) {
+      textToExport = viewport.innerText.trim();
+    }
+  }
+
+  if (!textToExport || textToExport.trim().length === 0) {
+    showNotification(t('toasts.noTranscriptToCopy') || 'No transcript text available to export', "info");
+    return;
+  }
+
+  let defaultName = 'transcript.txt';
+  if (selectedMediaFile) {
+    const base = getBasename(selectedMediaFile);
+    const dotIdx = base.lastIndexOf('.');
+    defaultName = (dotIdx > 0 ? base.substring(0, dotIdx) : base) + '.txt';
+  } else if (isBatchMode && batchItems && batchItems.length > 0) {
+    defaultName = 'batch_transcripts.txt';
+  }
+
+  try {
+    const blob = new Blob([textToExport], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = defaultName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showNotification(t('toasts.fileExportedSuccess') || 'Transcript exported successfully', "success");
+  } catch (err) {
+    console.error('Export transcript failed:', err);
+    showNotification(String(err), "error");
   }
 };
 

@@ -3077,39 +3077,84 @@
             <div class="transcribe-layout">
               
               <div class="transcribe-left-panel">
-                <!-- STEP 1: SELECT FILE -->
-                <div class="wizard-step active" id="wizard-step-1">
-                  <div class="wizard-step-header" onclick="toggleWizardAccordion(1)">
-                    <div style="display:flex; align-items:center; gap:12px;">
-                      <div class="wizard-step-icon" id="wizard-icon-1">1</div>
-                      <div class="wizard-step-title" data-i18n="transcribe.wizardStep1">Select Media File</div>
-                    </div>
-                    <span class="wizard-chevron" id="wizard-chevron-1">▼</span>
-                  </div>
-                  <div class="wizard-step-body" id="wizard-body-1">
-                    <div class="media-drop-zone" id="transcribe-drop-zone">
-                      <svg class="media-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
-                        <line x1="7" y1="2" x2="7" y2="22"/>
-                        <line x1="17" y1="2" x2="17" y2="22"/>
-                        <line x1="2" y1="12" x2="22" y2="12"/>
-                        <line x1="2" y1="7" x2="7" y2="7"/>
-                        <line x1="2" y1="17" x2="7" y2="17"/>
-                        <line x1="17" y1="17" x2="22" y2="17"/>
-                        <line x1="17" y1="7" x2="22" y2="7"/>
+                <div class="glass-card transcribe-unified-deck" id="transcribe-unified-deck">
+                  <!-- Header: Studio Title & Settings Shortcut -->
+                  <div class="transcribe-deck-header">
+                    <div class="transcribe-deck-title-group">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="transcribe-deck-icon">
+                        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+                        <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
+                        <line x1="12" x2="12" y1="19" y2="22"/>
                       </svg>
-                      <div>
-                        <p style="font-weight:600; margin-bottom:4px;" id="lbl-file-name" data-i18n="transcribe.noFileLoaded">No Media File Loaded</p>
-                        <!-- dir="auto" for the same reason as the hardsub drop zones above. -->
-                        <p dir="auto" style="font-size:0.8rem; color:var(--color-text-muted);" id="lbl-file-path" data-i18n="transcribe.selectFilePrompt">Select audio or video file</p>
-                      </div>
-                      <button class="btn-secondary" onclick="browseMediaFile()" data-i18n="transcribe.browseSystem">Browse System</button>
+                      <span class="transcribe-deck-title" data-i18n="transcribe.deckTitle">Transcription Setup</span>
                     </div>
-                    <!-- Batch Queue Panel (hidden by default) -->
+                    <button type="button" class="btn-link-settings" id="btn-transcribe-manage-settings" title="Configure models and engines in Settings" data-i18n-title="transcribe.manageInSettings" onclick="openTranscriptionSettings()">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px; height:12px;">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                      </svg>
+                      <span data-i18n="transcribe.manageInSettings">Configure in Settings</span>
+                    </button>
+                  </div>
+
+                  <div class="transcribe-deck-body">
+                    <!-- 1. Smart Media File Card -->
+                    <div class="media-drop-zone transcribe-dropzone-card" id="transcribe-drop-zone" title="Drag &amp; drop audio or video file" data-i18n-title="transcribe.selectFilePrompt">
+                      <div class="transcribe-dropzone-main-row">
+                        <div class="transcribe-dropzone-identity">
+                          <svg class="media-icon transcribe-media-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
+                            <line x1="7" y1="2" x2="7" y2="22"/>
+                            <line x1="17" y1="2" x2="17" y2="22"/>
+                            <line x1="2" y1="12" x2="22" y2="12"/>
+                            <line x1="2" y1="7" x2="7" y2="7"/>
+                            <line x1="2" y1="17" x2="7" y2="17"/>
+                            <line x1="17" y1="17" x2="22" y2="17"/>
+                            <line x1="17" y1="7" x2="22" y2="7"/>
+                          </svg>
+                          <div class="transcribe-media-titles">
+                            <p class="transcribe-media-name" id="lbl-file-name" data-i18n="transcribe.noFileLoaded">No Media File Loaded</p>
+                          </div>
+                        </div>
+                        <div class="transcribe-dropzone-actions">
+                          <button class="btn-secondary btn-media-browse" id="btn-browse-media" onclick="browseMediaFile()" data-i18n="transcribe.browseSystem" type="button">Browse System</button>
+                          <button class="btn-secondary btn-clear-media" id="btn-clear-media" onclick="clearSingleMediaFile()" data-i18n="transcribe.clearMedia" type="button" style="display:none;">Clear</button>
+                        </div>
+                      </div>
+
+                      <!-- The empty-state prompt hint -->
+                      <p class="transcribe-media-prompt" id="lbl-file-path" data-i18n="transcribe.selectFilePrompt">Select audio or video file</p>
+
+                      <!-- Loaded file metadata badges row (Single-file) -->
+                      <div class="transcribe-meta-badges-row" id="media-meta-box" style="display:none;">
+                        <span class="transcribe-meta-badge pill-type" id="meta-type" title="File Type">-</span>
+                        <span class="transcribe-meta-badge pill-duration" id="meta-duration" title="Duration">-</span>
+                        <span class="transcribe-meta-badge pill-size" id="meta-size" title="File Size">-</span>
+                        <span class="transcribe-meta-badge pill-target" id="meta-target-format" title="Target Format" data-i18n="transcribe.targetFormatVal">16kHz Mono Target</span>
+                        <span class="transcribe-meta-badge pill-engine" id="meta-recommendation" title="Active Processing Engine">-</span>
+                      </div>
+                    </div>
+
+                    <!-- Batch Spec Box (when batch mode active) -->
+                    <div class="glass-card batch-specs-box" id="batch-specs-box" style="display:none;">
+                      <div class="batch-specs-header">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="batch-specs-icon">
+                          <path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2" ry="2"/>
+                        </svg>
+                        <span class="batch-specs-title" data-i18n="transcribe.batchModeActive">Batch Processing Mode Active</span>
+                      </div>
+                      <div class="batch-specs-info">
+                        <span class="batch-stat-item"><strong id="batch-files-count">0</strong> <span data-i18n="transcribe.queueFiles">Files</span></span>
+                        <span class="batch-stat-divider">•</span>
+                        <span class="batch-stat-item"><span data-i18n="transcribe.batchTotalDuration">Total Duration:</span> <strong id="batch-total-duration">--:--:--</strong></span>
+                      </div>
+                    </div>
+
+                    <!-- Batch Queue Container -->
                     <div id="batch-queue-container" class="batch-queue-panel" style="display:none;">
                       <div class="batch-queue-header">
                         <div class="batch-queue-title">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <line x1="8" y1="6" x2="21" y2="6"></line>
                             <line x1="8" y1="12" x2="21" y2="12"></line>
                             <line x1="8" y1="18" x2="21" y2="18"></line>
@@ -3148,146 +3193,132 @@
                             </tr>
                           </thead>
                           <tbody id="batch-queue-body">
-                            <!-- Dynamic rows injected here -->
                           </tbody>
                         </table>
                       </div>
                     </div>
-                  </div>
-                </div>
 
-                <!-- STEP 2: METADATA & SPECS -->
-                <div class="wizard-step" id="wizard-step-2">
-                  <div class="wizard-step-header" onclick="toggleWizardAccordion(2)">
-                    <div style="display:flex; align-items:center; gap:12px;">
-                      <div class="wizard-step-icon" id="wizard-icon-2">2</div>
-                      <div class="wizard-step-title" data-i18n="transcribe.wizardStep2">Media Details</div>
+                    <!-- 2. AI Model Selector -->
+                    <div class="transcribe-field-group">
+                      <label for="quick-opt-model">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        <span data-i18n="transcribe.aiModel">AI Model</span>
+                      </label>
+                      <select class="select-control" id="quick-opt-model" data-searchable data-model-select aria-label="Quick Select Model"></select>
                     </div>
-                    <span class="wizard-chevron" id="wizard-chevron-2">▼</span>
-                  </div>
-                  <div class="wizard-step-body" id="wizard-body-2">
-                    <div class="media-metadata-box" id="media-meta-box">
-                      <div class="meta-item">
-                        <div class="meta-label" data-i18n="transcribe.fileType">File Type</div>
-                        <div class="meta-value" id="meta-type">-</div>
-                      </div>
-                      <div class="meta-item">
-                        <div class="meta-label" data-i18n="transcribe.fileSize">File Size</div>
-                        <div class="meta-value" id="meta-size">-</div>
-                      </div>
-                      <div class="meta-item">
-                        <div class="meta-label" data-i18n="transcribe.duration">Duration</div>
-                        <div class="meta-value" id="meta-duration" style="color:var(--color-gold);">-</div>
-                      </div>
-                      <div class="meta-item">
-                        <div class="meta-label" data-i18n="transcribe.targetFormat">Target Format</div>
-                        <div class="meta-value" style="color:var(--color-cyan);" data-i18n="transcribe.targetFormatVal">16kHz Mono Target</div>
-                      </div>
-                      <div class="meta-item" style="grid-column: span 2;">
-                        <div class="meta-label" data-i18n="transcribe.activeExtractor">Active Processing Engine</div>
-                        <div class="meta-value" id="meta-recommendation" style="font-size:0.8rem; line-height:1.4; color:var(--color-royal-blue);">-</div>
-                      </div>
+
+                    <!-- 3. Spoken Language Selector -->
+                    <div class="transcribe-field-group">
+                      <label for="quick-opt-language">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-royal-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                        </svg>
+                        <span data-i18n="transcribe.spokenLang">Spoken Language</span>
+                      </label>
+                      <select class="select-control" id="quick-opt-language" data-searchable data-language-select="spoken" aria-label="Quick Select Language"></select>
                     </div>
-                    <!-- Batch Spec Card (hidden by default) -->
-                    <div class="glass-card" id="batch-specs-box" style="display:none; padding:16px; margin-bottom:16px; border:1px solid var(--border-glass);">
-                      <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px;color:var(--color-cyan);"><path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2" ry="2"/></svg>
-                        <span style="font-weight:600; font-size:0.9rem; color:var(--color-cyan);" data-i18n="transcribe.batchModeActive">Batch Processing Mode Active</span>
-                      </div>
-                      <div style="font-size:0.85rem; color:var(--color-text-muted); line-height:1.6;">
-                        <p style="margin-bottom:6px;"><strong style="color:#fff;" id="batch-files-count">0</strong> <span data-i18n="transcribe.batchLoadedDesc">media files are loaded in the queue.</span></p>
-                        <p style="margin-bottom:12px;"><span data-i18n="transcribe.batchTotalDuration">Total Duration:</span> <strong style="color:var(--color-gold);" id="batch-total-duration">--:--:--</strong></p>
-                        <p data-i18n="transcribe.batchGlobalNote">Global configurations selected in the settings panel will be applied **globally** to all files in the batch. Processing runs sequentially to ensure stability.</p>
-                      </div>
+
+                    <!-- 4. Task Type Selector (Transcribe vs Translate) -->
+                    <div class="transcribe-field-group">
+                      <label for="quick-opt-task">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="m5 8 6 6"/>
+                          <path d="m4 14 6-6 2-3"/>
+                          <path d="M2 5h12"/>
+                          <path d="M7 2h1"/>
+                          <path d="m22 22-5-10-5 10"/>
+                          <path d="M14 18h6"/>
+                        </svg>
+                        <span data-i18n="transcribe.taskLabel">Task Type</span>
+                      </label>
+                      <select class="select-control" id="quick-opt-task" aria-label="Task Type" onchange="onQuickTaskChanged(this.value)">
+                        <option value="transcribe" data-i18n="transcribe.taskTranscribe">Transcribe (Speech to Text in same language)</option>
+                        <option value="translate" data-i18n="transcribe.taskTranslate">Translate to English (Built-in Engine)</option>
+                      </select>
                     </div>
-                    <button class="btn-primary wizard-next-btn" id="btn-next-step-2" onclick="openWizardStep(3)" data-i18n="transcribe.continueToTranscription">
-                      Continue to Transcription
-                    </button>
-                  </div>
-                </div>
 
-                <!-- STEP 3: EXECUTE TRANSCRIPTION -->
-                <div class="wizard-step" id="wizard-step-3">
-                  <div class="wizard-step-header" onclick="toggleWizardAccordion(3)">
-                    <div style="display:flex; align-items:center; gap:12px;">
-                      <div class="wizard-step-icon" id="wizard-icon-3">3</div>
-                      <div class="wizard-step-title" data-i18n="transcribe.wizardStep3">Run Transcription</div>
+                    <!-- 4. Hardware Engine / Backend Selector -->
+                    <div class="transcribe-field-group">
+                      <label for="quick-opt-selectedBackend">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>
+                        </svg>
+                        <span data-i18n="transcribe.engine">Engine</span>
+                      </label>
+                      <select class="select-control" id="quick-opt-selectedBackend" aria-label="Quick Select Engine">
+                        <option value="Standard" data-i18n="transcribe.backendCpu">CPU (Standard)</option>
+                      </select>
                     </div>
-                    <span class="wizard-chevron" id="wizard-chevron-3">▼</span>
-                  </div>
-                  <div class="wizard-step-body" id="wizard-body-3">
-                    <!-- Quick Transcription Configuration Deck -->
-                    <div class="transcribe-quick-config-deck">
-                      <div class="quick-config-card">
-                        <div class="quick-config-label">
-                          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-                          </svg>
-                          <span data-i18n="transcribe.aiModel">AI Model</span>
-                        </div>
-                        <select class="select-control quick-select" id="quick-opt-model" data-searchable data-model-select aria-label="Quick Select Model">
-                          <!-- Dynamically populated from scanned models -->
-                        </select>
-                      </div>
 
-                      <div class="quick-config-card">
-                        <div class="quick-config-label">
-                          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-royal-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-                          </svg>
-                          <span data-i18n="transcribe.spokenLang">Spoken Language</span>
-                        </div>
-                        <select class="select-control quick-select" id="quick-opt-language" data-searchable data-language-select="spoken" aria-label="Quick Select Language"></select>
-                      </div>
-
-                      <div class="quick-config-card">
-                        <div class="quick-config-label">
-                          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>
-                          </svg>
-                          <span data-i18n="transcribe.engine">Engine</span>
-                        </div>
-                        <select class="select-control quick-select" id="quick-opt-selectedBackend" aria-label="Quick Select Engine">
-                          <option value="Standard" data-i18n="transcribe.backendCpu">CPU (Standard)</option>
-                        </select>
-                      </div>
-
-                      <div class="quick-config-card quick-toggle-card">
-                        <div class="quick-config-label">
-                          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" x2="12" y1="19" y2="22"/>
-                          </svg>
-                          <span data-i18n="transcribe.sileroVad">Silero VAD</span>
+                    <!-- 5. Silero VAD Switch Row -->
+                    <div class="transcribe-field-group">
+                      <div class="transcribe-switch-row" title="Voice activity detection filters non-speech audio segments.">
+                        <div class="transcribe-switch-info">
+                          <span class="transcribe-switch-title">
+                            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" x2="12" y1="19" y2="22"/>
+                            </svg>
+                            <span data-i18n="transcribe.sileroVad">Silero VAD</span>
+                          </span>
+                          <span class="transcribe-switch-desc" id="quick-vad-status-text" data-i18n="transcribe.vadDisabledStatus">VAD Disabled</span>
                         </div>
                         <button type="button" class="quick-vad-toggle-btn" id="quick-toggle-vad" onclick="toggleQuickVad()" title="Toggle Silero Voice Activity Detection">
                           <span class="quick-vad-dot"></span>
-                          <span id="quick-vad-status-text" data-i18n="transcribe.vadDisabledStatus">VAD OFF</span>
                         </button>
                       </div>
                     </div>
-                    <!-- Single-file controls -->
-                    <div style="display:flex; gap:12px;">
-                      <button class="btn-primary" id="btn-run-transcribe" style="flex:2;" onclick="runWhisperTranscription()">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:18px;height:18px;margin-inline-end:8px;"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
-                        <span data-i18n="transcribe.startAiExtraction">Start Transcription</span>
-                      </button>
-                      <button class="btn-secondary" id="btn-cancel-transcribe" style="display:none; flex:1; border-color:var(--color-red); color:var(--color-red); font-weight:600; text-align:center; justify-content:center;" onclick="abortTranscription()">
-                        <span data-i18n="common.cancel">Cancel</span>
-                      </button>
-                    </div>
-                    <!-- Batch Control Panel (hidden by default) -->
-                    <div id="batch-controls-box" style="display:none; width:100%; margin-top: 16px;">
-                      <div class="step-details-row" style="margin-bottom: 16px;">
-                        <span data-i18n="transcribe.automatedPipeline">Automated Pipeline</span> | <span data-i18n="transcribe.pipelineDesc">FFmpeg Conversion & Audio Transcription</span>
-                      </div>
-                      <div style="display:flex; gap:12px;">
-                        <button class="btn-primary" id="btn-run-batch" style="flex:2;" onclick="runBatchExtraction()">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:18px;height:18px;margin-inline-end:8px;"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
-                          <span data-i18n="transcribe.startBatchAiExtraction">Start Batch Transcription</span>
+
+                    <!-- 7. Speaker Diarization Switch Row -->
+                    <div class="transcribe-field-group">
+                      <div class="transcribe-switch-row" title="Separates and labels speakers across stereo audio channels." data-i18n-title="settings.diarizeDesc">
+                        <div class="transcribe-switch-info">
+                          <span class="transcribe-switch-title">
+                            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                            </svg>
+                            <span data-i18n="settings.diarizeTitle">Speaker Diarization</span>
+                          </span>
+                          <span class="transcribe-switch-desc" id="quick-diarize-status-text">Diarization Disabled</span>
+                        </div>
+                        <button type="button" class="quick-vad-toggle-btn" id="quick-toggle-diarize" onclick="toggleQuickDiarize()" title="Toggle Speaker Diarization">
+                          <span class="quick-vad-dot"></span>
                         </button>
-                        <button class="btn-secondary" id="btn-cancel-batch" style="display:none; flex:1; border-color:var(--color-red); color:var(--color-red); font-weight:600; text-align:center; justify-content:center;" onclick="abortBatchExtraction()">
+                      </div>
+                    </div>
+
+                    <!-- Hidden legacy fallback button for backwards compatibility -->
+                    <button id="btn-next-step-2" style="display:none;" type="button"></button>
+
+                    <!-- 6. Action & Execution Section -->
+                    <div class="transcribe-actions-section">
+                      <!-- Single-file actions -->
+                      <div class="transcribe-actions-bar" id="single-transcribe-actions">
+                        <button class="btn-primary btn-start-transcription" id="btn-run-transcribe" type="button" onclick="runWhisperTranscription()">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px;">
+                            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" x2="12" y1="19" y2="22"/>
+                          </svg>
+                          <span data-i18n="transcribe.startAiExtraction">Start Transcription</span>
+                        </button>
+                        <button class="btn-secondary btn-cancel-transcription" id="btn-cancel-transcribe" type="button" style="display:none;" onclick="abortTranscription()">
                           <span data-i18n="common.cancel">Cancel</span>
                         </button>
+                      </div>
+
+                      <!-- Batch actions (shown when batch mode active) -->
+                      <div id="batch-controls-box" class="batch-controls-box" style="display:none;">
+                        <div class="transcribe-actions-bar">
+                          <button class="btn-primary btn-start-transcription" id="btn-run-batch" type="button" onclick="runBatchExtraction()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px;">
+                              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" x2="12" y1="19" y2="22"/>
+                            </svg>
+                            <span data-i18n="transcribe.startBatchAiExtraction">Start Batch Transcription</span>
+                          </button>
+                          <button class="btn-secondary btn-cancel-transcription" id="btn-cancel-batch" type="button" style="display:none;" onclick="abortBatchExtraction()">
+                            <span data-i18n="common.cancel">Cancel</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -3362,19 +3393,48 @@
                 </div>
 
                 <!-- Live Transcript Viewer -->
-                <div class="glass-card transcript-viewer-card" style="display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 20px; gap: 12px; overflow: hidden;">
-                  <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: 10px;">
-                    <h3 style="font-weight: 600; font-size: 1rem; margin: 0;" data-i18n="transcribe.liveViewerTitle">Live Transcript Viewer</h3>
-                    <button class="btn-secondary" id="btn-copy-transcript" onclick="copyLiveTranscriptToClipboard()" aria-label="Copy live transcript preview to clipboard" style="padding: 4px 10px; font-size: 0.75rem; margin: 0;" data-i18n="transcribe.copyLiveTranscript">Copy</button>
+                <div class="glass-card transcript-viewer-card" id="transcribe-viewer-card">
+                  <div class="transcript-viewer-header">
+                    <div class="transcript-viewer-title-group">
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="transcript-viewer-icon">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="16" y1="13" x2="8" y2="13"/>
+                        <line x1="16" y1="17" x2="8" y2="17"/>
+                        <polyline points="10 9 9 9 8 9"/>
+                      </svg>
+                      <h3 class="transcript-viewer-title" data-i18n="transcribe.liveViewerTitle">Live Transcript Viewer</h3>
+                    </div>
+                    <div class="transcript-viewer-actions">
+                      <button class="btn-secondary btn-export-transcript" id="btn-export-transcript" onclick="exportLiveTranscript()" aria-label="Export transcript to file">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-inline-end: 4px;">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                          <polyline points="7 10 12 15 17 10"/>
+                          <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        <span data-i18n="transcribe.exportTxt">Export TXT</span>
+                      </button>
+                      <button class="btn-secondary btn-copy-transcript" id="btn-copy-transcript" onclick="copyLiveTranscriptToClipboard()" aria-label="Copy live transcript preview to clipboard">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-inline-end: 4px;">
+                          <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                          <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                        </svg>
+                        <span data-i18n="transcribe.copyLiveTranscript">Copy</span>
+                      </button>
+                    </div>
                   </div>
                   
-                  <div class="transcript-search-box" style="display: flex; gap: 8px; width: 100%;">
-                    <input class="text-input" type="text" id="transcript-search" placeholder="Search transcript..." data-i18n-placeholder="transcribe.searchTranscript" oninput="filterTranscriptLines()" style="padding: 6px 12px; font-size: 0.8rem; margin: 0; width: 100%;" />
+                  <div class="transcript-search-box">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--color-text-dim)" stroke-width="2" class="transcript-search-icon">
+                      <circle cx="11" cy="11" r="8"/>
+                      <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    </svg>
+                    <input class="text-input transcript-search-input" type="text" id="transcript-search" placeholder="Search transcript..." data-i18n-placeholder="transcribe.searchTranscript" oninput="filterTranscriptLines()" />
                   </div>
                   
                   <!-- Real-time transcript display box -->
-                  <div class="transcript-viewport" id="transcript-viewport" style="flex-grow: 1; min-height: 0; overflow-y: auto; font-family: var(--font-sans); font-size: 0.85rem; line-height: 1.6; padding: 12px; border-radius: 8px; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255,255,255,0.03); user-select: text;">
-                    <div style="color: var(--color-text-dim); text-align: center; margin-top: 40px;" id="transcript-placeholder" data-i18n="transcribe.streamNotice">
+                  <div class="transcript-viewport" id="transcript-viewport">
+                    <div class="transcript-placeholder" id="transcript-placeholder" data-i18n="transcribe.streamNotice">
                       Start transcription to stream live text preview.
                     </div>
                   </div>
