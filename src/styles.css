@@ -4331,15 +4331,19 @@ select.select-control {
   right: 24px;
   display: flex;
   flex-direction: column-reverse; /* Newest toast at the bottom */
+  align-items: flex-end;
   gap: 12px;
   z-index: 9999999;
   pointer-events: none;
+  max-width: calc(100vw - 48px);
 }
 
 .toast-notification {
   pointer-events: auto;
-  min-width: 320px;
-  max-width: 460px;
+  box-sizing: border-box;
+  width: fit-content;
+  min-width: min(280px, calc(100vw - 48px));
+  max-width: min(580px, calc(100vw - 48px));
   background: var(--bg-dropdown);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
@@ -4351,7 +4355,7 @@ select.select-control {
   font-weight: 500;
   font-size: 0.95rem;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
   transform: translateY(30px) scale(0.95);
   opacity: 0;
@@ -4362,15 +4366,21 @@ select.select-control {
 
 .toast-message {
   flex: 1;
-  word-break: break-word;
-  line-height: 1.4;
+  min-width: 0;
+  line-height: 1.5;
   white-space: pre-line;
+  overflow-wrap: break-word;
+  word-break: normal;
+  text-wrap: pretty;
+  text-wrap: balance;
 }
 
 .toast-title {
   font-weight: 600;
   color: var(--color-text-bright, #ffffff);
   line-height: 1.45;
+  text-wrap: pretty;
+  text-wrap: balance;
 }
 
 .toast-tech-detail {
@@ -4387,6 +4397,7 @@ select.select-control {
   margin-top: 5px;
   unicode-bidi: isolate;
   user-select: text;
+  overflow-wrap: break-word;
   word-break: break-all;
 }
 
@@ -4410,6 +4421,7 @@ select.select-control {
   border-radius: 6px;
   transition: color 0.2s, background 0.2s;
   flex-shrink: 0;
+  margin-top: -1px;
 }
 
 .toast-close-btn:hover {
@@ -4461,6 +4473,7 @@ select.select-control {
   color: var(--color-royal-blue);
   filter: drop-shadow(0 0 4px rgba(var(--color-royal-blue-rgb), 0.5));
   flex-shrink: 0;
+  margin-top: 1px;
 }
 
 .toast-success {

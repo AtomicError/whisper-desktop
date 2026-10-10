@@ -253,6 +253,7 @@ html[dir="rtl"] .custom-select-option.selected {
 html[dir="rtl"] #toast-container {
   right: auto;
   left: 24px;
+  align-items: flex-end;
 }
 
 html[dir="rtl"] .toast-notification {
@@ -261,7 +262,7 @@ html[dir="rtl"] .toast-notification {
 }
 
 html[dir="rtl"] .toast-icon {
-  margin-left: 10px;
+  margin-left: 0;
   margin-right: 0;
 }
 

@@ -54,6 +54,22 @@ function getParentDir(path) {
   return lastSlash >= 0 ? clean.substring(0, lastSlash) : '';
 }
 
+/**
+ * Formats toast message text with typographic orphan / widow word prevention.
+ * Joins the last two words on each line with a non-breaking space (U+00A0)
+ * so that a trailing word (like "شد." in Persian or "successfully." in English)
+ * never gets stranded alone on a new line.
+ * Preserves multi-line structure, newlines, and handles edge cases safely.
+ */
+function formatToastMessage(text) {
+  if (!text || typeof text !== 'string') return text;
+  return text.split('\n').map(line => {
+    // Only bind if the line contains at least two words separated by horizontal whitespace,
+    // and the trailing token is a natural word length (typographic widow prevention)
+    return line.replace(/(\S+)[^\S\r\n]+(\S{1,25}[.!?،؛:»)"']?)[^\S\r\n]*$/, '$1\u00A0$2');
+  }).join('\n');
+}
+
 // Premium Glassmorphic Toast Notification System
 window.showNotification = function(message, type = 'info', customDuration = null) {
   let container = document.getElementById('toast-container');
@@ -63,6 +79,9 @@ window.showNotification = function(message, type = 'info', customDuration = null
     document.body.appendChild(container);
   }
   
+  const cleanMsg = String(message != null ? message : '').trim();
+  const cleanNormalized = cleanMsg.replace(/\u00A0/g, ' ').trim();
+
   // Extended durations: 10s for errors, 6s for info/success
   let defaultDuration = 6000;
   if (type === 'error') {
@@ -74,7 +93,9 @@ window.showNotification = function(message, type = 'info', customDuration = null
   const existingToasts = container.querySelectorAll('.toast-notification');
   for (const existing of existingToasts) {
     const msgEl = existing.querySelector('.toast-message');
-    if (msgEl && msgEl.textContent.trim() === String(message).trim() && !existing.classList.contains('hide')) {
+    const existingRaw = existing._rawMessage;
+    const existingText = msgEl ? msgEl.textContent.replace(/\u00A0/g, ' ').trim() : '';
+    if ((existingRaw === cleanMsg || existingText === cleanNormalized) && !existing.classList.contains('hide')) {
       existing.style.animation = 'none';
       void existing.offsetWidth; // trigger reflow
       existing.style.animation = '';
@@ -87,6 +108,7 @@ window.showNotification = function(message, type = 'info', customDuration = null
 
   const toast = document.createElement('div');
   toast.className = `toast-notification toast-${type}`;
+  toast._rawMessage = cleanMsg;
   
   let iconSvg = '';
   if (type === 'success') {
@@ -118,7 +140,7 @@ window.showNotification = function(message, type = 'info', customDuration = null
       msgEl.textContent = '';
       const titleDiv = document.createElement('div');
       titleDiv.className = 'toast-title';
-      titleDiv.textContent = header;
+      titleDiv.textContent = formatToastMessage(header);
 
       const techDiv = document.createElement('div');
       techDiv.className = 'toast-tech-detail';
@@ -134,10 +156,10 @@ window.showNotification = function(message, type = 'info', customDuration = null
       msgEl.appendChild(titleDiv);
       msgEl.appendChild(techDiv);
     } else {
-      msgEl.textContent = header || message;
+      msgEl.textContent = formatToastMessage(header || message);
     }
   } else {
-    msgEl.textContent = message;
+    msgEl.textContent = formatToastMessage(message);
   }
   
   const progressBar = toast.querySelector('.toast-progress-bar');

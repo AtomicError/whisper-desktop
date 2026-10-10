@@ -389,6 +389,71 @@ describe('toast message multi-line rendering', () => {
   });
 });
 
+describe('toast notification formatting and orphan prevention', () => {
+  function formatToastMessage(text: string | null | undefined): string | null | undefined {
+    if (!text || typeof text !== 'string') return text;
+    return text.split('\n').map(line => {
+      return line.replace(/(\S+)[^\S\r\n]+(\S{1,25}[.!?،؛:»)"']?)[^\S\r\n]*$/, '$1\u00A0$2');
+    }).join('\n');
+  }
+
+  it('prevents orphan word at the end of Persian toast messages', () => {
+    const raw = 'مدل ggml-silero-vad-v6.2.3.bin از دیسک حذف شد.';
+    const formatted = formatToastMessage(raw);
+    expect(formatted).toBe('مدل ggml-silero-vad-v6.2.3.bin از دیسک حذف\u00A0شد.');
+  });
+
+  it('prevents orphan word for English messages', () => {
+    const raw = 'Transcription completed successfully.';
+    const formatted = formatToastMessage(raw);
+    expect(formatted).toBe('Transcription completed\u00A0successfully.');
+  });
+
+  it('preserves multi-line structure and explicit newlines without collapsing lines', () => {
+    const raw = 'خط اول\nدوم';
+    const formatted = formatToastMessage(raw);
+    expect(formatted).toBe('خط\u00A0اول\nدوم');
+    expect(formatted?.includes('\n')).toBe(true);
+  });
+
+  it('applies orphan prevention to each multi-word line in a multi-line message', () => {
+    const raw = 'خط اول پیام مهم\nخط دوم توضیحات تکمیلی شد.';
+    const formatted = formatToastMessage(raw);
+    expect(formatted).toBe('خط اول پیام\u00A0مهم\nخط دوم توضیحات تکمیلی\u00A0شد.');
+  });
+
+  it('handles various trailing punctuation characters gracefully', () => {
+    expect(formatToastMessage('دانلود مدل انجام شد...')).toBe('دانلود مدل انجام\u00A0شد...');
+    expect(formatToastMessage('عملیات با موفقیت انجام شد!')).toBe('عملیات با موفقیت انجام\u00A0شد!');
+    expect(formatToastMessage('آیا مطمئن هستید؟')).toBe('آیا مطمئن\u00A0هستید؟');
+    expect(formatToastMessage('دانلود نسخه آزمایشی (تست)')).toBe('دانلود نسخه آزمایشی\u00A0(تست)');
+    expect(formatToastMessage('فایل ذخیره شد.')).toBe('فایل ذخیره\u00A0شد.');
+  });
+
+  it('does not inappropriately bind massive unbroken technical paths', () => {
+    const longToken = '/very/long/unbroken/path/to/models/without/any/spaces/ggml-v6.2.3.bin';
+    const raw = `دانلود ${longToken}`;
+    const formatted = formatToastMessage(raw);
+    // Because the second token exceeds 25 chars, normal wrap boundary is preserved
+    expect(formatted).toBe(`دانلود ${longToken}`);
+  });
+
+  it('preserves single-word messages without crashing', () => {
+    expect(formatToastMessage('Completed')).toBe('Completed');
+    expect(formatToastMessage('تکمیل')).toBe('تکمیل');
+  });
+
+  it('handles trailing whitespace cleanly', () => {
+    expect(formatToastMessage('مدل ذخیره شد.   ')).toBe('مدل ذخیره\u00A0شد.');
+  });
+
+  it('handles empty and null inputs gracefully', () => {
+    expect(formatToastMessage('')).toBe('');
+    expect(formatToastMessage(null as any)).toBe(null);
+    expect(formatToastMessage(undefined as any)).toBe(undefined);
+  });
+});
+
 describe('CustomSelect model search placeholder and label resolution', () => {
   function resolveCustomSelectLabels(selectEl: {
     hasAttribute: (attr: string) => boolean;
