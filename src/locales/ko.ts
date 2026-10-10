@@ -558,6 +558,7 @@ export const ko: Translations = {
     timeHourMin: '{h}시간 {m}분',
     timeHourMinSec: '{h}시간 {m}분 {s}초',
     unitMB: 'MB',
+    unitKB: 'KB',
     speedUnitMB: 'MB/s',
     speedUnitKB: 'KB/s',
     downloadLiveProgress: '{size} {unit} ({pct}%) • {speedLabel}: {speed}',

@@ -558,6 +558,7 @@ export const ru: Translations = {
     timeHourMin: '{h} ч {m} мин',
     timeHourMinSec: '{h}ч {m}м {s}с',
     unitMB: 'МБ',
+    unitKB: 'КБ',
     speedUnitMB: 'МБ/с',
     speedUnitKB: 'КБ/с',
     downloadLiveProgress: '{size} {unit} ({pct}%) • {speedLabel}: {speed}',

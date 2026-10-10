@@ -558,6 +558,7 @@ export const fa: Translations = {
     timeHourMin: '{h} ساعت و {m} دقیقه',
     timeHourMinSec: '{h} ساعت و {m} دقیقه و {s} ثانیه',
     unitMB: 'مگابایت',
+    unitKB: 'کیلوبایت',
     speedUnitMB: 'مگابایت بر ثانیه',
     speedUnitKB: 'کیلوبایت بر ثانیه',
     downloadLiveProgress: '{size} {unit} ({pct}٪) • {speedLabel}: {speed}',

@@ -845,4 +845,220 @@ describe('Model Dropdown Population and Fallback Sync', () => {
   });
 });
 
+describe('Model Download Progress and Zero-Byte State Formatting', () => {
+  const formatModelDownloadProgress = (
+    downloadedBytes: number,
+    totalBytes: number,
+    progressPct: number,
+    mockT: (key: string, params?: any) => string,
+    formatNum: (n: number | string) => string = (n) => String(n)
+  ) => {
+    const dlBytes = Math.max(0, Math.floor(Number(downloadedBytes) || 0));
+    const total = Math.max(0, Math.floor(Number(totalBytes) || 0));
+    const isSubMegabyte = (total > 0 && total < 1048576) || (total === 0 && dlBytes < 1048576);
+
+    let sizeNum: number;
+    let unitText: string;
+
+    if (isSubMegabyte || dlBytes < 1048576) {
+      sizeNum = dlBytes === 0 ? 0 : Math.max(1, Math.round(dlBytes / 1024));
+      unitText = mockT('models.unitKB') || 'KB';
+    } else {
+      sizeNum = Math.round(dlBytes / 1048576);
+      unitText = mockT('models.unitMB') || 'MB';
+    }
+
+    const sizeFormatted = formatNum(sizeNum);
+    const pctFormatted = total > 0 ? formatNum(Math.min(100, Math.round(progressPct || 0))) : '...';
+
+    const liveTemplate = mockT('models.downloadLiveProgress', {
+      size: sizeFormatted,
+      unit: unitText,
+      pct: pctFormatted,
+      speedLabel: '',
+      speed: ''
+    });
+    const parts = liveTemplate.split('•');
+    let result = parts.length >= 1 ? parts[0].trim() : `${sizeFormatted} ${unitText} (${pctFormatted}%)`;
+    if (total <= 0) {
+      result = result.replace(/%\s*(\.|\u2026)+|(\.|\u2026)+\s*[%٪]/g, '...');
+    }
+    return result;
+  };
+
+  const getLiveDownloadStatus = (
+    payload: { phase: string; downloadedBytes: number; totalBytes: number; progress: number; speedBps: number },
+    smoothedEtaSeconds: number | null,
+    mockT: (key: string, params?: any) => string,
+    formatNum: (n: number | string) => string = (n) => String(n)
+  ) => {
+    const dlBytes = Math.max(0, payload.downloadedBytes || 0);
+    const isConnecting = payload.phase === 'starting' || payload.speedBps <= 0;
+    const pct = Math.min(100, Math.round((payload.progress || 0) * 100));
+
+    if (dlBytes <= 0) {
+      return payload.phase === 'starting' ? mockT('models.statusStarting') : mockT('models.statusConnecting');
+    }
+
+    const prefix = formatModelDownloadProgress(dlBytes, payload.totalBytes, pct, mockT, formatNum);
+    if (isConnecting) {
+      return `${prefix} • ${mockT('models.statusConnecting')}`;
+    } else if (smoothedEtaSeconds && smoothedEtaSeconds > 0) {
+      return `${prefix} • ${mockT('models.etaLabel', { time: `${smoothedEtaSeconds}s` })}`;
+    } else {
+      const inProgressSuffix = (mockT('models.statusInProgress', { size: '', pct: '' }).split('•')[1] || mockT('models.statusConnecting')).trim();
+      return `${prefix} • ${inProgressSuffix}`;
+    }
+  };
+
+  const mockEnT = (key: string, params?: any) => {
+    switch (key) {
+      case 'models.unitMB': return 'MB';
+      case 'models.unitKB': return 'KB';
+      case 'models.statusStarting': return 'Starting...';
+      case 'models.statusConnecting': return 'Connecting...';
+      case 'models.badgePaused': return 'Paused';
+      case 'models.etaLabel': return `ETA: ${params?.time}`;
+      case 'models.statusInProgress': return '{size} MB ({pct}%) • In progress';
+      case 'models.statusPaused': return '{size} MB ({pct}%) • Paused';
+      case 'models.downloadLiveProgress': return `${params?.size} ${params?.unit} (${params?.pct}%) • : `;
+      default: return '';
+    }
+  };
+
+  const mockFaT = (key: string, params?: any) => {
+    switch (key) {
+      case 'models.unitMB': return 'مگابایت';
+      case 'models.unitKB': return 'کیلوبایت';
+      case 'models.statusStarting': return 'در حال شروع...';
+      case 'models.statusConnecting': return 'در حال اتصال...';
+      case 'models.badgePaused': return 'متوقف‌شده';
+      case 'models.etaLabel': return `زمان باقی‌مانده: ${params?.time}`;
+      case 'models.statusInProgress': return '{size} مگابایت ({pct}٪) • در حال دانلود';
+      case 'models.statusPaused': return '{size} مگابایت ({pct}٪) • متوقف‌شده';
+      case 'models.downloadLiveProgress': return `${params?.size} ${params?.unit} (${params?.pct}٪) • : `;
+      default: return '';
+    }
+  };
+
+  it('shows clean Starting... / Connecting... without awkward "0 MB" when downloadedBytes is 0', () => {
+    const startingPayload = {
+      phase: 'starting',
+      downloadedBytes: 0,
+      totalBytes: 885098,
+      progress: 0,
+      speedBps: 0
+    };
+    expect(getLiveDownloadStatus(startingPayload, null, mockEnT)).toBe('Starting...');
+    expect(getLiveDownloadStatus(startingPayload, null, mockFaT)).toBe('در حال شروع...');
+
+    const connectingPayload = {
+      phase: 'downloading',
+      downloadedBytes: 0,
+      totalBytes: 885098,
+      progress: 0,
+      speedBps: 0
+    };
+    expect(getLiveDownloadStatus(connectingPayload, null, mockEnT)).toBe('Connecting...');
+    expect(getLiveDownloadStatus(connectingPayload, null, mockFaT)).toBe('در حال اتصال...');
+  });
+
+  it('formats Silero VAD (sub-megabyte) progress in KB instead of 0 MB throughout the download', () => {
+    const sileroTotalBytes = 885098; // ~864 KB
+
+    // ~146 KB (17%)
+    const p1 = formatModelDownloadProgress(150000, sileroTotalBytes, 17, mockEnT);
+    expect(p1).toBe('146 KB (17%)');
+
+    // ~488 KB (55%)
+    const p2 = formatModelDownloadProgress(500000, sileroTotalBytes, 55, mockEnT);
+    expect(p2).toBe('488 KB (55%)');
+
+    // Finished ~864 KB (100%)
+    const p3 = formatModelDownloadProgress(sileroTotalBytes, sileroTotalBytes, 100, mockEnT);
+    expect(p3).toBe('864 KB (100%)');
+
+    // Exactly 0 bytes formatted without fake 1 KB
+    const pZero = formatModelDownloadProgress(0, sileroTotalBytes, 0, mockEnT);
+    expect(pZero).toBe('0 KB (0%)');
+
+    // Unknown total size (streaming without Content-Length)
+    const pUnknown = formatModelDownloadProgress(500000, 0, 0, mockEnT);
+    expect(pUnknown).toBe('488 KB (...)');
+
+    // In Persian with Persian digits
+    const toFaDigits = (n: number | string) => String(n).replace(/\d/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[+d]);
+    const pFa = formatModelDownloadProgress(500000, sileroTotalBytes, 55, mockFaT, toFaDigits);
+    expect(pFa).toBe('۴۸۸ کیلوبایت (۵۵٪)');
+
+    const pFaUnknown = formatModelDownloadProgress(500000, 0, 0, mockFaT, toFaDigits);
+    expect(pFaUnknown).toBe('۴۸۸ کیلوبایت (...)');
+
+    // In Turkish with leading percent symbol (%55 vs indeterminate ...)
+    const mockTrT = (key: string, params?: any) => {
+      switch (key) {
+        case 'models.unitMB': return 'MB';
+        case 'models.unitKB': return 'KB';
+        case 'models.downloadLiveProgress': return `${params?.size} ${params?.unit} (%${params?.pct}) • : `;
+        default: return '';
+      }
+    };
+    const pTr = formatModelDownloadProgress(500000, sileroTotalBytes, 55, mockTrT);
+    expect(pTr).toBe('488 KB (%55)');
+
+    const pTrUnknown = formatModelDownloadProgress(500000, 0, 0, mockTrT);
+    expect(pTrUnknown).toBe('488 KB (...)');
+  });
+
+  it('formats large Whisper models in KB for initial chunk (< 1 MB) and MB thereafter', () => {
+    const whisperBaseTotal = 147951465; // ~141 MB
+
+    // First chunk: 400 KB transferred (< 1 MB) -> formats cleanly in KB
+    const initialChunk = formatModelDownloadProgress(409600, whisperBaseTotal, 0, mockEnT);
+    expect(initialChunk).toBe('400 KB (0%)');
+
+    // Substantial transfer: 20 MB transferred
+    const midTransfer = formatModelDownloadProgress(20971520, whisperBaseTotal, 14, mockEnT);
+    expect(midTransfer).toBe('20 MB (14%)');
+  });
+
+  it('renders live status with smooth ETA and proper localized labels once data transfers', () => {
+    const sileroTotalBytes = 885098;
+    const activePayload = {
+      phase: 'downloading',
+      downloadedBytes: 450000,
+      totalBytes: sileroTotalBytes,
+      progress: 0.51,
+      speedBps: 200000
+    };
+
+    const statusEn = getLiveDownloadStatus(activePayload, 2, mockEnT);
+    expect(statusEn).toBe('439 KB (51%) • ETA: 2s');
+
+    const toFaDigits = (n: number | string) => String(n).replace(/\d/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[+d]);
+    const statusFa = getLiveDownloadStatus(activePayload, 2, mockFaT, toFaDigits);
+    expect(statusFa).toBe('۴۳۹ کیلوبایت (۵۱٪) • زمان باقی‌مانده: 2s');
+  });
+
+  it('preserves downloaded progress and updates status to Connecting when resuming a paused card', () => {
+    const getResumeDownloadStatus = (currentText: string, mockT: (key: string) => string) => {
+      if (!currentText.trim()) return mockT('models.statusStarting');
+      if (currentText.includes('•')) {
+        const parts = currentText.split('•');
+        return `${parts[0].trim()} • ${mockT('models.statusConnecting')}`;
+      }
+      return mockT('models.statusStarting');
+    };
+
+    // Starting from scratch with no prior progress
+    expect(getResumeDownloadStatus('', mockEnT)).toBe('Starting...');
+    expect(getResumeDownloadStatus('', mockFaT)).toBe('در حال شروع...');
+
+    // Resuming paused Silero VAD transfer
+    expect(getResumeDownloadStatus('439 KB (51%) • Paused', mockEnT)).toBe('439 KB (51%) • Connecting...');
+    expect(getResumeDownloadStatus('۴۳۹ کیلوبایت (۵۱٪) • متوقف‌شده', mockFaT)).toBe('۴۳۹ کیلوبایت (۵۱٪) • در حال اتصال...');
+  });
+});
+
+
 

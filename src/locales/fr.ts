@@ -558,6 +558,7 @@ export const fr: Translations = {
     timeHourMin: '{h} h {m} min',
     timeHourMinSec: '{h}h {m}m {s}s',
     unitMB: 'Mo',
+    unitKB: 'Ko',
     speedUnitMB: 'Mo/s',
     speedUnitKB: 'Ko/s',
     downloadLiveProgress: '{size} {unit} ({pct}%) • {speedLabel} : {speed}',

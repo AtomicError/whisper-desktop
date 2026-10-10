@@ -182,6 +182,15 @@ describe('locale consistency for speed presets', () => {
       expect(models.speedUnitKB.length).toBeGreaterThan(0);
     });
 
+    it(`locale ${code} has models.unitMB and models.unitKB defined`, () => {
+      const models = (dict as any).models;
+      expect(models).toBeDefined();
+      expect(typeof models.unitMB).toBe('string');
+      expect(models.unitMB.length).toBeGreaterThan(0);
+      expect(typeof models.unitKB).toBe('string');
+      expect(models.unitKB.length).toBeGreaterThan(0);
+    });
+
     it(`locale ${code} has models.installedSize and translate.deckTitle defined`, () => {
       const models = (dict as any).models;
       expect(models).toBeDefined();

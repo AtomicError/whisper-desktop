@@ -3152,9 +3152,9 @@ function setupTauriListeners() {
       if (!card) return;
 
       const pct = Math.min(100, Math.round((payload.progress || 0) * 100));
-      const dlMB = ((payload.downloadedBytes || 0) / 1048576).toFixed(0);
       const totalMB = ((payload.totalBytes || 0) / 1048576).toFixed(0);
       const totalKnown = payload.totalBytes > 0;
+      const dlBytes = Math.max(0, payload.downloadedBytes || 0);
 
       // 1. Progress bar & status display in-place
       const progressBlock = card.querySelector('.model-progress-block');
@@ -3169,20 +3169,10 @@ function setupTauriListeners() {
       }
 
       // 2. Status text above progress bar (clean progress + smooth ETA without speed noise)
-      const pctFormatted = totalKnown ? window.formatNumberForLang(pct) : '...';
-      const inProgressTemplate = t('models.statusInProgress', {
-        size: window.formatNumberForLang(dlMB),
-        pct: pctFormatted
-      });
-      const parts = inProgressTemplate.split('•');
-      const prefix = parts.length >= 2
-        ? parts[0].trim()
-        : `${window.formatNumberForLang(dlMB)} ${t('models.unitMB')} (${pctFormatted}%)`;
-
       const isConnecting = payload.phase === 'starting' || payload.speedBps <= 0;
 
-      if (!isConnecting && totalKnown && payload.downloadedBytes <= payload.totalBytes) {
-        const rawSeconds = (payload.totalBytes - payload.downloadedBytes) / payload.speedBps;
+      if (!isConnecting && totalKnown && dlBytes <= payload.totalBytes) {
+        const rawSeconds = (payload.totalBytes - dlBytes) / payload.speedBps;
         if (rawSeconds > 0 && isFinite(rawSeconds)) {
           if (!card._smoothedEtaSeconds || card._smoothedEtaSeconds <= 0) {
             card._smoothedEtaSeconds = rawSeconds;
@@ -3194,14 +3184,21 @@ function setupTauriListeners() {
       }
 
       let liveStatus = '';
-      if (isConnecting) {
+      if (dlBytes <= 0) {
         card._smoothedEtaSeconds = null;
-        liveStatus = `${prefix} • ${t('models.statusConnecting')}`;
-      } else if (card._smoothedEtaSeconds && card._smoothedEtaSeconds > 0) {
-        const etaText = t('models.etaLabel', { time: formatRemainingTime(card._smoothedEtaSeconds) });
-        liveStatus = `${prefix} • ${isolateDirection(etaText)}`;
+        liveStatus = payload.phase === 'starting' ? t('models.statusStarting') : t('models.statusConnecting');
       } else {
-        liveStatus = `${prefix} • ${parts.length >= 2 ? parts[1].trim() : t('models.statusConnecting')}`;
+        const prefix = formatModelDownloadProgress(dlBytes, payload.totalBytes, pct);
+        if (isConnecting) {
+          card._smoothedEtaSeconds = null;
+          liveStatus = `${prefix} • ${t('models.statusConnecting')}`;
+        } else if (card._smoothedEtaSeconds && card._smoothedEtaSeconds > 0) {
+          const etaText = t('models.etaLabel', { time: formatRemainingTime(card._smoothedEtaSeconds) });
+          liveStatus = `${prefix} • ${isolateDirection(etaText)}`;
+        } else {
+          const inProgressSuffix = (t('models.statusInProgress', { size: '', pct: '' }).split('•')[1] || t('models.statusConnecting')).trim();
+          liveStatus = `${prefix} • ${inProgressSuffix}`;
+        }
       }
 
       // Manage stall detection watchdog (switches to connecting state if stream stalls for >= 3s)
@@ -3217,7 +3214,12 @@ function setupTauriListeners() {
             const statusEl = targetCard.querySelector('.model-progress-status');
             if (statusEl) {
               targetCard._smoothedEtaSeconds = null;
-              statusEl.innerHTML = `${prefix} • ${t('models.statusConnecting')}`;
+              if (dlBytes <= 0) {
+                statusEl.innerHTML = t('models.statusConnecting');
+              } else {
+                const prefix = formatModelDownloadProgress(dlBytes, payload.totalBytes, pct);
+                statusEl.innerHTML = `${prefix} • ${t('models.statusConnecting')}`;
+              }
             }
           }
         }, 3000);
@@ -3248,7 +3250,9 @@ function setupTauriListeners() {
       const descEl = card.querySelector('.setting-desc');
       if (descEl && (!descEl.querySelector('.badge-downloading') || descEl.querySelector('span[style*="var(--color-cyan)"]'))) {
         const meta = getModelMetaInfo(payload.modelName);
-        const displayedSizeMB = totalKnown ? totalMB : (card.dataset.sizeMb || totalMB);
+        const displayedSizeMB = totalKnown
+          ? Math.max(1, Math.round(payload.totalBytes / 1048576))
+          : (card.dataset.sizeMb || totalMB);
         descEl.innerHTML = `
           <span class="model-badge badge-downloading">${t('models.badgeDownloading')}</span>
           <span style="color: rgba(255,255,255,0.1);">|</span>
@@ -6522,6 +6526,51 @@ async function handleDroppedFiles(files) {
 let currentCategoryFilter = 'recommended';
 let currentModelQuickFilter = 'all';
 
+/**
+ * Formats model download progress text with unit intelligence:
+ * - Sub-megabyte models (e.g. Silero VAD ~885 KB) and initial sub-megabyte transfers use KB with localized units.
+ * - Multi-megabyte models with >= 1 MB transferred use MB with localized units.
+ * - Respects localized percent position, direction, and localized digits.
+ */
+function formatModelDownloadProgress(downloadedBytes, totalBytes, progressPct) {
+  const dlBytes = Math.max(0, Math.floor(Number(downloadedBytes) || 0));
+  const total = Math.max(0, Math.floor(Number(totalBytes) || 0));
+  const isSubMegabyte = (total > 0 && total < 1048576) || (total === 0 && dlBytes < 1048576);
+
+  let sizeNum;
+  let unitText;
+
+  if (isSubMegabyte || dlBytes < 1048576) {
+    sizeNum = dlBytes === 0 ? 0 : Math.max(1, Math.round(dlBytes / 1024));
+    unitText = t('models.unitKB') || t('transcribe.unitKB') || 'KB';
+  } else {
+    sizeNum = Math.round(dlBytes / 1048576);
+    unitText = t('models.unitMB') || 'MB';
+  }
+
+  const sizeFormatted = typeof window.formatNumberForLang === 'function'
+    ? window.formatNumberForLang(sizeNum)
+    : String(sizeNum);
+  const pctFormatted = total > 0
+    ? (typeof window.formatNumberForLang === 'function' ? window.formatNumberForLang(Math.min(100, Math.round(progressPct || 0))) : String(Math.min(100, Math.round(progressPct || 0))))
+    : '...';
+
+  const liveTemplate = t('models.downloadLiveProgress', {
+    size: sizeFormatted,
+    unit: unitText,
+    pct: pctFormatted,
+    speedLabel: '',
+    speed: ''
+  });
+  const parts = liveTemplate.split('•');
+  let result = parts.length >= 1 ? parts[0].trim() : `${sizeFormatted} ${unitText} (${pctFormatted}%)`;
+  if (total <= 0) {
+    result = result.replace(/%\s*(\.|\u2026)+|(\.|\u2026)+\s*[%٪]/g, '...');
+  }
+  return result;
+}
+window.formatModelDownloadProgress = formatModelDownloadProgress;
+
 function formatRemainingTime(seconds) {
   if (seconds <= 0 || !isFinite(seconds)) return t('models.timeUnknown');
   const totalSeconds = Math.round(seconds);
@@ -6915,9 +6964,9 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
       card.className = 'setting-card';
       card.dataset.name = m.name;
       card.setAttribute('data-model', m.name);
-      const sizeMB = (m.sizeBytes / 1024 / 1024).toFixed(0);
-      card.dataset.sizeMb = sizeMB;
-      const dlMB = (m.downloadedBytes / 1024 / 1024).toFixed(0);
+      const sizeMB = Math.max(1, Math.round((m.sizeBytes || 0) / 1048576));
+      card.dataset.sizeMb = String(sizeMB);
+      const dlBytes = m.downloadedBytes || 0;
       const pct = Math.round((m.progress || 0) * 100);
       const safeName = escapeHTML(m.name);
       const meta = getModelMetaInfo(m.name);
@@ -7005,8 +7054,16 @@ window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = f
           ${recReasonHtml}
           <div class="model-progress-block" style="display: ${showProgressBlock};">
             <div class="model-progress-status ${m.status === 'Paused' ? 'status-paused' : 'status-downloading'}">
-              ${m.status === 'Downloading' ? t('models.statusInProgress', { size: window.formatNumberForLang(dlMB), pct: window.formatNumberForLang(pct) }) : ''}
-              ${m.status === 'Paused' ? t('models.statusPaused', { size: window.formatNumberForLang(dlMB), pct: window.formatNumberForLang(pct) }) : ''}
+              ${m.status === 'Downloading' ? (
+                dlBytes <= 0
+                  ? t('models.statusConnecting')
+                  : `${formatModelDownloadProgress(dlBytes, m.sizeBytes, pct)} • ${(t('models.statusInProgress', { size: '', pct: '' }).split('•')[1] || t('models.statusConnecting')).trim()}`
+              ) : ''}
+              ${m.status === 'Paused' ? (
+                dlBytes <= 0
+                  ? t('models.badgePaused')
+                  : `${formatModelDownloadProgress(dlBytes, m.sizeBytes, pct)} • ${(t('models.statusPaused', { size: '', pct: '' }).split('•')[1] || t('models.badgePaused')).trim()}`
+              ) : ''}
             </div>
             <div class="progress-bar-container" style="height: 6px; border-radius: 3px; background: rgba(255,255,255,0.05); overflow: hidden; border: 1px solid rgba(255,255,255,0.02);">
               <div class="progress-bar-fill" style="width: ${pct}%; height: 100%; background: ${m.status === 'Downloading' ? 'var(--color-cyan)' : 'var(--color-gold)'}; box-shadow: ${m.status === 'Downloading' ? 'var(--shadow-neon-cyan)' : 'var(--shadow-neon-gold)'}; transition: width 0.3s ease;"></div>
@@ -7082,6 +7139,11 @@ window.downloadModelClick = async function(name) {
       const statusEl = card.querySelector('.model-progress-status');
       if (statusEl) {
         if (!statusEl.textContent.trim()) {
+          statusEl.textContent = t('models.statusStarting');
+        } else if (statusEl.textContent.includes('•')) {
+          const parts = statusEl.textContent.split('•');
+          statusEl.textContent = `${parts[0].trim()} • ${t('models.statusConnecting')}`;
+        } else {
           statusEl.textContent = t('models.statusStarting');
         }
         statusEl.classList.remove('status-paused');

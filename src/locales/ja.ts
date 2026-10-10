@@ -558,6 +558,7 @@ export const ja: Translations = {
     timeHourMin: '{h}時間 {m}分',
     timeHourMinSec: '{h}時間 {m}分 {s}秒',
     unitMB: 'MB',
+    unitKB: 'KB',
     speedUnitMB: 'MB/s',
     speedUnitKB: 'KB/s',
     downloadLiveProgress: '{size} {unit} ({pct}%) • {speedLabel}: {speed}',

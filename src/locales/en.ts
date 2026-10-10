@@ -556,6 +556,7 @@ export const en = {
     timeHourMin: '{h}h {m}m',
     timeHourMinSec: '{h}h {m}m {s}s',
     unitMB: 'MB',
+    unitKB: 'KB',
     speedUnitMB: 'MB/s',
     speedUnitKB: 'KB/s',
     downloadLiveProgress: '{size} {unit} ({pct}%) • {speedLabel}: {speed}',

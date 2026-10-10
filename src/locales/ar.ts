@@ -558,6 +558,7 @@ export const ar: Translations = {
     timeHourMin: '{h} ساعة و {m} دقيقة',
     timeHourMinSec: '{h} ساعة و {m} دقيقة و {s} ثانية',
     unitMB: 'ميغابايت',
+    unitKB: 'كيلوبايت',
     speedUnitMB: 'ميجابايت في الثانية',
     speedUnitKB: 'كيلوبايت في الثانية',
     downloadLiveProgress: '{size} {unit} ({pct}%) • {speedLabel}: {speed}',
