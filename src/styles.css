@@ -4147,26 +4147,13 @@ select.select-control {
   box-sizing: border-box;
 }
 
-.btn-export-transcript {
-  padding: 4px 10px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  border-radius: 6px;
-  margin: 0;
-  height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-text);
-  border: 1px solid var(--border-glass);
-  background: rgba(255, 255, 255, 0.04);
-  cursor: pointer;
-  transition: var(--transition-smooth);
-}
-
-.btn-export-transcript:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(var(--color-cyan-rgb), 0.4);
+.transcript-viewer-actions button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  color: var(--color-text-dim);
+  border-color: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+  filter: grayscale(1);
 }
 
 .btn-copy-transcript {
@@ -4220,9 +4207,36 @@ select.select-control {
 }
 
 .transcript-placeholder {
-  color: var(--color-text-dim);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 200px;
   text-align: center;
-  margin-top: 40px;
+  padding: 24px;
+  color: var(--color-text-dim);
+}
+
+.transcript-empty-icon {
+  width: 36px;
+  height: 36px;
+  opacity: 0.4;
+  margin-bottom: 12px;
+}
+
+.transcript-empty-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin-bottom: 4px;
+}
+
+.transcript-empty-desc {
+  font-size: 0.78rem;
+  max-width: 260px;
+  line-height: 1.4;
+  opacity: 0.8;
 }
 
 /* Minimal IDE-Style Configuration Status Bar in Step 3 */

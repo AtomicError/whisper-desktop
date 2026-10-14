@@ -464,7 +464,8 @@ html[dir="rtl"] .transcribe-switch-info {
    mono face. The drop-zone's own path line was styled alongside it until now, though
    that line has been hidden since a loaded file started showing its name and size on the
    card and its path only in the tooltip, isolated by `isolateLtr`. */
-html[dir="rtl"] .translate-output-display.has-custom-path {
+html[dir="rtl"] .translate-output-display.has-custom-path,
+html[dir="rtl"] .transcribe-output-display.has-custom-path {
   direction: ltr;
   text-align: left;
   unicode-bidi: isolate;

@@ -4802,9 +4802,15 @@ window.updateTranscribeWorkflowButtons = function() {
   const btnOpenFolder = document.getElementById('btn-open-output-folder');
   const btnSendTranslate = document.getElementById('btn-send-to-translation');
   const btnSendHardsub = document.getElementById('btn-transcribe-send-to-hardsub');
+  const btnCopy = document.getElementById('btn-copy-transcript');
 
   const hasOutputDir = Boolean(window.lastTranscribedOutputDir);
   const hasSubtitle = Boolean(window.lastTranscribedSubtitlePath);
+  const hasTranscript = Boolean((typeof transcriptLines !== 'undefined' && transcriptLines && transcriptLines.length > 0) || hasSubtitle);
+
+  if (btnCopy) {
+    btnCopy.disabled = !hasTranscript;
+  }
 
   if (btnOpenFolder) {
     btnOpenFolder.disabled = !hasOutputDir;
@@ -5037,14 +5043,26 @@ window.clearSingleMediaFile = function() {
   window.lastTranscribedSubtitlePath = null;
   window.lastTranscribedVideoPath = null;
   window.lastTranscribedOutputDir = null;
+  transcriptLines = [];
   if (typeof window.updateTranscribeWorkflowButtons === 'function') {
     window.updateTranscribeWorkflowButtons();
   }
 
-  transcriptLines = [];
   const viewport = document.getElementById('transcript-viewport');
   if (viewport) {
-    viewport.innerHTML = `<div class="transcript-placeholder" id="transcript-placeholder" data-i18n="transcribe.streamNotice">${escapeHTML(t('transcribe.streamNotice'))}</div>`;
+    viewport.innerHTML = `
+      <div class="transcript-placeholder" id="transcript-placeholder">
+        <svg class="transcript-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+          <polyline points="10 9 9 9 8 9"></polyline>
+        </svg>
+        <div class="transcript-empty-title" data-i18n="transcribe.liveViewerTitle">${escapeHTML(t('transcribe.liveViewerTitle') || 'Live Transcript Viewer')}</div>
+        <div class="transcript-empty-desc" data-i18n="transcribe.streamNotice">${escapeHTML(t('transcribe.streamNotice') || 'Start transcription to stream live text preview.')}</div>
+      </div>
+    `;
   }
   const searchInput = document.getElementById('transcript-search');
   if (searchInput) searchInput.value = '';
@@ -5433,22 +5451,18 @@ function updateTranscribeUIConfigs() {
   }
   
   const quickVadBtn = document.getElementById('quick-toggle-vad');
-  const quickVadText = document.getElementById('quick-vad-status-text');
-  if (quickVadBtn && quickVadText) {
+  if (quickVadBtn) {
     if ('checked' in quickVadBtn) {
       quickVadBtn.checked = vadActive;
     }
     if (vadActive) {
       quickVadBtn.classList.add('active');
-      quickVadText.textContent = t('transcribe.vadActiveStatus');
       quickVadBtn.title = `Silero VAD Active (${vadModelName}) - Click to disable`;
     } else {
       quickVadBtn.classList.remove('active');
       if (hasVadModel) {
-        quickVadText.textContent = t('transcribe.vadDisabledStatus');
         quickVadBtn.title = `Silero VAD Disabled (${vadModelName}) - Click to enable`;
       } else {
-        quickVadText.textContent = t('transcribe.vadNoModelStatus');
         quickVadBtn.title = 'No Silero VAD model found on system - Click for instructions';
       }
     }
@@ -5469,32 +5483,7 @@ function updateTranscribeUIConfigs() {
     transCfgTranslation.className = translationEnabled ? 'val-green' : 'val-muted';
   }
 
-  // 5. Sync Quick Task Select (Transcribe vs Translate)
-  const quickTaskSelect = document.getElementById('quick-opt-task');
-  if (quickTaskSelect && settingsState) {
-    quickTaskSelect.value = settingsState.translate ? 'translate' : 'transcribe';
-  }
-
-  // 6. Sync Quick Diarize Button & Status
-  const quickDiarizeBtn = document.getElementById('quick-toggle-diarize');
-  const quickDiarizeText = document.getElementById('quick-diarize-status-text');
-  if (quickDiarizeBtn && quickDiarizeText && settingsState) {
-    const diarizeActive = Boolean(settingsState.diarize);
-    if ('checked' in quickDiarizeBtn) {
-      quickDiarizeBtn.checked = diarizeActive;
-    }
-    if (diarizeActive) {
-      quickDiarizeBtn.classList.add('active');
-      quickDiarizeText.textContent = t('transcribe.vadActiveStatus') || 'Active';
-      quickDiarizeBtn.title = 'Speaker Diarization Active - Click to disable';
-    } else {
-      quickDiarizeBtn.classList.remove('active');
-      quickDiarizeText.textContent = t('transcribe.vadDisabledStatus') || 'Disabled';
-      quickDiarizeBtn.title = 'Speaker Diarization Disabled - Click to enable';
-    }
-  }
-
-  // 7. Sync Transcribe Output Folder UI & Workflow Buttons
+  // 5. Sync Transcribe Output Folder UI & Workflow Buttons
   if (typeof updateTranscribeOutputDirUI === 'function') {
     updateTranscribeOutputDirUI();
   }
@@ -5515,34 +5504,6 @@ window.openTranscriptionSettings = function() {
       window.switchSettingsCategory('transcription');
     }
   }
-};
-
-window.onQuickTaskChanged = function(task) {
-  if (!settingsState) return;
-  settingsState.translate = (task === 'translate');
-  const optTranslate = document.getElementById('opt-translate');
-  if (optTranslate) {
-    optTranslate.checked = settingsState.translate;
-  }
-  saveCurrentSettings();
-  updateTranscribeUIConfigs();
-};
-
-window.toggleQuickDiarize = function(forceVal) {
-  if (!settingsState) return;
-  settingsState.diarize = (typeof forceVal === 'boolean') ? forceVal : !settingsState.diarize;
-  const optDiarize = document.getElementById('opt-diarize');
-  if (optDiarize) {
-    optDiarize.checked = settingsState.diarize;
-  }
-  const quickDiarize = document.getElementById('quick-toggle-diarize');
-  if (quickDiarize) {
-    quickDiarize.checked = settingsState.diarize;
-  }
-  saveCurrentSettings();
-  updateTranscribeUIConfigs();
-  const msg = settingsState.diarize ? 'Speaker Diarization Active' : 'Speaker Diarization Disabled';
-  showNotification(msg, 'info');
 };
 
 function setupQuickConfigDeckEventListeners() {
@@ -5661,6 +5622,10 @@ window.runWhisperTranscription = async function() {
 
   // Clear transcript preview
   transcriptLines = [];
+  window.lastTranscribedSubtitlePath = null;
+  if (typeof updateTranscribeWorkflowButtons === 'function') {
+    updateTranscribeWorkflowButtons();
+  }
   const viewport = document.getElementById('transcript-viewport');
   if (viewport) {
     viewport.innerHTML = `
@@ -6379,14 +6344,26 @@ window.clearBatchQueue = function() {
   window.lastTranscribedSubtitlePath = null;
   window.lastTranscribedVideoPath = null;
   window.lastTranscribedOutputDir = null;
+  transcriptLines = [];
   if (typeof window.updateTranscribeWorkflowButtons === 'function') {
     window.updateTranscribeWorkflowButtons();
   }
 
-  transcriptLines = [];
   const viewport = document.getElementById('transcript-viewport');
   if (viewport) {
-    viewport.innerHTML = `<div class="transcript-placeholder" id="transcript-placeholder" data-i18n="transcribe.streamNotice">${escapeHTML(t('transcribe.streamNotice'))}</div>`;
+    viewport.innerHTML = `
+      <div class="transcript-placeholder" id="transcript-placeholder">
+        <svg class="transcript-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+          <polyline points="10 9 9 9 8 9"></polyline>
+        </svg>
+        <div class="transcript-empty-title" data-i18n="transcribe.liveViewerTitle">${escapeHTML(t('transcribe.liveViewerTitle') || 'Live Transcript Viewer')}</div>
+        <div class="transcript-empty-desc" data-i18n="transcribe.streamNotice">${escapeHTML(t('transcribe.streamNotice') || 'Start transcription to stream live text preview.')}</div>
+      </div>
+    `;
   }
   const searchInput = document.getElementById('transcript-search');
   if (searchInput) searchInput.value = '';
@@ -6650,6 +6627,14 @@ window.runBatchExtraction = async function() {
   const metricsEl = document.getElementById('transcribe-metrics');
   if (metricsEl) metricsEl.style.display = 'none';
   
+  // Reset prior output state at batch start
+  window.lastTranscribedSubtitlePath = null;
+  window.lastTranscribedOutputDir = null;
+  transcriptLines = [];
+  if (typeof updateTranscribeWorkflowButtons === 'function') {
+    updateTranscribeWorkflowButtons();
+  }
+
   // Set up global progress tracking
   const fillBar = document.getElementById('progress-linear-fill');
   const pctEl = document.getElementById('lbl-radial-pct');
@@ -6698,6 +6683,10 @@ window.runBatchExtraction = async function() {
 
           // Clear transcript preview for this file
       transcriptLines = [];
+      window.lastTranscribedSubtitlePath = null;
+      if (typeof updateTranscribeWorkflowButtons === 'function') {
+        updateTranscribeWorkflowButtons();
+      }
       const viewport = document.getElementById('transcript-viewport');
       if (viewport) {
         viewport.innerHTML = `
@@ -7892,6 +7881,9 @@ function appendTranscriptLine(timeRange, text) {
   const lineObj = { timeRange, text: cleanText, id: transcriptLines.length };
   transcriptLines.push(lineObj);
 
+  const btnCopy = document.getElementById('btn-copy-transcript');
+  if (btnCopy) btnCopy.disabled = false;
+
   const parsedTime = parseTranscriptTimeRange(timeRange);
   
   const cardEl = document.createElement('div');
@@ -8031,6 +8023,8 @@ window.loadTranscriptFromFile = async function(fullPath) {
     if (transcriptLines.length === 0) {
       viewport.innerHTML = `<div style="color: var(--color-text-dim); text-align: center; margin-top: 40px;">Transcript is empty.</div>`;
     }
+    const btnCopy = document.getElementById('btn-copy-transcript');
+    if (btnCopy) btnCopy.disabled = (transcriptLines.length === 0);
   } catch (err) {
     console.error("Failed to load transcript file:", err);
   }
@@ -8088,7 +8082,7 @@ window.copyLiveTranscriptToClipboard = async function() {
 
   // Fallback: check transcript viewport text if transcriptLines array is unpopulated
   const viewport = document.getElementById('transcript-viewport');
-  if (viewport && viewport.innerText && !viewport.innerText.includes("Start transcription to stream")) {
+  if (viewport && !viewport.querySelector('.transcript-placeholder') && !viewport.querySelector('.transcript-initializing-state')) {
     const rawPreview = viewport.innerText.trim();
     if (rawPreview.length > 0) {
       try {
@@ -8109,48 +8103,6 @@ window.copyLiveTranscriptToClipboard = async function() {
     await window.copyMainTranscriptToClipboard();
   } else {
     showNotification(t('toasts.noTranscriptToCopy'), "info");
-  }
-};
-
-window.exportLiveTranscript = function() {
-  let textToExport = '';
-  if (transcriptLines && transcriptLines.length > 0) {
-    textToExport = transcriptLines.map(l => l.text).join('\n');
-  } else {
-    const viewport = document.getElementById('transcript-viewport');
-    if (viewport && viewport.innerText && !viewport.innerText.includes("Start transcription to stream")) {
-      textToExport = viewport.innerText.trim();
-    }
-  }
-
-  if (!textToExport || textToExport.trim().length === 0) {
-    showNotification(t('toasts.noTranscriptToCopy') || 'No transcript text available to export', "info");
-    return;
-  }
-
-  let defaultName = 'transcript.txt';
-  if (selectedMediaFile) {
-    const base = getBasename(selectedMediaFile);
-    const dotIdx = base.lastIndexOf('.');
-    defaultName = (dotIdx > 0 ? base.substring(0, dotIdx) : base) + '.txt';
-  } else if (isBatchMode && batchItems && batchItems.length > 0) {
-    defaultName = 'batch_transcripts.txt';
-  }
-
-  try {
-    const blob = new Blob([textToExport], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = defaultName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    showNotification(t('toasts.fileExportedSuccess') || 'Transcript exported successfully', "success");
-  } catch (err) {
-    console.error('Export transcript failed:', err);
-    showNotification(String(err), "error");
   }
 };
 

@@ -3099,7 +3099,7 @@
 
                   <div class="transcribe-deck-body">
                     <!-- 1. Smart Media File Card -->
-                    <div class="media-drop-zone transcribe-dropzone-card" id="transcribe-drop-zone" title="Drag &amp; drop audio or video file" data-i18n-title="transcribe.selectFilePrompt">
+                    <div class="media-drop-zone transcribe-dropzone-card" id="transcribe-drop-zone" title="Drag &amp; drop audio or video (.mp4, .mkv, .mp3, .wav)" data-i18n-title="transcribe.selectFilePrompt">
                       <div class="transcribe-dropzone-main-row">
                         <div class="transcribe-dropzone-identity">
                           <svg class="media-icon transcribe-media-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -3117,13 +3117,13 @@
                           </div>
                         </div>
                         <div class="transcribe-dropzone-actions">
-                          <button class="btn-secondary btn-media-browse" id="btn-browse-media" onclick="browseMediaFile()" data-i18n="transcribe.browseSystem" type="button">Browse System</button>
+                          <button class="btn-secondary btn-media-browse" id="btn-browse-media" onclick="browseMediaFile()" data-i18n="transcribe.browseSystem" type="button">Browse</button>
                           <button class="btn-secondary btn-clear-media" id="btn-clear-media" onclick="clearSingleMediaFile()" data-i18n="transcribe.clearMedia" type="button" style="display:none;">Clear</button>
                         </div>
                       </div>
 
                       <!-- The empty-state prompt hint -->
-                      <p class="transcribe-media-prompt" id="lbl-file-path" data-i18n="transcribe.selectFilePrompt">Select audio or video file</p>
+                      <p class="transcribe-media-prompt" id="lbl-file-path" data-i18n="transcribe.selectFilePrompt">Drag &amp; drop audio or video (.mp4, .mkv, .mp3, .wav)</p>
 
                       <!-- Loaded file metadata badges row (Single-file) -->
                       <div class="transcribe-meta-badges-row" id="media-meta-box" style="display:none;">
@@ -3220,25 +3220,6 @@
                       <select class="select-control" id="quick-opt-language" data-searchable data-language-select="spoken" aria-label="Quick Select Language"></select>
                     </div>
 
-                    <!-- 4. Task Type Selector (Transcribe vs Translate) -->
-                    <div class="transcribe-field-group">
-                      <label for="quick-opt-task">
-                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="m5 8 6 6"/>
-                          <path d="m4 14 6-6 2-3"/>
-                          <path d="M2 5h12"/>
-                          <path d="M7 2h1"/>
-                          <path d="m22 22-5-10-5 10"/>
-                          <path d="M14 18h6"/>
-                        </svg>
-                        <span data-i18n="transcribe.taskLabel">Task Type</span>
-                      </label>
-                      <select class="select-control" id="quick-opt-task" aria-label="Task Type" onchange="onQuickTaskChanged(this.value)">
-                        <option value="transcribe" data-i18n="transcribe.taskTranscribe">Transcribe (Speech to Text in same language)</option>
-                        <option value="translate" data-i18n="transcribe.taskTranslate">Translate to English (Built-in Engine)</option>
-                      </select>
-                    </div>
-
                     <!-- 4. Hardware Engine / Backend Selector -->
                     <div class="transcribe-field-group">
                       <label for="quick-opt-selectedBackend">
@@ -3262,7 +3243,7 @@
                             </svg>
                             <span data-i18n="transcribe.sileroVad">Silero VAD</span>
                           </span>
-                          <span class="transcribe-switch-desc" id="quick-vad-status-text" data-i18n="transcribe.vadDisabledStatus">VAD Disabled</span>
+                          <span class="transcribe-switch-desc" data-i18n="settings.vadEnableDesc">Pre-filter silent intervals using Silero neural voice activity detection.</span>
                         </div>
                         <label class="switch">
                           <input type="checkbox" id="quick-toggle-vad" onchange="toggleQuickVad(this.checked)" title="Toggle Silero Voice Activity Detection" />
@@ -3271,26 +3252,7 @@
                       </div>
                     </div>
 
-                    <!-- 7. Speaker Diarization Switch Row -->
-                    <div class="transcribe-field-group">
-                      <div class="transcribe-switch-row" title="Separates and labels speakers across stereo audio channels." data-i18n-title="settings.diarizeDesc">
-                        <div class="transcribe-switch-info">
-                          <span class="transcribe-switch-title">
-                            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                            </svg>
-                            <span data-i18n="settings.diarizeTitle">Speaker Diarization</span>
-                          </span>
-                          <span class="transcribe-switch-desc" id="quick-diarize-status-text">Diarization Disabled</span>
-                        </div>
-                        <label class="switch">
-                          <input type="checkbox" id="quick-toggle-diarize" onchange="toggleQuickDiarize(this.checked)" title="Toggle Speaker Diarization" />
-                          <span class="slider"></span>
-                        </label>
-                      </div>
-                    </div>
-
-                    <!-- 8. Output Folder Row (Matching Translation Studio) -->
+                    <!-- 6. Output Folder Row (Matching Translation Studio) -->
                     <div class="transcribe-field-group">
                       <label>
                         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -3387,22 +3349,14 @@
                       <h3 class="transcript-viewer-title" data-i18n="transcribe.liveViewerTitle">Live Transcript Viewer</h3>
                     </div>
                     <div class="transcript-viewer-actions">
-                      <button class="btn-secondary btn-export-transcript" id="btn-export-transcript" onclick="exportLiveTranscript()" aria-label="Export transcript to file">
-                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-inline-end: 4px;">
-                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                          <polyline points="7 10 12 15 17 10"/>
-                          <line x1="12" y1="15" x2="12" y2="3"/>
-                        </svg>
-                        <span data-i18n="transcribe.exportTxt">Export TXT</span>
-                      </button>
-                      <button class="btn-secondary btn-copy-transcript" id="btn-copy-transcript" onclick="copyLiveTranscriptToClipboard()" aria-label="Copy live transcript preview to clipboard">
+                      <button class="btn-secondary btn-copy-transcript" id="btn-copy-transcript" type="button" disabled onclick="copyLiveTranscriptToClipboard()" aria-label="Copy live transcript preview to clipboard">
                         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-inline-end: 4px;">
                           <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
                           <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
                         </svg>
                         <span data-i18n="transcribe.copyLiveTranscript">Copy</span>
                       </button>
-                      <button class="btn-secondary btn-icon-text" id="btn-open-output-folder" onclick="openOutputFolder()" aria-label="Open output folder in file manager" disabled data-i18n-title="transcribe.noOutputDirYet" title="No output folder available yet">
+                      <button class="btn-secondary btn-icon-text" id="btn-open-output-folder" type="button" onclick="openOutputFolder()" aria-label="Open output folder in file manager" disabled data-i18n-title="transcribe.noOutputDirYet" title="No output folder available yet">
                         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="margin-inline-end: 4px;">
                           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                         </svg>
@@ -3429,13 +3383,21 @@
                       <circle cx="11" cy="11" r="8"/>
                       <line x1="21" y1="21" x2="16.65" y2="16.65"/>
                     </svg>
-                    <input class="text-input transcript-search-input" type="text" id="transcript-search" placeholder="Search transcript..." data-i18n-placeholder="transcribe.searchTranscript" oninput="filterTranscriptLines()" />
+                    <input class="text-input transcript-search-input" type="text" id="transcript-search" placeholder="Search transcript..." aria-label="Search transcript" data-i18n-placeholder="transcribe.searchTranscript" oninput="filterTranscriptLines()" />
                   </div>
                   
                   <!-- Real-time transcript display box -->
-                  <div class="transcript-viewport" id="transcript-viewport">
-                    <div class="transcript-placeholder" id="transcript-placeholder" data-i18n="transcribe.streamNotice">
-                      Start transcription to stream live text preview.
+                  <div class="transcript-viewport" id="transcript-viewport" aria-live="polite">
+                    <div class="transcript-placeholder" id="transcript-placeholder">
+                      <svg class="transcript-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="16" y1="13" x2="8" y2="13"/>
+                        <line x1="16" y1="17" x2="8" y2="17"/>
+                        <polyline points="10 9 9 9 8 9"/>
+                      </svg>
+                      <div class="transcript-empty-title" data-i18n="transcribe.liveViewerTitle">Live Transcript Viewer</div>
+                      <div class="transcript-empty-desc" data-i18n="transcribe.streamNotice">Start transcription to stream live text preview.</div>
                     </div>
                   </div>
                 </div>

@@ -48,6 +48,8 @@ describe('Transcription Studio Unified Deck DOM Structure', () => {
     expect(html).toContain('id="lbl-file-name"');
     expect(html).toContain('id="lbl-file-path"');
     expect(html).toContain('id="btn-browse-media"');
+    expect(html).toMatch(/<button[^>]*id="btn-browse-media"[^>]*>Browse<\/button>/);
+    expect(html).toContain('Drag &amp; drop audio or video (.mp4, .mkv, .mp3, .wav)');
     expect(html).toContain('id="btn-clear-media"');
     expect(html).toContain('id="media-meta-box"');
     expect(html).toContain('transcribe-meta-badges-row');
@@ -58,17 +60,25 @@ describe('Transcription Studio Unified Deck DOM Structure', () => {
     expect(html).toContain('id="meta-recommendation"');
   });
 
-  it('contains quick configuration fields including task selection and diarization toggle', () => {
+  it('contains quick configuration fields without removed task selection or duplicate diarization toggle', () => {
     expect(html).toContain('id="quick-opt-model"');
     expect(html).toContain('id="quick-opt-language"');
-    expect(html).toContain('id="quick-opt-task"');
-    expect(html).toContain('data-i18n="transcribe.taskLabel"');
-    expect(html).toContain('data-i18n="transcribe.taskTranscribe"');
-    expect(html).toContain('data-i18n="transcribe.taskTranslate"');
     expect(html).toContain('id="quick-opt-selectedBackend"');
     expect(html).toContain('id="quick-toggle-vad"');
-    expect(html).toContain('id="quick-toggle-diarize"');
-    expect(html).toContain('data-i18n="settings.diarizeTitle"');
+
+    // Task Type selector has been removed from Transcribe Studio deck
+    expect(html).not.toContain('id="quick-opt-task"');
+    expect(html).not.toContain('data-i18n="transcribe.taskLabel"');
+    expect(html).not.toContain('data-i18n="transcribe.taskTranscribe"');
+    expect(html).not.toContain('data-i18n="transcribe.taskTranslate"');
+
+    // Duplicate Diarization toggle has been removed from Transcribe Studio deck
+    expect(html).not.toContain('id="quick-toggle-diarize"');
+
+    // VAD switch uses informative feature description matching translation studio
+    expect(html).toContain('data-i18n="settings.vadEnableDesc"');
+    expect(html).not.toContain('id="quick-vad-status-text"');
+    expect(html).not.toContain('data-i18n="transcribe.vadDisabledStatus"');
   });
 
   it('contains batch queue container and batch specs box', () => {
@@ -124,11 +134,18 @@ describe('Transcription Studio Unified Deck DOM Structure', () => {
     expect(rightPanelHtml).toContain('transcript-viewer-card');
     expect(rightPanelHtml).toContain('id="transcribe-viewer-card"');
     expect(rightPanelHtml).toContain('id="transcript-search"');
-    expect(rightPanelHtml).toContain('id="btn-export-transcript"');
+    expect(rightPanelHtml).not.toContain('id="btn-export-transcript"');
+    expect(rightPanelHtml).not.toContain('data-i18n="transcribe.exportTxt"');
     expect(rightPanelHtml).toContain('id="btn-copy-transcript"');
     expect(rightPanelHtml).toContain('id="btn-open-output-folder"');
     expect(rightPanelHtml).toContain('id="btn-send-to-translation"');
     expect(rightPanelHtml).toContain('id="btn-transcribe-send-to-hardsub"');
+
+    // Accessibility and initial disabled state checks
+    expect(rightPanelHtml).toMatch(/<button[^>]*id="btn-copy-transcript"[^>]*type="button"[^>]*disabled/);
+    expect(rightPanelHtml).toContain('aria-label="Search transcript"');
+    expect(rightPanelHtml).toContain('id="transcript-viewport" aria-live="polite"');
+    expect(rightPanelHtml).toContain('class="transcript-placeholder" id="transcript-placeholder"');
   });
 });
 
@@ -143,6 +160,11 @@ describe('Transcription Studio Locales & Symmetry', () => {
       expect(loc.transcribe.deckTitle, `Locale ${code}.transcribe.deckTitle should be non-empty string`).toBeTruthy();
       expect(loc.transcribe.clearMedia, `Locale ${code}.transcribe.clearMedia should be non-empty string`).toBeTruthy();
       expect(loc.transcribe.manageInSettings, `Locale ${code}.transcribe.manageInSettings should be non-empty string`).toBeTruthy();
+      // Obsolete transcribe keys must be absent
+      expect((loc.transcribe as any).taskLabel, `Locale ${code}.transcribe.taskLabel should be removed`).toBeUndefined();
+      expect((loc.transcribe as any).taskTranscribe, `Locale ${code}.transcribe.taskTranscribe should be removed`).toBeUndefined();
+      expect((loc.transcribe as any).taskTranslate, `Locale ${code}.transcribe.taskTranslate should be removed`).toBeUndefined();
+      expect((loc.transcribe as any).exportTxt, `Locale ${code}.transcribe.exportTxt should be removed`).toBeUndefined();
     }
   });
 
@@ -166,7 +188,8 @@ describe('Transcription Studio Locales & Symmetry', () => {
 
   it('provides appropriate localized deckTitle values', () => {
     expect(locales.en.transcribe.deckTitle).toBe('Transcription Setup');
-    expect(locales.fa.transcribe.deckTitle).toBe('تنظیمات پیاده‌سازی');
+    expect(locales.fa.transcribe.deckTitle).toBe('تنظیمات رونویسی');
+    expect(locales.fa.transcribe.clearMedia).toBe('پاک\u200cکردن');
     expect(locales.ar.transcribe.deckTitle).toBe('إعدادات النسخ الصوتي');
     expect(locales.de.transcribe.deckTitle).toBe('Transkriptions-Setup');
   });
@@ -380,16 +403,19 @@ describe('Transcription Studio Output Directory & Workflow Logic', () => {
     sendTranslateTitle: string;
     sendHardsubDisabled: boolean;
     sendHardsubTitle: string;
+    copyTranscriptDisabled: boolean;
   }
 
   function simulateUpdateWorkflowButtons(
     outputDir: string | null,
     subPath: string | null,
-    noOutputDirMsg: string,
-    noSubMsg: string
+    transcriptLinesCount: number = 0,
+    noOutputDirMsg: string = 'No output folder available yet',
+    noSubMsg: string = 'No generated subtitle yet'
   ): WorkflowButtonsState {
     const hasDir = Boolean(outputDir);
     const hasSub = Boolean(subPath);
+    const hasTranscript = transcriptLinesCount > 0 || hasSub;
 
     return {
       openFolderDisabled: !hasDir,
@@ -398,26 +424,34 @@ describe('Transcription Studio Output Directory & Workflow Logic', () => {
       sendTranslateTitle: hasSub ? '' : noSubMsg,
       sendHardsubDisabled: !hasSub,
       sendHardsubTitle: hasSub ? '' : noSubMsg,
+      copyTranscriptDisabled: !hasTranscript,
     };
   }
 
-  it('manages workflow bridging buttons state across lifecycle', () => {
+  it('manages workflow bridging buttons state across lifecycle including copy button', () => {
     const noOutputDirMsg = 'No output folder available yet';
     const noSubMsg = 'No generated subtitle yet';
 
-    // Initial / reset state: no outputs
-    const initialState = simulateUpdateWorkflowButtons(null, null, noOutputDirMsg, noSubMsg);
+    // Initial / reset state: no outputs, no transcript lines
+    const initialState = simulateUpdateWorkflowButtons(null, null, 0, noOutputDirMsg, noSubMsg);
     expect(initialState.openFolderDisabled).toBe(true);
     expect(initialState.openFolderTitle).toBe(noOutputDirMsg);
     expect(initialState.sendTranslateDisabled).toBe(true);
     expect(initialState.sendTranslateTitle).toBe(noSubMsg);
     expect(initialState.sendHardsubDisabled).toBe(true);
     expect(initialState.sendHardsubTitle).toBe(noSubMsg);
+    expect(initialState.copyTranscriptDisabled).toBe(true);
 
-    // Transcription completed successfully
+    // Live streaming lines arrive during transcription before completion
+    const streamingState = simulateUpdateWorkflowButtons(null, null, 3, noOutputDirMsg, noSubMsg);
+    expect(streamingState.copyTranscriptDisabled).toBe(false);
+    expect(streamingState.sendTranslateDisabled).toBe(true);
+
+    // Transcription completed successfully with output file
     const successState = simulateUpdateWorkflowButtons(
       '/home/user/Videos',
       '/home/user/Videos/speech.srt',
+      12,
       noOutputDirMsg,
       noSubMsg
     );
@@ -427,6 +461,20 @@ describe('Transcription Studio Output Directory & Workflow Logic', () => {
     expect(successState.sendTranslateTitle).toBe('');
     expect(successState.sendHardsubDisabled).toBe(false);
     expect(successState.sendHardsubTitle).toBe('');
+    expect(successState.copyTranscriptDisabled).toBe(false);
+
+    // Clearing media/queue empties transcriptLines and resets subtitle path
+    let lines = ['line 1', 'line 2'];
+    let sub = '/home/user/Videos/speech.srt';
+    // Clear operation order: transcriptLines = []; sub = null; updateTranscribeWorkflowButtons();
+    lines = [];
+    sub = null;
+    const clearedState = simulateUpdateWorkflowButtons(null, sub, lines.length, noOutputDirMsg, noSubMsg);
+    expect(clearedState.copyTranscriptDisabled).toBe(true);
+
+    // Starting a new transcription run also resets previous outputs before lines arrive
+    const newRunState = simulateUpdateWorkflowButtons(null, null, 0, noOutputDirMsg, noSubMsg);
+    expect(newRunState.copyTranscriptDisabled).toBe(true);
   });
 
   it('renders Telemetry HUD status badge CSS classes correctly', () => {

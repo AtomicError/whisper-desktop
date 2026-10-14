@@ -215,9 +215,6 @@ describe('locale consistency for speed presets', () => {
       expect(transcribe.modelLabel).not.toMatch(/\bwhisper\b/i);
       expect(transcribe.modelLabel).not.toContain('ویسپر');
 
-      expect(transcribe.taskLabel).not.toMatch(/\bwhisper\b/i);
-      expect(transcribe.taskLabel).not.toContain('ویسپر');
-
       expect(transcribe.progressTranscribe).not.toMatch(/\bwhisper\b/i);
       expect(transcribe.progressTranscribe).not.toContain('ویسپر');
 
@@ -236,6 +233,17 @@ describe('locale consistency for speed presets', () => {
       expect(settings.resetDesc).not.toMatch(/\bwhisper\b/i);
       expect(settings.resetDesc).not.toContain('ویسپر');
     });
+
+    it(`locale ${code} has removed obsolete transcribe keys`, () => {
+      const transcribe = (dict as any).transcribe;
+      expect(transcribe.taskLabel).toBeUndefined();
+      expect(transcribe.taskTranscribe).toBeUndefined();
+      expect(transcribe.taskTranslate).toBeUndefined();
+      expect(transcribe.exportTxt).toBeUndefined();
+      expect(transcribe.vadActiveStatus).toBeUndefined();
+      expect(transcribe.vadDisabledStatus).toBeUndefined();
+      expect(transcribe.vadNoModelStatus).toBeUndefined();
+    });
   }
 
   it('validates fa locale translation improvements', () => {
@@ -245,8 +253,10 @@ describe('locale consistency for speed presets', () => {
     expect(fa.transcribe.wizardStep3).toBe('شروع رونویسی');
     expect(fa.models.title).toBe('مرکز مدل‌های رونویسی');
     expect(fa.transcribe.modelLabel).toBe('مدل رونویسی');
-    expect(fa.transcribe.taskLabel).toBe('نوع عملیات');
-    expect(fa.transcribe.taskTranslate).toBe('ترجمه به انگلیسی (موتور صوتی داخلی)');
+    expect(fa.transcribe.browseSystem).toBe('انتخاب');
+    expect(fa.transcribe.selectFilePrompt).toContain('.mp4, .mkv, .mp3, .wav');
+    expect(fa.transcribe.clearMedia).toBe('پاک\u200cکردن');
+    expect(fa.transcribe.deckTitle).toBe('تنظیمات رونویسی');
     expect(fa.transcribe.progressTranscribe).toBe('در حال تبدیل گفتار به متن...');
     expect(fa.settings.printSpecialDesc).not.toContain('ویسپر');
     expect(fa.settings.aiTranslatePoints).toContain('<bdi>OpenAI</bdi>، <bdi>Claude</bdi>');
@@ -267,8 +277,6 @@ describe('locale consistency for speed presets', () => {
     expect(en.models.title).toBe('Model Hub');
     expect(en.transcribe.modelLabel).toBe('Transcription Model');
     expect(en.transcribe.modelPlaceholder).toBe('Select a transcription model...');
-    expect(en.transcribe.taskLabel).toBe('Task Type');
-    expect(en.transcribe.taskTranslate).toBe('Translate to English (Built-in Engine)');
     expect(en.transcribe.progressTranscribe).toBe('Transcribing speech...');
     expect(en.transcribe.pipelineDesc).toBe('FFmpeg Conversion & Audio Transcription');
     expect(en.models.guideHeroTitle).toBe('Transcription Model Architecture & Selection Guide');
