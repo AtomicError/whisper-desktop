@@ -3411,7 +3411,7 @@ window.selectBackend = function(backend, isInitialSelection = false) {
 
 async function refreshBuildStatuses() {
   const allBackends = [
-    { key: 'Standard', label: (typeof t === 'function' && t('transcribe.backendCpu')) || 'Standard CPU' },
+    { key: 'Standard', label: (typeof t === 'function' && t('transcribe.backendCpu')) || 'CPU' },
     { key: 'Vulkan', label: (typeof t === 'function' && t('transcribe.backendVulkan')) || 'Vulkan GPU' },
     { key: 'OpenVINO', label: (typeof t === 'function' && t('transcribe.backendOpenvino')) || 'OpenVINO Intel' },
     { key: 'CUDA', label: (typeof t === 'function' && t('transcribe.backendCuda')) || 'NVIDIA CUDA' }
@@ -5543,7 +5543,8 @@ function setupQuickConfigDeckEventListeners() {
         if (cfgBackendSelect) {
           cfgBackendSelect.value = backend;
         }
-        showNotification(t('toasts.backendSwitched', { backend: backend === 'Standard' ? 'Standard CPU' : backend + ' GPU' }), "success");
+        const backendLabel = backend === 'Standard' ? ((typeof t === 'function' && t('transcribe.backendCpu')) || 'CPU') : backend + ' GPU';
+        showNotification(t('toasts.backendSwitched', { backend: backendLabel }), "success");
       }
     });
   }

@@ -1182,7 +1182,7 @@ pub fn format_cli_exit_error(
     exit_code: Option<i32>,
 ) -> String {
     let backend_display = match selected_backend {
-        "Standard" => "Standard CPU",
+        "Standard" => "CPU",
         "Vulkan" => "Vulkan GPU",
         "OpenVINO" => "Intel OpenVINO",
         "CUDA" => "NVIDIA CUDA",
