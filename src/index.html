@@ -4265,8 +4265,10 @@
                     <span id="hardsub-video-status-badge" style="font-size: 0.75rem; background: rgba(var(--color-royal-blue-rgb), 0.15); color: var(--color-royal-blue); padding: 3px 8px; border-radius: 12px; font-weight: 500;" data-i18n="transcribe.standingBy">Standing By</span>
                   </div>
 
-                  <!-- Frame Viewport Outer Container -->
-                  <div id="hardsub-player-container">
+                  <!-- Video Player Console Unit (Viewport + Dedicated Controls Footer) -->
+                  <div class="hardsub-player-stage-wrapper">
+                    <!-- Frame Viewport Outer Container (16:9 Aspect Ratio) -->
+                    <div id="hardsub-player-container">
                     
                     <!-- HTML5 Video Player -->
                     <video id="hardsub-video-element" preload="auto" style="width: 100%; height: 100%; object-fit: contain; display: none;"></video>
@@ -4313,7 +4315,9 @@
                       <span id="hardsub-volume-hud-text">100%</span>
                     </div>
 
-                    <!-- Custom Interactive Video Control Bar (Inside player container for fullscreen) -->
+                    </div>
+
+                    <!-- Dedicated Video Control Bar (Positioned below the 16:9 stage) -->
                     <div id="hardsub-video-controls" dir="ltr">
                       <div style="display: flex; align-items: center; gap: 10px;">
                         <!-- Play / Pause Button -->

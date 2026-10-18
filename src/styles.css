@@ -673,7 +673,6 @@ html.theme-transitioning .batch-queue-panel {
 .transcribe-left-panel::-webkit-scrollbar,
 .translate-left-panel::-webkit-scrollbar,
 .hardsub-left-panel::-webkit-scrollbar,
-.hardsub-right-panel::-webkit-scrollbar,
 #panel-transcribe::-webkit-scrollbar,
 #panel-hardsub::-webkit-scrollbar,
 #hardsub-tab-view-style::-webkit-scrollbar,
@@ -704,7 +703,6 @@ html.theme-transitioning .batch-queue-panel {
 .transcribe-left-panel::-webkit-scrollbar-track,
 .translate-left-panel::-webkit-scrollbar-track,
 .hardsub-left-panel::-webkit-scrollbar-track,
-.hardsub-right-panel::-webkit-scrollbar-track,
 #panel-transcribe::-webkit-scrollbar-track,
 #panel-hardsub::-webkit-scrollbar-track,
 #hardsub-tab-view-style::-webkit-scrollbar-track,
@@ -737,7 +735,6 @@ html.theme-transitioning .batch-queue-panel {
 .transcribe-left-panel::-webkit-scrollbar-thumb,
 .translate-left-panel::-webkit-scrollbar-thumb,
 .hardsub-left-panel::-webkit-scrollbar-thumb,
-.hardsub-right-panel::-webkit-scrollbar-thumb,
 #panel-transcribe::-webkit-scrollbar-thumb,
 #panel-hardsub::-webkit-scrollbar-thumb,
 #hardsub-tab-view-style::-webkit-scrollbar-thumb,
@@ -787,8 +784,6 @@ html.theme-transitioning .batch-queue-panel {
 .translate-left-panel:hover::-webkit-scrollbar-thumb,
 .hardsub-left-panel.scrolling-active::-webkit-scrollbar-thumb,
 .hardsub-left-panel:hover::-webkit-scrollbar-thumb,
-.hardsub-right-panel.scrolling-active::-webkit-scrollbar-thumb,
-.hardsub-right-panel:hover::-webkit-scrollbar-thumb,
 #panel-transcribe.scrolling-active::-webkit-scrollbar-thumb,
 #panel-transcribe:hover::-webkit-scrollbar-thumb,
 #panel-hardsub.scrolling-active::-webkit-scrollbar-thumb,
@@ -844,8 +839,6 @@ html.theme-transitioning .batch-queue-panel {
 .translate-left-panel::-webkit-scrollbar-thumb:active,
 .hardsub-left-panel::-webkit-scrollbar-thumb:hover,
 .hardsub-left-panel::-webkit-scrollbar-thumb:active,
-.hardsub-right-panel::-webkit-scrollbar-thumb:hover,
-.hardsub-right-panel::-webkit-scrollbar-thumb:active,
 #panel-transcribe::-webkit-scrollbar-thumb:hover,
 #panel-transcribe::-webkit-scrollbar-thumb:active,
 #panel-hardsub::-webkit-scrollbar-thumb:hover,
@@ -8932,9 +8925,7 @@ html[dir="rtl"] .cat-match-badge {
   height: 100%;
   min-height: 0;
   min-width: 0;
-  overflow-y: auto;
-  scrollbar-gutter: stable;
-  padding-inline-end: 6px;
+  overflow: hidden;
 }
 
 .hardsub-preview-card {
@@ -8942,7 +8933,21 @@ html[dir="rtl"] .cat-match-badge {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  flex-shrink: 0;
+  flex: 1;
+  min-height: 0;
+}
+
+.hardsub-player-stage-wrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  background: rgba(15, 23, 42, 0.9);
 }
 
 @media (max-width: 960px) {
@@ -9364,12 +9369,10 @@ html[dir="rtl"] .cat-match-badge {
 #hardsub-player-container {
   position: relative;
   width: 100%;
-  aspect-ratio: 16 / 9;
-  min-height: 320px;
-  max-height: 65vh;
+  flex: 1;
+  min-height: 0;
   background: #000000;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: none;
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -9438,21 +9441,32 @@ body.hardsub-fullscreen-active #app-container {
 }
 
 #hardsub-video-controls {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  position: relative;
   z-index: 10;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.4) 75%, transparent 100%) !important;
-  border: none !important;
+  background: rgba(15, 23, 42, 0.9);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 0 0 10px 10px;
-  padding: 24px 16px 12px 16px !important;
+  padding: 10px 14px;
   box-sizing: border-box;
-  
-  /* Hide by default, show on container hover or show-controls class active */
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
+  flex-shrink: 0;
+}
+
+body.hardsub-fullscreen-active #hardsub-video-controls {
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 1000000 !important;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.4) 75%, transparent 100%) !important;
+  border-top: none !important;
+  border-radius: 0 !important;
+  padding: 24px 20px 16px 20px !important;
   opacity: 0;
   transform: translateY(10px);
   pointer-events: none;
@@ -9460,8 +9474,9 @@ body.hardsub-fullscreen-active #app-container {
               transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-#hardsub-player-container:hover #hardsub-video-controls,
-#hardsub-video-controls.show-controls {
+body.hardsub-fullscreen-active #hardsub-player-container:hover ~ #hardsub-video-controls,
+body.hardsub-fullscreen-active #hardsub-video-controls.show-controls,
+body.hardsub-fullscreen-active #hardsub-video-controls:hover {
   opacity: 1;
   transform: translateY(0);
   pointer-events: auto;
