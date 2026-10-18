@@ -4090,8 +4090,24 @@
                     </div>
                   </div>
 
-                  <!-- 4. Live FFmpeg Command Preview Card -->
-                  <div class="glass-card" style="padding: 18px;">
+                  <!-- 4. Output Destination Card -->
+                  <div class="glass-card" style="padding: 16px 18px;">
+                    <h3 style="margin: 0 0 12px 0; font-size: 0.95rem; color: var(--color-royal-blue); display: flex; align-items: center; gap: 8px;">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px;">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                      </svg>
+                      <span data-i18n="hardsub.outputFolder">Output Folder</span>
+                    </h3>
+                    
+                    <div class="translate-output-row">
+                      <div class="translate-output-display" id="hardsub-output-dir-text" data-i18n="hardsub.sameAsSource">Same as source file folder</div>
+                      <button class="btn-secondary btn-sm" id="btn-browse-hardsub-dir" data-i18n="hardsub.changeFolder" type="button">Change...</button>
+                      <button class="btn-secondary btn-sm" id="btn-reset-hardsub-dir" data-i18n="hardsub.resetFolder" type="button" style="display:none;">Reset</button>
+                    </div>
+                  </div>
+
+                  <!-- 5. Live FFmpeg Command Preview Card -->
+                  <div class="glass-card" style="padding: 16px 18px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                       <h3 style="margin: 0; font-size: 0.95rem; color: var(--color-royal-blue); display: flex; align-items: center; gap: 8px;">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px;"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
@@ -4103,25 +4119,32 @@
                       </button>
                     </div>
                     
-                    <div style="position: relative; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.78rem; line-height: 1.5; overflow-x: auto; max-height: 100px; white-space: pre-wrap; word-break: break-all;" id="hardsub-ffmpeg-cmd-preview">
+                    <div style="position: relative; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.78rem; line-height: 1.5; overflow-x: auto; max-height: 90px; white-space: pre-wrap; word-break: break-all;" id="hardsub-ffmpeg-cmd-preview">
                       ffmpeg -nostdin -progress pipe:1 -i input.mp4 -vf subtitles=... -c:v libx264 -crf 22 -preset medium -c:a copy output.mp4
                     </div>
                   </div>
 
-                  <!-- 5. Hardsub Action & Export Deck (Dark Glassmorphic Studio Theme) -->
+                  <!-- 6. Hardsub Action & Export Deck (Dark Glassmorphic Studio Theme) -->
                   <div class="glass-card hardsub-action-deck" style="margin-bottom: 0; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px;">
-                    <!-- 1. Output Folder Row -->
-                    <div class="translate-field-group" style="margin: 0;">
-                      <label>
-                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-gold, #f59e0b)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                        </svg>
-                        <span data-i18n="hardsub.outputFolder">Output Folder</span>
-                      </label>
-                      <div class="translate-output-row">
-                        <div class="translate-output-display" id="hardsub-output-dir-text" data-i18n="hardsub.sameAsSource">Same as source file folder</div>
-                        <button class="btn-secondary btn-sm" id="btn-browse-hardsub-dir" data-i18n="hardsub.changeFolder" type="button">Change...</button>
-                        <button class="btn-secondary btn-sm" id="btn-reset-hardsub-dir" data-i18n="hardsub.resetFolder" type="button" style="display:none;">Reset</button>
+                    <!-- 1. Telemetry HUD (Permanently visible in idle, active, and complete states) -->
+                    <div class="hardsub-telemetry" id="hardsub-telemetry-box" style="display: flex;">
+                      <div class="progress-linear-wrapper" style="margin: 0; width: 100%;">
+                        <div class="hud-stats-row" style="margin-bottom: 8px;">
+                          <span class="hud-stat-label" data-i18n="hardsub.encodingProgress">HARDSUB ENCODING PROGRESS</span>
+                          <span class="radial-pct" id="hardsub-pct-text">0%</span>
+                        </div>
+                        
+                        <div class="progress-linear-track" style="height: 10px;">
+                          <div class="progress-linear-fill" id="hardsub-progress-fill" style="width: 0%;">
+                            <div class="progress-linear-glow"></div>
+                            <div class="progress-linear-scanner"></div>
+                          </div>
+                        </div>
+                        
+                        <div class="hud-status-subtitle" style="margin-top: 10px;">
+                          <div class="hud-pulse-dot" id="hardsub-hud-pulse"></div>
+                          <span class="radial-msg" id="hardsub-status-text" data-i18n="transcribe.standingBy">Standing By</span>
+                        </div>
                       </div>
                     </div>
 
@@ -4146,28 +4169,6 @@
                         </svg>
                         <span data-i18n="hardsub.openOutputFolder">Open Folder</span>
                       </button>
-                    </div>
-
-                    <!-- 3. Telemetry HUD (Revealed with smooth transition during & after encoding) -->
-                    <div class="hardsub-telemetry" id="hardsub-telemetry-box" style="display: none;">
-                      <div class="progress-linear-wrapper" style="margin: 0; width: 100%;">
-                        <div class="hud-stats-row" style="margin-bottom: 8px;">
-                          <span class="hud-stat-label" data-i18n="hardsub.encodingProgress">HARDSUB ENCODING PROGRESS</span>
-                          <span class="radial-pct" id="hardsub-pct-text">0%</span>
-                        </div>
-                        
-                        <div class="progress-linear-track" style="height: 10px;">
-                          <div class="progress-linear-fill" id="hardsub-progress-fill" style="width: 0%;">
-                            <div class="progress-linear-glow"></div>
-                            <div class="progress-linear-scanner"></div>
-                          </div>
-                        </div>
-                        
-                        <div class="hud-status-subtitle" style="margin-top: 10px;">
-                          <div class="hud-pulse-dot" id="hardsub-hud-pulse"></div>
-                          <span class="radial-msg" id="hardsub-status-text" data-i18n="transcribe.standingBy">Standing By</span>
-                        </div>
-                      </div>
                     </div>
                   </div>
 

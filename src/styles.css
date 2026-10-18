@@ -4338,20 +4338,30 @@ select.select-control {
 }
 
 .hardsub-telemetry {
-  animation: hardsubFadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  padding-top: 14px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  width: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
-@keyframes hardsubFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.hardsub-telemetry .progress-linear-wrapper {
+  margin: 0;
+  padding: 12px 14px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+}
+
+.hardsub-telemetry .radial-pct {
+  font-size: 1.25rem;
+}
+
+.progress-linear-fill[style*="width: 0%"] {
+  box-shadow: none;
+}
+
+.progress-linear-fill[style*="width: 0%"] .progress-linear-glow,
+.progress-linear-fill[style*="width: 0%"] .progress-linear-scanner {
+  display: none;
 }
 
 /* Premium Cyber-Neon Linear Progress HUD */

@@ -767,12 +767,12 @@ describe('hardsub output directory management', () => {
     expect((internal as any).lastExportedPath).toBeNull();
   });
 
-  it('manages progressive disclosure of telemetry HUD during and after encoding', async () => {
+  it('manages permanent telemetry HUD and resets to idle state', async () => {
     const { controller, internal, telemetryBox } = fixture();
-    // Initially hidden
-    telemetryBox.style.display = 'none';
+    // Initially and permanently visible
+    telemetryBox.style.display = 'flex';
 
-    // When encoding becomes active, telemetryBox reveals
+    // When encoding becomes active, telemetryBox remains visible
     internal.updateEncodingUIState(true);
     expect(telemetryBox.style.display).toBe('flex');
 
@@ -781,10 +781,10 @@ describe('hardsub output directory management', () => {
     internal.updateEncodingUIState(false);
     expect(telemetryBox.style.display).toBe('flex');
 
-    // When selecting a new video, telemetryBox resets to hidden
+    // When selecting a new video, telemetryBox stays visible in idle mode
     controller.prefillFilePaths('/media/movies/another_video.mp4', '');
     await flush();
-    expect(telemetryBox.style.display).toBe('none');
+    expect(telemetryBox.style.display).toBe('flex');
   });
 
   describe('findCueAtTimeBinary', () => {

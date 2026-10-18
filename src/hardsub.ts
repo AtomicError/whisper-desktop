@@ -3577,7 +3577,7 @@ export class HardsubController {
       this.btnPlayVideo.style.display = 'none';
     }
     if (this.telemetryBox) {
-      this.telemetryBox.style.display = 'none';
+      this.telemetryBox.style.display = 'flex';
     }
     if (this.progressFill) {
       this.progressFill.style.width = '0%';
@@ -4584,18 +4584,17 @@ export class HardsubController {
     }
 
     if (this.telemetryBox) {
-      if (active) {
-        this.telemetryBox.style.display = 'flex';
-      } else {
-        const isSettled = this.lastStatusPayload && (
-          this.lastStatusPayload.stage === 'completed' ||
-          this.lastStatusPayload.progress >= 1.0 ||
-          this.lastStatusPayload.stage === 'cancelled' ||
-          this.lastStatusPayload.stage === 'failed'
-        );
-        if (!isSettled) {
-          this.telemetryBox.style.display = 'none';
-        }
+      this.telemetryBox.style.display = 'flex';
+      const isSettled = this.lastStatusPayload && (
+        this.lastStatusPayload.stage === 'completed' ||
+        this.lastStatusPayload.progress >= 1.0 ||
+        this.lastStatusPayload.stage === 'cancelled' ||
+        this.lastStatusPayload.stage === 'failed'
+      );
+      if (!active && !isSettled) {
+        if (this.progressFill) this.progressFill.style.width = '0%';
+        if (this.progressPctText) this.progressPctText.textContent = '0%';
+        if (this.progressStatusText) this.progressStatusText.textContent = t('transcribe.standingBy');
       }
     }
 
