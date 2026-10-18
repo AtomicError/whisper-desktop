@@ -673,6 +673,7 @@ html.theme-transitioning .batch-queue-panel {
 .transcribe-left-panel::-webkit-scrollbar,
 .translate-left-panel::-webkit-scrollbar,
 .hardsub-left-panel::-webkit-scrollbar,
+.hardsub-right-panel::-webkit-scrollbar,
 #panel-transcribe::-webkit-scrollbar,
 #panel-hardsub::-webkit-scrollbar,
 #hardsub-tab-view-style::-webkit-scrollbar,
@@ -703,6 +704,7 @@ html.theme-transitioning .batch-queue-panel {
 .transcribe-left-panel::-webkit-scrollbar-track,
 .translate-left-panel::-webkit-scrollbar-track,
 .hardsub-left-panel::-webkit-scrollbar-track,
+.hardsub-right-panel::-webkit-scrollbar-track,
 #panel-transcribe::-webkit-scrollbar-track,
 #panel-hardsub::-webkit-scrollbar-track,
 #hardsub-tab-view-style::-webkit-scrollbar-track,
@@ -735,6 +737,7 @@ html.theme-transitioning .batch-queue-panel {
 .transcribe-left-panel::-webkit-scrollbar-thumb,
 .translate-left-panel::-webkit-scrollbar-thumb,
 .hardsub-left-panel::-webkit-scrollbar-thumb,
+.hardsub-right-panel::-webkit-scrollbar-thumb,
 #panel-transcribe::-webkit-scrollbar-thumb,
 #panel-hardsub::-webkit-scrollbar-thumb,
 #hardsub-tab-view-style::-webkit-scrollbar-thumb,
@@ -784,6 +787,8 @@ html.theme-transitioning .batch-queue-panel {
 .translate-left-panel:hover::-webkit-scrollbar-thumb,
 .hardsub-left-panel.scrolling-active::-webkit-scrollbar-thumb,
 .hardsub-left-panel:hover::-webkit-scrollbar-thumb,
+.hardsub-right-panel.scrolling-active::-webkit-scrollbar-thumb,
+.hardsub-right-panel:hover::-webkit-scrollbar-thumb,
 #panel-transcribe.scrolling-active::-webkit-scrollbar-thumb,
 #panel-transcribe:hover::-webkit-scrollbar-thumb,
 #panel-hardsub.scrolling-active::-webkit-scrollbar-thumb,
@@ -839,6 +844,8 @@ html.theme-transitioning .batch-queue-panel {
 .translate-left-panel::-webkit-scrollbar-thumb:active,
 .hardsub-left-panel::-webkit-scrollbar-thumb:hover,
 .hardsub-left-panel::-webkit-scrollbar-thumb:active,
+.hardsub-right-panel::-webkit-scrollbar-thumb:hover,
+.hardsub-right-panel::-webkit-scrollbar-thumb:active,
 #panel-transcribe::-webkit-scrollbar-thumb:hover,
 #panel-transcribe::-webkit-scrollbar-thumb:active,
 #panel-hardsub::-webkit-scrollbar-thumb:hover,
@@ -8902,7 +8909,7 @@ html[dir="rtl"] .cat-match-badge {
    ========================================================================== */
 .hardsub-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  grid-template-columns: minmax(460px, 1fr) minmax(0, 1.38fr);
   gap: 20px;
   min-height: 0;
   height: 100%;
@@ -8914,9 +8921,8 @@ html[dir="rtl"] .cat-match-badge {
   gap: 16px;
   height: 100%;
   min-height: 0;
-  overflow-y: auto;
-  scrollbar-gutter: stable;
-  padding-inline-end: 6px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .hardsub-right-panel {
@@ -8925,7 +8931,18 @@ html[dir="rtl"] .cat-match-badge {
   gap: 16px;
   height: 100%;
   min-height: 0;
-  overflow: hidden;
+  min-width: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding-inline-end: 6px;
+}
+
+.hardsub-preview-card {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex-shrink: 0;
 }
 
 @media (max-width: 960px) {
@@ -8944,6 +8961,8 @@ html[dir="rtl"] .cat-match-badge {
   }
   .hardsub-left-panel,
   .hardsub-right-panel {
+    width: 100% !important;
+    max-width: 100% !important;
     height: auto !important;
     min-height: min-content !important;
     overflow: visible !important;
@@ -9342,10 +9361,26 @@ html[dir="rtl"] .cat-match-badge {
 }
 
 /* High-Contrast Video Controls & Auto-Hide positioning */
+#hardsub-player-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  min-height: 320px;
+  max-height: 65vh;
+  background: #000000;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.9);
+}
+
 #hardsub-video-element {
   width: 100%;
   height: 100%;
-  max-height: 320px;
+  max-height: 100%;
   object-fit: contain;
 }
 
@@ -9366,6 +9401,7 @@ html[dir="rtl"] .cat-match-badge {
   height: 100vh !important;
   max-height: 100vh !important;
   min-height: 100vh !important;
+  aspect-ratio: auto !important;
   background: #000000 !important;
   contain: strict !important;
 }
@@ -9435,19 +9471,17 @@ body.hardsub-fullscreen-active #app-container {
   color: rgba(255, 255, 255, 0.8) !important;
   background: transparent;
   border: 1px solid transparent;
-  transition: color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
 }
 
 #hardsub-video-controls .pill-btn:hover {
   color: #ffffff !important;
-  background: transparent !important;
-  border-color: transparent !important;
-  transform: scale(1.1);
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
 }
 
 #hardsub-video-controls .pill-btn:active {
-  background: rgba(255, 255, 255, 0.15);
-  transform: scale(0.95);
+  background: rgba(255, 255, 255, 0.2) !important;
 }
 
 #hardsub-video-controls .pill-btn.active {

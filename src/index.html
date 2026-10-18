@@ -3713,270 +3713,8 @@
           <div class="view-panel fixed-layout-panel" id="panel-hardsub" role="tabpanel" aria-labelledby="nav-tab-hardsub" tabindex="0">
             <div class="hardsub-layout">
               
-              <!-- Left Column: Media Source, Real Video Frame Preview, Media Controls & Telemetry -->
+              <!-- Left Column: Inspector / Settings Panel (Editor, Style, Export) -->
               <div class="hardsub-left-panel">
-                
-                <!-- File Selection Accordion (Collapsible Wizard Step matching Transcribe page style) -->
-                <div class="wizard-step active" id="hardsub-media-step">
-                  <div class="wizard-step-header" id="hardsub-media-step-header">
-                    <div style="display:flex; align-items:center; gap:12px;">
-                      <div class="wizard-step-icon" id="hardsub-media-step-icon">1</div>
-                      <div class="wizard-step-title" id="hardsub-media-step-title" data-i18n="hardsub.selectResource">Select Video &amp; Subtitle</div>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                      <button class="btn-secondary" id="btn-reset-hardsub-all" type="button" style="display: none; padding: 4px 10px; font-size: 0.78rem; gap: 6px; align-items: center;" data-i18n-title="hardsub.resetAll">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 13px; height: 13px;">
-                          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-                          <path d="M3 3v5h5"/>
-                        </svg>
-                        <span data-i18n="hardsub.resetAll">Reset All</span>
-                      </button>
-                      <span id="hardsub-media-summary-badge" style="display: none;"></span>
-                      <span class="wizard-chevron" id="hardsub-media-chevron">▼</span>
-                    </div>
-                  </div>
-
-                  <div class="wizard-step-body" id="hardsub-media-step-body">
-                    <!-- The two cards' columns live in styles.css rather than here: they
-                         share the body's width (`minmax(0, 1fr)` each) and stack below
-                         1100px, both of which an inline style would outrank. -->
-                    <div class="hardsub-media-grid">
-                      
-                      <!-- Video File Dropzone -->
-                      <div class="media-drop-zone" id="hardsub-video-drop-zone" style="padding: 20px 14px; gap: 10px; position: relative;">
-                        <svg class="media-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width: 32px; height: 32px;">
-                          <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
-                          <line x1="7" y1="2" x2="7" y2="22"/>
-                          <line x1="17" y1="2" x2="17" y2="22"/>
-                          <line x1="2" y1="12" x2="22" y2="12"/>
-                          <line x1="2" y1="7" x2="7" y2="7"/>
-                          <line x1="2" y1="17" x2="7" y2="17"/>
-                          <line x1="17" y1="17" x2="22" y2="17"/>
-                          <line x1="17" y1="7" x2="22" y2="7"/>
-                        </svg>
-                        <div style="flex:1; overflow: hidden; max-width: 100%;">
-                          <p style="font-weight:600; margin-bottom:4px; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-video-name" data-i18n="hardsub.noVideoLoaded">No Video Loaded</p>
-                          <!-- dir="auto": this field holds either a localized prompt or a path. A path is
-                               an LTR technical string, and without this an RTL interface moves its leading
-                               slash to the end ("home/ahmad/Videos/vid.srt/"). It also holds two
-                               shapes of text with opposite needs from one box, which is why its
-                               one-line ellipsis lives in styles.css, keyed on the card's
-                               `has-file` class, rather than here: a path elides, the prompt wraps. -->
-                          <p dir="auto" style="font-size:0.75rem; color:var(--color-text-muted); margin:0;" id="lbl-hardsub-video-path" data-i18n="hardsub.dropVideoPrompt">Drag & drop video (.mp4, .mkv, .mov)</p>
-                        </div>
-                        <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: center;">
-                          <button class="btn-secondary" id="btn-browse-video" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap;" data-i18n="hardsub.browseVideo">Browse Video</button>
-                          <button class="btn-secondary btn-clear-sub" id="btn-clear-hardsub-video" type="button" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap; display: none;" data-i18n="hardsub.clearVideo">Clear</button>
-                        </div>
-                        <input type="hidden" id="hardsub-video-path" />
-                      </div>
-
-                      <!-- Subtitle File Dropzone -->
-                      <div class="media-drop-zone" id="hardsub-sub-drop-zone" style="padding: 20px 14px; gap: 10px; position: relative;">
-                        <svg class="media-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width: 32px; height: 32px;">
-                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                          <line x1="7" y1="8" x2="17" y2="8"/>
-                          <line x1="7" y1="12" x2="14" y2="12"/>
-                        </svg>
-                        <div style="flex:1; overflow: hidden; max-width: 100%;">
-                          <p style="font-weight:600; margin-bottom:4px; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-sub-name" data-i18n="hardsub.noSubLoaded">No Subtitle Loaded</p>
-                          <p dir="auto" style="font-size:0.75rem; color:var(--color-text-muted); margin:0;" id="lbl-hardsub-sub-path" data-i18n="hardsub.dropSubPrompt">Drag & drop subtitle (.srt, .vtt, .ass)</p>
-                        </div>
-                        <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: center;">
-                          <button class="btn-secondary" id="btn-browse-sub" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap;" data-i18n="hardsub.browseSub">Browse Subtitle</button>
-                          <button class="btn-secondary btn-clear-sub" id="btn-clear-hardsub-sub" type="button" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap; display: none;" data-i18n="hardsub.clearSub">Clear</button>
-                        </div>
-                        <input type="hidden" id="hardsub-sub-path" />
-                      </div>
-
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Real Video Frame & Live Subtitle Visual Preview Card -->
-                <div class="glass-card" style="padding: 18px; display: flex; flex-direction: column; gap: 12px;">
-                  <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <h3 style="margin: 0; font-size: 1.05rem; color: var(--color-royal-blue); display: flex; align-items: center; gap: 8px;">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px; height:20px;"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-                      <span data-i18n="hardsub.framePreview">Real Video Preview</span>
-                    </h3>
-                    <span id="hardsub-video-status-badge" style="font-size: 0.75rem; background: rgba(var(--color-royal-blue-rgb), 0.15); color: var(--color-royal-blue); padding: 3px 8px; border-radius: 12px; font-weight: 500;" data-i18n="transcribe.standingBy">Standing By</span>
-                  </div>
-
-                  <!-- Frame Viewport Outer Container -->
-                  <div id="hardsub-player-container" style="position: relative; width: 100%; min-height: 240px; background: #000; border-radius: 10px; border: 1px solid rgba(255,255,255,0.12); overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 0 40px rgba(0,0,0,0.9);">
-                    
-                    <!-- HTML5 Video Player -->
-                    <video id="hardsub-video-element" preload="auto" style="width: 100%; height: 100%; max-height: 320px; object-fit: contain; display: none;"></video>
-                    
-                    <!-- Video Placeholder state (Idle and Loading) -->
-                    <div id="hardsub-video-placeholder" class="hardsub-placeholder-container" style="cursor: pointer;">
-                      <div id="hardsub-placeholder-idle" class="hardsub-placeholder-content">
-                        <div class="premium-play-trigger" title="Select a video file">
-                          <svg class="modern-player-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <!-- Waveform play emblem in the center -->
-                            <path class="wave-bar bar-1" d="M18 14V34" stroke="url(#btn-grad)" stroke-width="3" stroke-linecap="round"/>
-                            <path class="wave-bar bar-2" d="M24 18V30" stroke="url(#btn-grad)" stroke-width="3" stroke-linecap="round"/>
-                            <path class="wave-bar bar-3" d="M30 21V27" stroke="url(#btn-grad)" stroke-width="3" stroke-linecap="round"/>
-                            <path class="wave-bar bar-4" d="M36 24V24" stroke="url(#btn-grad)" stroke-width="3" stroke-linecap="round"/>
-                            <defs>
-                              <linearGradient id="btn-grad" x1="4" y1="4" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-                                <stop offset="0%" stop-color="var(--color-royal-blue)" />
-                                <stop offset="100%" stop-color="var(--color-cyan)" />
-                              </linearGradient>
-                            </defs>
-                          </svg>
-                        </div>
-                        <span class="hardsub-placeholder-hint" dir="auto" data-i18n="hardsub.selectVideoNotice">Select a video file above to enable the live preview</span>
-                      </div>
-                      <div id="hardsub-placeholder-loading" class="hardsub-placeholder-content" style="display: none;">
-                        <div class="hardsub-player-spinner-wrapper">
-                          <div class="hardsub-player-spinner"></div>
-                        </div>
-                        <span id="hardsub-placeholder-loading-text" class="hardsub-placeholder-loading-label" dir="auto"></span>
-                      </div>
-                    </div>
-
-                    <!-- Video Frame Freeze Canvas (Seamless Double-Buffering during Seek) -->
-                    <canvas id="hardsub-freeze-canvas" style="position: absolute; top: 0; left: 0; pointer-events: none; display: none; z-index: 3;"></canvas>
-
-                    <!-- Canvas Subtitle Overlay (ASS-matching renderer) -->
-                    <canvas id="hardsub-subtitle-canvas" style="position: absolute; top: 0; left: 0; pointer-events: none; display: none; z-index: 5;"></canvas>
-
-                    <!-- Volume HUD Indicator -->
-                    <div id="hardsub-volume-hud" style="position: absolute; top: 15px; right: 15px; z-index: 15; pointer-events: none; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.15); padding: 8px 14px; border-radius: 20px; display: flex; align-items: center; gap: 8px; color: #fff; opacity: 0; transform: translateY(-10px); transition: opacity 0.25s ease, transform 0.25s ease; font-family: var(--font-sans); font-size: 0.85rem; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
-                      <svg id="hardsub-hud-vol-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; display: none;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-                      <svg id="hardsub-hud-vol-low" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; display: none;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-                      <svg id="hardsub-hud-vol-mute" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; display: none;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
-                      <span id="hardsub-volume-hud-text">100%</span>
-                    </div>
-
-                    <!-- Custom Interactive Video Control Bar (Inside player container for fullscreen) -->
-                    <div id="hardsub-video-controls" dir="ltr">
-                      <div style="display: flex; align-items: center; gap: 10px;">
-                        <!-- Play / Pause Button -->
-                        <button id="hardsub-btn-play" class="pill-btn" style="padding: 6px 12px; height: 32px; gap: 4px;" title="Play / Pause Video">
-                          <svg id="hardsub-icon-play" viewBox="0 0 24 24" fill="currentColor" style="width:14px; height:14px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                          <svg id="hardsub-icon-pause" viewBox="0 0 24 24" fill="currentColor" style="width:14px; height:14px; display:none;"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-                        </button>
-
-                        <!-- Prev / Next Subtitle Jump Buttons -->
-                        <button id="hardsub-btn-prev-cue" class="pill-btn" style="padding: 6px 8px; height: 32px;" title="Previous Subtitle Cue">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/></svg>
-                        </button>
-                        <button id="hardsub-btn-next-cue" class="pill-btn" style="padding: 6px 8px; height: 32px;" title="Next Subtitle Cue">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
-                        </button>
-
-                        <!-- Scrub Slider -->
-                        <input type="range" id="hardsub-video-seek" min="0" max="100" value="0" step="0.1" class="range-slider" style="flex:1;" />
-
-                        <!-- Time Display -->
-                        <span id="hardsub-video-time" style="font-family: monospace; font-size: 0.98rem; font-weight: 600; color: var(--color-royal-blue); min-width: 120px; text-align: right;">00:00 / 00:00</span>
-
-                        <!-- Volume Controls -->
-                        <div id="hardsub-volume-wrapper" class="volume-control-wrapper">
-                          <button id="hardsub-btn-volume" class="pill-btn" style="padding: 6px 6px; height: 32px; z-index: 2;" title="Mute / Unmute">
-                            <svg id="hardsub-icon-vol-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-                            <svg id="hardsub-icon-vol-mute" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px; display:none;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
-                          </button>
-                          <input type="range" id="hardsub-volume-slider" min="0" max="1" step="0.05" value="1" class="volume-slider" />
-                        </div>
-
-                        <!-- Fullscreen Button -->
-                        <button id="hardsub-btn-fullscreen" class="pill-btn" style="padding: 6px 8px; height: 32px;" title="Toggle Fullscreen">
-                          <svg id="hardsub-icon-fs-enter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
-                          <svg id="hardsub-icon-fs-exit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px; display:none;"><path d="M4 14h6v6m10-6h-6v6M4 10h6V4m10 6h-6V4"/></svg>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  <div id="hardsub-preview-status" class="hardsub-preview-banner" style="display: none;">
-                    <div class="hardsub-preview-main-row">
-                      <div class="hardsub-preview-info">
-                        <div class="hardsub-preview-mini-spinner" aria-hidden="true"></div>
-                        <p id="hardsub-preview-status-text" role="status" aria-live="polite"></p>
-                      </div>
-                      <div class="hardsub-preview-progress-wrapper" hidden>
-                        <progress id="hardsub-preview-progress" max="1" aria-labelledby="hardsub-preview-status-text" hidden></progress>
-                      </div>
-                      <div class="hardsub-preview-actions">
-                        <button type="button" id="btn-cancel-hardsub-preview" class="pill-btn hardsub-preview-action-btn" hidden></button>
-                        <button type="button" id="btn-retry-hardsub-preview" class="pill-btn hardsub-preview-action-btn" hidden></button>
-                      </div>
-                    </div>
-                    <p id="hardsub-preview-original-note" class="hardsub-preview-note" hidden></p>
-                    <p id="hardsub-preview-detail" dir="auto" class="hardsub-preview-detail-text" hidden></p>
-                  </div>
-                </div>
-
-                <!-- Hardsub Action & Export Deck (Dark Glassmorphic Studio Theme) -->
-                <div class="glass-card hardsub-action-deck" style="margin-bottom: 0; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px;">
-                  <!-- 1. Output Folder Row -->
-                  <div class="translate-field-group" style="margin: 0;">
-                    <label>
-                      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-gold, #f59e0b)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                      </svg>
-                      <span data-i18n="hardsub.outputFolder">Output Folder</span>
-                    </label>
-                    <div class="translate-output-row">
-                      <div class="translate-output-display" id="hardsub-output-dir-text" data-i18n="hardsub.sameAsSource">Same as source file folder</div>
-                      <button class="btn-secondary btn-sm" id="btn-browse-hardsub-dir" data-i18n="hardsub.changeFolder" type="button">Change...</button>
-                      <button class="btn-secondary btn-sm" id="btn-reset-hardsub-dir" data-i18n="hardsub.resetFolder" type="button" style="display:none;">Reset</button>
-                    </div>
-                  </div>
-
-                  <!-- 2. Primary Actions Row -->
-                  <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                    <button class="btn-primary" id="btn-start-hardsub" disabled style="flex: 1; min-width: 200px; justify-content: center; padding: 12px 18px; font-size: 0.95rem; font-weight: 600; gap: 10px; opacity: 0.5; cursor: not-allowed;">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width: 18px; height: 18px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                      <span data-i18n="hardsub.exportHardsubVideo">Export Hardsub Video</span>
-                    </button>
-                    <button class="btn-secondary" id="btn-cancel-hardsub" style="display: none; padding: 12px 18px; border-color: rgba(239, 68, 68, 0.4); color: #ef4444; background: rgba(239, 68, 68, 0.1); font-weight: 600;">
-                      <span data-i18n="common.cancel">Cancel</span>
-                    </button>
-                    <button class="btn-secondary" id="btn-play-hardsub-video" style="display: none; padding: 12px 18px; align-items: center; gap: 6px; font-weight: 600;" type="button" title="Play Video" data-i18n-title="hardsub.playVideo">
-                      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                        <polygon points="6 4 20 12 6 20 6 4"/>
-                      </svg>
-                      <span data-i18n="hardsub.playVideo">Play Video</span>
-                    </button>
-                    <button class="btn-secondary" id="btn-open-hardsub-folder" style="display: none; padding: 12px 18px; align-items: center; gap: 6px; font-weight: 600;" type="button" title="Open Output Folder" data-i18n-title="hardsub.openOutputFolder">
-                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                      </svg>
-                      <span data-i18n="hardsub.openOutputFolder">Open Folder</span>
-                    </button>
-                  </div>
-
-                  <!-- 3. Telemetry HUD (Revealed with smooth transition during & after encoding) -->
-                  <div class="hardsub-telemetry" id="hardsub-telemetry-box" style="display: none;">
-                    <div class="progress-linear-wrapper" style="margin: 0; width: 100%;">
-                      <div class="hud-stats-row" style="margin-bottom: 8px;">
-                        <span class="hud-stat-label" data-i18n="hardsub.encodingProgress">HARDSUB ENCODING PROGRESS</span>
-                        <span class="radial-pct" id="hardsub-pct-text">0%</span>
-                      </div>
-                      
-                      <div class="progress-linear-track" style="height: 10px;">
-                        <div class="progress-linear-fill" id="hardsub-progress-fill" style="width: 0%;">
-                          <div class="progress-linear-glow"></div>
-                          <div class="progress-linear-scanner"></div>
-                        </div>
-                      </div>
-                      
-                      <div class="hud-status-subtitle" style="margin-top: 10px;">
-                        <div class="hud-pulse-dot" id="hardsub-hud-pulse"></div>
-                        <span class="radial-msg" id="hardsub-status-text" data-i18n="transcribe.standingBy">Standing By</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-
-              <!-- Right Column: Dual-Tab Studio Panel (Subtitles Block Editor & Typography/Encoding) -->
-              <div class="hardsub-right-panel">
                 
                 <!-- Studio Navigation Tabs Bar (3 Dedicated Tabs) -->
                 <div class="hardsub-tabs-container" role="tablist" aria-label="Hardsub Studio Tabs">
@@ -4370,6 +4108,268 @@
                     </div>
                   </div>
 
+                  <!-- 5. Hardsub Action & Export Deck (Dark Glassmorphic Studio Theme) -->
+                  <div class="glass-card hardsub-action-deck" style="margin-bottom: 0; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px;">
+                    <!-- 1. Output Folder Row -->
+                    <div class="translate-field-group" style="margin: 0;">
+                      <label>
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-gold, #f59e0b)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                        </svg>
+                        <span data-i18n="hardsub.outputFolder">Output Folder</span>
+                      </label>
+                      <div class="translate-output-row">
+                        <div class="translate-output-display" id="hardsub-output-dir-text" data-i18n="hardsub.sameAsSource">Same as source file folder</div>
+                        <button class="btn-secondary btn-sm" id="btn-browse-hardsub-dir" data-i18n="hardsub.changeFolder" type="button">Change...</button>
+                        <button class="btn-secondary btn-sm" id="btn-reset-hardsub-dir" data-i18n="hardsub.resetFolder" type="button" style="display:none;">Reset</button>
+                      </div>
+                    </div>
+
+                    <!-- 2. Primary Actions Row -->
+                    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                      <button class="btn-primary" id="btn-start-hardsub" disabled style="flex: 1; min-width: 200px; justify-content: center; padding: 12px 18px; font-size: 0.95rem; font-weight: 600; gap: 10px; opacity: 0.5; cursor: not-allowed;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width: 18px; height: 18px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        <span data-i18n="hardsub.exportHardsubVideo">Export Hardsub Video</span>
+                      </button>
+                      <button class="btn-secondary" id="btn-cancel-hardsub" style="display: none; padding: 12px 18px; border-color: rgba(239, 68, 68, 0.4); color: #ef4444; background: rgba(239, 68, 68, 0.1); font-weight: 600;">
+                        <span data-i18n="common.cancel">Cancel</span>
+                      </button>
+                      <button class="btn-secondary" id="btn-play-hardsub-video" style="display: none; padding: 12px 18px; align-items: center; gap: 6px; font-weight: 600;" type="button" title="Play Video" data-i18n-title="hardsub.playVideo">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                          <polygon points="6 4 20 12 6 20 6 4"/>
+                        </svg>
+                        <span data-i18n="hardsub.playVideo">Play Video</span>
+                      </button>
+                      <button class="btn-secondary" id="btn-open-hardsub-folder" style="display: none; padding: 12px 18px; align-items: center; gap: 6px; font-weight: 600;" type="button" title="Open Output Folder" data-i18n-title="hardsub.openOutputFolder">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                        </svg>
+                        <span data-i18n="hardsub.openOutputFolder">Open Folder</span>
+                      </button>
+                    </div>
+
+                    <!-- 3. Telemetry HUD (Revealed with smooth transition during & after encoding) -->
+                    <div class="hardsub-telemetry" id="hardsub-telemetry-box" style="display: none;">
+                      <div class="progress-linear-wrapper" style="margin: 0; width: 100%;">
+                        <div class="hud-stats-row" style="margin-bottom: 8px;">
+                          <span class="hud-stat-label" data-i18n="hardsub.encodingProgress">HARDSUB ENCODING PROGRESS</span>
+                          <span class="radial-pct" id="hardsub-pct-text">0%</span>
+                        </div>
+                        
+                        <div class="progress-linear-track" style="height: 10px;">
+                          <div class="progress-linear-fill" id="hardsub-progress-fill" style="width: 0%;">
+                            <div class="progress-linear-glow"></div>
+                            <div class="progress-linear-scanner"></div>
+                          </div>
+                        </div>
+                        
+                        <div class="hud-status-subtitle" style="margin-top: 10px;">
+                          <div class="hud-pulse-dot" id="hardsub-hud-pulse"></div>
+                          <span class="radial-msg" id="hardsub-status-text" data-i18n="transcribe.standingBy">Standing By</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+              </div>
+
+              <!-- Right Column: Main Stage / Workspace (Media Resource & Real Video Preview) -->
+              <div class="hardsub-right-panel">
+                
+                <!-- File Selection Accordion (Collapsible Wizard Step matching Transcribe page style) -->
+                <div class="wizard-step active" id="hardsub-media-step">
+                  <div class="wizard-step-header" id="hardsub-media-step-header">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                      <div class="wizard-step-icon" id="hardsub-media-step-icon">1</div>
+                      <div class="wizard-step-title" id="hardsub-media-step-title" data-i18n="hardsub.selectResource">Select Video &amp; Subtitle</div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <button class="btn-secondary" id="btn-reset-hardsub-all" type="button" style="display: none; padding: 4px 10px; font-size: 0.78rem; gap: 6px; align-items: center;" data-i18n-title="hardsub.resetAll">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 13px; height: 13px;">
+                          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                          <path d="M3 3v5h5"/>
+                        </svg>
+                        <span data-i18n="hardsub.resetAll">Reset All</span>
+                      </button>
+                      <span id="hardsub-media-summary-badge" style="display: none;"></span>
+                      <span class="wizard-chevron" id="hardsub-media-chevron">▼</span>
+                    </div>
+                  </div>
+
+                  <div class="wizard-step-body" id="hardsub-media-step-body">
+                    <!-- The two cards' columns live in styles.css rather than here: they
+                         share the body's width (`minmax(0, 1fr)` each) and stack below
+                         1100px, both of which an inline style would outrank. -->
+                    <div class="hardsub-media-grid">
+                      
+                      <!-- Video File Dropzone -->
+                      <div class="media-drop-zone" id="hardsub-video-drop-zone" style="padding: 20px 14px; gap: 10px; position: relative;">
+                        <svg class="media-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width: 32px; height: 32px;">
+                          <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
+                          <line x1="7" y1="2" x2="7" y2="22"/>
+                          <line x1="17" y1="2" x2="17" y2="22"/>
+                          <line x1="2" y1="12" x2="22" y2="12"/>
+                          <line x1="2" y1="7" x2="7" y2="7"/>
+                          <line x1="2" y1="17" x2="7" y2="17"/>
+                          <line x1="17" y1="17" x2="22" y2="17"/>
+                          <line x1="17" y1="7" x2="22" y2="7"/>
+                        </svg>
+                        <div style="flex:1; overflow: hidden; max-width: 100%;">
+                          <p style="font-weight:600; margin-bottom:4px; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-video-name" data-i18n="hardsub.noVideoLoaded">No Video Loaded</p>
+                          <!-- dir="auto": this field holds either a localized prompt or a path. A path is
+                               an LTR technical string, and without this an RTL interface moves its leading
+                               slash to the end ("home/ahmad/Videos/vid.srt/"). It also holds two
+                               shapes of text with opposite needs from one box, which is why its
+                               one-line ellipsis lives in styles.css, keyed on the card's
+                               `has-file` class, rather than here: a path elides, the prompt wraps. -->
+                          <p dir="auto" style="font-size:0.75rem; color:var(--color-text-muted); margin:0;" id="lbl-hardsub-video-path" data-i18n="hardsub.dropVideoPrompt">Drag & drop video (.mp4, .mkv, .mov)</p>
+                        </div>
+                        <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: center;">
+                          <button class="btn-secondary" id="btn-browse-video" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap;" data-i18n="hardsub.browseVideo">Browse Video</button>
+                          <button class="btn-secondary btn-clear-sub" id="btn-clear-hardsub-video" type="button" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap; display: none;" data-i18n="hardsub.clearVideo">Clear</button>
+                        </div>
+                        <input type="hidden" id="hardsub-video-path" />
+                      </div>
+
+                      <!-- Subtitle File Dropzone -->
+                      <div class="media-drop-zone" id="hardsub-sub-drop-zone" style="padding: 20px 14px; gap: 10px; position: relative;">
+                        <svg class="media-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width: 32px; height: 32px;">
+                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                          <line x1="7" y1="8" x2="17" y2="8"/>
+                          <line x1="7" y1="12" x2="14" y2="12"/>
+                        </svg>
+                        <div style="flex:1; overflow: hidden; max-width: 100%;">
+                          <p style="font-weight:600; margin-bottom:4px; font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-hardsub-sub-name" data-i18n="hardsub.noSubLoaded">No Subtitle Loaded</p>
+                          <p dir="auto" style="font-size:0.75rem; color:var(--color-text-muted); margin:0;" id="lbl-hardsub-sub-path" data-i18n="hardsub.dropSubPrompt">Drag & drop subtitle (.srt, .vtt, .ass)</p>
+                        </div>
+                        <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: center;">
+                          <button class="btn-secondary" id="btn-browse-sub" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap;" data-i18n="hardsub.browseSub">Browse Subtitle</button>
+                          <button class="btn-secondary btn-clear-sub" id="btn-clear-hardsub-sub" type="button" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap; display: none;" data-i18n="hardsub.clearSub">Clear</button>
+                        </div>
+                        <input type="hidden" id="hardsub-sub-path" />
+                      </div>
+
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Real Video Frame & Live Subtitle Visual Preview Card -->
+                <div class="glass-card hardsub-preview-card">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0; font-size: 1.05rem; color: var(--color-royal-blue); display: flex; align-items: center; gap: 8px;">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px; height:20px;"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                      <span data-i18n="hardsub.framePreview">Real Video Preview</span>
+                    </h3>
+                    <span id="hardsub-video-status-badge" style="font-size: 0.75rem; background: rgba(var(--color-royal-blue-rgb), 0.15); color: var(--color-royal-blue); padding: 3px 8px; border-radius: 12px; font-weight: 500;" data-i18n="transcribe.standingBy">Standing By</span>
+                  </div>
+
+                  <!-- Frame Viewport Outer Container -->
+                  <div id="hardsub-player-container">
+                    
+                    <!-- HTML5 Video Player -->
+                    <video id="hardsub-video-element" preload="auto" style="width: 100%; height: 100%; object-fit: contain; display: none;"></video>
+                    
+                    <!-- Video Placeholder state (Idle and Loading) -->
+                    <div id="hardsub-video-placeholder" class="hardsub-placeholder-container" style="cursor: pointer;">
+                      <div id="hardsub-placeholder-idle" class="hardsub-placeholder-content">
+                        <div class="premium-play-trigger" title="Select a video file">
+                          <svg class="modern-player-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <!-- Waveform play emblem in the center -->
+                            <path class="wave-bar bar-1" d="M18 14V34" stroke="url(#btn-grad)" stroke-width="3" stroke-linecap="round"/>
+                            <path class="wave-bar bar-2" d="M24 18V30" stroke="url(#btn-grad)" stroke-width="3" stroke-linecap="round"/>
+                            <path class="wave-bar bar-3" d="M30 21V27" stroke="url(#btn-grad)" stroke-width="3" stroke-linecap="round"/>
+                            <path class="wave-bar bar-4" d="M36 24V24" stroke="url(#btn-grad)" stroke-width="3" stroke-linecap="round"/>
+                            <defs>
+                              <linearGradient id="btn-grad" x1="4" y1="4" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+                                <stop offset="0%" stop-color="var(--color-royal-blue)" />
+                                <stop offset="100%" stop-color="var(--color-cyan)" />
+                              </linearGradient>
+                            </defs>
+                          </svg>
+                        </div>
+                        <span class="hardsub-placeholder-hint" dir="auto" data-i18n="hardsub.selectVideoNotice">Select a video file above to enable the live preview</span>
+                      </div>
+                      <div id="hardsub-placeholder-loading" class="hardsub-placeholder-content" style="display: none;">
+                        <div class="hardsub-player-spinner-wrapper">
+                          <div class="hardsub-player-spinner"></div>
+                        </div>
+                        <span id="hardsub-placeholder-loading-text" class="hardsub-placeholder-loading-label" dir="auto"></span>
+                      </div>
+                    </div>
+
+                    <!-- Video Frame Freeze Canvas (Seamless Double-Buffering during Seek) -->
+                    <canvas id="hardsub-freeze-canvas" style="position: absolute; top: 0; left: 0; pointer-events: none; display: none; z-index: 3;"></canvas>
+
+                    <!-- Canvas Subtitle Overlay (ASS-matching renderer) -->
+                    <canvas id="hardsub-subtitle-canvas" style="position: absolute; top: 0; left: 0; pointer-events: none; display: none; z-index: 5;"></canvas>
+
+                    <!-- Volume HUD Indicator -->
+                    <div id="hardsub-volume-hud" style="position: absolute; top: 15px; right: 15px; z-index: 15; pointer-events: none; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.15); padding: 8px 14px; border-radius: 20px; display: flex; align-items: center; gap: 8px; color: #fff; opacity: 0; transform: translateY(-10px); transition: opacity 0.25s ease, transform 0.25s ease; font-family: var(--font-sans); font-size: 0.85rem; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
+                      <svg id="hardsub-hud-vol-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; display: none;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                      <svg id="hardsub-hud-vol-low" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; display: none;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                      <svg id="hardsub-hud-vol-mute" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px; display: none;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+                      <span id="hardsub-volume-hud-text">100%</span>
+                    </div>
+
+                    <!-- Custom Interactive Video Control Bar (Inside player container for fullscreen) -->
+                    <div id="hardsub-video-controls" dir="ltr">
+                      <div style="display: flex; align-items: center; gap: 10px;">
+                        <!-- Play / Pause Button -->
+                        <button id="hardsub-btn-play" class="pill-btn" style="padding: 6px 12px; height: 32px; gap: 4px;" title="Play / Pause Video">
+                          <svg id="hardsub-icon-play" viewBox="0 0 24 24" fill="currentColor" style="width:14px; height:14px;"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                          <svg id="hardsub-icon-pause" viewBox="0 0 24 24" fill="currentColor" style="width:14px; height:14px; display:none;"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                        </button>
+
+                        <!-- Prev / Next Subtitle Jump Buttons -->
+                        <button id="hardsub-btn-prev-cue" class="pill-btn" style="padding: 6px 8px; height: 32px;" title="Previous Subtitle Cue">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5"/></svg>
+                        </button>
+                        <button id="hardsub-btn-next-cue" class="pill-btn" style="padding: 6px 8px; height: 32px;" title="Next Subtitle Cue">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
+                        </button>
+
+                        <!-- Scrub Slider -->
+                        <input type="range" id="hardsub-video-seek" min="0" max="100" value="0" step="0.1" class="range-slider" style="flex:1;" />
+
+                        <!-- Time Display -->
+                        <span id="hardsub-video-time" style="font-family: monospace; font-size: 0.98rem; font-weight: 600; color: var(--color-royal-blue); min-width: 120px; text-align: right;">00:00 / 00:00</span>
+
+                        <!-- Volume Controls -->
+                        <div id="hardsub-volume-wrapper" class="volume-control-wrapper">
+                          <button id="hardsub-btn-volume" class="pill-btn" style="padding: 6px 6px; height: 32px; z-index: 2;" title="Mute / Unmute">
+                            <svg id="hardsub-icon-vol-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                            <svg id="hardsub-icon-vol-mute" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px; display:none;"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+                          </button>
+                          <input type="range" id="hardsub-volume-slider" min="0" max="1" step="0.05" value="1" class="volume-slider" />
+                        </div>
+
+                        <!-- Fullscreen Button -->
+                        <button id="hardsub-btn-fullscreen" class="pill-btn" style="padding: 6px 8px; height: 32px;" title="Toggle Fullscreen">
+                          <svg id="hardsub-icon-fs-enter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+                          <svg id="hardsub-icon-fs-exit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px; display:none;"><path d="M4 14h6v6m10-6h-6v6M4 10h6V4m10 6h-6V4"/></svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <div id="hardsub-preview-status" class="hardsub-preview-banner" style="display: none;">
+                    <div class="hardsub-preview-main-row">
+                      <div class="hardsub-preview-info">
+                        <div class="hardsub-preview-mini-spinner" aria-hidden="true"></div>
+                        <p id="hardsub-preview-status-text" role="status" aria-live="polite"></p>
+                      </div>
+                      <div class="hardsub-preview-progress-wrapper" hidden>
+                        <progress id="hardsub-preview-progress" max="1" aria-labelledby="hardsub-preview-status-text" hidden></progress>
+                      </div>
+                      <div class="hardsub-preview-actions">
+                        <button type="button" id="btn-cancel-hardsub-preview" class="pill-btn hardsub-preview-action-btn" hidden></button>
+                        <button type="button" id="btn-retry-hardsub-preview" class="pill-btn hardsub-preview-action-btn" hidden></button>
+                      </div>
+                    </div>
+                    <p id="hardsub-preview-original-note" class="hardsub-preview-note" hidden></p>
+                    <p id="hardsub-preview-detail" dir="auto" class="hardsub-preview-detail-text" hidden></p>
+                  </div>
                 </div>
 
               </div>
