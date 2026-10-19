@@ -625,15 +625,15 @@ describe('formatHardsubStatus localization', () => {
   it('formats encoding stage with speed and fps telemetry', () => {
     const formatted = formatHardsubStatusFn({
       progress: 0.82,
-      message: 'Embedding Subtitles into Video... 82% (Speed: 6.52x | 188.18 FPS)',
+      message: 'Rendering Hardsub Video... (Speed: 6.52x | 188.18 FPS)',
       active: true,
       stage: 'encoding',
       speed: '6.52x',
       fps: '188.18',
     });
-    expect(formatted).toContain('82%');
     expect(formatted).toContain('6.52x');
     expect(formatted).toContain('188.18');
+    expect(formatted).toContain('Rendering Hardsub Video');
   });
 
   it('formats finalizing stage', () => {
@@ -664,9 +664,19 @@ describe('formatHardsubStatus localization', () => {
       message: 'Embedding Subtitles into Video... 45% (Speed: 4.12x | 120.00 FPS)',
       active: true,
     });
-    expect(formatted).toContain('45%');
     expect(formatted).toContain('4.12x');
     expect(formatted).toContain('120.00');
+  });
+
+  it('formats Rendering Hardsub Video messages cleanly', () => {
+    const formatted = formatHardsubStatusFn({
+      progress: 0.55,
+      message: 'Rendering Hardsub Video... (Speed: 5.20x | 144.00 FPS)',
+      active: true,
+    });
+    expect(formatted).toContain('5.20x');
+    expect(formatted).toContain('144.00');
+    expect(formatted).toContain('Rendering Hardsub Video');
   });
 });
 

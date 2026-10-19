@@ -171,7 +171,7 @@ export function formatHardsubStatus(data: {
   if (!stage) {
     if (rawMsg.includes('Initializing') || rawMsg.includes('Encoder')) {
       stage = 'init';
-    } else if (rawMsg.includes('Embedding Subtitles')) {
+    } else if (rawMsg.includes('Embedding Subtitles') || rawMsg.includes('Rendering Hardsub Video') || rawMsg.includes('Burning in Subtitles')) {
       stage = 'encoding';
     } else if (rawMsg.includes('Finalizing video export') || rawMsg.includes('Finalizing')) {
       stage = 'finalizing';
@@ -696,6 +696,7 @@ export class HardsubController {
   private hwSelect: HTMLSelectElement | null = null;
   private alignmentButtons: NodeListOf<HTMLButtonElement> | null = null;
   private cancelBtn: HTMLButtonElement | null = null;
+  private isCancelling: boolean = false;
 
   // Canvas-based subtitle preview (ASS-matching renderer)
   private subtitleCanvas: HTMLCanvasElement | null = null;
@@ -1859,11 +1860,23 @@ export class HardsubController {
 
     // Cancel Hardsub Button
     this.on(this.cancelBtn, 'click', async () => {
+      if (this.isCancelling) return;
+      this.isCancelling = true;
+      if (this.cancelBtn) {
+        this.cancelBtn.disabled = true;
+        const span = this.cancelBtn.querySelector('span');
+        if (span) span.textContent = t('transcribe.cancelling');
+      }
       try {
         await invoke('cancel_hardsub_task');
-        this.updateEncodingUIState(false);
       } catch (e) {
         console.warn('Cancel hardsub error:', e);
+        this.isCancelling = false;
+        if (this.cancelBtn) {
+          this.cancelBtn.disabled = false;
+          const span = this.cancelBtn.querySelector('span');
+          if (span) span.textContent = t('common.cancel');
+        }
       }
     });
 
@@ -4228,6 +4241,7 @@ export class HardsubController {
 
   public resetAllMedia(): void {
     if (this.disposed || this.isEncoding) return;
+    this.isCancelling = false;
     ++this.subtitleSerial;
     this.clearVideoState();
     this.clearSubtitleState();
@@ -4559,6 +4573,12 @@ export class HardsubController {
 
     if (this.cancelBtn) {
       this.cancelBtn.style.display = active ? 'inline-flex' : 'none';
+      if (!active) {
+        this.cancelBtn.disabled = false;
+        const span = this.cancelBtn.querySelector('span');
+        if (span) span.textContent = t('common.cancel');
+        this.isCancelling = false;
+      }
     }
 
     if (this.btnBrowseDir) {
@@ -4588,7 +4608,6 @@ export class HardsubController {
       const isSettled = this.lastStatusPayload && (
         this.lastStatusPayload.stage === 'completed' ||
         this.lastStatusPayload.progress >= 1.0 ||
-        this.lastStatusPayload.stage === 'cancelled' ||
         this.lastStatusPayload.stage === 'failed'
       );
       if (!active && !isSettled) {
@@ -4620,6 +4639,21 @@ export class HardsubController {
     }>('hardsub-status', (event) => {
       if (this.disposed) return;
       const data = event.payload;
+      if (this.isCancelling && data.active && (data.stage === 'encoding' || data.stage === 'init')) {
+        return;
+      }
+      if (!data.active || data.stage === 'cancelled') {
+        this.isCancelling = false;
+        if (data.stage === 'cancelled') {
+          if (this.progressFill) this.progressFill.style.width = '0%';
+          if (this.progressPctText) this.progressPctText.textContent = '0%';
+          if (this.progressStatusText) {
+            this.progressStatusText.textContent = t('transcribe.standingBy');
+          }
+          this.updateEncodingUIState(false);
+          return;
+        }
+      }
       this.lastStatusPayload = data;
       if (this.telemetryBox && data.active) {
         this.telemetryBox.style.display = 'flex';
@@ -5037,8 +5071,13 @@ ${events}`;
       const msg = String(e || '');
       if (msg.includes('cancelled') || msg.includes('Cancelled')) {
         console.log('Hardsub task cancelled by user');
+        if ((window as any).showNotification) {
+          (window as any).showNotification(t('hardsub.statusEncodingCancelled'), 'info');
+        }
+        if (this.progressFill) this.progressFill.style.width = '0%';
+        if (this.progressPctText) this.progressPctText.textContent = '0%';
         if (this.progressStatusText) {
-          this.progressStatusText.textContent = t('hardsub.statusEncodingCancelled');
+          this.progressStatusText.textContent = t('transcribe.standingBy');
         }
       } else {
         const errorText = this.formatHardsubErrorMessage(e);
@@ -5052,6 +5091,7 @@ ${events}`;
         }
       }
     } finally {
+      this.isCancelling = false;
       this.updateEncodingUIState(false);
     }
   }

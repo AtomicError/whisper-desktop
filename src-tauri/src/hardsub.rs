@@ -1981,10 +1981,20 @@ pub async fn run_hardsub_task(
     };
 
     while !stdout_done || !stderr_done {
+        if session.lock().map(|l| l.cancel_requested).unwrap_or(false) {
+            let _ = child.kill().await;
+            break;
+        }
+
         tokio::select! {
             res = crate::transcribe::next_line_lossy(&mut stdout_reader), if !stdout_done => {
                 match res {
                     Some(line) => {
+                        if session.lock().map(|l| l.cancel_requested).unwrap_or(false) {
+                            let _ = child.kill().await;
+                            break;
+                        }
+
                         let trimmed = line.trim();
                         if let Some((k, v)) = trimmed.split_once('=') {
                             let k = k.trim();
@@ -2036,19 +2046,21 @@ pub async fn run_hardsub_task(
                                         }
 
                                         let msg = if !detail.is_empty() {
-                                            format!("Embedding Subtitles into Video... {}% ({})", percent, detail.join(" | "))
+                                            format!("Rendering Hardsub Video... ({})", detail.join(" | "))
                                         } else {
-                                            format!("Embedding Subtitles into Video... {}%", percent)
+                                            "Rendering Hardsub Video...".to_string()
                                         };
 
-                                        let _ = app.emit("hardsub-status", HardsubProgress {
-                                            progress: p,
-                                            message: msg,
-                                            active: true,
-                                            stage: Some("encoding".to_string()),
-                                            speed: speed_opt,
-                                            fps: fps_opt,
-                                        });
+                                        if !session.lock().map(|l| l.cancel_requested).unwrap_or(false) {
+                                            let _ = app.emit("hardsub-status", HardsubProgress {
+                                                progress: p,
+                                                message: msg,
+                                                active: true,
+                                                stage: Some("encoding".to_string()),
+                                                speed: speed_opt,
+                                                fps: fps_opt,
+                                            });
+                                        }
                                     }
                                 }
                             }
@@ -2060,7 +2072,7 @@ pub async fn run_hardsub_task(
                                 "fps" => {
                                     current_fps = v.to_string();
                                 }
-                                "progress" if v == "end" => {
+                                "progress" if v == "end" && !session.lock().map(|l| l.cancel_requested).unwrap_or(false) => {
                                     let _ = app.emit("hardsub-status", HardsubProgress {
                                         progress: 0.99,
                                         message: "Finalizing video export...".to_string(),
@@ -2078,6 +2090,10 @@ pub async fn run_hardsub_task(
                 }
             }
             res = crate::transcribe::next_line_lossy(&mut stderr_reader), if !stderr_done => {
+                if session.lock().map(|l| l.cancel_requested).unwrap_or(false) {
+                    let _ = child.kill().await;
+                    break;
+                }
                 match res {
                     Some(line) => {
                         if stderr_tail.len() >= 30 {

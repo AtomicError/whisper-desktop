@@ -4337,6 +4337,73 @@ select.select-control {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.hardsub-actions-bar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.hardsub-actions-bar .btn-start-hardsub {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 18px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.hardsub-actions-bar .btn-cancel-hardsub {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 18px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  gap: 8px;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.hardsub-actions-bar .btn-cancel-hardsub:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #ef4444;
+}
+
+.hardsub-actions-bar .btn-cancel-hardsub:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.hardsub-actions-bar .btn-play-hardsub,
+.hardsub-actions-bar .btn-open-hardsub-folder {
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  gap: 6px;
+  white-space: nowrap;
+}
+
 .hardsub-telemetry {
   width: 100%;
   display: flex;
