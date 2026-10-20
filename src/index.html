@@ -3235,7 +3235,7 @@
 
                     <!-- 5. Silero VAD Switch Row -->
                     <div class="transcribe-field-group">
-                      <div class="transcribe-switch-row" title="Voice activity detection filters non-speech audio segments.">
+                      <div class="transcribe-switch-row">
                         <div class="transcribe-switch-info">
                           <span class="transcribe-switch-title">
                             <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -3246,7 +3246,7 @@
                           <span class="transcribe-switch-desc" data-i18n="settings.vadEnableDesc">Pre-filter silent intervals using Silero neural voice activity detection.</span>
                         </div>
                         <label class="switch">
-                          <input type="checkbox" id="quick-toggle-vad" onchange="toggleQuickVad(this.checked)" title="Toggle Silero Voice Activity Detection" />
+                          <input type="checkbox" id="quick-toggle-vad" onchange="toggleQuickVad(this.checked)" />
                           <span class="slider"></span>
                         </label>
                       </div>
@@ -3274,11 +3274,11 @@
                     <div class="transcribe-actions-section">
                       <!-- Single-file actions -->
                       <div class="transcribe-actions-bar" id="single-transcribe-actions">
-                        <button class="btn-primary btn-start-transcription" id="btn-run-transcribe" type="button" onclick="runWhisperTranscription()">
+                        <button class="btn-primary btn-start-transcription" id="btn-run-transcribe" type="button" disabled data-i18n-title="toasts.noFileSelected" title="Please select an audio or video file first." onclick="runWhisperTranscription()">
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px;">
                             <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" x2="12" y1="19" y2="22"/>
                           </svg>
-                          <span data-i18n="transcribe.startAiExtraction">Start Transcription</span>
+                          <span data-i18n="transcribe.startAiExtraction">Transcribe File</span>
                         </button>
                         <button class="btn-secondary btn-cancel-transcription" id="btn-cancel-transcribe" type="button" style="display:none;" onclick="abortTranscription()">
                           <span data-i18n="common.cancel">Cancel</span>
@@ -3288,11 +3288,11 @@
                       <!-- Batch actions (shown when batch mode active) -->
                       <div id="batch-controls-box" class="batch-controls-box" style="display:none;">
                         <div class="transcribe-actions-bar">
-                          <button class="btn-primary btn-start-transcription" id="btn-run-batch" type="button" onclick="runBatchExtraction()">
+                          <button class="btn-primary btn-start-transcription" id="btn-run-batch" type="button" disabled data-i18n-title="toasts.noFileSelected" title="Please select an audio or video file first." onclick="runBatchExtraction()">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px;">
                               <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" x2="12" y1="19" y2="22"/>
                             </svg>
-                            <span data-i18n="transcribe.startBatchAiExtraction">Start Batch Transcription</span>
+                            <span data-i18n="transcribe.startBatchAiExtraction">Transcribe Files</span>
                           </button>
                           <button class="btn-secondary btn-cancel-transcription" id="btn-cancel-batch" type="button" style="display:none;" onclick="abortBatchExtraction()">
                             <span data-i18n="common.cancel">Cancel</span>

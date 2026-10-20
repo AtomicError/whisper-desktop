@@ -89,12 +89,16 @@ describe('Transcription Studio Unified Deck DOM Structure', () => {
     expect(html).toContain('id="batch-queue-body"');
   });
 
-  it('contains single and batch action controls', () => {
+  it('contains single and batch action controls with initial disabled state and tooltip', () => {
     expect(html).toContain('id="single-transcribe-actions"');
     expect(html).toContain('id="btn-run-transcribe"');
+    expect(html).toMatch(/<button[^>]*id="btn-run-transcribe"[^>]*disabled/);
+    expect(html).toMatch(/<button[^>]*id="btn-run-transcribe"[^>]*data-i18n-title="toasts\.noFileSelected"/);
     expect(html).toContain('id="btn-cancel-transcribe"');
     expect(html).toContain('id="batch-controls-box"');
     expect(html).toContain('id="btn-run-batch"');
+    expect(html).toMatch(/<button[^>]*id="btn-run-batch"[^>]*disabled/);
+    expect(html).toMatch(/<button[^>]*id="btn-run-batch"[^>]*data-i18n-title="toasts\.noFileSelected"/);
     expect(html).toContain('id="btn-cancel-batch"');
   });
 
@@ -203,8 +207,26 @@ describe('Transcription Studio Locales & Symmetry', () => {
     expect(locales.fa.transcribe.sendToHardsub).toBe('ارسال به استودیو هاردساب');
     expect(locales.en.transcribe.noSubGeneratedYet).toBe('No generated subtitle yet');
     expect(locales.fa.transcribe.noSubGeneratedYet).toBe('هنوز زیرنویسی استخراج نشده است');
+    expect(locales.noOutputDirYet).toBeUndefined();
     expect(locales.en.transcribe.noOutputDirYet).toBe('No output folder available yet');
     expect(locales.fa.transcribe.noOutputDirYet).toBe('هنوز پوشه خروجی در دسترس نیست');
+  });
+
+  it('provides polished target-oriented action button and status labels across all 13 supported languages', () => {
+    for (const code of languageCodes) {
+      const loc = locales[code];
+      expect(loc.transcribe.startAiExtraction, `Locale ${code}.transcribe.startAiExtraction should exist`).toBeTruthy();
+      expect(loc.transcribe.startBatchAiExtraction, `Locale ${code}.transcribe.startBatchAiExtraction should exist`).toBeTruthy();
+      expect(loc.transcribe.statusExtracting, `Locale ${code}.transcribe.statusExtracting should exist`).toBeTruthy();
+    }
+
+    expect(locales.en.transcribe.startAiExtraction).toBe('Transcribe File');
+    expect(locales.en.transcribe.startBatchAiExtraction).toBe('Transcribe Files');
+    expect(locales.en.transcribe.statusExtracting).toBe('Transcribing...');
+
+    expect(locales.fa.transcribe.startAiExtraction).toBe('رونویسی فایل');
+    expect(locales.fa.transcribe.startBatchAiExtraction).toBe('رونویسی فایل‌ها');
+    expect(locales.fa.transcribe.statusExtracting).toBe('در حال رونویسی...');
   });
 });
 
@@ -351,6 +373,124 @@ describe('Transcription Studio State Transitions Simulation', () => {
     expect(state.batchQueueDisplay).toBe('none');
     expect(state.singleActionsDisplay).toBe('flex');
     expect(state.batchActionsDisplay).toBe('none');
+  });
+
+  it('controls transcribe action buttons enabled/disabled states and tooltips across lifecycles', () => {
+    interface TranscribeActionButtonsState {
+      runBtnDisabled: boolean;
+      runBtnTitle: string;
+      runBtnText: string;
+      batchBtnDisabled: boolean;
+      batchBtnTitle: string;
+      batchBtnText: string;
+    }
+
+    function simulateUpdateTranscribeActionButtons(
+      hasSingleMedia: boolean,
+      hasBatchMedia: boolean,
+      isTranscribing: boolean = false,
+      isBatchExtracting: boolean = false,
+      tFn: (key: string) => string = (k) => {
+        const [ns, key] = k.split('.');
+        return locales.en[ns]?.[key] || k;
+      }
+    ): TranscribeActionButtonsState {
+      const canRun = !isTranscribing && hasSingleMedia;
+      const canRunBatch = !isBatchExtracting && hasBatchMedia;
+
+      let runTitle = '';
+      let runText = tFn('transcribe.startAiExtraction');
+      if (isTranscribing) {
+        runTitle = tFn('transcribe.statusExtracting');
+        runText = tFn('transcribe.statusExtracting');
+      } else if (!hasSingleMedia) {
+        runTitle = tFn('toasts.noFileSelected');
+      } else {
+        runTitle = tFn('transcribe.startAiExtraction');
+      }
+
+      let batchTitle = '';
+      let batchText = tFn('transcribe.startBatchAiExtraction');
+      if (isBatchExtracting) {
+        batchTitle = tFn('transcribe.batchRunning');
+        batchText = tFn('transcribe.batchRunning');
+      } else if (!hasBatchMedia) {
+        batchTitle = tFn('toasts.noFileSelected');
+      } else {
+        batchTitle = tFn('transcribe.startBatchAiExtraction');
+      }
+
+      return {
+        runBtnDisabled: !canRun,
+        runBtnTitle: runTitle,
+        runBtnText: runText,
+        batchBtnDisabled: !canRunBatch,
+        batchBtnTitle: batchTitle,
+        batchBtnText: batchText,
+      };
+    }
+
+    const tEn = (k: string) => {
+      const [ns, key] = k.split('.');
+      return locales.en[ns]?.[key] || k;
+    };
+    const tFa = (k: string) => {
+      const [ns, key] = k.split('.');
+      return locales.fa[ns]?.[key] || k;
+    };
+
+    // Initial state: no media loaded -> disabled with tooltip
+    const initial = simulateUpdateTranscribeActionButtons(false, false, false, false, tEn);
+    expect(initial.runBtnDisabled).toBe(true);
+    expect(initial.runBtnTitle).toBe('Please select an audio or video file first.');
+    expect(initial.runBtnText).toBe('Transcribe File');
+    expect(initial.batchBtnDisabled).toBe(true);
+    expect(initial.batchBtnTitle).toBe('Please select an audio or video file first.');
+    expect(initial.batchBtnText).toBe('Transcribe Files');
+
+    // In Persian:
+    const initialFa = simulateUpdateTranscribeActionButtons(false, false, false, false, tFa);
+    expect(initialFa.runBtnDisabled).toBe(true);
+    expect(initialFa.runBtnTitle).toBe('لطفاً ابتدا یک فایل صوتی یا ویدیویی انتخاب کنید.');
+    expect(initialFa.runBtnText).toBe('رونویسی فایل');
+    expect(initialFa.batchBtnDisabled).toBe(true);
+    expect(initialFa.batchBtnTitle).toBe('لطفاً ابتدا یک فایل صوتی یا ویدیویی انتخاب کنید.');
+    expect(initialFa.batchBtnText).toBe('رونویسی فایل‌ها');
+
+    // Single file loaded -> enabled with ready tooltip
+    const singleLoaded = simulateUpdateTranscribeActionButtons(true, false, false, false, tEn);
+    expect(singleLoaded.runBtnDisabled).toBe(false);
+    expect(singleLoaded.runBtnTitle).toBe('Transcribe File');
+    expect(singleLoaded.runBtnText).toBe('Transcribe File');
+
+    // Batch files loaded -> batch button enabled
+    const batchLoaded = simulateUpdateTranscribeActionButtons(false, true, false, false, tEn);
+    expect(batchLoaded.batchBtnDisabled).toBe(false);
+    expect(batchLoaded.batchBtnTitle).toBe('Transcribe Files');
+    expect(batchLoaded.batchBtnText).toBe('Transcribe Files');
+
+    // Transcribing active -> disabled with "Transcribing..."
+    const transcribing = simulateUpdateTranscribeActionButtons(true, false, true, false, tEn);
+    expect(transcribing.runBtnDisabled).toBe(true);
+    expect(transcribing.runBtnTitle).toBe('Transcribing...');
+    expect(transcribing.runBtnText).toBe('Transcribing...');
+
+    // Transcribing active in Persian -> disabled with "در حال رونویسی..."
+    const transcribingFa = simulateUpdateTranscribeActionButtons(true, false, true, false, tFa);
+    expect(transcribingFa.runBtnDisabled).toBe(true);
+    expect(transcribingFa.runBtnTitle).toBe('در حال رونویسی...');
+    expect(transcribingFa.runBtnText).toBe('در حال رونویسی...');
+
+    // Batch active -> disabled with "Batch Running..."
+    const batchActive = simulateUpdateTranscribeActionButtons(false, true, false, true, tEn);
+    expect(batchActive.batchBtnDisabled).toBe(true);
+    expect(batchActive.batchBtnTitle).toBe('Batch Running...');
+    expect(batchActive.batchBtnText).toBe('Batch Running...');
+
+    // Cleared -> disabled with tooltip
+    const cleared = simulateUpdateTranscribeActionButtons(false, false, false, false, tEn);
+    expect(cleared.runBtnDisabled).toBe(true);
+    expect(cleared.runBtnTitle).toBe('Please select an audio or video file first.');
   });
 });
 

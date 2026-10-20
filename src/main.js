@@ -1178,6 +1178,8 @@ let lastAppendedCategory = null;
 let selectedMediaFiles = [];
 let batchItems = [];
 let isBatchMode = false;
+let isTranscribing = false;
+let isBatchExtracting = false;
 let batchCancelActive = false;
 let _unlistenFns = [];
 let _modelActionsInProgress = new Set();
@@ -2789,6 +2791,10 @@ async function initApp() {
     if (settingsSearchInput && settingsSearchInput.value && typeof window.filterSettings === 'function') {
       window.filterSettings(settingsSearchInput.value);
     }
+
+    if (typeof window.updateTranscribeActionButtons === 'function') {
+      window.updateTranscribeActionButtons();
+    }
   });
 
   // Wire up settings search keyboard shortcuts (Escape clears search)
@@ -2879,6 +2885,9 @@ async function initApp() {
 
   // Switch to default transcribe view
   switchView('transcribe');
+  if (typeof window.updateTranscribeActionButtons === 'function') {
+    window.updateTranscribeActionButtons(false);
+  }
 
   // Lift the initial startup transition freeze after first layout has completed
   requestAnimationFrame(() => {
@@ -4844,6 +4853,81 @@ window.updateTranscribeWorkflowButtons = function() {
   }
 };
 
+window.updateTranscribeActionButtons = function(isTranscribingParam) {
+  if (typeof isTranscribingParam === 'boolean') {
+    if (!isTranscribingParam) {
+      isTranscribing = false;
+      isBatchExtracting = false;
+    } else if (isBatchMode) {
+      isBatchExtracting = true;
+    } else {
+      isTranscribing = true;
+    }
+  }
+
+  const btnRun = document.getElementById('btn-run-transcribe');
+  const btnBatch = document.getElementById('btn-run-batch');
+  const btnRunSpan = btnRun?.querySelector('span');
+  const btnBatchSpan = btnBatch?.querySelector('span');
+
+  const hasSingleMedia = Boolean(selectedMediaFile || wavPathForTranscription);
+  const hasBatchMedia = Array.isArray(batchItems) && batchItems.length > 0;
+
+  if (btnRun) {
+    const canRun = !isTranscribing && hasSingleMedia;
+    btnRun.disabled = !canRun;
+    if (isTranscribing) {
+      btnRun.title = t('transcribe.statusExtracting');
+      btnRun.setAttribute('data-i18n-title', 'transcribe.statusExtracting');
+      if (btnRunSpan) {
+        btnRunSpan.setAttribute('data-i18n', 'transcribe.statusExtracting');
+        btnRunSpan.textContent = t('transcribe.statusExtracting');
+      }
+    } else if (!hasSingleMedia) {
+      btnRun.title = t('toasts.noFileSelected');
+      btnRun.setAttribute('data-i18n-title', 'toasts.noFileSelected');
+      if (btnRunSpan) {
+        btnRunSpan.setAttribute('data-i18n', 'transcribe.startAiExtraction');
+        btnRunSpan.textContent = t('transcribe.startAiExtraction');
+      }
+    } else {
+      btnRun.title = t('transcribe.startAiExtraction');
+      btnRun.setAttribute('data-i18n-title', 'transcribe.startAiExtraction');
+      if (btnRunSpan) {
+        btnRunSpan.setAttribute('data-i18n', 'transcribe.startAiExtraction');
+        btnRunSpan.textContent = t('transcribe.startAiExtraction');
+      }
+    }
+  }
+
+  if (btnBatch) {
+    const canRunBatch = !isBatchExtracting && hasBatchMedia;
+    btnBatch.disabled = !canRunBatch;
+    if (isBatchExtracting) {
+      btnBatch.title = t('transcribe.batchRunning');
+      btnBatch.setAttribute('data-i18n-title', 'transcribe.batchRunning');
+      if (btnBatchSpan) {
+        btnBatchSpan.setAttribute('data-i18n', 'transcribe.batchRunning');
+        btnBatchSpan.textContent = t('transcribe.batchRunning');
+      }
+    } else if (!hasBatchMedia) {
+      btnBatch.title = t('toasts.noFileSelected');
+      btnBatch.setAttribute('data-i18n-title', 'toasts.noFileSelected');
+      if (btnBatchSpan) {
+        btnBatchSpan.setAttribute('data-i18n', 'transcribe.startBatchAiExtraction');
+        btnBatchSpan.textContent = t('transcribe.startBatchAiExtraction');
+      }
+    } else {
+      btnBatch.title = t('transcribe.startBatchAiExtraction');
+      btnBatch.setAttribute('data-i18n-title', 'transcribe.startBatchAiExtraction');
+      if (btnBatchSpan) {
+        btnBatchSpan.setAttribute('data-i18n', 'transcribe.startBatchAiExtraction');
+        btnBatchSpan.textContent = t('transcribe.startBatchAiExtraction');
+      }
+    }
+  }
+};
+
 window.sendTranscribeToTranslationStudio = async function() {
   const subToLoad = window.lastTranscribedSubtitlePath;
   if (!subToLoad) {
@@ -5047,6 +5131,9 @@ window.clearSingleMediaFile = function() {
   if (typeof window.updateTranscribeWorkflowButtons === 'function') {
     window.updateTranscribeWorkflowButtons();
   }
+  if (typeof window.updateTranscribeActionButtons === 'function') {
+    window.updateTranscribeActionButtons(false);
+  }
 
   const viewport = document.getElementById('transcript-viewport');
   if (viewport) {
@@ -5069,8 +5156,7 @@ window.clearSingleMediaFile = function() {
 };
 
 window.browseMediaFile = async function() {
-  const startBtn = document.getElementById('btn-run-batch');
-  if (startBtn && startBtn.disabled) {
+  if (isBatchExtracting || isTranscribing) {
     showNotification(t('toasts.batchActiveSelectBlocked'), "info");
     return;
   }
@@ -5123,6 +5209,9 @@ window.browseMediaFile = async function() {
       if (wizardStep3) wizardStep3.style.display = 'block';
       
       wavPathForTranscription = null;
+      if (typeof window.updateTranscribeActionButtons === 'function') {
+        window.updateTranscribeActionButtons(false);
+      }
       
       if (settingsState) {
         settingsState.inputFile = selectedMediaFile;
@@ -5187,6 +5276,9 @@ window.browseMediaFile = async function() {
       if (runBatchBtn) runBatchBtn.style.display = 'inline-flex';
       const cancelBatchBtn = document.getElementById('btn-cancel-batch');
       if (cancelBatchBtn) cancelBatchBtn.style.display = 'none';
+      if (typeof window.updateTranscribeActionButtons === 'function') {
+        window.updateTranscribeActionButtons(false);
+      }
       
       setWizardStepCompleted(1, true);
       setWizardStepCompleted(2, true);
@@ -5607,7 +5699,10 @@ window.runWhisperTranscription = async function() {
     return;
   }
 
-  btn.disabled = true;
+  isTranscribing = true;
+  if (typeof updateTranscribeActionButtons === 'function') {
+    updateTranscribeActionButtons(true);
+  }
   document.getElementById('analytics-box').style.display = 'none';
 
   const telemetryCard = document.getElementById('telemetry-hud-card');
@@ -5817,14 +5912,11 @@ window.runWhisperTranscription = async function() {
       }
     }
   } finally {
+    isTranscribing = false;
     // ALWAYS clear the temporary WAV state since it has been cleaned up by the backend
     wavPathForTranscription = null;
-    btn.disabled = false;
-    if (btnSpan) {
-      btnSpan.setAttribute('data-i18n', 'transcribe.startAiExtraction');
-      btnSpan.textContent = t('transcribe.startAiExtraction');
-    } else {
-      btn.textContent = t('transcribe.startAiExtraction');
+    if (typeof updateTranscribeActionButtons === 'function') {
+      updateTranscribeActionButtons(false);
     }
     if (fillBar) fillBar.classList.remove('indeterminate');
     // Guarantee the HUD pulse dot can never get stuck (success, error, or cancel).
@@ -6249,6 +6341,9 @@ window.removeFileFromBatch = function(index) {
   } else {
     renderBatchQueueTable();
     updateBatchSpecs();
+    if (typeof window.updateTranscribeActionButtons === 'function') {
+      window.updateTranscribeActionButtons(false);
+    }
   }
 };
 
@@ -6348,6 +6443,9 @@ window.clearBatchQueue = function() {
   transcriptLines = [];
   if (typeof window.updateTranscribeWorkflowButtons === 'function') {
     window.updateTranscribeWorkflowButtons();
+  }
+  if (typeof window.updateTranscribeActionButtons === 'function') {
+    window.updateTranscribeActionButtons(false);
   }
 
   const viewport = document.getElementById('transcript-viewport');
@@ -6508,8 +6606,7 @@ function renderBatchQueueTable() {
     const actionGroup = document.createElement('div');
     actionGroup.className = 'batch-action-group';
     
-    const startBtn = document.getElementById('btn-run-batch');
-    const isRunning = startBtn && startBtn.disabled;
+    const isRunning = isBatchExtracting;
     
     // Up button
     const upBtn = document.createElement('button');
@@ -6603,8 +6700,10 @@ window.runBatchExtraction = async function() {
   const sortSelect = document.getElementById('batch-sort-select');
   const clearBtn = document.getElementById('btn-clear-batch');
   
-  startBtn.disabled = true;
-  if (startBtnSpan) startBtnSpan.textContent = t('transcribe.batchRunning'); else startBtn.textContent = t('transcribe.batchRunning');
+  isBatchExtracting = true;
+  if (typeof updateTranscribeActionButtons === 'function') {
+    updateTranscribeActionButtons(true);
+  }
   if (sortSelect) sortSelect.disabled = true;
   if (clearBtn) clearBtn.disabled = true;
   
@@ -6837,8 +6936,10 @@ window.runBatchExtraction = async function() {
   }
   
   // Reset buttons
-  startBtn.disabled = false;
-  if (startBtnSpan) startBtnSpan.textContent = t('transcribe.startBatchAiExtraction'); else startBtn.textContent = t('transcribe.startBatchAiExtraction');
+  isBatchExtracting = false;
+  if (typeof updateTranscribeActionButtons === 'function') {
+    updateTranscribeActionButtons(false);
+  }
   if (cancelBtn) cancelBtn.style.display = 'none';
   if (sortSelect) sortSelect.disabled = false;
   if (clearBtn) clearBtn.disabled = false;
@@ -6960,8 +7061,7 @@ function setupTranscribeDragAndDrop() {
 }
 
 async function handleDroppedFiles(files) {
-  const startBtn = document.getElementById('btn-run-batch');
-  if (startBtn && startBtn.disabled) {
+  if (isBatchExtracting || isTranscribing) {
     showNotification(t('toasts.batchActiveDropBlocked'), "info");
     return;
   }
@@ -7011,6 +7111,9 @@ async function handleDroppedFiles(files) {
     if (wizardStep3) wizardStep3.style.display = 'block';
     
     wavPathForTranscription = null;
+    if (typeof window.updateTranscribeActionButtons === 'function') {
+      window.updateTranscribeActionButtons(false);
+    }
     
     if (settingsState) {
       settingsState.inputFile = selectedMediaFile;
@@ -7071,6 +7174,9 @@ async function handleDroppedFiles(files) {
     if (runBatchBtn) runBatchBtn.style.display = 'inline-flex';
     const cancelBatchBtn = document.getElementById('btn-cancel-batch');
     if (cancelBatchBtn) cancelBatchBtn.style.display = 'none';
+    if (typeof window.updateTranscribeActionButtons === 'function') {
+      window.updateTranscribeActionButtons(false);
+    }
     
     setWizardStepCompleted(1, true);
     setWizardStepCompleted(2, true);
