@@ -4562,12 +4562,16 @@ export class HardsubController {
       startBtn.style.cursor = canStart ? 'pointer' : 'not-allowed';
       if (!this.state.videoPath) {
         startBtn.title = t('hardsub.selectVideoFirst');
+        startBtn.setAttribute?.('data-i18n-title', 'hardsub.selectVideoFirst');
       } else if (!this.state.subtitlePath) {
         startBtn.title = t('hardsub.selectSubFirst');
+        startBtn.setAttribute?.('data-i18n-title', 'hardsub.selectSubFirst');
       } else if (active) {
         startBtn.title = t('hardsub.exportingVideo');
+        startBtn.setAttribute?.('data-i18n-title', 'hardsub.exportingVideo');
       } else {
         startBtn.title = t('hardsub.exportHardsubVideo');
+        startBtn.setAttribute?.('data-i18n-title', 'hardsub.exportHardsubVideo');
       }
     }
 

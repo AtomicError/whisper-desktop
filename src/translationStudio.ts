@@ -833,6 +833,7 @@ export class TranslationStudioController {
     } catch (err: any) {
       if (loadId !== this.subtitleLoadId) return;
       console.error('Failed to load subtitle file:', err);
+      this.clearLoadedSubtitle();
       this.notify(String(err || t('translate.noSubSelectedError')), 'error');
     }
   }
@@ -1277,12 +1278,16 @@ export class TranslationStudioController {
       this.btnStart.disabled = !hasSub || isTranslating || !this.state.activeModel;
       if (!hasSub) {
         this.btnStart.title = t('translate.noSubSelectedError');
+        this.btnStart.setAttribute?.('data-i18n-title', 'translate.noSubSelectedError');
       } else if (!this.state.activeModel) {
         this.btnStart.title = t('translate.noModelError');
+        this.btnStart.setAttribute?.('data-i18n-title', 'translate.noModelError');
       } else if (isTranslating) {
         this.btnStart.title = t('translate.translating');
+        this.btnStart.setAttribute?.('data-i18n-title', 'translate.translating');
       } else {
         this.btnStart.title = t('translate.startTranslate');
+        this.btnStart.setAttribute?.('data-i18n-title', 'translate.startTranslate');
       }
     }
     if (this.btnStartText) {
@@ -1300,14 +1305,17 @@ export class TranslationStudioController {
     if (this.btnCopy) {
       this.btnCopy.disabled = !hasTranslation;
       this.btnCopy.title = hasTranslation ? t('translate.copyTranslation') : t('translate.emptyTargetTitle');
+      this.btnCopy.setAttribute?.('data-i18n-title', hasTranslation ? 'translate.copyTranslation' : 'translate.emptyTargetTitle');
     }
     if (this.btnOpenFolder) {
       this.btnOpenFolder.disabled = !hasTranslation;
       this.btnOpenFolder.title = hasTranslation ? t('translate.openOutputFolder') : t('translate.emptyTargetTitle');
+      this.btnOpenFolder.setAttribute?.('data-i18n-title', hasTranslation ? 'translate.openOutputFolder' : 'translate.emptyTargetTitle');
     }
     if (this.btnSendToHardsub) {
       this.btnSendToHardsub.disabled = !hasTranslation;
       this.btnSendToHardsub.title = hasTranslation ? t('translate.sendToHardsub') : t('translate.emptyTargetTitle');
+      this.btnSendToHardsub.setAttribute?.('data-i18n-title', hasTranslation ? 'translate.sendToHardsub' : 'translate.emptyTargetTitle');
     }
   }
 
@@ -1609,6 +1617,10 @@ export class TranslationStudioController {
     if (mode === 'split') this.btnViewSplit?.classList.add('active');
     else if (mode === 'source') this.btnViewSource?.classList.add('active');
     else if (mode === 'target') this.btnViewTarget?.classList.add('active');
+
+    this.btnViewSplit?.setAttribute?.('aria-selected', String(mode === 'split'));
+    this.btnViewSource?.setAttribute?.('aria-selected', String(mode === 'source'));
+    this.btnViewTarget?.setAttribute?.('aria-selected', String(mode === 'target'));
 
     if (this.previewGrid && this.sourcePane && this.targetPane) {
       if (mode === 'split') {

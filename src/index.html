@@ -3479,7 +3479,7 @@
                         </svg>
                         <span data-i18n="translate.targetLang">Target Language</span>
                       </label>
-                      <select class="select-control" id="translate-target-lang" data-searchable data-language-select="translation"></select>
+                      <select class="select-control" id="translate-target-lang" data-searchable data-language-select="translation" data-i18n-aria="translate.targetLang" aria-label="Target Language"></select>
                     </div>
 
                     <!-- 3. Provider Selector (Full Width) -->
@@ -3490,7 +3490,7 @@
                         </svg>
                         <span data-i18n="translate.activeProvider">Active Provider</span>
                       </label>
-                      <select class="select-control" id="translate-provider-select" title="Active Provider"></select>
+                      <select class="select-control" id="translate-provider-select" title="Active Provider" data-i18n-title="translate.activeProvider" data-i18n-aria="translate.activeProvider" aria-label="Active Provider"></select>
                     </div>
 
                     <!-- 4. Model Selector (Full Width) -->
@@ -3501,7 +3501,7 @@
                         </svg>
                         <span data-i18n="translate.activeModel">Active Model</span>
                       </label>
-                      <select class="select-control" id="translate-model-select" data-searchable data-model-select title="Active Model"></select>
+                      <select class="select-control" id="translate-model-select" data-searchable data-model-select title="Active Model" data-i18n-title="translate.activeModel" data-i18n-aria="translate.activeModel" aria-label="Active Model"></select>
                     </div>
 
                     <!-- 4. Conversational Polish Pass (Full Width) -->
@@ -3541,7 +3541,7 @@
                     <!-- 5. Action & Telemetry Deck -->
                     <div class="translate-actions-section">
                       <div class="translate-actions-bar">
-                        <button class="btn-primary btn-start-translation" id="btn-start-translation" type="button" disabled>
+                        <button class="btn-primary btn-start-translation" id="btn-start-translation" type="button" disabled data-i18n-title="translate.noSubSelectedError" title="Please select a subtitle file first.">
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px;">
                             <path d="m5 8 6 6"/>
                             <path d="m4 14 6-6 2-3"/>
@@ -3552,7 +3552,7 @@
                           </svg>
                           <span id="btn-start-translation-text" data-i18n="translate.startTranslate">Translate Subtitle</span>
                         </button>
-                        <button class="btn-secondary btn-cancel-translation" id="btn-cancel-translation" type="button" style="display:none;" data-i18n="translate.cancelTranslate">Cancel</button>
+                        <button class="btn-secondary btn-cancel-translation" id="btn-cancel-translation" type="button" style="display:none;" data-i18n="translate.cancelTranslate" data-i18n-aria="translate.cancelTranslate" aria-label="Cancel Translation">Cancel</button>
                       </div>
 
                       <!-- Telemetry HUD -->
@@ -3580,26 +3580,26 @@
                 <div class="glass-card translate-preview-card">
                   <!-- Header Toolbar -->
                   <div class="translate-preview-toolbar">
-                    <div class="translate-view-segmented">
-                      <button class="view-segment-btn active" id="btn-view-split" type="button" data-i18n="translate.viewSplit">Split View</button>
-                      <button class="view-segment-btn" id="btn-view-source" type="button" data-i18n="translate.viewSource">Original Only</button>
-                      <button class="view-segment-btn" id="btn-view-target" type="button" data-i18n="translate.viewTarget">Translated Only</button>
+                    <div class="translate-view-segmented" role="tablist" aria-label="Subtitle View Mode">
+                      <button class="view-segment-btn active" id="btn-view-split" type="button" role="tab" aria-selected="true" data-i18n="translate.viewSplit" data-i18n-aria="translate.viewSplit" aria-label="Split View">Split View</button>
+                      <button class="view-segment-btn" id="btn-view-source" type="button" role="tab" aria-selected="false" data-i18n="translate.viewSource" data-i18n-aria="translate.viewSource" aria-label="Original Only">Original Only</button>
+                      <button class="view-segment-btn" id="btn-view-target" type="button" role="tab" aria-selected="false" data-i18n="translate.viewTarget" data-i18n-aria="translate.viewTarget" aria-label="Translated Only">Translated Only</button>
                     </div>
                     <div class="translate-toolbar-actions">
-                      <button class="btn-secondary btn-icon-text" id="btn-copy-translated" type="button" disabled title="No Translation Yet">
+                      <button class="btn-secondary btn-icon-text" id="btn-copy-translated" type="button" disabled data-i18n-title="translate.emptyTargetTitle" title="No Translation Yet" data-i18n-aria="translate.copyTranslation" aria-label="Copy Subtitles">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;">
                           <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
                           <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                         </svg>
                         <span data-i18n="translate.copyTranslation">Copy Subtitles</span>
                       </button>
-                      <button class="btn-secondary btn-icon-text" id="btn-open-translated-dir" type="button" disabled title="No Translation Yet">
+                      <button class="btn-secondary btn-icon-text" id="btn-open-translated-dir" type="button" disabled data-i18n-title="translate.emptyTargetTitle" title="No Translation Yet" data-i18n-aria="translate.openOutputFolder" aria-label="Open Containing Folder">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;">
                           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                         </svg>
                         <span data-i18n="translate.openOutputFolder">Open Folder</span>
                       </button>
-                      <button class="btn-secondary btn-icon-text btn-toolbar-hardsub" id="btn-send-to-hardsub" type="button" disabled title="No Translation Yet" data-i18n-title="translate.emptyTargetTitle">
+                      <button class="btn-secondary btn-icon-text btn-toolbar-hardsub" id="btn-send-to-hardsub" type="button" disabled data-i18n-title="translate.emptyTargetTitle" title="No Translation Yet" data-i18n-aria="translate.sendToHardsub" aria-label="Send to Hardsub Studio">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;">
                           <polygon points="23 7 16 12 23 17 23 7"/>
                           <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
@@ -4113,7 +4113,7 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px;"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
                         <span data-i18n="hardsub.ffmpegPreviewTitle">FFmpeg Command Preview</span>
                       </h3>
-                      <button type="button" class="btn-secondary" id="btn-copy-ffmpeg-cmd" style="padding: 4px 12px; font-size: 0.75rem; display: flex; align-items: center; gap: 6px;">
+                      <button type="button" class="btn-secondary" id="btn-copy-ffmpeg-cmd" style="padding: 4px 12px; font-size: 0.75rem; display: flex; align-items: center; gap: 6px;" data-i18n-title="hardsub.copyCommand" title="Copy Command" data-i18n-aria="hardsub.copyCommand" aria-label="Copy Command">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px; height:13px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                         <span data-i18n="hardsub.copyCommand">Copy Command</span>
                       </button>
@@ -4150,21 +4150,21 @@
 
                     <!-- 2. Primary Actions Row -->
                     <div class="hardsub-actions-bar">
-                      <button class="btn-primary btn-start-hardsub" id="btn-start-hardsub" disabled style="opacity: 0.5; cursor: not-allowed;">
+                      <button class="btn-primary btn-start-hardsub" id="btn-start-hardsub" disabled style="opacity: 0.5; cursor: not-allowed;" data-i18n-title="hardsub.selectVideoFirst" title="Please select a video file first.">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width: 18px; height: 18px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                         <span data-i18n="hardsub.exportHardsubVideo">Export Hardsub Video</span>
                       </button>
-                      <button class="btn-secondary btn-cancel-hardsub" id="btn-cancel-hardsub" type="button" style="display: none;">
+                      <button class="btn-secondary btn-cancel-hardsub" id="btn-cancel-hardsub" type="button" style="display: none;" data-i18n-aria="common.cancel" aria-label="Cancel">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
                         <span data-i18n="common.cancel">Cancel</span>
                       </button>
-                      <button class="btn-secondary btn-play-hardsub" id="btn-play-hardsub-video" style="display: none;" type="button" title="Play Video" data-i18n-title="hardsub.playVideo">
+                      <button class="btn-secondary btn-play-hardsub" id="btn-play-hardsub-video" style="display: none;" type="button" title="Play Video" data-i18n-title="hardsub.playVideo" data-i18n-aria="hardsub.playVideo" aria-label="Play Video">
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                           <polygon points="6 4 20 12 6 20 6 4"/>
                         </svg>
                         <span data-i18n="hardsub.playVideo">Play Video</span>
                       </button>
-                      <button class="btn-secondary btn-open-hardsub-folder" id="btn-open-hardsub-folder" style="display: none;" type="button" title="Open Output Folder" data-i18n-title="hardsub.openOutputFolder">
+                      <button class="btn-secondary btn-open-hardsub-folder" id="btn-open-hardsub-folder" style="display: none;" type="button" title="Open Output Folder" data-i18n-title="hardsub.openOutputFolder" data-i18n-aria="hardsub.openOutputFolder" aria-label="Open Output Folder">
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                         </svg>
@@ -4188,7 +4188,7 @@
                       <div class="wizard-step-title" id="hardsub-media-step-title" data-i18n="hardsub.selectResource">Select Video &amp; Subtitle</div>
                     </div>
                     <div style="display: flex; align-items: center; gap: 10px;">
-                      <button class="btn-secondary" id="btn-reset-hardsub-all" type="button" style="display: none; padding: 4px 10px; font-size: 0.78rem; gap: 6px; align-items: center;" data-i18n-title="hardsub.resetAll">
+                      <button class="btn-secondary" id="btn-reset-hardsub-all" type="button" style="display: none; padding: 4px 10px; font-size: 0.78rem; gap: 6px; align-items: center;" data-i18n-title="hardsub.resetAll" data-i18n-aria="hardsub.resetAll" aria-label="Reset All">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 13px; height: 13px;">
                           <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
                           <path d="M3 3v5h5"/>
@@ -4207,7 +4207,7 @@
                     <div class="hardsub-media-grid">
                       
                       <!-- Video File Dropzone -->
-                      <div class="media-drop-zone" id="hardsub-video-drop-zone" style="padding: 20px 14px; gap: 10px; position: relative;">
+                      <div class="media-drop-zone" id="hardsub-video-drop-zone" style="padding: 20px 14px; gap: 10px; position: relative;" data-i18n-title="hardsub.dropVideoPrompt" title="Drag &amp; drop video (.mp4, .mkv, .mov)">
                         <svg class="media-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width: 32px; height: 32px;">
                           <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
                           <line x1="7" y1="2" x2="7" y2="22"/>
@@ -4229,14 +4229,14 @@
                           <p dir="auto" style="font-size:0.75rem; color:var(--color-text-muted); margin:0;" id="lbl-hardsub-video-path" data-i18n="hardsub.dropVideoPrompt">Drag & drop video (.mp4, .mkv, .mov)</p>
                         </div>
                         <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: center;">
-                          <button class="btn-secondary" id="btn-browse-video" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap;" data-i18n="hardsub.browseVideo">Browse Video</button>
-                          <button class="btn-secondary btn-clear-sub" id="btn-clear-hardsub-video" type="button" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap; display: none;" data-i18n="hardsub.clearVideo">Clear</button>
+                          <button class="btn-secondary" id="btn-browse-video" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap;" data-i18n="hardsub.browseVideo" data-i18n-aria="hardsub.browseVideo" aria-label="Browse Video">Browse Video</button>
+                          <button class="btn-secondary btn-clear-sub" id="btn-clear-hardsub-video" type="button" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap; display: none;" data-i18n="hardsub.clearVideo" data-i18n-aria="hardsub.clearVideo" aria-label="Clear Video">Clear</button>
                         </div>
                         <input type="hidden" id="hardsub-video-path" />
                       </div>
 
                       <!-- Subtitle File Dropzone -->
-                      <div class="media-drop-zone" id="hardsub-sub-drop-zone" style="padding: 20px 14px; gap: 10px; position: relative;">
+                      <div class="media-drop-zone" id="hardsub-sub-drop-zone" style="padding: 20px 14px; gap: 10px; position: relative;" data-i18n-title="hardsub.dropSubPrompt" title="Drag &amp; drop subtitle (.srt, .vtt, .ass)">
                         <svg class="media-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="width: 32px; height: 32px;">
                           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                           <line x1="7" y1="8" x2="17" y2="8"/>
@@ -4247,8 +4247,8 @@
                           <p dir="auto" style="font-size:0.75rem; color:var(--color-text-muted); margin:0;" id="lbl-hardsub-sub-path" data-i18n="hardsub.dropSubPrompt">Drag & drop subtitle (.srt, .vtt, .ass)</p>
                         </div>
                         <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: center;">
-                          <button class="btn-secondary" id="btn-browse-sub" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap;" data-i18n="hardsub.browseSub">Browse Subtitle</button>
-                          <button class="btn-secondary btn-clear-sub" id="btn-clear-hardsub-sub" type="button" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap; display: none;" data-i18n="hardsub.clearSub">Clear</button>
+                          <button class="btn-secondary" id="btn-browse-sub" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap;" data-i18n="hardsub.browseSub" data-i18n-aria="hardsub.browseSub" aria-label="Browse Subtitle">Browse Subtitle</button>
+                          <button class="btn-secondary btn-clear-sub" id="btn-clear-hardsub-sub" type="button" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap; display: none;" data-i18n="hardsub.clearSub" data-i18n-aria="hardsub.clearSub" aria-label="Clear Subtitle">Clear</button>
                         </div>
                         <input type="hidden" id="hardsub-sub-path" />
                       </div>

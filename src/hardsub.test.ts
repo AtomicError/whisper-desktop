@@ -31,12 +31,14 @@ class Control extends EventTarget {
   children: Control[] = [];
   selectedIndex = 0;
   closest = (_selector: string): Control | null => null;
-  setAttribute() {}
+  attributes = new Map<string, string>();
+  setAttribute(name: string, value: string) { this.attributes.set(name, value); }
+  getAttribute(name: string): string | null { return this.attributes.get(name) ?? null; }
   focus = vi.fn();
   blur = vi.fn();
   contains(_node: unknown): boolean { return false; }
   matches(_selector: string): boolean { return false; }
-  removeAttribute(_name: string) {}
+  removeAttribute(name: string) { this.attributes.delete(name); }
   appendChild(child: Control) { this.children.push(child); return child; }
   get innerHTML() { return ''; }
   set innerHTML(_v: string) { this.children = []; }
@@ -1243,28 +1245,32 @@ describe('hardsub output directory management', () => {
       expect(invoke).toHaveBeenCalledWith('release_hardsub_preview', expect.anything());
     });
 
-    it('updates start button disabled state and tooltip title based on video, subtitle, and encoding readiness', async () => {
+    it('updates start button disabled state, title, and data-i18n-title based on video, subtitle, and encoding readiness', async () => {
       const { load, internal, startBtn } = fixture();
       internal.state.videoPath = '';
       internal.state.subtitlePath = '';
       internal.updateEncodingUIState(false);
       expect((startBtn as any).disabled).toBe(true);
       expect((startBtn as any).title).toBe('Please select a video file first.');
+      expect((startBtn as any).getAttribute('data-i18n-title')).toBe('hardsub.selectVideoFirst');
 
       await load();
       internal.state.subtitlePath = '';
       internal.updateEncodingUIState(false);
       expect((startBtn as any).disabled).toBe(true);
       expect((startBtn as any).title).toBe('Please select a subtitle file first.');
+      expect((startBtn as any).getAttribute('data-i18n-title')).toBe('hardsub.selectSubFirst');
 
       internal.state.subtitlePath = '/sub.srt';
       internal.updateEncodingUIState(false);
       expect((startBtn as any).disabled).toBe(false);
       expect((startBtn as any).title).toBe('Export Hardsub Video');
+      expect((startBtn as any).getAttribute('data-i18n-title')).toBe('hardsub.exportHardsubVideo');
 
       internal.updateEncodingUIState(true);
       expect((startBtn as any).disabled).toBe(true);
       expect((startBtn as any).title).toBe('Exporting Hardsub Video...');
+      expect((startBtn as any).getAttribute('data-i18n-title')).toBe('hardsub.exportingVideo');
     });
 
     it('clearVideoState invalidates in-flight video preview loads via videoLoadGeneration', async () => {
