@@ -3127,11 +3127,11 @@
 
                       <!-- Loaded file metadata badges row (Single-file) -->
                       <div class="transcribe-meta-badges-row" id="media-meta-box" style="display:none;">
-                        <span class="transcribe-meta-badge pill-type" id="meta-type" title="File Type">-</span>
-                        <span class="transcribe-meta-badge pill-duration" id="meta-duration" title="Duration">-</span>
-                        <span class="transcribe-meta-badge pill-size" id="meta-size" title="File Size">-</span>
-                        <span class="transcribe-meta-badge pill-target" id="meta-target-format" title="Target Format" data-i18n="transcribe.targetFormatVal">16kHz Mono Target</span>
-                        <span class="transcribe-meta-badge pill-engine" id="meta-recommendation" title="Active Processing Engine">-</span>
+                        <span class="transcribe-meta-badge pill-type" id="meta-type" data-i18n-title="transcribe.fileType" title="File Type">-</span>
+                        <span class="transcribe-meta-badge pill-duration" id="meta-duration" data-i18n-title="transcribe.duration" title="Duration">-</span>
+                        <span class="transcribe-meta-badge pill-size" id="meta-size" data-i18n-title="transcribe.fileSize" title="File Size">-</span>
+                        <span class="transcribe-meta-badge pill-target" id="meta-target-format" data-i18n-title="transcribe.targetFormat" title="Target Format" data-i18n="transcribe.targetFormatVal">16kHz Mono Target</span>
+                        <span class="transcribe-meta-badge pill-engine" id="meta-recommendation" data-i18n-title="transcribe.activeExtractor" title="Active Processing Engine">-</span>
                       </div>
                     </div>
 
@@ -3162,7 +3162,7 @@
                             <line x1="3" y1="12" x2="3.01" y2="12"></line>
                             <line x1="3" y1="18" x2="3.01" y2="18"></line>
                           </svg>
-                          <span data-i18n="transcribe.queueFiles">Queue Files</span>
+                          <span data-i18n="transcribe.queueFilesHeader">Queue Files</span>
                           <span class="batch-count-chip" id="lbl-batch-count">0</span>
                         </div>
                         <div class="batch-queue-actions">
@@ -3206,7 +3206,7 @@
                         </svg>
                         <span data-i18n="transcribe.aiModel">AI Model</span>
                       </label>
-                      <select class="select-control" id="quick-opt-model" data-searchable data-model-select aria-label="Quick Select Model"></select>
+                      <select class="select-control" id="quick-opt-model" data-searchable data-model-select data-i18n-aria="transcribe.aiModel" aria-label="AI Model"></select>
                     </div>
 
                     <!-- 3. Spoken Language Selector -->
@@ -3217,7 +3217,7 @@
                         </svg>
                         <span data-i18n="transcribe.spokenLang">Spoken Language</span>
                       </label>
-                      <select class="select-control" id="quick-opt-language" data-searchable data-language-select="spoken" aria-label="Quick Select Language"></select>
+                      <select class="select-control" id="quick-opt-language" data-searchable data-language-select="spoken" data-i18n-aria="transcribe.spokenLang" aria-label="Spoken Language"></select>
                     </div>
 
                     <!-- 4. Hardware Engine / Backend Selector -->
@@ -3228,7 +3228,7 @@
                         </svg>
                         <span data-i18n="transcribe.engine">Engine</span>
                       </label>
-                      <select class="select-control" id="quick-opt-selectedBackend" aria-label="Quick Select Engine">
+                      <select class="select-control" id="quick-opt-selectedBackend" data-i18n-aria="transcribe.engine" aria-label="Engine">
                         <option value="Standard" data-i18n="transcribe.backendCpu">CPU</option>
                       </select>
                     </div>
@@ -3349,14 +3349,14 @@
                       <h3 class="transcript-viewer-title" data-i18n="transcribe.liveViewerTitle">Live Transcript Viewer</h3>
                     </div>
                     <div class="transcript-viewer-actions">
-                      <button class="btn-secondary btn-copy-transcript" id="btn-copy-transcript" type="button" disabled onclick="copyLiveTranscriptToClipboard()" aria-label="Copy live transcript preview to clipboard">
+                      <button class="btn-secondary btn-copy-transcript" id="btn-copy-transcript" type="button" disabled onclick="copyLiveTranscriptToClipboard()" data-i18n-aria="transcribe.copyTranscript" aria-label="Copy transcript">
                         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-inline-end: 4px;">
                           <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
                           <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
                         </svg>
                         <span data-i18n="transcribe.copyLiveTranscript">Copy</span>
                       </button>
-                      <button class="btn-secondary btn-icon-text" id="btn-open-output-folder" type="button" onclick="openOutputFolder()" aria-label="Open output folder in file manager" disabled data-i18n-title="transcribe.noOutputDirYet" title="No output folder available yet">
+                      <button class="btn-secondary btn-icon-text" id="btn-open-output-folder" type="button" onclick="openOutputFolder()" data-i18n-aria="transcribe.openFolder" aria-label="Open Folder" disabled data-i18n-title="transcribe.noOutputDirYet" title="No output folder available yet">
                         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="margin-inline-end: 4px;">
                           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                         </svg>
@@ -3383,7 +3383,7 @@
                       <circle cx="11" cy="11" r="8"/>
                       <line x1="21" y1="21" x2="16.65" y2="16.65"/>
                     </svg>
-                    <input class="text-input transcript-search-input" type="text" id="transcript-search" placeholder="Search transcript..." aria-label="Search transcript" data-i18n-placeholder="transcribe.searchTranscript" oninput="filterTranscriptLines()" />
+                    <input class="text-input transcript-search-input" type="text" id="transcript-search" placeholder="Search transcript..." data-i18n-aria="transcribe.searchTranscript" aria-label="Search transcript" data-i18n-placeholder="transcribe.searchTranscript" oninput="filterTranscriptLines()" />
                   </div>
                   
                   <!-- Real-time transcript display box -->

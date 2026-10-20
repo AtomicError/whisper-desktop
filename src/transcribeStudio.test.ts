@@ -631,5 +631,49 @@ describe('Transcription Studio Output Directory & Workflow Logic', () => {
     expect(getBadgeClass('complete')).toBe('transcribe-status-badge complete');
     expect(getBadgeClass('cancelled')).toBe('transcribe-status-badge cancelled');
   });
+
+  it('guarantees complete localization symmetry for new transcribe tooltips, toast and queue header across all 13 locales', () => {
+    const requiredTranscribeKeys = ['vadDisableHint', 'vadEnableHint', 'queueFilesHeader'];
+    const requiredToastKeys = ['filesAlreadyInBatch'];
+    for (const [langCode, locale] of Object.entries(locales)) {
+      expect(locale.transcribe, `Missing transcribe object in ${langCode}`).toBeDefined();
+      for (const key of requiredTranscribeKeys) {
+        expect(locale.transcribe[key], `Missing ${key} in ${langCode}.transcribe`).toBeDefined();
+        expect(typeof locale.transcribe[key], `${key} in ${langCode} must be a non-empty string`).toBe('string');
+        expect(locale.transcribe[key].trim().length, `${key} in ${langCode} cannot be empty`).toBeGreaterThan(0);
+      }
+      expect(locale.toasts, `Missing toasts object in ${langCode}`).toBeDefined();
+      for (const key of requiredToastKeys) {
+        expect(locale.toasts[key], `Missing ${key} in ${langCode}.toasts`).toBeDefined();
+        expect(typeof locale.toasts[key], `${key} in ${langCode} must be a non-empty string`).toBe('string');
+        expect(locale.toasts[key].trim().length, `${key} in ${langCode} cannot be empty`).toBeGreaterThan(0);
+      }
+    }
+
+    // Verify Persian grammatical correctness for queue count suffix
+    expect(fa.transcribe.queueFiles).toBe('فایل در صف');
+  });
+
+  it('verifies accessibility and i18n title attributes in transcribe DOM', () => {
+    const htmlContent = readFileSync(resolve(__dirname, 'index.html'), 'utf-8');
+    // Badges in metadata row have localized title tags
+    expect(htmlContent).toContain('id="meta-type" data-i18n-title="transcribe.fileType"');
+    expect(htmlContent).toContain('id="meta-duration" data-i18n-title="transcribe.duration"');
+    expect(htmlContent).toContain('id="meta-size" data-i18n-title="transcribe.fileSize"');
+    expect(htmlContent).toContain('id="meta-target-format" data-i18n-title="transcribe.targetFormat"');
+    expect(htmlContent).toContain('id="meta-recommendation" data-i18n-title="transcribe.activeExtractor"');
+
+    // Controls have localized aria attributes
+    expect(htmlContent).toContain('id="quick-opt-model" data-searchable data-model-select data-i18n-aria="transcribe.aiModel"');
+    expect(htmlContent).toContain('id="quick-opt-language" data-searchable data-language-select="spoken" data-i18n-aria="transcribe.spokenLang"');
+    expect(htmlContent).toContain('id="quick-opt-selectedBackend" data-i18n-aria="transcribe.engine"');
+    expect(htmlContent).toContain('id="btn-copy-transcript" type="button" disabled onclick="copyLiveTranscriptToClipboard()" data-i18n-aria="transcribe.copyTranscript"');
+    expect(htmlContent).toContain('id="btn-open-output-folder" type="button" onclick="openOutputFolder()" data-i18n-aria="transcribe.openFolder"');
+    expect(htmlContent).toContain('id="transcript-search" placeholder="Search transcript..." data-i18n-aria="transcribe.searchTranscript"');
+
+    // Batch queue header uses queueFilesHeader
+    expect(htmlContent).toContain('data-i18n="transcribe.queueFilesHeader"');
+  });
 });
+
 

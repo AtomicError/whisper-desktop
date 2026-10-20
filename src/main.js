@@ -5134,6 +5134,10 @@ window.clearSingleMediaFile = function() {
   if (typeof window.updateTranscribeActionButtons === 'function') {
     window.updateTranscribeActionButtons(false);
   }
+  setWizardStepCompleted(1, false);
+  setWizardStepCompleted(2, false);
+  setWizardStepCompleted(3, false);
+  openWizardStep(1);
 
   const viewport = document.getElementById('transcript-viewport');
   if (viewport) {
@@ -5162,6 +5166,59 @@ window.browseMediaFile = async function() {
   }
   const files = await invoke('select_files');
   if (files && files.length > 0) {
+    if (isBatchMode && batchItems.length > 0) {
+      const existingPaths = new Set(batchItems.map(item => item.path));
+      const newFiles = files.filter(f => !existingPaths.has(f));
+
+      if (newFiles.length === 0) {
+        showNotification(t('toasts.filesAlreadyInBatch') || 'Selected files are already in the batch queue', "info");
+        return;
+      }
+
+      const newItems = newFiles.map(filePath => ({
+        path: filePath,
+        name: getBasename(filePath),
+        size: t('transcribe.statusPending') + '...',
+        durationSec: null,
+        status: 'pending',
+        timeSec: 0,
+        speedFactor: 0.0,
+        outputs: []
+      }));
+
+      batchItems = batchItems.concat(newItems);
+      selectedMediaFiles = batchItems.map(item => item.path);
+
+      const fileNameEl = document.getElementById('lbl-file-name');
+      if (fileNameEl) {
+        fileNameEl.textContent = `${batchItems.length} ${t('transcribe.queueFiles')}`;
+      }
+      const countEl = document.getElementById('batch-files-count');
+      if (countEl) countEl.textContent = batchItems.length;
+
+      renderBatchQueueTable();
+      updateBatchSpecs();
+
+      (async () => {
+        for (const item of newItems) {
+          try {
+            const meta = await invoke('probe_media_file', { filePath: item.path });
+            if (meta && meta.exists) {
+              item.size = meta.size;
+              item.durationSec = meta.durationSec;
+            }
+          } catch (err) {
+            console.error("Failed to probe file in batch:", err);
+          }
+        }
+        renderBatchQueueTable();
+        updateBatchSpecs();
+      })();
+
+      showNotification(t('toasts.filesLoaded', { count: newFiles.length }), "success");
+      return;
+    }
+
     selectedMediaFiles = files;
     
     if (files.length === 1) {
@@ -5442,10 +5499,12 @@ async function probeSelectedFile() {
       document.getElementById('analytics-box').style.display = 'none';
     } else {
       showNotification(t('toasts.fileNotFoundOrInvalid'), "error");
+      if (typeof window.clearSingleMediaFile === 'function') window.clearSingleMediaFile();
     }
   } catch (e) {
     console.error("Probing failed:", e);
     showNotification(t('toasts.metaReadError'), "error");
+    if (typeof window.clearSingleMediaFile === 'function') window.clearSingleMediaFile();
   }
 }
 
@@ -5539,7 +5598,7 @@ function updateTranscribeUIConfigs() {
   if (vadEl) {
     vadEl.textContent = vadActive ? 'ON' : 'OFF';
     vadEl.className = vadActive ? 'val-gold' : 'val-muted';
-    vadEl.title = vadActive ? `VAD Active (${vadModelName})` : 'VAD Disabled';
+    vadEl.title = vadActive ? `${t('transcribe.vadActive')} (${vadModelName})` : t('transcribe.vadDisabled');
   }
   
   const quickVadBtn = document.getElementById('quick-toggle-vad');
@@ -5549,13 +5608,13 @@ function updateTranscribeUIConfigs() {
     }
     if (vadActive) {
       quickVadBtn.classList.add('active');
-      quickVadBtn.title = `Silero VAD Active (${vadModelName}) - Click to disable`;
+      quickVadBtn.title = `${t('transcribe.vadActive')} (${vadModelName}) - ${t('transcribe.vadDisableHint') || 'Click to disable'}`;
     } else {
       quickVadBtn.classList.remove('active');
       if (hasVadModel) {
-        quickVadBtn.title = `Silero VAD Disabled (${vadModelName}) - Click to enable`;
+        quickVadBtn.title = `${t('transcribe.vadDisabled')} (${vadModelName}) - ${t('transcribe.vadEnableHint') || 'Click to enable'}`;
       } else {
-        quickVadBtn.title = 'No Silero VAD model found on system - Click for instructions';
+        quickVadBtn.title = t('toasts.noVadFound') || 'No Silero VAD model found on system';
       }
     }
   }
@@ -5599,7 +5658,38 @@ window.openTranscriptionSettings = function() {
 };
 
 function setupQuickConfigDeckEventListeners() {
-  // 1. Quick Language Selection Listener
+  // 1. Quick Model Selection Listener
+  const quickModelSelect = document.getElementById('quick-opt-model');
+  if (quickModelSelect) {
+    quickModelSelect.addEventListener('change', () => {
+      if (settingsState && quickModelSelect.value) {
+        settingsState.modelPath = quickModelSelect.value;
+        const cfgModelSelect = document.getElementById('opt-modelPath');
+        if (cfgModelSelect) {
+          cfgModelSelect.value = quickModelSelect.value;
+        }
+        saveCurrentSettings();
+        updateTranscribeUIConfigs();
+      }
+    });
+  }
+
+  const cfgModelSelect = document.getElementById('opt-modelPath');
+  if (cfgModelSelect) {
+    cfgModelSelect.addEventListener('change', () => {
+      if (settingsState && cfgModelSelect.value) {
+        settingsState.modelPath = cfgModelSelect.value;
+        if (quickModelSelect) {
+          quickModelSelect.value = cfgModelSelect.value;
+          if (window.syncCustomSelects) window.syncCustomSelects();
+        }
+        saveCurrentSettings();
+        updateTranscribeUIConfigs();
+      }
+    });
+  }
+
+  // 2. Quick Language Selection Listener
   const quickLangSelect = document.getElementById('quick-opt-language');
   if (quickLangSelect) {
     quickLangSelect.addEventListener('change', () => {
@@ -5696,6 +5786,9 @@ window.runWhisperTranscription = async function() {
   const modelExists = localScannedTransModels.includes(settingsState.modelPath);
   if (!modelExists) {
     showNotification(t('toasts.noModelFound'), "error");
+    if (!localScannedTransModels || localScannedTransModels.length === 0) {
+      if (typeof switchView === 'function') switchView('models');
+    }
     return;
   }
 
@@ -6447,6 +6540,10 @@ window.clearBatchQueue = function() {
   if (typeof window.updateTranscribeActionButtons === 'function') {
     window.updateTranscribeActionButtons(false);
   }
+  setWizardStepCompleted(1, false);
+  setWizardStepCompleted(2, false);
+  setWizardStepCompleted(3, false);
+  openWizardStep(1);
 
   const viewport = document.getElementById('transcript-viewport');
   if (viewport) {
@@ -6693,6 +6790,22 @@ function renderBatchQueueTable() {
 window.runBatchExtraction = async function() {
   if (!isBatchMode || batchItems.length === 0) return;
   
+  const isCompiled = settingsState.selectedBackend === 'Standard' || Boolean(compiledBackends[settingsState.selectedBackend]);
+  if (!isCompiled) {
+    showNotification(t('toasts.backendNotFound', { backend: settingsState.selectedBackend }), "error");
+    if (typeof switchView === 'function') switchView('settings');
+    return;
+  }
+
+  const modelExists = localScannedTransModels.includes(settingsState.modelPath);
+  if (!modelExists) {
+    showNotification(t('toasts.noModelFound'), "error");
+    if (!localScannedTransModels || localScannedTransModels.length === 0) {
+      if (typeof switchView === 'function') switchView('models');
+    }
+    return;
+  }
+
   const startBtn = document.getElementById('btn-run-batch');
   const startBtnSpan = startBtn?.querySelector('span');
   const cancelBtn = document.getElementById('btn-cancel-batch');
@@ -7065,6 +7178,61 @@ async function handleDroppedFiles(files) {
     showNotification(t('toasts.batchActiveDropBlocked'), "info");
     return;
   }
+
+  if (isBatchMode && batchItems.length > 0) {
+    const existingPaths = new Set(batchItems.map(item => item.path));
+    const newFiles = files.filter(f => !existingPaths.has(f));
+
+    if (newFiles.length === 0) {
+      showNotification(t('toasts.filesAlreadyInBatch') || 'Dropped files are already in the batch queue', "info");
+      return;
+    }
+
+    const newItems = newFiles.map(filePath => ({
+      path: filePath,
+      name: getBasename(filePath),
+      size: t('transcribe.statusPending') + '...',
+      durationSec: null,
+      status: 'pending',
+      timeSec: 0,
+      speedFactor: 0.0,
+      outputs: []
+    }));
+
+    batchItems = batchItems.concat(newItems);
+    selectedMediaFiles = batchItems.map(item => item.path);
+
+    const fileNameEl = document.getElementById('lbl-file-name');
+    if (fileNameEl) {
+      fileNameEl.textContent = `${batchItems.length} ${t('transcribe.queueFiles')}`;
+    }
+    const batchCountEl = document.getElementById('batch-files-count');
+    if (batchCountEl) batchCountEl.textContent = batchItems.length;
+
+    renderBatchQueueTable();
+    updateBatchSpecs();
+
+    (async () => {
+      for (const item of newItems) {
+        try {
+          const meta = await invoke('probe_media_file', { filePath: item.path });
+          if (meta && meta.exists) {
+            item.size = meta.size;
+            item.durationSec = meta.durationSec;
+          }
+        } catch (err) {
+          console.error("Failed to probe file in batch:", err);
+        }
+      }
+      renderBatchQueueTable();
+      updateBatchSpecs();
+    })();
+
+    switchView('transcribe');
+    showNotification(t('toasts.filesLoaded', { count: newFiles.length }), "success");
+    return;
+  }
+
   selectedMediaFiles = files;
   
   if (files.length === 1) {
