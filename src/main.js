@@ -663,6 +663,9 @@ window.addEventListener('whisper:languageChanged', () => {
   if (typeof probedMetadata !== 'undefined' && probedMetadata && probedMetadata.exists) {
     renderMediaMetadata(probedMetadata);
   }
+  if (typeof isBatchMode !== 'undefined' && isBatchMode && typeof renderBatchQueueTable === 'function' && Array.isArray(batchItems) && batchItems.length > 0) {
+    renderBatchQueueTable();
+  }
   const msgEl = document.getElementById('lbl-radial-msg');
   if (msgEl && msgEl.dataset.batchSummaryTotal) {
     msgEl.textContent = t('transcribe.batchCompletedSummary', {
@@ -2721,6 +2724,8 @@ async function initApp() {
       } else if (!batchItems || batchItems.length === 0) {
         updateMediaCardName(null);
         filePathEl.textContent = t('transcribe.selectFilePrompt');
+      } else if (isBatchMode && batchItems.length > 0) {
+        fileNameEl.textContent = `${batchItems.length} ${t('transcribe.queueFiles')}`;
       }
     }
     
@@ -3909,6 +3914,11 @@ function bindSettingsToDOM() {
             applyMonochromeCanvas(el.checked, true);
           }
           saveCurrentSettings();
+          if (key === 'vad') {
+            const quickVadInput = document.getElementById('quick-toggle-vad');
+            if (quickVadInput) quickVadInput.checked = el.checked;
+            updateTranscribeUIConfigs();
+          }
           if (key === 'translateAiPolish' && window.translationStudioController) {
             window.translationStudioController.syncFromGlobalSettings();
           }
@@ -3965,6 +3975,9 @@ function bindSettingsToDOM() {
           saveCurrentSettings(true);
           
           if (key === 'language') {
+            updateTranscribeUIConfigs();
+          }
+          if (key === 'modelPath' || key === 'threads') {
             updateTranscribeUIConfigs();
           }
           if (key === 'selectedBackend') {
@@ -5134,10 +5147,6 @@ window.clearSingleMediaFile = function() {
   if (typeof window.updateTranscribeActionButtons === 'function') {
     window.updateTranscribeActionButtons(false);
   }
-  setWizardStepCompleted(1, false);
-  setWizardStepCompleted(2, false);
-  setWizardStepCompleted(3, false);
-  openWizardStep(1);
 
   const viewport = document.getElementById('transcript-viewport');
   if (viewport) {
@@ -5164,8 +5173,9 @@ window.browseMediaFile = async function() {
     showNotification(t('toasts.batchActiveSelectBlocked'), "info");
     return;
   }
-  const files = await invoke('select_files');
-  if (files && files.length > 0) {
+  const rawFiles = await invoke('select_files');
+  if (rawFiles && rawFiles.length > 0) {
+    const files = Array.from(new Set(rawFiles));
     if (isBatchMode && batchItems.length > 0) {
       const existingPaths = new Set(batchItems.map(item => item.path));
       const newFiles = files.filter(f => !existingPaths.has(f));
@@ -5667,21 +5677,6 @@ function setupQuickConfigDeckEventListeners() {
         const cfgModelSelect = document.getElementById('opt-modelPath');
         if (cfgModelSelect) {
           cfgModelSelect.value = quickModelSelect.value;
-        }
-        saveCurrentSettings();
-        updateTranscribeUIConfigs();
-      }
-    });
-  }
-
-  const cfgModelSelect = document.getElementById('opt-modelPath');
-  if (cfgModelSelect) {
-    cfgModelSelect.addEventListener('change', () => {
-      if (settingsState && cfgModelSelect.value) {
-        settingsState.modelPath = cfgModelSelect.value;
-        if (quickModelSelect) {
-          quickModelSelect.value = cfgModelSelect.value;
-          if (window.syncCustomSelects) window.syncCustomSelects();
         }
         saveCurrentSettings();
         updateTranscribeUIConfigs();
@@ -6540,10 +6535,6 @@ window.clearBatchQueue = function() {
   if (typeof window.updateTranscribeActionButtons === 'function') {
     window.updateTranscribeActionButtons(false);
   }
-  setWizardStepCompleted(1, false);
-  setWizardStepCompleted(2, false);
-  setWizardStepCompleted(3, false);
-  openWizardStep(1);
 
   const viewport = document.getElementById('transcript-viewport');
   if (viewport) {
@@ -6611,9 +6602,17 @@ window.sortBatchQueue = function(criteria) {
   }));
 
   if (criteria === 'name-asc') {
-    zipped.sort((a, b) => a.item.name.localeCompare(b.item.name));
+    zipped.sort((a, b) => {
+      const nameA = String(a.item?.name || '');
+      const nameB = String(b.item?.name || '');
+      return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+    });
   } else if (criteria === 'name-desc') {
-    zipped.sort((a, b) => b.item.name.localeCompare(a.item.name));
+    zipped.sort((a, b) => {
+      const nameA = String(a.item?.name || '');
+      const nameB = String(b.item?.name || '');
+      return nameB.localeCompare(nameA, undefined, { numeric: true, sensitivity: 'base' });
+    });
   } else if (criteria === 'duration-asc') {
     zipped.sort((a, b) => {
       const da = a.item.durationSec || 0;
@@ -6715,7 +6714,9 @@ function renderBatchQueueTable() {
     upBtn.style.display = 'inline-flex';
     upBtn.style.alignItems = 'center';
     upBtn.style.justifyContent = 'center';
-    upBtn.title = 'Move up';
+    const moveUpText = t('transcribe.moveUp') || 'Move up';
+    upBtn.title = moveUpText;
+    upBtn.setAttribute('aria-label', moveUpText);
     
     if (isRunning || index === 0) {
       upBtn.disabled = true;
@@ -6739,7 +6740,9 @@ function renderBatchQueueTable() {
     downBtn.style.display = 'inline-flex';
     downBtn.style.alignItems = 'center';
     downBtn.style.justifyContent = 'center';
-    downBtn.title = 'Move down';
+    const moveDownText = t('transcribe.moveDown') || 'Move down';
+    downBtn.title = moveDownText;
+    downBtn.setAttribute('aria-label', moveDownText);
     
     if (isRunning || index === batchItems.length - 1) {
       downBtn.disabled = true;
@@ -6763,7 +6766,9 @@ function renderBatchQueueTable() {
     deleteBtn.style.display = 'inline-flex';
     deleteBtn.style.alignItems = 'center';
     deleteBtn.style.justifyContent = 'center';
-    deleteBtn.title = 'Remove from queue';
+    const removeText = t('transcribe.removeFile') || 'Remove file';
+    deleteBtn.title = removeText;
+    deleteBtn.setAttribute('aria-label', removeText);
     
     if (isRunning) {
       deleteBtn.disabled = true;
@@ -7173,11 +7178,14 @@ function setupTranscribeDragAndDrop() {
   }
 }
 
-async function handleDroppedFiles(files) {
+async function handleDroppedFiles(rawFiles) {
   if (isBatchExtracting || isTranscribing) {
     showNotification(t('toasts.batchActiveDropBlocked'), "info");
     return;
   }
+
+  const files = Array.isArray(rawFiles) ? Array.from(new Set(rawFiles)) : [];
+  if (files.length === 0) return;
 
   if (isBatchMode && batchItems.length > 0) {
     const existingPaths = new Set(batchItems.map(item => item.path));
@@ -8242,18 +8250,40 @@ window.updateTranscriptLineText = function(id, value) {
 window.filterTranscriptLines = function() {
   const searchInput = document.getElementById('transcript-search');
   if (searchInput) applyDynamicDirection(searchInput);
-  const query = searchInput ? searchInput.value.toLowerCase() : '';
+  const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
   const lines = document.querySelectorAll('.transcript-line');
+  const viewport = document.getElementById('transcript-viewport');
+  let matchCount = 0;
+
   lines.forEach(lineEl => {
     const textInput = lineEl.querySelector('.transcript-text-input');
     if (textInput) {
-      const match = textInput.value.toLowerCase().includes(query);
+      const match = !query || textInput.value.toLowerCase().includes(query);
       lineEl.style.display = match ? 'flex' : 'none';
       if (match) {
+        matchCount++;
         autoResizeTranscriptField(textInput);
       }
     }
   });
+
+  if (viewport && lines.length > 0) {
+    let emptySearchEl = document.getElementById('transcript-search-empty');
+    if (query && matchCount === 0) {
+      if (!emptySearchEl) {
+        emptySearchEl = document.createElement('div');
+        emptySearchEl.id = 'transcript-search-empty';
+        emptySearchEl.className = 'transcript-empty-notice';
+        emptySearchEl.style.cssText = 'padding: 32px 16px; text-align: center; color: var(--color-text-dim); font-size: 0.85rem; user-select: none;';
+        viewport.appendChild(emptySearchEl);
+      }
+      emptySearchEl.setAttribute('data-i18n', 'transcribe.noMatchingTranscript');
+      emptySearchEl.textContent = t('transcribe.noMatchingTranscript') || 'No matching transcript lines found.';
+      emptySearchEl.style.display = 'block';
+    } else if (emptySearchEl) {
+      emptySearchEl.style.display = 'none';
+    }
+  }
 };
 
 window.loadTranscriptFromFile = async function(fullPath) {

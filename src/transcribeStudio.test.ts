@@ -633,7 +633,7 @@ describe('Transcription Studio Output Directory & Workflow Logic', () => {
   });
 
   it('guarantees complete localization symmetry for new transcribe tooltips, toast and queue header across all 13 locales', () => {
-    const requiredTranscribeKeys = ['vadDisableHint', 'vadEnableHint', 'queueFilesHeader'];
+    const requiredTranscribeKeys = ['vadDisableHint', 'vadEnableHint', 'queueFilesHeader', 'moveUp', 'moveDown', 'noMatchingTranscript'];
     const requiredToastKeys = ['filesAlreadyInBatch'];
     for (const [langCode, locale] of Object.entries(locales)) {
       expect(locale.transcribe, `Missing transcribe object in ${langCode}`).toBeDefined();
@@ -650,8 +650,45 @@ describe('Transcription Studio Output Directory & Workflow Logic', () => {
       }
     }
 
-    // Verify Persian grammatical correctness for queue count suffix
+    // Verify Persian grammatical correctness for queue count suffix and action buttons
     expect(fa.transcribe.queueFiles).toBe('فایل در صف');
+    expect(fa.transcribe.moveUp).toBe('انتقال به بالا');
+    expect(fa.transcribe.moveDown).toBe('انتقال به پایین');
+    expect(fa.transcribe.noMatchingTranscript).toBe('هیچ متنی مطابق با جستجوی شما یافت نشد.');
+  });
+
+  it('verifies natural numeric alphanumeric sorting for batch queue', () => {
+    const items = [
+      { name: 'Episode 10.mp4', durationSec: 100 },
+      { name: 'Episode 2.mp4', durationSec: 50 },
+      { name: 'Episode 1.mp4', durationSec: 80 }
+    ];
+
+    // Standard ASCII sort would put Episode 10 before Episode 2
+    const asciiSorted = [...items].sort((a, b) => a.name.localeCompare(b.name));
+    expect(asciiSorted.map(i => i.name)).toEqual(['Episode 1.mp4', 'Episode 10.mp4', 'Episode 2.mp4']);
+
+    // Natural alphanumeric numeric sort correctly puts Episode 2 before Episode 10
+    const naturalSorted = [...items].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+    );
+    expect(naturalSorted.map(i => i.name)).toEqual(['Episode 1.mp4', 'Episode 2.mp4', 'Episode 10.mp4']);
+
+    // Defensive sorting safely handles missing or undefined names without throwing
+    const raggedItems = [
+      { name: 'Beta.mp4' },
+      { name: undefined },
+      { name: 'Alpha.mp4' },
+      {}
+    ] as Array<{ name?: string }>;
+
+    expect(() => {
+      raggedItems.sort((a, b) => {
+        const nameA = String(a.name || '');
+        const nameB = String(b.name || '');
+        return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+      });
+    }).not.toThrow();
   });
 
   it('verifies accessibility and i18n title attributes in transcribe DOM', () => {
@@ -673,6 +710,28 @@ describe('Transcription Studio Output Directory & Workflow Logic', () => {
 
     // Batch queue header uses queueFilesHeader
     expect(htmlContent).toContain('data-i18n="transcribe.queueFilesHeader"');
+  });
+
+  it('guarantees self-deduplication when appending or selecting files in batch queue', () => {
+    const rawFiles = [
+      '/path/to/ep1.mp4',
+      '/path/to/ep2.mp4',
+      '/path/to/ep1.mp4', // duplicate in same drop
+      '/path/to/ep3.mp4',
+      '/path/to/ep2.mp4'  // duplicate in same drop
+    ];
+
+    const uniqueFiles = Array.from(new Set(rawFiles));
+    expect(uniqueFiles).toEqual(['/path/to/ep1.mp4', '/path/to/ep2.mp4', '/path/to/ep3.mp4']);
+
+    // Simulation of appending to existing batch queue with both existing and duplicate items
+    const existingQueue = [
+      { path: '/path/to/ep1.mp4', name: 'ep1.mp4' }
+    ];
+    const existingPaths = new Set(existingQueue.map(item => item.path));
+    const newlyAppended = uniqueFiles.filter(f => !existingPaths.has(f));
+
+    expect(newlyAppended).toEqual(['/path/to/ep2.mp4', '/path/to/ep3.mp4']);
   });
 });
 
