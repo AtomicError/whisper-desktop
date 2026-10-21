@@ -966,56 +966,57 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: 'Whisper Desktop ${{ github.ref_name }}'
           body: |
-            ## Whisper Desktop ${{ github.ref_name }} 🎙️
+            ## 📦 Downloads & Installation Hub
 
-            A high-performance, private, and offline speech-to-text desktop application powered by `whisper.cpp` and `Tauri`.
+            > [!TIP]
+            > **Which edition should you choose?**
+            > * **Universal Edition:** Ideal for all standard setups (AMD Radeon, Intel Arc / Iris Xe / Core Ultra, Apple Silicon, and CPU-only systems). Dynamically leverages Vulkan, OpenVINO, Metal, or optimized AVX2/NEON backends.
+            > * **NVIDIA CUDA Edition:** Best for PCs with dedicated NVIDIA GeForce RTX / GTX graphics cards (ships with pre-configured CUDA 12 runtimes for maximum inference speed).
 
-            ### 📦 Download & Package Guide
+            ### 🪟 Windows (x64 & ARM64 via Prism)
+            *Compatible with Windows 10, Windows 11, and Windows Server 2019+*
 
-            | Platform | Format & Edition | Hardware Acceleration | Download |
-            | :--- | :--- | :--- | :---: |
-            | **Windows** | Setup Installer (`.exe`) | Universal (CPU + Vulkan + OpenVINO) | [![Download Setup Installer](https://img.shields.io/badge/Download%20Setup%20Installer-x64%20(Universal)-0078d4?style=flat-square&logo=windows11&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_x64-setup.exe) |
-            | **Windows** | Setup Installer (`.exe`) | NVIDIA CUDA (RTX / GTX GPUs) | [![Download Setup Installer](https://img.shields.io/badge/Download%20Setup%20Installer-x64%20(CUDA)-76b900?style=flat-square&logo=nvidia&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_x64-cuda-setup.exe) |
-            | **Windows** | Portable ZIP (`.zip`) | Universal (CPU + Vulkan + OpenVINO) | [![Download Portable ZIP](https://img.shields.io/badge/Download%20Portable%20ZIP-x64%20(Universal)-0078d4?style=flat-square&logo=windows11&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_x64-portable.zip) |
-            | **Windows** | Portable ZIP (`.zip`) | NVIDIA CUDA (RTX / GTX GPUs) | [![Download Portable ZIP](https://img.shields.io/badge/Download%20Portable%20ZIP-x64%20(CUDA)-76b900?style=flat-square&logo=nvidia&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_x64-cuda-portable.zip) |
-            | **Windows** | MSI Package (`.msi`) | Universal (CPU + Vulkan + OpenVINO) | [![Download MSI Package](https://img.shields.io/badge/Download%20MSI%20Package-x64%20(Universal)-0078d4?style=flat-square&logo=windows11&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_x64_en-US.msi) |
-            | **Windows** | MSI Package (`.msi`) | NVIDIA CUDA (RTX / GTX GPUs) | [![Download MSI Package](https://img.shields.io/badge/Download%20MSI%20Package-x64%20(CUDA)-76b900?style=flat-square&logo=nvidia&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_x64_cuda_en-US.msi) |
-            | **macOS** | Universal DMG (`.dmg`) | Apple Silicon (Metal M1–M4) + Intel | [![Download Universal DMG](https://img.shields.io/badge/Download%20Universal%20DMG-Apple%20Silicon%20%2B%20Intel-000000?style=flat-square&logo=apple&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_universal.dmg) |
-            | **Linux** | Portable AppImage (`.AppImage`) | Universal (CPU + Vulkan + OpenVINO) | [![Download Portable AppImage](https://img.shields.io/badge/Download%20Portable%20AppImage-x86__64%20(Universal)-0057d9?style=flat-square&logo=linux&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_amd64.AppImage) |
-            | **Linux** | Portable AppImage (`.AppImage`) | NVIDIA CUDA (RTX / GTX GPUs) | [![Download Portable AppImage](https://img.shields.io/badge/Download%20Portable%20AppImage-x86__64%20(CUDA)-76b900?style=flat-square&logo=nvidia&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_amd64-cuda.AppImage) |
-            | **Linux** | Portable AppImage (`.AppImage`) | ARM64 (NEON + Vulkan) | [![Download Portable AppImage](https://img.shields.io/badge/Download%20Portable%20AppImage-ARM64%20(Universal)-0057d9?style=flat-square&logo=linux&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_aarch64.AppImage) |
-            | **Linux (Debian/Ubuntu)** | DEB Package (`.deb`) | Universal (CPU + Vulkan + OpenVINO) | [![Download DEB Package](https://img.shields.io/badge/Download%20DEB%20Package-amd64%20(Universal)-d70a53?style=flat-square&logo=debian&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_amd64.deb) |
-            | **Linux (Debian/Ubuntu)** | DEB Package (`.deb`) | NVIDIA CUDA (RTX / GTX GPUs) | [![Download DEB Package](https://img.shields.io/badge/Download%20DEB%20Package-amd64%20(CUDA)-76b900?style=flat-square&logo=nvidia&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_amd64-cuda.deb) |
-            | **Linux (Debian/Ubuntu)** | DEB Package (`.deb`) | ARM64 (NEON + Vulkan) | [![Download DEB Package](https://img.shields.io/badge/Download%20DEB%20Package-arm64%20(Universal)-d70a53?style=flat-square&logo=debian&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_arm64.deb) |
-            | **Linux (Fedora/RHEL)** | RPM Package (`.rpm`) | Universal (CPU + Vulkan + OpenVINO) | [![Download RPM Package](https://img.shields.io/badge/Download%20RPM%20Package-x86__64%20(Universal)-e03c11?style=flat-square&logo=redhat&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop-${{ steps.app_version.outputs.version }}-1.x86_64.rpm) |
-            | **Linux (Fedora/RHEL)** | RPM Package (`.rpm`) | NVIDIA CUDA (RTX / GTX GPUs) | [![Download RPM Package](https://img.shields.io/badge/Download%20RPM%20Package-x86__64%20(CUDA)-76b900?style=flat-square&logo=nvidia&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop-${{ steps.app_version.outputs.version }}-1.x86_64-cuda.rpm) |
-            | **Linux (Fedora/RHEL)** | RPM Package (`.rpm`) | ARM64 (NEON + Vulkan) | [![Download RPM Package](https://img.shields.io/badge/Download%20RPM%20Package-aarch64%20(Universal)-e03c11?style=flat-square&logo=redhat&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop-${{ steps.app_version.outputs.version }}-1.aarch64.rpm) |
+            #### Universal Edition *(AMD Radeon, Intel Arc / Iris Xe, Standard CPU)*
+            * [![Setup Installer](https://img.shields.io/badge/Setup%20Installer-.exe-0078d4?style=flat-square&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0id2hpdGUiPjxwYXRoIGQ9Ik0wIDBoN3Y3SDB6bTkgMGg3djdIOXptMCA5aDd2N0g5ek0wIDloN3Y3SDB6Ii8%2BPC9zdmc%2B)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_x64-setup.exe) — Standard setup wizard (auto-installs Visual C++ 2015–2022 redistributable if missing)
+            * [![Portable ZIP](https://img.shields.io/badge/Portable%20Archive-.zip-0078d4?style=flat-square&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0id2hpdGUiPjxwYXRoIGQ9Ik0wIDBoN3Y3SDB6bTkgMGg3djdIOXptMCA5aDd2N0g5ek0wIDloN3Y3SDB6Ii8%2BPC9zdmc%2B)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_x64-portable.zip) — Zero-install standalone archive (run from any folder or USB drive)
+            * [![MSI Package](https://img.shields.io/badge/Enterprise%20Package-.msi-0078d4?style=flat-square&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0id2hpdGUiPjxwYXRoIGQ9Ik0wIDBoN3Y3SDB6bTkgMGg3djdIOXptMCA5aDd2N0g5ek0wIDloN3Y3SDB6Ii8%2BPC9zdmc%2B)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_x64_en-US.msi) — Windows Installer package for enterprise managed environments
+
+            #### NVIDIA CUDA Edition *(Dedicated RTX / GTX Hardware Acceleration)*
+            * [![CUDA Setup Installer](https://img.shields.io/badge/Setup%20Installer%20(CUDA)-.exe-76b900?style=flat-square&logo=nvidia&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_x64-cuda-setup.exe) — Full installer with bundled CUDA 12 runtimes
+            * [![CUDA Portable ZIP](https://img.shields.io/badge/Portable%20Archive%20(CUDA)-.zip-76b900?style=flat-square&logo=nvidia&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_x64-cuda-portable.zip) — Standalone portable archive with CUDA acceleration
+            * [![CUDA MSI Package](https://img.shields.io/badge/Enterprise%20Package%20(CUDA)-.msi-76b900?style=flat-square&logo=nvidia&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_x64_cuda_en-US.msi) — Enterprise MSI with CUDA acceleration
 
             ---
 
-            ### ⚡ Hardware Acceleration & Edition Guide
+            ### 🍏 macOS (Apple Silicon M1–M4 & Intel)
+            *Compatible with macOS 12 Monterey, macOS 13 Ventura, macOS 14 Sonoma, and macOS 15 Sequoia*
 
-            > [!TIP]
-            > **Which edition should I download?**
-            > * **NVIDIA GPUs (GeForce / RTX / GTX / Quadro / Tesla):** Choose the **NVIDIA CUDA Edition** for maximum inference speed and lowest latency powered by dedicated CUDA 12 & cuBLAS.
-            > * **All Other Hardware (AMD Radeon, Intel Arc / Iris Xe / UHD, Apple Silicon, CPUs):** Choose the **Universal Edition**, which provides automatic hardware selection across Vulkan, Intel OpenVINO, Apple Metal, or optimized AVX2/NEON CPU backends.
+            * [![Universal DMG](https://img.shields.io/badge/Universal%20Disk%20Image-.dmg-000000?style=flat-square&logo=apple&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_universal.dmg) — Native Mach-O Universal binary with Metal GPU acceleration for Apple Silicon and Intel Macs
 
-            #### 🚀 Edition Breakdown
+            ---
 
-            * **Universal Edition (`x64` / `amd64`)**
-              Bundles optimized Standard CPU (AVX2/OpenMP), cross-vendor Vulkan GPU, and Intel OpenVINO acceleration. Ideal for AMD Radeon GPUs, Intel Arc / Iris Xe graphics, and standard systems without a dedicated NVIDIA GPU.
+            ### 🐧 Linux (x86_64 & ARM64)
+            *Compatible with Ubuntu 20.04+, Debian 11+, Fedora 38+, Arch Linux, and RHEL 9+*
 
-            * **NVIDIA CUDA Edition (`x64-cuda` / `amd64-cuda`)**
-              Bundles specialized CUDA 12.8 and cuBLAS acceleration kernels. Delivers peak performance on NVIDIA GPUs with compute capability 5.0+ (GTX 900 series up to RTX 40/50 series).
+            #### Arch Linux (AUR)
+            ```bash
+            yay -S whisper-desktop-bin
+            ```
 
-            * **macOS Universal (`Apple Silicon & Intel`)**
-              Native Mach-O Universal binary featuring native Apple Silicon Metal GPU acceleration (optimized for M1, M2, M3, and M4 chips) with zero-configuration fallback for Intel x86_64 Macs.
+            #### x86_64 Universal Edition *(Vulkan, Intel OpenVINO, CPU)*
+            * [![AppImage](https://img.shields.io/badge/Portable%20AppImage-.AppImage-0057d9?style=flat-square&logo=linux&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_amd64.AppImage) — Standalone binary; runs on any modern distribution
+            * [![Debian / Ubuntu Package](https://img.shields.io/badge/Debian%20%2F%20Ubuntu-.deb-d70a53?style=flat-square&logo=debian&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_amd64.deb) — Native package for Debian, Ubuntu, and Linux Mint (zstd compressed)
+            * [![Fedora / RHEL Package](https://img.shields.io/badge/Fedora%20%2F%20RHEL-.rpm-e03c11?style=flat-square&logo=redhat&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop-${{ steps.app_version.outputs.version }}-1.x86_64.rpm) — Native package for Fedora, RHEL, and openSUSE (zstd compressed)
 
-            * **Linux ARM64 (`aarch64`)**
-              Native 64-bit ARM architecture binaries with NEON and Vulkan support for devices such as Raspberry Pi 5, Rockchip, Ampere, and ARM64 servers.
+            #### x86_64 NVIDIA CUDA Edition *(Dedicated RTX / GTX Acceleration)*
+            * [![CUDA AppImage](https://img.shields.io/badge/AppImage%20(CUDA)-.AppImage-76b900?style=flat-square&logo=nvidia&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_amd64-cuda.AppImage) — Portable AppImage with bundled CUDA acceleration
+            * [![CUDA Debian / Ubuntu Package](https://img.shields.io/badge/Debian%20%2F%20Ubuntu%20(CUDA)-.deb-76b900?style=flat-square&logo=debian&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_amd64-cuda.deb) — Native `.deb` package with CUDA support
+            * [![CUDA Fedora / RHEL Package](https://img.shields.io/badge/Fedora%20%2F%20RHEL%20(CUDA)-.rpm-76b900?style=flat-square&logo=redhat&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop-${{ steps.app_version.outputs.version }}-1.x86_64-cuda.rpm) — Native `.rpm` package with CUDA support
 
-            * **Windows on ARM64 (`Snapdragon X Elite / Surface`)**
-              Runs seamlessly via the Windows Universal installer with Microsoft Prism x64 emulation.
+            #### ARM64 (aarch64) Universal Edition *(SBCs & ARM Linux Desktops)*
+            * [![ARM64 AppImage](https://img.shields.io/badge/AppImage%20(ARM64)-.AppImage-0057d9?style=flat-square&logo=linux&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_aarch64.AppImage) — Standalone AppImage for Raspberry Pi 5, Rockchip, and ARM64 servers
+            * [![ARM64 Debian / Ubuntu Package](https://img.shields.io/badge/Debian%20%2F%20Ubuntu%20(ARM64)-.deb-d70a53?style=flat-square&logo=debian&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop_${{ steps.app_version.outputs.version }}_arm64.deb) — Native `.deb` for 64-bit ARM Debian/Ubuntu
+            * [![ARM64 Fedora / RHEL Package](https://img.shields.io/badge/Fedora%20%2F%20RHEL%20(ARM64)-.rpm-e03c11?style=flat-square&logo=redhat&logoColor=white)](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/WhisperDesktop-${{ steps.app_version.outputs.version }}-1.aarch64.rpm) — Native `.rpm` for 64-bit ARM Fedora/RHEL
           draft: true
           prerelease: false
           files: |
