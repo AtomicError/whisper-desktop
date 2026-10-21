@@ -512,7 +512,7 @@ jobs:
         with:
           path: |
             ffmpeg-bins/**
-          key: ffmpeg-${{ matrix.platform }}-${{ matrix.arch }}-v5
+          key: ffmpeg-${{ matrix.platform }}-${{ matrix.arch }}-v6
 
       - name: Download Hardware-Accelerated FFmpeg (Linux x86_64 - BtbN GPL)
         if: matrix.platform == 'ubuntu-22.04' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
@@ -548,20 +548,24 @@ jobs:
         if: matrix.platform == 'macos-latest' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p ffmpeg-bins
-          # 1. FFmpeg Universal Mach-O binary (ARM64 + x86_64 from Martin Riedl)
-          curl -fL -o ffmpeg-arm64.zip "https://ffmpeg.martin-riedl.de/redirect/latest/macos/arm64/release/ffmpeg.zip"
+          # 1. FFmpeg Universal Mach-O binary (ARM64 + x86_64 from OSXExperts)
+          curl -fL -o ffmpeg-arm64.zip "https://www.osxexperts.net/ffmpeg9arm.zip"
           unzip -q -o ffmpeg-arm64.zip -d ./ffmpeg-arm64-dir
-          curl -fL -o ffmpeg-x64.zip "https://ffmpeg.martin-riedl.de/redirect/latest/macos/amd64/release/ffmpeg.zip"
+          curl -fL -o ffmpeg-x64.zip "https://www.osxexperts.net/ffmpeg80intel.zip"
           unzip -q -o ffmpeg-x64.zip -d ./ffmpeg-x64-dir
-          lipo -create ./ffmpeg-arm64-dir/ffmpeg ./ffmpeg-x64-dir/ffmpeg -output ffmpeg-bins/ffmpeg
+          ARM_FFMPEG=$(find ./ffmpeg-arm64-dir -type f \( -name "ffmpeg" -o -name "FFmpeg" \) | head -n 1)
+          X64_FFMPEG=$(find ./ffmpeg-x64-dir -type f \( -name "ffmpeg" -o -name "FFmpeg" \) | head -n 1)
+          lipo -create "$ARM_FFMPEG" "$X64_FFMPEG" -output ffmpeg-bins/ffmpeg
           rm -rf ffmpeg-arm64.zip ffmpeg-x64.zip ./ffmpeg-arm64-dir ./ffmpeg-x64-dir
 
-          # 2. FFprobe Universal Mach-O binary (ARM64 + x86_64 from Martin Riedl)
-          curl -fL -o ffprobe-arm64.zip "https://ffmpeg.martin-riedl.de/redirect/latest/macos/arm64/release/ffprobe.zip"
+          # 2. FFprobe Universal Mach-O binary (ARM64 + x86_64 from OSXExperts)
+          curl -fL -o ffprobe-arm64.zip "https://www.osxexperts.net/ffprobe9arm.zip"
           unzip -q -o ffprobe-arm64.zip -d ./ffprobe-arm64-dir
-          curl -fL -o ffprobe-x64.zip "https://ffmpeg.martin-riedl.de/redirect/latest/macos/amd64/release/ffprobe.zip"
+          curl -fL -o ffprobe-x64.zip "https://www.osxexperts.net/ffprobe80intel.zip"
           unzip -q -o ffprobe-x64.zip -d ./ffprobe-x64-dir
-          lipo -create ./ffprobe-arm64-dir/ffprobe ./ffprobe-x64-dir/ffprobe -output ffmpeg-bins/ffprobe
+          ARM_FFPROBE=$(find ./ffprobe-arm64-dir -type f \( -name "ffprobe" -o -name "FFprobe" \) | head -n 1)
+          X64_FFPROBE=$(find ./ffprobe-x64-dir -type f \( -name "ffprobe" -o -name "FFprobe" \) | head -n 1)
+          lipo -create "$ARM_FFPROBE" "$X64_FFPROBE" -output ffmpeg-bins/ffprobe
           rm -rf ffprobe-arm64.zip ffprobe-x64.zip ./ffprobe-arm64-dir ./ffprobe-x64-dir
 
           # 3. Fix permissions and ad-hoc code sign for Apple Silicon Gatekeeper
