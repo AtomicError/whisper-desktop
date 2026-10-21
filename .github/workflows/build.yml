@@ -512,7 +512,7 @@ jobs:
         with:
           path: |
             ffmpeg-bins/**
-          key: ffmpeg-${{ matrix.platform }}-${{ matrix.arch }}-v4
+          key: ffmpeg-${{ matrix.platform }}-${{ matrix.arch }}-v5
 
       - name: Download Hardware-Accelerated FFmpeg (Linux x86_64 - BtbN GPL)
         if: matrix.platform == 'ubuntu-22.04' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
@@ -548,18 +548,18 @@ jobs:
         if: matrix.platform == 'macos-latest' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p ffmpeg-bins
-          # 1. FFmpeg Universal Mach-O binary (ARM64 with SVT-AV1 + x86_64)
-          curl -L -o ffmpeg-arm64.zip "https://ffmpeg.martin-riedl.de/download/macos/arm64/1785863997_9.0/ffmpeg.zip"
+          # 1. FFmpeg Universal Mach-O binary (ARM64 + x86_64 from Martin Riedl)
+          curl -fL -o ffmpeg-arm64.zip "https://ffmpeg.martin-riedl.de/redirect/latest/macos/arm64/release/ffmpeg.zip"
           unzip -q -o ffmpeg-arm64.zip -d ./ffmpeg-arm64-dir
-          curl -L -o ffmpeg-x64.zip "https://evermeet.cx/ffmpeg/getrelease/zip"
+          curl -fL -o ffmpeg-x64.zip "https://ffmpeg.martin-riedl.de/redirect/latest/macos/amd64/release/ffmpeg.zip"
           unzip -q -o ffmpeg-x64.zip -d ./ffmpeg-x64-dir
           lipo -create ./ffmpeg-arm64-dir/ffmpeg ./ffmpeg-x64-dir/ffmpeg -output ffmpeg-bins/ffmpeg
           rm -rf ffmpeg-arm64.zip ffmpeg-x64.zip ./ffmpeg-arm64-dir ./ffmpeg-x64-dir
 
-          # 2. FFprobe Universal Mach-O binary (ARM64 + x86_64)
-          curl -L -o ffprobe-arm64.zip "https://ffmpeg.martin-riedl.de/download/macos/arm64/1785863997_9.0/ffprobe.zip"
+          # 2. FFprobe Universal Mach-O binary (ARM64 + x86_64 from Martin Riedl)
+          curl -fL -o ffprobe-arm64.zip "https://ffmpeg.martin-riedl.de/redirect/latest/macos/arm64/release/ffprobe.zip"
           unzip -q -o ffprobe-arm64.zip -d ./ffprobe-arm64-dir
-          curl -L -o ffprobe-x64.zip "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip"
+          curl -fL -o ffprobe-x64.zip "https://ffmpeg.martin-riedl.de/redirect/latest/macos/amd64/release/ffprobe.zip"
           unzip -q -o ffprobe-x64.zip -d ./ffprobe-x64-dir
           lipo -create ./ffprobe-arm64-dir/ffprobe ./ffprobe-x64-dir/ffprobe -output ffmpeg-bins/ffprobe
           rm -rf ffprobe-arm64.zip ffprobe-x64.zip ./ffprobe-arm64-dir ./ffprobe-x64-dir
@@ -911,17 +911,25 @@ jobs:
         run: |
           mkdir -p src-tauri/resources/fonts src-tauri/resources/standard src-tauri/resources/vulkan src-tauri/resources/openvino src-tauri/resources/cuda
           touch src-tauri/resources/standard/.keep src-tauri/resources/vulkan/.keep src-tauri/resources/openvino/.keep src-tauri/resources/cuda/.keep
+
+          # Populate backend-isolated subdirectories
+          [ -f whisper-bins/whisper-cli-standard ] && cp -f whisper-bins/whisper-cli-standard src-tauri/resources/standard/whisper-cli-standard
+          [ -f whisper-bins/whisper-cli-vulkan ] && cp -f whisper-bins/whisper-cli-vulkan src-tauri/resources/vulkan/whisper-cli-vulkan
+          [ -f whisper-bins/whisper-cli-openvino ] && cp -f whisper-bins/whisper-cli-openvino src-tauri/resources/openvino/whisper-cli-openvino
+          [ -f whisper-bins/whisper-cli-cuda ] && cp -f whisper-bins/whisper-cli-cuda src-tauri/resources/cuda/whisper-cli-cuda
+          cp -f whisper-bins/*.so* src-tauri/resources/standard/ 2>/dev/null || true
+
+          # Also keep top-level copy for compatibility
           if [ "$(uname)" = "Darwin" ]; then
-            cp -R whisper-bins/whisper-cli-* src-tauri/resources/
+            cp -R whisper-bins/whisper-cli-* src-tauri/resources/ 2>/dev/null || true
           else
-            cp -d whisper-bins/whisper-cli-* src-tauri/resources/
+            cp -d whisper-bins/whisper-cli-* src-tauri/resources/ 2>/dev/null || true
             cp -d whisper-bins/*.so* src-tauri/resources/ 2>/dev/null || true
           fi
           cp ffmpeg-bins/ffmpeg src-tauri/resources/
           cp ffmpeg-bins/ffprobe src-tauri/resources/
           cp src/fonts/* src-tauri/resources/fonts/ || true
-          chmod +x src-tauri/resources/whisper-cli-* src-tauri/resources/ffmpeg src-tauri/resources/ffprobe 2>/dev/null || true
-          find src-tauri/resources/ -name "*.so*" -exec chmod +x {} + 2>/dev/null || true
+          chmod -R 755 src-tauri/resources/ 2>/dev/null || true
           npm run tauri build -- ${{ matrix.args }}
 
           if [ "$(uname)" = "Linux" ]; then

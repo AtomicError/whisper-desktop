@@ -37,11 +37,9 @@
     "active": true,
     "targets": "all",
     "resources": [
-      "resources/whisper-cli-*",
       "resources/ffmpeg*",
       "resources/ffprobe*",
       "resources/fonts/*",
-      "resources/*.so*",
       "resources/standard/*",
       "resources/vulkan/*",
       "resources/openvino/*",

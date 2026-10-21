@@ -2,11 +2,9 @@
   "$schema": "https://schema.tauri.app/config/2",
   "bundle": {
     "resources": [
-      "resources/whisper-cli-*",
       "resources/ffmpeg*",
       "resources/ffprobe*",
       "resources/fonts/*",
-      "resources/*.dll",
       "resources/standard/*",
       "resources/vulkan/*",
       "resources/openvino/*",
