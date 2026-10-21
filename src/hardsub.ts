@@ -1749,6 +1749,7 @@ export class HardsubController {
     this.on(this.boldToggle, 'click', async () => {
       this.state.bold = !this.state.bold;
       this.boldToggle!.classList.toggle('active', this.state.bold);
+      this.boldToggle?.setAttribute?.('aria-pressed', String(this.state.bold));
       this.updateLivePreview();
       await this.refreshFontRenderScale();
       this.updateLivePreview();
@@ -1758,6 +1759,7 @@ export class HardsubController {
     this.on(this.italicToggle, 'click', async () => {
       this.state.italic = !this.state.italic;
       this.italicToggle!.classList.toggle('active', this.state.italic);
+      this.italicToggle?.setAttribute?.('aria-pressed', String(this.state.italic));
       this.updateLivePreview();
       await this.refreshFontRenderScale();
       this.updateLivePreview();
@@ -1797,6 +1799,19 @@ export class HardsubController {
       if (alignValLabel) {
         alignValLabel.textContent = getAlignName(code);
       }
+
+      document.querySelectorAll('.align-v-btn').forEach((b) => {
+        const btn = b as HTMLButtonElement;
+        const isActive = btn.dataset.v === currentV;
+        btn.classList.toggle('active', isActive);
+        btn.setAttribute?.('aria-pressed', String(isActive));
+      });
+      document.querySelectorAll('.align-h-btn').forEach((b) => {
+        const btn = b as HTMLButtonElement;
+        const isActive = btn.dataset.h === currentH;
+        btn.classList.toggle('active', isActive);
+        btn.setAttribute?.('aria-pressed', String(isActive));
+      });
 
       // Disable/gray out Vertical Offset when aligned to Middle (as MarginV has no effect in ASS for middle alignment)
       const posyWrapper = document.getElementById('hardsub-posy-wrapper');
@@ -1865,7 +1880,10 @@ export class HardsubController {
       if (this.cancelBtn) {
         this.cancelBtn.disabled = true;
         const span = this.cancelBtn.querySelector('span');
-        if (span) span.textContent = t('transcribe.cancelling');
+        if (span) {
+          span.textContent = t('transcribe.cancelling');
+          span.setAttribute?.('data-i18n', 'transcribe.cancelling');
+        }
       }
       try {
         await invoke('cancel_hardsub_task');
@@ -1875,7 +1893,10 @@ export class HardsubController {
         if (this.cancelBtn) {
           this.cancelBtn.disabled = false;
           const span = this.cancelBtn.querySelector('span');
-          if (span) span.textContent = t('common.cancel');
+          if (span) {
+            span.textContent = t('common.cancel');
+            span.setAttribute?.('data-i18n', 'common.cancel');
+          }
         }
       }
     });
@@ -2295,6 +2316,19 @@ export class HardsubController {
     this.updateVideoDropzoneUI(this.state.videoPath);
     this.updateSubDropzoneUI(this.state.subtitlePath, this.subtitleCues.length);
     this.renderSubtitleCards();
+    this.syncPlayPauseUI();
+    if (this.videoFullscreenBtn) {
+      const isFs = this.isFullscreen();
+      const fsKey = isFs ? 'hardsub.exitFullscreen' : 'hardsub.toggleFullscreen';
+      const fsTitle = t(fsKey);
+      this.videoFullscreenBtn.title = fsTitle;
+      this.videoFullscreenBtn.setAttribute?.('aria-label', fsTitle);
+      this.videoFullscreenBtn.setAttribute?.('data-i18n-title', fsKey);
+      this.videoFullscreenBtn.setAttribute?.('data-i18n-aria', fsKey);
+    }
+    const vol = this.videoElement ? (this.videoVolumeSlider ? parseFloat(this.videoVolumeSlider.value) : this.videoElement.volume) : 1;
+    const isMuted = this.videoElement ? (this.videoElement.muted || vol === 0) : false;
+    this.updateVolumeIcons(vol, isMuted);
     this.renderPlayerPhase();
     this.updateOutputDirUI();
     if (this.progressStatusText && this.lastStatusPayload) {
@@ -2636,6 +2670,14 @@ export class HardsubController {
     const playing = this.phase === 'ready' && !!this.videoElement && (this.playIntent || !this.videoElement.paused) && !this.videoElement.ended;
     if (this.videoIconPlay) this.videoIconPlay.style.display = playing ? 'none' : 'block';
     if (this.videoIconPause) this.videoIconPause.style.display = playing ? 'block' : 'none';
+    if (this.videoPlayBtn) {
+      const playKey = playing ? 'hardsub.pauseVideo' : 'hardsub.playVideo';
+      const playTitle = t(playKey);
+      this.videoPlayBtn.title = playTitle;
+      this.videoPlayBtn.setAttribute?.('aria-label', playTitle);
+      this.videoPlayBtn.setAttribute?.('data-i18n-title', playKey);
+      this.videoPlayBtn.setAttribute?.('data-i18n-aria', playKey);
+    }
     this.renderPlayerPhase();
   }
 
@@ -2870,6 +2912,7 @@ export class HardsubController {
     this.on(document, 'fullscreenchange', () => {
       this.onFullscreenStateChanged(this.isFullscreen());
     });
+    this.onFullscreenStateChanged(this.isFullscreen());
 
     // Support Escape key to exit player fullscreen
     this.on(document, 'keydown', (e: KeyboardEvent) => {
@@ -3326,7 +3369,8 @@ export class HardsubController {
   }
 
   private updateVolumeIcons(volume: number, muted: boolean) {
-    if (muted || volume === 0) {
+    const isMuted = muted || volume === 0;
+    if (isMuted) {
       if (this.videoIconVolUp) this.videoIconVolUp.style.display = 'none';
       if (this.videoIconVolMute) this.videoIconVolMute.style.display = 'block';
       if (this.videoVolumeSlider) {
@@ -3341,6 +3385,14 @@ export class HardsubController {
         const pct = volume * 100;
         this.videoVolumeSlider.style.background = `linear-gradient(to right, var(--color-royal-blue) 0%, var(--color-royal-blue) ${pct}%, rgba(255, 255, 255, 0.1) ${pct}%, rgba(255, 255, 255, 0.1) 100%)`;
       }
+    }
+    if (this.videoVolumeBtn) {
+      const volKey = isMuted ? 'hardsub.unmuteAudio' : 'hardsub.muteAudio';
+      const volTitle = t(volKey);
+      this.videoVolumeBtn.title = volTitle;
+      this.videoVolumeBtn.setAttribute?.('aria-label', volTitle);
+      this.videoVolumeBtn.setAttribute?.('data-i18n-title', volKey);
+      this.videoVolumeBtn.setAttribute?.('data-i18n-aria', volKey);
     }
   }
 
@@ -3378,6 +3430,14 @@ export class HardsubController {
   private onFullscreenStateChanged(isFs: boolean): void {
     if (this.videoIconFsEnter) this.videoIconFsEnter.style.display = isFs ? 'none' : 'block';
     if (this.videoIconFsExit) this.videoIconFsExit.style.display = isFs ? 'block' : 'none';
+    if (this.videoFullscreenBtn) {
+      const fsKey = isFs ? 'hardsub.exitFullscreen' : 'hardsub.toggleFullscreen';
+      const fsTitle = t(fsKey);
+      this.videoFullscreenBtn.title = fsTitle;
+      this.videoFullscreenBtn.setAttribute?.('aria-label', fsTitle);
+      this.videoFullscreenBtn.setAttribute?.('data-i18n-title', fsKey);
+      this.videoFullscreenBtn.setAttribute?.('data-i18n-aria', fsKey);
+    }
     this.renderPlayerPhase();
     this.updateVideoPreviewOverlayBounds(false);
     setTimeout(() => {
@@ -3895,11 +3955,11 @@ export class HardsubController {
             <span class="subtitle-cue-time">${cue.startTimeStr} → ${cue.endTimeStr}</span>
             <span class="subtitle-cue-active-badge">${t('hardsub.cueActive')}</span>
           </div>
-          <button class="pill-btn jump-cue-btn" style="padding: 2px 8px; font-size: 0.72rem; height: 22px;" title="${t('hardsub.cuePlayTooltip')}">
+          <button type="button" class="pill-btn jump-cue-btn" style="padding: 2px 8px; font-size: 0.72rem; height: 22px;" title="${t('hardsub.cuePlayTooltip')}" aria-label="${t('hardsub.cuePlay')} #${cue.id}">
             ▶ ${t('hardsub.cuePlay')}
           </button>
         </div>
-        <textarea class="subtitle-cue-textarea" data-cue-id="${cue.id}">${cue.text}</textarea>
+        <textarea class="subtitle-cue-textarea" data-cue-id="${cue.id}" aria-label="${t('hardsub.cueAriaLabel', { id: cue.id })}">${cue.text}</textarea>
       `;
 
       const cueField = card.querySelector<HTMLTextAreaElement>('textarea.subtitle-cue-textarea');
@@ -4541,9 +4601,11 @@ export class HardsubController {
 
     if (this.boldToggle) {
       this.boldToggle.classList.toggle('active', this.state.bold);
+      this.boldToggle.setAttribute?.('aria-pressed', String(this.state.bold));
     }
     if (this.italicToggle) {
       this.italicToggle.classList.toggle('active', this.state.italic);
+      this.italicToggle.setAttribute?.('aria-pressed', String(this.state.italic));
     }
   }
 
@@ -4557,6 +4619,7 @@ export class HardsubController {
       startBtn.disabled = !canStart;
       if (startBtnSpan) {
         startBtnSpan.textContent = active ? t('hardsub.exportingVideo') : t('hardsub.exportHardsubVideo');
+        startBtnSpan.setAttribute?.('data-i18n', active ? 'hardsub.exportingVideo' : 'hardsub.exportHardsubVideo');
       }
       startBtn.style.opacity = canStart ? '1' : '0.5';
       startBtn.style.cursor = canStart ? 'pointer' : 'not-allowed';
@@ -4580,7 +4643,10 @@ export class HardsubController {
       if (!active) {
         this.cancelBtn.disabled = false;
         const span = this.cancelBtn.querySelector('span');
-        if (span) span.textContent = t('common.cancel');
+        if (span) {
+          span.textContent = t('common.cancel');
+          span.setAttribute?.('data-i18n', 'common.cancel');
+        }
         this.isCancelling = false;
       }
     }

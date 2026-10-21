@@ -44,6 +44,9 @@ class Control extends EventTarget {
   set innerHTML(_v: string) { this.children = []; }
   get options() { return this.children; }
   querySelector(selector: string): Control | null {
+    if (selector === 'span') {
+      return this.children.find(c => (c as any).tagName === 'SPAN') ?? null;
+    }
     const match = selector.match(/value="([^"]+)"/);
     if (match) {
       return this.children.find(c => c.value === match[1]) ?? null;
@@ -161,6 +164,9 @@ function fixture() {
   const btnResetAll = new Control();
   btnResetAll.style.display = 'none';
   const startBtn = new Control();
+  const startBtnSpan = new Control();
+  (startBtnSpan as any).tagName = 'SPAN';
+  startBtn.appendChild(startBtnSpan);
   doc.elements.set('btn-start-hardsub', startBtn);
   doc.elements.set('hardsub-output-dir-text', outputDirText);
   doc.elements.set('btn-browse-hardsub-dir', btnBrowseDir);
@@ -993,16 +999,22 @@ describe('hardsub output directory management', () => {
       volumeSlider.value = '0.75';
       volumeSlider.dispatchEvent(new Event('input'));
       expect(video.volume).toBe(0.75);
+      expect(volumeBtn.getAttribute('aria-label')).toBe('Mute');
+      expect(volumeBtn.getAttribute('data-i18n-title')).toBe('hardsub.muteAudio');
 
       // Click mute
       volumeBtn.dispatchEvent(new Event('click'));
       expect(video.muted).toBe(true);
       expect(volumeSlider.value).toBe('0');
+      expect(volumeBtn.getAttribute('aria-label')).toBe('Unmute');
+      expect(volumeBtn.getAttribute('data-i18n-title')).toBe('hardsub.unmuteAudio');
 
       // Click unmute
       volumeBtn.dispatchEvent(new Event('click'));
       expect(video.muted).toBe(false);
       expect(video.volume).toBe(0.75);
+      expect(volumeBtn.getAttribute('aria-label')).toBe('Mute');
+      expect(volumeBtn.getAttribute('data-i18n-title')).toBe('hardsub.muteAudio');
     });
 
     it('preserves muted state across playVideo calls without auto-unmuting', async () => {
@@ -1026,6 +1038,32 @@ describe('hardsub output directory management', () => {
       Object.assign(escEvent, { key: 'Escape' });
       volumeSlider.dispatchEvent(escEvent);
       expect(volumeSlider.blur).toHaveBeenCalled();
+    });
+
+    it('synchronizes play and fullscreen button titles and aria attributes', async () => {
+      const { play, fullscreenBtn, load, internal } = fixture();
+      await load();
+
+      // Initially paused
+      expect(play.getAttribute('aria-label')).toBe('Play Video');
+      expect(play.getAttribute('data-i18n-title')).toBe('hardsub.playVideo');
+      expect(fullscreenBtn.getAttribute('aria-label')).toBe('Toggle Fullscreen');
+      expect(fullscreenBtn.getAttribute('data-i18n-title')).toBe('hardsub.toggleFullscreen');
+
+      // Play video
+      play.dispatchEvent(new Event('click'));
+      await flush();
+      expect(play.getAttribute('aria-label')).toBe('Pause Video');
+      expect(play.getAttribute('data-i18n-title')).toBe('hardsub.pauseVideo');
+
+      // Fullscreen change
+      (internal as any).onFullscreenStateChanged(true);
+      expect(fullscreenBtn.getAttribute('aria-label')).toBe('Exit Fullscreen');
+      expect(fullscreenBtn.getAttribute('data-i18n-title')).toBe('hardsub.exitFullscreen');
+
+      (internal as any).onFullscreenStateChanged(false);
+      expect(fullscreenBtn.getAttribute('aria-label')).toBe('Toggle Fullscreen');
+      expect(fullscreenBtn.getAttribute('data-i18n-title')).toBe('hardsub.toggleFullscreen');
     });
   });
 
@@ -1247,12 +1285,14 @@ describe('hardsub output directory management', () => {
 
     it('updates start button disabled state, title, and data-i18n-title based on video, subtitle, and encoding readiness', async () => {
       const { load, internal, startBtn } = fixture();
+      const startBtnSpan = (startBtn as any).querySelector('span');
       internal.state.videoPath = '';
       internal.state.subtitlePath = '';
       internal.updateEncodingUIState(false);
       expect((startBtn as any).disabled).toBe(true);
       expect((startBtn as any).title).toBe('Please select a video file first.');
       expect((startBtn as any).getAttribute('data-i18n-title')).toBe('hardsub.selectVideoFirst');
+      expect(startBtnSpan?.getAttribute('data-i18n')).toBe('hardsub.exportHardsubVideo');
 
       await load();
       internal.state.subtitlePath = '';
@@ -1266,11 +1306,13 @@ describe('hardsub output directory management', () => {
       expect((startBtn as any).disabled).toBe(false);
       expect((startBtn as any).title).toBe('Export Hardsub Video');
       expect((startBtn as any).getAttribute('data-i18n-title')).toBe('hardsub.exportHardsubVideo');
+      expect(startBtnSpan?.getAttribute('data-i18n')).toBe('hardsub.exportHardsubVideo');
 
       internal.updateEncodingUIState(true);
       expect((startBtn as any).disabled).toBe(true);
       expect((startBtn as any).title).toBe('Exporting Hardsub Video...');
       expect((startBtn as any).getAttribute('data-i18n-title')).toBe('hardsub.exportingVideo');
+      expect(startBtnSpan?.getAttribute('data-i18n')).toBe('hardsub.exportingVideo');
     });
 
     it('clearVideoState invalidates in-flight video preview loads via videoLoadGeneration', async () => {

@@ -251,7 +251,7 @@ describe('subtitle loading', () => {
 
     await controller.loadSubtitleFile('/bad.srt');
     expect(controller.state.subtitlePath).toBe('');
-    expect(notifySpy).toHaveBeenCalledWith(expect.any(String), 'error');
+    expect(notifySpy).toHaveBeenCalledWith('Permission denied', 'error');
   });
 
   it('updates aria-selected and active classes on view mode buttons when switching view modes', () => {
@@ -282,6 +282,9 @@ describe('subtitle loading', () => {
     expect(btnSplit.setAttribute).toHaveBeenCalledWith('aria-selected', 'false');
     expect(btnSource.setAttribute).toHaveBeenCalledWith('aria-selected', 'true');
     expect(btnTarget.setAttribute).toHaveBeenCalledWith('aria-selected', 'false');
+    expect(btnSplit.setAttribute).toHaveBeenCalledWith('tabindex', '-1');
+    expect(btnSource.setAttribute).toHaveBeenCalledWith('tabindex', '0');
+    expect(btnTarget.setAttribute).toHaveBeenCalledWith('tabindex', '-1');
     expect(btnSource.classList.add).toHaveBeenCalledWith('active');
     expect(btnSplit.classList.remove).toHaveBeenCalledWith('active');
 
@@ -289,11 +292,117 @@ describe('subtitle loading', () => {
     expect(btnSplit.setAttribute).toHaveBeenCalledWith('aria-selected', 'false');
     expect(btnSource.setAttribute).toHaveBeenCalledWith('aria-selected', 'false');
     expect(btnTarget.setAttribute).toHaveBeenCalledWith('aria-selected', 'true');
+    expect(btnSplit.setAttribute).toHaveBeenCalledWith('tabindex', '-1');
+    expect(btnSource.setAttribute).toHaveBeenCalledWith('tabindex', '-1');
+    expect(btnTarget.setAttribute).toHaveBeenCalledWith('tabindex', '0');
 
     controller.setViewMode('split');
     expect(btnSplit.setAttribute).toHaveBeenCalledWith('aria-selected', 'true');
     expect(btnSource.setAttribute).toHaveBeenCalledWith('aria-selected', 'false');
     expect(btnTarget.setAttribute).toHaveBeenCalledWith('aria-selected', 'false');
+    expect(btnSplit.setAttribute).toHaveBeenCalledWith('tabindex', '0');
+    expect(btnSource.setAttribute).toHaveBeenCalledWith('tabindex', '-1');
+    expect(btnTarget.setAttribute).toHaveBeenCalledWith('tabindex', '-1');
+  });
+
+  it('navigates view mode tabs with keyboard in LTR and RTL directions', () => {
+    let keyHandler: ((e: any) => void) | null = null;
+    const viewSegmented = {
+      addEventListener: vi.fn((event: string, handler: any) => {
+        if (event === 'keydown') keyHandler = handler;
+      }),
+      removeEventListener: vi.fn(),
+    };
+
+    const createMockBtn = (id: string) => ({
+      id,
+      closest: vi.fn(() => viewSegmented),
+      focus: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      setAttribute: vi.fn(),
+      classList: { add: vi.fn(), remove: vi.fn(), toggle: vi.fn(), contains: vi.fn() },
+    });
+
+    const btnSplit = createMockBtn('btn-view-split');
+    const btnSource = createMockBtn('btn-view-source');
+    const btnTarget = createMockBtn('btn-view-target');
+
+    const origDoc = (globalThis as any).document;
+    const origWin = (globalThis as any).window;
+    let docDir = 'ltr';
+    (globalThis as any).document = {
+      ...origDoc,
+      documentElement: {
+        getAttribute: (attr: string) => (attr === 'dir' ? docDir : null),
+      },
+    };
+    (globalThis as any).window = {
+      ...origWin,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    };
+
+    try {
+      const controller = new TranslationStudioController();
+      (controller as any).btnViewSplit = btnSplit;
+      (controller as any).btnViewSource = btnSource;
+      (controller as any).btnViewTarget = btnTarget;
+      (controller as any).setupEventListeners();
+      expect(keyHandler).toBeDefined();
+
+      const trigger = (key: string, extra = {}) => {
+        const event = { key, defaultPrevented: false, preventDefault: vi.fn(() => { event.defaultPrevented = true; }), ...extra };
+        keyHandler!(event);
+        return event;
+      };
+
+      // Initial state is 'split' (index 0)
+      expect(controller.state.viewMode).toBe('split');
+
+      // LTR: ArrowRight moves next (split -> source)
+      trigger('ArrowRight');
+      expect(controller.state.viewMode).toBe('source');
+      expect(btnSource.focus).toHaveBeenCalled();
+
+      // LTR: ArrowRight moves next (source -> target)
+      trigger('ArrowRight');
+      expect(controller.state.viewMode).toBe('target');
+      expect(btnTarget.focus).toHaveBeenCalled();
+
+      // LTR: ArrowLeft moves prev (target -> source)
+      trigger('ArrowLeft');
+      expect(controller.state.viewMode).toBe('source');
+
+      // Home moves to first (split)
+      trigger('Home');
+      expect(controller.state.viewMode).toBe('split');
+
+      // End moves to last (target)
+      trigger('End');
+      expect(controller.state.viewMode).toBe('target');
+
+      // Now switch to RTL
+      docDir = 'rtl';
+      // In RTL: ArrowRight moves prev (target -> source)
+      trigger('ArrowRight');
+      expect(controller.state.viewMode).toBe('source');
+
+      // In RTL: ArrowLeft moves next (source -> target)
+      trigger('ArrowLeft');
+      expect(controller.state.viewMode).toBe('target');
+
+      // Modifiers like Ctrl should be ignored
+      trigger('ArrowLeft', { ctrlKey: true });
+      expect(controller.state.viewMode).toBe('target');
+
+      // Dispose removes listener
+      controller.dispose();
+      expect(viewSegmented.removeEventListener).toHaveBeenCalledWith('keydown', expect.any(Function));
+    } finally {
+      (globalThis as any).document = origDoc;
+      (globalThis as any).window = origWin;
+    }
   });
 });
 

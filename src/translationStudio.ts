@@ -309,9 +309,6 @@ export class TranslationStudioController {
   private btnViewSplit: HTMLButtonElement | null = null;
   private btnViewSource: HTMLButtonElement | null = null;
   private btnViewTarget: HTMLButtonElement | null = null;
-
-  // Hardsub CTA
-  private hardsubCtaCard: HTMLElement | null = null;
   private btnSendToHardsub: HTMLButtonElement | null = null;
 
   private activeScrollDriver: HTMLElement | null = null;
@@ -404,8 +401,6 @@ export class TranslationStudioController {
     this.btnViewSplit = document.getElementById('btn-view-split') as HTMLButtonElement;
     this.btnViewSource = document.getElementById('btn-view-source') as HTMLButtonElement;
     this.btnViewTarget = document.getElementById('btn-view-target') as HTMLButtonElement;
-
-    this.hardsubCtaCard = document.getElementById('translate-hardsub-cta-card');
     this.btnSendToHardsub = document.getElementById('btn-send-to-hardsub') as HTMLButtonElement;
   }
 
@@ -521,15 +516,50 @@ export class TranslationStudioController {
     this.btnViewSource?.addEventListener('click', () => this.setViewMode('source'));
     this.btnViewTarget?.addEventListener('click', () => this.setViewMode('target'));
 
+    const tabs = ['split', 'source', 'target'] as const;
+    const viewSegmented = this.btnViewSplit?.closest('.translate-view-segmented') as HTMLElement | null;
+    if (viewSegmented) {
+      const onKeyDown = (e: KeyboardEvent) => {
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        const currentIdx = tabs.indexOf(this.state.viewMode);
+        let targetIdx = -1;
+        const isRtl = document.documentElement.getAttribute('dir') === 'rtl';
+        const isNext = e.key === 'ArrowDown' || (isRtl ? e.key === 'ArrowLeft' : e.key === 'ArrowRight');
+        const isPrev = e.key === 'ArrowUp' || (isRtl ? e.key === 'ArrowRight' : e.key === 'ArrowLeft');
+
+        if (isNext) {
+          targetIdx = (currentIdx + 1) % tabs.length;
+        } else if (isPrev) {
+          targetIdx = (currentIdx - 1 + tabs.length) % tabs.length;
+        } else if (e.key === 'Home') {
+          targetIdx = 0;
+        } else if (e.key === 'End') {
+          targetIdx = tabs.length - 1;
+        }
+
+        if (targetIdx !== -1) {
+          e.preventDefault();
+          const targetMode = tabs[targetIdx];
+          this.setViewMode(targetMode);
+          const targetBtn = targetMode === 'split' ? this.btnViewSplit : targetMode === 'source' ? this.btnViewSource : this.btnViewTarget;
+          targetBtn?.focus();
+        }
+      };
+      viewSegmented.addEventListener('keydown', onKeyDown);
+      this.unlisteners.push(() => viewSegmented.removeEventListener('keydown', onKeyDown));
+    }
+
     this.btnSendToHardsub?.addEventListener('click', () => this.sendToHardsubStudio());
 
     this.setupSynchronizedScrolling();
     this.setupSynchronizedHighlighting();
 
     // Re-render strings when language changes globally
-    window.addEventListener('whisper:languageChanged', () => {
+    const onLanguageChange = () => {
       this.refreshLocalization();
-    });
+    };
+    window.addEventListener?.('whisper:languageChanged', onLanguageChange);
+    this.unlisteners.push(() => window.removeEventListener?.('whisper:languageChanged', onLanguageChange));
   }
 
   private markScrolling() {
@@ -834,7 +864,8 @@ export class TranslationStudioController {
       if (loadId !== this.subtitleLoadId) return;
       console.error('Failed to load subtitle file:', err);
       this.clearLoadedSubtitle();
-      this.notify(String(err || t('translate.noSubSelectedError')), 'error');
+      const errMsg = err?.message || (typeof err === 'string' ? err : null) || t('translate.noSubSelectedError');
+      this.notify(errMsg, 'error');
     }
   }
 
@@ -1621,6 +1652,10 @@ export class TranslationStudioController {
     this.btnViewSplit?.setAttribute?.('aria-selected', String(mode === 'split'));
     this.btnViewSource?.setAttribute?.('aria-selected', String(mode === 'source'));
     this.btnViewTarget?.setAttribute?.('aria-selected', String(mode === 'target'));
+
+    this.btnViewSplit?.setAttribute?.('tabindex', mode === 'split' ? '0' : '-1');
+    this.btnViewSource?.setAttribute?.('tabindex', mode === 'source' ? '0' : '-1');
+    this.btnViewTarget?.setAttribute?.('tabindex', mode === 'target' ? '0' : '-1');
 
     if (this.previewGrid && this.sourcePane && this.targetPane) {
       if (mode === 'split') {

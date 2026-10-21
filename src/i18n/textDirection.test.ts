@@ -323,7 +323,7 @@ describe('isolateDirection', () => {
       ].join(' • ');
 
     setLanguage('fa');
-    expect(badge()).toBe('\u2066SRT\u2069 • \u206712 سطر\u2069 • \u2066921 B\u2069');
+    expect(badge()).toBe('\u2066SRT\u2069 • \u206712 خط\u2069 • \u2066921 B\u2069');
 
     setLanguage('en');
     expect(badge()).toBe('\u2066SRT\u2069 • \u206612 cues\u2069 • \u2066921 B\u2069');
