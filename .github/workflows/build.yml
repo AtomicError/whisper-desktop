@@ -548,25 +548,23 @@ jobs:
         if: matrix.platform == 'macos-latest' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p ffmpeg-bins
-          # 1. FFmpeg Universal Mach-O binary (ARM64 + x86_64 from OSXExperts)
-          curl -fL -o ffmpeg-arm64.zip "https://www.osxexperts.net/ffmpeg9arm.zip"
-          unzip -q -o ffmpeg-arm64.zip -d ./ffmpeg-arm64-dir
-          curl -fL -o ffmpeg-x64.zip "https://www.osxexperts.net/ffmpeg80intel.zip"
-          unzip -q -o ffmpeg-x64.zip -d ./ffmpeg-x64-dir
-          ARM_FFMPEG=$(find ./ffmpeg-arm64-dir -type f \( -name "ffmpeg" -o -name "FFmpeg" \) | head -n 1)
-          X64_FFMPEG=$(find ./ffmpeg-x64-dir -type f \( -name "ffmpeg" -o -name "FFmpeg" \) | head -n 1)
-          lipo -create "$ARM_FFMPEG" "$X64_FFMPEG" -output ffmpeg-bins/ffmpeg
-          rm -rf ffmpeg-arm64.zip ffmpeg-x64.zip ./ffmpeg-arm64-dir ./ffmpeg-x64-dir
+          # 1. FFmpeg Universal Mach-O binary (ARM64 + x86_64 from eugeneware/ffmpeg-static)
+          curl -fL -o ffmpeg-arm64.gz "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-darwin-arm64.gz"
+          gzip -d ffmpeg-arm64.gz
+          curl -fL -o ffmpeg-x64.gz "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-darwin-x64.gz"
+          gzip -d ffmpeg-x64.gz
+          chmod +x ffmpeg-arm64 ffmpeg-x64
+          lipo -create ffmpeg-arm64 ffmpeg-x64 -output ffmpeg-bins/ffmpeg
+          rm -f ffmpeg-arm64 ffmpeg-x64
 
-          # 2. FFprobe Universal Mach-O binary (ARM64 + x86_64 from OSXExperts)
-          curl -fL -o ffprobe-arm64.zip "https://www.osxexperts.net/ffprobe9arm.zip"
-          unzip -q -o ffprobe-arm64.zip -d ./ffprobe-arm64-dir
-          curl -fL -o ffprobe-x64.zip "https://www.osxexperts.net/ffprobe80intel.zip"
-          unzip -q -o ffprobe-x64.zip -d ./ffprobe-x64-dir
-          ARM_FFPROBE=$(find ./ffprobe-arm64-dir -type f \( -name "ffprobe" -o -name "FFprobe" \) | head -n 1)
-          X64_FFPROBE=$(find ./ffprobe-x64-dir -type f \( -name "ffprobe" -o -name "FFprobe" \) | head -n 1)
-          lipo -create "$ARM_FFPROBE" "$X64_FFPROBE" -output ffmpeg-bins/ffprobe
-          rm -rf ffprobe-arm64.zip ffprobe-x64.zip ./ffprobe-arm64-dir ./ffprobe-x64-dir
+          # 2. FFprobe Universal Mach-O binary (ARM64 + x86_64 from eugeneware/ffmpeg-static)
+          curl -fL -o ffprobe-arm64.gz "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffprobe-darwin-arm64.gz"
+          gzip -d ffprobe-arm64.gz
+          curl -fL -o ffprobe-x64.gz "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffprobe-darwin-x64.gz"
+          gzip -d ffprobe-x64.gz
+          chmod +x ffprobe-arm64 ffprobe-x64
+          lipo -create ffprobe-arm64 ffprobe-x64 -output ffmpeg-bins/ffprobe
+          rm -f ffprobe-arm64 ffprobe-x64
 
           # 3. Fix permissions and ad-hoc code sign for Apple Silicon Gatekeeper
           chmod +x ffmpeg-bins/ffmpeg ffmpeg-bins/ffprobe
