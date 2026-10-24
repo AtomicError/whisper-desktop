@@ -6,6 +6,7 @@ description = "Allow all custom Whisper Desktop command invokes"
 allow = [
   "load_settings",
   "save_settings",
+  "reset_whisper_core_settings",
   "check_build",
   "probe_media_file",
   "convert_media_file",
@@ -27,7 +28,6 @@ allow = [
   "read_text_file_content",
   "get_file_size",
   "start_download_model_task",
-  "get_model_download_progress",
   "get_all_models_status",
   "pause_download_model",
   "delete_model_file",

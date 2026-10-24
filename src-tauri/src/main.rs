@@ -1289,4 +1289,58 @@ mod main_tests {
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }
+
+    #[test]
+    fn test_all_invoke_handlers_are_allowed_in_acl() {
+        let main_src = include_str!("main.rs");
+        let toml_src = include_str!("../permissions/allow-all-custom.toml");
+
+        let handler_start = main_src
+            .find("tauri::generate_handler![")
+            .expect("generate_handler! not found in main.rs");
+        let after_start = &main_src[handler_start..];
+        let handler_end = after_start
+            .find("])")
+            .expect("end of generate_handler! not found");
+        let handler_block = &after_start[..handler_end];
+
+        let mut registered_handlers = std::collections::BTreeSet::new();
+        for line in handler_block.lines().skip(1) {
+            let trimmed = line.trim().trim_end_matches(',');
+            if trimmed.is_empty() || trimmed.starts_with("//") {
+                continue;
+            }
+            let command_name = trimmed.rsplit("::").next().unwrap().trim();
+            registered_handlers.insert(command_name.to_string());
+        }
+
+        let mut allowed_commands = std::collections::BTreeSet::new();
+        for line in toml_src.lines() {
+            let trimmed = line.trim().trim_end_matches(',');
+            if trimmed.starts_with('"') && trimmed.ends_with('"') && trimmed.len() >= 2 {
+                let name = &trimmed[1..trimmed.len() - 1];
+                allowed_commands.insert(name.to_string());
+            }
+        }
+
+        let missing: Vec<_> = registered_handlers
+            .difference(&allowed_commands)
+            .cloned()
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "The following commands are registered in generate_handler! but missing from allow-all-custom.toml: {:?}",
+            missing
+        );
+
+        let obsolete: Vec<_> = allowed_commands
+            .difference(&registered_handlers)
+            .cloned()
+            .collect();
+        assert!(
+            obsolete.is_empty(),
+            "The following commands in allow-all-custom.toml are not registered in generate_handler!: {:?}",
+            obsolete
+        );
+    }
 }
