@@ -3988,7 +3988,7 @@ select.select-control {
 }
 
 .btn-cancel-transcription:active {
-  transform: scale(0.97);
+  background: rgba(239, 68, 68, 0.2);
 }
 
 /* Integrated Transcribe Telemetry HUD (Inside Left Deck) */
@@ -4017,6 +4017,9 @@ select.select-control {
 }
 
 .transcribe-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 0.72rem;
   font-weight: 600;
   padding: 2px 8px;
@@ -4025,6 +4028,17 @@ select.select-control {
   color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.transcribe-status-badge.active::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--color-royal-blue);
+  box-shadow: 0 0 8px var(--color-royal-blue);
+  animation: pulse-glow 1.5s infinite;
   flex-shrink: 0;
 }
 
@@ -4050,6 +4064,7 @@ select.select-control {
   font-size: 0.74rem;
   font-family: monospace;
   direction: ltr;
+  color: var(--color-cyan);
 }
 
 .transcribe-telemetry-pct {
@@ -4166,6 +4181,76 @@ select.select-control {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Transcribe Output File Dropdown */
+.transcribe-output-file-group {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.transcribe-output-files-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  inset-inline-start: 0;
+  min-width: 220px;
+  max-width: 320px;
+  background: var(--bg-surface, #121215);
+  border: 1px solid var(--border-subtle, #27272a);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 1000;
+  backdrop-filter: blur(12px);
+}
+
+.transcribe-output-file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  font-size: 0.76rem;
+  border-radius: var(--radius-sm, 6px);
+  color: var(--text-primary, #fafafa);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  text-align: start;
+  transition: background-color 0.15s ease;
+  user-select: none;
+}
+
+.transcribe-output-file-item:hover {
+  background-color: var(--bg-hover, #27272a);
+}
+
+.transcribe-output-file-item .file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-sans);
+}
+
+.transcribe-output-file-item .file-badge {
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-secondary, #a1a1aa);
+  flex-shrink: 0;
+}
+
+.transcribe-output-file-item .file-badge.translated {
+  background: rgba(var(--color-royal-blue-rgb, 59, 130, 246), 0.2);
+  color: var(--color-cyan, #06b6d4);
 }
 
 .transcript-search-box {
@@ -11354,7 +11439,8 @@ body.hardsub-fullscreen-active #hardsub-video-controls:hover {
   font-size: 0.76rem;
 }
 
-.btn-toolbar-hardsub:not(:disabled) {
+.btn-toolbar-hardsub:not(:disabled),
+.btn-toolbar-workflow:not(:disabled) {
   background: linear-gradient(135deg, rgba(var(--color-royal-blue-rgb), 0.25) 0%, rgba(var(--color-cyan-rgb), 0.2) 100%);
   color: var(--color-sky);
   border: 1px solid rgba(var(--color-cyan-rgb), 0.45);
@@ -11363,14 +11449,16 @@ body.hardsub-fullscreen-active #hardsub-video-controls:hover {
   transition: all 0.2s ease;
 }
 
-.btn-toolbar-hardsub:not(:disabled):hover {
+.btn-toolbar-hardsub:not(:disabled):hover,
+.btn-toolbar-workflow:not(:disabled):hover {
   background: linear-gradient(135deg, var(--color-royal-blue) 0%, var(--color-cyan) 100%);
   color: #ffffff;
   border-color: var(--color-cyan);
   box-shadow: 0 4px 14px rgba(var(--color-cyan-rgb), 0.35);
 }
 
-.btn-toolbar-hardsub:not(:disabled):active {
+.btn-toolbar-hardsub:not(:disabled):active,
+.btn-toolbar-workflow:not(:disabled):active {
   opacity: 0.9;
 }
 

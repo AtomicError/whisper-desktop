@@ -282,7 +282,16 @@ export const tr: Translations = {
     sendToHardsub: 'Hardsub Stüdyosuna Gönder',
     sendToHardsubDesc: 'Bu altyazıyı özel tipografi, stil ve GPU kodlamasıyla doğrudan videoya kalıcı olarak gömün.',
     noSubGeneratedYet: 'Henüz altyazı oluşturulmadı',
-    noOutputDirYet: 'Henüz çıktı klasörü mevcut değil'
+    noOutputDirYet: 'Henüz çıktı klasörü mevcut değil',
+    transcribingWithAi: 'Yapay Zeka ile Yazıya Aktarılıyor...',
+    cancelTranscription: 'Yazıya Aktarmayı İptal Et',
+    openFile: 'Dosyayı Aç',
+    originalSubtitle: 'Orijinal Altyazı',
+    translatedSubtitle: 'Çevrilmiş Altyazı',
+    rawTranscriptText: 'Düz Metin',
+    statusComplete: 'Yazıya Aktarma Tamamlandı',
+    statusCancelled: 'Yazıya Aktarma İptal Edildi',
+    progressCompleteWithStats: 'Yazıya aktarma {time} içinde {speed} gerçek zamanlı hızla tamamlandı!'
   },
   translate: {
     title: 'Çeviri Stüdyosu',

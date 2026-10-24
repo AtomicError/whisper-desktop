@@ -282,7 +282,16 @@ export const ru: Translations = {
     sendToHardsub: 'Отправить в студию хардсаба',
     sendToHardsubDesc: 'Вшейте субтитры прямо в видео с настраиваемыми шрифтами и GPU-ускорением.',
     noSubGeneratedYet: 'Субтитры еще не сгенерированы',
-    noOutputDirYet: 'Папка вывода пока недоступна'
+    noOutputDirYet: 'Папка вывода пока недоступна',
+    transcribingWithAi: 'Транскрибация через AI...',
+    cancelTranscription: 'Отменить транскрибацию',
+    openFile: 'Открыть файл',
+    originalSubtitle: 'Исходные субтитры',
+    translatedSubtitle: 'Переведённые субтитры',
+    rawTranscriptText: 'Простой текст',
+    statusComplete: 'Транскрибация завершена',
+    statusCancelled: 'Транскрибация отменена',
+    progressCompleteWithStats: 'Транскрибация завершена за {time} со скоростью {speed} от реального времени!'
   },
   translate: {
     title: 'Студия перевода',

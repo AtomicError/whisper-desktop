@@ -3281,7 +3281,7 @@
                           <span data-i18n="transcribe.startAiExtraction">Transcribe File</span>
                         </button>
                         <button class="btn-secondary btn-cancel-transcription" id="btn-cancel-transcribe" type="button" style="display:none;" onclick="abortTranscription()">
-                          <span data-i18n="common.cancel">Cancel</span>
+                          <span data-i18n="transcribe.cancelTranscription">Cancel Transcription</span>
                         </button>
                       </div>
 
@@ -3295,7 +3295,7 @@
                             <span data-i18n="transcribe.startBatchAiExtraction">Transcribe Files</span>
                           </button>
                           <button class="btn-secondary btn-cancel-transcription" id="btn-cancel-batch" type="button" style="display:none;" onclick="abortBatchExtraction()">
-                            <span data-i18n="common.cancel">Cancel</span>
+                            <span data-i18n="transcribe.cancelTranscription">Cancel Transcription</span>
                           </button>
                         </div>
                       </div>
@@ -3305,7 +3305,7 @@
                         <div class="transcribe-telemetry-header">
                           <div class="transcribe-telemetry-status">
                             <span class="transcribe-status-badge" id="hud-status-badge" data-i18n="transcribe.standingBy">Standing By</span>
-                            <div class="hud-pulse-dot" id="hud-pulse-dot"></div>
+                            <div class="hud-pulse-dot" id="hud-pulse-dot" style="display:none;"></div>
                             <div class="transcribe-telemetry-stats" id="transcribe-metrics" style="display:none;">
                               <span class="chip-val" id="analytic-time">0s</span>
                               <span class="chip-divider" style="color:var(--color-text-dim);">•</span>
@@ -3320,14 +3320,6 @@
                           </div>
                         </div>
                         <div class="transcribe-telemetry-msg" id="lbl-radial-msg" data-i18n="transcribe.standingBy">Standing By</div>
-
-                        <!-- Results Analytics File Outputs -->
-                        <div class="analytics-box compact-analytics" id="analytics-box" style="display:none; width:100%; margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.06);">
-                          <div class="analytics-files-row" style="display:flex; align-items:center; gap:8px;">
-                            <span class="analytics-files-label" data-i18n="transcribe.filesLabel" style="font-size:0.75rem; color:var(--color-text-dim);">Files:</span>
-                            <div class="outputs-row compact-outputs" id="badge-outputs-row" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
-                          </div>
-                        </div>
                       </div>
                     </div>
                   </div>
@@ -3356,19 +3348,34 @@
                         </svg>
                         <span data-i18n="transcribe.copyLiveTranscript">Copy</span>
                       </button>
+                      <div class="transcribe-output-file-group" id="transcribe-output-file-group">
+                        <button class="btn-secondary btn-icon-text" id="btn-open-output-file" type="button" onclick="handleOutputFileButtonClick(event)" data-i18n-aria="transcribe.openFile" aria-label="Open File" disabled data-i18n-title="transcribe.noSubGeneratedYet" title="No generated subtitle yet">
+                          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-inline-end: 4px;">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="16" y1="13" x2="8" y2="13"/>
+                            <line x1="16" y1="17" x2="8" y2="17"/>
+                          </svg>
+                          <span id="lbl-open-output-file" data-i18n="transcribe.openFile">Open File</span>
+                          <svg id="chevron-open-output-file" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-inline-start: 4px; display: none;">
+                            <path d="m6 9 6 6 6-6"/>
+                          </svg>
+                        </button>
+                        <div class="transcribe-output-files-dropdown" id="transcribe-output-files-dropdown" style="display: none;"></div>
+                      </div>
                       <button class="btn-secondary btn-icon-text" id="btn-open-output-folder" type="button" onclick="openOutputFolder()" data-i18n-aria="transcribe.openFolder" aria-label="Open Folder" disabled data-i18n-title="transcribe.noOutputDirYet" title="No output folder available yet">
                         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="margin-inline-end: 4px;">
                           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                         </svg>
                         <span data-i18n="transcribe.openFolder">Open Folder</span>
                       </button>
-                      <button class="btn-secondary btn-icon-text" id="btn-send-to-translation" type="button" disabled data-i18n-title="transcribe.noSubGeneratedYet" title="No generated subtitle yet" onclick="sendTranscribeToTranslationStudio()">
+                      <button class="btn-secondary btn-icon-text btn-toolbar-hardsub btn-toolbar-workflow" id="btn-send-to-translation" type="button" disabled data-i18n-title="transcribe.noSubGeneratedYet" title="No generated subtitle yet" onclick="sendTranscribeToTranslationStudio()">
                         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="margin-inline-end: 4px;">
                           <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
                         </svg>
                         <span data-i18n="transcribe.sendToTranslation">Send to Translation Studio</span>
                       </button>
-                      <button class="btn-secondary btn-icon-text btn-toolbar-hardsub" id="btn-transcribe-send-to-hardsub" type="button" disabled data-i18n-title="transcribe.noSubGeneratedYet" title="No generated subtitle yet" onclick="sendTranscribeToHardsubStudio()">
+                      <button class="btn-secondary btn-icon-text btn-toolbar-hardsub btn-toolbar-workflow" id="btn-transcribe-send-to-hardsub" type="button" disabled data-i18n-title="transcribe.noSubGeneratedYet" title="No generated subtitle yet" onclick="sendTranscribeToHardsubStudio()">
                         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="margin-inline-end: 4px;">
                           <polygon points="23 7 16 12 23 17 23 7"/>
                           <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
@@ -3599,7 +3606,7 @@
                         </svg>
                         <span data-i18n="translate.openOutputFolder">Open Folder</span>
                       </button>
-                      <button class="btn-secondary btn-icon-text btn-toolbar-hardsub" id="btn-send-to-hardsub" type="button" disabled data-i18n-title="translate.emptyTargetTitle" title="No Translation Yet" data-i18n-aria="translate.sendToHardsub" aria-label="Send to Hardsub Studio">
+                      <button class="btn-secondary btn-icon-text btn-toolbar-hardsub btn-toolbar-workflow" id="btn-send-to-hardsub" type="button" disabled data-i18n-title="translate.emptyTargetTitle" title="No Translation Yet" data-i18n-aria="translate.sendToHardsub" aria-label="Send to Hardsub Studio">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;">
                           <polygon points="23 7 16 12 23 17 23 7"/>
                           <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>

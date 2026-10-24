@@ -4819,19 +4819,125 @@ window.updateTranscribeOutputDirUI = function() {
 
 window.lastTranscribedSubtitlePath = null;
 window.lastTranscribedVideoPath = null;
+window.lastTranscribedOutputFiles = [];
+
+window.handleOutputFileButtonClick = function(event) {
+  event?.stopPropagation();
+  const btn = document.getElementById('btn-open-output-file');
+  if (!btn || btn.disabled) return;
+
+  const files = window.lastTranscribedOutputFiles || [];
+  if (files.length <= 1) {
+    const targetPath = files.length === 1 ? files[0].path : window.lastTranscribedSubtitlePath;
+    if (targetPath) {
+      window.openFileInEditor(targetPath).catch((e) => {
+        const msg = (e && (e.message || e.toString())) || String(e);
+        showNotification(t('toasts.openFileError', { error: msg }) || msg, "error");
+      });
+    }
+  } else {
+    window.toggleOutputFilesDropdown();
+  }
+};
+
+window.toggleOutputFilesDropdown = function(forceClose) {
+  const dropdown = document.getElementById('transcribe-output-files-dropdown');
+  if (!dropdown) return;
+  const isCurrentlyOpen = dropdown.style.display !== 'none';
+  if (forceClose || isCurrentlyOpen) {
+    dropdown.style.display = 'none';
+    return;
+  }
+  window.renderOutputFilesDropdown();
+  dropdown.style.display = 'flex';
+};
+
+window.renderOutputFilesDropdown = function() {
+  const dropdown = document.getElementById('transcribe-output-files-dropdown');
+  if (!dropdown) return;
+  dropdown.innerHTML = '';
+
+  const files = window.lastTranscribedOutputFiles || [];
+  files.forEach(file => {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'transcribe-output-file-item';
+    const displayName = window.formatFileNameMiddleTruncate ? window.formatFileNameMiddleTruncate(file.name, 24) : file.name;
+
+    let badgeText = '';
+    let badgeClass = 'file-badge';
+    if (file.type === 'translated') {
+      badgeText = t('transcribe.translatedSubtitle') || 'Translated';
+      badgeClass += ' translated';
+    } else if (file.type === 'original') {
+      badgeText = t('transcribe.originalSubtitle') || 'Original';
+    } else if (file.type === 'text') {
+      badgeText = t('transcribe.rawTranscriptText') || 'Text';
+    }
+
+    item.innerHTML = `
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+      </svg>
+      <span class="file-name" title="${escapeHTML(file.path)}">${escapeHTML(displayName)}</span>
+      ${badgeText ? `<span class="${badgeClass}">${escapeHTML(badgeText)}</span>` : ''}
+    `;
+
+    item.onclick = (e) => {
+      e.stopPropagation();
+      window.toggleOutputFilesDropdown(true);
+      window.openFileInEditor(file.path).catch((err) => {
+        const msg = (err && (err.message || err.toString())) || String(err);
+        showNotification(t('toasts.openFileError', { error: msg }) || msg, "error");
+      });
+    };
+
+    dropdown.appendChild(item);
+  });
+};
+
+document.addEventListener('click', (e) => {
+  const group = document.getElementById('transcribe-output-file-group');
+  if (group && !group.contains(e.target)) {
+    window.toggleOutputFilesDropdown(true);
+  }
+});
 
 window.updateTranscribeWorkflowButtons = function() {
   const btnOpenFolder = document.getElementById('btn-open-output-folder');
+  const btnOpenFile = document.getElementById('btn-open-output-file');
+  const chevronOpenFile = document.getElementById('chevron-open-output-file');
   const btnSendTranslate = document.getElementById('btn-send-to-translation');
   const btnSendHardsub = document.getElementById('btn-transcribe-send-to-hardsub');
   const btnCopy = document.getElementById('btn-copy-transcript');
 
   const hasOutputDir = Boolean(window.lastTranscribedOutputDir);
   const hasSubtitle = Boolean(window.lastTranscribedSubtitlePath);
+  const outputFiles = window.lastTranscribedOutputFiles || [];
+  const hasFiles = outputFiles.length > 0 || hasSubtitle;
   const hasTranscript = Boolean((typeof transcriptLines !== 'undefined' && transcriptLines && transcriptLines.length > 0) || hasSubtitle);
 
   if (btnCopy) {
     btnCopy.disabled = !hasTranscript;
+  }
+
+  if (btnOpenFile) {
+    btnOpenFile.disabled = !hasFiles;
+    if (outputFiles.length > 1) {
+      if (chevronOpenFile) chevronOpenFile.style.display = 'inline-block';
+      btnOpenFile.title = t('transcribe.openFile');
+      btnOpenFile.removeAttribute('data-i18n-title');
+    } else if (hasFiles) {
+      if (chevronOpenFile) chevronOpenFile.style.display = 'none';
+      const singleName = outputFiles.length === 1 ? outputFiles[0].name : (window.lastTranscribedSubtitlePath ? getBasename(window.lastTranscribedSubtitlePath) : '');
+      btnOpenFile.title = singleName ? `${t('transcribe.openFile')}: ${singleName}` : t('transcribe.openFile');
+      btnOpenFile.removeAttribute('data-i18n-title');
+    } else {
+      if (chevronOpenFile) chevronOpenFile.style.display = 'none';
+      btnOpenFile.setAttribute('title', t('transcribe.noSubGeneratedYet') || 'No generated subtitle yet');
+      btnOpenFile.setAttribute('data-i18n-title', 'transcribe.noSubGeneratedYet');
+    }
   }
 
   if (btnOpenFolder) {
@@ -4882,6 +4988,8 @@ window.updateTranscribeActionButtons = function(isTranscribingParam) {
   const btnBatch = document.getElementById('btn-run-batch');
   const btnRunSpan = btnRun?.querySelector('span');
   const btnBatchSpan = btnBatch?.querySelector('span');
+  const cancelBtn = document.getElementById('btn-cancel-transcribe');
+  const cancelBatchBtn = document.getElementById('btn-cancel-batch');
 
   const hasSingleMedia = Boolean(selectedMediaFile || wavPathForTranscription);
   const hasBatchMedia = Array.isArray(batchItems) && batchItems.length > 0;
@@ -4890,11 +4998,12 @@ window.updateTranscribeActionButtons = function(isTranscribingParam) {
     const canRun = !isTranscribing && hasSingleMedia;
     btnRun.disabled = !canRun;
     if (isTranscribing) {
-      btnRun.title = t('transcribe.statusExtracting');
-      btnRun.setAttribute('data-i18n-title', 'transcribe.statusExtracting');
+      const transcribingText = t('transcribe.transcribingWithAi') || t('transcribe.statusExtracting');
+      btnRun.title = transcribingText;
+      btnRun.setAttribute('data-i18n-title', 'transcribe.transcribingWithAi');
       if (btnRunSpan) {
-        btnRunSpan.setAttribute('data-i18n', 'transcribe.statusExtracting');
-        btnRunSpan.textContent = t('transcribe.statusExtracting');
+        btnRunSpan.setAttribute('data-i18n', 'transcribe.transcribingWithAi');
+        btnRunSpan.textContent = transcribingText;
       }
     } else if (!hasSingleMedia) {
       btnRun.title = t('toasts.noFileSelected');
@@ -4917,11 +5026,12 @@ window.updateTranscribeActionButtons = function(isTranscribingParam) {
     const canRunBatch = !isBatchExtracting && hasBatchMedia;
     btnBatch.disabled = !canRunBatch;
     if (isBatchExtracting) {
-      btnBatch.title = t('transcribe.batchRunning');
-      btnBatch.setAttribute('data-i18n-title', 'transcribe.batchRunning');
+      const batchRunningText = t('transcribe.transcribingWithAi') || t('transcribe.batchRunning');
+      btnBatch.title = batchRunningText;
+      btnBatch.setAttribute('data-i18n-title', 'transcribe.transcribingWithAi');
       if (btnBatchSpan) {
-        btnBatchSpan.setAttribute('data-i18n', 'transcribe.batchRunning');
-        btnBatchSpan.textContent = t('transcribe.batchRunning');
+        btnBatchSpan.setAttribute('data-i18n', 'transcribe.transcribingWithAi');
+        btnBatchSpan.textContent = batchRunningText;
       }
     } else if (!hasBatchMedia) {
       btnBatch.title = t('toasts.noFileSelected');
@@ -4937,6 +5047,21 @@ window.updateTranscribeActionButtons = function(isTranscribingParam) {
         btnBatchSpan.setAttribute('data-i18n', 'transcribe.startBatchAiExtraction');
         btnBatchSpan.textContent = t('transcribe.startBatchAiExtraction');
       }
+    }
+  }
+
+  if (cancelBtn) {
+    const cancelSpan = cancelBtn.querySelector('span');
+    if (cancelSpan) {
+      cancelSpan.setAttribute('data-i18n', 'transcribe.cancelTranscription');
+      cancelSpan.textContent = t('transcribe.cancelTranscription');
+    }
+  }
+  if (cancelBatchBtn) {
+    const cancelBatchSpan = cancelBatchBtn.querySelector('span');
+    if (cancelBatchSpan) {
+      cancelBatchSpan.setAttribute('data-i18n', 'transcribe.cancelTranscription');
+      cancelBatchSpan.textContent = t('transcribe.cancelTranscription');
     }
   }
 };
@@ -5131,6 +5256,7 @@ window.clearSingleMediaFile = function() {
   const statusBadge = document.getElementById('hud-status-badge');
   if (statusBadge) {
     statusBadge.textContent = t('transcribe.standingBy');
+    statusBadge.setAttribute('data-i18n', 'transcribe.standingBy');
     statusBadge.className = 'transcribe-status-badge';
     statusBadge.style.display = 'none';
   }
@@ -5140,6 +5266,7 @@ window.clearSingleMediaFile = function() {
   window.lastTranscribedSubtitlePath = null;
   window.lastTranscribedVideoPath = null;
   window.lastTranscribedOutputDir = null;
+  window.lastTranscribedOutputFiles = [];
   transcriptLines = [];
   if (typeof window.updateTranscribeWorkflowButtons === 'function') {
     window.updateTranscribeWorkflowButtons();
@@ -5791,13 +5918,15 @@ window.runWhisperTranscription = async function() {
   if (typeof updateTranscribeActionButtons === 'function') {
     updateTranscribeActionButtons(true);
   }
-  document.getElementById('analytics-box').style.display = 'none';
+  const analyticsBox = document.getElementById('analytics-box');
+  if (analyticsBox) analyticsBox.style.display = 'none';
 
   const telemetryCard = document.getElementById('telemetry-hud-card');
   if (telemetryCard) telemetryCard.style.display = 'block';
   const statusBadge = document.getElementById('hud-status-badge');
   if (statusBadge) {
     statusBadge.textContent = t('transcribe.statusExtracting');
+    statusBadge.setAttribute('data-i18n', 'transcribe.statusExtracting');
     statusBadge.className = 'transcribe-status-badge active';
     statusBadge.style.display = 'inline-block';
   }
@@ -5807,6 +5936,7 @@ window.runWhisperTranscription = async function() {
   // Clear transcript preview
   transcriptLines = [];
   window.lastTranscribedSubtitlePath = null;
+  window.lastTranscribedOutputFiles = [];
   if (typeof updateTranscribeWorkflowButtons === 'function') {
     updateTranscribeWorkflowButtons();
   }
@@ -5852,12 +5982,19 @@ window.runWhisperTranscription = async function() {
     }
 
     // Phase 2: Run Whisper transcription
-    if (cancelBtn) cancelBtn.style.display = 'inline-flex';
+    if (cancelBtn) {
+      cancelBtn.style.display = 'inline-flex';
+      if (cancelBtnSpan) {
+        cancelBtnSpan.setAttribute('data-i18n', 'transcribe.cancelTranscription');
+        cancelBtnSpan.textContent = t('transcribe.cancelTranscription');
+      }
+    }
+    const transcribingText = t('transcribe.transcribingWithAi') || t('transcribe.aiTranscribingStatus');
     if (btnSpan) {
-      btnSpan.setAttribute('data-i18n', 'transcribe.aiTranscribingStatus');
-      btnSpan.textContent = t('transcribe.aiTranscribingStatus');
+      btnSpan.setAttribute('data-i18n', 'transcribe.transcribingWithAi');
+      btnSpan.textContent = transcribingText;
     } else {
-      btn.textContent = t('transcribe.aiTranscribingStatus');
+      btn.textContent = transcribingText;
     }
 
     const result = await invoke('start_transcription_task', {
@@ -5872,55 +6009,49 @@ window.runWhisperTranscription = async function() {
     const sep = outputDir && outputDir.includes('\\') && !outputDir.includes('/') ? '\\' : '/';
     window.lastTranscribedOutputDir = outputDir;
 
+    window.lastTranscribedOutputFiles = [];
     if (result.generatedFiles && result.generatedFiles.length > 0) {
+      result.generatedFiles.forEach(f => {
+        let type = 'other';
+        if (f.endsWith('.srt') || f.endsWith('.vtt')) type = 'original';
+        else if (f.endsWith('.txt')) type = 'text';
+        window.lastTranscribedOutputFiles.push({
+          path: `${outputDir}${sep}${f}`,
+          name: f,
+          type
+        });
+      });
       const txtFile = result.generatedFiles.find(f => f.endsWith('.txt'));
       if (txtFile) {
         await loadTranscriptFromFile(`${outputDir}${sep}${txtFile}`);
       }
     }
 
-    document.getElementById('analytics-box').style.display = 'flex';
-    document.getElementById('analytic-time').textContent = `${((result.durationMs || 0) / 1000).toFixed(1)}s`;
-    document.getElementById('analytic-speed').textContent = `${(result.speedFactor || 0).toFixed(1)}x`;
-
-    const badgesRow = document.getElementById('badge-outputs-row');
-    badgesRow.innerHTML = '';
-
-    const createRoyalBadge = (filename) => {
-      const fullPath = `${outputDir}${sep}${filename}`;
-      const badge = document.createElement('button');
-      badge.type = 'button';
-      badge.className = 'output-badge royal-badge';
-      badge.title = `Click to open "${filename}" in default text editor`;
-      const displayName = window.formatFileNameMiddleTruncate(filename, 26);
-      badge.innerHTML = `
-        <svg class="badge-icon-file" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-        <span class="badge-name">${escapeHTML(displayName)}</span>
-        <svg class="badge-icon-open" viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-      `;
-      badge.onclick = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        window.openFileInEditor(fullPath);
-      };
-      return badge;
-    };
-
-    result.generatedFiles.forEach(f => {
-      badgesRow.appendChild(createRoyalBadge(f));
-    });
+    const elapsedVal = result.durationMs ? (result.durationMs / 1000) : 0;
+    const elapsedSec = elapsedVal.toFixed(1);
+    const speedFactor = (result.speedFactor || 0).toFixed(1);
+    const analyticTimeEl = document.getElementById('analytic-time');
+    const analyticSpeedEl = document.getElementById('analytic-speed');
+    if (analyticTimeEl) analyticTimeEl.textContent = `${elapsedSec}s`;
+    if (analyticSpeedEl) analyticSpeedEl.textContent = `${speedFactor}x`;
 
     // Mark Step 3 as completed and notify user immediately when transcription succeeds
     setWizardStepCompleted(3, true);
-    const elapsedSec = result.durationMs ? (result.durationMs / 1000) : 0;
-    showNotification(t('toasts.transcriptionComplete', { time: formatDuration(elapsedSec) }), "success");
+    showNotification(t('toasts.transcriptionComplete', { time: formatDuration(elapsedVal) }), "success");
 
     if (statusBadge) {
-      statusBadge.textContent = t('transcribe.statusCompleted');
+      statusBadge.textContent = t('transcribe.statusComplete');
+      statusBadge.setAttribute('data-i18n', 'transcribe.statusComplete');
       statusBadge.className = 'transcribe-status-badge complete';
       statusBadge.style.display = 'inline-block';
     }
     if (metricsEl) metricsEl.style.display = 'inline-flex';
+
+    if (msgEl) {
+      msgEl.removeAttribute('data-i18n');
+      msgEl.textContent = t('transcribe.progressCompleteWithStats', { time: `${elapsedSec}s`, speed: `${speedFactor}x` }) ||
+                          t('transcribe.progressComplete');
+    }
 
     // Find generated subtitle file (.srt, .vtt, or .txt) and update workflow bridging
     const subFile = result.generatedFiles?.find(f => f.endsWith('.srt')) ||
@@ -5957,9 +6088,22 @@ window.runWhisperTranscription = async function() {
           parentDir: outputDir
         });
 
-        translatedFiles.forEach(f => {
-          badgesRow.appendChild(createRoyalBadge(f));
-        });
+        if (translatedFiles && translatedFiles.length > 0) {
+          translatedFiles.forEach(f => {
+            window.lastTranscribedOutputFiles.push({
+              path: `${outputDir}${sep}${f}`,
+              name: f,
+              type: 'translated'
+            });
+          });
+          const translatedSub = translatedFiles.find(f => f.endsWith('.srt') || f.endsWith('.vtt'));
+          if (translatedSub) {
+            window.lastTranscribedSubtitlePath = `${outputDir}${sep}${translatedSub}`;
+          }
+          if (typeof updateTranscribeWorkflowButtons === 'function') {
+            updateTranscribeWorkflowButtons();
+          }
+        }
 
         showNotification(t('toasts.aiTranslateComplete'), "success");
       } catch (err) {
@@ -5977,21 +6121,35 @@ window.runWhisperTranscription = async function() {
     const errMsg = (typeof e === 'string') ? e : (e && e.toString ? e.toString() : '');
     setWizardStepCompleted(3, false);
     const isCancelled = errMsg.toLowerCase().includes('cancelled by the user') || errMsg.toLowerCase().includes('was cancelled by the user');
-    if (statusBadge) {
-      statusBadge.textContent = isCancelled ? t('transcribe.cancelled') : t('transcribe.statusFailed');
-      statusBadge.className = 'transcribe-status-badge cancelled';
-      statusBadge.style.display = 'inline-block';
-    }
     if (isCancelled) {
+      if (telemetryCard) telemetryCard.style.display = 'none';
+      if (fillBar) fillBar.style.width = '0%';
+      if (pctEl) pctEl.textContent = '0%';
       showNotification(t('toasts.transcriptionCancelled'), "info");
-      if (msgEl) {
-        delete msgEl.dataset.batchSummarySuccess;
-        delete msgEl.dataset.batchSummaryTotal;
-        msgEl.setAttribute('data-i18n', 'transcribe.cancelled');
-        msgEl.textContent = t('transcribe.cancelled');
+      const viewport = document.getElementById('transcript-viewport');
+      if (viewport && viewport.querySelector('.transcript-initializing-state')) {
+        viewport.innerHTML = `
+          <div class="transcript-placeholder" id="transcript-placeholder">
+            <svg class="transcript-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+            <div class="transcript-empty-title" data-i18n="transcribe.liveViewerTitle">${escapeHTML(t('transcribe.liveViewerTitle') || 'Live Transcript Viewer')}</div>
+            <div class="transcript-empty-desc" data-i18n="transcribe.streamNotice">${escapeHTML(t('transcribe.streamNotice') || 'Start transcription to stream live text preview.')}</div>
+          </div>
+        `;
       }
     } else {
       showNotification(t('toasts.transcriptionError', { error: errMsg }), "error");
+      if (statusBadge) {
+        statusBadge.textContent = t('transcribe.statusFailed');
+        statusBadge.setAttribute('data-i18n', 'transcribe.statusFailed');
+        statusBadge.className = 'transcribe-status-badge cancelled';
+        statusBadge.style.display = 'inline-block';
+      }
       if (msgEl) {
         delete msgEl.dataset.batchSummarySuccess;
         delete msgEl.dataset.batchSummaryTotal;
@@ -6012,10 +6170,10 @@ window.runWhisperTranscription = async function() {
     if (cancelBtn) {
       cancelBtn.disabled = false;
       if (cancelBtnSpan) {
-        cancelBtnSpan.setAttribute('data-i18n', 'common.cancel');
-        cancelBtnSpan.textContent = t('common.cancel');
+        cancelBtnSpan.setAttribute('data-i18n', 'transcribe.cancelTranscription');
+        cancelBtnSpan.textContent = t('transcribe.cancelTranscription');
       } else {
-        cancelBtn.textContent = t('common.cancel');
+        cancelBtn.textContent = t('transcribe.cancelTranscription');
       }
       cancelBtn.style.display = 'none';
     }
@@ -6032,6 +6190,8 @@ window.abortTranscription = async function() {
   
   try {
     await invoke('cancel_transcription');
+    const telemetryCard = document.getElementById('telemetry-hud-card');
+    if (telemetryCard) telemetryCard.style.display = 'none';
   } catch (e) {
     const errMsg = (typeof e === 'string') ? e : (e && e.toString ? e.toString() : '');
     if (!errMsg.includes("No active transcription or translation session")) {
@@ -6039,7 +6199,7 @@ window.abortTranscription = async function() {
     }
     if (cancelBtn) {
       cancelBtn.disabled = false;
-      if (cancelBtnSpan) cancelBtnSpan.textContent = t('common.cancel'); else cancelBtn.textContent = t('common.cancel');
+      if (cancelBtnSpan) cancelBtnSpan.textContent = t('transcribe.cancelTranscription'); else cancelBtn.textContent = t('transcribe.cancelTranscription');
     }
   }
 };
@@ -6998,21 +7158,18 @@ window.runBatchExtraction = async function() {
   }
   
   // Batch processing completed
-  if (fillBar) fillBar.style.width = '100%';
-  if (pctEl) {
-    pctEl.removeAttribute('data-i18n');
-    pctEl.textContent = '100%';
-  }
-  
   if (batchCancelActive) {
-    if (msgEl) {
-      delete msgEl.dataset.batchSummarySuccess;
-      delete msgEl.dataset.batchSummaryTotal;
-      msgEl.setAttribute('data-i18n', 'transcribe.batchExtractionCancelled');
-      msgEl.textContent = t('transcribe.batchExtractionCancelled');
-    }
+    const telemetryCard = document.getElementById('telemetry-hud-card');
+    if (telemetryCard) telemetryCard.style.display = 'none';
+    if (fillBar) fillBar.style.width = '0%';
+    if (pctEl) pctEl.textContent = '0%';
     showNotification(t('toasts.batchCancelled'), "info");
   } else {
+    if (fillBar) fillBar.style.width = '100%';
+    if (pctEl) {
+      pctEl.removeAttribute('data-i18n');
+      pctEl.textContent = '100%';
+    }
     if (msgEl) {
       msgEl.removeAttribute('data-i18n');
       msgEl.textContent = t('transcribe.batchCompletedSummary', { success: successCount, total: totalCount });
@@ -7020,15 +7177,9 @@ window.runBatchExtraction = async function() {
       msgEl.dataset.batchSummaryTotal = String(totalCount);
     }
     showNotification(t('toasts.batchComplete', { success: successCount, total: totalCount }), "success");
-  }
-
-  if (statusBadge) {
-    if (batchCancelActive) {
-      statusBadge.textContent = t('transcribe.cancelled');
-      statusBadge.className = 'transcribe-status-badge cancelled';
-      statusBadge.style.display = 'inline-block';
-    } else {
-      statusBadge.textContent = t('transcribe.statusCompleted');
+    if (statusBadge) {
+      statusBadge.textContent = t('transcribe.statusComplete');
+      statusBadge.setAttribute('data-i18n', 'transcribe.statusComplete');
       statusBadge.className = 'transcribe-status-badge complete';
       statusBadge.style.display = 'inline-block';
     }
@@ -7080,6 +7231,8 @@ window.abortBatchExtraction = async function() {
   try {
     // Terminate active whisper process immediately
     await invoke('cancel_transcription');
+    const telemetryCard = document.getElementById('telemetry-hud-card');
+    if (telemetryCard) telemetryCard.style.display = 'none';
     showNotification(t('toasts.cancellingTask'), "info");
   } catch (err) {
     console.error("Failed to cancel active whisper process:", err);
@@ -7088,9 +7241,10 @@ window.abortBatchExtraction = async function() {
       cancelBtn.disabled = false;
       const cancelSpan = cancelBtn.querySelector('span');
       if (cancelSpan) {
-        cancelSpan.textContent = t('common.cancel');
+        cancelSpan.setAttribute('data-i18n', 'transcribe.cancelTranscription');
+        cancelSpan.textContent = t('transcribe.cancelTranscription');
       } else {
-        cancelBtn.innerHTML = `<span data-i18n="common.cancel">${t('common.cancel')}</span>`;
+        cancelBtn.innerHTML = `<span data-i18n="transcribe.cancelTranscription">${t('transcribe.cancelTranscription')}</span>`;
       }
       cancelBtn.style.display = 'none';
     }

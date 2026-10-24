@@ -282,7 +282,16 @@ export const ja: Translations = {
     sendToHardsub: 'ハードサブスタジオへ送る',
     sendToHardsubDesc: 'カスタムフォントスタイルと GPU 高速エンコードで、この字幕を動画に直接焼き込みます。',
     noSubGeneratedYet: '生成された字幕がまだありません',
-    noOutputDirYet: '出力フォルダーがまだ利用できません'
+    noOutputDirYet: '出力フォルダーがまだ利用できません',
+    transcribingWithAi: 'AI で文字起こし中...',
+    cancelTranscription: '文字起こしをキャンセル',
+    openFile: 'ファイルを開く',
+    originalSubtitle: '元の字幕',
+    translatedSubtitle: '翻訳済み字幕',
+    rawTranscriptText: 'プレーンテキスト',
+    statusComplete: '文字起こし完了',
+    statusCancelled: '文字起こしをキャンセルしました',
+    progressCompleteWithStats: '{time} で文字起こしが完了しました (処理速度: {speed})'
   },
   translate: {
     title: '字幕翻訳スタジオ',

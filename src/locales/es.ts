@@ -282,7 +282,16 @@ export const es: Translations = {
     sendToHardsub: 'Enviar a Hardsub Studio',
     sendToHardsubDesc: 'Incrusta estos subtítulos directamente en tu video con tipografía personalizada y codificación GPU.',
     noSubGeneratedYet: 'Aún no se ha generado ningún subtítulo',
-    noOutputDirYet: 'Aún no hay carpeta de salida disponible'
+    noOutputDirYet: 'Aún no hay carpeta de salida disponible',
+    transcribingWithAi: 'Transcribiendo con IA...',
+    cancelTranscription: 'Cancelar Transcripción',
+    openFile: 'Abrir Archivo',
+    originalSubtitle: 'Subtítulo Original',
+    translatedSubtitle: 'Subtítulo Traducido',
+    rawTranscriptText: 'Texto sin formato',
+    statusComplete: 'Transcripción Completa',
+    statusCancelled: 'Transcripción Cancelada',
+    progressCompleteWithStats: '¡Transcripción completada en {time} a {speed} de velocidad en tiempo real!'
   },
   translate: {
     title: 'Estudio de Traducción',

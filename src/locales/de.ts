@@ -282,7 +282,16 @@ export const de: Translations = {
     sendToHardsub: 'An Hardsub-Studio senden',
     sendToHardsubDesc: 'Brennen Sie diese Untertitel mit individueller Typografie und GPU-Beschleunigung direkt ins Video ein.',
     noSubGeneratedYet: 'Noch keine Untertiteldatei generiert',
-    noOutputDirYet: 'Noch kein Ausgabeordner verfügbar'
+    noOutputDirYet: 'Noch kein Ausgabeordner verfügbar',
+    transcribingWithAi: 'Transkription mit KI läuft...',
+    cancelTranscription: 'Transkription Abbrechen',
+    openFile: 'Datei Öffnen',
+    originalSubtitle: 'Original-Untertitel',
+    translatedSubtitle: 'Übersetzter Untertitel',
+    rawTranscriptText: 'Rohtext',
+    statusComplete: 'Transkription Abgeschlossen',
+    statusCancelled: 'Transkription Abgebrochen',
+    progressCompleteWithStats: 'Transkription in {time} mit {speed}-facher Echtzeit-Geschwindigkeit abgeschlossen!'
   },
   translate: {
     title: 'Übersetzungs-Studio',

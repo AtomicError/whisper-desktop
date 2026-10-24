@@ -280,7 +280,16 @@ export const en = {
     sendToHardsub: 'Send to Hardsub Studio',
     sendToHardsubDesc: 'Burn this subtitle directly onto your video with custom typography, styling, and GPU encoding.',
     noSubGeneratedYet: 'No generated subtitle yet',
-    noOutputDirYet: 'No output folder available yet'
+    noOutputDirYet: 'No output folder available yet',
+    transcribingWithAi: 'Transcribing with AI...',
+    cancelTranscription: 'Cancel Transcription',
+    openFile: 'Open File',
+    originalSubtitle: 'Original Subtitle',
+    translatedSubtitle: 'Translated Subtitle',
+    rawTranscriptText: 'Raw Text',
+    statusComplete: 'Transcription Complete',
+    statusCancelled: 'Transcription Cancelled',
+    progressCompleteWithStats: 'Transcription completed in {time} at {speed} real-time speed!'
   },
   translate: {
     title: 'Translation Studio',

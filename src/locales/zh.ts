@@ -282,7 +282,16 @@ export const zh: Translations = {
     sendToHardsub: '发送到压制字幕工作室',
     sendToHardsubDesc: '使用自定义样式字体与 GPU 高速编码，将此字幕永久烧录进视频。',
     noSubGeneratedYet: '尚未生成字幕文件',
-    noOutputDirYet: '输出文件夹尚不可用'
+    noOutputDirYet: '输出文件夹尚不可用',
+    transcribingWithAi: 'AI 模型正在转录中...',
+    cancelTranscription: '取消转录',
+    openFile: '打开文件',
+    originalSubtitle: '原始字幕',
+    translatedSubtitle: '已翻译字幕',
+    rawTranscriptText: '纯文本',
+    statusComplete: '转录完成',
+    statusCancelled: '转录已取消',
+    progressCompleteWithStats: '转录完成，耗时 {time}，处理速度为实时速度的 {speed}！'
   },
   translate: {
     title: '字幕翻译工作室',

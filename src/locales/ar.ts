@@ -282,7 +282,16 @@ export const ar: Translations = {
     sendToHardsub: 'إرسال إلى استودیو هاردسب',
     sendToHardsubDesc: 'دمج ملف الترجمة مباشرة في الفيديو مع خطوط مخصصة وتسريع كرت الشاشة.',
     noSubGeneratedYet: 'لم يتم استخراج ملف ترجمة بعد',
-    noOutputDirYet: 'مجلد الإخراج غير متوفر بعد'
+    noOutputDirYet: 'مجلد الإخراج غير متوفر بعد',
+    transcribingWithAi: 'جارٍ النسخ الصوتي بالذكاء الاصطناعي...',
+    cancelTranscription: 'إلغاء النسخ الصوتي',
+    openFile: 'فتح الملف',
+    originalSubtitle: 'الترجمة الأصلية',
+    translatedSubtitle: 'الترجمة المترجمة',
+    rawTranscriptText: 'النص الخام',
+    statusComplete: 'اكتمل النسخ الصوتي',
+    statusCancelled: 'تم إلغاء النسخ الصوتي',
+    progressCompleteWithStats: 'اكتمل النسخ في {time} بسرعة {speed} من الوقت الفعلي!'
   },
   translate: {
     title: 'استوديو الترجمة',

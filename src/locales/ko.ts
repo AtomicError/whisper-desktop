@@ -282,7 +282,16 @@ export const ko: Translations = {
     sendToHardsub: '하드서브 스튜디오로 보내기',
     sendToHardsubDesc: '사용자 정의 글꼴, 스타일 및 GPU 인코딩을 적용하여 자막을 비디오에 직접 합성합니다.',
     noSubGeneratedYet: '아직 생성된 자막이 없습니다',
-    noOutputDirYet: '사용 가능한 출력 폴더가 아직 없습니다'
+    noOutputDirYet: '사용 가능한 출력 폴더가 아직 없습니다',
+    transcribingWithAi: 'AI로 전사 중...',
+    cancelTranscription: '전사 취소',
+    openFile: '파일 열기',
+    originalSubtitle: '원본 자막',
+    translatedSubtitle: '번역된 자막',
+    rawTranscriptText: '일반 텍스트',
+    statusComplete: '전사 완료',
+    statusCancelled: '전사 취소됨',
+    progressCompleteWithStats: '{time} 만에 전사 완료 (처리 속도: {speed})'
   },
   translate: {
     title: '번역 스튜디오',

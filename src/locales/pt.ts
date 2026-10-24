@@ -282,7 +282,16 @@ export const pt: Translations = {
     sendToHardsub: 'Enviar para o Hardsub Studio',
     sendToHardsubDesc: 'Embuta estas legendas diretamente no vídeo com tipografia personalizada e aceleração GPU.',
     noSubGeneratedYet: 'Nenhuma legenda gerada ainda',
-    noOutputDirYet: 'Nenhuma pasta de saída disponível ainda'
+    noOutputDirYet: 'Nenhuma pasta de saída disponível ainda',
+    transcribingWithAi: 'Transcrevendo com IA...',
+    cancelTranscription: 'Cancelar Transcrição',
+    openFile: 'Abrir Arquivo',
+    originalSubtitle: 'Legenda Original',
+    translatedSubtitle: 'Legenda Traduzida',
+    rawTranscriptText: 'Texto simples',
+    statusComplete: 'Transcrição Concluída',
+    statusCancelled: 'Transcrição Cancelada',
+    progressCompleteWithStats: 'Transcrição concluída em {time} a {speed} da velocidade em tempo real!'
   },
   translate: {
     title: 'Estúdio de Tradução',

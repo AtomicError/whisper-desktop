@@ -282,7 +282,16 @@ export const fa: Translations = {
     sendToHardsub: 'ارسال به استودیو هاردساب',
     sendToHardsubDesc: 'چسباندن مستقیم این زیرنویس به ویدیو با فونت‌های دلخواه، استایل سفارشی و شتاب‌دهنده گرافیکی.',
     noSubGeneratedYet: 'هنوز زیرنویسی استخراج نشده است',
-    noOutputDirYet: 'هنوز پوشه خروجی در دسترس نیست'
+    noOutputDirYet: 'هنوز پوشه خروجی در دسترس نیست',
+    transcribingWithAi: 'در حال رونویسی با هوش مصنوعی...',
+    cancelTranscription: 'لغو رونویسی',
+    openFile: 'باز کردن فایل',
+    originalSubtitle: 'زیرنویس اصلی',
+    translatedSubtitle: 'زیرنویس ترجمه‌شده',
+    rawTranscriptText: 'متن خام',
+    statusComplete: 'رونویسی تکمیل شد',
+    statusCancelled: 'رونویسی لغو شد',
+    progressCompleteWithStats: 'رونویسی در {time} با سرعت {speed} با موفقیت به پایان رسید!'
   },
   translate: {
     title: 'استودیو ترجمه',

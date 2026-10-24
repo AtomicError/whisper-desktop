@@ -118,13 +118,15 @@ describe('Transcription Studio Unified Deck DOM Structure', () => {
     const leftPanelHtml = html.substring(leftPanelIdx, rightPanelIdx);
     const rightPanelHtml = html.substring(rightPanelIdx, html.indexOf('id="panel-translate"'));
 
-    // Left deck has the telemetry HUD
+    // Left deck has the telemetry HUD and no cluttered legacy files box
     expect(leftPanelHtml).toContain('id="telemetry-hud-card"');
     expect(leftPanelHtml).toContain('transcribe-telemetry');
     expect(leftPanelHtml).toContain('id="hud-status-badge"');
     expect(leftPanelHtml).toContain('id="progress-linear-fill"');
     expect(leftPanelHtml).toContain('id="lbl-radial-pct"');
     expect(leftPanelHtml).toContain('id="lbl-radial-msg"');
+    expect(leftPanelHtml).not.toContain('id="analytics-box"');
+    expect(leftPanelHtml).not.toContain('data-i18n="transcribe.filesLabel"');
 
     // Right panel does not contain telemetry HUD
     expect(rightPanelHtml).not.toContain('id="telemetry-hud-card"');
@@ -141,13 +143,22 @@ describe('Transcription Studio Unified Deck DOM Structure', () => {
     expect(rightPanelHtml).not.toContain('id="btn-export-transcript"');
     expect(rightPanelHtml).not.toContain('data-i18n="transcribe.exportTxt"');
     expect(rightPanelHtml).toContain('id="btn-copy-transcript"');
+    expect(rightPanelHtml).toContain('id="transcribe-output-file-group"');
+    expect(rightPanelHtml).toContain('id="btn-open-output-file"');
+    expect(rightPanelHtml).toContain('id="transcribe-output-files-dropdown"');
     expect(rightPanelHtml).toContain('id="btn-open-output-folder"');
     expect(rightPanelHtml).toContain('id="btn-send-to-translation"');
     expect(rightPanelHtml).toContain('id="btn-transcribe-send-to-hardsub"');
 
+    // Both workflow send buttons share identical highlight styling classes
+    expect(rightPanelHtml).toMatch(/<button[^>]*class="[^"]*btn-toolbar-workflow[^"]*"[^>]*id="btn-send-to-translation"/);
+    expect(rightPanelHtml).toMatch(/<button[^>]*class="[^"]*btn-toolbar-workflow[^"]*"[^>]*id="btn-transcribe-send-to-hardsub"/);
+
     // Accessibility and initial disabled state checks
     expect(rightPanelHtml).toMatch(/<button[^>]*id="btn-copy-transcript"[^>]*type="button"[^>]*disabled/);
+    expect(rightPanelHtml).toMatch(/<button[^>]*id="btn-open-output-file"[^>]*type="button"[^>]*disabled/);
     expect(rightPanelHtml).toContain('aria-label="Search transcript"');
+    expect(rightPanelHtml).toContain('aria-label="Open File"');
     expect(rightPanelHtml).toContain('id="transcript-viewport" aria-live="polite"');
     expect(rightPanelHtml).toContain('class="transcript-placeholder" id="transcript-placeholder"');
   });
@@ -539,6 +550,9 @@ describe('Transcription Studio Output Directory & Workflow Logic', () => {
   interface WorkflowButtonsState {
     openFolderDisabled: boolean;
     openFolderTitle: string;
+    openFileDisabled: boolean;
+    openFileHasDropdown: boolean;
+    openFileTitle: string;
     sendTranslateDisabled: boolean;
     sendTranslateTitle: string;
     sendHardsubDisabled: boolean;
@@ -550,16 +564,31 @@ describe('Transcription Studio Output Directory & Workflow Logic', () => {
     outputDir: string | null,
     subPath: string | null,
     transcriptLinesCount: number = 0,
+    outputFiles: Array<{ name: string; path: string; type: string }> = [],
     noOutputDirMsg: string = 'No output folder available yet',
-    noSubMsg: string = 'No generated subtitle yet'
+    noSubMsg: string = 'No generated subtitle yet',
+    openFileLabel: string = 'Open File'
   ): WorkflowButtonsState {
     const hasDir = Boolean(outputDir);
     const hasSub = Boolean(subPath);
     const hasTranscript = transcriptLinesCount > 0 || hasSub;
+    const hasFiles = outputFiles.length > 0 || hasSub;
+    const hasDropdown = outputFiles.length > 1;
+
+    let openFileTitle = noSubMsg;
+    if (hasDropdown) {
+      openFileTitle = openFileLabel;
+    } else if (hasFiles) {
+      const singleName = outputFiles.length === 1 ? outputFiles[0].name : (subPath ? subPath.split(/[/\\]/).pop() : '');
+      openFileTitle = singleName ? `${openFileLabel}: ${singleName}` : openFileLabel;
+    }
 
     return {
       openFolderDisabled: !hasDir,
       openFolderTitle: hasDir ? outputDir! : noOutputDirMsg,
+      openFileDisabled: !hasFiles,
+      openFileHasDropdown: hasDropdown,
+      openFileTitle,
       sendTranslateDisabled: !hasSub,
       sendTranslateTitle: hasSub ? '' : noSubMsg,
       sendHardsubDisabled: !hasSub,
@@ -573,9 +602,12 @@ describe('Transcription Studio Output Directory & Workflow Logic', () => {
     const noSubMsg = 'No generated subtitle yet';
 
     // Initial / reset state: no outputs, no transcript lines
-    const initialState = simulateUpdateWorkflowButtons(null, null, 0, noOutputDirMsg, noSubMsg);
+    const initialState = simulateUpdateWorkflowButtons(null, null, 0, [], noOutputDirMsg, noSubMsg);
     expect(initialState.openFolderDisabled).toBe(true);
     expect(initialState.openFolderTitle).toBe(noOutputDirMsg);
+    expect(initialState.openFileDisabled).toBe(true);
+    expect(initialState.openFileHasDropdown).toBe(false);
+    expect(initialState.openFileTitle).toBe(noSubMsg);
     expect(initialState.sendTranslateDisabled).toBe(true);
     expect(initialState.sendTranslateTitle).toBe(noSubMsg);
     expect(initialState.sendHardsubDisabled).toBe(true);
@@ -583,25 +615,48 @@ describe('Transcription Studio Output Directory & Workflow Logic', () => {
     expect(initialState.copyTranscriptDisabled).toBe(true);
 
     // Live streaming lines arrive during transcription before completion
-    const streamingState = simulateUpdateWorkflowButtons(null, null, 3, noOutputDirMsg, noSubMsg);
+    const streamingState = simulateUpdateWorkflowButtons(null, null, 3, [], noOutputDirMsg, noSubMsg);
     expect(streamingState.copyTranscriptDisabled).toBe(false);
+    expect(streamingState.openFileDisabled).toBe(true);
     expect(streamingState.sendTranslateDisabled).toBe(true);
 
-    // Transcription completed successfully with output file
+    // Transcription completed successfully with single output file
+    const singleFile = [{ name: 'speech.srt', path: '/home/user/Videos/speech.srt', type: 'original' }];
     const successState = simulateUpdateWorkflowButtons(
       '/home/user/Videos',
       '/home/user/Videos/speech.srt',
       12,
+      singleFile,
       noOutputDirMsg,
       noSubMsg
     );
     expect(successState.openFolderDisabled).toBe(false);
     expect(successState.openFolderTitle).toBe('/home/user/Videos');
+    expect(successState.openFileDisabled).toBe(false);
+    expect(successState.openFileHasDropdown).toBe(false);
+    expect(successState.openFileTitle).toBe('Open File: speech.srt');
     expect(successState.sendTranslateDisabled).toBe(false);
     expect(successState.sendTranslateTitle).toBe('');
     expect(successState.sendHardsubDisabled).toBe(false);
     expect(successState.sendHardsubTitle).toBe('');
     expect(successState.copyTranscriptDisabled).toBe(false);
+
+    // Transcription completed with multiple files (e.g., original + translated subtitle)
+    const multiFiles = [
+      { name: 'speech.srt', path: '/home/user/Videos/speech.srt', type: 'original' },
+      { name: 'speech.fa.srt', path: '/home/user/Videos/speech.fa.srt', type: 'translated' }
+    ];
+    const multiState = simulateUpdateWorkflowButtons(
+      '/home/user/Videos',
+      '/home/user/Videos/speech.fa.srt',
+      12,
+      multiFiles,
+      noOutputDirMsg,
+      noSubMsg
+    );
+    expect(multiState.openFileDisabled).toBe(false);
+    expect(multiState.openFileHasDropdown).toBe(true);
+    expect(multiState.openFileTitle).toBe('Open File');
 
     // Clearing media/queue empties transcriptLines and resets subtitle path
     let lines = ['line 1', 'line 2'];
@@ -609,8 +664,9 @@ describe('Transcription Studio Output Directory & Workflow Logic', () => {
     // Clear operation order: transcriptLines = []; sub = null; updateTranscribeWorkflowButtons();
     lines = [];
     sub = null;
-    const clearedState = simulateUpdateWorkflowButtons(null, sub, lines.length, noOutputDirMsg, noSubMsg);
+    const clearedState = simulateUpdateWorkflowButtons(null, sub, lines.length, [], noOutputDirMsg, noSubMsg);
     expect(clearedState.copyTranscriptDisabled).toBe(true);
+    expect(clearedState.openFileDisabled).toBe(true);
 
     // Starting a new transcription run also resets previous outputs before lines arrive
     const newRunState = simulateUpdateWorkflowButtons(null, null, 0, noOutputDirMsg, noSubMsg);
@@ -633,7 +689,23 @@ describe('Transcription Studio Output Directory & Workflow Logic', () => {
   });
 
   it('guarantees complete localization symmetry for new transcribe tooltips, toast and queue header across all 13 locales', () => {
-    const requiredTranscribeKeys = ['vadDisableHint', 'vadEnableHint', 'queueFilesHeader', 'moveUp', 'moveDown', 'noMatchingTranscript'];
+    const requiredTranscribeKeys = [
+      'vadDisableHint',
+      'vadEnableHint',
+      'queueFilesHeader',
+      'moveUp',
+      'moveDown',
+      'noMatchingTranscript',
+      'transcribingWithAi',
+      'cancelTranscription',
+      'openFile',
+      'originalSubtitle',
+      'translatedSubtitle',
+      'rawTranscriptText',
+      'statusComplete',
+      'statusCancelled',
+      'progressCompleteWithStats'
+    ];
     const requiredToastKeys = ['filesAlreadyInBatch'];
     for (const [langCode, locale] of Object.entries(locales)) {
       expect(locale.transcribe, `Missing transcribe object in ${langCode}`).toBeDefined();
