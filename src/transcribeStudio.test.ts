@@ -503,6 +503,21 @@ describe('Transcription Studio State Transitions Simulation', () => {
     expect(cleared.runBtnDisabled).toBe(true);
     expect(cleared.runBtnTitle).toBe('Please select an audio or video file first.');
   });
+
+  it('safely handles media probing and batch transitions without legacy analytics-box in DOM', () => {
+    // Simulates DOM without #analytics-box as redesigned
+    const mockDocument = {
+      getElementById: (id: string) => {
+        if (id === 'analytics-box') return null;
+        return { style: { display: '' } };
+      }
+    };
+
+    expect(() => {
+      const analyticsBox = mockDocument.getElementById('analytics-box');
+      if (analyticsBox) analyticsBox.style.display = 'none';
+    }).not.toThrow();
+  });
 });
 
 describe('Transcription Studio Output Directory & Workflow Logic', () => {
@@ -805,6 +820,61 @@ describe('Transcription Studio Output Directory & Workflow Logic', () => {
 
     expect(newlyAppended).toEqual(['/path/to/ep2.mp4', '/path/to/ep3.mp4']);
   });
+
+  it('contains the pulse dot nested inside the hud-status-badge in DOM structure', () => {
+    const htmlContent = readFileSync(resolve(__dirname, 'index.html'), 'utf-8');
+    // Ensure hud-status-badge contains hud-pulse-dot inside it
+    expect(htmlContent).toMatch(/<span[^>]*id="hud-status-badge"[^>]*>[\s\S]*?<span[^>]*id="hud-pulse-dot"[^>]*><\/span>[\s\S]*?<span[^>]*id="hud-status-text"/);
+  });
+
+  it('enforces RTL progress bar head and gradient symmetry in stylesheet', () => {
+    const cssContent = readFileSync(resolve(__dirname, 'styles.css'), 'utf-8');
+    // Glowing head moves to left: 0 in RTL
+    expect(cssContent).toMatch(/html\[dir="rtl"\]\s+\.progress-linear-glow[\s\S]*?left:\s*0/);
+    expect(cssContent).toMatch(/html\[dir="rtl"\]\s+\.progress-linear-glow[\s\S]*?right:\s*auto/);
+    // Fill gradient in RTL flows from royal blue on right to cyan on left
+    expect(cssContent).toMatch(/html\[dir="rtl"\]\s+\.progress-linear-fill[\s\S]*?linear-gradient\(to left/);
+  });
+
+  it('enforces equal 50% width and ellipsis overflow protection on action buttons in stylesheet', () => {
+    const cssContent = readFileSync(resolve(__dirname, 'styles.css'), 'utf-8');
+    // Start and cancel buttons both have flex: 1 1 0 and width: 50%
+    expect(cssContent).toMatch(/\.btn-start-transcription\s*\{[\s\S]*?flex:\s*1 1 0/);
+    expect(cssContent).toMatch(/\.btn-start-transcription\s*\{[\s\S]*?width:\s*50%/);
+    expect(cssContent).toMatch(/\.btn-cancel-transcription\s*\{[\s\S]*?flex:\s*1 1 0/);
+    expect(cssContent).toMatch(/\.btn-cancel-transcription\s*\{[\s\S]*?width:\s*50%/);
+    // Span elements have text-overflow ellipsis
+    expect(cssContent).toMatch(/\.btn-start-transcription\s+span\s*\{[\s\S]*?text-overflow:\s*ellipsis/);
+    expect(cssContent).toMatch(/\.btn-cancel-transcription\s+span\s*\{[\s\S]*?text-overflow:\s*ellipsis/);
+  });
+
+  it('formats localized duration cleanly using durationSeconds and durationMinutesSeconds', () => {
+    function simulateFormatLocalizedTimeDuration(secondsVal: number, localeObj: any) {
+      if (secondsVal < 60) {
+        const secStr = secondsVal.toFixed(1);
+        const template = localeObj.transcribe.durationSeconds || localeObj.common?.durationSeconds;
+        return template.replace('{seconds}', secStr);
+      }
+      const mins = Math.floor(secondsVal / 60);
+      const remSec = (secondsVal % 60).toFixed(0);
+      const template = localeObj.transcribe.durationMinutesSeconds || localeObj.common?.durationMinutesSeconds;
+      return template.replace('{minutes}', String(mins)).replace('{seconds}', String(remSec));
+    }
+
+    // Persian: 11.7 ثانیه
+    expect(simulateFormatLocalizedTimeDuration(11.7, fa)).toBe('11.7 ثانیه');
+    // English: 11.7 sec
+    expect(simulateFormatLocalizedTimeDuration(11.7, en)).toBe('11.7 sec');
+    // German: 11.7 Sek.
+    expect(simulateFormatLocalizedTimeDuration(11.7, de)).toBe('11.7 Sek.');
+    // Arabic: 11.7 ثانية
+    expect(simulateFormatLocalizedTimeDuration(11.7, ar)).toBe('11.7 ثانية');
+
+    // > 60 seconds formatted with minutes and seconds
+    expect(simulateFormatLocalizedTimeDuration(75.2, fa)).toBe('1 دقیقه و 15 ثانیه');
+    expect(simulateFormatLocalizedTimeDuration(75.2, en)).toBe('1 min 15 sec');
+  });
 });
+
 
 

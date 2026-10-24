@@ -3935,11 +3935,12 @@ select.select-control {
   display: flex;
   gap: 8px;
   align-items: center;
-  min-width: 0;
+  width: 100%;
 }
 
 .btn-start-transcription {
-  flex: 1;
+  flex: 1 1 0;
+  width: 50%;
   min-width: 0;
   height: 38px;
   min-height: 38px;
@@ -3947,22 +3948,28 @@ select.select-control {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 0 16px;
+  padding: 0 12px;
   font-weight: 600;
-  font-size: 0.88rem;
+  font-size: 0.86rem;
   border-radius: 8px;
-  transition-property: transform, box-shadow, filter;
-  transition-duration: 0.15s;
-  transition-timing-function: ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
   white-space: nowrap;
 }
 
+.btn-start-transcription span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
 .btn-start-transcription:active:not(:disabled) {
-  transform: scale(0.97);
+  opacity: 0.9;
 }
 
 .btn-cancel-transcription {
-  flex: 1;
+  flex: 1 1 0;
+  width: 50%;
   min-width: 0;
   height: 38px;
   min-height: 38px;
@@ -3970,16 +3977,22 @@ select.select-control {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 0 14px;
+  padding: 0 12px;
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: 0.86rem;
   border-radius: 8px;
   color: #ef4444;
   border: 1px solid rgba(239, 68, 68, 0.3);
   background: rgba(239, 68, 68, 0.05);
   white-space: nowrap;
-  flex-shrink: 0;
-  transition: all 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.btn-cancel-transcription span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .btn-cancel-transcription:hover {
@@ -4031,15 +4044,19 @@ select.select-control {
   flex-shrink: 0;
 }
 
-.transcribe-status-badge.active::before {
-  content: '';
-  width: 6px;
-  height: 6px;
+.transcribe-status-badge .hud-pulse-dot {
+  display: none;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background-color: var(--color-royal-blue);
-  box-shadow: 0 0 8px var(--color-royal-blue);
-  animation: pulse-glow 1.5s infinite;
   flex-shrink: 0;
+}
+
+.transcribe-status-badge .hud-pulse-dot.active {
+  display: inline-block;
+  background-color: var(--color-cyan);
+  box-shadow: 0 0 8px var(--color-cyan), 0 0 15px var(--color-cyan);
+  animation: pulse-glow 1.5s infinite;
 }
 
 .transcribe-status-badge.active {
@@ -4585,6 +4602,23 @@ select.select-control {
   background: #fff;
   box-shadow: 0 0 12px 2px #fff, 0 0 20px 6px var(--color-cyan);
   opacity: 0.95;
+}
+
+/* RTL Support for Progress Linear Bar and Glowing Head */
+html[dir="rtl"] .progress-linear-glow,
+body.rtl .progress-linear-glow,
+[dir="rtl"] .progress-linear-glow {
+  right: auto;
+  left: 0;
+}
+
+html[dir="rtl"] .progress-linear-fill,
+body.rtl .progress-linear-fill,
+[dir="rtl"] .progress-linear-fill,
+html[dir="rtl"] .transcribe-linear-fill,
+body.rtl .transcribe-linear-fill,
+[dir="rtl"] .transcribe-linear-fill {
+  background: linear-gradient(to left, var(--color-royal-blue) 0%, var(--color-cyan) 100%);
 }
 
 .progress-linear-scanner {

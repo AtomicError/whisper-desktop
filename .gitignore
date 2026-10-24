@@ -65,3 +65,19 @@ debug_rust.log
 # --- Local & Bundled Standalone Media Binaries ---
 src-tauri/resources/ffmpeg*
 src-tauri/resources/ffprobe*
+
+# --- Local Compiled Whisper Engines & Shared Libraries (Dev Testing Only) ---
+src-tauri/resources/standard/*
+!src-tauri/resources/standard/.keep
+src-tauri/resources/vulkan/*
+!src-tauri/resources/vulkan/.keep
+src-tauri/resources/openvino/*
+!src-tauri/resources/openvino/.keep
+src-tauri/resources/cuda/*
+!src-tauri/resources/cuda/.keep
+src-tauri/resources/*.so
+src-tauri/resources/*.so.*
+!src-tauri/resources/placeholder.so
+
+# --- Local AI & Agent Guidelines ---
+AGENTS.md

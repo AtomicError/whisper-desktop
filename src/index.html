@@ -3304,8 +3304,10 @@
                       <div class="transcribe-telemetry" id="telemetry-hud-card" style="display:none;">
                         <div class="transcribe-telemetry-header">
                           <div class="transcribe-telemetry-status">
-                            <span class="transcribe-status-badge" id="hud-status-badge" data-i18n="transcribe.standingBy">Standing By</span>
-                            <div class="hud-pulse-dot" id="hud-pulse-dot" style="display:none;"></div>
+                            <span class="transcribe-status-badge" id="hud-status-badge">
+                              <span class="hud-pulse-dot" id="hud-pulse-dot"></span>
+                              <span id="hud-status-text" data-i18n="transcribe.standingBy">Standing By</span>
+                            </span>
                             <div class="transcribe-telemetry-stats" id="transcribe-metrics" style="display:none;">
                               <span class="chip-val" id="analytic-time">0s</span>
                               <span class="chip-divider" style="color:var(--color-text-dim);">•</span>
