@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -935,6 +936,11 @@ describe('Transcription Studio Output Directory & Workflow Logic', () => {
     expect(en.transcribe.batchFileProcessing).toBeDefined();
     expect(fa.transcribe.viewingTranscript).toBe('در حال نمایش');
     expect(fa.transcribe.clickToViewTranscript).toBe('کلیک برای مشاهده متن');
+  });
+
+  it('guarantees src/main.js has zero parse or syntax errors for runtime load stability', () => {
+    const mainJsPath = resolve(__dirname, 'main.js');
+    expect(() => execSync(`node --check "${mainJsPath}"`, { stdio: 'pipe' })).not.toThrow();
   });
 });
 

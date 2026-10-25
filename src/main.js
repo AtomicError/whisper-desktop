@@ -6714,11 +6714,6 @@ window.clearBatchQueue = function() {
   window.lastTranscribedVideoPath = null;
   window.lastTranscribedOutputFiles = [];
   transcriptLines = [];
-  const viewport = document.getElementById('transcript-viewport');
-  if (viewport) viewport.innerHTML = '';
-  if (typeof updateTranscribeWorkflowButtons === 'function') {
-    updateTranscribeWorkflowButtons();
-  }
   
   // Revert UI to initial empty single-file state
   const dropZone = document.getElementById('transcribe-drop-zone');
