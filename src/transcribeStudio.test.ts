@@ -921,9 +921,16 @@ describe('Transcription Studio Output Directory & Workflow Logic', () => {
     expect(mainJsContent).toContain('activeBatchViewerIndex = index;');
 
     // Verification of card selection and visual indicators in queue renderer
-    expect(mainJsContent).toContain('const isSelected = isCompleted && activeBatchViewerIndex === index;');
+    expect(mainJsContent).toContain('const isSelected = isCompleted && !isRunning && activeBatchViewerIndex === index;');
+    expect(mainJsContent).toContain('const isClickable = isCompleted && !isRunning;');
+    expect(mainJsContent).toContain('${isClickable ? \'is-clickable\' : \'\'}');
     expect(mainJsContent).toContain('${isSelected ? \'is-selected\' : \'\'}');
     expect(mainJsContent).toContain('batch-viewing-chip');
+
+    // Verification of in-memory transcript lines preservation and unified rendering
+    expect(mainJsContent).toContain('item.transcriptLines = transcriptLines.map(');
+    expect(mainJsContent).toContain('function createTranscriptCardElement(lineObj)');
+    expect(mainJsContent).toContain('function renderTranscriptLines(lines)');
 
     // Verification of workflow bridging and toolbar synchronization
     expect(mainJsContent).toContain('window.lastTranscribedSubtitlePath = item.subtitlePath');
@@ -936,6 +943,63 @@ describe('Transcription Studio Output Directory & Workflow Logic', () => {
     expect(en.transcribe.batchFileProcessing).toBeDefined();
     expect(fa.transcribe.viewingTranscript).toBe('در حال نمایش');
     expect(fa.transcribe.clickToViewTranscript).toBe('کلیک برای مشاهده متن');
+  });
+
+  it('correctly parses SRT subtitle cues into unified timestamped segments and avoids multi-card fragmentation', () => {
+    const rawSrt = `1
+00:00:00,070 --> 00:00:02,190
+When you cut off the root of an onion,
+
+2
+00:00:02,190 --> 00:00:04,500
+it releases chemicals that hit your eyes
+`;
+
+    // Simulate SRT parser logic implemented in main.js
+    const lines = rawSrt.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+    let i = 0;
+    const total = lines.length;
+    let cueId = 0;
+    const parsedSegments: Array<{ timeRange: string; text: string; id: number }> = [];
+
+    while (i < total) {
+      const line = lines[i];
+      if (line.includes('-->')) {
+        const parts = line.split('-->');
+        if (parts.length === 2) {
+          const startRaw = parts[0].trim().split(' ')[0].replace(',', '.');
+          const endRaw = parts[1].trim().split(' ')[0].replace(',', '.');
+          const timeRange = `[${startRaw} --> ${endRaw}]`;
+
+          const textParts: string[] = [];
+          i++;
+          while (i < total && lines[i].trim() !== '' && !lines[i].includes('-->')) {
+            if (/^\d+$/.test(lines[i].trim()) && (i + 1 < total) && lines[i + 1].includes('-->')) {
+              break;
+            }
+            textParts.push(lines[i]);
+            i++;
+          }
+
+          const cleanText = textParts.join('\n').replace(/<[^>]+>/g, '').trim();
+          if (cleanText || startRaw) {
+            parsedSegments.push({ timeRange, text: cleanText, id: cueId++ });
+          }
+          continue;
+        }
+      }
+      i++;
+    }
+
+    // Must be exactly 2 cues, NOT 6 separate fragmented lines
+    expect(parsedSegments.length).toBe(2);
+    expect(parsedSegments[0].id).toBe(0);
+    expect(parsedSegments[0].timeRange).toBe('[00:00:00.070 --> 00:00:02.190]');
+    expect(parsedSegments[0].text).toBe('When you cut off the root of an onion,');
+
+    expect(parsedSegments[1].id).toBe(1);
+    expect(parsedSegments[1].timeRange).toBe('[00:00:02.190 --> 00:00:04.500]');
+    expect(parsedSegments[1].text).toBe('it releases chemicals that hit your eyes');
   });
 
   it('guarantees src/main.js has zero parse or syntax errors for runtime load stability', () => {

@@ -6106,9 +6106,14 @@ window.runWhisperTranscription = async function() {
           type
         });
       });
-      const txtFile = result.generatedFiles.find(f => f.endsWith('.txt'));
-      if (txtFile) {
-        await loadTranscriptFromFile(`${outputDir}${sep}${txtFile}`);
+      // Fallback: If transcriptLines was not populated via live events, load from generated subtitle/text file
+      if ((!transcriptLines || transcriptLines.length === 0) && result.generatedFiles && result.generatedFiles.length > 0) {
+        const subFile = result.generatedFiles.find(f => f.endsWith('.srt')) ||
+                        result.generatedFiles.find(f => f.endsWith('.vtt')) ||
+                        result.generatedFiles.find(f => f.endsWith('.txt'));
+        if (subFile) {
+          await loadTranscriptFromFile(`${outputDir}${sep}${subFile}`);
+        }
       }
     }
 
@@ -6940,6 +6945,8 @@ window.selectBatchItemTranscript = async function(index) {
   const item = batchItems[index];
   if (!item) return;
 
+  if (isBatchExtracting) return;
+
   if (item.status !== 'completed') {
     if (item.status === 'converting' || item.status === 'transcribing' || item.status === 'translating') {
       showNotification(t('transcribe.batchFileProcessing') || "This file is still processing.", "info");
@@ -6949,12 +6956,30 @@ window.selectBatchItemTranscript = async function(index) {
 
   activeBatchViewerIndex = index;
 
-  // 1. Load the transcript text into Transcript Viewer
-  if (item.txtPath) {
+  // 1. Load the transcript into Transcript Viewer (prefer in-memory lines, then subtitle file, then txt)
+  if (item.transcriptLines && item.transcriptLines.length > 0) {
+    transcriptLines = item.transcriptLines.map(l => ({ ...l }));
+    if (typeof renderTranscriptLines === 'function') {
+      renderTranscriptLines(transcriptLines);
+    }
+  } else if (item.subtitlePath) {
+    try {
+      await loadTranscriptFromFile(item.subtitlePath);
+      item.transcriptLines = transcriptLines.map(l => ({ ...l }));
+    } catch (e) {
+      console.error("Failed to load batch item subtitle:", e);
+    }
+  } else if (item.txtPath) {
     try {
       await loadTranscriptFromFile(item.txtPath);
+      item.transcriptLines = transcriptLines.map(l => ({ ...l }));
     } catch (e) {
       console.error("Failed to load batch item transcript:", e);
+    }
+  } else {
+    transcriptLines = [];
+    if (typeof renderTranscriptLines === 'function') {
+      renderTranscriptLines([]);
     }
   }
 
@@ -6987,12 +7012,13 @@ function renderBatchQueueTable() {
     const card = document.createElement('div');
     const isActive = item.status === 'converting' || item.status === 'transcribing' || item.status === 'translating';
     const isCompleted = item.status === 'completed';
-    const isSelected = isCompleted && activeBatchViewerIndex === index;
+    const isSelected = isCompleted && !isRunning && activeBatchViewerIndex === index;
+    const isClickable = isCompleted && !isRunning;
 
-    card.className = `batch-queue-card batch-row ${isActive ? 'is-active' : ''} ${isCompleted ? 'is-clickable' : ''} ${isSelected ? 'is-selected' : ''}`;
+    card.className = `batch-queue-card batch-row ${isActive ? 'is-active' : ''} ${isClickable ? 'is-clickable' : ''} ${isSelected ? 'is-selected' : ''}`;
     card.dataset.index = index;
 
-    if (isCompleted) {
+    if (isClickable) {
       card.tabIndex = 0;
       card.setAttribute('role', 'button');
       const viewHint = isSelected ? t('transcribe.viewingTranscript') : t('transcribe.clickToViewTranscript');
@@ -7008,6 +7034,8 @@ function renderBatchQueueTable() {
           window.selectBatchItemTranscript(index);
         }
       };
+    } else {
+      card.title = item.name;
     }
 
     // --- Top Row: File Name + Duration ---
@@ -7277,13 +7305,15 @@ window.runBatchExtraction = async function() {
         durationSec: item.durationSec || 60.0
       });
 
-      // Load final transcript from the text file
-      if (result.generatedFiles && result.generatedFiles.length > 0) {
+      // Fallback: If transcriptLines was not populated via live events, load from generated subtitle/text file
+      if ((!transcriptLines || transcriptLines.length === 0) && result.generatedFiles && result.generatedFiles.length > 0) {
         const outputDir = result.outputDir || getParentDir(item.path);
-        const txtFile = result.generatedFiles.find(f => f.endsWith('.txt'));
-        if (txtFile) {
+        const subFile = result.generatedFiles.find(f => f.endsWith('.srt')) ||
+                        result.generatedFiles.find(f => f.endsWith('.vtt')) ||
+                        result.generatedFiles.find(f => f.endsWith('.txt'));
+        if (subFile) {
           const sep = outputDir.includes('\\') && !outputDir.includes('/') ? '\\' : '/';
-          await loadTranscriptFromFile(`${outputDir}${sep}${txtFile}`);
+          await loadTranscriptFromFile(`${outputDir}${sep}${subFile}`);
         }
       }
       
@@ -7343,6 +7373,9 @@ window.runBatchExtraction = async function() {
       item.speedFactor = result.speedFactor;
       successCount++;
 
+      // Save complete transcript lines for this batch item
+      item.transcriptLines = transcriptLines.map(l => ({ ...l }));
+
       const rawItemOutputDir = (settingsState && settingsState.outputDirMode === 'custom' && settingsState.outputDirPath) ? settingsState.outputDirPath : (result.outputDir || getParentDir(item.path));
       const itemOutputDir = (rawItemOutputDir && (rawItemOutputDir.endsWith('/') || rawItemOutputDir.endsWith('\\'))) ? rawItemOutputDir.slice(0, -1) : rawItemOutputDir;
       const sep = itemOutputDir && itemOutputDir.includes('\\') && !itemOutputDir.includes('/') ? '\\' : '/';
@@ -7373,11 +7406,7 @@ window.runBatchExtraction = async function() {
       const txtFileObj = outputFilesList.find(f => f.name.endsWith('.txt'));
       item.txtPath = txtFileObj ? txtFileObj.path : (item.subtitlePath || null);
 
-      if (typeof window.selectBatchItemTranscript === 'function') {
-        await window.selectBatchItemTranscript(i);
-      } else {
-        renderBatchQueueTable();
-      }
+      renderBatchQueueTable();
     } catch (err) {
       item.status = 'failed';
       renderBatchQueueTable();
@@ -7388,6 +7417,14 @@ window.runBatchExtraction = async function() {
   }
   
   // Batch processing completed
+  isBatchExtracting = false;
+  if (typeof updateTranscribeActionButtons === 'function') {
+    updateTranscribeActionButtons(false);
+  }
+  if (cancelBtn) cancelBtn.style.display = 'none';
+  if (sortSelect) sortSelect.disabled = false;
+  if (clearBtn) clearBtn.disabled = false;
+
   if (batchCancelActive) {
     const telemetryCard = document.getElementById('telemetry-hud-card');
     if (telemetryCard) telemetryCard.style.display = 'none';
@@ -7414,30 +7451,21 @@ window.runBatchExtraction = async function() {
   }
 
   // Ensure active batch viewer item is synchronized for workflow bridging
-  if (activeBatchViewerIndex < 0 || !batchItems[activeBatchViewerIndex] || batchItems[activeBatchViewerIndex].status !== 'completed') {
-    let latestCompletedIdx = -1;
-    for (let k = batchItems.length - 1; k >= 0; k--) {
-      if (batchItems[k].status === 'completed') {
-        latestCompletedIdx = k;
-        break;
-      }
-    }
-    if (latestCompletedIdx !== -1 && typeof window.selectBatchItemTranscript === 'function') {
-      await window.selectBatchItemTranscript(latestCompletedIdx);
+  let latestCompletedIdx = -1;
+  for (let k = batchItems.length - 1; k >= 0; k--) {
+    if (batchItems[k].status === 'completed') {
+      latestCompletedIdx = k;
+      break;
     }
   }
-  if (typeof updateTranscribeWorkflowButtons === 'function') {
-    updateTranscribeWorkflowButtons();
+  if (latestCompletedIdx !== -1 && typeof window.selectBatchItemTranscript === 'function') {
+    await window.selectBatchItemTranscript(latestCompletedIdx);
+  } else {
+    renderBatchQueueTable();
+    if (typeof updateTranscribeWorkflowButtons === 'function') {
+      updateTranscribeWorkflowButtons();
+    }
   }
-  
-  // Reset buttons
-  isBatchExtracting = false;
-  if (typeof updateTranscribeActionButtons === 'function') {
-    updateTranscribeActionButtons(false);
-  }
-  if (cancelBtn) cancelBtn.style.display = 'none';
-  if (sortSelect) sortSelect.disabled = false;
-  if (clearBtn) clearBtn.disabled = false;
   
   renderBatchQueueTable();
   
@@ -8531,26 +8559,8 @@ function parseTranscriptTimeRange(timeRange) {
 }
 window.parseTranscriptTimeRange = parseTranscriptTimeRange;
 
-function appendTranscriptLine(timeRange, text) {
-  const placeholder = document.getElementById('transcript-placeholder');
-  if (placeholder) placeholder.remove();
-  
-  const viewport = document.getElementById('transcript-viewport');
-  if (!viewport) return;
-
-  const lingeringInit = viewport.querySelector('.transcript-initializing-state, [data-i18n="transcribe.aiModelInitializing"]');
-  if (lingeringInit) lingeringInit.remove();
-  
-  // Clean text
-  const cleanText = text.trim();
-  
-  const lineObj = { timeRange, text: cleanText, id: transcriptLines.length };
-  transcriptLines.push(lineObj);
-
-  const btnCopy = document.getElementById('btn-copy-transcript');
-  if (btnCopy) btnCopy.disabled = false;
-
-  const parsedTime = parseTranscriptTimeRange(timeRange);
+function createTranscriptCardElement(lineObj) {
+  const parsedTime = parseTranscriptTimeRange(lineObj.timeRange);
   
   const cardEl = document.createElement('div');
   cardEl.className = 'transcript-card transcript-line';
@@ -8577,13 +8587,18 @@ function appendTranscriptLine(timeRange, text) {
   const timeDiv = document.createElement('div');
   timeDiv.className = 'transcript-card-time';
   timeDiv.setAttribute('dir', 'ltr');
-  timeDiv.innerHTML = `
-    <svg class="transcript-time-icon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="12" cy="12" r="10"></circle>
-      <polyline points="12 6 12 12 16 14"></polyline>
-    </svg>
-    <span>${escapeHTML(parsedTime.raw)}</span>
-  `;
+
+  if (parsedTime.raw && (parsedTime.raw.includes('→') || parsedTime.raw.includes('-->') || parsedTime.raw.includes(':'))) {
+    timeDiv.innerHTML = `
+      <svg class="transcript-time-icon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <polyline points="12 6 12 12 16 14"></polyline>
+      </svg>
+      <span>${escapeHTML(parsedTime.raw)}</span>
+    `;
+  } else {
+    timeDiv.innerHTML = `<span style="color: var(--color-text-dim); font-size: 0.72rem;">${escapeHTML(parsedTime.raw || `Line ${lineObj.id + 1}`)}</span>`;
+  }
 
   headerEl.appendChild(badgeWrap);
   headerEl.appendChild(timeDiv);
@@ -8594,7 +8609,7 @@ function appendTranscriptLine(timeRange, text) {
   const textarea = document.createElement('textarea');
   textarea.rows = 1;
   textarea.className = 'transcript-text-input';
-  textarea.value = cleanText;
+  textarea.value = lineObj.text;
   applyTextDirection(textarea);
   textarea.oninput = function() {
     updateTranscriptLineText(lineObj.id, this.value);
@@ -8606,9 +8621,66 @@ function appendTranscriptLine(timeRange, text) {
 
   cardEl.appendChild(headerEl);
   cardEl.appendChild(bodyEl);
+  return cardEl;
+}
+window.createTranscriptCardElement = createTranscriptCardElement;
+
+function renderTranscriptLines(lines) {
+  const viewport = document.getElementById('transcript-viewport');
+  if (!viewport) return;
+  viewport.innerHTML = '';
+
+  const placeholder = document.getElementById('transcript-placeholder');
+  if (placeholder) placeholder.remove();
+
+  if (!lines || lines.length === 0) {
+    viewport.innerHTML = `<div style="color: var(--color-text-dim); text-align: center; margin-top: 40px;" data-i18n="transcribe.noSegments">${escapeHTML(t('transcribe.noSegments') || 'No transcript segments generated yet.')}</div>`;
+    const btnCopy = document.getElementById('btn-copy-transcript');
+    if (btnCopy) btnCopy.disabled = true;
+    return;
+  }
+
+  const btnCopy = document.getElementById('btn-copy-transcript');
+  if (btnCopy) btnCopy.disabled = false;
+
+  const frag = document.createDocumentFragment();
+  lines.forEach((lineObj) => {
+    const cardEl = createTranscriptCardElement(lineObj);
+    frag.appendChild(cardEl);
+  });
+  viewport.appendChild(frag);
+
+  viewport.querySelectorAll('.transcript-text-input').forEach((input) => {
+    applyTextDirection(input);
+    autoResizeTranscriptField(input);
+  });
+}
+window.renderTranscriptLines = renderTranscriptLines;
+
+function appendTranscriptLine(timeRange, text) {
+  const placeholder = document.getElementById('transcript-placeholder');
+  if (placeholder) placeholder.remove();
+  
+  const viewport = document.getElementById('transcript-viewport');
+  if (!viewport) return;
+
+  const lingeringInit = viewport.querySelector('.transcript-initializing-state, [data-i18n="transcribe.aiModelInitializing"]');
+  if (lingeringInit) lingeringInit.remove();
+  
+  // Clean text
+  const cleanText = text.trim();
+  
+  const lineObj = { timeRange, text: cleanText, id: transcriptLines.length };
+  transcriptLines.push(lineObj);
+
+  const btnCopy = document.getElementById('btn-copy-transcript');
+  if (btnCopy) btnCopy.disabled = false;
+
+  const cardEl = createTranscriptCardElement(lineObj);
   viewport.appendChild(cardEl);
 
-  autoResizeTranscriptField(textarea);
+  const textarea = cardEl.querySelector('.transcript-text-input');
+  if (textarea) autoResizeTranscriptField(textarea);
 
   // Cap DOM children in viewport (mirrors the log-viewport cap) so a very long
   // transcription can't grow thousands of live <input> nodes. The full data
@@ -8627,6 +8699,15 @@ window.updateTranscriptLineText = function(id, value) {
   const line = transcriptLines.find(l => l.id === id);
   if (line) {
     line.text = value;
+  }
+  if (isBatchMode && activeBatchViewerIndex >= 0 && batchItems[activeBatchViewerIndex]) {
+    const item = batchItems[activeBatchViewerIndex];
+    if (item.transcriptLines) {
+      const itemLine = item.transcriptLines.find(l => l.id === id);
+      if (itemLine) {
+        itemLine.text = value;
+      }
+    }
   }
 };
 
@@ -8675,44 +8756,65 @@ window.loadTranscriptFromFile = async function(fullPath) {
     
     // Clear transcript lines
     transcriptLines = [];
-    const viewport = document.getElementById('transcript-viewport');
-    viewport.innerHTML = '';
-    
-    // Split text by newlines and add to viewer
-    const lines = text.split('\n');
-    lines.forEach((lineText, idx) => {
-      if (!lineText.trim()) return;
-      
-      const lineObj = { timeRange: `Line ${idx + 1}`, text: lineText.trim(), id: idx };
-      transcriptLines.push(lineObj);
-      
-      const cardEl = document.createElement('div');
-      cardEl.className = 'transcript-card transcript-line';
-      cardEl.dataset.id = lineObj.id;
-      cardEl.innerHTML = `
-        <div class="transcript-card-header">
-          <div class="transcript-card-badge-wrap">
-            <span class="transcript-card-num">#${idx + 1}</span>
-          </div>
-          <div class="transcript-card-time" dir="ltr">
-            <span style="color: var(--color-text-dim); font-size: 0.72rem;">Line ${idx + 1}</span>
-          </div>
-        </div>
-        <div class="transcript-card-body">
-          <textarea rows="1" class="transcript-text-input" oninput="updateTranscriptLineText(${lineObj.id}, this.value)" onchange="updateTranscriptLineText(${lineObj.id}, this.value)">${escapeHTML(lineText.trim())}</textarea>
-        </div>
-      `;
-      const textarea = cardEl.querySelector('.transcript-text-input');
-      applyTextDirection(textarea);
-      viewport.appendChild(cardEl);
-      autoResizeTranscriptField(textarea);
-    });
-    
-    if (transcriptLines.length === 0) {
-      viewport.innerHTML = `<div style="color: var(--color-text-dim); text-align: center; margin-top: 40px;">Transcript is empty.</div>`;
+    const ext = (fullPath.split('.').pop() || '').toLowerCase();
+    const isSub = (ext === 'srt' || ext === 'vtt' || text.includes('-->')) && ext !== 'txt';
+
+    if (isSub) {
+      // Parse subtitle format (SRT / VTT)
+      const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+      let i = 0;
+      const total = lines.length;
+      let cueId = 0;
+
+      while (i < total) {
+        const line = lines[i];
+
+        // Skip WebVTT header or metadata
+        if (ext === 'vtt' && (line.startsWith('WEBVTT') || line.startsWith('NOTE') || line.startsWith('STYLE') || line.startsWith('REGION'))) {
+          i++;
+          while (i < total && lines[i].trim() !== '') i++;
+          continue;
+        }
+
+        if (line.includes('-->')) {
+          const parts = line.split('-->');
+          if (parts.length === 2) {
+            const startRaw = parts[0].trim().split(' ')[0].replace(',', '.');
+            const endRaw = parts[1].trim().split(' ')[0].replace(',', '.');
+            const timeRange = `[${startRaw} --> ${endRaw}]`;
+
+            // Collect text lines until next blank line or next timeline
+            const textParts = [];
+            i++;
+            while (i < total && lines[i].trim() !== '' && !lines[i].includes('-->')) {
+              if (/^\d+$/.test(lines[i].trim()) && (i + 1 < total) && lines[i + 1].includes('-->')) {
+                break;
+              }
+              textParts.push(lines[i]);
+              i++;
+            }
+
+            const cleanText = textParts.join('\n').replace(/<[^>]+>/g, '').trim();
+            if (cleanText || startRaw) {
+              transcriptLines.push({ timeRange, text: cleanText, id: cueId++ });
+            }
+            continue;
+          }
+        }
+        i++;
+      }
+    } else {
+      // Plain text format
+      const lines = text.split('\n');
+      let lineId = 0;
+      lines.forEach((lineText) => {
+        const trimmed = lineText.trim();
+        if (!trimmed) return;
+        transcriptLines.push({ timeRange: `Line ${lineId + 1}`, text: trimmed, id: lineId++ });
+      });
     }
-    const btnCopy = document.getElementById('btn-copy-transcript');
-    if (btnCopy) btnCopy.disabled = (transcriptLines.length === 0);
+
+    renderTranscriptLines(transcriptLines);
   } catch (err) {
     console.error("Failed to load transcript file:", err);
   }
