@@ -500,11 +500,13 @@ html[dir="rtl"] .translate-switch-info {
   text-align: right;
 }
 
-/* The queue table mirrors its columns in an RTL interface — that is the table's own
-   `direction` — so its cells have to read from the side its columns do. `.batch-table`
-   aligns them left for the left-to-right table, and without this the file name in the
-   rightmost column hugs the far edge, away from the header over it. The 18px that the
-   first and last columns keep from the table's edges swap sides with them. */
+/* The queue card mirrors in an RTL interface — that is the card's own
+   `direction` — so its cells and duration badges read from the side its columns do. */
+html[dir="rtl"] .batch-card-duration {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
 html[dir="rtl"] .batch-table {
   text-align: right;
 }

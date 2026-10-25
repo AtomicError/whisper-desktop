@@ -705,6 +705,11 @@ window.addEventListener('whisper:languageChanged', () => {
     renderMediaMetadata(probedMetadata);
   }
   if (typeof isBatchMode !== 'undefined' && isBatchMode && typeof renderBatchQueueTable === 'function' && Array.isArray(batchItems) && batchItems.length > 0) {
+    const fileNameEl = document.getElementById('lbl-file-name');
+    if (fileNameEl) {
+      fileNameEl.textContent = t('transcribe.batchModeActive');
+      fileNameEl.removeAttribute('title');
+    }
     renderBatchQueueTable();
   }
   const msgEl = document.getElementById('lbl-radial-msg');
@@ -1508,10 +1513,12 @@ class CustomSelect {
 
     this.trigger.addEventListener('click', (e) => {
       e.stopPropagation();
+      if (this.select.disabled) return;
       this.toggle();
     });
 
     this._keydownHandler = (e) => {
+      if (this.select.disabled) return;
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         if (!this.isOpen) {
@@ -1662,12 +1669,29 @@ class CustomSelect {
     if (shouldObserve) {
       this.observer = new MutationObserver(() => {
         this.updateOptions();
+        this.syncDisabledState();
       });
       this.observer.observe(this.select, { childList: true, attributes: true, subtree: true });
     }
 
+    this.syncDisabledState();
+
     // Register this instance globally for sync
     window.customSelectsMap.set(this.select.id || this.select, this);
+  }
+
+  syncDisabledState() {
+    const isDisabled = Boolean(this.select && this.select.disabled);
+    if (isDisabled) {
+      this.container.classList.add('disabled');
+      this.trigger.setAttribute('aria-disabled', 'true');
+      this.trigger.tabIndex = -1;
+      if (this.isOpen) this.close();
+    } else {
+      this.container.classList.remove('disabled');
+      this.trigger.removeAttribute('aria-disabled');
+      this.trigger.tabIndex = 0;
+    }
   }
 
   getOptionDivs() {
@@ -2013,6 +2037,7 @@ class CustomSelect {
   }
 
   toggle() {
+    if (this.select && this.select.disabled) return;
     if (this.isOpen) {
       this.close();
     } else {
@@ -2021,6 +2046,7 @@ class CustomSelect {
   }
 
   open() {
+    if (this.select && this.select.disabled) return;
     if (window.customSelectsMap) {
       window.customSelectsMap.forEach(cs => {
         if (cs !== this && cs && typeof cs.close === 'function' && cs.isOpen) {
@@ -5382,7 +5408,8 @@ window.browseMediaFile = async function() {
 
       const fileNameEl = document.getElementById('lbl-file-name');
       if (fileNameEl) {
-        fileNameEl.textContent = `${batchItems.length} ${t('transcribe.queueFiles')}`;
+        fileNameEl.textContent = t('transcribe.batchModeActive');
+        fileNameEl.removeAttribute('title');
       }
       const countEl = document.getElementById('batch-files-count');
       if (countEl) countEl.textContent = batchItems.length;
@@ -5480,7 +5507,8 @@ window.browseMediaFile = async function() {
       const filePathEl = document.getElementById('lbl-file-path');
       if (fileNameEl) {
         fileNameEl.style.display = 'block';
-        fileNameEl.textContent = `${files.length} ${t('transcribe.queueFiles')}`;
+        fileNameEl.textContent = t('transcribe.batchModeActive');
+        fileNameEl.removeAttribute('title');
       }
       if (filePathEl) filePathEl.style.display = 'none';
 
@@ -5509,7 +5537,7 @@ window.browseMediaFile = async function() {
       const metaBox = document.getElementById('media-meta-box');
       if (metaBox) metaBox.style.display = 'none';
       const batchSpecsBox = document.getElementById('batch-specs-box');
-      if (batchSpecsBox) batchSpecsBox.style.display = 'block';
+      if (batchSpecsBox) batchSpecsBox.style.display = 'flex';
       const countEl = document.getElementById('batch-files-count');
       if (countEl) countEl.textContent = files.length;
 
@@ -6651,6 +6679,7 @@ window.removeFileFromBatch = function(index) {
 };
 
 window.clearBatchQueue = function() {
+  if (isBatchExtracting) return;
   batchItems = [];
   selectedMediaFiles = [];
   isBatchMode = false;
@@ -6847,43 +6876,75 @@ window.sortBatchQueue = function(criteria) {
 
   // Reset dropdown value
   const sortSelect = document.getElementById('batch-sort-select');
-  if (sortSelect) sortSelect.value = '';
+  if (sortSelect) {
+    sortSelect.value = '';
+    if (window.customSelectsMap && window.customSelectsMap.get('batch-sort-select')) {
+      window.customSelectsMap.get('batch-sort-select').syncSelectedValue();
+    }
+  }
 
   renderBatchQueueTable();
   showNotification(t('toasts.queueSorted'), "success");
 };
 
 function renderBatchQueueTable() {
-  const tbody = document.getElementById('batch-queue-body');
-  if (!tbody) return;
+  const container = document.getElementById('batch-queue-body');
+  if (!container) return;
   
   const countChip = document.getElementById('lbl-batch-count');
   if (countChip) countChip.textContent = batchItems.length;
 
-  tbody.innerHTML = '';
+  container.innerHTML = '';
+  const isRunning = isBatchExtracting;
+
   batchItems.forEach((item, index) => {
-    const tr = document.createElement('tr');
-    tr.className = 'batch-row';
-    
-    // Name column
-    const nameTd = document.createElement('td');
-    nameTd.textContent = item.name;
-    // A queued file's name is the user's own text, so it reads in its own direction
-    // whatever the interface is doing around it — the same treatment the single-file
-    // card above gives the same name.
-    applyContentDirection(nameTd, item.name);
-    nameTd.title = isolateLtr(item.path);
-    tr.appendChild(nameTd);
-    
-    // Duration column
-    const durationTd = document.createElement('td');
-    durationTd.textContent = formatDuration(item.durationSec);
-    tr.appendChild(durationTd);
-    
-    // Status column
-    const statusTd = document.createElement('td');
+    const card = document.createElement('div');
+    const isActive = item.status === 'converting' || item.status === 'transcribing' || item.status === 'translating';
+    card.className = `batch-queue-card batch-row ${isActive ? 'is-active' : ''}`;
+    card.dataset.index = index;
+
+    // --- Top Row: File Name + Duration ---
+    const topRow = document.createElement('div');
+    topRow.className = 'batch-card-top-row';
+
+    const nameGroup = document.createElement('div');
+    nameGroup.className = 'batch-card-name-group';
+
+    const fileIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    fileIcon.setAttribute('viewBox', '0 0 24 24');
+    fileIcon.setAttribute('fill', 'none');
+    fileIcon.setAttribute('stroke', 'currentColor');
+    fileIcon.setAttribute('stroke-width', '2');
+    fileIcon.setAttribute('stroke-linecap', 'round');
+    fileIcon.setAttribute('stroke-linejoin', 'round');
+    fileIcon.classList.add('batch-card-file-icon');
+    fileIcon.innerHTML = `<rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line>`;
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'batch-card-name';
+    nameSpan.textContent = item.name;
+    applyContentDirection(nameSpan, item.name);
+    nameSpan.title = isolateLtr(item.path);
+
+    nameGroup.appendChild(fileIcon);
+    nameGroup.appendChild(nameSpan);
+
+    const durationSpan = document.createElement('span');
+    durationSpan.className = 'batch-card-duration';
+    durationSpan.textContent = formatDuration(item.durationSec);
+
+    topRow.appendChild(nameGroup);
+    topRow.appendChild(durationSpan);
+    card.appendChild(topRow);
+
+    // --- Bottom Row: Status Badge + Action Buttons ---
+    const bottomRow = document.createElement('div');
+    bottomRow.className = 'batch-card-bottom-row';
+
+    const statusWrapper = document.createElement('div');
+    statusWrapper.className = 'batch-card-status-wrapper';
+
     const badge = document.createElement('span');
-    
     if (item.status === 'pending') {
       badge.className = 'batch-status-badge badge-pending';
       badge.textContent = t('transcribe.statusPending');
@@ -6906,104 +6967,73 @@ function renderBatchQueueTable() {
       badge.className = 'batch-status-badge badge-failed';
       badge.textContent = t('transcribe.statusAborted');
     }
-    
-    statusTd.appendChild(badge);
-    tr.appendChild(statusTd);
-    
-    // Action column
-    const actionTd = document.createElement('td');
-    actionTd.className = 'batch-action-cell';
-    
+    statusWrapper.appendChild(badge);
+    bottomRow.appendChild(statusWrapper);
+
     const actionGroup = document.createElement('div');
     actionGroup.className = 'batch-action-group';
-    
-    const isRunning = isBatchExtracting;
-    
+
     // Up button
     const upBtn = document.createElement('button');
-    upBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px;"><path d="m18 15-6-6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-    upBtn.style.background = 'transparent';
-    upBtn.style.border = 'none';
-    upBtn.style.color = 'var(--color-cyan)';
-    upBtn.style.padding = '4px';
-    upBtn.style.display = 'inline-flex';
-    upBtn.style.alignItems = 'center';
-    upBtn.style.justifyContent = 'center';
+    upBtn.type = 'button';
+    upBtn.className = 'btn-batch-action btn-move-up';
+    upBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><path d="m18 15-6-6-6 6"/></svg>`;
     const moveUpText = t('transcribe.moveUp') || 'Move up';
     upBtn.title = moveUpText;
     upBtn.setAttribute('aria-label', moveUpText);
-    
+
     if (isRunning || index === 0) {
       upBtn.disabled = true;
-      upBtn.style.opacity = '0.3';
-      upBtn.style.cursor = 'not-allowed';
     } else {
-      upBtn.style.cursor = 'pointer';
       upBtn.onclick = (e) => {
         e.stopPropagation();
         moveBatchItemUp(index);
       };
     }
-    
+
     // Down button
     const downBtn = document.createElement('button');
-    downBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px;"><path d="m6 9 6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-    downBtn.style.background = 'transparent';
-    downBtn.style.border = 'none';
-    downBtn.style.color = 'var(--color-cyan)';
-    downBtn.style.padding = '4px';
-    downBtn.style.display = 'inline-flex';
-    downBtn.style.alignItems = 'center';
-    downBtn.style.justifyContent = 'center';
+    downBtn.type = 'button';
+    downBtn.className = 'btn-batch-action btn-move-down';
+    downBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><path d="m6 9 6 6 6-6"/></svg>`;
     const moveDownText = t('transcribe.moveDown') || 'Move down';
     downBtn.title = moveDownText;
     downBtn.setAttribute('aria-label', moveDownText);
-    
+
     if (isRunning || index === batchItems.length - 1) {
       downBtn.disabled = true;
-      downBtn.style.opacity = '0.3';
-      downBtn.style.cursor = 'not-allowed';
     } else {
-      downBtn.style.cursor = 'pointer';
       downBtn.onclick = (e) => {
         e.stopPropagation();
         moveBatchItemDown(index);
       };
     }
-    
+
     // Delete button
     const deleteBtn = document.createElement('button');
-    deleteBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px;"><path d="M18 6 6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-    deleteBtn.style.background = 'transparent';
-    deleteBtn.style.border = 'none';
-    deleteBtn.style.color = 'var(--color-red)';
-    deleteBtn.style.padding = '4px';
-    deleteBtn.style.display = 'inline-flex';
-    deleteBtn.style.alignItems = 'center';
-    deleteBtn.style.justifyContent = 'center';
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'btn-batch-action btn-batch-remove';
+    deleteBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><path d="M18 6 6 18M6 6l12 12"/></svg>`;
     const removeText = t('transcribe.removeFile') || 'Remove file';
     deleteBtn.title = removeText;
     deleteBtn.setAttribute('aria-label', removeText);
-    
+
     if (isRunning) {
       deleteBtn.disabled = true;
-      deleteBtn.style.opacity = '0.3';
-      deleteBtn.style.cursor = 'not-allowed';
     } else {
-      deleteBtn.style.cursor = 'pointer';
       deleteBtn.onclick = (e) => {
         e.stopPropagation();
         removeFileFromBatch(index);
       };
     }
-    
+
     actionGroup.appendChild(upBtn);
     actionGroup.appendChild(downBtn);
     actionGroup.appendChild(deleteBtn);
-    actionTd.appendChild(actionGroup);
-    tr.appendChild(actionTd);
-    
-    tbody.appendChild(tr);
+    bottomRow.appendChild(actionGroup);
+
+    card.appendChild(bottomRow);
+    container.appendChild(card);
   });
 }
 
@@ -7415,7 +7445,8 @@ async function handleDroppedFiles(rawFiles) {
 
     const fileNameEl = document.getElementById('lbl-file-name');
     if (fileNameEl) {
-      fileNameEl.textContent = `${batchItems.length} ${t('transcribe.queueFiles')}`;
+      fileNameEl.textContent = t('transcribe.batchModeActive');
+      fileNameEl.removeAttribute('title');
     }
     const batchCountEl = document.getElementById('batch-files-count');
     if (batchCountEl) batchCountEl.textContent = batchItems.length;
@@ -7512,7 +7543,8 @@ async function handleDroppedFiles(rawFiles) {
     const filePathEl = document.getElementById('lbl-file-path');
     if (fileNameEl) {
       fileNameEl.style.display = 'block';
-      fileNameEl.textContent = `${files.length} ${t('transcribe.queueFiles')}`;
+      fileNameEl.textContent = t('transcribe.batchModeActive');
+      fileNameEl.removeAttribute('title');
     }
     if (filePathEl) filePathEl.style.display = 'none';
 
@@ -7539,7 +7571,7 @@ async function handleDroppedFiles(rawFiles) {
     const metaBox = document.getElementById('media-meta-box');
     if (metaBox) metaBox.style.display = 'none';
     const batchSpecsBox = document.getElementById('batch-specs-box');
-    if (batchSpecsBox) batchSpecsBox.style.display = 'block';
+    if (batchSpecsBox) batchSpecsBox.style.display = 'flex';
     const batchCountEl = document.getElementById('batch-files-count');
     if (batchCountEl) batchCountEl.textContent = files.length;
     const nextStepBtn = document.getElementById('btn-next-step-2');

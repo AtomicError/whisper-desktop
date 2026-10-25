@@ -202,6 +202,32 @@ html {
   --color-text-muted: #9ca3af;
   --color-text-dim: #94a3b8;
 
+  /* Sizing & Radius Tokens */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 14px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+
+  /* Surfaces & Typography Design Tokens */
+  --bg-app: #09090b;
+  --bg-surface: #121215;
+  --bg-elevated: #18181b;
+  --bg-hover: #27272a;
+  --border-subtle: #27272a;
+  --border-focus: #3f3f46;
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --accent-primary: #3b82f6;
+  --accent-hover: #2563eb;
+  --danger: #ef4444;
+
   /* Model Family Palette Accents */
   --color-model-large: #2d7fff;
   --color-model-large-rgb: 45, 127, 255;
@@ -363,6 +389,10 @@ html {
   --color-text-muted: #a1a1aa;
   --color-text-dim: #94a3b8;
 
+  /* Theme-specific Accent Token Overrides */
+  --accent-primary: var(--color-accent);
+  --accent-hover: var(--color-accent-dark);
+
   /* Model Family Palette Accents (Obsidian Cherry to Platinum Spectrum) */
   --color-model-large: #ef4444;
   --color-model-large-rgb: 239, 68, 68;
@@ -441,6 +471,32 @@ html {
   --color-text-main: #f0fdf4;
   --color-text-muted: #94a3b8;
   --color-text-dim: #94a3b8;
+
+  /* Sizing & Radius Tokens */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 14px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+
+  /* Surfaces & Typography Design Tokens */
+  --bg-app: #09090b;
+  --bg-surface: #121215;
+  --bg-elevated: #18181b;
+  --bg-hover: #27272a;
+  --border-subtle: #27272a;
+  --border-focus: #3f3f46;
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --accent-primary: #3b82f6;
+  --accent-hover: #2563eb;
+  --danger: #ef4444;
 
   /* Model Family Palette Accents */
   --color-model-large: #10b981;
@@ -3769,44 +3825,29 @@ select.select-control {
   border-color: rgba(var(--color-royal-blue-rgb), 0.3);
 }
 
-/* Batch Specs Box */
-.batch-specs-box {
-  padding: 12px 14px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid var(--border-glass);
-}
-
-.batch-specs-header {
+/* Batch Specs Badges Row (Embedded inside Dropzone Card) */
+.transcribe-dropzone-card .batch-specs-box {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+  padding-top: 8px;
+  margin: 0;
+  background: transparent;
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0;
+  box-shadow: none;
 }
 
-.batch-specs-icon {
-  width: 15px;
-  height: 15px;
+.batch-badge-mode {
   color: var(--color-cyan);
-  flex-shrink: 0;
-}
-
-.batch-specs-title {
+  background: rgba(var(--color-cyan-rgb), 0.12);
+  border-color: rgba(var(--color-cyan-rgb), 0.28);
   font-weight: 600;
-  font-size: 0.82rem;
-  color: var(--color-cyan);
-}
-
-.batch-specs-info {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  font-size: 0.78rem;
-  color: var(--color-text-muted);
-}
-
-.batch-stat-divider {
-  color: var(--color-text-dim);
 }
 
 /* Silero VAD Switch Row */
@@ -5431,13 +5472,13 @@ body.rtl .transcribe-linear-fill,
 /* Premium Unified Batch Queue Panel Styling */
 .batch-queue-panel {
   width: 100%;
-  margin-top: 16px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-glass);
+  margin-top: 0;
+  background: var(--bg-surface, #121215);
+  border: 1px solid var(--border-subtle, #27272a);
   border-radius: 12px;
   overflow: visible;
   position: relative;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
   transition: var(--transition-smooth);
 }
 
@@ -5445,154 +5486,322 @@ body.rtl .transcribe-linear-fill,
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--border-glass);
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-subtle, #27272a);
   background: rgba(255, 255, 255, 0.02);
   border-top-left-radius: 12px;
   border-top-right-radius: 12px;
   position: relative;
-  z-index: 10;
+  z-index: 20;
+  min-width: 0;
 }
 
 .batch-queue-title {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 0.88rem;
+  gap: 6px;
+  font-size: 0.82rem;
   font-weight: 600;
   color: var(--color-cyan);
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.batch-title-text {
+  white-space: nowrap;
 }
 
 .batch-count-chip {
   background: rgba(var(--color-cyan-rgb), 0.15);
   color: var(--color-cyan);
   border: 1px solid rgba(var(--color-cyan-rgb), 0.3);
-  padding: 1px 7px;
+  padding: 1px 6px;
   border-radius: 10px;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-family: var(--font-mono);
   font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .batch-queue-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
+  flex-shrink: 0;
   position: relative;
-  z-index: 20;
+  z-index: 30;
+}
+
+.batch-sort-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
 }
 
 #custom-select-batch-sort-select {
-  min-width: 160px !important;
-  width: 160px !important;
-  height: 32px !important;
+  width: 112px !important;
+  min-width: 95px !important;
+  height: 28px !important;
+  min-height: 28px !important;
   margin: 0 !important;
+  flex-shrink: 0 !important;
 }
 
 #custom-select-batch-sort-select .custom-select-trigger {
-  height: 32px !important;
-  padding: 0 10px !important;
-  font-size: 0.78rem !important;
-  border-radius: 8px !important;
-  background: rgba(255, 255, 255, 0.03) !important;
-  border: 1px solid var(--border-glass) !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  max-height: 28px !important;
+  padding: 0 8px !important;
+  font-size: 0.74rem !important;
+  font-weight: 500 !important;
+  border-radius: 6px !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid var(--border-subtle, #27272a) !important;
+  color: var(--text-secondary, #a1a1aa) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 4px !important;
+  box-sizing: border-box !important;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+}
+
+#custom-select-batch-sort-select .custom-select-trigger:hover {
+  background: var(--bg-hover, #27272a) !important;
+  border-color: var(--border-focus, #3f3f46) !important;
+  color: var(--text-primary, #fafafa) !important;
+}
+
+#custom-select-batch-sort-select .custom-select-trigger .custom-select-value {
+  font-size: 0.74rem !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  flex: 1 !important;
+  text-align: start !important;
+}
+
+#custom-select-batch-sort-select .custom-select-trigger .custom-select-arrow {
+  width: 10px !important;
+  height: 10px !important;
+  flex-shrink: 0 !important;
+  color: var(--text-muted, #71717a) !important;
 }
 
 .batch-queue-actions .custom-select-options {
   right: 0 !important;
   left: auto !important;
-  min-width: 190px !important;
+  min-width: 185px !important;
+  width: auto !important;
+  border-radius: 8px !important;
+  background: #141418 !important;
+  border: 1px solid var(--border-subtle, #27272a) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
+  z-index: 100 !important;
 }
 
-.batch-action-cell {
-  text-align: center !important;
-  vertical-align: middle !important;
-  padding: 6px 16px !important;
-}
-
-.batch-action-group {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 8px !important;
-  vertical-align: middle !important;
+html[dir="rtl"] .batch-queue-actions .custom-select-options,
+body.rtl .batch-queue-actions .custom-select-options {
+  right: auto !important;
+  left: 0 !important;
 }
 
 .btn-clear-queue {
-  padding: 0 12px !important;
-  font-size: 0.78rem !important;
-  height: 32px !important;
-  border-color: rgba(var(--color-red-rgb), 0.35) !important;
+  padding: 0 8px !important;
+  font-size: 0.74rem !important;
+  font-weight: 500 !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  line-height: 26px !important;
+  box-sizing: border-box !important;
+  border: 1px solid rgba(var(--color-red-rgb), 0.25) !important;
   color: var(--color-red) !important;
   background: rgba(var(--color-red-rgb), 0.06) !important;
   margin: 0 !important;
   display: inline-flex !important;
   align-items: center !important;
-  gap: 6px !important;
-  border-radius: 8px !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  border-radius: 6px !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
 }
 
 .btn-clear-queue:hover {
-  background: rgba(var(--color-red-rgb), 0.15) !important;
+  background: rgba(var(--color-red-rgb), 0.16) !important;
   border-color: var(--color-red) !important;
   color: #ffffff !important;
 }
 
+.btn-clear-queue:disabled {
+  opacity: 0.35 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+}
+
+.custom-select-container.disabled {
+  opacity: 0.45;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+}
+
+/* Card List Container */
 .batch-table-wrapper {
   max-height: 220px;
   overflow-y: auto;
   overflow-x: hidden;
   border: none;
+  background: transparent;
+  padding: 8px 10px;
+  scrollbar-gutter: stable;
   border-bottom-left-radius: 12px;
   border-bottom-right-radius: 12px;
-  background: transparent;
 }
 
-.batch-table {
+.batch-queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   width: 100%;
-  border-collapse: collapse;
-  font-family: var(--font-sans);
-  font-size: 0.84rem;
-  text-align: left;
 }
 
-.batch-table th {
-  padding: 10px 16px;
+.batch-queue-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 7px 10px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 7px;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  position: relative;
+}
+
+.batch-queue-card:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.batch-queue-card.is-active {
   background: rgba(var(--color-royal-blue-rgb), 0.07);
-  color: var(--color-text-muted);
-  font-weight: 600;
-  border-bottom: 1px solid var(--border-glass);
-  letter-spacing: 0.02em;
+  border-color: rgba(var(--color-royal-blue-rgb), 0.35);
+  box-shadow: inset 0 0 12px rgba(var(--color-royal-blue-rgb), 0.08);
 }
 
-.batch-table th:first-child {
-  padding-inline-start: 18px;
+.batch-card-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
 }
 
-.batch-table th:last-child {
-  padding-inline-end: 18px;
+.batch-card-name-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
 }
 
-.batch-table td {
-  padding: 10px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-  color: #f3f4f6;
+.batch-card-file-icon {
+  width: 13px;
+  height: 13px;
+  color: var(--color-cyan);
+  opacity: 0.85;
+  flex-shrink: 0;
+}
+
+.batch-card-name {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--color-text-normal);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 200px;
+  min-width: 0;
 }
 
-.batch-table td:first-child {
-  padding-inline-start: 18px;
+.batch-card-duration {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--color-text-dim);
+  white-space: nowrap;
+  flex-shrink: 0;
+  direction: ltr;
 }
 
-.batch-table td:last-child {
-  padding-inline-end: 18px;
+.batch-card-bottom-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
-.batch-table tr:hover {
-  background: rgba(var(--color-royal-blue-rgb), 0.04);
+.batch-card-status-wrapper {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.batch-action-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.btn-batch-action {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.btn-batch-action:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.btn-move-up,
+.btn-move-down {
+  color: var(--color-text-muted);
+}
+
+.btn-move-up:hover:not(:disabled),
+.btn-move-down:hover:not(:disabled) {
+  color: var(--color-cyan);
+  background: rgba(var(--color-cyan-rgb), 0.12);
+}
+
+.btn-batch-remove {
+  color: var(--color-text-muted);
+}
+
+.btn-batch-remove:hover:not(:disabled) {
+  color: var(--color-red);
+  background: rgba(var(--color-red-rgb), 0.14);
+}
+
+.btn-batch-action:disabled {
+  opacity: 0.2;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 /* Glowing Status Badges */

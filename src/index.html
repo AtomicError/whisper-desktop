@@ -3133,20 +3133,11 @@
                         <span class="transcribe-meta-badge pill-target" id="meta-target-format" data-i18n-title="transcribe.targetFormat" title="Target Format" data-i18n="transcribe.targetFormatVal">16kHz Mono Target</span>
                         <span class="transcribe-meta-badge pill-engine" id="meta-recommendation" data-i18n-title="transcribe.activeExtractor" title="Active Processing Engine">-</span>
                       </div>
-                    </div>
 
-                    <!-- Batch Spec Box (when batch mode active) -->
-                    <div class="glass-card batch-specs-box" id="batch-specs-box" style="display:none;">
-                      <div class="batch-specs-header">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="batch-specs-icon">
-                          <path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2" ry="2"/>
-                        </svg>
-                        <span class="batch-specs-title" data-i18n="transcribe.batchModeActive">Batch Processing Mode Active</span>
-                      </div>
-                      <div class="batch-specs-info">
-                        <span class="batch-stat-item"><strong id="batch-files-count">0</strong> <span data-i18n="transcribe.queueFiles">Files</span></span>
-                        <span class="batch-stat-divider">•</span>
-                        <span class="batch-stat-item"><span data-i18n="transcribe.batchTotalDuration">Total Duration:</span> <strong id="batch-total-duration">--:--:--</strong></span>
+                      <!-- Batch Spec Badges Row (Embedded inside Dropzone Card when batch mode active) -->
+                      <div class="transcribe-meta-badges-row batch-specs-box" id="batch-specs-box" style="display:none;">
+                        <span class="transcribe-meta-badge pill-size"><strong id="batch-files-count">0</strong>&nbsp;<span data-i18n="transcribe.batchFilesUnit">Files</span></span>
+                        <span class="transcribe-meta-badge pill-duration"><span data-i18n="transcribe.batchTotalDuration">Total Duration:</span>&nbsp;<strong id="batch-total-duration">--:--:--</strong></span>
                       </div>
                     </div>
 
@@ -3154,7 +3145,7 @@
                     <div id="batch-queue-container" class="batch-queue-panel" style="display:none;">
                       <div class="batch-queue-header">
                         <div class="batch-queue-title">
-                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <line x1="8" y1="6" x2="21" y2="6"></line>
                             <line x1="8" y1="12" x2="21" y2="12"></line>
                             <line x1="8" y1="18" x2="21" y2="18"></line>
@@ -3162,39 +3153,31 @@
                             <line x1="3" y1="12" x2="3.01" y2="12"></line>
                             <line x1="3" y1="18" x2="3.01" y2="18"></line>
                           </svg>
-                          <span data-i18n="transcribe.queueFilesHeader">Queue Files</span>
+                          <span class="batch-title-text" data-i18n="transcribe.queueFilesHeader">Queue Files</span>
                           <span class="batch-count-chip" id="lbl-batch-count">0</span>
                         </div>
                         <div class="batch-queue-actions">
-                          <select id="batch-sort-select" class="select-control batch-sort-control" onchange="sortBatchQueue(this.value)">
-                            <option value="" disabled selected data-i18n="transcribe.sortQueue">Sort Queue...</option>
-                            <option value="name-asc" data-i18n="transcribe.sortNameAsc">Alphabetical (A-Z)</option>
-                            <option value="name-desc" data-i18n="transcribe.sortNameDesc">Alphabetical (Z-A)</option>
-                            <option value="duration-asc" data-i18n="transcribe.sortDurationAsc">Duration (Shortest first)</option>
-                            <option value="duration-desc" data-i18n="transcribe.sortDurationDesc">Duration (Longest first)</option>
-                          </select>
-                          <button class="btn-secondary btn-clear-queue" id="btn-clear-batch" onclick="clearBatchQueue()" type="button">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <div class="batch-sort-wrapper">
+                            <select id="batch-sort-select" class="select-control batch-sort-control" onchange="sortBatchQueue(this.value)">
+                              <option value="" disabled selected data-i18n="transcribe.sortQueue">Sort...</option>
+                              <option value="name-asc" data-i18n="transcribe.sortNameAsc">Alphabetical (A-Z)</option>
+                              <option value="name-desc" data-i18n="transcribe.sortNameDesc">Alphabetical (Z-A)</option>
+                              <option value="duration-asc" data-i18n="transcribe.sortDurationAsc">Duration (Shortest first)</option>
+                              <option value="duration-desc" data-i18n="transcribe.sortDurationDesc">Duration (Longest first)</option>
+                            </select>
+                          </div>
+                          <button class="btn-secondary btn-clear-queue" id="btn-clear-batch" onclick="clearBatchQueue()" type="button" data-i18n-title="transcribe.clearQueue" title="Clear Queue">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                               <polyline points="3 6 5 6 21 6"></polyline>
                               <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                             </svg>
-                            <span data-i18n="transcribe.clearQueue">Clear Queue</span>
+                            <span data-i18n="transcribe.clearQueue">Clear</span>
                           </button>
                         </div>
                       </div>
-                      <div class="batch-table-wrapper">
-                        <table class="batch-table">
-                          <thead>
-                            <tr>
-                              <th data-i18n="transcribe.batchColFile">File Name</th>
-                              <th data-i18n="transcribe.batchColDuration">Duration</th>
-                              <th data-i18n="transcribe.batchColStatus">Status</th>
-                              <th style="width: 100px; text-align: center;" data-i18n="transcribe.batchColActions">Action</th>
-                            </tr>
-                          </thead>
-                          <tbody id="batch-queue-body">
-                          </tbody>
-                        </table>
+
+                      <div class="batch-table-wrapper batch-queue-list-wrapper">
+                        <div class="batch-queue-list" id="batch-queue-body"></div>
                       </div>
                     </div>
 

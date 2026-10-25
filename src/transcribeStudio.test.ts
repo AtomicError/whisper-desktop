@@ -874,6 +874,39 @@ describe('Transcription Studio Output Directory & Workflow Logic', () => {
     expect(simulateFormatLocalizedTimeDuration(75.2, fa)).toBe('1 دقیقه و 15 ثانیه');
     expect(simulateFormatLocalizedTimeDuration(75.2, en)).toBe('1 min 15 sec');
   });
+
+  it('validates modern batch queue card layout, balanced actions, and header structure in HTML and CSS', () => {
+    const htmlContent = readFileSync(resolve(__dirname, 'index.html'), 'utf-8');
+    // Structural HTML expectations
+    expect(htmlContent).toContain('class="batch-queue-header"');
+    expect(htmlContent).toContain('class="batch-queue-title"');
+    expect(htmlContent).toContain('class="batch-title-text"');
+    expect(htmlContent).toContain('id="lbl-batch-count"');
+    expect(htmlContent).toContain('class="batch-queue-actions"');
+    expect(htmlContent).toContain('id="btn-clear-batch"');
+    expect(htmlContent).toContain('class="batch-sort-wrapper"');
+    expect(htmlContent).toContain('id="batch-sort-select"');
+    expect(htmlContent).toContain('class="batch-queue-list"');
+    expect(htmlContent).toContain('id="batch-queue-body"');
+
+    // Confirm legacy broken table and toolbar elements are eliminated
+    expect(htmlContent).not.toMatch(/<table[^>]*class="batch-table"/);
+    expect(htmlContent).not.toMatch(/<thead[\s\S]*?<th/);
+    expect(htmlContent).not.toContain('class="batch-queue-toolbar"');
+
+    // CSS structure validation
+    const cssContent = readFileSync(resolve(__dirname, 'styles.css'), 'utf-8');
+    expect(cssContent).toContain('.batch-queue-card');
+    expect(cssContent).toContain('.batch-card-top-row');
+    expect(cssContent).toContain('.batch-card-bottom-row');
+    expect(cssContent).toContain('.batch-card-name-group');
+    expect(cssContent).toContain('.btn-batch-action');
+    expect(cssContent).toContain('.batch-queue-actions');
+
+    // Check RTL styles
+    const rtlContent = readFileSync(resolve(__dirname, 'rtl.css'), 'utf-8');
+    expect(rtlContent).toContain('.batch-card-duration');
+  });
 });
 
 
