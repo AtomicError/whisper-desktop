@@ -902,10 +902,39 @@ describe('Transcription Studio Output Directory & Workflow Logic', () => {
     expect(cssContent).toContain('.batch-card-name-group');
     expect(cssContent).toContain('.btn-batch-action');
     expect(cssContent).toContain('.batch-queue-actions');
+    expect(cssContent).toContain('.batch-queue-card.is-clickable');
+    expect(cssContent).toContain('.batch-queue-card.is-selected');
+    expect(cssContent).toContain('.batch-viewing-chip');
 
     // Check RTL styles
     const rtlContent = readFileSync(resolve(__dirname, 'rtl.css'), 'utf-8');
     expect(rtlContent).toContain('.batch-card-duration');
+  });
+
+  it('verifies interactive batch item selection, transcript switching, and toolbar bridging in main.js and locales', () => {
+    const mainJsContent = readFileSync(resolve(__dirname, 'main.js'), 'utf-8');
+
+    // Verification of active batch viewer state tracking and select function
+    expect(mainJsContent).toContain('let activeBatchViewerIndex = -1;');
+    expect(mainJsContent).toContain('window.selectBatchItemTranscript = async function(');
+    expect(mainJsContent).toContain('activeBatchViewerIndex = index;');
+
+    // Verification of card selection and visual indicators in queue renderer
+    expect(mainJsContent).toContain('const isSelected = isCompleted && activeBatchViewerIndex === index;');
+    expect(mainJsContent).toContain('${isSelected ? \'is-selected\' : \'\'}');
+    expect(mainJsContent).toContain('batch-viewing-chip');
+
+    // Verification of workflow bridging and toolbar synchronization
+    expect(mainJsContent).toContain('window.lastTranscribedSubtitlePath = item.subtitlePath');
+    expect(mainJsContent).toContain('window.lastTranscribedVideoPath = item.path;');
+    expect(mainJsContent).toContain('window.lastTranscribedOutputFiles = item.outputFiles');
+
+    // Verification that new localization keys exist across locales
+    expect(en.transcribe.viewingTranscript).toBeDefined();
+    expect(en.transcribe.clickToViewTranscript).toBeDefined();
+    expect(en.transcribe.batchFileProcessing).toBeDefined();
+    expect(fa.transcribe.viewingTranscript).toBe('در حال نمایش');
+    expect(fa.transcribe.clickToViewTranscript).toBe('کلیک برای مشاهده متن');
   });
 });
 

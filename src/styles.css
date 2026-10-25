@@ -5689,6 +5689,21 @@ body.rtl .batch-queue-actions .custom-select-options {
   border-color: rgba(255, 255, 255, 0.1);
 }
 
+.batch-queue-card.is-clickable {
+  cursor: pointer;
+}
+
+.batch-queue-card.is-clickable:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(var(--color-cyan-rgb), 0.35);
+}
+
+.batch-queue-card.is-selected {
+  background: rgba(var(--color-cyan-rgb), 0.08) !important;
+  border-color: rgba(var(--color-cyan-rgb), 0.5) !important;
+  box-shadow: 0 0 12px rgba(var(--color-cyan-rgb), 0.12), inset 0 0 8px rgba(var(--color-cyan-rgb), 0.06);
+}
+
 .batch-queue-card.is-active {
   background: rgba(var(--color-royal-blue-rgb), 0.07);
   border-color: rgba(var(--color-royal-blue-rgb), 0.35);
@@ -5749,7 +5764,23 @@ body.rtl .batch-queue-actions .custom-select-options {
 .batch-card-status-wrapper {
   display: flex;
   align-items: center;
+  gap: 6px;
   min-width: 0;
+  flex-wrap: wrap;
+}
+
+.batch-viewing-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1.5px 6px;
+  border-radius: 10px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--color-cyan);
+  background: rgba(var(--color-cyan-rgb), 0.14);
+  border: 1px solid rgba(var(--color-cyan-rgb), 0.35);
+  white-space: nowrap;
 }
 
 .batch-action-group {
