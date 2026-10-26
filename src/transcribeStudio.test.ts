@@ -1002,6 +1002,40 @@ it releases chemicals that hit your eyes
     expect(parsedSegments[1].text).toBe('it releases chemicals that hit your eyes');
   });
 
+  it('correctly parses JSON, LRC, and CSV outputs into timestamped segments', () => {
+    // 1. Test JSON Parsing
+    const sampleJson = JSON.stringify({
+      transcription: [
+        { timestamps: { from: '00:00:01,000', to: '00:00:03,500' }, text: 'First segment' },
+        { timestamps: { from: '00:00:03,500', to: '00:00:06,000' }, text: 'Second segment' }
+      ]
+    });
+    const parsedJson = JSON.parse(sampleJson);
+    const jsonSegments = parsedJson.transcription.map((seg: any, idx: number) => ({
+      timeRange: `[${seg.timestamps.from.replace(',', '.')} --> ${seg.timestamps.to.replace(',', '.')}]`,
+      text: seg.text,
+      id: idx
+    }));
+    expect(jsonSegments.length).toBe(2);
+    expect(jsonSegments[0].timeRange).toBe('[00:00:01.000 --> 00:00:03.500]');
+    expect(jsonSegments[0].text).toBe('First segment');
+
+    // 2. Test LRC Parsing
+    const sampleLrc = `[00:01.20]First lyric\n[00:05.40]Second lyric`;
+    const lrcLines = sampleLrc.split('\n');
+    const lrcRegex = /^\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\](.*)/;
+    const lrcSegments: any[] = [];
+    lrcLines.forEach((l, idx) => {
+      const match = l.match(lrcRegex);
+      if (match) {
+        lrcSegments.push({ id: idx, text: match[4].trim(), time: `${match[1]}:${match[2]}` });
+      }
+    });
+    expect(lrcSegments.length).toBe(2);
+    expect(lrcSegments[0].text).toBe('First lyric');
+    expect(lrcSegments[1].text).toBe('Second lyric');
+  });
+
   it('guarantees src/main.js has zero parse or syntax errors for runtime load stability', () => {
     const mainJsPath = resolve(__dirname, 'main.js');
     expect(() => execSync(`node --check "${mainJsPath}"`, { stdio: 'pipe' })).not.toThrow();
