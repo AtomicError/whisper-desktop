@@ -1036,6 +1036,286 @@ it releases chemicals that hit your eyes
     expect(lrcSegments[1].text).toBe('Second lyric');
   });
 
+  it('parses timestamps across whisper.cpp integer ms, float seconds, colon formats, and long audio > 2.7 hours', () => {
+    const mainJsContent = readFileSync(resolve(__dirname, 'main.js'), 'utf-8');
+    expect(mainJsContent).toContain('function parseTimestampStringToMs(');
+    expect(mainJsContent).toContain('function parseSegmentTimestamps(');
+
+    // Extract parser functions from main.js and execute them
+    const codeToEval = `
+      const window = {};
+      ${mainJsContent.slice(mainJsContent.indexOf('function formatMsToTimestamp('), mainJsContent.indexOf('window.loadTranscriptFromFile'))}
+      return { parseTimestampStringToMs, parseSegmentTimestamps, formatMsToTimestamp };
+    `;
+    const fnExtract = new Function(codeToEval);
+    const { parseTimestampStringToMs, parseSegmentTimestamps, formatMsToTimestamp } = fnExtract();
+
+    // 1. whisper.cpp integer millisecond CSV values: 0, 4920
+    const cppCue = parseSegmentTimestamps(0, 4920);
+    expect(cppCue).toEqual({ startMs: 0, endMs: 4920 });
+    expect(formatMsToTimestamp(cppCue.startMs)).toBe('00:00:00.000');
+    expect(formatMsToTimestamp(cppCue.endMs)).toBe('00:00:04.920');
+
+    // Subsequent whisper.cpp cue: 50000, 54920
+    const cppCueLater = parseSegmentTimestamps(50000, 54920);
+    expect(cppCueLater).toEqual({ startMs: 50000, endMs: 54920 });
+    expect(formatMsToTimestamp(cppCueLater.startMs)).toBe('00:00:50.000');
+    expect(formatMsToTimestamp(cppCueLater.endMs)).toBe('00:00:54.920');
+
+    // 2. OpenAI Whisper float seconds: 0.0, 4.92
+    const openaiCue = parseSegmentTimestamps('0.0', '4.92');
+    expect(openaiCue).toEqual({ startMs: 0, endMs: 4920 });
+    expect(formatMsToTimestamp(openaiCue.endMs)).toBe('00:00:04.920');
+
+    // 3. Audio > 2.7 hours / > 10,000s: 10800.5, 10805.2 (must NOT wrap to 10s and must NOT multiply by 1000 erroneously)
+    const longAudioCue = parseSegmentTimestamps('10800.5', '10805.2');
+    expect(longAudioCue).toEqual({ startMs: 10800500, endMs: 10805200 });
+    expect(formatMsToTimestamp(longAudioCue.startMs)).toBe('03:00:00.500');
+    expect(formatMsToTimestamp(longAudioCue.endMs)).toBe('03:00:05.200');
+
+    // 4. Colon formats: 00:01:23.456 and with comma 00:01:23,456
+    const colonCue1 = parseSegmentTimestamps('00:01:23.456', '00:01:27.890');
+    expect(colonCue1).toEqual({ startMs: 83456, endMs: 87890 });
+
+    const colonCue2 = parseSegmentTimestamps('00:01:23,456', '00:01:27,890');
+    expect(colonCue2).toEqual({ startMs: 83456, endMs: 87890 });
+
+    // 5. Quoted timestamps and colon strings
+    const quotedCue = parseSegmentTimestamps('"4920"', '"8500"');
+    expect(quotedCue).toEqual({ startMs: 4920, endMs: 8500 });
+
+    const quotedColonCue = parseSegmentTimestamps('"01:00:00.000"', '"01:00:04.920"');
+    expect(quotedColonCue).toEqual({ startMs: 3600000, endMs: 3604920 });
+
+    // 6. Integer seconds: 0 to 5 seconds
+    const intSecCue = parseSegmentTimestamps('0', '5');
+    expect(intSecCue).toEqual({ startMs: 0, endMs: 5000 });
+
+    // 7. Long audio integer ms at 3 hours
+    const longAudioMs = parseSegmentTimestamps('10800000', '10804920');
+    expect(longAudioMs).toEqual({ startMs: 10800000, endMs: 10804920 });
+
+    // Edge cases: null / undefined / invalid
+    expect(parseSegmentTimestamps(null, null)).toBeNull();
+    expect(parseSegmentTimestamps('invalid', '123')).toBeNull();
+  });
+
+  it('verifies CSV and TSV parsing with whisper.cpp integer ms, quotes, and headers', () => {
+    const mainJsContent = readFileSync(resolve(__dirname, 'main.js'), 'utf-8');
+    const codeToEval = `
+      const window = {};
+      ${mainJsContent.slice(mainJsContent.indexOf('function formatMsToTimestamp('), mainJsContent.indexOf('window.loadTranscriptFromFile'))}
+      return { parseSegmentTimestamps, formatMsToTimestamp };
+    `;
+    const { parseSegmentTimestamps, formatMsToTimestamp } = new Function(codeToEval)();
+
+    // 1. CSV with whisper.cpp integer ms
+    const sampleCsv = `start,end,text\n0,4920,"When you cut off the root of an onion,"\n4920,8500,"it releases chemicals that hit your eyes"`;
+    const lines = sampleCsv.split('\n');
+    const csvCues: any[] = [];
+    let cueId = 0;
+    lines.forEach((l, idx) => {
+      if (!l.trim() || (idx === 0 && l.toLowerCase().includes('start'))) return;
+      const cols = l.split(',');
+      if (cols.length >= 3) {
+        const parsed = parseSegmentTimestamps(cols[0].trim(), cols[1].trim());
+        const textVal = cols.slice(2).join(',').replace(/^["']|["']$/g, '').trim();
+        if (parsed && textVal) {
+          csvCues.push({
+            id: cueId++,
+            timeRange: `[${formatMsToTimestamp(parsed.startMs)} --> ${formatMsToTimestamp(parsed.endMs)}]`,
+            text: textVal
+          });
+        }
+      }
+    });
+
+    expect(csvCues.length).toBe(2);
+    expect(csvCues[0].timeRange).toBe('[00:00:00.000 --> 00:00:04.920]');
+    expect(csvCues[0].text).toBe('When you cut off the root of an onion,');
+    expect(csvCues[1].timeRange).toBe('[00:00:04.920 --> 00:00:08.500]');
+    expect(csvCues[1].text).toBe('it releases chemicals that hit your eyes');
+
+    // 2. CSV with id column header: id,start,end,text and escaped double quotes
+    const advancedCsv = `id,start,end,text\n0,0,4920,"He said, ""Hello!"""\n1,4920,8500,"Second line"`;
+    const advLines = advancedCsv.split('\n');
+    let startCol = 0, endCol = 1, textCol = 2;
+    const advCues: any[] = [];
+    advLines.forEach((l, idx) => {
+      const line = l.trim();
+      if (!line) return;
+      if (idx === 0 && (line.toLowerCase().includes('start') || line.toLowerCase().includes('text'))) {
+        const headerCols = line.split(',').map(c => c.replace(/^["']|["']$/g, '').trim().toLowerCase());
+        const sIdx = headerCols.findIndex(c => c === 'start' || c === 'start_time' || c === 'from');
+        const eIdx = headerCols.findIndex(c => c === 'end' || c === 'end_time' || c === 'to');
+        const tIdx = headerCols.findIndex(c => c === 'text' || c === 'content' || c === 'sentence');
+        if (sIdx !== -1 && eIdx !== -1) {
+          startCol = sIdx;
+          endCol = eIdx;
+          if (tIdx !== -1) textCol = tIdx;
+        }
+        return;
+      }
+      const cols = line.split(',');
+      const parsed = parseSegmentTimestamps(cols[startCol].trim(), cols[endCol].trim());
+      const textVal = cols.slice(textCol).join(',').replace(/^["']|["']$/g, '').replace(/""/g, '"').trim();
+      if (parsed && textVal) {
+        advCues.push({
+          timeRange: `[${formatMsToTimestamp(parsed.startMs)} --> ${formatMsToTimestamp(parsed.endMs)}]`,
+          text: textVal
+        });
+      }
+    });
+    expect(advCues.length).toBe(2);
+    expect(advCues[0].timeRange).toBe('[00:00:00.000 --> 00:00:04.920]');
+    expect(advCues[0].text).toBe('He said, "Hello!"');
+    expect(advCues[1].text).toBe('Second line');
+
+    // 3. TSV with tab delimiter
+    const sampleTsv = `start\tend\ttext\n0.0\t4.92\t"Tab separated speech segment"`;
+    const tsvLines = sampleTsv.split('\n');
+    const tsvCues: any[] = [];
+    tsvLines.forEach((l, idx) => {
+      if (!l.trim() || (idx === 0 && l.toLowerCase().includes('start'))) return;
+      const cols = l.split('\t');
+      if (cols.length >= 3) {
+        const parsed = parseSegmentTimestamps(cols[0].trim(), cols[1].trim());
+        const textVal = cols.slice(2).join('\t').replace(/^["']|["']$/g, '').trim();
+        if (parsed && textVal) {
+          tsvCues.push({
+            timeRange: `[${formatMsToTimestamp(parsed.startMs)} --> ${formatMsToTimestamp(parsed.endMs)}]`,
+            text: textVal
+          });
+        }
+      }
+    });
+    expect(tsvCues.length).toBe(1);
+    expect(tsvCues[0].timeRange).toBe('[00:00:00.000 --> 00:00:04.920]');
+    expect(tsvCues[0].text).toBe('Tab separated speech segment');
+  });
+
+  it('verifies JSON subtitle parser handles Whisper formats and long audio without wrapping', () => {
+    const mainJsContent = readFileSync(resolve(__dirname, 'main.js'), 'utf-8');
+    const codeToEval = `
+      const window = {};
+      ${mainJsContent.slice(mainJsContent.indexOf('function formatMsToTimestamp('), mainJsContent.indexOf('window.loadTranscriptFromFile'))}
+      return { parseSegmentTimestamps, formatMsToTimestamp };
+    `;
+    const { parseSegmentTimestamps, formatMsToTimestamp } = new Function(codeToEval)();
+
+    // Python Whisper JSON for long audio at 3 hours
+    const pythonWhisperJson = {
+      segments: [
+        { id: 0, start: 10800.5, end: 10804.8, text: 'Segment at hour 3' }
+      ]
+    };
+    const seg = pythonWhisperJson.segments[0];
+    const parsed = parseSegmentTimestamps(seg.start, seg.end);
+    expect(parsed).toEqual({ startMs: 10800500, endMs: 10804800 });
+    const timeRange = `[${formatMsToTimestamp(parsed!.startMs)} --> ${formatMsToTimestamp(parsed!.endMs)}]`;
+    expect(timeRange).toBe('[03:00:00.500 --> 03:00:04.800]');
+  });
+
+  it('verifies Auto-Transfer to Translation Studio UI setting, localization, and bridging', () => {
+    // 1. Verify index.html setting element
+    const html = readFileSync(resolve(__dirname, 'index.html'), 'utf-8');
+    expect(html).toContain('id="opt-autoTransferToTranslate"');
+    expect(html).toContain('data-i18n="settings.aiTranslateTitle"');
+    expect(html).toContain('data-i18n="settings.aiTranslateDesc"');
+
+    // 2. Verify all 13 locales contain updated title, description, tab name, and points without legacy LLM providers
+    for (const [code, loc] of Object.entries(locales)) {
+      expect(loc.settings.aiTranslateTitle, `aiTranslateTitle missing in locale ${code}`).toBeDefined();
+      expect(loc.settings.aiTranslateDesc, `aiTranslateDesc missing in locale ${code}`).toBeDefined();
+      expect(loc.settings.tabAutoTranslate, `tabAutoTranslate missing in locale ${code}`).toBeDefined();
+      expect(loc.settings.aiTranslatePoints, `aiTranslatePoints missing in locale ${code}`).toBeDefined();
+      expect(loc.settings.aiTranslatePoints).not.toContain('OpenAI');
+      expect(loc.settings.aiTranslatePoints).not.toContain('Claude');
+    }
+
+    // Verify Persian translations match requirements
+    expect(fa.settings.aiTranslateTitle).toBe('انتقال خودکار به استودیوی ترجمه');
+    expect(fa.settings.aiTranslateDesc).toContain('استودیوی ترجمه');
+    expect(fa.settings.tabAutoTranslate).toBe('انتقال خودکار');
+    expect(fa.settings.aiTranslatePoints).toContain('استودیوی ترجمه');
+
+    // Verify English translations match requirements
+    expect(en.settings.aiTranslateTitle).toBe('Auto-Transfer to Translation Studio');
+    expect(en.settings.tabAutoTranslate).toBe('Auto-Transfer');
+    expect(en.settings.aiTranslatePoints).toContain('Translation Studio');
+
+    // 3. Verify main.js contains the Auto-Transfer bridge calls and removed legacy headless translation loops
+    const mainJsContent = readFileSync(resolve(__dirname, 'main.js'), 'utf-8');
+    expect(mainJsContent).toContain('window.sendTranscribeToTranslationStudio()');
+    expect(mainJsContent).toContain('settingsState?.autoTransferToTranslate ?? settingsState?.translateAiEnabled');
+    expect(mainJsContent).not.toContain('translate_transcription_files');
+  });
+
+  it('strictly protects subtitlePath for studio bridges and eliminates hallucinated .ass and .sub checks', () => {
+    const mainJsContent = readFileSync(resolve(__dirname, 'main.js'), 'utf-8');
+
+    // Verify .ass and .sub were completely cleaned up from batch file categorization
+    expect(mainJsContent).not.toContain("f.endsWith('.ass')");
+    expect(mainJsContent).not.toContain("f.name.endsWith('.ass')");
+    expect(mainJsContent).not.toContain("f.endsWith('.sub')");
+    expect(mainJsContent).not.toContain("f.name.endsWith('.sub')");
+
+    // Verify item.subtitlePath strictly selects real playable subtitle formats
+    expect(mainJsContent).toContain("const subFileObj = outputFilesList.find(f => f.name.endsWith('.srt')) ||");
+    expect(mainJsContent).toContain("outputFilesList.find(f => f.name.endsWith('.vtt')) ||");
+    expect(mainJsContent).toContain("outputFilesList.find(f => f.name.endsWith('.lrc'));");
+    expect(mainJsContent).toContain("item.subtitlePath = subFileObj ? subFileObj.path : null;");
+
+    // Verify single-mode output files categorization handles subtitle, json, and csv
+    expect(mainJsContent).toContain("if (f.endsWith('.srt') || f.endsWith('.vtt') || f.endsWith('.lrc')) {\n          type = 'subtitle';");
+    expect(mainJsContent).toContain("} else if (f.endsWith('.json')) {\n          type = 'json';");
+    expect(mainJsContent).toContain("} else if (f.endsWith('.csv')) {\n          type = 'csv';");
+
+    // Verify output files dropdown renders badges for subtitle, json, and csv
+    expect(mainJsContent).toContain("else if (file.type === 'original' || file.type === 'subtitle') {");
+    expect(mainJsContent).toContain("else if (file.type === 'json') {\n      badgeText = 'JSON';");
+    expect(mainJsContent).toContain("else if (file.type === 'csv') {\n      badgeText = 'CSV';");
+  });
+
+  it('properly resets batch queue sort select and restores empty placeholder on item removal', () => {
+    const mainJsContent = readFileSync(resolve(__dirname, 'main.js'), 'utf-8');
+
+    // Verify clearBatchQueue resets batch-sort-select
+    expect(mainJsContent).toContain("const sortSelect = document.getElementById('batch-sort-select');");
+    expect(mainJsContent).toContain("sortSelect.value = '';");
+    expect(mainJsContent).toContain('syncCustomSelect(sortSelect);');
+
+    // Verify removeFileFromBatch restores placeholder, clears paths, and clears outputDir
+    expect(mainJsContent).toContain("window.lastTranscribedVideoPath = null;");
+    expect(mainJsContent).toContain("window.lastTranscribedOutputDir = null;");
+    expect(mainJsContent).toContain("const btnCopy = document.getElementById('btn-copy-transcript');");
+    expect(mainJsContent).toContain("if (btnCopy) btnCopy.disabled = true;");
+    expect(mainJsContent).toContain('transcript-placeholder');
+  });
+
+  it('isolates duration display in RTL stylesheet and localizes pending status in formatDuration', () => {
+    // Verify RTL duration isolation in rtl.css
+    const rtlCss = readFileSync(resolve(__dirname, 'rtl.css'), 'utf-8');
+    expect(rtlCss).toMatch(/html\[dir="rtl"\]\s+#batch-total-duration/);
+    expect(rtlCss).toContain('.transcript-card-time');
+    expect(rtlCss).toContain('unicode-bidi: isolate;');
+
+    // Verify formatDuration in main.js uses localized pending string and guards against negative
+    const mainJsContent = readFileSync(resolve(__dirname, 'main.js'), 'utf-8');
+    expect(mainJsContent).toContain("t('transcribe.statusPending')");
+    expect(mainJsContent).toContain("dur < 0");
+
+    const codeToEval = `
+      const t = (k) => k === 'transcribe.statusPending' ? 'در انتظار' : k;
+      ${mainJsContent.slice(mainJsContent.indexOf('function formatDuration('), mainJsContent.indexOf('function updateBatchSpecs('))}
+      return formatDuration;
+    `;
+    const formatDuration = new Function(codeToEval)();
+    expect(formatDuration(-5)).toBe('در انتظار...');
+    expect(formatDuration(NaN)).toBe('در انتظار...');
+    expect(formatDuration(3665)).toBe('01:01:05');
+  });
+
   it('guarantees src/main.js has zero parse or syntax errors for runtime load stability', () => {
     const mainJsPath = resolve(__dirname, 'main.js');
     expect(() => execSync(`node --check "${mainJsPath}"`, { stdio: 'pipe' })).not.toThrow();

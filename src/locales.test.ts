@@ -279,7 +279,7 @@ describe('locale consistency for speed presets', () => {
     expect(fa.transcribe.deckTitle).toBe('تنظیمات رونویسی');
     expect(fa.transcribe.progressTranscribe).toBe('در حال تبدیل گفتار به متن...');
     expect(fa.settings.printSpecialDesc).not.toContain('ویسپر');
-    expect(fa.settings.aiTranslatePoints).toContain('<bdi>OpenAI</bdi>، <bdi>Claude</bdi>');
+    expect(fa.settings.aiTranslatePoints).toContain('استودیوی ترجمه');
     expect(fa.settings.targetLangPoints).toContain('بیش از ۱۰۰ زبان زنده دنیا با رسم‌الخط بومی');
     expect(fa.settings.providerCustomPromptPlaceholder).toBe('شما یک مترجم حرفه‌ای هستید...');
     expect(fa.settings.addProvider).toBe('افزودن ارائه‌دهنده');

@@ -2737,17 +2737,17 @@
                       <div class="setting-card">
                         <div class="setting-info">
                           <div class="setting-label-row">
-                            <span class="setting-title" data-i18n="settings.aiTranslateTitle">Auto-Translate After Transcription</span>
+                            <span class="setting-title" data-i18n="settings.aiTranslateTitle">Auto-Transfer to Translation Studio</span>
                           </div>
-                          <div class="setting-desc"><span data-i18n="settings.aiTranslateDesc">Automatically translates transcribed subtitles into your target language using cloud or local LLM APIs once transcription finishes.</span>
+                          <div class="setting-desc"><span data-i18n="settings.aiTranslateDesc">Automatically load generated subtitles and companion video into Translation Studio upon transcription completion.</span>
                             <div class="setting-desc-points" data-i18n-html="settings.aiTranslatePoints">
-                              <span class="setting-desc-point"><strong>Supported:</strong> OpenAI, Claude, Gemini, Groq, LM Studio, DeepSeek</span>
+                              <span class="setting-desc-point"><strong>Integrated Workflow:</strong> Automatically loads generated subtitles and companion video into Translation Studio</span>
                             </div>
                           </div>
                         </div>
                         <div class="setting-control">
                           <label class="switch">
-                            <input type="checkbox" id="opt-translateAiEnabled" onchange="saveCurrentSettings()" />
+                            <input type="checkbox" id="opt-autoTransferToTranslate" onchange="saveCurrentSettings()" />
                             <span class="slider"></span>
                           </label>
                         </div>

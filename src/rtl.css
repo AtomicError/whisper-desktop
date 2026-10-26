@@ -502,7 +502,10 @@ html[dir="rtl"] .translate-switch-info {
 
 /* The queue card mirrors in an RTL interface — that is the card's own
    `direction` — so its cells and duration badges read from the side its columns do. */
-html[dir="rtl"] .batch-card-duration {
+html[dir="rtl"] .batch-card-duration,
+html[dir="rtl"] #batch-total-duration,
+html[dir="rtl"] .pill-duration strong,
+html[dir="rtl"] .transcript-card-time {
   direction: ltr;
   unicode-bidi: isolate;
 }

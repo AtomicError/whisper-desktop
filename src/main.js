@@ -3987,6 +3987,16 @@ function bindSettingsToDOM() {
   }
   
   // Helper to map keys
+  const autoTransferCheckbox = document.getElementById('opt-autoTransferToTranslate') || document.getElementById('opt-translateAiEnabled');
+  if (autoTransferCheckbox) {
+    autoTransferCheckbox.checked = !!(settingsState.autoTransferToTranslate ?? settingsState.translateAiEnabled);
+    autoTransferCheckbox.onchange = () => {
+      settingsState.autoTransferToTranslate = autoTransferCheckbox.checked;
+      settingsState.translateAiEnabled = autoTransferCheckbox.checked;
+      saveCurrentSettings();
+    };
+  }
+
   const keys = Object.keys(settingsState);
   keys.forEach(key => {
     const el = document.getElementById(`opt-${key}`);
@@ -3995,6 +4005,10 @@ function bindSettingsToDOM() {
         el.checked = settingsState[key];
         el.onchange = () => {
           settingsState[key] = el.checked;
+          if (key === 'autoTransferToTranslate' || key === 'translateAiEnabled') {
+            settingsState.autoTransferToTranslate = el.checked;
+            settingsState.translateAiEnabled = el.checked;
+          }
           if (key === 'monochromeCanvas') {
             applyMonochromeCanvas(el.checked, true);
           }
@@ -4228,6 +4242,11 @@ const FLOAT_SETTING_KEYS = new Set([
 function sanitizeSettingsPayload(state) {
   if (!state) return state;
   const clean = { ...state };
+  if (clean.autoTransferToTranslate !== undefined) {
+    clean.translateAiEnabled = Boolean(clean.autoTransferToTranslate);
+  } else if (clean.translateAiEnabled !== undefined) {
+    clean.autoTransferToTranslate = Boolean(clean.translateAiEnabled);
+  }
   for (const key of Object.keys(clean)) {
     if (INT_SETTING_KEYS.has(key)) {
       const parsed = parseInt(clean[key]);
@@ -4954,10 +4973,14 @@ window.renderOutputFilesDropdown = function() {
     if (file.type === 'translated') {
       badgeText = t('transcribe.translatedSubtitle') || 'Translated';
       badgeClass += ' translated';
-    } else if (file.type === 'original') {
-      badgeText = t('transcribe.originalSubtitle') || 'Original';
+    } else if (file.type === 'original' || file.type === 'subtitle') {
+      badgeText = t('transcribe.originalSubtitle') || 'Subtitle';
     } else if (file.type === 'text') {
       badgeText = t('transcribe.rawTranscriptText') || 'Text';
+    } else if (file.type === 'json') {
+      badgeText = 'JSON';
+    } else if (file.type === 'csv') {
+      badgeText = 'CSV';
     }
 
     item.innerHTML = `
@@ -5846,13 +5869,12 @@ function updateTranscribeUIConfigs() {
   
   const transCfgTranslation = document.getElementById('trans-cfg-translation');
   if (transCfgTranslation) {
-    const translationEnabled = settingsState.translateAiEnabled === true;
+    const translationEnabled = Boolean(settingsState?.autoTransferToTranslate ?? settingsState?.translateAiEnabled);
     let translationText = 'OFF';
-    let fullTitle = 'Translation Disabled';
+    let fullTitle = 'Auto-Transfer to Translation Studio Disabled';
     if (translationEnabled) {
-      const aiModel = settingsState.translateAiModel || '';
-      translationText = aiModel ? `ON (${aiModel})` : 'ON';
-      fullTitle = aiModel ? `Translation Active: ${aiModel}` : 'Translation Active';
+      translationText = 'ON';
+      fullTitle = 'Auto-Transfer to Translation Studio Active';
     }
     transCfgTranslation.textContent = translationText;
     transCfgTranslation.title = fullTitle;
@@ -6098,8 +6120,15 @@ window.runWhisperTranscription = async function() {
     if (result.generatedFiles && result.generatedFiles.length > 0) {
       result.generatedFiles.forEach(f => {
         let type = 'other';
-        if (f.endsWith('.srt') || f.endsWith('.vtt')) type = 'original';
-        else if (f.endsWith('.txt')) type = 'text';
+        if (f.endsWith('.srt') || f.endsWith('.vtt') || f.endsWith('.lrc')) {
+          type = 'subtitle';
+        } else if (f.endsWith('.txt')) {
+          type = 'text';
+        } else if (f.endsWith('.json')) {
+          type = 'json';
+        } else if (f.endsWith('.csv')) {
+          type = 'csv';
+        }
         window.lastTranscribedOutputFiles.push({
           path: `${outputDir}${sep}${f}`,
           name: f,
@@ -6110,6 +6139,9 @@ window.runWhisperTranscription = async function() {
       if ((!transcriptLines || transcriptLines.length === 0) && result.generatedFiles && result.generatedFiles.length > 0) {
         const subFile = result.generatedFiles.find(f => f.endsWith('.srt')) ||
                         result.generatedFiles.find(f => f.endsWith('.vtt')) ||
+                        result.generatedFiles.find(f => f.endsWith('.lrc')) ||
+                        result.generatedFiles.find(f => f.endsWith('.json')) ||
+                        result.generatedFiles.find(f => f.endsWith('.csv')) ||
                         result.generatedFiles.find(f => f.endsWith('.txt'));
         if (subFile) {
           await loadTranscriptFromFile(`${outputDir}${sep}${subFile}`);
@@ -6145,10 +6177,10 @@ window.runWhisperTranscription = async function() {
       msgEl.textContent = t('transcribe.progressComplete');
     }
 
-    // Find generated subtitle file (.srt, .vtt, or .txt) and update workflow bridging
+    // Find generated subtitle file (.srt, .vtt, or .lrc) and update workflow bridging
     const subFile = result.generatedFiles?.find(f => f.endsWith('.srt')) ||
                     result.generatedFiles?.find(f => f.endsWith('.vtt')) ||
-                    result.generatedFiles?.find(f => f.endsWith('.txt'));
+                    result.generatedFiles?.find(f => f.endsWith('.lrc'));
     if (subFile) {
       window.lastTranscribedSubtitlePath = `${outputDir}${sep}${subFile}`;
     }
@@ -6157,57 +6189,11 @@ window.runWhisperTranscription = async function() {
       updateTranscribeWorkflowButtons();
     }
 
-    // Run AI Translation if enabled
-    if (settingsState.translateAiEnabled && result.generatedFiles && result.generatedFiles.length > 0) {
-      try {
-        if (btnSpan) {
-          btnSpan.setAttribute('data-i18n', 'transcribe.aiTranslating');
-          btnSpan.textContent = t('transcribe.aiTranslating');
-        } else {
-          btn.textContent = t('transcribe.aiTranslating');
-        }
-        if (msgEl) {
-          delete msgEl.dataset.batchSummarySuccess;
-          delete msgEl.dataset.batchSummaryTotal;
-          msgEl.setAttribute('data-i18n', 'transcribe.aiTranslating');
-          msgEl.textContent = t('transcribe.aiTranslating');
-        }
-        showNotification(t('toasts.aiTranslateStart'), "info");
-
-        const translatedFiles = await invoke('translate_transcription_files', {
-          settings: settingsState,
-          generatedFiles: result.generatedFiles,
-          parentDir: outputDir
-        });
-
-        if (translatedFiles && translatedFiles.length > 0) {
-          translatedFiles.forEach(f => {
-            window.lastTranscribedOutputFiles.push({
-              path: `${outputDir}${sep}${f}`,
-              name: f,
-              type: 'translated'
-            });
-          });
-          const translatedSub = translatedFiles.find(f => f.endsWith('.srt') || f.endsWith('.vtt') || f.endsWith('.lrc') || f.endsWith('.txt'));
-          if (translatedSub) {
-            window.lastTranscribedSubtitlePath = `${outputDir}${sep}${translatedSub}`;
-            await loadTranscriptFromFile(window.lastTranscribedSubtitlePath);
-          }
-          if (typeof updateTranscribeWorkflowButtons === 'function') {
-            updateTranscribeWorkflowButtons();
-          }
-        }
-
-        showNotification(t('toasts.aiTranslateComplete'), "success");
-      } catch (err) {
-        const errMsg = (typeof err === 'string') ? err : (err && err.toString ? err.toString() : '');
-        if (errMsg.toLowerCase().includes('cancelled')) {
-          // Bubble up to outer catch so it shows the proper "cancelled" message
-          // and marks the step as incomplete.
-          throw err;
-        } else {
-          showNotification(t('toasts.aiTranslateError', { error: errMsg }), "error");
-        }
+    // Auto-Transfer to Translation Studio if enabled
+    const autoTransferEnabled = Boolean(settingsState?.autoTransferToTranslate ?? settingsState?.translateAiEnabled);
+    if (autoTransferEnabled && window.lastTranscribedSubtitlePath) {
+      if (typeof window.sendTranscribeToTranslationStudio === 'function') {
+        await window.sendTranscribeToTranslationStudio();
       }
     }
   } catch (e) {
@@ -6645,7 +6631,9 @@ window.clearLogsHistory = async function() {
 
 // ----------------- Batch Processing Queue Helpers & Engine -----------------
 function formatDuration(dur) {
-  if (dur === undefined || dur === null || isNaN(dur)) return 'Pending...';
+  if (dur === undefined || dur === null || isNaN(dur) || dur < 0) {
+    return (typeof t === 'function' && t('transcribe.statusPending')) ? (t('transcribe.statusPending') + '...') : 'Pending...';
+  }
   const hours = Math.floor(dur / 3600);
   const minutes = Math.floor((dur % 3600) / 60);
   const seconds = Math.floor(dur % 60);
@@ -6690,9 +6678,27 @@ window.removeFileFromBatch = function(index) {
       } else {
         transcriptLines = [];
         const viewport = document.getElementById('transcript-viewport');
-        if (viewport) viewport.innerHTML = '';
+        if (viewport) {
+          viewport.innerHTML = `
+            <div class="transcript-placeholder" id="transcript-placeholder">
+              <svg class="transcript-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <polyline points="10 9 9 9 8 9"></polyline>
+              </svg>
+              <div class="transcript-empty-title" data-i18n="transcribe.liveViewerTitle">${escapeHTML(t('transcribe.liveViewerTitle') || 'Live Transcript Viewer')}</div>
+              <div class="transcript-empty-desc" data-i18n="transcribe.streamNotice">${escapeHTML(t('transcribe.streamNotice') || 'Start transcription to stream live text preview.')}</div>
+            </div>
+          `;
+        }
         window.lastTranscribedSubtitlePath = null;
+        window.lastTranscribedVideoPath = null;
+        window.lastTranscribedOutputDir = null;
         window.lastTranscribedOutputFiles = [];
+        const btnCopy = document.getElementById('btn-copy-transcript');
+        if (btnCopy) btnCopy.disabled = true;
         if (typeof updateTranscribeWorkflowButtons === 'function') {
           updateTranscribeWorkflowButtons();
         }
@@ -6835,6 +6841,14 @@ window.clearBatchQueue = function() {
   const searchInput = document.getElementById('transcript-search');
   if (searchInput) searchInput.value = '';
   
+  const sortSelect = document.getElementById('batch-sort-select');
+  if (sortSelect) {
+    sortSelect.value = '';
+    if (typeof syncCustomSelect === 'function') {
+      syncCustomSelect(sortSelect);
+    }
+  }
+
   if (settingsState) {
     settingsState.inputFile = "";
     saveCurrentSettings();
@@ -7318,63 +7332,7 @@ window.runBatchExtraction = async function() {
         }
       }
       
-      // Run AI Translation if enabled
-      let translationSuccess = false;
-      item.outputs = result.generatedFiles;
-      
-      while (!translationSuccess && settingsState.translateAiEnabled && result.generatedFiles && result.generatedFiles.length > 0) {
-        if (batchCancelActive) break;
-        
-        try {
-          item.status = 'translating';
-          renderBatchQueueTable();
-          // Message only — the percentage bar is driven by per-chunk
-          // 'translation-status' events from the backend, so it keeps
-          // moving instead of freezing at the batch-item fraction.
-          if (msgEl) msgEl.textContent = t('transcribe.batchTranslatingProgress', { current: i + 1, total: totalCount, name: item.name });
-          
-          const outputDir = result.outputDir || getParentDir(item.path);
-          const translatedFiles = await invoke('translate_transcription_files', {
-            settings: settingsState,
-            generatedFiles: result.generatedFiles,
-            parentDir: outputDir
-          });
-          
-          item.outputs = [...result.generatedFiles, ...translatedFiles];
-          translationSuccess = true;
-
-          const translatedSub = translatedFiles.find(f => f.endsWith('.srt') || f.endsWith('.vtt') || f.endsWith('.lrc') || f.endsWith('.txt'));
-          if (translatedSub) {
-            const sep = outputDir.includes('\\') && !outputDir.includes('/') ? '\\' : '/';
-            await loadTranscriptFromFile(`${outputDir}${sep}${translatedSub}`);
-          }
-        } catch (transErr) {
-          console.error("Batch translation error:", transErr);
-          const errMsg = (typeof transErr === 'string') ? transErr : (transErr && transErr.toString ? transErr.toString() : '');
-          if (errMsg.toLowerCase().includes('cancelled')) {
-            batchCancelActive = true;
-            item.status = 'aborted';
-            renderBatchQueueTable();
-            break;
-          }
-          const choice = await showBatchErrorDialog(item.name, transErr);
-          if (choice === 'retry') {
-            // continues the while loop to retry
-          } else if (choice === 'skip') {
-            translationSuccess = true; // exit loop, proceed with transcription outputs only
-          } else { // abort
-            batchCancelActive = true;
-            item.status = 'aborted';
-            renderBatchQueueTable();
-            break;
-          }
-        }
-      }
-      
-      if (batchCancelActive) {
-        continue;
-      }
-      
+      item.outputs = result.generatedFiles || [];
       item.status = 'completed';
       item.timeSec = result.durationMs / 1000;
       item.speedFactor = result.speedFactor;
@@ -7388,14 +7346,18 @@ window.runBatchExtraction = async function() {
       const sep = itemOutputDir && itemOutputDir.includes('\\') && !itemOutputDir.includes('/') ? '\\' : '/';
       item.outputDir = itemOutputDir;
 
-      const allGenerated = item.outputs || result.generatedFiles || [];
+      const allGenerated = result.generatedFiles || [];
       const outputFilesList = [];
       allGenerated.forEach(f => {
         let type = 'other';
-        if (f.endsWith('.srt') || f.endsWith('.vtt') || f.endsWith('.lrc') || f.endsWith('.ass') || f.endsWith('.sub')) {
-          type = (translationSuccess && translatedFiles && translatedFiles.includes(f)) ? 'translated' : 'original';
+        if (f.endsWith('.srt') || f.endsWith('.vtt') || f.endsWith('.lrc')) {
+          type = 'subtitle';
         } else if (f.endsWith('.txt')) {
-          type = (translationSuccess && translatedFiles && translatedFiles.includes(f)) ? 'translated' : 'text';
+          type = 'text';
+        } else if (f.endsWith('.json')) {
+          type = 'json';
+        } else if (f.endsWith('.csv')) {
+          type = 'csv';
         }
         outputFilesList.push({
           path: `${itemOutputDir}${sep}${f}`,
@@ -7405,14 +7367,14 @@ window.runBatchExtraction = async function() {
       });
       item.outputFiles = outputFilesList;
 
-      const subFileObj = (translationSuccess && translatedFiles) ?
-                         (outputFilesList.find(f => f.type === 'translated' && (f.name.endsWith('.srt') || f.name.endsWith('.vtt') || f.name.endsWith('.lrc') || f.name.endsWith('.ass') || f.name.endsWith('.sub'))) ||
-                          outputFilesList.find(f => f.type === 'translated') ||
-                          outputFilesList.find(f => f.name.endsWith('.srt') || f.name.endsWith('.vtt') || f.name.endsWith('.lrc') || f.name.endsWith('.ass') || f.name.endsWith('.sub') || f.name.endsWith('.txt') || f.name.endsWith('.csv') || f.name.endsWith('.json'))) :
-                         (outputFilesList.find(f => f.name.endsWith('.srt') || f.name.endsWith('.vtt') || f.name.endsWith('.lrc') || f.name.endsWith('.ass') || f.name.endsWith('.sub') || f.name.endsWith('.txt') || f.name.endsWith('.csv') || f.name.endsWith('.json')));
+      // Subtitle path strictly points to playable subtitle formats (.srt, .vtt, .lrc)
+      const subFileObj = outputFilesList.find(f => f.name.endsWith('.srt')) ||
+                         outputFilesList.find(f => f.name.endsWith('.vtt')) ||
+                         outputFilesList.find(f => f.name.endsWith('.lrc'));
       item.subtitlePath = subFileObj ? subFileObj.path : null;
 
-      const txtFileObj = outputFilesList.find(f => f.name.endsWith('.txt'));
+      const txtFileObj = outputFilesList.find(f => f.name.endsWith('.txt')) ||
+                         outputFilesList.find(f => f.name.endsWith('.json') || f.name.endsWith('.csv'));
       item.txtPath = txtFileObj ? txtFileObj.path : (item.subtitlePath || null);
 
       renderBatchQueueTable();
@@ -7477,6 +7439,14 @@ window.runBatchExtraction = async function() {
   }
   
   renderBatchQueueTable();
+
+  // Auto-transfer to Translation Studio if enabled
+  const autoTransferEnabled = Boolean(settingsState?.autoTransferToTranslate ?? settingsState?.translateAiEnabled);
+  if (!batchCancelActive && successCount > 0 && autoTransferEnabled && window.lastTranscribedSubtitlePath) {
+    if (typeof window.sendTranscribeToTranslationStudio === 'function') {
+      await window.sendTranscribeToTranslationStudio();
+    }
+  }
   
   setWizardStepCompleted(3, true);
 };
@@ -8769,6 +8739,64 @@ function formatMsToTimestamp(ms) {
 }
 window.formatMsToTimestamp = formatMsToTimestamp;
 
+function parseTimestampStringToMs(str) {
+  if (!str) return null;
+  const s = String(str).replace(/^["']|["']$/g, '').trim().replace(',', '.');
+  if (s.includes(':')) {
+    const parts = s.split(':');
+    if (parts.length === 3) {
+      const h = parseFloat(parts[0].replace(/^["']|["']$/g, '')) || 0;
+      const m = parseFloat(parts[1].replace(/^["']|["']$/g, '')) || 0;
+      const sec = parseFloat(parts[2].replace(/^["']|["']$/g, '')) || 0;
+      return Math.round((h * 3600 + m * 60 + sec) * 1000);
+    } else if (parts.length === 2) {
+      const m = parseFloat(parts[0].replace(/^["']|["']$/g, '')) || 0;
+      const sec = parseFloat(parts[1].replace(/^["']|["']$/g, '')) || 0;
+      return Math.round((m * 60 + sec) * 1000);
+    }
+  }
+  return null;
+}
+window.parseTimestampStringToMs = parseTimestampStringToMs;
+
+function parseSegmentTimestamps(rawStart, rawEnd) {
+  if (rawStart === undefined || rawStart === null || rawEnd === undefined || rawEnd === null) {
+    return null;
+  }
+  const sClean = typeof rawStart === 'string' ? rawStart.replace(/^["']|["']$/g, '').trim() : String(rawStart);
+  const eClean = typeof rawEnd === 'string' ? rawEnd.replace(/^["']|["']$/g, '').trim() : String(rawEnd);
+
+  if (sClean.includes(':') || eClean.includes(':')) {
+    const s = parseTimestampStringToMs(sClean);
+    const e = parseTimestampStringToMs(eClean);
+    if (s !== null && e !== null) {
+      return { startMs: Math.max(0, s), endMs: Math.max(0, e) };
+    }
+  }
+  const sNum = parseFloat(sClean);
+  const eNum = parseFloat(eClean);
+  if (isNaN(sNum) || isNaN(eNum)) {
+    return null;
+  }
+  const diff = eNum - sNum;
+  const isFractional = sClean.includes('.') || eClean.includes('.') || !Number.isInteger(sNum) || !Number.isInteger(eNum);
+  // Whisper segment is at most 30 seconds.
+  // If diff > 30, it cannot be seconds; values are integer milliseconds.
+  // If fractional or diff <= 30, values are in seconds.
+  if (isFractional || (diff <= 30 && diff >= 0)) {
+    return {
+      startMs: Math.max(0, Math.round(sNum * 1000)),
+      endMs: Math.max(0, Math.round(eNum * 1000))
+    };
+  } else {
+    return {
+      startMs: Math.max(0, Math.round(sNum)),
+      endMs: Math.max(0, Math.round(eNum))
+    };
+  }
+}
+window.parseSegmentTimestamps = parseSegmentTimestamps;
+
 window.loadTranscriptFromFile = async function(fullPath) {
   try {
     const text = await invoke('read_text_file_content', { filePath: fullPath });
@@ -8789,10 +8817,13 @@ window.loadTranscriptFromFile = async function(fullPath) {
               timeRange = `[${seg.timestamps.from.replace(',', '.')} --> ${seg.timestamps.to.replace(',', '.')}]`;
             } else if (seg.offsets && typeof seg.offsets.from === 'number' && typeof seg.offsets.to === 'number') {
               timeRange = `[${formatMsToTimestamp(seg.offsets.from)} --> ${formatMsToTimestamp(seg.offsets.to)}]`;
-            } else if (typeof seg.start === 'number' && typeof seg.end === 'number') {
-              const startMs = seg.start > 10000 ? seg.start : seg.start * 1000;
-              const endMs = seg.end > 10000 ? seg.end : seg.end * 1000;
-              timeRange = `[${formatMsToTimestamp(startMs)} --> ${formatMsToTimestamp(endMs)}]`;
+            } else if ((typeof seg.start === 'number' || typeof seg.start === 'string') && (typeof seg.end === 'number' || typeof seg.end === 'string')) {
+              const parsedTimes = parseSegmentTimestamps(seg.start, seg.end);
+              if (parsedTimes) {
+                timeRange = `[${formatMsToTimestamp(parsedTimes.startMs)} --> ${formatMsToTimestamp(parsedTimes.endMs)}]`;
+              } else {
+                timeRange = `Line ${idx + 1}`;
+              }
             } else {
               timeRange = `Line ${idx + 1}`;
             }
@@ -8843,18 +8874,43 @@ window.loadTranscriptFromFile = async function(fullPath) {
       const sep = ext === 'tsv' ? '\t' : ',';
       const rawLines = text.split('\n');
       let cueId = 0;
+      let startCol = 0;
+      let endCol = 1;
+      let textCol = 2;
+
       rawLines.forEach((l, idx) => {
-        if (!l.trim()) return;
-        if (idx === 0 && (l.toLowerCase().includes('start') || l.toLowerCase().includes('text'))) return;
-        const cols = l.split(sep);
-        if (cols.length >= 3) {
-          const startVal = parseFloat(cols[0].trim());
-          const endVal = parseFloat(cols[1].trim());
-          const textVal = cols.slice(2).join(sep).replace(/^["']|["']$/g, '').trim();
-          if (!isNaN(startVal) && !isNaN(endVal) && textVal) {
-            const startMs = startVal > 10000 ? startVal : startVal * 1000;
-            const endMs = endVal > 10000 ? endVal : endVal * 1000;
-            const timeRange = `[${formatMsToTimestamp(startMs)} --> ${formatMsToTimestamp(endMs)}]`;
+        const line = l.trim();
+        if (!line) return;
+
+        if (idx === 0 && (line.toLowerCase().includes('start') || line.toLowerCase().includes('text'))) {
+          // Detect header columns (e.g. id,start,end,text or start,end,text)
+          const headerCols = line.split(sep).map(c => c.replace(/^["']|["']$/g, '').trim().toLowerCase());
+          const sIdx = headerCols.findIndex(c => c === 'start' || c === 'start_time' || c === 'from');
+          const eIdx = headerCols.findIndex(c => c === 'end' || c === 'end_time' || c === 'to');
+          const tIdx = headerCols.findIndex(c => c === 'text' || c === 'content' || c === 'sentence');
+          if (sIdx !== -1 && eIdx !== -1) {
+            startCol = sIdx;
+            endCol = eIdx;
+            if (tIdx !== -1) textCol = tIdx;
+          }
+          return;
+        }
+
+        const cols = line.split(sep);
+        const minCols = Math.max(startCol, endCol, textCol) + 1;
+        if (cols.length >= minCols) {
+          const rawStart = cols[startCol].trim();
+          const rawEnd = cols[endCol].trim();
+          let textVal = '';
+          if (textCol === cols.length - 1 || textCol === 2) {
+            textVal = cols.slice(textCol).join(sep);
+          } else {
+            textVal = cols[textCol];
+          }
+          textVal = textVal.replace(/^["']|["']$/g, '').replace(/""/g, '"').trim();
+          const parsedTimes = parseSegmentTimestamps(rawStart, rawEnd);
+          if (parsedTimes && textVal) {
+            const timeRange = `[${formatMsToTimestamp(parsedTimes.startMs)} --> ${formatMsToTimestamp(parsedTimes.endMs)}]`;
             transcriptLines.push({ timeRange, text: textVal, id: cueId++ });
           }
         }
