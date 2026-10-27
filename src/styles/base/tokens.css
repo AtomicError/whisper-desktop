@@ -1,0 +1,681 @@
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('../../fonts/Vazirmatn.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Vazir';
+  src: url('../../fonts/Vazirmatn.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Shabnam';
+  src: url('../../fonts/Shabnam.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Samim';
+  src: url('../../fonts/Samim.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Sahel';
+  src: url('../../fonts/Sahel.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url('../../fonts/Inter.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('../../fonts/JetBrainsMono.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Roboto';
+  src: url('../../fonts/Roboto.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Outfit';
+  src: url('../../fonts/Outfit.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Lora';
+  src: url('../../fonts/Lora.ttf') format('truetype');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Montserrat';
+  src: url('../../fonts/Montserrat.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+html {
+  font-size: 16px;
+}
+
+@media (min-width: 1400px) {
+  html {
+    font-size: 17px;
+  }
+}
+
+@media (min-width: 1900px) {
+  html {
+    font-size: 18px;
+  }
+}
+
+@property --color-accent {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #2d7fff;
+}
+
+@property --color-royal-blue {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #2d7fff;
+}
+
+@property --color-royal-blue-dark {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #0057d9;
+}
+
+@property --color-cyan {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #06b6d4;
+}
+
+@property --color-sky {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #38bdf8;
+}
+
+@property --bg-space {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #070913;
+}
+
+@property --bg-deep {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #0b0e1b;
+}
+
+@property --bg-titlebar {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: rgba(9, 11, 23, 0.98);
+}
+
+@property --bg-card {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: rgba(15, 20, 38, 0.55);
+}
+
+@property --bg-card-hover {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: rgba(22, 29, 54, 0.75);
+}
+
+@property --bg-glass-card {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: rgba(15, 20, 38, 0.65);
+}
+
+@property --border-glass-active {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: rgba(45, 127, 255, 0.4);
+}
+
+:root,
+:root[data-theme="royal-blue"],
+:root[data-theme="cyber-blue"] {
+  --bg-space: #070913;
+  --bg-deep: #0b0e1b;
+  --bg-card: rgba(15, 20, 38, 0.55);
+  --bg-card-hover: rgba(22, 29, 54, 0.75);
+  --bg-input: rgba(10, 13, 28, 0.8);
+  --bg-dropdown: #111427;
+  --bg-titlebar: rgba(9, 11, 23, 0.98);
+  --bg-table-head: #0d1021;
+  --bg-table-body: rgba(9, 12, 24, 0.85);
+  --bg-glass-card: rgba(15, 20, 38, 0.65);
+  --border-glass: rgba(255, 255, 255, 0.06);
+  --border-glass-active: rgba(45, 127, 255, 0.4);
+  
+  --color-accent: #2d7fff;
+  --color-accent-rgb: 45, 127, 255;
+  --color-accent-dark: #0057d9;
+  --color-accent-dark-rgb: 0, 87, 217;
+  --shadow-neon-accent: 0 0 20px rgba(45, 127, 255, 0.25);
+
+  --color-cyan: #06b6d4;
+  --color-cyan-rgb: 6, 182, 212;
+  --color-sky: #38bdf8;
+  --color-sky-rgb: 56, 189, 248;
+  --color-royal-blue: #2d7fff;
+  --color-royal-blue-rgb: 45, 127, 255;
+  --color-royal-blue-dark: #0057d9;
+  --color-royal-blue-dark-rgb: 0, 87, 217;
+  --color-gold: #f59e0b;
+  --color-gold-rgb: 245, 158, 11;
+  --color-warm: #f59e0b;
+  --color-green: #10b981;
+  --color-green-rgb: 16, 185, 129;
+  --color-red: #ef4444;
+  --color-red-rgb: 239, 68, 68;
+  --color-hot: #f43f5e;
+  --color-text: #f3f4f6;
+  --color-text-muted: #9ca3af;
+  --color-text-dim: #94a3b8;
+
+  /* Sizing & Radius Tokens */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 14px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+
+  /* Surfaces & Typography Design Tokens */
+  --bg-app: #09090b;
+  --bg-surface: #121215;
+  --bg-elevated: #18181b;
+  --bg-hover: #27272a;
+  --border-subtle: #27272a;
+  --border-focus: #3f3f46;
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --accent-primary: #3b82f6;
+  --accent-hover: #2563eb;
+  --danger: #ef4444;
+
+  /* Model Family Palette Accents */
+  --color-model-large: #2d7fff;
+  --color-model-large-rgb: 45, 127, 255;
+  --color-model-medium: #06b6d4;
+  --color-model-medium-rgb: 6, 182, 212;
+  --color-model-small: #10b981;
+  --color-model-small-rgb: 16, 185, 129;
+  --color-model-base: #f59e0b;
+  --color-model-base-rgb: 245, 158, 11;
+  
+  --shadow-neon-cyan: 0 0 15px rgba(6, 182, 212, 0.15);
+  --shadow-neon-royal-blue: 0 0 20px rgba(45, 127, 255, 0.25);
+  --shadow-neon-gold: 0 0 15px rgba(245, 158, 11, 0.15);
+  --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+
+  --bg-radial-1: rgba(45, 127, 255, 0.08);
+  --bg-radial-2: rgba(6, 182, 212, 0.06);
+
+  --primary-btn-bg: linear-gradient(135deg, #2d7fff, #0057d9);
+  --primary-btn-border: #003ca6;
+  --primary-btn-shadow: 0 4px 16px 0 rgba(0, 87, 217, 0.2);
+  --primary-btn-hover-bg: linear-gradient(135deg, #3d8bff, #0a66f2);
+  --primary-btn-hover-border: #004ad4;
+  --primary-btn-hover-shadow: 0 6px 20px 0 rgba(0, 87, 217, 0.3);
+  --primary-btn-active-bg: linear-gradient(135deg, #0057d9, #003ca6);
+  --primary-btn-active-border: #002e80;
+
+  --nav-active-bg: linear-gradient(135deg, rgba(45, 127, 255, 0.16) 0%, rgba(45, 127, 255, 0.06) 100%);
+  --nav-active-border: rgba(45, 127, 255, 0.4);
+  --nav-active-shadow: 0 4px 16px rgba(45, 127, 255, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.15), inset 0 0 12px rgba(45, 127, 255, 0.1);
+  --nav-active-hover-bg: linear-gradient(135deg, rgba(45, 127, 255, 0.22) 0%, rgba(45, 127, 255, 0.1) 100%);
+  --nav-active-hover-border: rgba(45, 127, 255, 0.58);
+  --nav-active-hover-shadow: 0 6px 20px rgba(45, 127, 255, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2), inset 0 0 16px rgba(45, 127, 255, 0.15);
+  
+  --font-sans: 'Inter', 'Outfit', 'Vazirmatn', 'Vazir', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Noto Sans SC", "Noto Sans JP", "Noto Sans KR", "Malgun Gothic", "WenQuanYi Micro Hei", sans-serif;
+  --font-mono: 'JetBrains Mono', 'Vazirmatn', 'Vazir', monospace;
+  
+  --transition-smooth: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
+}
+
+:root[data-theme="fire-orange"],
+:root[data-theme="fire"] {
+  --bg-space: #0c0a09;
+  --bg-deep: #140f0c;
+  --bg-card: rgba(28, 20, 16, 0.6);
+  --bg-card-hover: rgba(42, 28, 22, 0.75);
+  --bg-input: rgba(20, 14, 11, 0.85);
+  --bg-dropdown: #17120e;
+  --bg-titlebar: rgba(16, 12, 10, 0.98);
+  --bg-table-head: #16110d;
+  --bg-table-body: rgba(22, 17, 13, 0.85);
+  --bg-glass-card: rgba(28, 20, 16, 0.70);
+  --border-glass: rgba(255, 255, 255, 0.07);
+  --border-glass-active: rgba(255, 107, 0, 0.45);
+  
+  --color-accent: #ff6b00;
+  --color-accent-rgb: 255, 107, 0;
+  --color-accent-dark: #d94800;
+  --color-accent-dark-rgb: 217, 72, 0;
+  --shadow-neon-accent: 0 0 20px rgba(255, 107, 0, 0.3);
+
+  --color-cyan: #ff9800;
+  --color-cyan-rgb: 255, 152, 0;
+  --color-sky: #fb923c;
+  --color-sky-rgb: 251, 146, 60;
+  --color-royal-blue: #ff6b00;
+  --color-royal-blue-rgb: 255, 107, 0;
+  --color-royal-blue-dark: #d94800;
+  --color-royal-blue-dark-rgb: 217, 72, 0;
+  --color-gold: #fbbf24;
+  --color-gold-rgb: 251, 191, 36;
+  --color-green: #10b981;
+  --color-green-rgb: 16, 185, 129;
+  --color-red: #ef4444;
+  --color-red-rgb: 239, 68, 68;
+  --color-hot: #f43f5e;
+
+  /* Model Family Palette Accents (Option 1: Natural Thermal Spectrum) */
+  --color-model-large: #ef4444;
+  --color-model-large-rgb: 239, 68, 68;
+  --color-model-medium: #ff6b00;
+  --color-model-medium-rgb: 255, 107, 0;
+  --color-model-small: #f59e0b;
+  --color-model-small-rgb: 245, 158, 11;
+  --color-model-base: #fde047;
+  --color-model-base-rgb: 253, 224, 71;
+  
+  --shadow-neon-cyan: 0 0 15px rgba(255, 152, 0, 0.2);
+  --shadow-neon-royal-blue: 0 0 20px rgba(255, 107, 0, 0.3);
+  --shadow-neon-gold: 0 0 15px rgba(251, 191, 36, 0.2);
+  
+  --bg-radial-1: rgba(255, 107, 0, 0.10);
+  --bg-radial-2: rgba(251, 191, 36, 0.07);
+
+  --primary-btn-bg: linear-gradient(135deg, #ff6b00, #d94800);
+  --primary-btn-border: #b83800;
+  --primary-btn-shadow: 0 4px 16px 0 rgba(217, 72, 0, 0.25);
+  --primary-btn-hover-bg: linear-gradient(135deg, #ff7a1a, #f05000);
+  --primary-btn-hover-border: #cc3e00;
+  --primary-btn-hover-shadow: 0 6px 20px 0 rgba(255, 107, 0, 0.35);
+  --primary-btn-active-bg: linear-gradient(135deg, #d94800, #b83800);
+  --primary-btn-active-border: #992e00;
+
+  --nav-active-bg: linear-gradient(135deg, rgba(255, 107, 0, 0.18) 0%, rgba(255, 107, 0, 0.06) 100%);
+  --nav-active-border: rgba(255, 107, 0, 0.45);
+  --nav-active-shadow: 0 4px 16px rgba(255, 107, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.15), inset 0 0 12px rgba(255, 107, 0, 0.12);
+  --nav-active-hover-bg: linear-gradient(135deg, rgba(255, 107, 0, 0.25) 0%, rgba(255, 107, 0, 0.1) 100%);
+  --nav-active-hover-border: rgba(255, 107, 0, 0.65);
+  --nav-active-hover-shadow: 0 6px 20px rgba(255, 107, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2), inset 0 0 16px rgba(255, 107, 0, 0.15);
+}
+
+:root[data-theme="carbon"] {
+  /* Surfaces & Canvas (Neutral monochrome canvas without color cast) */
+  --bg-space: #121214;                      /* Main application canvas */
+  --bg-deep: #18181b;                       /* Sidebar and deep containers */
+  --bg-card: rgba(28, 28, 32, 0.75);        /* Floating cards and panels */
+  --bg-card-hover: rgba(38, 38, 44, 0.88);  /* Card hover state */
+  --bg-input: #161619;                      /* Form input fields */
+  --bg-dropdown: #1c1c20;                   /* Dropdown selection menus */
+  --bg-titlebar: rgba(18, 18, 20, 0.98);    /* Window titlebar */
+  --bg-table-head: #17171a;                 /* History and models table headers */
+  --bg-table-body: rgba(20, 20, 23, 0.85);  /* Table row background */
+  --bg-glass-card: rgba(28, 28, 32, 0.75);
+
+  /* Borders & Dividers */
+  --border-glass: rgba(255, 255, 255, 0.08);
+  --border-glass-active: rgba(239, 68, 68, 0.50);
+
+  /* Actionable Crimson / Racing Red Accent */
+  --color-accent: #ef4444;
+  --color-accent-rgb: 239, 68, 68;
+  --color-accent-dark: #dc2626;
+  --color-accent-dark-rgb: 220, 38, 38;
+  --shadow-neon-accent: 0 0 20px rgba(239, 68, 68, 0.28);
+
+  /* Base Semantic Colors */
+  --color-cyan: #f43f5e;
+  --color-cyan-rgb: 244, 63, 94;
+  --color-sky: #f87171;
+  --color-sky-rgb: 248, 113, 113;
+  --color-gold: #f59e0b;
+  --color-gold-rgb: 245, 158, 11;
+  --color-warm: #f59e0b;
+  --color-green: #10b981;
+  --color-green-rgb: 16, 185, 129;
+  --color-red: #ef4444;
+  --color-red-rgb: 239, 68, 68;
+  --color-hot: #f43f5e;
+
+  /* Legacy & Shadowing Tokens (Brand icon/name and signature accents in vibrant crimson) */
+  --color-royal-blue: #ef4444;
+  --color-royal-blue-rgb: 239, 68, 68;
+  --color-royal-blue-dark: #dc2626;
+  --color-royal-blue-dark-rgb: 220, 38, 38;
+
+  /* High Contrast Neutral Typography (WCAG AAA compliant) */
+  --color-text: #f4f4f5;
+  --color-text-main: #f4f4f5;
+  --color-text-muted: #a1a1aa;
+  --color-text-dim: #94a3b8;
+
+  /* Theme-specific Accent Token Overrides */
+  --accent-primary: var(--color-accent);
+  --accent-hover: var(--color-accent-dark);
+
+  /* Model Family Palette Accents (Obsidian Cherry to Platinum Spectrum) */
+  --color-model-large: #ef4444;
+  --color-model-large-rgb: 239, 68, 68;
+  --color-model-medium: #f43f5e;
+  --color-model-medium-rgb: 244, 63, 94;
+  --color-model-small: #fb7185;
+  --color-model-small-rgb: 251, 113, 133;
+  --color-model-base: #e4e4e7;
+  --color-model-base-rgb: 228, 228, 231;
+
+  --shadow-neon-cyan: 0 0 12px rgba(244, 63, 94, 0.20);
+  --shadow-neon-royal-blue: 0 0 20px rgba(239, 68, 68, 0.28);
+  --shadow-neon-gold: 0 0 15px rgba(244, 63, 94, 0.15);
+
+  --bg-radial-1: rgba(255, 255, 255, 0.02);
+  --bg-radial-2: rgba(255, 255, 255, 0.01);
+
+  /* Buttons & Action Elements */
+  --primary-btn-bg: linear-gradient(135deg, #ef4444, #dc2626);
+  --primary-btn-border: #b91c1c;
+  --primary-btn-shadow: 0 4px 16px 0 rgba(220, 38, 38, 0.30);
+  --primary-btn-hover-bg: linear-gradient(135deg, #f87171, #ef4444);
+  --primary-btn-hover-border: #dc2626;
+  --primary-btn-hover-shadow: 0 6px 20px 0 rgba(220, 38, 38, 0.40);
+  --primary-btn-active-bg: linear-gradient(135deg, #dc2626, #991b1b);
+  --primary-btn-active-border: #7f1d1d;
+
+  /* Navigation Item States */
+  --nav-active-bg: linear-gradient(135deg, rgba(239, 68, 68, 0.16) 0%, rgba(239, 68, 68, 0.04) 100%);
+  --nav-active-border: rgba(239, 68, 68, 0.45);
+  --nav-active-shadow: 0 4px 16px rgba(239, 68, 68, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  --nav-active-hover-bg: linear-gradient(135deg, rgba(239, 68, 68, 0.22) 0%, rgba(239, 68, 68, 0.08) 100%);
+  --nav-active-hover-border: rgba(239, 68, 68, 0.60);
+  --nav-active-hover-shadow: 0 6px 20px rgba(239, 68, 68, 0.28);
+}
+
+:root[data-theme="emerald"] {
+  --bg-space: #060e0a;
+  --bg-deep: #09150f;
+  --bg-card: rgba(12, 28, 20, 0.60);
+  --bg-card-hover: rgba(18, 38, 28, 0.80);
+  --bg-input: rgba(8, 20, 14, 0.85);
+  --bg-dropdown: #0d1f16;
+  --bg-titlebar: rgba(8, 18, 13, 0.98);
+  --bg-table-head: #0b1c13;
+  --bg-table-body: rgba(10, 24, 17, 0.85);
+  --bg-glass-card: rgba(12, 28, 20, 0.65);
+
+  --border-glass: rgba(255, 255, 255, 0.07);
+  --border-glass-active: rgba(16, 185, 129, 0.45);
+
+  --color-accent: #10b981;
+  --color-accent-rgb: 16, 185, 129;
+  --color-accent-dark: #059669;
+  --color-accent-dark-rgb: 5, 150, 105;
+  --shadow-neon-accent: 0 0 20px rgba(16, 185, 129, 0.30);
+
+  --color-cyan: #2dd4bf;
+  --color-cyan-rgb: 45, 212, 191;
+  --color-sky: #34d399;
+  --color-sky-rgb: 52, 211, 153;
+  --color-royal-blue: #10b981;
+  --color-royal-blue-rgb: 16, 185, 129;
+  --color-royal-blue-dark: #059669;
+  --color-royal-blue-dark-rgb: 5, 150, 105;
+  --color-gold: #fbbf24;
+  --color-gold-rgb: 251, 191, 36;
+  --color-warm: #f59e0b;
+  --color-green: #10b981;
+  --color-green-rgb: 16, 185, 129;
+  --color-red: #ef4444;
+  --color-red-rgb: 239, 68, 68;
+  --color-hot: #f43f5e;
+
+  --color-text: #f0fdf4;
+  --color-text-main: #f0fdf4;
+  --color-text-muted: #94a3b8;
+  --color-text-dim: #94a3b8;
+
+  /* Sizing & Radius Tokens */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 14px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+
+  /* Surfaces & Typography Design Tokens */
+  --bg-app: #09090b;
+  --bg-surface: #121215;
+  --bg-elevated: #18181b;
+  --bg-hover: #27272a;
+  --border-subtle: #27272a;
+  --border-focus: #3f3f46;
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --accent-primary: #3b82f6;
+  --accent-hover: #2563eb;
+  --danger: #ef4444;
+
+  /* Model Family Palette Accents */
+  --color-model-large: #10b981;
+  --color-model-large-rgb: 16, 185, 129;
+  --color-model-medium: #2dd4bf;
+  --color-model-medium-rgb: 45, 212, 191;
+  --color-model-small: #34d399;
+  --color-model-small-rgb: 52, 211, 153;
+  --color-model-base: #a7f3d0;
+  --color-model-base-rgb: 167, 243, 208;
+
+  --shadow-neon-cyan: 0 0 15px rgba(45, 212, 191, 0.20);
+  --shadow-neon-royal-blue: 0 0 20px rgba(16, 185, 129, 0.30);
+  --shadow-neon-gold: 0 0 15px rgba(251, 191, 36, 0.15);
+
+  --bg-radial-1: rgba(16, 185, 129, 0.09);
+  --bg-radial-2: rgba(45, 212, 191, 0.05);
+
+  --primary-btn-bg: linear-gradient(135deg, #10b981, #059669);
+  --primary-btn-border: #047857;
+  --primary-btn-shadow: 0 4px 16px 0 rgba(5, 150, 105, 0.28);
+  --primary-btn-hover-bg: linear-gradient(135deg, #34d399, #10b981);
+  --primary-btn-hover-border: #059669;
+  --primary-btn-hover-shadow: 0 6px 20px 0 rgba(16, 185, 129, 0.35);
+  --primary-btn-active-bg: linear-gradient(135deg, #059669, #047857);
+  --primary-btn-active-border: #065f46;
+
+  --nav-active-bg: linear-gradient(135deg, rgba(16, 185, 129, 0.18) 0%, rgba(16, 185, 129, 0.06) 100%);
+  --nav-active-border: rgba(16, 185, 129, 0.45);
+  --nav-active-shadow: 0 4px 16px rgba(16, 185, 129, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.15), inset 0 0 12px rgba(16, 185, 129, 0.12);
+  --nav-active-hover-bg: linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(16, 185, 129, 0.10) 100%);
+  --nav-active-hover-border: rgba(16, 185, 129, 0.65);
+  --nav-active-hover-shadow: 0 6px 20px rgba(16, 185, 129, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2), inset 0 0 16px rgba(16, 185, 129, 0.15);
+}
+
+/* ==========================================================================
+   MONOCHROME CANVAS ENGINE (TINT-FREE STUDIO SURFACES)
+   Subtle studio matte charcoal surfaces with full preservation of
+   theme accent colors, typography, buttons, and semantic states.
+   ========================================================================== */
+
+/* 1. Base & Royal Blue with Monochrome Canvas (Deep studio graphite with zero navy/cyan cast) */
+:root[data-canvas="monochrome"],
+:root[data-theme="royal-blue"][data-canvas="monochrome"],
+:root[data-theme="cyber-blue"][data-canvas="monochrome"] {
+  --bg-space: #101114;
+  --bg-deep: #16171b;
+  --bg-card: rgba(26, 27, 32, 0.72);
+  --bg-card-hover: rgba(36, 37, 44, 0.85);
+  --bg-input: #151619;
+  --bg-dropdown: #1b1c20;
+  --bg-titlebar: rgba(16, 17, 20, 0.98);
+  --bg-table-head: #16171a;
+  --bg-table-body: rgba(18, 19, 23, 0.85);
+  --bg-glass-card: rgba(26, 27, 32, 0.72);
+  --border-glass: rgba(255, 255, 255, 0.07);
+
+  --bg-radial-1: rgba(255, 255, 255, 0.015);
+  --bg-radial-2: rgba(255, 255, 255, 0.01);
+}
+
+/* 2. Fiery Orange with Monochrome Canvas (Volcanic obsidian matte with zero muddy brown cast) */
+:root[data-theme="fire-orange"][data-canvas="monochrome"],
+:root[data-theme="fire"][data-canvas="monochrome"] {
+  --bg-space: #121111;
+  --bg-deep: #171515;
+  --bg-card: rgba(30, 26, 26, 0.72);
+  --bg-card-hover: rgba(40, 35, 35, 0.85);
+  --bg-input: #171515;
+  --bg-dropdown: #1d1a1a;
+  --bg-titlebar: rgba(18, 17, 17, 0.98);
+  --bg-table-head: #181616;
+  --bg-table-body: rgba(20, 18, 18, 0.85);
+  --bg-glass-card: rgba(30, 26, 26, 0.72);
+  --border-glass: rgba(255, 255, 255, 0.07);
+
+  --bg-radial-1: rgba(255, 255, 255, 0.015);
+  --bg-radial-2: rgba(255, 255, 255, 0.01);
+}
+
+/* 3. Emerald with Monochrome Canvas (Titanium charcoal matte with zero marshy green cast) */
+:root[data-theme="emerald"][data-canvas="monochrome"] {
+  --bg-space: #101211;
+  --bg-deep: #151816;
+  --bg-card: rgba(24, 29, 26, 0.72);
+  --bg-card-hover: rgba(34, 40, 36, 0.85);
+  --bg-input: #141715;
+  --bg-dropdown: #1a1e1c;
+  --bg-titlebar: rgba(16, 18, 17, 0.98);
+  --bg-table-head: #151917;
+  --bg-table-body: rgba(18, 22, 20, 0.85);
+  --bg-glass-card: rgba(24, 29, 26, 0.72);
+  --border-glass: rgba(255, 255, 255, 0.07);
+
+  --bg-radial-1: rgba(255, 255, 255, 0.015);
+  --bg-radial-2: rgba(255, 255, 255, 0.01);
+}
+
+/* 4. Carbon with Monochrome Canvas (Maintains native neutral obsidian surfaces) */
+:root[data-theme="carbon"][data-canvas="monochrome"] {
+  --bg-space: #121214;
+  --bg-deep: #18181b;
+  --bg-card: rgba(28, 28, 32, 0.75);
+  --bg-card-hover: rgba(38, 38, 44, 0.88);
+  --bg-input: #161619;
+  --bg-dropdown: #1c1c20;
+  --bg-titlebar: rgba(18, 18, 20, 0.98);
+  --bg-table-head: #17171a;
+  --bg-table-body: rgba(20, 20, 23, 0.85);
+  --bg-glass-card: rgba(28, 28, 32, 0.75);
+  --border-glass: rgba(255, 255, 255, 0.08);
+
+  --bg-radial-1: rgba(255, 255, 255, 0.015);
+  --bg-radial-2: rgba(255, 255, 255, 0.01);
+}
+
+/* ==========================================================================
+   SMOOTH DESKTOP THEME TRANSITIONS (GPU ACCELERATED VIEW TRANSITIONS)
+   ========================================================================== */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 260ms;
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+
+::view-transition-old(root) {
+  animation-name: theme-crossfade-out;
+}
+
+::view-transition-new(root) {
+  animation-name: theme-crossfade-in;
+}
+
+@keyframes theme-crossfade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes theme-crossfade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Fallback for environments without View Transitions API */
+html.theme-transitioning,
+html.theme-transitioning body,
+html.theme-transitioning .titlebar,
+html.theme-transitioning sidebar,
+html.theme-transitioning header,
+html.theme-transitioning .main-view,
+html.theme-transitioning .nav-item,
+html.theme-transitioning .theme-picker-card,
+html.theme-transitioning .backend-card,
+html.theme-transitioning .setting-card,
+html.theme-transitioning .wizard-step,
+html.theme-transitioning .btn-primary,
+html.theme-transitioning .btn-secondary,
+html.theme-transitioning .output-badge,
+html.theme-transitioning .analytics-box,
+html.theme-transitioning .telemetry-hud,
+html.theme-transitioning .batch-queue-panel {
+  transition: background-color 260ms cubic-bezier(0.2, 0, 0, 1),
+              border-color 260ms cubic-bezier(0.2, 0, 0, 1),
+              box-shadow 260ms cubic-bezier(0.2, 0, 0, 1),
+              color 260ms cubic-bezier(0.2, 0, 0, 1) !important;
+  transition-delay: 0s !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+

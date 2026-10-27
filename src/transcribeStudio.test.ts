@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ar } from './locales/ar';
 import { de } from './locales/de';
@@ -828,8 +828,16 @@ describe('Transcription Studio Output Directory & Workflow Logic', () => {
     expect(htmlContent).toMatch(/<span[^>]*id="hud-status-badge"[^>]*>[\s\S]*?<span[^>]*id="hud-pulse-dot"[^>]*><\/span>[\s\S]*?<span[^>]*id="hud-status-text"/);
   });
 
+  function loadResolvedCss(cssFile: string): string {
+    const content = readFileSync(cssFile, 'utf-8');
+    return content.replace(/@import\s+['"]([^'"]+)['"];/g, (_, importPath) => {
+      const resolvedPath = resolve(dirname(cssFile), importPath);
+      return readFileSync(resolvedPath, 'utf-8');
+    });
+  }
+
   it('enforces RTL progress bar head and gradient symmetry in stylesheet', () => {
-    const cssContent = readFileSync(resolve(__dirname, 'styles.css'), 'utf-8');
+    const cssContent = loadResolvedCss(resolve(__dirname, 'styles.css'));
     // Glowing head moves to left: 0 in RTL
     expect(cssContent).toMatch(/html\[dir="rtl"\]\s+\.progress-linear-glow[\s\S]*?left:\s*0/);
     expect(cssContent).toMatch(/html\[dir="rtl"\]\s+\.progress-linear-glow[\s\S]*?right:\s*auto/);
@@ -838,7 +846,7 @@ describe('Transcription Studio Output Directory & Workflow Logic', () => {
   });
 
   it('enforces equal 50% width and ellipsis overflow protection on action buttons in stylesheet', () => {
-    const cssContent = readFileSync(resolve(__dirname, 'styles.css'), 'utf-8');
+    const cssContent = loadResolvedCss(resolve(__dirname, 'styles.css'));
     // Start and cancel buttons both have flex: 1 1 0 and width: 50%
     expect(cssContent).toMatch(/\.btn-start-transcription\s*\{[\s\S]*?flex:\s*1 1 0/);
     expect(cssContent).toMatch(/\.btn-start-transcription\s*\{[\s\S]*?width:\s*50%/);
@@ -896,7 +904,7 @@ describe('Transcription Studio Output Directory & Workflow Logic', () => {
     expect(htmlContent).not.toContain('class="batch-queue-toolbar"');
 
     // CSS structure validation
-    const cssContent = readFileSync(resolve(__dirname, 'styles.css'), 'utf-8');
+    const cssContent = loadResolvedCss(resolve(__dirname, 'styles.css'));
     expect(cssContent).toContain('.batch-queue-card');
     expect(cssContent).toContain('.batch-card-top-row');
     expect(cssContent).toContain('.batch-card-bottom-row');
