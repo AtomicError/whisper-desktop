@@ -501,13 +501,39 @@ html[dir="rtl"] .translate-switch-info {
 }
 
 /* The queue card mirrors in an RTL interface — that is the card's own
-   `direction` — so its cells and duration badges read from the side its columns do. */
-html[dir="rtl"] .batch-card-duration,
-html[dir="rtl"] #batch-total-duration,
-html[dir="rtl"] .pill-duration strong,
+   `direction` — so its cells and duration badges read from the side its columns do.
+   Duration digits and time values maintain LTR formatting without forcing Persian strings
+   (such as 'در حال محاسبه...' or 'در انتظار...') into LTR. */
 html[dir="rtl"] .transcript-card-time {
   direction: ltr;
   unicode-bidi: isolate;
+}
+
+html[dir="rtl"] .batch-card-duration,
+html[dir="rtl"] #batch-total-duration,
+html[dir="rtl"] .pill-duration strong {
+  unicode-bidi: isolate;
+  text-align: end;
+}
+
+html[dir="rtl"] .batch-card-duration[dir="ltr"],
+html[dir="rtl"] #batch-total-duration[dir="ltr"] {
+  direction: ltr;
+}
+
+html[dir="rtl"] .batch-card-duration:dir(ltr),
+html[dir="rtl"] #batch-total-duration:dir(ltr) {
+  direction: ltr;
+}
+
+html[dir="rtl"] .batch-card-duration[dir="rtl"],
+html[dir="rtl"] #batch-total-duration[dir="rtl"] {
+  direction: rtl;
+}
+
+html[dir="rtl"] .batch-card-duration:dir(rtl),
+html[dir="rtl"] #batch-total-duration:dir(rtl) {
+  direction: rtl;
 }
 
 html[dir="rtl"] .batch-table {

@@ -921,14 +921,14 @@ describe('Transcription Studio Output Directory & Workflow Logic', () => {
     expect(mainJsContent).toContain('activeBatchViewerIndex = index;');
 
     // Verification of card selection and visual indicators in queue renderer
-    expect(mainJsContent).toContain('const isSelected = isCompleted && !isRunning && activeBatchViewerIndex === index;');
-    expect(mainJsContent).toContain('const isClickable = isCompleted && !isRunning;');
+    expect(mainJsContent).toContain('const isSelected = activeBatchViewerIndex === index;');
+    expect(mainJsContent).toContain('const isClickable = isCompleted || isActive;');
     expect(mainJsContent).toContain('${isClickable ? \'is-clickable\' : \'\'}');
     expect(mainJsContent).toContain('${isSelected ? \'is-selected\' : \'\'}');
     expect(mainJsContent).toContain('batch-viewing-chip');
 
     // Verification of in-memory transcript lines preservation and unified rendering
-    expect(mainJsContent).toContain('item.transcriptLines = transcriptLines.map(');
+    expect(mainJsContent).toContain('transcriptLines = item.transcriptLines.map(');
     expect(mainJsContent).toContain('function createTranscriptCardElement(lineObj)');
     expect(mainJsContent).toContain('function renderTranscriptLines(lines)');
 
@@ -1280,10 +1280,10 @@ it releases chemicals that hit your eyes
   it('properly resets batch queue sort select and restores empty placeholder on item removal', () => {
     const mainJsContent = readFileSync(resolve(__dirname, 'main.js'), 'utf-8');
 
-    // Verify clearBatchQueue resets batch-sort-select
+    // Verify clearBatchQueue resets batch-sort-select using customSelectsMap
     expect(mainJsContent).toContain("const sortSelect = document.getElementById('batch-sort-select');");
     expect(mainJsContent).toContain("sortSelect.value = '';");
-    expect(mainJsContent).toContain('syncCustomSelect(sortSelect);');
+    expect(mainJsContent).toContain("window.customSelectsMap.get('batch-sort-select').syncSelectedValue();");
 
     // Verify removeFileFromBatch restores placeholder, clears paths, and clears outputDir
     expect(mainJsContent).toContain("window.lastTranscribedVideoPath = null;");
@@ -1293,17 +1293,164 @@ it releases chemicals that hit your eyes
     expect(mainJsContent).toContain('transcript-placeholder');
   });
 
+  it('enables viewing completed and active transcripts during batch execution with decoupled streaming and non-hijacked views', () => {
+    const mainJsContent = readFileSync(resolve(__dirname, 'main.js'), 'utf-8');
+
+    // 1. Verify tracking variables
+    expect(mainJsContent).toContain('let batchProcessingIndex = -1;');
+    expect(mainJsContent).toContain('let userExplicitlySelectedBatchItem = false;');
+
+    // 2. Verify selectBatchItemTranscript allows viewing completed and active items without isBatchExtracting lockout
+    const selectBatchFunc = mainJsContent.slice(
+      mainJsContent.indexOf('window.selectBatchItemTranscript = async function'),
+      mainJsContent.indexOf('function renderBatchQueueTable()')
+    );
+    expect(selectBatchFunc).not.toContain('if (isBatchExtracting) return;');
+    expect(selectBatchFunc).toContain("const isActive = item.status === 'converting' || item.status === 'transcribing' || item.status === 'translating';");
+    expect(selectBatchFunc).toContain("const isCompleted = item.status === 'completed';");
+    expect(selectBatchFunc).toContain('userExplicitlySelectedBatchItem = !isActive;');
+    expect(mainJsContent).toContain('if (!isCompleted && !isActive)');
+
+    // 3. Verify card clickability in queue renderer permits completed and active items while extracting
+    expect(mainJsContent).toContain('const isClickable = isCompleted || isActive;');
+    expect(mainJsContent).toContain('const isSelected = activeBatchViewerIndex === index;');
+
+    // 4. Verify Whisper log streaming is decoupled from viewer DOM
+    expect(mainJsContent).toContain('const isBatchRunning = isBatchExtracting && batchProcessingIndex >= 0 && batchItems[batchProcessingIndex];');
+    expect(mainJsContent).toContain('activeItem.transcriptLines.push({ ...lineObj });');
+    expect(mainJsContent).toContain('if (activeBatchViewerIndex !== batchProcessingIndex) {\n      return;\n    }');
+
+    // 5. Verify batch runner uses smart auto-follow and eliminates view hijack when reading completed items
+    expect(mainJsContent).toContain('batchProcessingIndex = i;');
+    expect(mainJsContent).toContain('activeBatchViewerIndex = 0; // Follow first item initially');
+    expect(mainJsContent).toContain('if (!userExplicitlySelectedBatchItem) {\n      activeBatchViewerIndex = i;\n    }');
+    expect(mainJsContent).toContain('if (activeBatchViewerIndex === i) {\n            transcriptLines = [];');
+
+    // 6. Verify end of batch respects currently viewed completed item and resets index on all-fail
+    expect(mainJsContent).toContain('const isAlreadyViewingCompleted = activeBatchViewerIndex >= 0 &&\n    batchItems[activeBatchViewerIndex] &&\n    batchItems[activeBatchViewerIndex].status === \'completed\';');
+    expect(mainJsContent).toContain('if (!isAlreadyViewingCompleted && latestCompletedIdx !== -1');
+    expect(mainJsContent).toContain('activeBatchViewerIndex = -1;');
+
+    // 7. Verify batch card view hint strictly uses localized keys without raw key leak
+    expect(mainJsContent).toContain("const viewHint = isViewing ? t('transcribe.viewingTranscript') : t('transcribe.clickToViewTranscript');");
+    expect(mainJsContent).not.toContain('t(\'transcribe.viewActiveTranscript\')');
+
+    // 8. Verify loadTranscriptFromFile supports background parsing without touching viewer DOM
+    expect(mainJsContent).toContain('window.loadTranscriptFromFile = async function(fullPath, shouldRender = true)');
+    expect(mainJsContent).toContain('const loaded = await loadTranscriptFromFile(subFullPath, shouldRender);');
+  });
+
+  it('supports silent background transcript loading via loadTranscriptFromFile without UI flicker', async () => {
+    const mainJsContent = readFileSync(resolve(__dirname, 'main.js'), 'utf-8');
+
+    const codeToEval = `
+      let transcriptLines = [{ id: 99, text: 'user-reading-completed-line' }];
+      let renderCalls = 0;
+      const renderTranscriptLines = (lines) => { renderCalls++; };
+      const invoke = async () => '1\\n00:00:01,000 --> 00:00:03,500\\nBackground whisper result';
+      const window = {};
+      ${mainJsContent.slice(mainJsContent.indexOf('window.loadTranscriptFromFile = async function'), mainJsContent.indexOf('window.copyLiveTranscriptToClipboard'))}
+      return {
+        loadTranscriptFromFile: window.loadTranscriptFromFile,
+        getLines: () => transcriptLines,
+        getRenderCalls: () => renderCalls
+      };
+    `;
+    const runner = new Function(codeToEval)();
+
+    // 1. Silent background parsing (shouldRender = false): must NOT mutate viewer lines and must NOT touch DOM
+    const backgroundResult = await runner.loadTranscriptFromFile('/out/bg.srt', false);
+    expect(backgroundResult).toHaveLength(1);
+    expect(backgroundResult[0].text).toBe('Background whisper result');
+    expect(backgroundResult[0].timeRange).toBe('[00:00:01.000 --> 00:00:03.500]');
+    expect(runner.getLines()).toEqual([{ id: 99, text: 'user-reading-completed-line' }]);
+    expect(runner.getRenderCalls()).toBe(0);
+
+    // 2. Active viewer parsing (shouldRender = true): must mutate transcriptLines and call renderTranscriptLines
+    const activeResult = await runner.loadTranscriptFromFile('/out/bg.srt', true);
+    expect(activeResult).toHaveLength(1);
+    expect(runner.getLines()).toEqual(activeResult);
+    expect(runner.getRenderCalls()).toBe(1);
+  });
+
+  it('implements smart auto-follow: auto-advances when passive, locks view when user explicitly selects completed item', () => {
+    let userExplicitlySelectedBatchItem = false;
+    let activeBatchViewerIndex = 0;
+
+    // Simulation of 3-file batch run
+    const batchItems = [
+      { name: 'file1.mp4', status: 'pending', transcriptLines: [] },
+      { name: 'file2.mp4', status: 'pending', transcriptLines: [] },
+      { name: 'file3.mp4', status: 'pending', transcriptLines: [] }
+    ];
+
+    // Iteration 0 (File 1)
+    let i = 0;
+    if (!userExplicitlySelectedBatchItem) activeBatchViewerIndex = i;
+    expect(activeBatchViewerIndex).toBe(0);
+    batchItems[0].status = 'completed';
+
+    // Iteration 1 (File 2): User is passive (didn't touch mouse), auto-advances to file 2
+    i = 1;
+    if (!userExplicitlySelectedBatchItem) activeBatchViewerIndex = i;
+    expect(activeBatchViewerIndex).toBe(1);
+    batchItems[1].status = 'transcribing';
+
+    // User explicitly clicks File 1 to inspect completed transcript
+    const userSelectedIdx = 0;
+    const isActive = batchItems[userSelectedIdx].status === 'transcribing';
+    activeBatchViewerIndex = userSelectedIdx;
+    userExplicitlySelectedBatchItem = !isActive;
+    expect(userExplicitlySelectedBatchItem).toBe(true);
+    expect(activeBatchViewerIndex).toBe(0);
+
+    // Iteration 2 (File 3 starts): User selected File 1, view MUST NOT be hijacked
+    batchItems[1].status = 'completed';
+    i = 2;
+    if (!userExplicitlySelectedBatchItem) activeBatchViewerIndex = i;
+    expect(activeBatchViewerIndex).toBe(0); // Stays on File 1!
+
+    // User now clicks the active File 3 to resume live monitoring
+    batchItems[2].status = 'transcribing';
+    const clickedActiveIdx = 2;
+    const isFile3Active = batchItems[clickedActiveIdx].status === 'transcribing';
+    activeBatchViewerIndex = clickedActiveIdx;
+    userExplicitlySelectedBatchItem = !isFile3Active;
+    expect(userExplicitlySelectedBatchItem).toBe(false); // Resumed auto-follow!
+    expect(activeBatchViewerIndex).toBe(2);
+  });
+
+  it('enforces concurrency guards on queue reordering and sorting operations during batch extraction', () => {
+    const mainJsContent = readFileSync(resolve(__dirname, 'main.js'), 'utf-8');
+
+    // Verify moveBatchItemUp, moveBatchItemDown, sortBatchQueue are guarded against active extraction
+    expect(mainJsContent).toMatch(/window\.moveBatchItemUp\s*=\s*function\s*\([^)]*\)\s*\{\s*if\s*\(\s*isBatchExtracting\s*\)\s*return;/);
+    expect(mainJsContent).toMatch(/window\.moveBatchItemDown\s*=\s*function\s*\([^)]*\)\s*\{\s*if\s*\(\s*isBatchExtracting\s*\)\s*return;/);
+    expect(mainJsContent).toMatch(/window\.sortBatchQueue\s*=\s*function\s*\([^)]*\)\s*\{\s*if\s*\(\s*isBatchExtracting\s*\)\s*return;/);
+  });
+
+  it('supports all fallback subtitle and text formats in batch extraction with single-mode parity', () => {
+    const mainJsContent = readFileSync(resolve(__dirname, 'main.js'), 'utf-8');
+
+    // Match all subtitle and text fallback formats in batch mode
+    expect(mainJsContent).toContain("result.generatedFiles.find(f => f.endsWith('.lrc')) ||\n                        result.generatedFiles.find(f => f.endsWith('.json')) ||\n                        result.generatedFiles.find(f => f.endsWith('.csv')) ||\n                        result.generatedFiles.find(f => f.endsWith('.txt'));");
+  });
+
   it('isolates duration display in RTL stylesheet and localizes pending status in formatDuration', () => {
     // Verify RTL duration isolation in rtl.css
     const rtlCss = readFileSync(resolve(__dirname, 'rtl.css'), 'utf-8');
     expect(rtlCss).toMatch(/html\[dir="rtl"\]\s+#batch-total-duration/);
     expect(rtlCss).toContain('.transcript-card-time');
     expect(rtlCss).toContain('unicode-bidi: isolate;');
+    expect(rtlCss).toContain('.batch-card-duration[dir="ltr"]');
+    expect(rtlCss).toContain('.batch-card-duration[dir="rtl"]');
 
     // Verify formatDuration in main.js uses localized pending string and guards against negative
     const mainJsContent = readFileSync(resolve(__dirname, 'main.js'), 'utf-8');
     expect(mainJsContent).toContain("t('transcribe.statusPending')");
     expect(mainJsContent).toContain("dur < 0");
+    expect(mainJsContent).toContain("applyContentDirection(durationSpan, formattedDur, 'ltr');");
+    expect(mainJsContent).toContain("applyContentDirection(totalDurationEl, totalDurationEl.textContent, 'ltr');");
 
     const codeToEval = `
       const t = (k) => k === 'transcribe.statusPending' ? 'در انتظار' : k;
