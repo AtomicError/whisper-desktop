@@ -16,12 +16,13 @@ import { pt } from './locales/pt';
 import { ru } from './locales/ru';
 import { tr } from './locales/tr';
 import { zh } from './locales/zh';
+import { loadResolvedHtml } from './testUtils';
 
 const locales: Record<string, any> = { ar, de, en, es, fa, fr, it: itLocale, ja, ko, pt, ru, tr, zh };
 
 describe('Transcription Studio Unified Deck DOM Structure', () => {
   const htmlPath = resolve(__dirname, 'index.html');
-  const html = readFileSync(htmlPath, 'utf-8');
+  const html = loadResolvedHtml(htmlPath);
 
   it('contains the unified deck container and deck header', () => {
     expect(html).toContain('transcribe-unified-deck');
@@ -780,7 +781,7 @@ describe('Transcription Studio Output Directory & Workflow Logic', () => {
   });
 
   it('verifies accessibility and i18n title attributes in transcribe DOM', () => {
-    const htmlContent = readFileSync(resolve(__dirname, 'index.html'), 'utf-8');
+    const htmlContent = loadResolvedHtml(resolve(__dirname, 'index.html'));
     // Badges in metadata row have localized title tags
     expect(htmlContent).toContain('id="meta-type" data-i18n-title="transcribe.fileType"');
     expect(htmlContent).toContain('id="meta-duration" data-i18n-title="transcribe.duration"');
@@ -823,7 +824,7 @@ describe('Transcription Studio Output Directory & Workflow Logic', () => {
   });
 
   it('contains the pulse dot nested inside the hud-status-badge in DOM structure', () => {
-    const htmlContent = readFileSync(resolve(__dirname, 'index.html'), 'utf-8');
+    const htmlContent = loadResolvedHtml(resolve(__dirname, 'index.html'));
     // Ensure hud-status-badge contains hud-pulse-dot inside it
     expect(htmlContent).toMatch(/<span[^>]*id="hud-status-badge"[^>]*>[\s\S]*?<span[^>]*id="hud-pulse-dot"[^>]*><\/span>[\s\S]*?<span[^>]*id="hud-status-text"/);
   });
@@ -885,7 +886,7 @@ describe('Transcription Studio Output Directory & Workflow Logic', () => {
   });
 
   it('validates modern batch queue card layout, balanced actions, and header structure in HTML and CSS', () => {
-    const htmlContent = readFileSync(resolve(__dirname, 'index.html'), 'utf-8');
+    const htmlContent = loadResolvedHtml(resolve(__dirname, 'index.html'));
     // Structural HTML expectations
     expect(htmlContent).toContain('class="batch-queue-header"');
     expect(htmlContent).toContain('class="batch-queue-title"');
@@ -1226,7 +1227,7 @@ it releases chemicals that hit your eyes
 
   it('verifies Auto-Transfer to Translation Studio UI setting, localization, and bridging', () => {
     // 1. Verify index.html setting element
-    const html = readFileSync(resolve(__dirname, 'index.html'), 'utf-8');
+    const html = loadResolvedHtml(resolve(__dirname, 'index.html'));
     expect(html).toContain('id="opt-autoTransferToTranslate"');
     expect(html).toContain('data-i18n="settings.aiTranslateTitle"');
     expect(html).toContain('data-i18n="settings.aiTranslateDesc"');

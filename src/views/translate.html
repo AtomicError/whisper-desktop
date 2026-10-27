@@ -1,0 +1,258 @@
+          <!-- TRANSLATION STUDIO PANEL -->
+          <div class="view-panel fixed-layout-panel" id="panel-translate" role="tabpanel" aria-labelledby="nav-tab-translate" tabindex="0">
+            <div class="translate-layout">
+              <!-- Left Column: Single Seamless Glass Studio Deck -->
+              <div class="translate-left-panel">
+                <div class="glass-card translate-unified-deck" id="translate-unified-deck">
+                  <!-- Header: Studio Title & Settings Shortcut -->
+                  <div class="translate-deck-header">
+                    <div class="translate-deck-title-group">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="translate-deck-icon">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                      </svg>
+                      <span class="translate-deck-title" data-i18n="translate.deckTitle">Translation Setup</span>
+                    </div>
+                    <button type="button" class="btn-link-settings" id="btn-translate-manage-providers" title="Configure providers and API keys in Settings" data-i18n-title="translate.manageInSettings">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px; height:12px;">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                      </svg>
+                      <span data-i18n="translate.manageInSettings">Configure in Settings</span>
+                    </button>
+                  </div>
+
+                  <div class="translate-deck-body">
+                    <!-- 1. Smart Subtitle File Card -->
+                    <div class="media-drop-zone translate-dropzone-card" id="translate-drop-zone" title="Drag &amp; drop subtitle (.srt, .vtt, .lrc, .txt)" data-i18n-title="translate.dropSubPrompt">
+                      <div class="translate-dropzone-main-row">
+                        <div class="translate-dropzone-identity">
+                          <svg class="media-icon translate-sub-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/>
+                            <path d="M6 6h10"/>
+                            <path d="M6 10h10"/>
+                            <path d="M6 14h6"/>
+                          </svg>
+                          <div class="translate-sub-titles">
+                            <p class="translate-sub-name" id="lbl-translate-sub-name" data-i18n="translate.noSubLoaded">No Subtitle Loaded</p>
+                          </div>
+                        </div>
+                        <div class="translate-dropzone-actions">
+                          <button class="btn-secondary btn-sub-browse" id="btn-browse-translate-sub" data-i18n="translate.browseSub" type="button">Browse</button>
+                          <button class="btn-secondary btn-clear-sub" id="btn-clear-translate-sub" data-i18n="translate.clearSub" type="button" style="display:none;">Clear</button>
+                        </div>
+                      </div>
+
+                      <!-- The empty-state prompt, on a line of the card's own rather than in the
+                           identity column beside the icon: that column is what the browse
+                           button leaves of a 440px panel (213px), and the sentence needs 251px
+                           in Persian, 223px in German, and 197px in English. Full width it
+                           fits on one line in every language, and it is hidden outright once
+                           a file is loaded — the loaded card puts the path in a tooltip and
+                           its name and size on the row above. -->
+                      <p class="translate-sub-prompt" id="lbl-translate-sub-path" data-i18n="translate.dropSubPrompt">Drag &amp; drop subtitle (.srt, .vtt, .lrc, .txt)</p>
+
+                      <div class="translate-dropzone-meta-row">
+                        <span class="translate-sub-meta-badge" id="lbl-translate-sub-meta" style="display:none;"></span>
+                        <div id="translate-companion-chip" class="translate-companion-badge" style="display:none;">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:11px; height:11px;">
+                            <polygon points="23 7 16 12 23 17 23 7"/>
+                            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                          </svg>
+                          <span id="lbl-companion-video-name"></span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- 2. Target Language (Full Width) -->
+                    <div class="translate-field-group">
+                      <label for="translate-target-lang">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                        </svg>
+                        <span data-i18n="translate.targetLang">Target Language</span>
+                      </label>
+                      <select class="select-control" id="translate-target-lang" data-searchable data-language-select="translation" data-i18n-aria="translate.targetLang" aria-label="Target Language"></select>
+                    </div>
+
+                    <!-- 3. Provider Selector (Full Width) -->
+                    <div class="translate-field-group">
+                      <label for="translate-provider-select">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-royal-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line>
+                        </svg>
+                        <span data-i18n="translate.activeProvider">Active Provider</span>
+                      </label>
+                      <select class="select-control" id="translate-provider-select" title="Active Provider" data-i18n-title="translate.activeProvider" data-i18n-aria="translate.activeProvider" aria-label="Active Provider"></select>
+                    </div>
+
+                    <!-- 4. Model Selector (Full Width) -->
+                    <div class="translate-field-group">
+                      <label for="translate-model-select">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#a855f7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        <span data-i18n="translate.activeModel">Active Model</span>
+                      </label>
+                      <select class="select-control" id="translate-model-select" data-searchable data-model-select title="Active Model" data-i18n-title="translate.activeModel" data-i18n-aria="translate.activeModel" aria-label="Active Model"></select>
+                    </div>
+
+                    <!-- 4. Conversational Polish Pass (Full Width) -->
+                    <div class="translate-field-group">
+                      <div class="translate-switch-row" title="Refines translated subtitles for natural conversational rhythm and reading speed." data-i18n-title="settings.polishDesc">
+                        <div class="translate-switch-info">
+                          <span class="translate-switch-title">
+                            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/>
+                            </svg>
+                            <span data-i18n="translate.polishPass">Conversational Polish Pass</span>
+                          </span>
+                          <span class="translate-switch-desc" data-i18n="settings.polishDesc">Refines phrasing for natural subtitle flow and reading rhythm</span>
+                        </div>
+                        <label class="switch">
+                          <input type="checkbox" id="translate-polish-toggle" checked />
+                          <span class="slider"></span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <!-- 4. Output Folder Row -->
+                    <div class="translate-field-group">
+                      <label>
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                        </svg>
+                        <span data-i18n="translate.outputFolder">Output Folder</span>
+                      </label>
+                      <div class="translate-output-row">
+                        <div class="translate-output-display" id="translate-output-dir-text" data-i18n="translate.sameAsSource">Same as source file folder</div>
+                        <button class="btn-secondary btn-sm" id="btn-browse-translate-dir" data-i18n="translate.changeFolder" type="button">Change...</button>
+                        <button class="btn-secondary btn-sm" id="btn-reset-translate-dir" data-i18n="translate.resetFolder" type="button" style="display:none;">Reset</button>
+                      </div>
+                    </div>
+
+                    <!-- 5. Action & Telemetry Deck -->
+                    <div class="translate-actions-section">
+                      <div class="translate-actions-bar">
+                        <button class="btn-primary btn-start-translation" id="btn-start-translation" type="button" disabled data-i18n-title="translate.noSubSelectedError" title="Please select a subtitle file first.">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px;">
+                            <path d="m5 8 6 6"/>
+                            <path d="m4 14 6-6 2-3"/>
+                            <path d="M2 5h12"/>
+                            <path d="M7 2h1"/>
+                            <path d="m22 22-5-10-5 10"/>
+                            <path d="M14 18h6"/>
+                          </svg>
+                          <span id="btn-start-translation-text" data-i18n="translate.startTranslate">Translate Subtitle</span>
+                        </button>
+                        <button class="btn-secondary btn-cancel-translation" id="btn-cancel-translation" type="button" style="display:none;" data-i18n="translate.cancelTranslate" data-i18n-aria="translate.cancelTranslate" aria-label="Cancel Translation">Cancel</button>
+                      </div>
+
+                      <!-- Telemetry HUD -->
+                      <div class="translate-telemetry" id="translate-telemetry-box" style="display:none;">
+                        <div class="translate-telemetry-header">
+                          <div class="translate-telemetry-status">
+                            <span class="translate-status-badge" id="translate-status-badge" data-i18n="translate.statusReady">Ready</span>
+                            <span id="lbl-translate-lines" class="translate-lines-badge" style="display:none;"></span>
+                          </div>
+                          <div class="translate-telemetry-pct" id="lbl-translate-pct">0%</div>
+                        </div>
+                        <div class="translate-linear-track">
+                          <div class="translate-linear-fill" id="translate-progress-fill" style="width:0%;"></div>
+                        </div>
+                        <div class="translate-telemetry-msg" id="lbl-translate-msg"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- Right Column: Dual Subtitle Comparison Deck -->
+              <div class="translate-right-panel">
+                <div class="glass-card translate-preview-card">
+                  <!-- Header Toolbar -->
+                  <div class="translate-preview-toolbar">
+                    <div class="translate-view-segmented" role="tablist" aria-label="Subtitle View Mode">
+                      <button class="view-segment-btn active" id="btn-view-split" type="button" role="tab" aria-selected="true" tabindex="0" data-i18n="translate.viewSplit" data-i18n-aria="translate.viewSplit" aria-label="Split View">Split View</button>
+                      <button class="view-segment-btn" id="btn-view-source" type="button" role="tab" aria-selected="false" tabindex="-1" data-i18n="translate.viewSource" data-i18n-aria="translate.viewSource" aria-label="Original Only">Original Only</button>
+                      <button class="view-segment-btn" id="btn-view-target" type="button" role="tab" aria-selected="false" tabindex="-1" data-i18n="translate.viewTarget" data-i18n-aria="translate.viewTarget" aria-label="Translated Only">Translated Only</button>
+                    </div>
+                    <div class="translate-toolbar-actions">
+                      <button class="btn-secondary btn-icon-text" id="btn-copy-translated" type="button" disabled data-i18n-title="translate.emptyTargetTitle" title="No Translation Yet" data-i18n-aria="translate.copyTranslation" aria-label="Copy Subtitles">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;">
+                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                        </svg>
+                        <span data-i18n="translate.copyTranslation">Copy Subtitles</span>
+                      </button>
+                      <button class="btn-secondary btn-icon-text" id="btn-open-translated-dir" type="button" disabled data-i18n-title="translate.emptyTargetTitle" title="No Translation Yet" data-i18n-aria="translate.openOutputFolder" aria-label="Open Containing Folder">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;">
+                          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                        </svg>
+                        <span data-i18n="translate.openOutputFolder">Open Folder</span>
+                      </button>
+                      <button class="btn-secondary btn-icon-text btn-toolbar-hardsub btn-toolbar-workflow" id="btn-send-to-hardsub" type="button" disabled data-i18n-title="translate.emptyTargetTitle" title="No Translation Yet" data-i18n-aria="translate.sendToHardsub" aria-label="Send to Hardsub Studio">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px; height:14px;">
+                          <polygon points="23 7 16 12 23 17 23 7"/>
+                          <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                        </svg>
+                        <span data-i18n="translate.sendToHardsub">Send to Hardsub Studio</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Dual Preview Grid -->
+                  <div class="translate-preview-grid" id="translate-preview-grid">
+                    <!-- Source Subtitle Pane -->
+                    <div class="translate-pane" id="translate-source-pane">
+                      <div class="translate-pane-header">
+                        <div class="translate-pane-title">
+                          <span data-i18n="translate.sourceSub">Original Subtitle</span>
+                          <span class="translate-count-badge" id="translate-source-count">0</span>
+                        </div>
+                      </div>
+                      <div class="translate-cues-list" id="translate-source-cues-list" role="list">
+                        <div class="translate-empty-pane">
+                          <svg class="translate-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="16" y1="13" x2="8" y2="13"/>
+                            <line x1="16" y1="17" x2="8" y2="17"/>
+                            <polyline points="10 9 9 9 8 9"/>
+                          </svg>
+                          <div class="translate-empty-title" data-i18n="translate.emptySourceTitle">No Subtitle Loaded</div>
+                          <div class="translate-empty-desc" data-i18n="translate.emptySourceDesc">Drop an SRT, VTT, LRC, or TXT subtitle file to inspect cues and begin translation.</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Target Subtitle Pane -->
+                    <div class="translate-pane" id="translate-target-pane">
+                      <div class="translate-pane-header">
+                        <div class="translate-pane-title">
+                          <span data-i18n="translate.targetSub">Translated Subtitle</span>
+                          <span class="translate-count-badge" id="translate-target-count">0</span>
+                        </div>
+                      </div>
+                      <div class="translate-cues-list" id="translate-target-cues-list" role="list">
+                        <div class="translate-empty-pane">
+                          <svg class="translate-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="m5 8 6 6"/>
+                            <path d="m4 14 6-6 2-3"/>
+                            <path d="M2 5h12"/>
+                            <path d="M7 2h1"/>
+                            <path d="m22 22-5-10-5 10"/>
+                            <path d="M14 18h6"/>
+                          </svg>
+                          <div class="translate-empty-title" data-i18n="translate.emptyTargetTitle">No Translation Yet</div>
+                          <div class="translate-empty-desc" data-i18n="translate.emptyTargetDesc">Choose your destination language and click "Translate Subtitle" to generate AI subtitles.</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+

@@ -1,0 +1,1499 @@
+          <!-- 3. SETTINGS CONFIGURATION PANEL -->
+          <div class="view-panel fixed-layout-panel" id="panel-settings" role="tabpanel" aria-labelledby="nav-tab-settings" tabindex="0">
+            <div class="presets-container">
+              <div>
+                <h3 style="font-size:1.2rem; margin-bottom:4px;" data-i18n="settings.title">Settings & Preferences</h3>
+                <p style="font-size:0.8rem; color:var(--color-text-muted);" data-i18n="settings.subtitle">Configure application preferences, transcription engine, AI translation and performance options</p>
+              </div>
+              <div class="settings-search-wrapper">
+                <svg class="settings-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input class="text-input settings-search-input" id="settings-search-input" type="text" placeholder="Search..." data-i18n-placeholder="settings.searchPlaceholder" oninput="filterSettings(this.value)" autocomplete="off" spellcheck="false" />
+                <button type="button" class="settings-search-clear" id="settings-search-clear" onclick="clearSettingsSearch()" style="display: none;" title="Clear Search" aria-label="Clear Search">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="settings-layout">
+              <div class="settings-sidebar">
+                <div class="settings-categories">
+                  <div class="settings-cat-btn active" id="cat-btn-app" onclick="switchSettingsCategory('app')" data-i18n="settings.catApp">App Preferences</div>
+                  <div class="settings-cat-btn" id="cat-btn-transcription" onclick="switchSettingsCategory('transcription')" data-i18n="settings.catTranscription">Core Transcription</div>
+                  <div class="settings-cat-btn" id="cat-btn-computation" onclick="switchSettingsCategory('computation')" data-i18n="settings.catComputation">Computation</div>
+                  <div class="settings-cat-btn" id="cat-btn-search" onclick="switchSettingsCategory('search')" data-i18n="settings.catSearch">Decoding Strategy</div>
+                  <div class="settings-cat-btn" id="cat-btn-outputs" onclick="switchSettingsCategory('outputs')" data-i18n="settings.catOutputs">Outputs</div>
+                  <div class="settings-cat-btn" id="cat-btn-gpu" onclick="switchSettingsCategory('gpu')" data-i18n="settings.catGpu">GPU Execution</div>
+                  <div class="settings-cat-btn" id="cat-btn-vad" onclick="switchSettingsCategory('vad')" data-i18n="settings.catVad">Silero VAD</div>
+                  <div class="settings-cat-btn" id="cat-btn-translation" onclick="switchSettingsCategory('translation')" data-i18n="settings.catTranslation">AI Translation</div>
+                </div>
+                <div class="settings-sidebar-footer">
+                  <button type="button" class="btn-settings-reset-engine" id="btn-reset-whisper-engine" onclick="confirmResetWhisperEngine()" data-i18n-title="settings.resetEngineTooltip" title="Reset transcription parameters to defaults">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-reset-icon" aria-hidden="true">
+                      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                      <path d="M3 3v5h5"></path>
+                    </svg>
+                    <span data-i18n="settings.resetEngineBtn">Reset Engine</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="settings-scroll-container">
+                <!-- Search Empty State -->
+                <div class="settings-search-empty" id="settings-search-empty" style="display: none;" role="status" aria-live="polite">
+                  <div class="search-empty-icon-wrap">
+                    <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.8">
+                      <circle cx="11" cy="11" r="8"></circle>
+                      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                  </div>
+                  <div class="search-empty-title" data-i18n="settings.searchNoResults">No settings found</div>
+                  <div class="search-empty-desc" id="settings-search-empty-desc" data-i18n="settings.searchNoResultsDesc">No configuration options match your search.</div>
+                  <button type="button" class="btn-secondary" onclick="clearSettingsSearch()" data-i18n="settings.clearSearch">Clear Search</button>
+                </div>
+                <!-- Settings Groups -->
+                <!-- Group: App Preferences -->
+                <div class="settings-group active" id="group-app">
+                  <!-- Application Theme Card -->
+                  <div class="setting-card theme-setting-card" data-search-tags="theme color style dark skin mode carbon royal blue fiery orange emerald پوسته رنگ تم قالب آبی سلطنتی کربن آتشین نارنجی زمردین سبز">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.themeTitle">Application Theme</span>
+                      </div>
+                      <div class="setting-desc" data-i18n="settings.themeDesc">Choose the visual theme for the entire application interface.</div>
+                    </div>
+                    <div class="theme-picker-grid" role="radiogroup" aria-label="Application Theme">
+                      <!-- 1. Royal Blue -->
+                      <button class="theme-picker-card" id="theme-card-royal" type="button" role="radio" aria-checked="false" onclick="window.switchTheme('royal-blue')">
+                        <div class="theme-card-header">
+                          <div class="theme-card-preview preview-royal" aria-hidden="true">
+                            <span class="theme-preview-dot bg-dot-royal-bg"></span>
+                            <span class="theme-preview-dot bg-dot-royal-card"></span>
+                            <span class="theme-preview-dot bg-dot-royal-accent"></span>
+                          </div>
+                          <div class="theme-card-check" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
+                              <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                          </div>
+                        </div>
+                        <div class="theme-card-body">
+                          <div class="theme-card-title-row">
+                            <span class="theme-swatch-orb orb-royal" aria-hidden="true"></span>
+                            <strong class="theme-card-title" data-i18n="theme.royal">Royal Blue</strong>
+                          </div>
+                          <p class="theme-card-desc" data-i18n="theme.royalDesc">Cyberpunk dark navy canvas with electric neon blue accents</p>
+                        </div>
+                      </button>
+
+                      <!-- 2. Carbon -->
+                      <button class="theme-picker-card" id="theme-card-carbon" type="button" role="radio" aria-checked="false" onclick="window.switchTheme('carbon')">
+                        <div class="theme-card-header">
+                          <div class="theme-card-preview preview-carbon" aria-hidden="true">
+                            <span class="theme-preview-dot bg-dot-carbon-bg"></span>
+                            <span class="theme-preview-dot bg-dot-carbon-card"></span>
+                            <span class="theme-preview-dot bg-dot-carbon-accent"></span>
+                          </div>
+                          <div class="theme-card-check" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
+                              <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                          </div>
+                        </div>
+                        <div class="theme-card-body">
+                          <div class="theme-card-title-row">
+                            <span class="theme-swatch-orb orb-carbon" aria-hidden="true"></span>
+                            <strong class="theme-card-title" data-i18n="theme.carbon">Carbon</strong>
+                          </div>
+                          <p class="theme-card-desc" data-i18n="theme.carbonDesc">Minimal neutral dark canvas with crisp white typography and crimson red accents</p>
+                        </div>
+                      </button>
+
+                      <!-- 3. Fiery Orange -->
+                      <button class="theme-picker-card" id="theme-card-fire" type="button" role="radio" aria-checked="false" onclick="window.switchTheme('fire-orange')">
+                        <div class="theme-card-header">
+                          <div class="theme-card-preview preview-fire" aria-hidden="true">
+                            <span class="theme-preview-dot bg-dot-fire-bg"></span>
+                            <span class="theme-preview-dot bg-dot-fire-card"></span>
+                            <span class="theme-preview-dot bg-dot-fire-accent"></span>
+                          </div>
+                          <div class="theme-card-check" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
+                              <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                          </div>
+                        </div>
+                        <div class="theme-card-body">
+                          <div class="theme-card-title-row">
+                            <span class="theme-swatch-orb orb-fire" aria-hidden="true"></span>
+                            <strong class="theme-card-title" data-i18n="theme.fire">Fiery Orange</strong>
+                          </div>
+                          <p class="theme-card-desc" data-i18n="theme.fireDesc">Warm dark canvas with vibrant amber and fiery orange accents</p>
+                        </div>
+                      </button>
+
+                      <!-- 4. Emerald -->
+                      <button class="theme-picker-card" id="theme-card-emerald" type="button" role="radio" aria-checked="false" onclick="window.switchTheme('emerald')">
+                        <div class="theme-card-header">
+                          <div class="theme-card-preview preview-emerald" aria-hidden="true">
+                            <span class="theme-preview-dot bg-dot-emerald-bg"></span>
+                            <span class="theme-preview-dot bg-dot-emerald-card"></span>
+                            <span class="theme-preview-dot bg-dot-emerald-accent"></span>
+                          </div>
+                          <div class="theme-card-check" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
+                              <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                          </div>
+                        </div>
+                        <div class="theme-card-body">
+                          <div class="theme-card-title-row">
+                            <span class="theme-swatch-orb orb-emerald" aria-hidden="true"></span>
+                            <strong class="theme-card-title" data-i18n="theme.emerald">Emerald</strong>
+                          </div>
+                          <p class="theme-card-desc" data-i18n="theme.emeraldDesc">Obsidian studio canvas with cyber mint and relaxing emerald accents</p>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Monochrome / Tint-Free Canvas Card -->
+                  <div class="setting-card" data-search-tags="theme monochrome canvas tint free neutral charcoal dark matte پس زمینه مونوکروم تینت مات زغالی خنثی پوسته استودیویی">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.monochromeCanvasTitle">Monochrome Canvas (Tint-Free)</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.monochromeCanvasDesc">Removes saturated tints from background surfaces and sidebars, applying a neutral matte studio canvas while preserving all accent colors.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.monochromeCanvasPoints">
+                          <span class="setting-desc-point"><strong>Default:</strong> Disabled (standard tinted canvas)</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <label class="switch">
+                        <input type="checkbox" id="opt-monochromeCanvas" />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <!-- Interface Language Card -->
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.languageSettingTitle">Interface Language</span>
+                      </div>
+                      <div class="setting-desc" data-i18n="settings.languageSettingDesc">Select the display language for the application interface and menus.</div>
+                    </div>
+                    <div class="setting-control">
+                      <select class="select-control" id="opt-uiLanguage" onchange="window.setLanguage(this.value)">
+                        <option value="en" data-i18n="settings.langEn">English</option>
+                        <option value="fa" data-i18n="settings.langFa">فارسی</option>
+                        <option value="es" data-i18n="settings.langEs">Español</option>
+                        <option value="fr" data-i18n="settings.langFr">Français</option>
+                        <option value="de" data-i18n="settings.langDe">Deutsch</option>
+                        <option value="zh" data-i18n="settings.langZh">简体中文</option>
+                        <option value="ja" data-i18n="settings.langJa">日本語</option>
+                        <option value="ru" data-i18n="settings.langRu">Русский</option>
+                        <option value="ar" data-i18n="settings.langAr">العربية</option>
+                        <option value="pt" data-i18n="settings.langPt">Português</option>
+                        <option value="it" data-i18n="settings.langIt">Italiano</option>
+                        <option value="tr" data-i18n="settings.langTr">Türkçe</option>
+                        <option value="ko" data-i18n="settings.langKo">한국어</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <!-- UI Scale & Zoom Card -->
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.uiScaleTitle">UI Scale & Zoom</span>
+                        <span id="ui-scale-badge" class="setting-status-pill checking">100%</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.uiScaleDesc">Adjust the interface scaling to fit high-DPI displays.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.uiScalePoints">
+                          <span class="setting-desc-point"><strong>Shortcuts:</strong> <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">+</kbd> (In) &middot; <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">&minus;</kbd> (Out) &middot; <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">0</kbd> (Reset)</span>
+                          <span class="setting-desc-point"><strong>Default:</strong> <code>100%</code></span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control ui-scale-control-group">
+                      <button class="btn-secondary ui-scale-btn ui-scale-btn-icon" type="button" onclick="adjustUiZoom(-0.05)" title="Zoom Out (Ctrl+-)" aria-label="Zoom Out (Ctrl+-)">−</button>
+                      <select class="select-control" id="opt-uiScale" style="min-width:120px; width:120px;" onchange="setUiZoom(parseFloat(this.value))" aria-label="Select UI Scale">
+                        <option value="0.7">70%</option>
+                        <option value="0.75">75%</option>
+                        <option value="0.8">80%</option>
+                        <option value="0.85">85%</option>
+                        <option value="0.9">90%</option>
+                        <option value="0.95">95%</option>
+                        <option value="1">100%</option>
+                        <option value="1.05">105%</option>
+                        <option value="1.1">110%</option>
+                        <option value="1.15">115%</option>
+                        <option value="1.2">120%</option>
+                        <option value="1.25">125%</option>
+                        <option value="1.3">130%</option>
+                        <option value="1.35">135%</option>
+                        <option value="1.4">140%</option>
+                        <option value="1.45">145%</option>
+                        <option value="1.5">150%</option>
+                        <option value="1.55">155%</option>
+                        <option value="1.6">160%</option>
+                      </select>
+                      <button class="btn-secondary ui-scale-btn ui-scale-btn-icon" type="button" onclick="adjustUiZoom(0.05)" title="Zoom In (Ctrl++)" aria-label="Zoom In (Ctrl++)">+</button>
+                      <button class="btn-secondary ui-scale-btn ui-scale-btn-text" type="button" onclick="setUiZoom(1.0)" title="Reset to 100% (Ctrl+0)" aria-label="Reset UI Scale to 100% (Ctrl+0)" data-i18n="settings.uiScaleReset">Reset</button>
+                    </div>
+                  </div>
+
+                  <!-- Minimize to Tray Card -->
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.trayTitle">Minimize to System Tray on Close</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.trayDesc">Keeps Whisper Desktop active in the background system tray when the main window is closed.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.trayPoints">
+                          <span class="setting-desc-point"><strong>Default:</strong> Disabled (exits on window close)</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <label class="switch">
+                        <input type="checkbox" id="opt-closeToTray" />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <!-- Models Storage Directory Card -->
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.modelsDirTitle">Models Storage Directory</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.modelsDirDesc">Local disk directory where GGML model files (<code>.bin</code>) are stored and scanned.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.modelsDirPoints">
+                          <span class="setting-desc-point"><strong>Default:</strong> <code>~/whisper-desktop/models</code> (Linux/macOS) or <code>C:\Users\&lt;Username&gt;\whisper-desktop\models</code> (Windows)</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control setting-control-path">
+                      <div class="readonly-path-field">
+                        <svg class="path-folder-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        <input class="readonly-path-input" type="text" id="opt-modelsDir" readonly spellcheck="false" aria-label="Models storage directory path" data-i18n-aria="settings.modelsDirInputAria" />
+                        <button class="path-action-btn" type="button" onclick="openModelsDirectory()" title="Click to open folder in File Manager" data-i18n-title="settings.openModelsDirTooltip" aria-label="Open folder in File Manager" data-i18n-aria="settings.openModelsDirTooltip">
+                          <svg class="path-open-icon" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                            <polyline points="15 3 21 3 21 9"></polyline>
+                            <line x1="10" y1="14" x2="21" y2="3"></line>
+                          </svg>
+                        </button>
+                      </div>
+                      <button class="btn-secondary path-browse-btn" onclick="browseModelsDirectory()" type="button" data-i18n="common.browse">Browse</button>
+                    </div>
+                  </div>
+
+                  <!-- FFmpeg Engine Card -->
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.ffmpegTitle">FFmpeg Engine</span>
+                        <span id="ffmpeg-status-badge" class="setting-status-pill checking"><span class="ffmpeg-status-dot blue"></span> Checking...</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.ffmpegDesc">Audio extractor engine used to decode input media files into 16kHz mono audio.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.ffmpegPoints">
+                          <span class="setting-desc-point"><strong>Internal:</strong> Standalone bundled binary (recommended, zero-config)</span>
+                          <span class="setting-desc-point"><strong>System:</strong> Uses OS-installed FFmpeg binary</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <select class="select-control" id="opt-ffmpegSource">
+                        <option value="bundled" data-i18n="settings.ffmpegInternal">Internal</option>
+                        <option value="system" data-i18n="settings.ffmpegSystem">System</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Group: Core Transcription -->
+                <div class="settings-group" id="group-transcription">
+                  <!-- Model Selection Card -->
+                  <div class="setting-card" data-search-tags="-m --model">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.modelSelectTitle">Model Selection</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.modelSelectDesc">Active speech recognition and transcription model.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.modelSelectPoints">
+                          <span class="setting-desc-point"><strong>Fast &amp; Low RAM:</strong> <code>tiny</code>, <code>base</code>, <code>small</code></span>
+                          <span class="setting-desc-point"><strong>High Accuracy:</strong> <code>medium</code>, <code>large-v3</code></span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <select class="select-control" id="opt-modelPath" data-searchable data-model-select></select>
+                    </div>
+                  </div>
+
+                  <!-- Active Backend Card -->
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.backendTitle">Active Backend</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.backendDesc">Execution backend for transcription model inference.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.backendPoints">
+                          <span class="setting-desc-point"><strong>Standard:</strong> Universal CPU-only compatibility</span>
+                          <span class="setting-desc-point"><strong>Vulkan:</strong> Universal GPU acceleration (AMD, Intel, or NVIDIA)</span>
+                          <span class="setting-desc-point"><strong>CUDA:</strong> Dedicated NVIDIA GPUs</span>
+                          <span class="setting-desc-point"><strong>OpenVINO:</strong> Intel CPUs, Arc &amp; iGPUs</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <select class="select-control" id="opt-selectedBackend">
+                        <option value="Standard">CPU</option>
+                        <option value="Vulkan">Vulkan GPU</option>
+                        <option value="OpenVINO">OpenVINO Intel</option>
+                        <option value="CUDA">NVIDIA CUDA</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <!-- Language Spoken Card -->
+                  <div class="setting-card" data-search-tags="-l --language">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.langSpokenTitle">Language Spoken</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.langSpokenDesc">Language spoken in the audio. Pick <code>Auto Detect</code> to let Whisper detect it automatically.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.langSpokenPoints">
+                          <span class="setting-desc-point"><strong>Default:</strong> <code>auto</code> (automatic detection)</span>
+                          <span class="setting-desc-point"><strong>Tip:</strong> Explicitly setting the language skips detection and speeds up transcription.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <select class="select-control" id="opt-language" data-searchable data-language-select="spoken"></select>
+                    </div>
+                  </div>
+
+                  <!-- Initial Prompt Card -->
+                  <div class="setting-card" data-search-tags="--prompt">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.initialPromptTitle">Initial Prompt</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.initialPromptDesc">Contextual prompt to guide model spelling, domain terms, and acronyms.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.initialPromptPoints">
+                          <span class="setting-desc-point"><strong>Examples:</strong> <em>"Dr. John, COVID-19, PyTorch, iPhone 16"</em></span>
+                          <span class="setting-desc-point"><strong>Tip:</strong> Also steers punctuation and capitalization preferences.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" type="text" id="opt-prompt" dir="auto" />
+                    </div>
+                  </div>
+
+                  <!-- Carry Initial Prompt Card -->
+                  <div class="setting-card" data-search-tags="--carry-initial-prompt">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.carryPromptTitle">Carry Initial Prompt</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.carryPromptDesc">Maintains the initial prompt across all 30-second audio chunks instead of only the first chunk.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.carryPromptPoints">
+                          <span class="setting-desc-point"><strong>Recommended:</strong> Enabled for long audio with recurring names or technical terms.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <label class="switch">
+                        <input type="checkbox" id="opt-carryPrompt" />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <!-- Translate to English Card -->
+                  <div class="setting-card" data-search-tags="-tr --translate">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.translateTitle">Translate to English</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.translateDesc">Directly translates non-English speech into English text output during transcription without requiring an external translation service.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.translatePoints">
+                          <span class="setting-desc-point"><strong>Output:</strong> English transcripts &amp; subtitles directly from foreign speech.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <label class="switch">
+                        <input type="checkbox" id="opt-translate" />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <!-- DTW Timestamps Card -->
+                  <div class="setting-card" data-search-tags="--dtw">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.dtwTitle">DTW Timestamps</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.dtwDesc">Enables exact word-level timestamp alignment using Dynamic Time Warping (DTW).</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.dtwPoints">
+                          <span class="setting-desc-point"><strong>Use case:</strong> Millimeter subtitle sync for karaoke and precise video captioning.</span>
+                          <span class="setting-desc-point"><strong>Note:</strong> Automatically disables Flash Attention.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <label class="switch">
+                        <input type="checkbox" id="opt-dtwEnabled" />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="settings-group" id="group-computation">
+                  <div class="setting-card" data-search-tags="-t --threads">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.threadsTitle">Threads Count</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.threadsDesc">Number of CPU worker threads allocated for decoding.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.threadsPoints">
+                          <span class="setting-desc-point"><strong>Default:</strong> <code>4</code></span>
+                          <span class="setting-desc-point"><strong>Recommended:</strong> Match your physical core count (e.g. <code>4–8</code>) for maximum speed.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <div class="number-input-control">
+                        <button onclick="decrementNumber('opt-threads', 1)" type="button" aria-label="Decrease Threads">-</button>
+                        <input type="text" id="opt-threads" value="4" inputmode="numeric" autocomplete="off" aria-label="Threads Count" />
+                        <button onclick="incrementNumber('opt-threads', 1)" type="button" aria-label="Increase Threads">+</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="setting-card" data-search-tags="-p --processors">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.processorsTitle">Processors Count</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.processorsDesc">Number of parallel audio decoder instances.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.processorsPoints">
+                          <span class="setting-desc-point"><strong>Default:</strong> <code>1</code> (standard single-file mode)</span>
+                          <span class="setting-desc-point"><strong>Recommended:</strong> Increase (<code>2–4</code>) only when batch-transcribing multiple files.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <div class="number-input-control">
+                        <button onclick="decrementNumber('opt-processors', 1)" type="button" aria-label="Decrease Processors">-</button>
+                        <input type="text" id="opt-processors" value="1" inputmode="numeric" autocomplete="off" aria-label="Processors Count" />
+                        <button onclick="incrementNumber('opt-processors', 1)" type="button" aria-label="Increase Processors">+</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="setting-card" data-search-tags="-mc --max-context">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.maxContextTitle">Max Token Context</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.maxContextDesc">Maximum preceding token history passed to the decoder.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.maxContextPoints">
+                          <span class="setting-desc-point"><strong>Default:</strong> <code>-1</code> (automatic context window)</span>
+                          <span class="setting-desc-point"><strong>When to change:</strong> Lower to <code>64–128</code> if the model loops or repeats the same sentence.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <div class="number-input-control">
+                        <button onclick="decrementNumber('opt-maxContext', 1)" type="button" aria-label="Decrease Max Context">-</button>
+                        <input type="text" id="opt-maxContext" value="-1" inputmode="numeric" autocomplete="off" aria-label="Max Token Context" />
+                        <button onclick="incrementNumber('opt-maxContext', 1)" type="button" aria-label="Increase Max Context">+</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="setting-card" data-search-tags="-ml --max-len">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.maxLenTitle">Max Segment Length</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.maxLenDesc">Maximum character count allowed per subtitle line.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.maxLenPoints">
+                          <span class="setting-desc-point"><strong>Default:</strong> <code>0</code> (unlimited natural sentence pauses)</span>
+                          <span class="setting-desc-point"><strong>Recommended for Video / Reels:</strong> <code>35–45</code> characters for readable subtitles.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <div class="number-input-control">
+                        <button onclick="decrementNumber('opt-maxLen', 5)" type="button" aria-label="Decrease Max Length">-</button>
+                        <input type="text" id="opt-maxLen" value="0" inputmode="numeric" autocomplete="off" aria-label="Max Segment Length" />
+                        <button onclick="incrementNumber('opt-maxLen', 5)" type="button" aria-label="Increase Max Length">+</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="setting-card" data-search-tags="-ot --offset-t">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.offsetTTitle">Time Offset (ms)</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.offsetTDesc">Skip audio from the beginning up to this timestamp in milliseconds.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.offsetTPoints">
+                          <span class="setting-desc-point"><strong>Default:</strong> <code>0</code> ms</span>
+                          <span class="setting-desc-point"><strong>Example:</strong> Set to <code>30000</code> to skip a 30-second intro or podcast sponsor.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" type="number" min="0" step="1000" id="opt-offsetT" />
+                    </div>
+                  </div>
+
+                  <div class="setting-card" data-search-tags="-d --duration">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.durationTitle">Process Duration (ms)</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.durationDesc">Process only a slice of audio in milliseconds starting from offset.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.durationPoints">
+                          <span class="setting-desc-point"><strong>Default:</strong> <code>0</code> ms (processes full file)</span>
+                          <span class="setting-desc-point"><strong>Example:</strong> Set to <code>60000</code> to quickly preview a 1-minute clip.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" type="number" min="0" step="1000" id="opt-duration" />
+                    </div>
+                  </div>
+
+                  <div class="setting-card" data-search-tags="-sow --split-on-word">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.splitOnWordTitle">Split on Word</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.splitOnWordDesc">Forces subtitle line breaks strictly between full words rather than splitting in the middle of words.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.splitOnWordPoints">
+                          <span class="setting-desc-point"><strong>Recommended:</strong> Enabled for clean, professional subtitles.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <label class="switch">
+                        <input type="checkbox" id="opt-splitWord" />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div class="setting-card" data-search-tags="-di --diarize">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.diarizeTitle">Speaker Diarization</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.diarizeDesc">Separates and labels speakers across stereo audio channels (Left vs Right channel).</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.diarizePoints">
+                          <span class="setting-desc-point"><strong>Output tags:</strong> <code>[SPEAKER 0]</code> and <code>[SPEAKER 1]</code></span>
+                          <span class="setting-desc-point"><strong>Requirement:</strong> Requires 2-channel stereo audio.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <label class="switch">
+                        <input type="checkbox" id="opt-diarize" />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div class="setting-card" data-search-tags="-tdrz --tinydiarize">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.tinyDiarizeTitle">Tiny Diarization</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.tinyDiarizeDesc">Detects speaker turn transitions within a single mono channel using specialized models.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.tinyDiarizePoints">
+                          <span class="setting-desc-point"><strong>Requirement:</strong> Requires <code>tdrz</code>-enabled models (e.g. <code>small.en-tdrz</code>).</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <label class="switch">
+                        <input type="checkbox" id="opt-tinyDiarize" />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="settings-group" id="group-search">
+                  <div class="setting-card" data-search-tags="-bo --best-of">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.bestOfTitle">Best Candidates Count</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.bestOfDesc">Number of candidate sequences sampled during decoding.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.bestOfPoints">
+                          <span class="setting-desc-point"><strong>Default:</strong> <code>5</code></span>
+                          <span class="setting-desc-point"><strong>Recommendation:</strong> Higher (<code>6–8</code>) boosts accuracy; lower (<code>1–2</code>) runs faster.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <div class="number-input-control">
+                        <button onclick="decrementNumber('opt-bestOf', 1)" type="button" aria-label="Decrease Best Candidates">-</button>
+                        <input type="text" id="opt-bestOf" value="5" inputmode="numeric" autocomplete="off" aria-label="Best Candidates Count" />
+                        <button onclick="incrementNumber('opt-bestOf', 1)" type="button" aria-label="Increase Best Candidates">+</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="setting-card" data-search-tags="-bs --beam-size">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.beamSizeTitle">Beam Search Size</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.beamSizeDesc">Exploration beam width for finding optimal word sequences.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.beamSizePoints">
+                          <span class="setting-desc-point"><strong>Default:</strong> <code>5</code></span>
+                          <span class="setting-desc-point"><strong>Trade-off:</strong> Higher values reduce word errors and hallucinations, but increase transcription time.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <div class="number-input-control">
+                        <button onclick="decrementNumber('opt-beamSize', 1)" type="button" aria-label="Decrease Beam Size">-</button>
+                        <input type="text" id="opt-beamSize" value="5" inputmode="numeric" autocomplete="off" aria-label="Beam Search Size" />
+                        <button onclick="incrementNumber('opt-beamSize', 1)" type="button" aria-label="Increase Beam Size">+</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="setting-card" data-search-tags="-ac --audio-ctx">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.audioCtxTitle">Audio Context Size</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.audioCtxDesc">Audio frame context length in samples.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.audioCtxPoints">
+                          <span class="setting-desc-point"><strong>Default:</strong> <code>0</code> (uses model default 30-second context window)</span>
+                          <span class="setting-desc-point"><strong>Advanced:</strong> Restricts attention window for custom streaming workflows.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" type="number" min="0" step="1" id="opt-audioCtx" />
+                    </div>
+                  </div>
+
+                  <div class="setting-card" data-search-tags="-wt --word-thold">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.wordTholdTitle">Word Timestamp Threshold</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.wordTholdDesc">Acoustic probability cutoff for locking individual word timestamps.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.wordTholdPoints">
+                          <span class="setting-desc-point"><strong>Default:</strong> <code>0.01</code></span>
+                          <span class="setting-desc-point"><strong>When to change:</strong> Increase (<code>0.05–0.1</code>) if word timings drift during silent parts.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" type="number" min="0" max="1" step="0.01" id="opt-wordThold" />
+                    </div>
+                  </div>
+
+                  <div class="setting-card" data-search-tags="-et --entropy-thold">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.entropyTholdTitle">Entropy Threshold</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.entropyTholdDesc">Decoder uncertainty cutoff for triggering temperature fallback retry.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.entropyTholdPoints">
+                          <span class="setting-desc-point"><strong>Default:</strong> <code>2.4</code></span>
+                          <span class="setting-desc-point"><strong>When to change:</strong> Lower to <code>2.2</code> if model produces repetitive gibberish.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" type="number" min="0" step="0.1" id="opt-entropyThold" />
+                    </div>
+                  </div>
+
+                  <div class="setting-card" data-search-tags="-lpt --logprob-thold">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.logprobTholdTitle">Log Probability Threshold</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.logprobTholdDesc">Average token confidence threshold before fallback decoding is triggered.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.logprobTholdPoints">
+                          <span class="setting-desc-point"><strong>Default:</strong> <code>-1</code></span>
+                          <span class="setting-desc-point"><strong>When to change:</strong> Lower to <code>-1.5</code> for noisy or accented speech to prevent unnecessary retries.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" type="number" max="0" step="0.1" id="opt-logprobThold" />
+                    </div>
+                  </div>
+
+                  <div class="setting-card" data-search-tags="-nth --no-speech-thold">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.noSpeechTholdTitle">No Speech Threshold</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.noSpeechTholdDesc">Silence detection probability cutoff to suppress hallucinated words.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.noSpeechTholdPoints">
+                          <span class="setting-desc-point"><strong>Default:</strong> <code>0.6</code></span>
+                          <span class="setting-desc-point"><strong>When to change:</strong> Increase to <code>0.7–0.8</code> if Whisper hallucinates words during music or background noise.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" type="number" min="0" max="1" step="0.05" id="opt-noSpeechThold" />
+                    </div>
+                  </div>
+
+                  <div class="setting-card" data-search-tags="-tp --temperature">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.temperatureTitle">Sampling Temperature</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.temperatureDesc">Controls decoding randomness and exploration.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.temperaturePoints">
+                          <span class="setting-desc-point"><strong>Default:</strong> <code>0</code> (deterministic greedy decoding &mdash; highest precision)</span>
+                          <span class="setting-desc-point"><strong>When to change:</strong> Set to <code>0.2–0.4</code> only if the model gets stuck in repetition loops.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" type="number" min="0" max="2" step="0.05" id="opt-temperature" />
+                    </div>
+                  </div>
+
+                  <div class="setting-card" data-search-tags="-tpi --temperature-inc">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.tempIncTitle">Temperature Increment</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.tempIncDesc">Step size to increase temperature on each fallback retry.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.tempIncPoints">
+                          <span class="setting-desc-point"><strong>Default:</strong> <code>0.2</code></span>
+                          <span class="setting-desc-point"><strong>Retry sequence:</strong> Automatically retries at <code>0.2</code>, <code>0.4</code>, <code>0.6</code>, up to <code>1.0</code>.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" type="number" min="0" max="2" step="0.05" id="opt-temperatureInc" />
+                    </div>
+                  </div>
+
+                  <!-- Advanced Decoding Flags -->
+                  <div class="setting-card" data-search-tags="-nf --no-fallback">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.noFallbackTitle">Disable Temperature Fallback</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.noFallbackDesc">Skips retry passes with higher temperatures and accepts the first greedy pass.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.noFallbackPoints">
+                          <span class="setting-desc-point"><strong>Benefit:</strong> 30–50% faster processing on difficult or noisy files.</span>
+                          <span class="setting-desc-point"><strong>Trade-off:</strong> Skips error recovery if speech is unclear.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <label class="switch">
+                        <input type="checkbox" id="opt-noFallback" />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div class="setting-card" data-search-tags="-ls --log-score">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.logScoreTitle">Log Decoder Scores</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.logScoreDesc">Prints raw confidence and probability scores for each decoded token into the activity log stream.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.logScorePoints">
+                          <span class="setting-desc-point"><strong>Use case:</strong> Debugging model confidence, timestamp boundaries, and acoustic quality.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <label class="switch">
+                        <input type="checkbox" id="opt-logScore" />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="settings-group" id="group-outputs">
+                  <!-- Output checklist -->
+                  <div class="outputs-grid">
+                    <div class="setting-card" data-search-tags="-otxt --output-txt">
+                      <div class="setting-info">
+                        <span class="setting-title" data-i18n="settings.txtFormatTitle">Text Transcript (.txt)</span>
+                        </div>
+                      <div class="setting-control">
+                        <label class="switch">
+                          <input type="checkbox" id="opt-outputTxt" />
+                          <span class="slider"></span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="setting-card" data-search-tags="-osrt --output-srt">
+                      <div class="setting-info">
+                        <span class="setting-title" data-i18n="settings.srtFormatTitle">SRT Subtitles (.srt)</span>
+                        </div>
+                      <div class="setting-control">
+                        <label class="switch">
+                          <input type="checkbox" id="opt-outputSrt" />
+                          <span class="slider"></span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="setting-card" data-search-tags="-ovtt --output-vtt">
+                      <div class="setting-info">
+                        <span class="setting-title" data-i18n="settings.vttFormatTitle">WebVTT Subtitles (.vtt)</span>
+                        </div>
+                      <div class="setting-control">
+                        <label class="switch">
+                          <input type="checkbox" id="opt-outputVtt" />
+                          <span class="slider"></span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="setting-card" data-search-tags="-olrc --output-lrc">
+                      <div class="setting-info">
+                        <span class="setting-title" data-i18n="settings.lrcFormatTitle">LRC Lyrics (.lrc)</span>
+                        </div>
+                      <div class="setting-control">
+                        <label class="switch">
+                          <input type="checkbox" id="opt-outputLrc" />
+                          <span class="slider"></span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="setting-card" data-search-tags="-ocsv --output-csv">
+                      <div class="setting-info">
+                        <span class="setting-title" data-i18n="settings.csvFormatTitle">CSV Dataset (.csv)</span>
+                        </div>
+                      <div class="setting-control">
+                        <label class="switch">
+                          <input type="checkbox" id="opt-outputCsv" />
+                          <span class="slider"></span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="setting-card" data-search-tags="-oj --output-json">
+                      <div class="setting-info">
+                        <span class="setting-title" data-i18n="settings.jsonFormatTitle">JSON Formatted (.json)</span>
+                        </div>
+                      <div class="setting-control">
+                        <label class="switch">
+                          <input type="checkbox" id="opt-outputJson" />
+                          <span class="slider"></span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="setting-card" data-search-tags="-ojf --output-json-full">
+                      <div class="setting-info">
+                        <span class="setting-title" data-i18n="settings.jsonFullFormatTitle">Full Detailed JSON</span>
+                        </div>
+                      <div class="setting-control">
+                        <label class="switch">
+                          <input type="checkbox" id="opt-outputJsonFull" />
+                          <span class="slider"></span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="setting-card" id="card-printConfidence" data-search-tags="--print-confidence">
+                      <div class="setting-info">
+                        <span class="setting-title"><span data-i18n="settings.printConfidenceTitle">Word Confidence</span> <span style="font-size:0.75rem; color:var(--color-text-muted); font-weight:normal;">(in JSON)</span></span>
+                        </div>
+                      <div class="setting-control">
+                        <label class="switch">
+                          <input type="checkbox" id="opt-printConfidence" />
+                          <span class="slider"></span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.outputDirModeTitle">Output Directory Mode</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.outputDirModeDesc">Destination folder strategy for generated subtitles, transcripts, and export files.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.outputDirModePoints">
+                          <span class="setting-desc-point"><strong>Same as Input:</strong> Saves output files right next to original media file</span>
+                          <span class="setting-desc-point"><strong>Custom Directory:</strong> Centralizes all outputs into a single designated folder</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control" style="width:300px;">
+                      <div class="select-wrapper" style="width:100%;">
+                        <select class="select-control" id="opt-outputDirMode" onchange="toggleOutputDirCustomField()">
+                          <option value="input_dir" data-i18n="settings.outputDirSameAsInput">Same as Input File Directory (Default)</option>
+                          <option value="custom" data-i18n="settings.outputDirCustom">Custom Directory...</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="setting-card" id="output-dir-custom-card" style="display:none;">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.outputDirCustomTitle">Custom Output Path</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.outputDirCustomDesc">Dedicated folder path on disk where all transcripts and subtitles are saved.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.outputDirCustomPoints">
+                          <span class="setting-desc-point"><strong>Active when:</strong> Mode is set to <em>Custom Directory</em></span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control setting-control-path">
+                      <div class="readonly-path-field">
+                        <svg class="path-folder-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        <input class="readonly-path-input" type="text" id="opt-outputDirPath" readonly placeholder="Select output folder..." data-i18n-placeholder="settings.outputDirSelectPlaceholder" spellcheck="false" aria-label="Custom output directory path" data-i18n-aria="settings.outputDirInputAria" />
+                        <button class="path-action-btn" type="button" onclick="openCustomOutputDir()" title="Click to open output folder in File Manager" data-i18n-title="settings.openOutputDirTooltip" aria-label="Open output folder in File Manager" data-i18n-aria="settings.openOutputDirTooltip">
+                          <svg class="path-open-icon" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                            <polyline points="15 3 21 3 21 9"></polyline>
+                            <line x1="10" y1="14" x2="21" y2="3"></line>
+                          </svg>
+                        </button>
+                      </div>
+                      <button class="btn-secondary path-browse-btn" onclick="browseOutputDir()" type="button" data-i18n="common.browse">Browse</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="settings-group" id="group-gpu">
+
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.gpuDeviceTitle">GPU Device Index</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.gpuDeviceDesc">Target graphics card index on multi-GPU systems.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.gpuDevicePoints">
+                          <span class="setting-desc-point"><strong>Default:</strong> <code>0</code> (primary graphics card)</span>
+                          <span class="setting-desc-point"><strong>Multi-GPU:</strong> Set to <code>1</code> or <code>2</code> to target secondary GPUs.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <div class="number-input-control">
+                        <button onclick="decrementNumber('opt-deviceId', 1)" type="button" aria-label="Decrease Device ID">-</button>
+                        <input type="text" id="opt-deviceId" value="0" inputmode="numeric" autocomplete="off" aria-label="GPU Device ID" />
+                        <button onclick="incrementNumber('opt-deviceId', 1)" type="button" aria-label="Increase Device ID">+</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="setting-card" data-search-tags="-oved --ov-e-device">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.openvinoDeviceTitle">OpenVINO Hardware Device</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.openvinoDeviceDesc">Target execution device for Intel OpenVINO acceleration.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.openvinoDevicePoints">
+                          <span class="setting-desc-point"><strong>GPU:</strong> Intel Arc dedicated GPU or integrated graphics (iGPU)</span>
+                          <span class="setting-desc-point"><strong>CPU:</strong> AVX-optimized Intel CPU inference</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <select class="select-control" id="opt-ovDevice">
+                        <option value="CPU">CPU</option>
+                        <option value="GPU">GPU</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="setting-card" data-search-tags="-fa --flash-attn -nfa --no-flash-attn">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.flashAttnTitle">Flash Attention</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.flashAttnDesc">Optimized multi-head attention acceleration for modern GPU and CPU architectures.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.flashAttnPoints">
+                          <span class="setting-desc-point"><strong>Default:</strong> Enabled</span>
+                          <span class="setting-desc-point"><strong>Note:</strong> Automatically disabled when DTW word-level timestamps are enabled.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <label class="switch">
+                        <input type="checkbox" id="opt-flashAttn" />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="settings-group" id="group-vad">
+                  <div class="setting-card" data-search-tags="--vad">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.vadEnableTitle">Enable Voice Activity Detection</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.vadEnableDesc">Pre-filters audio using Silero VAD to detect and remove silent and non-speech sections before transcription decoding.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.vadEnablePoints">
+                          <span class="setting-desc-point"><strong>Benefits:</strong> Speeds up processing up to 3x and prevents silence hallucinations.</span>
+                          <span class="setting-desc-point"><strong>Recommended:</strong> Keep enabled for podcasts, interviews, and long videos with pauses.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <label class="switch">
+                        <input type="checkbox" id="opt-vad" />
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div class="setting-card" data-search-tags="-vm --vad-model">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.vadModelTitle">VAD Model</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.vadModelDesc">Active Silero VAD model binary.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.vadModelPoints">
+                          <span class="setting-desc-point"><strong>Default:</strong> <code>ggml-silero-v6.2.0.bin</code> (auto-loaded from models directory)</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <select class="select-control" id="opt-vadModel"></select>
+                    </div>
+                  </div>
+
+                  <div class="setting-card" data-search-tags="-vt --vad-thold">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.vadThresholdTitle">VAD Threshold</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.vadThresholdDesc">Speech probability cutoff for triggering voice activity detection.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.vadThresholdPoints">
+                          <span class="setting-desc-point"><strong>Default:</strong> <code>0.5</code></span>
+                          <span class="setting-desc-point"><strong>Noisy / Heavy Breathing:</strong> Set to <code>0.65–0.75</code> (stricter filter)</span>
+                          <span class="setting-desc-point"><strong>Soft Whispers / Distant Mic:</strong> Set to <code>0.35–0.45</code> (more sensitive)</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" type="number" min="0" max="1" step="0.05" id="opt-vadThold" />
+                    </div>
+                  </div>
+
+                  <div class="setting-card" data-search-tags="-vspd --vad-min-speech">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.vadMinSpeechTitle">VAD Min Speech (ms)</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.vadMinSpeechDesc">Minimum continuous voice duration required to trigger transcription.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.vadMinSpeechPoints">
+                          <span class="setting-desc-point"><strong>Default:</strong> <code>250</code> ms</span>
+                          <span class="setting-desc-point"><strong>Purpose:</strong> Ignores brief clicks, coughs, and keystrokes shorter than this duration.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" type="number" min="0" step="10" id="opt-vadMinSpeech" />
+                    </div>
+                  </div>
+
+                  <div class="setting-card" data-search-tags="-vsd --vad-min-silence">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.vadMinSilenceTitle">VAD Min Silence (ms)</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.vadMinSilenceDesc">Minimum silence duration required to split speech into a new subtitle segment.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.vadMinSilencePoints">
+                          <span class="setting-desc-point"><strong>Default:</strong> <code>100</code> ms</span>
+                          <span class="setting-desc-point"><strong>Recommended for Subtitles:</strong> Increase to <code>300–500</code> ms for natural conversational pauses.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" type="number" min="0" step="10" id="opt-vadMinSil" />
+                    </div>
+                  </div>
+
+                  <div class="setting-card" data-search-tags="-vmsd --vad-max-speech">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.vadMaxSpeechTitle">VAD Max Speech (s)</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.vadMaxSpeechDesc">Maximum continuous speech segment before forcing a split.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.vadMaxSpeechPoints">
+                          <span class="setting-desc-point"><strong>Default:</strong> <code>30</code> s</span>
+                          <span class="setting-desc-point"><strong>Purpose:</strong> Matches Whisper's acoustic window to prevent memory overflow.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" type="number" min="1" max="300" step="1" id="opt-vadMaxSpeech" />
+                    </div>
+                  </div>
+
+                  <div class="setting-card" data-search-tags="-vp --vad-speech-pad">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.vadSpeechPadTitle">VAD Speech Padding (ms)</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.vadSpeechPadDesc">Audio buffer added before and after each detected speech segment.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.vadSpeechPadPoints">
+                          <span class="setting-desc-point"><strong>Default:</strong> <code>30</code> ms</span>
+                          <span class="setting-desc-point"><strong>Purpose:</strong> Prevents clipping starting consonants or trailing syllables.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" type="number" min="0" step="5" id="opt-vadSpeechPad" />
+                    </div>
+                  </div>
+
+                  <div class="setting-card" data-search-tags="-vo --vad-overlap">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.vadOverlapTitle">VAD Segment Overlap</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.vadOverlapDesc">Contextual overlap duration between consecutive speech segments.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.vadOverlapPoints">
+                          <span class="setting-desc-point"><strong>Default:</strong> <code>0.1</code> s (100 ms)</span>
+                          <span class="setting-desc-point"><strong>Purpose:</strong> Preserves grammatical continuity across segment boundaries.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <input class="text-input" type="number" min="0" max="1" step="0.05" id="opt-vadOverlap" />
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- AI Translation Settings Group -->
+                <div class="settings-group" id="group-translation">
+                  <!-- Tabbed Provider Manager Card -->
+                  <div class="provider-manager-card" id="provider-manager-card">
+                    <!-- Active Model Banner -->
+                    <div class="active-model-banner" id="active-model-banner" style="display: none;">
+                      <div class="active-model-banner-info">
+                        <span class="active-model-banner-dot"></span>
+                        <span class="active-model-banner-label" data-i18n="settings.activeModelLabel">Active Translation Model:</span>
+                        <strong class="active-model-banner-value" id="active-model-banner-value">None</strong>
+                      </div>
+                    </div>
+                    <!-- Tab buttons -->
+                    <div class="provider-tabs">
+                      <button class="provider-tab-btn active" onclick="switchProviderTab('auto')" id="tab-btn-auto" data-i18n="settings.tabAutoTranslate">Auto-Translate</button>
+                      <button class="provider-tab-btn" onclick="switchProviderTab('providers')" id="tab-btn-providers" data-i18n="settings.tabProviders">API Providers</button>
+                      <button class="provider-tab-btn" onclick="switchProviderTab('general')" id="tab-btn-general" data-i18n="settings.tabGeneral">Provider Configuration</button>
+                      <button class="provider-tab-btn" onclick="switchProviderTab('models')" id="tab-btn-models"><span data-i18n="settings.tabModels">Models</span> (<span id="provider-models-count">0</span>)</button>
+                    </div>
+
+                    <!-- Tab 0 Content: Auto-Translate Automation Settings -->
+                    <div class="provider-tab-content" id="provider-tab-auto">
+                      <div class="setting-card">
+                        <div class="setting-info">
+                          <div class="setting-label-row">
+                            <span class="setting-title" data-i18n="settings.aiTranslateTitle">Auto-Transfer to Translation Studio</span>
+                          </div>
+                          <div class="setting-desc"><span data-i18n="settings.aiTranslateDesc">Automatically load generated subtitles and companion video into Translation Studio upon transcription completion.</span>
+                            <div class="setting-desc-points" data-i18n-html="settings.aiTranslatePoints">
+                              <span class="setting-desc-point"><strong>Integrated Workflow:</strong> Automatically loads generated subtitles and companion video into Translation Studio</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="setting-control">
+                          <label class="switch">
+                            <input type="checkbox" id="opt-autoTransferToTranslate" onchange="saveCurrentSettings()" />
+                            <span class="slider"></span>
+                          </label>
+                        </div>
+                      </div>
+
+                      <div class="setting-card">
+                        <div class="setting-info">
+                          <div class="setting-label-row">
+                            <span class="setting-title" data-i18n="settings.targetLangTitle">Target Language</span>
+                          </div>
+                          <div class="setting-desc"><span data-i18n="settings.targetLangDesc">Destination language for AI subtitle translation.</span>
+                            <div class="setting-desc-points" data-i18n-html="settings.targetLangPoints">
+                              <span class="setting-desc-point"><strong>Supported:</strong> 100+ global languages with native script rendering</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="setting-control setting-control-wide">
+                          <select class="select-control" id="opt-translateAiTargetLang" data-searchable data-language-select="translation" onchange="saveCurrentSettings()"></select>
+                        </div>
+                      </div>
+
+                      <div class="setting-card">
+                        <div class="setting-info">
+                          <div class="setting-label-row">
+                            <span class="setting-title" data-i18n="settings.polishTitle">Enable Polish Pass</span>
+                          </div>
+                          <div class="setting-desc"><span data-i18n="settings.polishDesc">Refines translated subtitles for natural conversational rhythm and reading speed.</span>
+                            <div class="setting-desc-points" data-i18n-html="settings.polishPoints">
+                              <span class="setting-desc-point"><strong>Recommended:</strong> Enabled for natural subtitle flow, avoiding rigid word-for-word machine translations.</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="setting-control">
+                          <label class="switch">
+                            <input type="checkbox" id="opt-translateAiPolish" onchange="saveCurrentSettings()" />
+                            <span class="slider"></span>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Tab 1 Content: Providers Card Grid -->
+                    <div class="provider-tab-content" id="provider-tab-providers" style="display: none;">
+                      <!-- Hidden select boxes for bindSettingsToDOM mapping -->
+                      <select class="select-control" id="opt-translateAiProvider" style="display: none;"></select>
+                      <select class="select-control" id="opt-translateAiModel" style="display: none;"></select>
+                      <div class="provider-grid" id="providers-tiles-grid">
+                        <!-- Populated dynamically in Javascript -->
+                      </div>
+                    </div>
+
+                    <!-- Tab 1 Content: General Setup -->
+                    <div class="provider-tab-content" id="provider-tab-general" style="display: none;">
+                      <!-- Placeholder Empty State -->
+                      <div class="provider-placeholder-overlay" id="general-placeholder-overlay">
+                        <svg class="provider-placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <circle cx="12" cy="12" r="10"/>
+                          <line x1="12" y1="8" x2="12" y2="16"/>
+                          <line x1="8" y1="12" x2="16" y2="12"/>
+                        </svg>
+                        <div class="provider-placeholder-text" data-i18n="settings.providerSelectPrompt">Please add or select an API Provider in the <strong>API Providers</strong> tab to configure its settings.</div>
+                      </div>
+
+                      <div id="general-config-fields" style="display: none;">
+                        <div class="provider-grid-two">
+                          <div class="provider-field">
+                            <label data-i18n="settings.baseUrl">Base URL</label>
+                            <input class="text-input" id="mgr-provider-url" type="text" placeholder="https://..." />
+                          </div>
+                          <div class="provider-field">
+                            <label data-i18n="settings.apiFormat">API Format</label>
+                            <select class="select-control" id="mgr-provider-format">
+                              <option value="Chat completions">Chat completions</option>
+                              <option value="Anthropic messages">Anthropic messages</option>
+                              <option value="Responses">Responses (Gemini)</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div class="provider-field" style="margin-bottom: 20px;">
+                          <label data-i18n="settings.apiKeyUpdate">API Key (Update)</label>
+                          <div class="password-input-wrapper">
+                            <input class="text-input" id="mgr-provider-key" type="password" placeholder="••••••••••••••••" />
+                            <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('mgr-provider-key', this)">
+                              <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                <circle cx="12" cy="12" r="3"/>
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+
+                        <div class="provider-field" style="margin-bottom: 16px;">
+                          <label data-i18n="settings.providerCustomPrompt">Provider Custom System Prompt</label>
+                          <span data-i18n="settings.providerCustomPromptDesc">Custom instructions to guide translation tone, domain vocabulary, or formatting conventions. Leave blank for system defaults.</span>
+                          <textarea class="textarea-control" id="mgr-provider-prompt" rows="3" placeholder="You are a professional translator..." data-i18n-placeholder="settings.providerCustomPromptPlaceholder" dir="auto"></textarea>
+                        </div>
+
+                        <div class="provider-actions">
+                          <button class="btn-secondary btn-delete" onclick="deleteActiveProvider()" data-i18n="settings.deleteProvider">Delete Provider</button>
+                          <button class="btn-primary" id="mgr-btn-test-connection" onclick="testTranslationConnection()" data-i18n="settings.testConnBtn">Test Connection</button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Tab 2 Content: Models -->
+                    <div class="provider-tab-content" id="provider-tab-models" style="display: none;">
+                      <!-- Placeholder Empty State -->
+                      <div class="provider-placeholder-overlay" id="models-placeholder-overlay">
+                        <svg class="provider-placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <circle cx="12" cy="12" r="10"/>
+                          <line x1="12" y1="8" x2="12" y2="16"/>
+                          <line x1="8" y1="12" x2="16" y2="12"/>
+                        </svg>
+                        <div class="provider-placeholder-text" data-i18n="settings.modelsSelectPrompt">Please add or select an API Provider in the <strong>API Providers</strong> tab to configure its models catalog.</div>
+                      </div>
+
+                      <div id="models-catalog-fields" style="display: none;">
+                        <!-- Search and Action header -->
+                        <div class="models-toolbar">
+                          <div class="models-search-wrapper">
+                            <svg class="models-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                              <circle cx="11" cy="11" r="8"></circle>
+                              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            </svg>
+                            <input class="text-input models-search-input" id="mgr-models-search" type="text" placeholder="Search models by identifier..." data-i18n-placeholder="settings.searchModelsPlaceholder" oninput="filterModelsTable()" />
+                            <button type="button" class="models-search-clear" id="mgr-models-search-clear" onclick="clearModelsSearch()" style="display: none;" title="Clear Search" data-i18n-title="settings.clearSearch">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                              </svg>
+                            </button>
+                          </div>
+                          <div class="models-actions-group">
+                            <button class="btn-secondary btn-model-action" id="mgr-btn-fetch-models" onclick="fetchActiveProviderModels()">
+                              <svg class="btn-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                              </svg>
+                              <span data-i18n="settings.fetchModels">Fetch Models</span>
+                            </button>
+                            <button class="btn-secondary btn-model-action" id="mgr-btn-add-custom-model">
+                              <svg class="btn-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                              </svg>
+                              <span data-i18n="settings.addCustomModel">Add Custom Model</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        <!-- Filters Quick Actions Bar (Single-line Chips) -->
+                        <div class="models-header-bar">
+                          <div class="models-filter-pills" id="models-filter-pills">
+                            <button class="btn-filter active" onclick="filterModelsStatus('all')" id="filter-models-all">
+                              <span data-i18n="settings.allModels">All Models</span>
+                              <span class="filter-badge" id="filter-count-all">0</span>
+                            </button>
+                            <button class="btn-filter" onclick="filterModelsStatus('free')" id="filter-models-free">
+                              <span class="filter-dot-free"></span>
+                              <span data-i18n="settings.freeTier">Free Tier</span>
+                              <span class="filter-badge badge-free" id="filter-count-free">0</span>
+                            </button>
+                            <button class="btn-filter" onclick="filterModelsStatus('reasoning')" id="filter-models-reasoning">
+                              <span class="filter-dot-reasoning"></span>
+                              <span data-i18n="settings.reasoning">Reasoning</span>
+                              <span class="filter-badge badge-reasoning" id="filter-count-reasoning">0</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        <!-- Models Data Table (CSS Grid with Absolute Column Alignment) -->
+                        <div class="models-data-table" id="mgr-models-table-wrapper" role="table">
+                          <div class="models-table-head" role="row">
+                            <div class="th-cell th-active" role="columnheader" tabindex="0" aria-sort="none" onclick="toggleSortModels('active')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSortModels('active');}" title="Sort by Active" data-i18n-title="settings.sortActive">
+                              <span data-i18n="settings.thActive">Active</span>
+                              <span class="sort-indicator" id="sort-icon-active" aria-hidden="true">↕</span>
+                            </div>
+                            <div class="th-cell th-id" role="columnheader" tabindex="0" aria-sort="none" onclick="toggleSortModels('id')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSortModels('id');}" title="Sort by Model Identifier" data-i18n-title="settings.sortId">
+                              <span data-i18n="settings.thModelId">Model Identifier</span>
+                              <span class="sort-indicator" id="sort-icon-id" aria-hidden="true">↕</span>
+                            </div>
+                            <div class="th-cell th-ctx" role="columnheader" tabindex="0" aria-sort="none" onclick="toggleSortModels('ctx')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSortModels('ctx');}" title="Sort by Context Window" data-i18n-title="settings.sortCtx">
+                              <span data-i18n="settings.thContextWindow">Context Window</span>
+                              <span class="sort-indicator" id="sort-icon-ctx" aria-hidden="true">↕</span>
+                            </div>
+                            <div class="th-cell th-reasoning" role="columnheader" tabindex="0" aria-sort="none" onclick="toggleSortModels('reasoning')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSortModels('reasoning');}" title="Sort by Reasoning Level" data-i18n-title="settings.sortReasoning">
+                              <span data-i18n="settings.thReasoning">Reasoning</span>
+                              <span class="sort-indicator" id="sort-icon-reasoning" aria-hidden="true">↕</span>
+                            </div>
+                            <div class="th-cell th-action" role="columnheader">
+                              <span data-i18n="settings.thAction">Action</span>
+                            </div>
+                          </div>
+                          <div class="models-table-body" id="mgr-models-tbody" role="rowgroup">
+                            <!-- Populated dynamically via JS -->
+                          </div>
+
+                          <!-- Empty Search Results State -->
+                          <div class="models-empty-state" id="mgr-models-empty-state" style="display: none;">
+                            <div class="models-empty-icon">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                <line x1="8" y1="11" x2="14" y2="11"></line>
+                              </svg>
+                            </div>
+                            <div class="models-empty-title" data-i18n="settings.noMatchingModels">No Matching Models Found</div>
+                            <div class="models-empty-desc" data-i18n="settings.noMatchingModelsDesc">No models match your current filter or search keyword.</div>
+                            <button type="button" class="btn-secondary btn-sm" id="mgr-models-empty-reset-btn" onclick="clearModelsSearch()" data-i18n="settings.resetFilterSearch">Reset Filter & Search</button>
+                          </div>
+                        </div>
+
+                        <!-- Models Pagination Controls -->
+                        <div class="models-pagination" id="mgr-models-pagination" style="display: none;">
+                          <div class="pagination-info" id="mgr-pagination-info"></div>
+                          <div class="pagination-nav">
+                            <div class="pagination-size-wrapper">
+                              <label for="models-page-size-select" class="pagination-size-label" data-i18n="settings.perPage">Per page:</label>
+                              <select id="models-page-size-select" class="select-control pagination-size-select" onchange="changeModelsPageSize(this.value)">
+                                <option value="20">20</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                                <option value="all" data-i18n="settings.allPageSize">All</option>
+                              </select>
+                            </div>
+                            <div class="pagination-divider" aria-hidden="true"></div>
+                            <button type="button" class="btn-pagination" id="btn-page-prev" onclick="changeModelsPage(-1)" title="Previous Page" data-i18n-title="settings.prevPage" aria-label="Previous Page" data-i18n-aria="settings.prevPage">
+                              <svg class="pagination-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                              <span data-i18n="settings.prevPage">Previous</span>
+                            </button>
+                            <span class="pagination-current-page" id="mgr-pagination-page-indicator">Page 1 of 1</span>
+                            <button type="button" class="btn-pagination" id="btn-page-next" onclick="changeModelsPage(1)" title="Next Page" data-i18n-title="settings.nextPage" aria-label="Next Page" data-i18n-aria="settings.nextPage">
+                              <span data-i18n="settings.nextPage">Next</span>
+                              <svg class="pagination-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                            </button>
+                          </div>
+                        </div>
+
+                        <!-- Table Footer Tip & Help -->
+                        <div class="models-table-footer">
+                          <div class="models-footer-tip">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                              <circle cx="12" cy="12" r="10"></circle>
+                              <line x1="12" y1="16" x2="12" y2="12"></line>
+                              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                            </svg>
+                            <span data-i18n="settings.modelsTip">Model edits auto-save in real time. Click any model row to set it as your default translation model.</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
+            </div>
+          </div>
+
