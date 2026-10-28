@@ -5,6 +5,21 @@ import { themeManager } from './modules/themeManager.ts';
 import { modelHub } from './modules/modelHub.ts';
 import { transcriptViewer } from './modules/transcriptViewer.ts';
 import { CustomSelect, customSelectsMap, initializeCustomSelects, syncCustomSelects, customSelect } from './modules/customSelect.ts';
+import {
+  batchProcessor,
+  formatDuration,
+  updateBatchSpecs,
+  removeFileFromBatch,
+  clearBatchQueue,
+  moveBatchItemUp,
+  moveBatchItemDown,
+  sortBatchQueue,
+  selectBatchItemTranscript,
+  renderBatchQueueTable,
+  runBatchExtraction,
+  abortBatchExtraction,
+  addBatchFiles
+} from './modules/batchProcessor.ts';
 import { initI18n, t, setLanguage, getLanguage, translateDOM, isRtlLanguage, firstStrongDirection, applyTextDirection, applyContentDirection, clearContentDirection, isolateDirection, isolateLtr, APP_NAME } from './i18n/index.ts';
 import { normalizeForSearch } from './languages.ts';
 import { initLanguageSelects, renderLanguageSelect } from './languageSelect.ts';
@@ -709,7 +724,7 @@ window.addEventListener('whisper:languageChanged', () => {
   if (typeof probedMetadata !== 'undefined' && probedMetadata && probedMetadata.exists) {
     renderMediaMetadata(probedMetadata);
   }
-  if (typeof isBatchMode !== 'undefined' && isBatchMode && typeof renderBatchQueueTable === 'function' && Array.isArray(batchItems) && batchItems.length > 0) {
+  if (batchProcessor.getIsBatchMode() && typeof renderBatchQueueTable === 'function' && Array.isArray(batchProcessor.getItems()) && batchProcessor.getItems().length > 0) {
     const fileNameEl = document.getElementById('lbl-file-name');
     if (fileNameEl) {
       fileNameEl.textContent = t('transcribe.batchModeActive');
@@ -1233,23 +1248,16 @@ let wavPathForTranscription = null;
 let localScannedTransModels = [];
 let localScannedVadModels = [];
 
-// Batch Processing State variables
-let selectedMediaFiles = [];
-let batchItems = [];
-let isBatchMode = false;
+// Transcription State variables
 let isTranscribing = false;
-let isBatchExtracting = false;
-let batchCancelActive = false;
-let activeBatchViewerIndex = -1;
-let batchProcessingIndex = -1;
-let userExplicitlySelectedBatchItem = false;
 let _unlistenFns = [];
 
 window.getCurrentSourceMediaFile = function() {
-  if (isBatchMode && activeBatchViewerIndex >= 0 && batchItems[activeBatchViewerIndex]) {
-    return batchItems[activeBatchViewerIndex].path;
+  if (batchProcessor.getIsBatchMode() && batchProcessor.getActiveViewerIndex() >= 0 && batchProcessor.getItems()[batchProcessor.getActiveViewerIndex()]) {
+    return batchProcessor.getItems()[batchProcessor.getActiveViewerIndex()].path;
   }
-  return selectedMediaFile || (selectedMediaFiles && selectedMediaFiles.length > 0 ? selectedMediaFiles[0] : null) || (window.settingsState?.inputFile || null);
+  const batchFiles = batchProcessor.getSelectedFiles();
+  return selectedMediaFile || (batchFiles && batchFiles.length > 0 ? batchFiles[0] : null) || (window.settingsState?.inputFile || null);
 };
 
 // Native OS Taskbar Progress Bar & Background Job Tracking
@@ -1537,28 +1545,33 @@ if (typeof window !== 'undefined') {
       configurable: true
     },
     isBatchMode: {
-      get() { return isBatchMode; },
-      set(val) { isBatchMode = val; },
+      get() { return batchProcessor.getIsBatchMode(); },
+      set(val) { batchProcessor.setIsBatchMode(val); },
       configurable: true
     },
     isBatchExtracting: {
-      get() { return isBatchExtracting; },
-      set(val) { isBatchExtracting = val; },
+      get() { return batchProcessor.getIsExtracting(); },
+      set(val) { batchProcessor.setIsExtracting(val); },
       configurable: true
     },
     batchItems: {
-      get() { return batchItems; },
-      set(val) { batchItems = val; },
+      get() { return batchProcessor.getItems(); },
+      set(val) { batchProcessor.setItems(val); },
       configurable: true
     },
     batchProcessingIndex: {
-      get() { return batchProcessingIndex; },
-      set(val) { batchProcessingIndex = val; },
+      get() { return batchProcessor.getProcessingIndex(); },
+      set(val) { batchProcessor.setProcessingIndex(val); },
       configurable: true
     },
     activeBatchViewerIndex: {
-      get() { return activeBatchViewerIndex; },
-      set(val) { activeBatchViewerIndex = val; },
+      get() { return batchProcessor.getActiveViewerIndex(); },
+      set(val) { batchProcessor.setActiveViewerIndex(val); },
+      configurable: true
+    },
+    selectedMediaFiles: {
+      get() { return batchProcessor.getSelectedFiles(); },
+      set(val) { batchProcessor.setSelectedFiles(val); },
       configurable: true
     },
     systemSpecs: {
@@ -1766,17 +1779,17 @@ async function initApp() {
       if (selectedMediaFile) {
         updateMediaCardName(selectedMediaFile);
         filePathEl.textContent = selectedMediaFile;
-      } else if (!batchItems || batchItems.length === 0) {
+      } else if (!batchProcessor.getItems() || batchProcessor.getItems().length === 0) {
         updateMediaCardName(null);
         filePathEl.textContent = t('transcribe.selectFilePrompt');
-      } else if (isBatchMode && batchItems.length > 0) {
-        fileNameEl.textContent = `${batchItems.length} ${t('transcribe.queueFiles')}`;
+      } else if (batchProcessor.getIsBatchMode() && batchProcessor.getItems().length > 0) {
+        fileNameEl.textContent = `${batchProcessor.getItems().length} ${t('transcribe.queueFiles')}`;
       }
     }
     
     const nextStep2Btn = document.getElementById('btn-next-step-2');
     if (nextStep2Btn) {
-      if (batchItems && batchItems.length > 0) {
+      if (batchProcessor.getItems() && batchProcessor.getItems().length > 0) {
         nextStep2Btn.textContent = t('transcribe.continueToBatchSetup');
       } else {
         nextStep2Btn.textContent = t('transcribe.continueToTranscription');
@@ -1784,7 +1797,7 @@ async function initApp() {
     }
 
     // Keep batch queue table and specs translated without affecting data
-    if (batchItems && batchItems.length > 0) {
+    if (batchProcessor.getItems() && batchProcessor.getItems().length > 0) {
       if (typeof renderBatchQueueTable === 'function') {
         renderBatchQueueTable();
       }
@@ -2118,7 +2131,7 @@ function setupTauriListeners() {
     }
     
     if (msgEl) {
-      if (isBatchMode && payload.stage === 'completed') {
+      if (batchProcessor.getIsBatchMode() && payload.stage === 'completed') {
         // In batch mode, single file completion is orchestrated by the batch queue
       } else {
         const i18nKey = mapTranscribeStatusKey(payload);
@@ -3962,9 +3975,9 @@ window.updateTranscribeActionButtons = function(isTranscribingParam) {
   if (typeof isTranscribingParam === 'boolean') {
     if (!isTranscribingParam) {
       isTranscribing = false;
-      isBatchExtracting = false;
-    } else if (isBatchMode) {
-      isBatchExtracting = true;
+      batchProcessor.setIsExtracting(false);
+    } else if (batchProcessor.getIsBatchMode()) {
+      batchProcessor.setIsExtracting(true);
     } else {
       isTranscribing = true;
     }
@@ -3978,7 +3991,8 @@ window.updateTranscribeActionButtons = function(isTranscribingParam) {
   const cancelBatchBtn = document.getElementById('btn-cancel-batch');
 
   const hasSingleMedia = Boolean(selectedMediaFile || wavPathForTranscription);
-  const hasBatchMedia = Array.isArray(batchItems) && batchItems.length > 0;
+  const hasBatchMedia = Array.isArray(batchProcessor.getItems()) && batchProcessor.getItems().length > 0;
+  const isBatchExtracting = batchProcessor.getIsExtracting();
 
   if (btnRun) {
     const canRun = !isTranscribing && hasSingleMedia;
@@ -4162,10 +4176,10 @@ function setWizardStepCompleted(stepNum, isCompleted) {
 
 window.clearSingleMediaFile = function() {
   selectedMediaFile = null;
-  selectedMediaFiles = [];
+  batchProcessor.setSelectedFiles([]);
   wavPathForTranscription = null;
   probedMetadata = null;
-  isBatchMode = false;
+  batchProcessor.setIsBatchMode(false);
 
   const dropZone = document.getElementById('transcribe-drop-zone');
   if (dropZone) dropZone.classList.remove('has-file');
@@ -4281,71 +4295,22 @@ window.clearSingleMediaFile = function() {
 };
 
 window.browseMediaFile = async function() {
-  if (isBatchExtracting || isTranscribing) {
+  if (batchProcessor.getIsExtracting() || isTranscribing) {
     showNotification(t('toasts.batchActiveSelectBlocked'), "info");
     return;
   }
   const rawFiles = await invoke('select_files');
   if (rawFiles && rawFiles.length > 0) {
     const files = Array.from(new Set(rawFiles));
-    if (isBatchMode && batchItems.length > 0) {
-      const existingPaths = new Set(batchItems.map(item => item.path));
-      const newFiles = files.filter(f => !existingPaths.has(f));
-
-      if (newFiles.length === 0) {
-        showNotification(t('toasts.filesAlreadyInBatch') || 'Selected files are already in the batch queue', "info");
-        return;
-      }
-
-      const newItems = newFiles.map(filePath => ({
-        path: filePath,
-        name: getBasename(filePath),
-        size: t('transcribe.statusPending') + '...',
-        durationSec: null,
-        status: 'pending',
-        timeSec: 0,
-        speedFactor: 0.0,
-        outputs: []
-      }));
-
-      batchItems = batchItems.concat(newItems);
-      selectedMediaFiles = batchItems.map(item => item.path);
-
-      const fileNameEl = document.getElementById('lbl-file-name');
-      if (fileNameEl) {
-        fileNameEl.textContent = t('transcribe.batchModeActive');
-        fileNameEl.removeAttribute('title');
-      }
-      const countEl = document.getElementById('batch-files-count');
-      if (countEl) countEl.textContent = batchItems.length;
-
-      renderBatchQueueTable();
-      updateBatchSpecs();
-
-      (async () => {
-        for (const item of newItems) {
-          try {
-            const meta = await invoke('probe_media_file', { filePath: item.path });
-            if (meta && meta.exists) {
-              item.size = meta.size;
-              item.durationSec = meta.durationSec;
-            }
-          } catch (err) {
-            console.error("Failed to probe file in batch:", err);
-          }
-        }
-        renderBatchQueueTable();
-        updateBatchSpecs();
-      })();
-
-      showNotification(t('toasts.filesLoaded', { count: newFiles.length }), "success");
+    if (batchProcessor.getIsBatchMode() && batchProcessor.getItems().length > 0) {
+      await addBatchFiles(files);
       return;
     }
 
-    selectedMediaFiles = files;
+    batchProcessor.setSelectedFiles(files);
     
     if (files.length === 1) {
-      isBatchMode = false;
+      batchProcessor.setIsBatchMode(false);
       selectedMediaFile = files[0];
       
       const dropZone = document.getElementById('transcribe-drop-zone');
@@ -4401,86 +4366,7 @@ window.browseMediaFile = async function() {
       setWizardStepCompleted(1, true);
       await probeSelectedFile();
     } else {
-      isBatchMode = true;
-      selectedMediaFile = null; // Clear single-file state
-      
-      const dropZone = document.getElementById('transcribe-drop-zone');
-      if (dropZone) dropZone.classList.add('has-file');
-
-      // Update UI for Batch Mode
-      const fileNameEl = document.getElementById('lbl-file-name');
-      const filePathEl = document.getElementById('lbl-file-path');
-      if (fileNameEl) {
-        fileNameEl.style.display = 'block';
-        fileNameEl.textContent = t('transcribe.batchModeActive');
-        fileNameEl.removeAttribute('title');
-      }
-      if (filePathEl) filePathEl.style.display = 'none';
-
-      const clearBtn = document.getElementById('btn-clear-media');
-      if (clearBtn) clearBtn.style.display = 'none';
-
-      const batchQueueContainer = document.getElementById('batch-queue-container');
-      if (batchQueueContainer) batchQueueContainer.style.display = 'block';
-      
-      activeBatchViewerIndex = -1;
-      // Populate batch table state
-      batchItems = files.map(filePath => ({
-        path: filePath,
-        name: getBasename(filePath),
-        size: t('transcribe.statusPending') + '...',
-        durationSec: null,
-        status: 'pending',
-        timeSec: 0,
-        speedFactor: 0.0,
-        outputs: []
-      }));
-      
-      renderBatchQueueTable();
-      updateBatchSpecs();
-      
-      // Setup specs details for batch
-      const metaBox = document.getElementById('media-meta-box');
-      if (metaBox) metaBox.style.display = 'none';
-      const batchSpecsBox = document.getElementById('batch-specs-box');
-      if (batchSpecsBox) batchSpecsBox.style.display = 'flex';
-      const countEl = document.getElementById('batch-files-count');
-      if (countEl) countEl.textContent = files.length;
-
-      const nextStepBtn = document.getElementById('btn-next-step-2');
-      if (nextStepBtn) nextStepBtn.textContent = t('transcribe.continueToBatchSetup');
-      
-      const singleActions = document.getElementById('single-transcribe-actions');
-      if (singleActions) singleActions.style.display = 'none';
-      const batchControlsBox = document.getElementById('batch-controls-box');
-      if (batchControlsBox) batchControlsBox.style.display = 'block';
-      const runBatchBtn = document.getElementById('btn-run-batch');
-      if (runBatchBtn) runBatchBtn.style.display = 'inline-flex';
-      const cancelBatchBtn = document.getElementById('btn-cancel-batch');
-      if (cancelBatchBtn) cancelBatchBtn.style.display = 'none';
-      if (typeof window.updateTranscribeActionButtons === 'function') {
-        window.updateTranscribeActionButtons(false);
-      }
-      
-      setWizardStepCompleted(1, true);
-      setWizardStepCompleted(2, true);
-      
-      // Probe file sizes and durations sequentially to avoid race / DOM thrash
-      (async () => {
-        for (let idx = 0; idx < files.length; idx++) {
-          try {
-            const meta = await invoke('probe_media_file', { filePath: files[idx] });
-            if (meta && meta.exists) {
-              batchItems[idx].size = meta.size;
-              batchItems[idx].durationSec = meta.durationSec;
-            }
-          } catch (err) {
-            console.error("Failed to probe file in batch:", err);
-          }
-        }
-        renderBatchQueueTable();
-        updateBatchSpecs();
-      })();
+      await addBatchFiles(files);
     }
   }
 };
@@ -5239,985 +5125,7 @@ window.copyTranscriptToClipboard = async function() {
 };
 
 // ----------------- Batch Processing Queue Helpers & Engine -----------------
-function formatDuration(dur) {
-  if (dur === undefined || dur === null || isNaN(dur) || dur < 0) {
-    return (typeof t === 'function' && t('transcribe.statusPending')) ? (t('transcribe.statusPending') + '...') : 'Pending...';
-  }
-  const hours = Math.floor(dur / 3600);
-  const minutes = Math.floor((dur % 3600) / 60);
-  const seconds = Math.floor(dur % 60);
-  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-}
-
-function updateBatchSpecs() {
-  document.getElementById('batch-files-count').textContent = batchItems.length;
-  let totalDur = 0;
-  let hasPending = false;
-  batchItems.forEach(item => {
-    if (item.durationSec !== undefined && item.durationSec !== null && !isNaN(item.durationSec)) {
-      totalDur += item.durationSec;
-    } else {
-      hasPending = true;
-    }
-  });
-  
-  const totalDurationEl = document.getElementById('batch-total-duration');
-  if (totalDurationEl) {
-    if (hasPending && totalDur === 0) {
-      totalDurationEl.textContent = t('transcribe.calculating');
-    } else {
-      totalDurationEl.textContent = formatDuration(totalDur) + (hasPending ? t('transcribe.calculatingSuffix') : '');
-    }
-    applyContentDirection(totalDurationEl, totalDurationEl.textContent, 'ltr');
-  }
-}
-
-window.removeFileFromBatch = function(index) {
-  if (isBatchExtracting) return;
-  batchItems.splice(index, 1);
-  selectedMediaFiles.splice(index, 1);
-  
-  if (batchItems.length === 0) {
-    clearBatchQueue();
-  } else {
-    if (activeBatchViewerIndex === index) {
-      activeBatchViewerIndex = -1;
-      const nextCompleted = batchItems.findIndex(it => it.status === 'completed');
-      if (nextCompleted !== -1 && typeof window.selectBatchItemTranscript === 'function') {
-        window.selectBatchItemTranscript(nextCompleted);
-      } else {
-        transcriptLines = [];
-        const viewport = document.getElementById('transcript-viewport');
-        if (viewport) {
-          viewport.innerHTML = `
-            <div class="transcript-placeholder" id="transcript-placeholder">
-              <svg class="transcript-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                <polyline points="14 2 14 8 20 8"></polyline>
-                <line x1="16" y1="13" x2="8" y2="13"></line>
-                <line x1="16" y1="17" x2="8" y2="17"></line>
-                <polyline points="10 9 9 9 8 9"></polyline>
-              </svg>
-              <div class="transcript-empty-title" data-i18n="transcribe.liveViewerTitle">${escapeHTML(t('transcribe.liveViewerTitle') || 'Live Transcript Viewer')}</div>
-              <div class="transcript-empty-desc" data-i18n="transcribe.streamNotice">${escapeHTML(t('transcribe.streamNotice') || 'Start transcription to stream live text preview.')}</div>
-            </div>
-          `;
-        }
-        window.lastTranscribedSubtitlePath = null;
-        window.lastTranscribedVideoPath = null;
-        window.lastTranscribedOutputDir = null;
-        window.lastTranscribedOutputFiles = [];
-        const btnCopy = document.getElementById('btn-copy-transcript');
-        if (btnCopy) btnCopy.disabled = true;
-        if (typeof updateTranscribeWorkflowButtons === 'function') {
-          updateTranscribeWorkflowButtons();
-        }
-      }
-    } else if (activeBatchViewerIndex > index) {
-      activeBatchViewerIndex--;
-    }
-
-    renderBatchQueueTable();
-    updateBatchSpecs();
-    if (typeof window.updateTranscribeActionButtons === 'function') {
-      window.updateTranscribeActionButtons(false);
-    }
-  }
-};
-
-window.clearBatchQueue = function() {
-  if (isBatchExtracting) return;
-  batchItems = [];
-  selectedMediaFiles = [];
-  isBatchMode = false;
-  selectedMediaFile = null;
-  activeBatchViewerIndex = -1;
-  batchProcessingIndex = -1;
-  userExplicitlySelectedBatchItem = false;
-  window.lastTranscribedSubtitlePath = null;
-  window.lastTranscribedVideoPath = null;
-  window.lastTranscribedOutputFiles = [];
-  transcriptLines = [];
-  
-  // Revert UI to initial empty single-file state
-  const dropZone = document.getElementById('transcribe-drop-zone');
-  if (dropZone) dropZone.classList.remove('has-file');
-
-  const fileNameEl = document.getElementById('lbl-file-name');
-  if (fileNameEl) {
-    fileNameEl.style.display = 'block';
-    updateMediaCardName(null);
-  }
-  const filePathEl = document.getElementById('lbl-file-path');
-  if (filePathEl) {
-    filePathEl.style.display = 'block';
-    filePathEl.textContent = t('transcribe.selectFilePrompt');
-    filePathEl.removeAttribute('title');
-  }
-
-  const clearBtn = document.getElementById('btn-clear-media');
-  if (clearBtn) clearBtn.style.display = 'none';
-
-  const batchQueueContainer = document.getElementById('batch-queue-container');
-  if (batchQueueContainer) batchQueueContainer.style.display = 'none';
-  
-  const metaBox = document.getElementById('media-meta-box');
-  if (metaBox) metaBox.style.display = 'none';
-  const batchSpecsBox = document.getElementById('batch-specs-box');
-  if (batchSpecsBox) batchSpecsBox.style.display = 'none';
-
-  const nextStepBtn = document.getElementById('btn-next-step-2');
-  if (nextStepBtn) nextStepBtn.textContent = t('transcribe.continueToTranscription');
-  
-  const batchControlsBox = document.getElementById('batch-controls-box');
-  if (batchControlsBox) batchControlsBox.style.display = 'none';
-  const singleActions = document.getElementById('single-transcribe-actions');
-  if (singleActions) singleActions.style.display = 'flex';
-  const runBtn = document.getElementById('btn-run-transcribe');
-  if (runBtn) runBtn.style.display = 'inline-flex';
-  const cancelBtn = document.getElementById('btn-cancel-transcribe');
-  if (cancelBtn) cancelBtn.style.display = 'none';
-
-  const wizardStep3 = document.getElementById('wizard-step-3');
-  if (wizardStep3) wizardStep3.style.display = 'block';
-  
-  // Set steps 1, 2, 3 as incomplete
-  setWizardStepCompleted(1, false);
-  setWizardStepCompleted(2, false);
-  setWizardStepCompleted(3, false);
-  
-  // Clear any meta values
-  document.getElementById('meta-type').textContent = '-';
-  document.getElementById('meta-size').textContent = '-';
-  const durEl = document.getElementById('meta-duration');
-  if (durEl) {
-    durEl.textContent = '-';
-    durEl.removeAttribute('title');
-  }
-  document.getElementById('meta-recommendation').textContent = '-';
-  probedMetadata = null;
-
-  const fillBar = document.getElementById('progress-linear-fill');
-  if (fillBar) fillBar.style.width = '0%';
-  const pctEl = document.getElementById('lbl-radial-pct');
-  if (pctEl) {
-    pctEl.removeAttribute('data-i18n');
-    pctEl.textContent = '0%';
-  }
-  const msgEl = document.getElementById('lbl-radial-msg');
-  if (msgEl) {
-    delete msgEl.dataset.batchSummarySuccess;
-    delete msgEl.dataset.batchSummaryTotal;
-    msgEl.setAttribute('data-i18n', 'transcribe.standingBy');
-    msgEl.textContent = t('transcribe.standingBy');
-  }
-
-  const telemetryCard = document.getElementById('telemetry-hud-card');
-  if (telemetryCard) telemetryCard.style.display = 'none';
-  setTranscribeStatusBadge('', 'transcribe.standingBy');
-  const badgeEl = document.getElementById('hud-status-badge');
-  if (badgeEl) badgeEl.style.display = 'none';
-  const metricsEl = document.getElementById('transcribe-metrics');
-  if (metricsEl) metricsEl.style.display = 'none';
-  const analyticTimeEl = document.getElementById('analytic-time');
-  if (analyticTimeEl) delete analyticTimeEl.dataset.elapsedSeconds;
-  if (msgEl) delete msgEl.dataset.statusCompleted;
-
-  window.lastTranscribedSubtitlePath = null;
-  window.lastTranscribedVideoPath = null;
-  window.lastTranscribedOutputDir = null;
-  transcriptLines = [];
-  if (typeof window.updateTranscribeWorkflowButtons === 'function') {
-    window.updateTranscribeWorkflowButtons();
-  }
-  if (typeof window.updateTranscribeActionButtons === 'function') {
-    window.updateTranscribeActionButtons(false);
-  }
-
-  const viewport = document.getElementById('transcript-viewport');
-  if (viewport) {
-    viewport.innerHTML = `
-      <div class="transcript-placeholder" id="transcript-placeholder">
-        <svg class="transcript-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-          <polyline points="14 2 14 8 20 8"></polyline>
-          <line x1="16" y1="13" x2="8" y2="13"></line>
-          <line x1="16" y1="17" x2="8" y2="17"></line>
-          <polyline points="10 9 9 9 8 9"></polyline>
-        </svg>
-        <div class="transcript-empty-title" data-i18n="transcribe.liveViewerTitle">${escapeHTML(t('transcribe.liveViewerTitle') || 'Live Transcript Viewer')}</div>
-        <div class="transcript-empty-desc" data-i18n="transcribe.streamNotice">${escapeHTML(t('transcribe.streamNotice') || 'Start transcription to stream live text preview.')}</div>
-      </div>
-    `;
-  }
-  const searchInput = document.getElementById('transcript-search');
-  if (searchInput) searchInput.value = '';
-  
-  const sortSelect = document.getElementById('batch-sort-select');
-  if (sortSelect) {
-    sortSelect.value = '';
-    if (window.customSelectsMap && window.customSelectsMap.get('batch-sort-select')) {
-      window.customSelectsMap.get('batch-sort-select').syncSelectedValue();
-    }
-  }
-
-  if (settingsState) {
-    settingsState.inputFile = "";
-    saveCurrentSettings();
-  }
-  
-  showNotification(t('toasts.queueCleared'), "info");
-};
-
-window.moveBatchItemUp = function(index) {
-  if (isBatchExtracting) return;
-  if (index <= 0 || index >= batchItems.length) return;
-  // Swap in batchItems
-  const tempItem = batchItems[index];
-  batchItems[index] = batchItems[index - 1];
-  batchItems[index - 1] = tempItem;
-
-  // Swap in selectedMediaFiles
-  const tempFile = selectedMediaFiles[index];
-  selectedMediaFiles[index] = selectedMediaFiles[index - 1];
-  selectedMediaFiles[index - 1] = tempFile;
-
-  if (activeBatchViewerIndex === index) {
-    activeBatchViewerIndex = index - 1;
-  } else if (activeBatchViewerIndex === index - 1) {
-    activeBatchViewerIndex = index;
-  }
-
-  renderBatchQueueTable();
-};
-
-window.moveBatchItemDown = function(index) {
-  if (isBatchExtracting) return;
-  if (index < 0 || index >= batchItems.length - 1) return;
-  // Swap in batchItems
-  const tempItem = batchItems[index];
-  batchItems[index] = batchItems[index + 1];
-  batchItems[index + 1] = tempItem;
-
-  // Swap in selectedMediaFiles
-  const tempFile = selectedMediaFiles[index];
-  selectedMediaFiles[index] = selectedMediaFiles[index + 1];
-  selectedMediaFiles[index + 1] = tempFile;
-
-  if (activeBatchViewerIndex === index) {
-    activeBatchViewerIndex = index + 1;
-  } else if (activeBatchViewerIndex === index + 1) {
-    activeBatchViewerIndex = index;
-  }
-
-  renderBatchQueueTable();
-};
-
-window.sortBatchQueue = function(criteria) {
-  if (isBatchExtracting) return;
-  if (batchItems.length <= 1) return;
-  
-  const selectedPath = activeBatchViewerIndex >= 0 && batchItems[activeBatchViewerIndex] ? batchItems[activeBatchViewerIndex].path : null;
-
-  const zipped = batchItems.map((item, index) => ({
-    item,
-    filePath: selectedMediaFiles[index]
-  }));
-
-  if (criteria === 'name-asc') {
-    zipped.sort((a, b) => {
-      const nameA = String(a.item?.name || '');
-      const nameB = String(b.item?.name || '');
-      return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
-    });
-  } else if (criteria === 'name-desc') {
-    zipped.sort((a, b) => {
-      const nameA = String(a.item?.name || '');
-      const nameB = String(b.item?.name || '');
-      return nameB.localeCompare(nameA, undefined, { numeric: true, sensitivity: 'base' });
-    });
-  } else if (criteria === 'duration-asc') {
-    zipped.sort((a, b) => {
-      const da = a.item.durationSec || 0;
-      const db = b.item.durationSec || 0;
-      return da - db;
-    });
-  } else if (criteria === 'duration-desc') {
-    zipped.sort((a, b) => {
-      const da = a.item.durationSec || 0;
-      const db = b.item.durationSec || 0;
-      return db - da;
-    });
-  }
-
-  batchItems = zipped.map(z => z.item);
-  selectedMediaFiles = zipped.map(z => z.filePath);
-
-  if (selectedPath) {
-    activeBatchViewerIndex = batchItems.findIndex(it => it.path === selectedPath);
-  }
-
-  // Reset dropdown value
-  const sortSelect = document.getElementById('batch-sort-select');
-  if (sortSelect) {
-    sortSelect.value = '';
-    if (window.customSelectsMap && window.customSelectsMap.get('batch-sort-select')) {
-      window.customSelectsMap.get('batch-sort-select').syncSelectedValue();
-    }
-  }
-
-  renderBatchQueueTable();
-  showNotification(t('toasts.queueSorted'), "success");
-};
-
-window.selectBatchItemTranscript = async function(index) {
-  if (index < 0 || index >= batchItems.length) return;
-  const item = batchItems[index];
-  if (!item) return;
-
-  const isActive = item.status === 'converting' || item.status === 'transcribing' || item.status === 'translating';
-  const isCompleted = item.status === 'completed';
-
-  if (!isCompleted && !isActive) {
-    if (item.status === 'pending') {
-      showNotification(t('transcribe.statusPending') || "Pending...", "info");
-    }
-    return;
-  }
-
-  activeBatchViewerIndex = index;
-  // If user clicked a completed historical item, lock view to prevent hijack.
-  // If user clicked the currently active processing item, resume following live progress.
-  userExplicitlySelectedBatchItem = !isActive;
-
-  if (isActive) {
-    if (item.transcriptLines && item.transcriptLines.length > 0) {
-      transcriptLines = item.transcriptLines.map(l => ({ ...l }));
-      if (typeof renderTranscriptLines === 'function') {
-        renderTranscriptLines(transcriptLines);
-      }
-      const viewport = document.getElementById('transcript-viewport');
-      if (viewport) {
-        viewport.scrollTop = viewport.scrollHeight;
-      }
-    } else {
-      transcriptLines = [];
-      const viewport = document.getElementById('transcript-viewport');
-      if (viewport) {
-        viewport.innerHTML = `
-          <div id="transcript-placeholder" class="transcript-initializing-state">
-            <div class="transcript-spinner"></div>
-            <div class="transcript-initializing-text" data-i18n="transcribe.aiModelInitializing">${escapeHTML(t('transcribe.aiModelInitializing'))}</div>
-          </div>
-        `;
-      }
-    }
-    const btnCopy = document.getElementById('btn-copy-transcript');
-    if (btnCopy) btnCopy.disabled = (transcriptLines.length === 0);
-  } else if (isCompleted) {
-    // 1. Load the transcript into Transcript Viewer (prefer in-memory lines, then subtitle file, then txt)
-    if (item.transcriptLines && item.transcriptLines.length > 0) {
-      transcriptLines = item.transcriptLines.map(l => ({ ...l }));
-      if (typeof renderTranscriptLines === 'function') {
-        renderTranscriptLines(transcriptLines);
-      }
-    } else if (item.subtitlePath) {
-      try {
-        const loaded = await loadTranscriptFromFile(item.subtitlePath, true);
-        item.transcriptLines = (loaded || []).map(l => ({ ...l }));
-      } catch (e) {
-        console.error("Failed to load batch item subtitle:", e);
-      }
-    } else if (item.txtPath) {
-      try {
-        const loaded = await loadTranscriptFromFile(item.txtPath, true);
-        item.transcriptLines = (loaded || []).map(l => ({ ...l }));
-      } catch (e) {
-        console.error("Failed to load batch item transcript:", e);
-      }
-    } else {
-      transcriptLines = [];
-      if (typeof renderTranscriptLines === 'function') {
-        renderTranscriptLines([]);
-      }
-    }
-    const btnCopy = document.getElementById('btn-copy-transcript');
-    if (btnCopy) btnCopy.disabled = (transcriptLines.length === 0);
-  }
-
-  // 2. Synchronize global context for toolbars, output menus, and studio bridges
-  window.lastTranscribedOutputDir = item.outputDir || getParentDir(item.path);
-  window.lastTranscribedSubtitlePath = item.subtitlePath || null;
-  window.lastTranscribedVideoPath = item.path;
-  window.lastTranscribedOutputFiles = item.outputFiles || [];
-
-  // 3. Re-render queue table to reflect active selected card highlight (.is-selected)
-  renderBatchQueueTable();
-
-  // 4. Update workflow bridging buttons (Translation Studio, Hardsub Studio, Open File, Open Folder, Copy)
-  if (typeof updateTranscribeWorkflowButtons === 'function') {
-    updateTranscribeWorkflowButtons();
-  }
-};
-
-function renderBatchQueueTable() {
-  const container = document.getElementById('batch-queue-body');
-  if (!container) return;
-  
-  const countChip = document.getElementById('lbl-batch-count');
-  if (countChip) countChip.textContent = batchItems.length;
-
-  container.innerHTML = '';
-  const isRunning = isBatchExtracting;
-
-  batchItems.forEach((item, index) => {
-    const card = document.createElement('div');
-    const isActive = item.status === 'converting' || item.status === 'transcribing' || item.status === 'translating';
-    const isCompleted = item.status === 'completed';
-    const isSelected = activeBatchViewerIndex === index;
-    const isClickable = isCompleted || isActive;
-
-    card.className = `batch-queue-card batch-row ${isActive ? 'is-active' : ''} ${isClickable ? 'is-clickable' : ''} ${isSelected ? 'is-selected' : ''}`;
-    card.dataset.index = index;
-
-    if (isClickable) {
-      card.tabIndex = 0;
-      card.setAttribute('role', 'button');
-      const isViewing = activeBatchViewerIndex === index;
-      const viewHint = isViewing ? t('transcribe.viewingTranscript') : t('transcribe.clickToViewTranscript');
-      card.title = `${item.name}\n${viewHint}`;
-      card.setAttribute('aria-label', `${item.name} - ${viewHint}`);
-
-      card.onclick = () => {
-        window.selectBatchItemTranscript(index);
-      };
-      card.onkeydown = (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          window.selectBatchItemTranscript(index);
-        }
-      };
-    } else {
-      card.title = item.name;
-    }
-
-    // --- Top Row: File Name + Duration ---
-    const topRow = document.createElement('div');
-    topRow.className = 'batch-card-top-row';
-
-    const nameGroup = document.createElement('div');
-    nameGroup.className = 'batch-card-name-group';
-
-    const fileIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    fileIcon.setAttribute('viewBox', '0 0 24 24');
-    fileIcon.setAttribute('fill', 'none');
-    fileIcon.setAttribute('stroke', 'currentColor');
-    fileIcon.setAttribute('stroke-width', '2');
-    fileIcon.setAttribute('stroke-linecap', 'round');
-    fileIcon.setAttribute('stroke-linejoin', 'round');
-    fileIcon.classList.add('batch-card-file-icon');
-    fileIcon.innerHTML = `<rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line>`;
-
-    const nameSpan = document.createElement('span');
-    nameSpan.className = 'batch-card-name';
-    nameSpan.textContent = item.name;
-    applyContentDirection(nameSpan, item.name);
-    nameSpan.title = isolateLtr(item.path);
-
-    nameGroup.appendChild(fileIcon);
-    nameGroup.appendChild(nameSpan);
-
-    const durationSpan = document.createElement('span');
-    durationSpan.className = 'batch-card-duration';
-    const formattedDur = formatDuration(item.durationSec);
-    durationSpan.textContent = formattedDur;
-    applyContentDirection(durationSpan, formattedDur, 'ltr');
-
-    topRow.appendChild(nameGroup);
-    topRow.appendChild(durationSpan);
-    card.appendChild(topRow);
-
-    // --- Bottom Row: Status Badge + Action Buttons ---
-    const bottomRow = document.createElement('div');
-    bottomRow.className = 'batch-card-bottom-row';
-
-    const statusWrapper = document.createElement('div');
-    statusWrapper.className = 'batch-card-status-wrapper';
-
-    const badge = document.createElement('span');
-    if (item.status === 'pending') {
-      badge.className = 'batch-status-badge badge-pending';
-      badge.textContent = t('transcribe.statusPending');
-    } else if (item.status === 'converting') {
-      badge.className = 'batch-status-badge badge-processing';
-      badge.textContent = t('transcribe.statusConverting');
-    } else if (item.status === 'transcribing') {
-      badge.className = 'batch-status-badge badge-processing';
-      badge.textContent = t('transcribe.statusExtracting');
-    } else if (item.status === 'translating') {
-      badge.className = 'batch-status-badge badge-processing';
-      badge.textContent = t('transcribe.statusTranslating');
-    } else if (item.status === 'completed') {
-      badge.className = 'batch-status-badge badge-completed';
-      badge.textContent = t('transcribe.statusCompleted');
-    } else if (item.status === 'failed') {
-      badge.className = 'batch-status-badge badge-failed';
-      badge.textContent = t('transcribe.statusFailed');
-    } else if (item.status === 'aborted') {
-      badge.className = 'batch-status-badge badge-failed';
-      badge.textContent = t('transcribe.statusAborted');
-    }
-    statusWrapper.appendChild(badge);
-
-    if (isSelected) {
-      const viewingChip = document.createElement('span');
-      viewingChip.className = 'batch-viewing-chip';
-      viewingChip.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg><span>${escapeHTML(t('transcribe.viewingTranscript'))}</span>`;
-      statusWrapper.appendChild(viewingChip);
-    }
-
-    bottomRow.appendChild(statusWrapper);
-
-    const actionGroup = document.createElement('div');
-    actionGroup.className = 'batch-action-group';
-
-    // Up button
-    const upBtn = document.createElement('button');
-    upBtn.type = 'button';
-    upBtn.className = 'btn-batch-action btn-move-up';
-    upBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><path d="m18 15-6-6-6 6"/></svg>`;
-    const moveUpText = t('transcribe.moveUp') || 'Move up';
-    upBtn.title = moveUpText;
-    upBtn.setAttribute('aria-label', moveUpText);
-
-    if (isRunning || index === 0) {
-      upBtn.disabled = true;
-    } else {
-      upBtn.onclick = (e) => {
-        e.stopPropagation();
-        moveBatchItemUp(index);
-      };
-    }
-
-    // Down button
-    const downBtn = document.createElement('button');
-    downBtn.type = 'button';
-    downBtn.className = 'btn-batch-action btn-move-down';
-    downBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><path d="m6 9 6 6 6-6"/></svg>`;
-    const moveDownText = t('transcribe.moveDown') || 'Move down';
-    downBtn.title = moveDownText;
-    downBtn.setAttribute('aria-label', moveDownText);
-
-    if (isRunning || index === batchItems.length - 1) {
-      downBtn.disabled = true;
-    } else {
-      downBtn.onclick = (e) => {
-        e.stopPropagation();
-        moveBatchItemDown(index);
-      };
-    }
-
-    // Delete button
-    const deleteBtn = document.createElement('button');
-    deleteBtn.type = 'button';
-    deleteBtn.className = 'btn-batch-action btn-batch-remove';
-    deleteBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;"><path d="M18 6 6 18M6 6l12 12"/></svg>`;
-    const removeText = t('transcribe.removeFile') || 'Remove file';
-    deleteBtn.title = removeText;
-    deleteBtn.setAttribute('aria-label', removeText);
-
-    if (isRunning) {
-      deleteBtn.disabled = true;
-    } else {
-      deleteBtn.onclick = (e) => {
-        e.stopPropagation();
-        removeFileFromBatch(index);
-      };
-    }
-
-    actionGroup.appendChild(upBtn);
-    actionGroup.appendChild(downBtn);
-    actionGroup.appendChild(deleteBtn);
-    bottomRow.appendChild(actionGroup);
-
-    card.appendChild(bottomRow);
-    container.appendChild(card);
-  });
-}
-
-window.runBatchExtraction = async function() {
-  if (!isBatchMode || batchItems.length === 0) return;
-  
-  const isCompiled = settingsState.selectedBackend === 'Standard' || Boolean(compiledBackends[settingsState.selectedBackend]);
-  if (!isCompiled) {
-    showNotification(t('toasts.backendNotFound', { backend: settingsState.selectedBackend }), "error");
-    if (typeof switchView === 'function') switchView('settings');
-    return;
-  }
-
-  const modelExists = localScannedTransModels.includes(settingsState.modelPath);
-  if (!modelExists) {
-    showNotification(t('toasts.noModelFound'), "error");
-    if (!localScannedTransModels || localScannedTransModels.length === 0) {
-      if (typeof switchView === 'function') switchView('models');
-    }
-    return;
-  }
-
-  const startBtn = document.getElementById('btn-run-batch');
-  const startBtnSpan = startBtn?.querySelector('span');
-  const cancelBtn = document.getElementById('btn-cancel-batch');
-  const cancelBtnSpan = cancelBtn?.querySelector('span');
-  const sortSelect = document.getElementById('batch-sort-select');
-  const clearBtn = document.getElementById('btn-clear-batch');
-  
-  isBatchExtracting = true;
-  if (typeof updateTranscribeActionButtons === 'function') {
-    updateTranscribeActionButtons(true);
-  }
-  if (sortSelect) sortSelect.disabled = true;
-  if (clearBtn) clearBtn.disabled = true;
-  
-  if (cancelBtn) {
-    cancelBtn.style.display = 'inline-flex';
-    cancelBtn.disabled = false;
-    if (cancelBtnSpan) cancelBtnSpan.textContent = t('transcribe.cancelBatch'); else cancelBtn.textContent = t('transcribe.cancelBatch');
-  }
-  
-  batchCancelActive = false;
-  const analyticsBox = document.getElementById('analytics-box');
-  if (analyticsBox) analyticsBox.style.display = 'none';
-
-  const telemetryCard = document.getElementById('telemetry-hud-card');
-  if (telemetryCard) telemetryCard.style.display = 'block';
-  setTranscribeStatusBadge('active', 'transcribe.batchRunning');
-  const metricsEl = document.getElementById('transcribe-metrics');
-  if (metricsEl) metricsEl.style.display = 'none';
-  
-  // Reset prior output state at batch start
-  batchProcessingIndex = -1;
-  userExplicitlySelectedBatchItem = false;
-  window.lastTranscribedSubtitlePath = null;
-  window.lastTranscribedOutputDir = null;
-  window.lastTranscribedVideoPath = null;
-  window.lastTranscribedOutputFiles = [];
-  transcriptLines = [];
-  activeBatchViewerIndex = 0; // Follow first item initially
-
-  batchItems.forEach(item => {
-    item.transcriptLines = [];
-    item.outputs = [];
-    item.outputFiles = [];
-    item.subtitlePath = null;
-    item.txtPath = null;
-    item.timeSec = 0;
-    item.speedFactor = 0.0;
-  });
-
-  if (typeof updateTranscribeWorkflowButtons === 'function') {
-    updateTranscribeWorkflowButtons();
-  }
-  renderBatchQueueTable();
-
-  const initialViewport = document.getElementById('transcript-viewport');
-  if (initialViewport) {
-    initialViewport.innerHTML = `
-      <div id="transcript-placeholder" class="transcript-initializing-state">
-        <div class="transcript-spinner"></div>
-        <div class="transcript-initializing-text" data-i18n="transcribe.aiModelInitializing">${escapeHTML(t('transcribe.aiModelInitializing'))}</div>
-      </div>
-    `;
-  }
-
-  // Set up global progress tracking
-  const fillBar = document.getElementById('progress-linear-fill');
-  const pctEl = document.getElementById('lbl-radial-pct');
-  const msgEl = document.getElementById('lbl-radial-msg');
-  
-  let successCount = 0;
-  let totalCount = batchItems.length;
-  
-  for (let i = 0; i < totalCount; i++) {
-    batchProcessingIndex = i;
-    if (batchCancelActive) {
-      batchItems[i].status = 'aborted';
-      continue;
-    }
-    
-    // Smart Auto-Follow: follow processing item unless user explicitly selected a completed item
-    if (!userExplicitlySelectedBatchItem) {
-      activeBatchViewerIndex = i;
-    }
-
-    const item = batchItems[i];
-    item.transcriptLines = [];
-    item.status = 'converting';
-    renderBatchQueueTable();
-    
-    // Update global progress bar
-    const globalPct = ((i / totalCount) * 100).toFixed(0);
-    if (fillBar) fillBar.style.width = `${globalPct}%`;
-    if (pctEl) pctEl.textContent = `${globalPct}%`;
-    if (msgEl) msgEl.textContent = t('transcribe.batchConvertingProgress', { current: i + 1, total: totalCount, name: item.name });
-    
-    let currentWavPath = null;
-
-        // Override settingsState inputFile to point to this item's path so outputs are generated next to the original file
-        const originalInputFile = settingsState.inputFile;
-        settingsState.inputFile = item.path;
-
-        try {
-          // 1. Run FFmpeg conversion
-          currentWavPath = await invoke('convert_media_file', { filePath: item.path });
-
-          if (batchCancelActive) {
-            item.status = 'aborted';
-            renderBatchQueueTable();
-            continue;
-          }
-
-          // 2. Run Whisper Transcription
-          item.status = 'transcribing';
-          renderBatchQueueTable();
-
-          if (msgEl) msgEl.textContent = t('transcribe.batchExtractingProgress', { current: i + 1, total: totalCount, name: item.name });
-
-          // Update transcript viewer only if active viewer is this processing item
-          if (activeBatchViewerIndex === i) {
-            transcriptLines = [];
-            window.lastTranscribedSubtitlePath = null;
-            if (typeof updateTranscribeWorkflowButtons === 'function') {
-              updateTranscribeWorkflowButtons();
-            }
-            const viewport = document.getElementById('transcript-viewport');
-            if (viewport) {
-              viewport.innerHTML = `
-                <div id="transcript-placeholder" class="transcript-initializing-state">
-                  <div class="transcript-spinner"></div>
-                  <div class="transcript-initializing-text" data-i18n="transcribe.aiModelInitializing">${escapeHTML(t('transcribe.aiModelInitializing'))}</div>
-                </div>
-              `;
-            }
-          }
-      
-      const result = await invoke('start_transcription_task', {
-        settings: settingsState,
-        wavPath: currentWavPath,
-        durationSec: item.durationSec || 60.0
-      });
-
-      // Fallback: If item.transcriptLines was not populated via live events, load from generated subtitle/text file
-      if ((!item.transcriptLines || item.transcriptLines.length === 0) && result.generatedFiles && result.generatedFiles.length > 0) {
-        const outputDir = result.outputDir || getParentDir(item.path);
-        const subFile = result.generatedFiles.find(f => f.endsWith('.srt')) ||
-                        result.generatedFiles.find(f => f.endsWith('.vtt')) ||
-                        result.generatedFiles.find(f => f.endsWith('.lrc')) ||
-                        result.generatedFiles.find(f => f.endsWith('.json')) ||
-                        result.generatedFiles.find(f => f.endsWith('.csv')) ||
-                        result.generatedFiles.find(f => f.endsWith('.txt'));
-        if (subFile) {
-          const sep = outputDir.includes('\\') && !outputDir.includes('/') ? '\\' : '/';
-          const subFullPath = `${outputDir}${sep}${subFile}`;
-          const shouldRender = (activeBatchViewerIndex === i);
-          const loaded = await loadTranscriptFromFile(subFullPath, shouldRender);
-          item.transcriptLines = (loaded || []).map(l => ({ ...l }));
-        }
-      }
-      
-      item.outputs = result.generatedFiles || [];
-      item.status = 'completed';
-      item.timeSec = result.durationMs / 1000;
-      item.speedFactor = result.speedFactor;
-      successCount++;
-
-      if (!item.transcriptLines) {
-        item.transcriptLines = [];
-      }
-
-      const rawItemOutputDir = (settingsState && settingsState.outputDirMode === 'custom' && settingsState.outputDirPath) ? settingsState.outputDirPath : (result.outputDir || getParentDir(item.path));
-      const itemOutputDir = (rawItemOutputDir && (rawItemOutputDir.endsWith('/') || rawItemOutputDir.endsWith('\\'))) ? rawItemOutputDir.slice(0, -1) : rawItemOutputDir;
-      const sep = itemOutputDir && itemOutputDir.includes('\\') && !itemOutputDir.includes('/') ? '\\' : '/';
-      item.outputDir = itemOutputDir;
-
-      const allGenerated = result.generatedFiles || [];
-      const outputFilesList = [];
-      allGenerated.forEach(f => {
-        let type = 'other';
-        if (f.endsWith('.srt') || f.endsWith('.vtt') || f.endsWith('.lrc')) {
-          type = 'subtitle';
-        } else if (f.endsWith('.txt')) {
-          type = 'text';
-        } else if (f.endsWith('.json')) {
-          type = 'json';
-        } else if (f.endsWith('.csv')) {
-          type = 'csv';
-        }
-        outputFilesList.push({
-          path: `${itemOutputDir}${sep}${f}`,
-          name: f,
-          type
-        });
-      });
-      item.outputFiles = outputFilesList;
-
-      // Subtitle path strictly points to playable subtitle formats (.srt, .vtt, .lrc)
-      const subFileObj = outputFilesList.find(f => f.name.endsWith('.srt')) ||
-                         outputFilesList.find(f => f.name.endsWith('.vtt')) ||
-                         outputFilesList.find(f => f.name.endsWith('.lrc'));
-      item.subtitlePath = subFileObj ? subFileObj.path : null;
-
-      const txtFileObj = outputFilesList.find(f => f.name.endsWith('.txt')) ||
-                         outputFilesList.find(f => f.name.endsWith('.json') || f.name.endsWith('.csv'));
-      item.txtPath = txtFileObj ? txtFileObj.path : (item.subtitlePath || null);
-
-      if (activeBatchViewerIndex === i) {
-        window.lastTranscribedOutputDir = item.outputDir;
-        window.lastTranscribedSubtitlePath = item.subtitlePath;
-        window.lastTranscribedVideoPath = item.path;
-        window.lastTranscribedOutputFiles = item.outputFiles;
-        if (typeof updateTranscribeWorkflowButtons === 'function') {
-          updateTranscribeWorkflowButtons();
-        }
-      }
-
-      renderBatchQueueTable();
-    } catch (err) {
-      item.status = 'failed';
-      renderBatchQueueTable();
-      showNotification(t('toasts.batchItemError', { name: item.name, error: String(err) }), "error");
-    } finally {
-      settingsState.inputFile = originalInputFile;
-    }
-  }
-  
-  // Batch processing completed
-  isBatchExtracting = false;
-  batchProcessingIndex = -1;
-  if (typeof updateTranscribeActionButtons === 'function') {
-    updateTranscribeActionButtons(false);
-  }
-  if (cancelBtn) cancelBtn.style.display = 'none';
-  if (sortSelect) sortSelect.disabled = false;
-  if (clearBtn) clearBtn.disabled = false;
-
-  if (batchCancelActive) {
-    const telemetryCard = document.getElementById('telemetry-hud-card');
-    if (telemetryCard) telemetryCard.style.display = 'none';
-    if (fillBar) fillBar.style.width = '0%';
-    if (pctEl) pctEl.textContent = '0%';
-    const metricsEl = document.getElementById('transcribe-metrics');
-    if (metricsEl) metricsEl.style.display = 'none';
-    setTranscribeStatusBadge('', 'transcribe.standingBy');
-    showNotification(t('toasts.batchCancelled'), "info");
-  } else {
-    if (fillBar) fillBar.style.width = '100%';
-    if (pctEl) {
-      pctEl.removeAttribute('data-i18n');
-      pctEl.textContent = '100%';
-    }
-    if (msgEl) {
-      msgEl.removeAttribute('data-i18n');
-      msgEl.textContent = t('transcribe.batchCompletedSummary', { success: successCount, total: totalCount });
-      msgEl.dataset.batchSummarySuccess = String(successCount);
-      msgEl.dataset.batchSummaryTotal = String(totalCount);
-    }
-    showNotification(t('toasts.batchComplete', { success: successCount, total: totalCount }), "success");
-    setTranscribeStatusBadge('complete', 'transcribe.statusComplete');
-  }
-
-  // Ensure active batch viewer item is synchronized for workflow bridging
-  let latestCompletedIdx = -1;
-  for (let k = batchItems.length - 1; k >= 0; k--) {
-    if (batchItems[k].status === 'completed') {
-      latestCompletedIdx = k;
-      break;
-    }
-  }
-
-  const isAlreadyViewingCompleted = activeBatchViewerIndex >= 0 &&
-    batchItems[activeBatchViewerIndex] &&
-    batchItems[activeBatchViewerIndex].status === 'completed';
-
-  if (!isAlreadyViewingCompleted && latestCompletedIdx !== -1 && typeof window.selectBatchItemTranscript === 'function') {
-    await window.selectBatchItemTranscript(latestCompletedIdx);
-  } else {
-    if (isAlreadyViewingCompleted) {
-      const viewedItem = batchItems[activeBatchViewerIndex];
-      window.lastTranscribedOutputDir = viewedItem.outputDir || getParentDir(viewedItem.path);
-      window.lastTranscribedSubtitlePath = viewedItem.subtitlePath || null;
-      window.lastTranscribedVideoPath = viewedItem.path;
-      window.lastTranscribedOutputFiles = viewedItem.outputFiles || [];
-    } else if (latestCompletedIdx === -1) {
-      activeBatchViewerIndex = -1;
-      transcriptLines = [];
-      const viewport = document.getElementById('transcript-viewport');
-      if (viewport) {
-        viewport.innerHTML = `
-          <div class="transcript-placeholder" id="transcript-placeholder">
-            <svg class="transcript-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-              <polyline points="14 2 14 8 20 8"></polyline>
-              <line x1="16" y1="13" x2="8" y2="13"></line>
-              <line x1="16" y1="17" x2="8" y2="17"></line>
-              <polyline points="10 9 9 9 8 9"></polyline>
-            </svg>
-            <div class="transcript-empty-title" data-i18n="transcribe.liveViewerTitle">${escapeHTML(t('transcribe.liveViewerTitle') || 'Live Transcript Viewer')}</div>
-            <div class="transcript-empty-desc" data-i18n="transcribe.streamNotice">${escapeHTML(t('transcribe.streamNotice') || 'Start transcription to stream live text preview.')}</div>
-          </div>
-        `;
-      }
-    }
-    renderBatchQueueTable();
-    if (typeof updateTranscribeWorkflowButtons === 'function') {
-      updateTranscribeWorkflowButtons();
-    }
-  }
-  
-  renderBatchQueueTable();
-
-  // Auto-transfer to Translation Studio if enabled
-  const autoTransferEnabled = Boolean(settingsState?.autoTransferToTranslate ?? settingsState?.translateAiEnabled);
-  if (!batchCancelActive && successCount > 0 && autoTransferEnabled && window.lastTranscribedSubtitlePath) {
-    if (typeof window.sendTranscribeToTranslationStudio === 'function') {
-      await window.sendTranscribeToTranslationStudio();
-    }
-  }
-  
-  setWizardStepCompleted(3, true);
-};
-
-window.abortBatchExtraction = async function() {
-  const cancelBtn = document.getElementById('btn-cancel-batch');
-  const cancelBtnSpan = cancelBtn?.querySelector('span');
-  if (cancelBtn) {
-    cancelBtn.disabled = true;
-    if (cancelBtnSpan) cancelBtnSpan.textContent = t('transcribe.aborting'); else cancelBtn.textContent = t('transcribe.aborting');
-  }
-  
-  batchCancelActive = true;
-  
-  try {
-    // Terminate active whisper process immediately
-    await invoke('cancel_transcription');
-    const telemetryCard = document.getElementById('telemetry-hud-card');
-    if (telemetryCard) telemetryCard.style.display = 'none';
-    showNotification(t('toasts.cancellingTask'), "info");
-  } catch (err) {
-    console.error("Failed to cancel active whisper process:", err);
-  } finally {
-    if (cancelBtn) {
-      cancelBtn.disabled = false;
-      const cancelSpan = cancelBtn.querySelector('span');
-      if (cancelSpan) {
-        cancelSpan.setAttribute('data-i18n', 'transcribe.cancelTranscription');
-        cancelSpan.textContent = t('transcribe.cancelTranscription');
-      } else {
-        cancelBtn.innerHTML = `<span data-i18n="transcribe.cancelTranscription">${t('transcribe.cancelTranscription')}</span>`;
-      }
-      cancelBtn.style.display = 'none';
-    }
-  }
-};
+// Extracted to src/modules/batchProcessor.ts
 
 // ----------------- Transcribe Interactive Drag & Drop -----------------
 function setupTranscribeDragAndDrop() {
@@ -6225,7 +5133,7 @@ function setupTranscribeDragAndDrop() {
   if (!transZone) return;
 
   transZone.addEventListener('click', (e) => {
-    if (selectedMediaFile || (isBatchMode && batchItems && batchItems.length > 0)) return;
+    if (selectedMediaFile || (batchProcessor.getIsBatchMode() && batchProcessor.getItems().length > 0)) return;
     if (e.target && e.target.closest && e.target.closest('button')) return;
     browseMediaFile();
   });
@@ -6301,7 +5209,7 @@ function setupTranscribeDragAndDrop() {
 }
 
 async function handleDroppedFiles(rawFiles) {
-  if (isBatchExtracting || isTranscribing) {
+  if (batchProcessor.getIsExtracting() || isTranscribing) {
     showNotification(t('toasts.batchActiveDropBlocked'), "info");
     return;
   }
@@ -6309,65 +5217,16 @@ async function handleDroppedFiles(rawFiles) {
   const files = Array.isArray(rawFiles) ? Array.from(new Set(rawFiles)) : [];
   if (files.length === 0) return;
 
-  if (isBatchMode && batchItems.length > 0) {
-    const existingPaths = new Set(batchItems.map(item => item.path));
-    const newFiles = files.filter(f => !existingPaths.has(f));
-
-    if (newFiles.length === 0) {
-      showNotification(t('toasts.filesAlreadyInBatch') || 'Dropped files are already in the batch queue', "info");
-      return;
-    }
-
-    const newItems = newFiles.map(filePath => ({
-      path: filePath,
-      name: getBasename(filePath),
-      size: t('transcribe.statusPending') + '...',
-      durationSec: null,
-      status: 'pending',
-      timeSec: 0,
-      speedFactor: 0.0,
-      outputs: []
-    }));
-
-    batchItems = batchItems.concat(newItems);
-    selectedMediaFiles = batchItems.map(item => item.path);
-
-    const fileNameEl = document.getElementById('lbl-file-name');
-    if (fileNameEl) {
-      fileNameEl.textContent = t('transcribe.batchModeActive');
-      fileNameEl.removeAttribute('title');
-    }
-    const batchCountEl = document.getElementById('batch-files-count');
-    if (batchCountEl) batchCountEl.textContent = batchItems.length;
-
-    renderBatchQueueTable();
-    updateBatchSpecs();
-
-    (async () => {
-      for (const item of newItems) {
-        try {
-          const meta = await invoke('probe_media_file', { filePath: item.path });
-          if (meta && meta.exists) {
-            item.size = meta.size;
-            item.durationSec = meta.durationSec;
-          }
-        } catch (err) {
-          console.error("Failed to probe file in batch:", err);
-        }
-      }
-      renderBatchQueueTable();
-      updateBatchSpecs();
-    })();
-
+  if (batchProcessor.getIsBatchMode() && batchProcessor.getItems().length > 0) {
+    await addBatchFiles(files);
     switchView('transcribe');
-    showNotification(t('toasts.filesLoaded', { count: newFiles.length }), "success");
     return;
   }
 
-  selectedMediaFiles = files;
+  batchProcessor.setSelectedFiles(files);
   
   if (files.length === 1) {
-    isBatchMode = false;
+    batchProcessor.setIsBatchMode(false);
     selectedMediaFile = files[0];
     
     const dropZone = document.getElementById('transcribe-drop-zone');
@@ -6422,82 +5281,7 @@ async function handleDroppedFiles(rawFiles) {
     setWizardStepCompleted(1, true);
     await probeSelectedFile();
   } else {
-    isBatchMode = true;
-    selectedMediaFile = null;
-    
-    const dropZone = document.getElementById('transcribe-drop-zone');
-    if (dropZone) dropZone.classList.add('has-file');
-
-    const fileNameEl = document.getElementById('lbl-file-name');
-    const filePathEl = document.getElementById('lbl-file-path');
-    if (fileNameEl) {
-      fileNameEl.style.display = 'block';
-      fileNameEl.textContent = t('transcribe.batchModeActive');
-      fileNameEl.removeAttribute('title');
-    }
-    if (filePathEl) filePathEl.style.display = 'none';
-
-    const clearBtn = document.getElementById('btn-clear-media');
-    if (clearBtn) clearBtn.style.display = 'none';
-
-    const batchQueueContainer = document.getElementById('batch-queue-container');
-    if (batchQueueContainer) batchQueueContainer.style.display = 'block';
-    
-    activeBatchViewerIndex = -1;
-    batchItems = files.map(filePath => ({
-      path: filePath,
-      name: getBasename(filePath),
-      size: t('transcribe.statusPending') + '...',
-      durationSec: null,
-      status: 'pending',
-      timeSec: 0,
-      speedFactor: 0.0,
-      outputs: []
-    }));
-    
-    renderBatchQueueTable();
-    updateBatchSpecs();
-    
-    const metaBox = document.getElementById('media-meta-box');
-    if (metaBox) metaBox.style.display = 'none';
-    const batchSpecsBox = document.getElementById('batch-specs-box');
-    if (batchSpecsBox) batchSpecsBox.style.display = 'flex';
-    const batchCountEl = document.getElementById('batch-files-count');
-    if (batchCountEl) batchCountEl.textContent = files.length;
-    const nextStepBtn = document.getElementById('btn-next-step-2');
-    if (nextStepBtn) nextStepBtn.textContent = t('transcribe.continueToBatchSetup');
-    
-    const singleActions = document.getElementById('single-transcribe-actions');
-    if (singleActions) singleActions.style.display = 'none';
-    const batchControlsBox = document.getElementById('batch-controls-box');
-    if (batchControlsBox) batchControlsBox.style.display = 'block';
-    const runBatchBtn = document.getElementById('btn-run-batch');
-    if (runBatchBtn) runBatchBtn.style.display = 'inline-flex';
-    const cancelBatchBtn = document.getElementById('btn-cancel-batch');
-    if (cancelBatchBtn) cancelBatchBtn.style.display = 'none';
-    if (typeof window.updateTranscribeActionButtons === 'function') {
-      window.updateTranscribeActionButtons(false);
-    }
-    
-    setWizardStepCompleted(1, true);
-    setWizardStepCompleted(2, true);
-    
-    (async () => {
-      for (let idx = 0; idx < files.length; idx++) {
-        try {
-          const meta = await invoke('probe_media_file', { filePath: files[idx] });
-          if (meta && meta.exists) {
-            batchItems[idx].size = meta.size;
-            batchItems[idx].durationSec = meta.durationSec;
-          }
-        } catch (err) {
-          console.error("Failed to probe file in batch:", err);
-        }
-      }
-      renderBatchQueueTable();
-      updateBatchSpecs();
-    })();
-    
+    await addBatchFiles(files);
     setTimeout(() => {
       openWizardStep(2);
     }, 500);
