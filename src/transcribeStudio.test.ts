@@ -3,6 +3,13 @@ import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import {
+  parseTimestampStringToMs,
+  parseSegmentTimestamps,
+  formatMsToTimestamp,
+  loadTranscriptFromFile,
+  transcriptViewer
+} from './modules/transcriptViewer';
 import { ar } from './locales/ar';
 import { de } from './locales/de';
 import { en } from './locales/en';
@@ -937,9 +944,10 @@ describe('Transcription Studio Output Directory & Workflow Logic', () => {
     expect(mainJsContent).toContain('batch-viewing-chip');
 
     // Verification of in-memory transcript lines preservation and unified rendering
+    const viewerContent = readFileSync(resolve(__dirname, 'modules/transcriptViewer.ts'), 'utf-8');
     expect(mainJsContent).toContain('transcriptLines = item.transcriptLines.map(');
-    expect(mainJsContent).toContain('function createTranscriptCardElement(lineObj)');
-    expect(mainJsContent).toContain('function renderTranscriptLines(lines)');
+    expect(viewerContent).toContain('function createTranscriptCardElement(lineObj');
+    expect(viewerContent).toContain('function renderTranscriptLines(lines');
 
     // Verification of workflow bridging and toolbar synchronization
     expect(mainJsContent).toContain('window.lastTranscribedSubtitlePath = item.subtitlePath');
@@ -1046,18 +1054,9 @@ it releases chemicals that hit your eyes
   });
 
   it('parses timestamps across whisper.cpp integer ms, float seconds, colon formats, and long audio > 2.7 hours', () => {
-    const mainJsContent = readFileSync(resolve(__dirname, 'main.js'), 'utf-8');
-    expect(mainJsContent).toContain('function parseTimestampStringToMs(');
-    expect(mainJsContent).toContain('function parseSegmentTimestamps(');
-
-    // Extract parser functions from main.js and execute them
-    const codeToEval = `
-      const window = {};
-      ${mainJsContent.slice(mainJsContent.indexOf('function formatMsToTimestamp('), mainJsContent.indexOf('window.loadTranscriptFromFile'))}
-      return { parseTimestampStringToMs, parseSegmentTimestamps, formatMsToTimestamp };
-    `;
-    const fnExtract = new Function(codeToEval);
-    const { parseTimestampStringToMs, parseSegmentTimestamps, formatMsToTimestamp } = fnExtract();
+    const viewerContent = readFileSync(resolve(__dirname, 'modules/transcriptViewer.ts'), 'utf-8');
+    expect(viewerContent).toContain('function parseTimestampStringToMs(');
+    expect(viewerContent).toContain('function parseSegmentTimestamps(');
 
     // 1. whisper.cpp integer millisecond CSV values: 0, 4920
     const cppCue = parseSegmentTimestamps(0, 4920);
@@ -1110,13 +1109,6 @@ it releases chemicals that hit your eyes
   });
 
   it('verifies CSV and TSV parsing with whisper.cpp integer ms, quotes, and headers', () => {
-    const mainJsContent = readFileSync(resolve(__dirname, 'main.js'), 'utf-8');
-    const codeToEval = `
-      const window = {};
-      ${mainJsContent.slice(mainJsContent.indexOf('function formatMsToTimestamp('), mainJsContent.indexOf('window.loadTranscriptFromFile'))}
-      return { parseSegmentTimestamps, formatMsToTimestamp };
-    `;
-    const { parseSegmentTimestamps, formatMsToTimestamp } = new Function(codeToEval)();
 
     // 1. CSV with whisper.cpp integer ms
     const sampleCsv = `start,end,text\n0,4920,"When you cut off the root of an onion,"\n4920,8500,"it releases chemicals that hit your eyes"`;
@@ -1204,13 +1196,6 @@ it releases chemicals that hit your eyes
   });
 
   it('verifies JSON subtitle parser handles Whisper formats and long audio without wrapping', () => {
-    const mainJsContent = readFileSync(resolve(__dirname, 'main.js'), 'utf-8');
-    const codeToEval = `
-      const window = {};
-      ${mainJsContent.slice(mainJsContent.indexOf('function formatMsToTimestamp('), mainJsContent.indexOf('window.loadTranscriptFromFile'))}
-      return { parseSegmentTimestamps, formatMsToTimestamp };
-    `;
-    const { parseSegmentTimestamps, formatMsToTimestamp } = new Function(codeToEval)();
 
     // Python Whisper JSON for long audio at 3 hours
     const pythonWhisperJson = {
@@ -1325,9 +1310,10 @@ it releases chemicals that hit your eyes
     expect(mainJsContent).toContain('const isSelected = activeBatchViewerIndex === index;');
 
     // 4. Verify Whisper log streaming is decoupled from viewer DOM
-    expect(mainJsContent).toContain('const isBatchRunning = isBatchExtracting && batchProcessingIndex >= 0 && batchItems[batchProcessingIndex];');
-    expect(mainJsContent).toContain('activeItem.transcriptLines.push({ ...lineObj });');
-    expect(mainJsContent).toContain('if (activeBatchViewerIndex !== batchProcessingIndex) {\n      return;\n    }');
+    const viewerContent = readFileSync(resolve(__dirname, 'modules/transcriptViewer.ts'), 'utf-8');
+    expect(viewerContent).toContain('const isBatchRunning = win.isBatchExtracting && win.batchProcessingIndex >= 0 && win.batchItems && win.batchItems[win.batchProcessingIndex];');
+    expect(viewerContent).toContain('activeItem.transcriptLines.push({ ...lineObj });');
+    expect(viewerContent).toContain('if (win.activeBatchViewerIndex !== win.batchProcessingIndex) {\n      return;\n    }');
 
     // 5. Verify batch runner uses smart auto-follow and eliminates view hijack when reading completed items
     expect(mainJsContent).toContain('batchProcessingIndex = i;');
@@ -1345,41 +1331,36 @@ it releases chemicals that hit your eyes
     expect(mainJsContent).not.toContain('t(\'transcribe.viewActiveTranscript\')');
 
     // 8. Verify loadTranscriptFromFile supports background parsing without touching viewer DOM
-    expect(mainJsContent).toContain('window.loadTranscriptFromFile = async function(fullPath, shouldRender = true)');
+    expect(viewerContent).toContain('export async function loadTranscriptFromFile(fullPath: string, shouldRender = true)');
     expect(mainJsContent).toContain('const loaded = await loadTranscriptFromFile(subFullPath, shouldRender);');
   });
 
   it('supports silent background transcript loading via loadTranscriptFromFile without UI flicker', async () => {
-    const mainJsContent = readFileSync(resolve(__dirname, 'main.js'), 'utf-8');
+    const originalWindow = (globalThis as any).window;
+    (globalThis as any).window = {
+      __TAURI__: {
+        core: {
+          invoke: async () => '1\n00:00:01,000 --> 00:00:03,500\nBackground whisper result'
+        }
+      }
+    };
+    transcriptViewer.lines = [{ id: 99, text: 'user-reading-completed-line', timeRange: '[00:00:00.000 --> 00:00:01.000]' }];
 
-    const codeToEval = `
-      let transcriptLines = [{ id: 99, text: 'user-reading-completed-line' }];
-      let renderCalls = 0;
-      const renderTranscriptLines = (lines) => { renderCalls++; };
-      const invoke = async () => '1\\n00:00:01,000 --> 00:00:03,500\\nBackground whisper result';
-      const window = {};
-      ${mainJsContent.slice(mainJsContent.indexOf('window.loadTranscriptFromFile = async function'), mainJsContent.indexOf('window.copyLiveTranscriptToClipboard'))}
-      return {
-        loadTranscriptFromFile: window.loadTranscriptFromFile,
-        getLines: () => transcriptLines,
-        getRenderCalls: () => renderCalls
-      };
-    `;
-    const runner = new Function(codeToEval)();
+    try {
+      // 1. Silent background parsing (shouldRender = false): must NOT mutate viewer lines and must NOT touch DOM
+      const backgroundResult = await loadTranscriptFromFile('/out/bg.srt', false);
+      expect(backgroundResult).toHaveLength(1);
+      expect(backgroundResult[0].text).toBe('Background whisper result');
+      expect(backgroundResult[0].timeRange).toBe('[00:00:01.000 --> 00:00:03.500]');
+      expect(transcriptViewer.lines).toEqual([{ id: 99, text: 'user-reading-completed-line', timeRange: '[00:00:00.000 --> 00:00:01.000]' }]);
 
-    // 1. Silent background parsing (shouldRender = false): must NOT mutate viewer lines and must NOT touch DOM
-    const backgroundResult = await runner.loadTranscriptFromFile('/out/bg.srt', false);
-    expect(backgroundResult).toHaveLength(1);
-    expect(backgroundResult[0].text).toBe('Background whisper result');
-    expect(backgroundResult[0].timeRange).toBe('[00:00:01.000 --> 00:00:03.500]');
-    expect(runner.getLines()).toEqual([{ id: 99, text: 'user-reading-completed-line' }]);
-    expect(runner.getRenderCalls()).toBe(0);
-
-    // 2. Active viewer parsing (shouldRender = true): must mutate transcriptLines and call renderTranscriptLines
-    const activeResult = await runner.loadTranscriptFromFile('/out/bg.srt', true);
-    expect(activeResult).toHaveLength(1);
-    expect(runner.getLines()).toEqual(activeResult);
-    expect(runner.getRenderCalls()).toBe(1);
+      // 2. Active viewer parsing (shouldRender = true): must mutate transcriptLines and call renderTranscriptLines
+      const activeResult = await loadTranscriptFromFile('/out/bg.srt', true);
+      expect(activeResult).toHaveLength(1);
+      expect(transcriptViewer.lines).toEqual(activeResult);
+    } finally {
+      (globalThis as any).window = originalWindow;
+    }
   });
 
   it('implements smart auto-follow: auto-advances when passive, locks view when user explicitly selects completed item', () => {

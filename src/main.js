@@ -2,6 +2,8 @@ import { hardsubController } from './hardsub.ts';
 import { translationStudioController } from './translationStudio.ts';
 import { logsController } from './modules/logsController.ts';
 import { themeManager } from './modules/themeManager.ts';
+import { modelHub } from './modules/modelHub.ts';
+import { transcriptViewer } from './modules/transcriptViewer.ts';
 import { initI18n, t, setLanguage, getLanguage, translateDOM, isRtlLanguage, firstStrongDirection, applyTextDirection, applyContentDirection, clearContentDirection, isolateDirection, isolateLtr, APP_NAME } from './i18n/index.ts';
 import { normalizeForSearch } from './languages.ts';
 import { initLanguageSelects, renderLanguageSelect } from './languageSelect.ts';
@@ -1073,6 +1075,7 @@ const invoke = async function(cmd, args = {}) {
   }
   return null;
 };
+window.invoke = invoke;
 
 const listen = function(event, handler) {
   if (originalListen) {
@@ -1240,7 +1243,6 @@ let activeBatchViewerIndex = -1;
 let batchProcessingIndex = -1;
 let userExplicitlySelectedBatchItem = false;
 let _unlistenFns = [];
-let _modelActionsInProgress = new Set();
 
 window.getCurrentSourceMediaFile = function() {
   if (isBatchMode && activeBatchViewerIndex >= 0 && batchItems[activeBatchViewerIndex]) {
@@ -1248,33 +1250,6 @@ window.getCurrentSourceMediaFile = function() {
   }
   return selectedMediaFile || (selectedMediaFiles && selectedMediaFiles.length > 0 ? selectedMediaFiles[0] : null) || (window.settingsState?.inputFile || null);
 };
-
-// Model Hub Action Icons (Accessible & Reusable SVGs)
-const MODEL_ICON_DOWNLOAD = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
-const MODEL_ICON_DELETE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`;
-const MODEL_ICON_PAUSE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
-const MODEL_ICON_RESUME = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
-
-function getModelMetaInfo(modelName) {
-  const isVad = modelName.startsWith('silero-');
-  let precisionText = isVad ? '' : t('models.prec16');
-  if (!isVad) {
-    if (modelName.includes('-q8_0')) {
-      precisionText = t('models.prec8');
-    } else if (modelName.includes('-q5_0') || modelName.includes('-q5_1')) {
-      precisionText = t('models.prec5');
-    }
-  }
-
-  let langText = t('models.langMulti');
-  if (modelName.includes('.en')) {
-    langText = t('models.langEnOnly');
-  } else if (isVad) {
-    langText = t('models.langVad');
-  }
-
-  return { precisionText, langText, isVad };
-}
 
 // Native OS Taskbar Progress Bar & Background Job Tracking
 window.isTranscriptionRunning = false;
@@ -2274,6 +2249,86 @@ const redrawLogsViewport = logsController.redraw;
 const copyAllLogs = logsController.copyAll;
 const clearLogsHistory = logsController.clearHistory;
 
+// ----------------- Model Hub & Management Center -----------------
+// Extracted to src/modules/modelHub.ts
+const MODEL_ICON_DOWNLOAD = modelHub.ICONS.DOWNLOAD;
+const MODEL_ICON_DELETE = modelHub.ICONS.DELETE;
+const MODEL_ICON_PAUSE = modelHub.ICONS.PAUSE;
+const MODEL_ICON_RESUME = modelHub.ICONS.RESUME;
+const getModelMetaInfo = modelHub.getMetaInfo;
+const formatModelDownloadProgress = modelHub.formatProgress;
+const formatRemainingTime = modelHub.formatRemainingTime;
+const switchModelQuickFilter = modelHub.setQuickFilter;
+const switchModelCategory = modelHub.setCategory;
+const clearModelSearch = modelHub.clearSearch;
+const loadModelStatusesGrid = modelHub.loadStatuses;
+const filterModelsGrid = modelHub.filter;
+const downloadModelClick = modelHub.download;
+const pauseModelClick = modelHub.pause;
+const deleteModelClick = modelHub.delete;
+const invalidateModelStatusesCache = modelHub.invalidateCache;
+window.scanAndPopulateModels = scanAndPopulateModels;
+
+// ----------------- Live Transcript Viewer Helper Functions -----------------
+// Extracted to src/modules/transcriptViewer.ts
+const autoResizeTranscriptField = transcriptViewer.autoResize;
+const setupTranscriptDirection = transcriptViewer.setupDirection;
+const parseTranscriptTimeRange = transcriptViewer.parseTimeRange;
+const renderTranscriptLines = transcriptViewer.render;
+const appendTranscriptLine = transcriptViewer.appendLine;
+const filterTranscriptLines = transcriptViewer.filter;
+const formatMsToTimestamp = transcriptViewer.formatMs;
+const parseTimestampStringToMs = transcriptViewer.parseTimestamp;
+const parseSegmentTimestamps = transcriptViewer.parseSegments;
+const loadTranscriptFromFile = transcriptViewer.loadFromFile;
+const copyLiveTranscriptToClipboard = transcriptViewer.copy;
+
+// Legacy and module proxy getter/setters on window for cross-module state access
+if (typeof window !== 'undefined') {
+  Object.defineProperties(window, {
+    transcriptLines: {
+      get() { return transcriptViewer.lines; },
+      set(val) { transcriptViewer.lines = val; },
+      configurable: true
+    },
+    selectedMediaFile: {
+      get() { return selectedMediaFile; },
+      set(val) { selectedMediaFile = val; },
+      configurable: true
+    },
+    isBatchMode: {
+      get() { return isBatchMode; },
+      set(val) { isBatchMode = val; },
+      configurable: true
+    },
+    isBatchExtracting: {
+      get() { return isBatchExtracting; },
+      set(val) { isBatchExtracting = val; },
+      configurable: true
+    },
+    batchItems: {
+      get() { return batchItems; },
+      set(val) { batchItems = val; },
+      configurable: true
+    },
+    batchProcessingIndex: {
+      get() { return batchProcessingIndex; },
+      set(val) { batchProcessingIndex = val; },
+      configurable: true
+    },
+    activeBatchViewerIndex: {
+      get() { return activeBatchViewerIndex; },
+      set(val) { activeBatchViewerIndex = val; },
+      configurable: true
+    },
+    systemSpecs: {
+      get() { return systemSpecs; },
+      set(val) { systemSpecs = val; },
+      configurable: true
+    }
+  });
+}
+
 async function initApp() {
   console.log("Whisper Desktop UI Initialized!");
 
@@ -2736,20 +2791,11 @@ window.switchView = function(viewName) {
 
   if (viewName === 'models') {
     // Always reset search input and default to Recommended category when entering the view
-    const searchInput = document.getElementById('model-search');
-    if (searchInput) {
-      searchInput.value = '';
-      applyDynamicDirection(searchInput);
+    if (typeof switchModelCategory === 'function') {
+      switchModelCategory('recommended', true);
+    } else {
+      loadModelStatusesGrid();
     }
-    const clearBtn = document.getElementById('model-search-clear');
-    if (clearBtn) clearBtn.style.display = 'none';
-    currentCategoryFilter = 'recommended';
-    currentModelQuickFilter = 'all';
-    const buttons = document.querySelectorAll('#model-categories-sidebar .settings-cat-btn');
-    buttons.forEach(btn => btn.classList.remove('active'));
-    const recBtn = document.getElementById('model-cat-recommended');
-    if (recBtn) recBtn.classList.add('active');
-    loadModelStatusesGrid();
   }
 
   if (viewName === 'translate') {
@@ -3053,7 +3099,9 @@ function setupTauriListeners() {
       }
 
       // paused / completed / failed -> Reload grid state once
-      _cachedModelStatuses = null;
+      if (typeof invalidateModelStatusesCache === 'function') {
+        invalidateModelStatusesCache();
+      }
       loadModelStatusesGrid(true, true);
       if (payload.phase === 'failed') {
         showNotification(t('toasts.modelDownloadError', { name: payload.modelName || '', error: payload.error || 'unknown error' }), "error");
@@ -3233,8 +3281,9 @@ window.browseModelsDirectory = async function() {
         await saveCurrentSettings();
         await scanAndPopulateModels();
       }
-      _cachedModelStatuses = null;
-      _cachedModelStatusesTime = 0;
+      if (typeof invalidateModelStatusesCache === 'function') {
+        invalidateModelStatusesCache();
+      }
       await refreshBuildStatuses();
     }
   } catch (err) {
@@ -4163,6 +4212,7 @@ function setupNumberInputControls() {
 }
 
 async function scanAndPopulateModels() {
+  window.scanAndPopulateModels = scanAndPopulateModels;
   if (!settingsState) return;
   
   try {
@@ -7218,1325 +7268,8 @@ async function handleDroppedFiles(rawFiles) {
 }
 
 
-let currentModelQuickFilter = 'all';
-
-/**
- * Formats model download progress text with unit intelligence:
- * - Sub-megabyte models (e.g. Silero VAD ~885 KB) and initial sub-megabyte transfers use KB with localized units.
- * - Multi-megabyte models with >= 1 MB transferred use MB with localized units.
- * - Respects localized percent position, direction, and localized digits.
- */
-function formatModelDownloadProgress(downloadedBytes, totalBytes, progressPct) {
-  const dlBytes = Math.max(0, Math.floor(Number(downloadedBytes) || 0));
-  const total = Math.max(0, Math.floor(Number(totalBytes) || 0));
-  const isSubMegabyte = (total > 0 && total < 1048576) || (total === 0 && dlBytes < 1048576);
-
-  let sizeNum;
-  let unitText;
-
-  if (isSubMegabyte || dlBytes < 1048576) {
-    sizeNum = dlBytes === 0 ? 0 : Math.max(1, Math.round(dlBytes / 1024));
-    unitText = t('models.unitKB') || t('transcribe.unitKB') || 'KB';
-  } else {
-    sizeNum = Math.round(dlBytes / 1048576);
-    unitText = t('models.unitMB') || 'MB';
-  }
-
-  const sizeFormatted = typeof window.formatNumberForLang === 'function'
-    ? window.formatNumberForLang(sizeNum)
-    : String(sizeNum);
-  const pctFormatted = total > 0
-    ? (typeof window.formatNumberForLang === 'function' ? window.formatNumberForLang(Math.min(100, Math.round(progressPct || 0))) : String(Math.min(100, Math.round(progressPct || 0))))
-    : '...';
-
-  const liveTemplate = t('models.downloadLiveProgress', {
-    size: sizeFormatted,
-    unit: unitText,
-    pct: pctFormatted,
-    speedLabel: '',
-    speed: ''
-  });
-  const parts = liveTemplate.split('•');
-  let result = parts.length >= 1 ? parts[0].trim() : `${sizeFormatted} ${unitText} (${pctFormatted}%)`;
-  if (total <= 0) {
-    result = result.replace(/%\s*(\.|\u2026)+|(\.|\u2026)+\s*[%٪]/g, '...');
-  }
-  return result;
-}
-window.formatModelDownloadProgress = formatModelDownloadProgress;
-
-function formatRemainingTime(seconds) {
-  if (seconds <= 0 || !isFinite(seconds)) return t('models.timeUnknown');
-  const totalSeconds = Math.round(seconds);
-  if (totalSeconds < 60) {
-    return t('models.timeSec', { s: window.formatNumberForLang(Math.max(1, totalSeconds)) });
-  }
-
-  const totalMinutes = Math.round(totalSeconds / 60);
-  if (totalMinutes < 60) {
-    return t('models.timeMin', { m: window.formatNumberForLang(Math.max(1, totalMinutes)) });
-  }
-
-  const hours = Math.floor(totalMinutes / 60);
-  const remainingMinutes = totalMinutes % 60;
-  if (remainingMinutes === 0) {
-    return t('models.timeHour', { h: window.formatNumberForLang(hours) });
-  }
-  return t('models.timeHourMin', {
-    h: window.formatNumberForLang(hours),
-    m: window.formatNumberForLang(remainingMinutes),
-  });
-}
-
-function renderFamilyHeaderBanner(category, counts = { all: 0, multi: 0, en: 0, quant: 0 }) {
-  let iconSvg = '';
-  let title = '';
-  let subtitle = '';
-  let body = '';
-  let specs = '';
-
-  switch (category) {
-    case 'recommended': {
-      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
-      title = t('models.catRecommendedTitle');
-      body = t('models.catRecommendedBody');
-      specs = '';
-      break;
-    }
-    case 'tiny':
-      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`;
-      title = t('models.guideTinyTitle');
-      subtitle = t('models.guideTinySubtitle');
-      body = t('models.guideTinyBody');
-      specs = t('models.guideTinySpecs');
-      break;
-    case 'base':
-      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="15" x2="23" y2="15"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="15" x2="4" y2="15"/></svg>`;
-      title = t('models.guideBaseTitle');
-      subtitle = t('models.guideBaseSubtitle');
-      body = t('models.guideBaseBody');
-      specs = t('models.guideBaseSpecs');
-      break;
-    case 'small':
-      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>`;
-      title = t('models.guideSmallTitle');
-      subtitle = t('models.guideSmallSubtitle');
-      body = t('models.guideSmallBody');
-      specs = t('models.guideSmallSpecs');
-      break;
-    case 'medium':
-      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>`;
-      title = t('models.guideMediumTitle');
-      subtitle = t('models.guideMediumSubtitle');
-      body = t('models.guideMediumBody');
-      specs = t('models.guideMediumSpecs');
-      break;
-    case 'large':
-      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14v2H5z"/></svg>`;
-      title = t('models.guideLargeTitle');
-      subtitle = t('models.guideLargeSubtitle');
-      body = t('models.guideLargeBody');
-      specs = t('models.guideLargeSpecs');
-      break;
-    case 'vad':
-      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`;
-      title = t('models.badgeVadTitle');
-      subtitle = t('models.guideVadSubtitle');
-      body = t('models.guideVadBody');
-      specs = t('models.guideVadSpecs');
-      break;
-    case 'local':
-      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
-      title = t('models.catLocal');
-      subtitle = t('models.catLocalSubtitle');
-      body = t('models.subtitle');
-      break;
-    case 'all':
-    default:
-      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`;
-      title = t('models.catAll');
-      subtitle = t('models.title');
-      body = t('models.subtitle');
-      break;
-  }
-
-  const specsHtml = specs ? `<div class="model-family-specs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px; height:13px; opacity:0.85;"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><span>${escapeHTML(specs)}</span></div>` : '';
-
-  let filterBarHtml = '';
-  if (category === 'vad') {
-    filterBarHtml = `
-      <div class="model-banner-filters">
-        <div class="model-filter-info-pill">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>
-          <span>${escapeHTML(t('models.badgeVadTitle'))} (${window.formatNumberForLang(counts.all)})</span>
-        </div>
-      </div>
-    `;
-  } else if (category === 'recommended') {
-    filterBarHtml = '';
-  } else if (counts.all > 0) {
-    const isAll = currentModelQuickFilter === 'all' ? 'active' : '';
-    const isMulti = currentModelQuickFilter === 'multi' ? 'active' : '';
-    const isEn = currentModelQuickFilter === 'en' ? 'active' : '';
-    const isQuant = currentModelQuickFilter === 'quant' ? 'active' : '';
-
-    const labelAll = t('models.filterAll');
-    const labelMulti = t('models.filterMulti');
-    const labelEn = t('models.filterEn');
-    const labelQuant = t('models.filterQuant');
-    const enTooltip = t('models.filterEnTooltip');
-    const quantTooltip = t('models.filterQuantTooltip');
-
-    const showMulti = counts.multi > 0 && counts.multi < counts.all;
-    const showEn = counts.en > 0 && counts.en < counts.all;
-    const showQuant = counts.quant > 0 && counts.quant < counts.all;
-
-    filterBarHtml = `
-      <div class="model-banner-filters">
-        <div class="model-segmented-control" role="tablist" aria-label="${escapeHTML(labelAll)}">
-          <button type="button" class="model-segment-btn ${isAll}" role="tab" aria-selected="${isAll ? 'true' : 'false'}" onclick="switchModelQuickFilter('all')">
-            <span>${escapeHTML(labelAll)}</span>
-            <span class="segment-count">${window.formatNumberForLang(counts.all)}</span>
-          </button>
-          ${showMulti ? `
-            <button type="button" class="model-segment-btn ${isMulti}" role="tab" aria-selected="${isMulti ? 'true' : 'false'}" onclick="switchModelQuickFilter('multi')">
-              <span>${escapeHTML(labelMulti)}</span>
-              <span class="segment-count">${window.formatNumberForLang(counts.multi)}</span>
-            </button>
-          ` : ''}
-          ${showEn ? `
-            <button type="button" class="model-segment-btn ${isEn}" role="tab" aria-selected="${isEn ? 'true' : 'false'}" onclick="switchModelQuickFilter('en')" title="${escapeHTML(enTooltip)}">
-              <span>${escapeHTML(labelEn)}</span>
-              <span class="segment-count">${window.formatNumberForLang(counts.en)}</span>
-            </button>
-          ` : ''}
-          ${showQuant ? `
-            <button type="button" class="model-segment-btn ${isQuant}" role="tab" aria-selected="${isQuant ? 'true' : 'false'}" onclick="switchModelQuickFilter('quant')" title="${escapeHTML(quantTooltip)}">
-              <span>${escapeHTML(labelQuant)}</span>
-              <span class="segment-count">${window.formatNumberForLang(counts.quant)}</span>
-            </button>
-          ` : ''}
-        </div>
-      </div>
-    `;
-  }
-
-  return `
-    <div class="model-family-banner">
-      <div class="model-family-banner-top">
-        <div class="model-family-identity">
-          <div class="model-family-icon">${iconSvg}</div>
-          <div class="model-family-title-wrap">
-            <span class="model-family-title">${escapeHTML(title)}</span>
-            ${subtitle ? `<span class="model-family-subtitle">${escapeHTML(subtitle)}</span>` : ''}
-          </div>
-        </div>
-        ${specsHtml}
-      </div>
-      ${body ? `<p class="model-family-body">${body}</p>` : ''}
-      ${filterBarHtml}
-    </div>
-  `;
-}
-
-window.switchModelQuickFilter = function(filter) {
-  currentModelQuickFilter = filter;
-  loadModelStatusesGrid(true);
-};
-
-window.switchModelCategory = function(category, clearSearch = true) {
-  currentCategoryFilter = category;
-  currentModelQuickFilter = 'all'; // Always reset quick filter to 'all' on category change
-  
-  if (clearSearch) {
-    const searchInput = document.getElementById('model-search');
-    if (searchInput) {
-      searchInput.value = '';
-      applyDynamicDirection(searchInput);
-    }
-    const clearBtn = document.getElementById('model-search-clear');
-    if (clearBtn) clearBtn.style.display = 'none';
-  }
-
-  const buttons = document.querySelectorAll('#model-categories-sidebar .settings-cat-btn');
-  buttons.forEach(btn => {
-    btn.classList.remove('active');
-  });
-  
-  const activeBtn = document.getElementById(`model-cat-${category}`);
-  if (activeBtn) {
-    activeBtn.classList.add('active');
-  }
-
-  const gridScroll = document.getElementById('models-list-scroll');
-  if (gridScroll) {
-    gridScroll.scrollTop = 0;
-  }
-  
-  loadModelStatusesGrid();
-};
-
-window.clearModelSearch = function() {
-  const searchInput = document.getElementById('model-search');
-  const clearBtn = document.getElementById('model-search-clear');
-  if (clearBtn) clearBtn.style.display = 'none';
-  if (searchInput) {
-    searchInput.value = '';
-    applyDynamicDirection(searchInput);
-    searchInput.focus();
-  }
-  loadModelStatusesGrid();
-};
-
-let _cachedModelStatuses = null;
-let _cachedModelStatusesTime = 0;
-const MODEL_STATUS_CACHE_TTL = 3500;
-
-window.loadModelStatusesGrid = async function(isSilent = false, forceRefresh = false) {
-  if (!settingsState) {
-    try {
-      settingsState = await invoke('load_settings');
-    } catch (e) {
-      console.error("Failed to load settings in loadModelStatusesGrid:", e);
-      return;
-    }
-  }
-  
-  // 1. Fetch system specifications if not already loaded
-  if (!systemSpecs) {
-    try {
-      systemSpecs = await invoke('get_system_specs');
-    } catch (e) {
-      console.error("Failed to load system specs:", e);
-      systemSpecs = { total_ram_gb: 8.0, cpu_cores: 4, gpu_type: 'unknown' };
-    }
-  }
-
-  // Update specs subtitle UI helper
-  const specsSubtitle = document.getElementById('model-specs-subtitle');
-  if (specsSubtitle && systemSpecs) {
-    const gpuLabelMap = {
-      'nvidia': t('models.gpuNvidia'),
-      'amd': t('models.gpuAmd'),
-      'intel': t('models.gpuIntel'),
-      'apple_silicon': t('models.gpuAppleSilicon'),
-      'unknown': t('models.gpuCpuOnly')
-    };
-    const hasDetailedGpuName = systemSpecs.gpu_name && systemSpecs.gpu_name !== 'CPU Only' && systemSpecs.gpu_name !== 'Unknown';
-    const gpuDisplayName = hasDetailedGpuName ? systemSpecs.gpu_name : (gpuLabelMap[systemSpecs.gpu_type] || systemSpecs.gpu_type || t('models.gpuUnknown'));
-    const ramVal = systemSpecs.total_ram_gb;
-    const ramFormatted = (ramVal % 1 === 0 ? ramVal.toFixed(0) : parseFloat(ramVal.toFixed(1)).toString());
-    specsSubtitle.innerHTML = t('models.systemSpecsDetected', {
-      ram: window.formatNumberForLang(ramFormatted),
-      cores: window.formatNumberForLang(systemSpecs.cpu_cores),
-      gpu: escapeHTML(gpuDisplayName)
-    });
-  }
-  
-  try {
-    const now = Date.now();
-    let statuses = _cachedModelStatuses;
-    if (forceRefresh || !statuses || (now - _cachedModelStatusesTime > MODEL_STATUS_CACHE_TTL)) {
-      statuses = await invoke('get_all_models_status', { modelsDir: settingsState.modelsDir });
-      _cachedModelStatuses = statuses;
-      _cachedModelStatusesTime = now;
-    }
-
-    const grid = document.getElementById('models-list-scroll');
-    if (!grid) return;
-    
-    const searchInput = document.getElementById('model-search');
-    const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
-    
-    // 0. Compute system-aware model recommendations based on RAM, CPU cores, GPU architecture
-    const recResult = recommendModelsForSystem(systemSpecs);
-    const recMap = new Map();
-    if (recResult && recResult.models) {
-      recMap.set(recResult.models.balanced.modelName, recResult.models.balanced);
-      recMap.set(recResult.models.quality.modelName, recResult.models.quality);
-      recMap.set(recResult.models.fast.modelName, recResult.models.fast);
-      recMap.set(recResult.models.english.modelName, recResult.models.english);
-      recMap.set(recResult.models.quantized.modelName, recResult.models.quantized);
-    }
-
-    // 1. Filter models belonging to current category & search query
-    const categoryModels = statuses.filter(m => {
-      if (query) {
-        const fullName = `ggml-${m.name}.bin`;
-        const searchTarget = `${m.name} ${fullName}`.toLowerCase();
-        if (!searchTarget.includes(query)) return false;
-      }
-      if (currentCategoryFilter === 'local') {
-        return m.status === 'Downloaded';
-      } else if (!query) {
-        if (currentCategoryFilter === 'recommended') return recResult ? recResult.modelNames.includes(m.name) : false;
-        if (currentCategoryFilter === 'tiny') return m.name.startsWith("tiny");
-        if (currentCategoryFilter === 'base') return m.name.startsWith("base");
-        if (currentCategoryFilter === 'small') return m.name.startsWith("small");
-        if (currentCategoryFilter === 'medium') return m.name.startsWith("medium");
-        if (currentCategoryFilter === 'large') return m.name.startsWith("large");
-        if (currentCategoryFilter === 'vad') return m.name.startsWith("silero-");
-      }
-      return true;
-    });
-
-    if (currentCategoryFilter === 'recommended' && !query && recResult && recResult.models) {
-      const order = [
-        recResult.models.balanced.modelName,
-        recResult.models.quality.modelName,
-        recResult.models.fast.modelName,
-        recResult.models.english.modelName,
-        recResult.models.quantized.modelName
-      ];
-      categoryModels.sort((a, b) => order.indexOf(a.name) - order.indexOf(b.name));
-    }
-
-    // 2. Compute dynamic filter counts for this category
-    const counts = {
-      all: categoryModels.length,
-      multi: categoryModels.filter(m => !m.name.includes('.en') && !m.name.startsWith('silero-')).length,
-      en: categoryModels.filter(m => m.name.includes('.en')).length,
-      quant: categoryModels.filter(m => m.name.includes('-q5') || m.name.includes('-q8')).length
-    };
-
-    const showMulti = counts.multi > 0 && counts.multi < counts.all;
-    const showEn = counts.en > 0 && counts.en < counts.all;
-    const showQuant = counts.quant > 0 && counts.quant < counts.all;
-
-    // Auto-fallback if active filter has 0 items or is hidden
-    if (currentCategoryFilter !== 'recommended') {
-      if (currentModelQuickFilter === 'en' && !showEn) {
-        currentModelQuickFilter = 'all';
-      } else if (currentModelQuickFilter === 'multi' && !showMulti) {
-        currentModelQuickFilter = 'all';
-      } else if (currentModelQuickFilter === 'quant' && !showQuant) {
-        currentModelQuickFilter = 'all';
-      }
-    }
-
-    grid.innerHTML = '';
-
-    // Render integrated category banner with sub-filters as first item in scroll list
-    if (!query) {
-      const bannerHtml = renderFamilyHeaderBanner(currentCategoryFilter, counts);
-      if (bannerHtml) {
-        grid.insertAdjacentHTML('beforeend', bannerHtml);
-      }
-    }
-
-    if (!grid._modelDelegate) {
-      grid.addEventListener('click', function(e) {
-        const btn = e.target.closest('button[data-action]');
-        if (!btn) return;
-        const card = btn.closest('[data-model]');
-        if (!card) return;
-        const name = card.dataset.model;
-        switch (btn.dataset.action) {
-          case 'delete': deleteModelClick(name); break;
-          case 'pause':  pauseModelClick(name); break;
-          case 'download': downloadModelClick(name); break;
-        }
-      });
-      grid._modelDelegate = true;
-    }
-    
-    let renderedCount = 0;
-
-    categoryModels.forEach(m => {
-      // Quick filter logic:
-      if (currentCategoryFilter !== 'recommended') {
-        if (currentModelQuickFilter === 'multi') {
-          if (m.name.includes('.en') || m.name.startsWith('silero-')) return;
-        } else if (currentModelQuickFilter === 'en') {
-          if (!m.name.includes('.en')) return;
-        } else if (currentModelQuickFilter === 'quant') {
-          if (!m.name.includes('-q5') && !m.name.includes('-q8')) return;
-        }
-      }
-
-      const card = document.createElement('div');
-      card.className = 'setting-card';
-      card.dataset.name = m.name;
-      card.setAttribute('data-model', m.name);
-      const sizeMB = Math.max(1, Math.round((m.sizeBytes || 0) / 1048576));
-      card.dataset.sizeMb = String(sizeMB);
-      const dlBytes = m.downloadedBytes || 0;
-      const pct = Math.round((m.progress || 0) * 100);
-      const safeName = escapeHTML(m.name);
-      const meta = getModelMetaInfo(m.name);
-
-      let actionButtons = '';
-      if (m.status === 'Downloaded') {
-        actionButtons = `
-          <button class="model-action-btn model-btn-delete" data-action="delete" aria-label="${t('models.ariaDeleteModel', { name: safeName })}">${MODEL_ICON_DELETE}<span>${t('models.actionDelete')}</span></button>
-        `;
-      } else if (m.status === 'Downloading') {
-        actionButtons = `
-          <button class="model-action-btn model-btn-pause" data-action="pause" aria-label="${t('models.ariaPauseDownload', { name: safeName })}">${MODEL_ICON_PAUSE}<span>${t('models.actionPause')}</span></button>
-        `;
-      } else if (m.status === 'Paused') {
-        actionButtons = `
-          <button class="model-action-btn model-btn-resume" data-action="download" aria-label="${t('models.ariaResumeDownload', { name: safeName })}">${MODEL_ICON_RESUME}<span>${t('models.actionResume')}</span></button>
-          <button class="model-action-btn model-btn-delete" data-action="delete" aria-label="${t('models.ariaDiscardDownload', { name: safeName })}">${MODEL_ICON_DELETE}<span>${t('models.actionDiscard')}</span></button>
-        `;
-      } else {
-        actionButtons = `
-          <button class="model-action-btn model-btn-download" data-action="download" aria-label="${t('models.ariaDownloadModel', { name: safeName })}">${MODEL_ICON_DOWNLOAD}<span>${t('models.actionDownload')}</span></button>
-        `;
-      }
-      
-      const showProgressBlock = m.status === 'Downloading' || m.status === 'Paused' ? 'block' : 'none';
-      
-      let badgeHtml = '';
-      if (m.name.startsWith('silero-')) {
-        badgeHtml = `<span class="model-badge model-badge-vad" title="${t('models.badgeVadTitle')}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg><span>${t('models.badgeVad')}</span></span>`;
-      }
-
-      let statusBadge = '';
-      if (m.status === 'Downloaded') {
-        statusBadge = `<span class="model-badge badge-installed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span>${t('models.installedBadge')}</span></span>`;
-      } else if (m.status === 'Downloading') {
-        statusBadge = `<span class="model-badge badge-downloading">${t('models.badgeDownloading')}</span>`;
-      } else if (m.status === 'Paused') {
-        statusBadge = `<span class="model-badge badge-paused">${t('models.badgePaused')}</span>`;
-      }
-
-      const recInfo = recMap.get(m.name);
-      let recBadgeHtml = '';
-      if (recInfo) {
-        const roleClass = `model-badge-rec-${recInfo.role}`;
-        const roleLabel = t(recInfo.badgeI18nKey) || recInfo.role;
-        let roleIcon = '';
-        if (recInfo.role === 'balanced') {
-          roleIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
-        } else if (recInfo.role === 'quality') {
-          roleIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>`;
-        } else if (recInfo.role === 'fast') {
-          roleIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`;
-        } else if (recInfo.role === 'english') {
-          roleIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`;
-        } else if (recInfo.role === 'quantized') {
-          roleIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>`;
-        }
-        recBadgeHtml = `<span class="model-badge model-badge-rec ${roleClass}">${roleIcon}<span>${escapeHTML(roleLabel)}</span></span>`;
-      }
-
-      let recReasonHtml = '';
-      if (recInfo && (currentCategoryFilter === 'recommended' || !query)) {
-        const reasonText = t(recInfo.reasonI18nKey) || recInfo.reasonFallback;
-        recReasonHtml = `<div class="model-rec-description">${escapeHTML(reasonText)}</div>`;
-      }
-
-      card.innerHTML = `
-        <div class="setting-info" style="flex-grow: 1; padding-inline-end: 20px;">
-          <div class="setting-label-row" style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap;">
-            <span class="setting-title" style="font-size: 1.05rem; font-weight: 600; color: #fff;">ggml-${safeName}.bin</span>
-            ${recBadgeHtml}
-            ${badgeHtml}
-          </div>
-          <div class="setting-desc" style="font-size: 0.82rem; color: var(--color-text-muted); line-height: 1.4; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-            ${statusBadge}
-            ${statusBadge ? '<span style="color: rgba(255,255,255,0.1);">|</span>' : ''}
-            <span>${m.status === 'Downloaded' ? (t('models.installedSize', { size: window.formatNumberForLang(sizeMB) }) || `${sizeMB} MB`) : t('models.expectedSize', { size: window.formatNumberForLang(sizeMB) })}</span>
-            ${meta.precisionText ? `
-              <span style="color: rgba(255,255,255,0.1);">|</span>
-              <span>${meta.precisionText}</span>
-            ` : ''}
-            <span style="color: rgba(255,255,255,0.1);">|</span>
-            <span>${meta.langText}</span>
-          </div>
-          ${recReasonHtml}
-          <div class="model-progress-block" style="display: ${showProgressBlock};">
-            <div class="model-progress-status ${m.status === 'Paused' ? 'status-paused' : 'status-downloading'}">
-              ${m.status === 'Downloading' ? (
-                dlBytes <= 0
-                  ? t('models.statusConnecting')
-                  : `${formatModelDownloadProgress(dlBytes, m.sizeBytes, pct)} • ${(t('models.statusInProgress', { size: '', pct: '' }).split('•')[1] || t('models.statusConnecting')).trim()}`
-              ) : ''}
-              ${m.status === 'Paused' ? (
-                dlBytes <= 0
-                  ? t('models.badgePaused')
-                  : `${formatModelDownloadProgress(dlBytes, m.sizeBytes, pct)} • ${(t('models.statusPaused', { size: '', pct: '' }).split('•')[1] || t('models.badgePaused')).trim()}`
-              ) : ''}
-            </div>
-            <div class="progress-bar-container" style="height: 6px; border-radius: 3px; background: rgba(255,255,255,0.05); overflow: hidden; border: 1px solid rgba(255,255,255,0.02);">
-              <div class="progress-bar-fill" style="width: ${pct}%; height: 100%; background: ${m.status === 'Downloading' ? 'var(--color-cyan)' : 'var(--color-gold)'}; box-shadow: ${m.status === 'Downloading' ? 'var(--shadow-neon-cyan)' : 'var(--shadow-neon-gold)'}; transition: width 0.3s ease;"></div>
-            </div>
-          </div>
-        </div>
-        <div class="setting-control" style="display: flex; gap: 8px; align-items: center; justify-content: flex-end; flex-shrink: 0; min-width: 160px;">
-          ${actionButtons}
-        </div>
-      `;
-      grid.appendChild(card);
-      renderedCount++;
-    });
-
-    if (renderedCount === 0) {
-      const emptyDiv = document.createElement('div');
-      emptyDiv.className = 'models-empty-state';
-      emptyDiv.style.padding = '48px 20px';
-      emptyDiv.innerHTML = `
-        <div class="models-empty-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            <line x1="8" y1="11" x2="14" y2="11"></line>
-          </svg>
-        </div>
-        <div class="models-empty-title">${t('models.emptyTitle')}</div>
-        <div class="models-empty-desc">${query ? t('models.emptyDescQuery', { query: escapeHTML(query) }) : t('models.emptyDescCategory')}</div>
-        ${query ? `<button type="button" class="btn-secondary btn-sm" onclick="clearModelSearch()" style="margin-top: 8px;">${t('models.emptyClearSearch')}</button>` : ''}
-      `;
-      grid.appendChild(emptyDiv);
-    }
-    
-  } catch (err) {
-    console.error("Failed to load model statuses:", err);
-  }
-};
-
-window.filterModelsGrid = function() {
-  const searchInput = document.getElementById('model-search');
-  if (searchInput) applyDynamicDirection(searchInput);
-  const clearBtn = document.getElementById('model-search-clear');
-  const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
-  if (clearBtn) clearBtn.style.display = query ? 'flex' : 'none';
-
-  // Debounce: the search box calls this per keystroke, and a full grid rebuild
-  // + IPC round-trip on every key makes typing janky.
-  if (filterModelsGrid._timer) clearTimeout(filterModelsGrid._timer);
-  filterModelsGrid._timer = setTimeout(() => {
-    filterModelsGrid._timer = null;
-    loadModelStatusesGrid();
-  }, 250);
-};
-
-window.downloadModelClick = async function(name) {
-  if (!settingsState || _modelActionsInProgress.has(name)) return;
-  _modelActionsInProgress.add(name);
-  try {
-    showNotification(t('toasts.modelDownloadStarted', { name: `ggml-${name}.bin` }), "info");
-    
-    // Invalidate model status cache so any tab switch/search filter re-fetches latest downloading status
-    _cachedModelStatuses = null;
-
-    // Immediate in-place button swap to Pause
-    const card = document.querySelector(`[data-model="${name}"]`);
-    if (card) {
-      const ctrlEl = card.querySelector('.setting-control');
-      if (ctrlEl) {
-        ctrlEl.innerHTML = `<button class="model-action-btn model-btn-pause" data-action="pause" aria-label="${t('models.ariaPauseDownload', { name: escapeHTML(name) })}">${MODEL_ICON_PAUSE}<span>${t('models.actionPause')}</span></button>`;
-      }
-      const progressBlock = card.querySelector('.model-progress-block');
-      if (progressBlock) progressBlock.style.display = 'block';
-      const statusEl = card.querySelector('.model-progress-status');
-      if (statusEl) {
-        if (!statusEl.textContent.trim()) {
-          statusEl.textContent = t('models.statusStarting');
-        } else if (statusEl.textContent.includes('•')) {
-          const parts = statusEl.textContent.split('•');
-          statusEl.textContent = `${parts[0].trim()} • ${t('models.statusConnecting')}`;
-        } else {
-          statusEl.textContent = t('models.statusStarting');
-        }
-        statusEl.classList.remove('status-paused');
-        statusEl.classList.add('status-downloading');
-        statusEl.style.color = '';
-      }
-      const barFill = card.querySelector('.progress-bar-fill');
-      if (barFill) {
-        barFill.style.background = 'var(--color-cyan)';
-        barFill.style.boxShadow = 'var(--shadow-neon-cyan)';
-      }
-    }
-
-    await invoke('start_download_model_task', {
-      modelsDir: settingsState.modelsDir,
-      modelName: name
-    });
-  } catch (err) {
-    showNotification(t('toasts.modelDownloadStartError', { error: String(err) }), "error");
-    _cachedModelStatuses = null;
-    await loadModelStatusesGrid(false, true);
-  } finally {
-    _modelActionsInProgress.delete(name);
-  }
-};
-
-window.pauseModelClick = async function(name) {
-  if (_modelActionsInProgress.has(name)) return;
-  _modelActionsInProgress.add(name);
-  try {
-    await invoke('pause_download_model', { modelName: name });
-    showNotification(t('toasts.modelDownloadPaused', { name: `ggml-${name}.bin` }), "info");
-    _cachedModelStatuses = null;
-    await loadModelStatusesGrid(false, true);
-  } catch (err) {
-    showNotification(t('toasts.modelDownloadPauseError', { error: String(err) }), "error");
-  } finally {
-    _modelActionsInProgress.delete(name);
-  }
-};
-
-window.deleteModelClick = async function(name) {
-  if (_modelActionsInProgress.has(name)) return;
-  const confirmed = await showConfirmModal(
-    t('modals.confirmDeleteModelTitle'),
-    t('modals.confirmDeleteModelDesc', { name }),
-    t('modals.deleteBtn')
-  );
-  if (!confirmed) return;
-  _modelActionsInProgress.add(name);
-  try {
-    await invoke('delete_model_file', {
-      modelsDir: settingsState.modelsDir,
-      modelName: name
-    });
-    showNotification(t('toasts.modelDeleted', { name: `ggml-${name}.bin` }), "success");
-    _cachedModelStatuses = null;
-    await loadModelStatusesGrid(false, true);
-    // Scan configuration dropdown to sync options
-    await scanAndPopulateModels();
-  } catch (err) {
-    showNotification(t('toasts.modelDeleteError', { error: String(err) }), "error");
-  } finally {
-    _modelActionsInProgress.delete(name);
-  }
-};
-
-// ----------------- Live Transcript Viewer Helper Functions -----------------
-let transcriptLines = [];
-
-/**
- * Keeps a transcript line's direction in step with what is being typed into it. The
- * lines are created in bulk (a long transcription can hold hundreds of them, and the
- * viewport caps the DOM at 2000), so one delegated listener covers them all instead
- * of a listener per input — each line opens on the side its content reads from, and
- * a line emptied while editing falls back to the interface direction.
- */
-function autoResizeTranscriptField(el) {
-  if (!el) return;
-  el.style.height = 'auto';
-  if (el.scrollHeight > 0) {
-    el.style.height = `${el.scrollHeight}px`;
-  }
-}
-window.autoResizeTranscriptField = autoResizeTranscriptField;
-
-function setupTranscriptDirection() {
-  const viewport = document.getElementById('transcript-viewport');
-  if (!viewport || viewport._hasDirectionListener) return;
-  viewport._hasDirectionListener = true;
-  viewport.addEventListener('input', (e) => {
-    const field = e.target;
-    if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement) {
-      applyTextDirection(field);
-      if (field.classList.contains('transcript-text-input')) {
-        autoResizeTranscriptField(field);
-      }
-    }
-  });
-
-  // A language switch changes the interface direction, which is what the lines with no
-  // strong character of their own fall back to. The hardsub cue fields re-resolve for
-  // the same reason when the cue list is re-rendered.
-  window.addEventListener('whisper:languageChanged', () => {
-    viewport.querySelectorAll('.transcript-text-input').forEach((input) => {
-      applyTextDirection(input);
-      autoResizeTranscriptField(input);
-    });
-  });
-
-  // Re-adjust heights on window resize if lines wrapped or unwrapped
-  window.addEventListener('resize', () => {
-    viewport.querySelectorAll('.transcript-text-input').forEach((input) => {
-      autoResizeTranscriptField(input);
-    });
-  });
-}
-
-function parseTranscriptTimeRange(timeRange) {
-  if (!timeRange) return { raw: '', durLabel: '' };
-  const match = timeRange.match(/\[?(\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?)\s*(?:-->|→)\s*(\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?)\]?/);
-  if (match) {
-    const start = match[1];
-    const end = match[2];
-    const toSec = (str) => {
-      const parts = str.split(':');
-      return parseFloat(parts[0]) * 3600 + parseFloat(parts[1]) * 60 + parseFloat(parts[2]);
-    };
-    const diff = Math.max(0, Math.round(toSec(end) - toSec(start)));
-    const durLabel = diff > 0 ? `${diff}s` : '';
-    return {
-      raw: `${start} → ${end}`,
-      durLabel
-    };
-  }
-  return {
-    raw: timeRange.replace(/^\[|\]$/g, ''),
-    durLabel: ''
-  };
-}
-window.parseTranscriptTimeRange = parseTranscriptTimeRange;
-
-function createTranscriptCardElement(lineObj) {
-  const parsedTime = parseTranscriptTimeRange(lineObj.timeRange);
-  
-  const cardEl = document.createElement('div');
-  cardEl.className = 'transcript-card transcript-line';
-  cardEl.dataset.id = lineObj.id;
-
-  const headerEl = document.createElement('div');
-  headerEl.className = 'transcript-card-header';
-
-  const badgeWrap = document.createElement('div');
-  badgeWrap.className = 'transcript-card-badge-wrap';
-
-  const numSpan = document.createElement('span');
-  numSpan.className = 'transcript-card-num';
-  numSpan.textContent = `#${lineObj.id + 1}`;
-  badgeWrap.appendChild(numSpan);
-
-  if (parsedTime.durLabel) {
-    const durSpan = document.createElement('span');
-    durSpan.className = 'transcript-card-dur';
-    durSpan.textContent = parsedTime.durLabel;
-    badgeWrap.appendChild(durSpan);
-  }
-
-  const timeDiv = document.createElement('div');
-  timeDiv.className = 'transcript-card-time';
-  timeDiv.setAttribute('dir', 'ltr');
-
-  if (parsedTime.raw && (parsedTime.raw.includes('→') || parsedTime.raw.includes('-->') || parsedTime.raw.includes(':'))) {
-    timeDiv.innerHTML = `
-      <svg class="transcript-time-icon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10"></circle>
-        <polyline points="12 6 12 12 16 14"></polyline>
-      </svg>
-      <span>${escapeHTML(parsedTime.raw)}</span>
-    `;
-  } else {
-    timeDiv.innerHTML = `<span style="color: var(--color-text-dim); font-size: 0.72rem;">${escapeHTML(parsedTime.raw || `Line ${lineObj.id + 1}`)}</span>`;
-  }
-
-  headerEl.appendChild(badgeWrap);
-  headerEl.appendChild(timeDiv);
-
-  const bodyEl = document.createElement('div');
-  bodyEl.className = 'transcript-card-body';
-
-  const textarea = document.createElement('textarea');
-  textarea.rows = 1;
-  textarea.className = 'transcript-text-input';
-  textarea.value = lineObj.text;
-  applyTextDirection(textarea);
-  textarea.oninput = function() {
-    updateTranscriptLineText(lineObj.id, this.value);
-  };
-  textarea.onchange = function() {
-    updateTranscriptLineText(lineObj.id, this.value);
-  };
-  bodyEl.appendChild(textarea);
-
-  cardEl.appendChild(headerEl);
-  cardEl.appendChild(bodyEl);
-  return cardEl;
-}
-window.createTranscriptCardElement = createTranscriptCardElement;
-
-function renderTranscriptLines(lines) {
-  const viewport = document.getElementById('transcript-viewport');
-  if (!viewport) return;
-  viewport.innerHTML = '';
-
-  const placeholder = document.getElementById('transcript-placeholder');
-  if (placeholder) placeholder.remove();
-
-  if (!lines || lines.length === 0) {
-    viewport.innerHTML = `<div style="color: var(--color-text-dim); text-align: center; margin-top: 40px;" data-i18n="transcribe.noSegments">${escapeHTML(t('transcribe.noSegments') || 'No transcript segments generated yet.')}</div>`;
-    const btnCopy = document.getElementById('btn-copy-transcript');
-    if (btnCopy) btnCopy.disabled = true;
-    return;
-  }
-
-  const btnCopy = document.getElementById('btn-copy-transcript');
-  if (btnCopy) btnCopy.disabled = false;
-
-  const frag = document.createDocumentFragment();
-  lines.forEach((lineObj) => {
-    const cardEl = createTranscriptCardElement(lineObj);
-    frag.appendChild(cardEl);
-  });
-  viewport.appendChild(frag);
-
-  viewport.querySelectorAll('.transcript-text-input').forEach((input) => {
-    applyTextDirection(input);
-    autoResizeTranscriptField(input);
-  });
-}
-window.renderTranscriptLines = renderTranscriptLines;
-
-function appendTranscriptLine(timeRange, text) {
-  const cleanText = text.trim();
-  const isBatchRunning = isBatchExtracting && batchProcessingIndex >= 0 && batchItems[batchProcessingIndex];
-  const activeItem = isBatchRunning ? batchItems[batchProcessingIndex] : null;
-
-  if (isBatchRunning && activeItem) {
-    if (!activeItem.transcriptLines) activeItem.transcriptLines = [];
-  }
-
-  const lineObj = {
-    timeRange,
-    text: cleanText,
-    id: (isBatchRunning && activeItem) ? activeItem.transcriptLines.length : transcriptLines.length
-  };
-
-  if (isBatchRunning && activeItem) {
-    activeItem.transcriptLines.push({ ...lineObj });
-
-    // If user is currently viewing a different item in batch, do not append to DOM or global transcriptLines
-    if (activeBatchViewerIndex !== batchProcessingIndex) {
-      return;
-    }
-  }
-
-  const placeholder = document.getElementById('transcript-placeholder');
-  if (placeholder) placeholder.remove();
-  
-  const viewport = document.getElementById('transcript-viewport');
-  if (!viewport) return;
-
-  const lingeringInit = viewport.querySelector('.transcript-initializing-state, [data-i18n="transcribe.aiModelInitializing"]');
-  if (lingeringInit) lingeringInit.remove();
-  
-  transcriptLines.push({ ...lineObj });
-
-  const btnCopy = document.getElementById('btn-copy-transcript');
-  if (btnCopy) btnCopy.disabled = false;
-
-  const cardEl = createTranscriptCardElement(lineObj);
-  viewport.appendChild(cardEl);
-
-  const textarea = cardEl.querySelector('.transcript-text-input');
-  if (textarea) autoResizeTranscriptField(textarea);
-
-  // Cap DOM children in viewport (mirrors the log-viewport cap) so a very long
-  // transcription can't grow thousands of live <input> nodes. The full data
-  // stays in `transcriptLines` for copy/export.
-  while (viewport.children.length > 2000) {
-    viewport.removeChild(viewport.firstElementChild);
-  }
-
-  clearTimeout(viewport._scrollDebounce);
-  viewport._scrollDebounce = setTimeout(() => {
-    viewport.scrollTop = viewport.scrollHeight;
-  }, 80);
-}
-
-window.updateTranscriptLineText = function(id, value) {
-  const line = transcriptLines.find(l => l.id === id);
-  if (line) {
-    line.text = value;
-  }
-  if (isBatchMode && activeBatchViewerIndex >= 0 && batchItems[activeBatchViewerIndex]) {
-    const item = batchItems[activeBatchViewerIndex];
-    if (item.transcriptLines) {
-      const itemLine = item.transcriptLines.find(l => l.id === id);
-      if (itemLine) {
-        itemLine.text = value;
-      }
-    }
-  }
-};
-
-window.filterTranscriptLines = function() {
-  const searchInput = document.getElementById('transcript-search');
-  if (searchInput) applyDynamicDirection(searchInput);
-  const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
-  const lines = document.querySelectorAll('.transcript-line');
-  const viewport = document.getElementById('transcript-viewport');
-  let matchCount = 0;
-
-  lines.forEach(lineEl => {
-    const textInput = lineEl.querySelector('.transcript-text-input');
-    if (textInput) {
-      const match = !query || textInput.value.toLowerCase().includes(query);
-      lineEl.style.display = match ? 'flex' : 'none';
-      if (match) {
-        matchCount++;
-        autoResizeTranscriptField(textInput);
-      }
-    }
-  });
-
-  if (viewport && lines.length > 0) {
-    let emptySearchEl = document.getElementById('transcript-search-empty');
-    if (query && matchCount === 0) {
-      if (!emptySearchEl) {
-        emptySearchEl = document.createElement('div');
-        emptySearchEl.id = 'transcript-search-empty';
-        emptySearchEl.className = 'transcript-empty-notice';
-        emptySearchEl.style.cssText = 'padding: 32px 16px; text-align: center; color: var(--color-text-dim); font-size: 0.85rem; user-select: none;';
-        viewport.appendChild(emptySearchEl);
-      }
-      emptySearchEl.setAttribute('data-i18n', 'transcribe.noMatchingTranscript');
-      emptySearchEl.textContent = t('transcribe.noMatchingTranscript') || 'No matching transcript lines found.';
-      emptySearchEl.style.display = 'block';
-    } else if (emptySearchEl) {
-      emptySearchEl.style.display = 'none';
-    }
-  }
-};
-
-function formatMsToTimestamp(ms) {
-  const totalMs = Math.max(0, Math.round(Number(ms) || 0));
-  const h = Math.floor(totalMs / 3600000);
-  const m = Math.floor((totalMs % 3600000) / 60000);
-  const s = Math.floor((totalMs % 60000) / 1000);
-  const remMs = totalMs % 1000;
-  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${remMs.toString().padStart(3, '0')}`;
-}
-window.formatMsToTimestamp = formatMsToTimestamp;
-
-function parseTimestampStringToMs(str) {
-  if (!str) return null;
-  const s = String(str).replace(/^["']|["']$/g, '').trim().replace(',', '.');
-  if (s.includes(':')) {
-    const parts = s.split(':');
-    if (parts.length === 3) {
-      const h = parseFloat(parts[0].replace(/^["']|["']$/g, '')) || 0;
-      const m = parseFloat(parts[1].replace(/^["']|["']$/g, '')) || 0;
-      const sec = parseFloat(parts[2].replace(/^["']|["']$/g, '')) || 0;
-      return Math.round((h * 3600 + m * 60 + sec) * 1000);
-    } else if (parts.length === 2) {
-      const m = parseFloat(parts[0].replace(/^["']|["']$/g, '')) || 0;
-      const sec = parseFloat(parts[1].replace(/^["']|["']$/g, '')) || 0;
-      return Math.round((m * 60 + sec) * 1000);
-    }
-  }
-  return null;
-}
-window.parseTimestampStringToMs = parseTimestampStringToMs;
-
-function parseSegmentTimestamps(rawStart, rawEnd) {
-  if (rawStart === undefined || rawStart === null || rawEnd === undefined || rawEnd === null) {
-    return null;
-  }
-  const sClean = typeof rawStart === 'string' ? rawStart.replace(/^["']|["']$/g, '').trim() : String(rawStart);
-  const eClean = typeof rawEnd === 'string' ? rawEnd.replace(/^["']|["']$/g, '').trim() : String(rawEnd);
-
-  if (sClean.includes(':') || eClean.includes(':')) {
-    const s = parseTimestampStringToMs(sClean);
-    const e = parseTimestampStringToMs(eClean);
-    if (s !== null && e !== null) {
-      return { startMs: Math.max(0, s), endMs: Math.max(0, e) };
-    }
-  }
-  const sNum = parseFloat(sClean);
-  const eNum = parseFloat(eClean);
-  if (isNaN(sNum) || isNaN(eNum)) {
-    return null;
-  }
-  const diff = eNum - sNum;
-  const isFractional = sClean.includes('.') || eClean.includes('.') || !Number.isInteger(sNum) || !Number.isInteger(eNum);
-  // Whisper segment is at most 30 seconds.
-  // If diff > 30, it cannot be seconds; values are integer milliseconds.
-  // If fractional or diff <= 30, values are in seconds.
-  if (isFractional || (diff <= 30 && diff >= 0)) {
-    return {
-      startMs: Math.max(0, Math.round(sNum * 1000)),
-      endMs: Math.max(0, Math.round(eNum * 1000))
-    };
-  } else {
-    return {
-      startMs: Math.max(0, Math.round(sNum)),
-      endMs: Math.max(0, Math.round(eNum))
-    };
-  }
-}
-window.parseSegmentTimestamps = parseSegmentTimestamps;
-
-window.loadTranscriptFromFile = async function(fullPath, shouldRender = true) {
-  try {
-    const text = await invoke('read_text_file_content', { filePath: fullPath });
-    
-    const parsedLines = [];
-    const ext = (fullPath.split('.').pop() || '').toLowerCase();
-
-    // 1. JSON Parser (Whisper CLI JSON or generic subtitle segment array)
-    if (ext === 'json' || text.trim().startsWith('{') || text.trim().startsWith('[')) {
-      try {
-        const parsed = JSON.parse(text);
-        const segments = Array.isArray(parsed) ? parsed : (parsed.transcription || parsed.segments || parsed.results || []);
-        if (Array.isArray(segments) && segments.length > 0) {
-          segments.forEach((seg, idx) => {
-            let timeRange = '';
-            if (seg.timestamps && seg.timestamps.from && seg.timestamps.to) {
-              timeRange = `[${seg.timestamps.from.replace(',', '.')} --> ${seg.timestamps.to.replace(',', '.')}]`;
-            } else if (seg.offsets && typeof seg.offsets.from === 'number' && typeof seg.offsets.to === 'number') {
-              timeRange = `[${formatMsToTimestamp(seg.offsets.from)} --> ${formatMsToTimestamp(seg.offsets.to)}]`;
-            } else if ((typeof seg.start === 'number' || typeof seg.start === 'string') && (typeof seg.end === 'number' || typeof seg.end === 'string')) {
-              const parsedTimes = parseSegmentTimestamps(seg.start, seg.end);
-              if (parsedTimes) {
-                timeRange = `[${formatMsToTimestamp(parsedTimes.startMs)} --> ${formatMsToTimestamp(parsedTimes.endMs)}]`;
-              } else {
-                timeRange = `Line ${idx + 1}`;
-              }
-            } else {
-              timeRange = `Line ${idx + 1}`;
-            }
-            const cleanText = (seg.text || seg.content || '').trim();
-            if (cleanText) {
-              parsedLines.push({ timeRange, text: cleanText, id: idx });
-            }
-          });
-          if (parsedLines.length > 0) {
-            if (shouldRender) {
-              transcriptLines = parsedLines;
-              renderTranscriptLines(transcriptLines);
-            }
-            return parsedLines;
-          }
-        }
-      } catch (_) {}
-    }
-
-    // 2. LRC Parser
-    if (ext === 'lrc' || /^\[\d{1,2}:\d{2}/m.test(text)) {
-      const rawLines = text.split('\n');
-      const lrcRegex = /^\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\](.*)/;
-      const parsedCues = [];
-      rawLines.forEach(l => {
-        const match = l.trim().match(lrcRegex);
-        if (match) {
-          const min = parseInt(match[1], 10) || 0;
-          const sec = parseInt(match[2], 10) || 0;
-          const ms = parseInt((match[3] || '0').padEnd(3, '0').slice(0, 3), 10) || 0;
-          const totalMs = (min * 60 + sec) * 1000 + ms;
-          const textContent = match[4].trim();
-          if (textContent) {
-            parsedCues.push({ ms: totalMs, text: textContent });
-          }
-        }
-      });
-      if (parsedCues.length > 0) {
-        parsedCues.forEach((cue, idx) => {
-          const nextMs = (idx + 1 < parsedCues.length) ? parsedCues[idx + 1].ms : (cue.ms + 3000);
-          const timeRange = `[${formatMsToTimestamp(cue.ms)} --> ${formatMsToTimestamp(nextMs)}]`;
-          parsedLines.push({ timeRange, text: cue.text, id: idx });
-        });
-        if (shouldRender) {
-          transcriptLines = parsedLines;
-          renderTranscriptLines(transcriptLines);
-        }
-        return parsedLines;
-      }
-    }
-
-    // 3. CSV / TSV Parser
-    if (ext === 'csv' || ext === 'tsv') {
-      const sep = ext === 'tsv' ? '\t' : ',';
-      const rawLines = text.split('\n');
-      let cueId = 0;
-      let startCol = 0;
-      let endCol = 1;
-      let textCol = 2;
-
-      rawLines.forEach((l, idx) => {
-        const line = l.trim();
-        if (!line) return;
-
-        if (idx === 0 && (line.toLowerCase().includes('start') || line.toLowerCase().includes('text'))) {
-          // Detect header columns (e.g. id,start,end,text or start,end,text)
-          const headerCols = line.split(sep).map(c => c.replace(/^["']|["']$/g, '').trim().toLowerCase());
-          const sIdx = headerCols.findIndex(c => c === 'start' || c === 'start_time' || c === 'from');
-          const eIdx = headerCols.findIndex(c => c === 'end' || c === 'end_time' || c === 'to');
-          const tIdx = headerCols.findIndex(c => c === 'text' || c === 'content' || c === 'sentence');
-          if (sIdx !== -1 && eIdx !== -1) {
-            startCol = sIdx;
-            endCol = eIdx;
-            if (tIdx !== -1) textCol = tIdx;
-          }
-          return;
-        }
-
-        const cols = line.split(sep);
-        const minCols = Math.max(startCol, endCol, textCol) + 1;
-        if (cols.length >= minCols) {
-          const rawStart = cols[startCol].trim();
-          const rawEnd = cols[endCol].trim();
-          let textVal = '';
-          if (textCol === cols.length - 1 || textCol === 2) {
-            textVal = cols.slice(textCol).join(sep);
-          } else {
-            textVal = cols[textCol];
-          }
-          textVal = textVal.replace(/^["']|["']$/g, '').replace(/""/g, '"').trim();
-          const parsedTimes = parseSegmentTimestamps(rawStart, rawEnd);
-          if (parsedTimes && textVal) {
-            const timeRange = `[${formatMsToTimestamp(parsedTimes.startMs)} --> ${formatMsToTimestamp(parsedTimes.endMs)}]`;
-            parsedLines.push({ timeRange, text: textVal, id: cueId++ });
-          }
-        }
-      });
-      if (parsedLines.length > 0) {
-        if (shouldRender) {
-          transcriptLines = parsedLines;
-          renderTranscriptLines(transcriptLines);
-        }
-        return parsedLines;
-      }
-    }
-
-    // 4. Subtitle format (SRT / VTT)
-    const isSub = (ext === 'srt' || ext === 'vtt' || text.includes('-->')) && ext !== 'txt';
-
-    if (isSub) {
-      // Parse subtitle format (SRT / VTT)
-      const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
-      let i = 0;
-      const total = lines.length;
-      let cueId = 0;
-
-      while (i < total) {
-        const line = lines[i];
-
-        // Skip WebVTT header or metadata
-        if (ext === 'vtt' && (line.startsWith('WEBVTT') || line.startsWith('NOTE') || line.startsWith('STYLE') || line.startsWith('REGION'))) {
-          i++;
-          while (i < total && lines[i].trim() !== '') i++;
-          continue;
-        }
-
-        if (line.includes('-->')) {
-          const parts = line.split('-->');
-          if (parts.length === 2) {
-            const startRaw = parts[0].trim().split(' ')[0].replace(',', '.');
-            const endRaw = parts[1].trim().split(' ')[0].replace(',', '.');
-            const timeRange = `[${startRaw} --> ${endRaw}]`;
-
-            // Collect text lines until next blank line or next timeline
-            const textParts = [];
-            i++;
-            while (i < total && lines[i].trim() !== '' && !lines[i].includes('-->')) {
-              if (/^\d+$/.test(lines[i].trim()) && (i + 1 < total) && lines[i + 1].includes('-->')) {
-                break;
-              }
-              textParts.push(lines[i]);
-              i++;
-            }
-
-            const cleanText = textParts.join('\n').replace(/<[^>]+>/g, '').trim();
-            if (cleanText || startRaw) {
-              parsedLines.push({ timeRange, text: cleanText, id: cueId++ });
-            }
-            continue;
-          }
-        }
-        i++;
-      }
-    } else {
-      // 5. Plain text format
-      const lines = text.split('\n');
-      let lineId = 0;
-      lines.forEach((lineText) => {
-        const trimmed = lineText.trim();
-        if (!trimmed) return;
-        parsedLines.push({ timeRange: `Line ${lineId + 1}`, text: trimmed, id: lineId++ });
-      });
-    }
-
-    if (shouldRender) {
-      transcriptLines = parsedLines;
-      renderTranscriptLines(transcriptLines);
-    }
-    return parsedLines;
-  } catch (err) {
-    console.error("Failed to load transcript file:", err);
-    return [];
-  }
-};
-
-window.copyLiveTranscriptToClipboard = async function() {
-  const btn = document.getElementById('btn-copy-transcript');
-  const triggerBtnFeedback = () => {
-    if (btn) {
-      const span = btn.querySelector('span');
-      if (span) {
-        if (!span._origText) {
-          span._origText = span.textContent;
-        }
-        span.textContent = t('transcribe.copied');
-        clearTimeout(btn._copyFeedbackTimer);
-        btn._copyFeedbackTimer = setTimeout(() => {
-          if (span && span._origText) {
-            span.textContent = span._origText;
-            span._origText = null;
-          }
-        }, 2000);
-      } else {
-        if (!btn._origText) {
-          btn._origText = btn.textContent;
-        }
-        btn.textContent = t('transcribe.copied');
-        clearTimeout(btn._copyFeedbackTimer);
-        btn._copyFeedbackTimer = setTimeout(() => {
-          if (btn && btn._origText) {
-            btn.textContent = btn._origText;
-            btn._origText = null;
-          }
-        }, 2000);
-      }
-    }
-  };
-
-  if (transcriptLines && transcriptLines.length > 0) {
-    const textToCopy = transcriptLines
-      .map(l => l.text)
-      .join('\n');
-      
-    try {
-      await copyToClipboard(textToCopy);
-      triggerBtnFeedback();
-      showNotification(t('toasts.liveTranscriptCopied'), "success");
-      return;
-    } catch (err) {
-      const msg = (err && (err.message || err.toString())) || String(err);
-      showNotification(t('toasts.copyTranscriptError', { error: msg }), "error");
-      return;
-    }
-  }
-
-  // Fallback: check transcript viewport text if transcriptLines array is unpopulated
-  const viewport = document.getElementById('transcript-viewport');
-  if (viewport && !viewport.querySelector('.transcript-placeholder') && !viewport.querySelector('.transcript-initializing-state')) {
-    const rawPreview = viewport.innerText.trim();
-    if (rawPreview.length > 0) {
-      try {
-        await copyToClipboard(rawPreview);
-        triggerBtnFeedback();
-        showNotification(t('toasts.previewCopied'), "success");
-        return;
-      } catch (err) {
-        const msg = (err && (err.message || err.toString())) || String(err);
-        showNotification(t('toasts.copyTranscriptError', { error: msg }), "error");
-        return;
-      }
-    }
-  }
-
-  // If live viewer is empty, attempt to copy the main output file
-  if (selectedMediaFile) {
-    await window.copyMainTranscriptToClipboard();
-  } else {
-    showNotification(t('toasts.noTranscriptToCopy'), "info");
-  }
-};
-
-window.copyEditorTranscriptToClipboard = window.copyLiveTranscriptToClipboard;
-
+// ----------------- Models Logic & Live Transcript Viewer -----------------
+// Extracted to src/modules/modelHub.ts and src/modules/transcriptViewer.ts
 
 
 // ----------------- AI Translation Configuration & Providers Handling -----------------
