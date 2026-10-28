@@ -1,5 +1,7 @@
 import { hardsubController } from './hardsub.ts';
 import { translationStudioController } from './translationStudio.ts';
+import { logsController } from './modules/logsController.ts';
+import { themeManager } from './modules/themeManager.ts';
 import { initI18n, t, setLanguage, getLanguage, translateDOM, isRtlLanguage, firstStrongDirection, applyTextDirection, applyContentDirection, clearContentDirection, isolateDirection, isolateLtr, APP_NAME } from './i18n/index.ts';
 import { normalizeForSearch } from './languages.ts';
 import { initLanguageSelects, renderLanguageSelect } from './languageSelect.ts';
@@ -1217,11 +1219,8 @@ window.formatFileNameMiddleTruncate = function(filename, maxLength = 26) {
 // Global States
 let activeView = 'transcribe';
 let activeSettingsCat = 'app';
-let activeLogCategory = 'All';
-let logSearchQuery = '';
 let settingsState = null;
 let compiledBackends = {};
-let allLogsArray = []; // Store raw log payloads
 let systemSpecs = null;
 
 let selectedMediaFile = null;
@@ -1229,7 +1228,6 @@ let probedMetadata = null;
 let wavPathForTranscription = null;
 let localScannedTransModels = [];
 let localScannedVadModels = [];
-let lastAppendedCategory = null;
 
 // Batch Processing State variables
 let selectedMediaFiles = [];
@@ -2244,366 +2242,37 @@ function setupHorizontalTabScroll() {
   });
 }
 
-// ----------------- UI Scaling & Zoom Engine -----------------
-let currentUiZoom = 1.0;
-let zoomSaveTimeout = null;
+// ----------------- UI Scaling & Zoom Engine + Multi-Theme Engine -----------------
+// Extracted to src/modules/themeManager.ts
+const applyUiZoom = themeManager.applyUiZoom;
+const adjustUiZoom = themeManager.adjustUiZoom;
+const setUiZoom = themeManager.setUiZoom;
+const applyTheme = themeManager.applyTheme;
+const resolveThemeConfig = themeManager.resolveTheme;
+const isMonochromeCanvasActive = themeManager.isMonochromeCanvasActive;
+const applyMonochromeCanvas = themeManager.applyMonochromeCanvas;
+const toggleTheme = themeManager.toggleTheme;
+const handleThemeSegmentClick = themeManager.handleThemeSegmentClick;
+const switchTheme = themeManager.switchTheme;
+const setupZoomKeyboardShortcuts = themeManager.setupShortcuts;
 
-async function applyUiZoom(scale, persist = true, showToast = false) {
-  let numScale = typeof scale === 'number' ? scale : parseFloat(scale);
-  if (isNaN(numScale) || numScale <= 0) {
-    numScale = 1.0;
-  }
-  // Clamp scale between 70% and 160% and round to 2 decimal places
-  numScale = Math.round(Math.min(Math.max(numScale, 0.70), 1.60) * 100) / 100;
-  currentUiZoom = numScale;
-
-  // Prefer Tauri native webview zoom (CoreWebView2 ZoomFactor on Windows, WebKitGTK zoom on Linux)
-  let nativeZoomSuccess = false;
-  if (originalInvoke) {
-    try {
-      await invoke('set_window_zoom', { scale: numScale });
-      nativeZoomSuccess = true;
-      // Clear CSS zoom when native zoom succeeds to prevent double-zoom and root shrinkage
-      document.documentElement.style.zoom = '';
-      document.body.style.zoom = '';
-    } catch (err) {
-      console.warn('[Zoom] Native set_window_zoom failed, falling back to CSS zoom:', err);
-    }
-  }
-
-  if (!nativeZoomSuccess) {
-    // Pure browser fallback outside Tauri
-    document.documentElement.style.zoom = numScale;
-    document.body.style.zoom = '';
-  }
-
-  // Update localStorage cache to prevent layout jump on next startup
-  try {
-    localStorage.setItem('whisper_ui_scale_cache', numScale.toString());
-  } catch (_) {}
-
-  // Update Settings UI Badge if present
-  const badge = document.getElementById('ui-scale-badge');
-  if (badge) {
-    badge.textContent = `${Math.round(numScale * 100)}%`;
-  }
-
-  // Update select dropdown if present
-  const selectEl = document.getElementById('opt-uiScale');
-  if (selectEl) {
-    const match = Array.from(selectEl.options).find(opt => Math.abs(parseFloat(opt.value) - numScale) < 0.01);
-    if (match) {
-      selectEl.value = match.value;
-    } else {
-      selectEl.value = numScale.toString();
-    }
-    if (window.syncCustomSelects) {
-      window.syncCustomSelects();
-    }
-  }
-
-  if (showToast && typeof showNotification === 'function') {
-    showNotification(t('toasts.uiScaleToast', { scale: Math.round(numScale * 100) }), "info");
-  }
-
-  if (persist && settingsState) {
-    settingsState.uiScale = numScale;
-    if (zoomSaveTimeout) {
-      clearTimeout(zoomSaveTimeout);
-    }
-    zoomSaveTimeout = setTimeout(() => {
-      saveCurrentSettings();
-    }, 400);
-  }
-}
-
-window.adjustUiZoom = function(delta) {
-  const newScale = Math.round((currentUiZoom + delta) * 100) / 100;
-  applyUiZoom(newScale, true, true);
-};
-
-window.setUiZoom = function(scale) {
-  applyUiZoom(scale, true, true);
-};
-
-// ----------------- Multi-Theme Engine & Registry -----------------
-const THEME_REGISTRY = {
-  'royal-blue': {
-    id: 'royal-blue',
-    label: 'Royal Blue',
-    dataTheme: 'royal-blue',
-    metaColor: '#070913',
-    toastName: 'Royal Blue (Default)',
-    iconSvg: `
-      <svg class="theme-btn-icon icon-royal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.735H5.81a1 1 0 0 1-.957-.735L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/>
-        <path d="M5 21h14"/>
-      </svg>
-    `
-  },
-  'carbon': {
-    id: 'carbon',
-    label: 'Carbon',
-    dataTheme: 'carbon',
-    metaColor: '#121214',
-    toastName: 'Carbon',
-    iconSvg: `
-      <svg class="theme-btn-icon icon-carbon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polygon points="12 2 22 12 12 22 2 12 12 2"/>
-      </svg>
-    `
-  },
-  'fire-orange': {
-    id: 'fire-orange',
-    label: 'Fiery Orange',
-    dataTheme: 'fire-orange',
-    metaColor: '#0c0a09',
-    toastName: 'Fiery Orange (Fire)',
-    iconSvg: `
-      <svg class="theme-btn-icon icon-fire" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>
-      </svg>
-    `
-  },
-  'emerald': {
-    id: 'emerald',
-    label: 'Emerald',
-    dataTheme: 'emerald',
-    metaColor: '#060e0a',
-    toastName: 'Emerald',
-    iconSvg: `
-      <svg class="theme-btn-icon icon-emerald" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M6 3h12l4 6-10 13L2 9Z"/>
-        <path d="M11 3 8 9l4 13 4-13-3-6"/>
-        <path d="M2 9h20"/>
-      </svg>
-    `
-  }
-};
-
-function resolveThemeConfig(themeName) {
-  if (themeName === 'carbon') {
-    return THEME_REGISTRY['carbon'];
-  }
-  if (themeName === 'fire' || themeName === 'fire-orange') {
-    return THEME_REGISTRY['fire-orange'];
-  }
-  if (themeName === 'emerald') {
-    return THEME_REGISTRY['emerald'];
-  }
-  if (themeName === 'cyber-blue' || themeName === 'royal-blue') {
-    return THEME_REGISTRY['royal-blue'];
-  }
-  return THEME_REGISTRY[themeName] || THEME_REGISTRY['royal-blue'];
-}
-
-const MONOCHROME_META_COLORS = {
-  'royal-blue': '#101114',
-  'cyber-blue': '#101114',
-  'carbon': '#121214',
-  'fire-orange': '#121111',
-  'fire': '#121111',
-  'emerald': '#101211'
-};
-
-function isMonochromeCanvasActive() {
-  return document.documentElement.getAttribute('data-canvas') === 'monochrome';
-}
-
-function applyMonochromeCanvas(isMonochrome, persist = true) {
-  const root = document.documentElement;
-  if (isMonochrome) {
-    root.setAttribute('data-canvas', 'monochrome');
-  } else {
-    root.removeAttribute('data-canvas');
-  }
-
-  if (persist) {
-    try {
-      localStorage.setItem('whisper_monochrome_canvas', isMonochrome ? 'true' : 'false');
-    } catch (_) {}
-  }
-
-  const monoCheck = document.getElementById('opt-monochromeCanvas');
-  if (monoCheck && monoCheck.checked !== !!isMonochrome) {
-    monoCheck.checked = !!isMonochrome;
-  }
-
-  // Sync active theme's background space and meta color
-  const currentThemeId = (window.settingsState && window.settingsState.theme)
-    ? window.settingsState.theme
-    : (localStorage.getItem('whisper_theme_cache') || 'royal-blue');
-  const config = resolveThemeConfig(currentThemeId);
-
-  if (isMonochrome) {
-    const monoBg = MONOCHROME_META_COLORS[config.id] || '#101114';
-    root.style.setProperty('--bg-space', monoBg);
-    const metaTheme = document.querySelector('meta[name="theme-color"]');
-    if (metaTheme) metaTheme.setAttribute('content', monoBg);
-  } else {
-    if (config.id === 'royal-blue') {
-      root.style.removeProperty('--bg-space');
-    } else if (config.metaColor) {
-      root.style.setProperty('--bg-space', config.metaColor);
-    }
-    const metaTheme = document.querySelector('meta[name="theme-color"]');
-    if (metaTheme && config.metaColor) {
-      metaTheme.setAttribute('content', config.metaColor);
-    }
-  }
-}
-
-window.applyMonochromeCanvas = applyMonochromeCanvas;
-window.isMonochromeCanvasActive = isMonochromeCanvasActive;
-
-function applyTheme(themeName) {
-  const root = document.documentElement;
-  const config = resolveThemeConfig(themeName);
-  const isMonochrome = isMonochromeCanvasActive();
-
-  if (config.id === 'royal-blue') {
-    root.removeAttribute('data-theme');
-    if (isMonochrome) {
-      root.style.setProperty('--bg-space', MONOCHROME_META_COLORS['royal-blue'] || '#101114');
-    } else {
-      root.style.removeProperty('--bg-space');
-    }
-  } else {
-    root.setAttribute('data-theme', config.dataTheme || config.id);
-    if (isMonochrome) {
-      root.style.setProperty('--bg-space', MONOCHROME_META_COLORS[config.id] || '#101114');
-    } else if (config.metaColor) {
-      root.style.setProperty('--bg-space', config.metaColor);
-    }
-  }
-
-  // Update localStorage cache to prevent FOUC on next startup
-  try {
-    localStorage.setItem('whisper_theme_cache', config.id);
-  } catch (_) {}
-
-  // Update theme meta color tag
-  const metaTheme = document.querySelector('meta[name="theme-color"]');
-  if (metaTheme) {
-    const effectiveColor = isMonochrome
-      ? (MONOCHROME_META_COLORS[config.id] || '#101114')
-      : config.metaColor;
-    if (effectiveColor) {
-      metaTheme.setAttribute('content', effectiveColor);
-    }
-  }
-
-  // Update theme picker cards in Settings -> App Preferences
-  const activeThemeId = config.id;
-  const themeCardMap = {
-    'royal-blue': 'theme-card-royal',
-    'carbon': 'theme-card-carbon',
-    'fire-orange': 'theme-card-fire',
-    'fire': 'theme-card-fire',
-    'emerald': 'theme-card-emerald'
-  };
-  const activeCardId = themeCardMap[activeThemeId] || 'theme-card-royal';
-
-  document.querySelectorAll('.theme-picker-card').forEach(card => {
-    const isActive = (card.id === activeCardId);
-    card.classList.toggle('active', isActive);
-    card.setAttribute('aria-checked', isActive ? 'true' : 'false');
-  });
-
-  if (window.syncCustomSelects) {
-    window.syncCustomSelects();
-  }
-}
-
-window.toggleTheme = function() {
-  const currentThemeAttr = document.documentElement.getAttribute('data-theme') || 'royal-blue';
-  let nextTheme = 'carbon';
-  if (currentThemeAttr === 'carbon') {
-    nextTheme = 'fire-orange';
-  } else if (currentThemeAttr === 'fire-orange' || currentThemeAttr === 'fire') {
-    nextTheme = 'emerald';
-  } else if (currentThemeAttr === 'emerald') {
-    nextTheme = 'royal-blue';
-  } else {
-    nextTheme = 'carbon';
-  }
-  window.switchTheme(nextTheme);
-};
-
-window.handleThemeSegmentClick = function(targetTheme) {
-  window.switchTheme(targetTheme);
-};
-
-window.switchTheme = function(themeName, animated = true) {
-  const config = resolveThemeConfig(themeName);
-
-  if (settingsState) {
-    settingsState.theme = config.id;
-    saveCurrentSettings();
-  }
-
-  const shouldAnimate = animated &&
-    !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  if (shouldAnimate) {
-    const root = document.documentElement;
-    root.classList.add('theme-transitioning');
-    applyTheme(config.id);
-    setTimeout(() => {
-      root.classList.remove('theme-transitioning');
-    }, 280);
-  } else {
-    applyTheme(config.id);
-  }
-
-  const themeKey = (config.id === 'royal-blue') ? 'royal' : (config.id === 'fire-orange' || config.id === 'fire') ? 'fire' : config.id;
-  const localizedThemeName = (typeof t === 'function' && t(`theme.${themeKey}`) !== `theme.${themeKey}`)
-    ? t(`theme.${themeKey}`)
-    : (config.toastName || config.label);
-  showNotification(t('toasts.themeSwitched', { theme: localizedThemeName }), 'info');
-};
-
-function setupZoomKeyboardShortcuts() {
-  window.addEventListener('keydown', (e) => {
-    // ESC key closes active modals and dropdowns
-    if (e.key === 'Escape') {
-      const providerModal = document.getElementById('translation-provider-modal');
-      if (providerModal && (providerModal.classList.contains('show') || providerModal.style.display === 'flex')) {
-        window.closeProviderModal();
-      }
-      const batchModal = document.getElementById('batch-error-modal');
-      if (batchModal && (batchModal.classList.contains('show') || batchModal.style.display === 'flex')) {
-        if (typeof window.resolveBatchError === 'function') {
-          window.resolveBatchError('abort');
-        }
-      }
-      const overlay = document.getElementById('app-modal-overlay');
-      if (overlay && (overlay.classList.contains('show') || overlay.style.display === 'flex')) {
-        if (window._confirmModalResolve) {
-          window.resolveAppConfirm(false);
-        } else {
-          window.closeAppModal();
-        }
-      }
-      document.querySelectorAll('.custom-select-options.open').forEach(el => {
-        el.classList.remove('open');
-      });
-    }
-
-    if (e.ctrlKey || e.metaKey) {
-      if (e.key === '=' || e.key === '+' || e.code === 'NumpadAdd' || e.code === 'Equal') {
-        e.preventDefault();
-        window.adjustUiZoom(0.05);
-      } else if (e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract' || e.code === 'Minus') {
-        e.preventDefault();
-        window.adjustUiZoom(-0.05);
-      } else if (e.key === '0' || e.code === 'Numpad0' || e.code === 'Digit0') {
-        e.preventDefault();
-        window.setUiZoom(1.0);
-      }
-    }
-  }, { passive: false });
-}
+// ----------------- Central Activity Logging Center -----------------
+// Extracted to src/modules/logsController.ts
+const appendLogToViewport = logsController.appendLogToViewport;
+const stripAnsi = logsController.stripAnsi;
+const escapeHTML = logsController.escapeHTML;
+const scrollLogsToBottom = logsController.scrollBottom;
+const scrollLogsToTop = logsController.scrollTop;
+const updateLogJumpPillVisibility = logsController.updateLogJumpPillVisibility;
+const setupLogsControls = logsController.setup;
+const filterLogs = logsController.filter;
+const handleLogSearch = logsController.search;
+const getFilteredLogs = logsController.getFilteredLogs;
+const scheduleUpdateLogsButtonsState = logsController.scheduleUpdateButtons;
+const updateLogsButtonsState = logsController.updateButtonsState;
+const redrawLogsViewport = logsController.redraw;
+const copyAllLogs = logsController.copyAll;
+const clearLogsHistory = logsController.clearHistory;
 
 async function initApp() {
   console.log("Whisper Desktop UI Initialized!");
@@ -2716,7 +2385,7 @@ async function initApp() {
           // Parse log format: [HH:MM:SS] [Category] message
           const match = line.match(/^\[(\d{2}:\d{2}:\d{2})\] \[([^\]]+)\] (.*)$/);
           if (match) {
-            allLogsArray.push({
+            logsController.push({
               timestamp: match[1],
               category: match[2],
               message: match[3]
@@ -3402,8 +3071,7 @@ function setupTauriListeners() {
     const now = new Date();
     const pad = (num) => num.toString().padStart(2, '0');
     payload.timestamp = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-    allLogsArray.push(payload);
-    if (allLogsArray.length > 10000) allLogsArray.splice(0, allLogsArray.length - 10000);
+    logsController.push(payload);
     scheduleUpdateLogsButtonsState();
     appendLogToViewport(payload);
 
@@ -3417,88 +3085,6 @@ function setupTauriListeners() {
       }
     }
   });
-}
-
-// Append log to Viewport with AutoScroll & Filtering
-function appendLogToViewport(payload, isBatchRedraw = false) {
-  // Check category filter
-  if (activeLogCategory !== 'All' && payload.category !== activeLogCategory) {
-    return;
-  }
-  
-  // Check search query
-  if (logSearchQuery !== '') {
-    const q = logSearchQuery.toLowerCase();
-    const msgMatch = Boolean(payload.message && payload.message.toLowerCase().includes(q));
-    const catMatch = Boolean(payload.category && payload.category.toLowerCase().includes(q));
-    if (!msgMatch && !catMatch) {
-      return;
-    }
-  }
-  
-  const viewport = document.getElementById('log-viewport');
-  if (!viewport) return;
-
-  if (!isBatchRedraw) {
-    const emptyState = viewport.querySelector('.log-empty-state');
-    if (emptyState) {
-      emptyState.remove();
-    }
-  }
-
-  const logLine = document.createElement('div');
-  logLine.className = 'log-line';
-  
-  const catClass = payload.category.toLowerCase();
-  logLine.dataset.category = payload.category;
-  if (payload.category === lastAppendedCategory) {
-    logLine.innerHTML = '<span class="log-time-spacer"></span><span class="log-cat-spacer"></span><span class="log-msg">' + escapeHTML(payload.message) + '</span>';
-  } else {
-    logLine.innerHTML = '<span class="log-time">' + payload.timestamp + '</span><span class="log-cat ' + catClass + '">' + payload.category.toUpperCase() + '</span><span class="log-msg">' + escapeHTML(payload.message) + '</span>';
-    lastAppendedCategory = payload.category;
-  }
-  
-  viewport.appendChild(logLine);
-  
-  // Cap DOM children in viewport to max 1500 to prevent unbounded memory bloat
-  if (viewport.children.length > 1500) {
-    viewport.removeChild(viewport.firstElementChild);
-  }
-  
-  // Batch redraws handle scrolling and pill visibility once at the end of the batch
-  if (isBatchRedraw) return;
-
-  // Handle Auto Scroll — debounced to avoid forced layout on every line
-  const autoScroll = document.getElementById('log-autoscroll')?.checked;
-  if (autoScroll) {
-    clearTimeout(viewport._scrollDebounce);
-    viewport._scrollDebounce = setTimeout(() => {
-      viewport.scrollTop = viewport.scrollHeight;
-      if (typeof updateLogJumpPillVisibility === 'function') {
-        updateLogJumpPillVisibility();
-      }
-    }, 80);
-  } else if (typeof updateLogJumpPillVisibility === 'function') {
-    updateLogJumpPillVisibility();
-  }
-}
-
-function stripAnsi(str) {
-  if (typeof str !== 'string') return '';
-  const ansiRegex = /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g;
-  return str.replace(ansiRegex, '');
-}
-
-function escapeHTML(str) {
-  return str.replace(/[&<>'"]/g, 
-    tag => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      "'": '&#39;',
-      '"': '&quot;'
-    }[tag] || tag)
-  );
 }
 
 window.selectBackend = function(backend, isInitialSelection = false) {
@@ -6323,7 +5909,7 @@ window.copyMainTranscriptToClipboard = async function() {
     showNotification(t('toasts.fileCopied'), "success");
   } catch (e) {
     // Fallback: copy Whisper logs
-    const fallback = allLogsArray
+    const fallback = logsController.allLogs
       .filter(l => l.category === 'Whisper')
       .map(l => l.message)
       .join('\n');
@@ -6360,275 +5946,6 @@ window.openOutputFolder = async function() {
 // Dispatcher alias for backward compatibility
 window.copyTranscriptToClipboard = async function() {
   await window.copyMainTranscriptToClipboard();
-};
-
-// ----------------- Central Logging Center -----------------
-let _isProgrammaticBottomScroll = false;
-let _programmaticBottomScrollTimer = null;
-
-window.scrollLogsToBottom = function(smooth = false) {
-  const viewport = document.getElementById('log-viewport');
-  if (!viewport) return;
-  const pill = document.getElementById('btn-logs-jump-bottom');
-  if (pill) {
-    pill.classList.remove('visible');
-  }
-  _isProgrammaticBottomScroll = true;
-  clearTimeout(_programmaticBottomScrollTimer);
-  _programmaticBottomScrollTimer = setTimeout(() => {
-    _isProgrammaticBottomScroll = false;
-  }, smooth ? 600 : 50);
-
-  if (smooth) {
-    viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
-  } else {
-    viewport.scrollTop = viewport.scrollHeight;
-  }
-  const autoScroll = document.getElementById('log-autoscroll');
-  if (autoScroll && !autoScroll.checked) {
-    autoScroll.checked = true;
-  }
-  updateLogJumpPillVisibility();
-};
-
-window.scrollLogsToTop = function(smooth = false) {
-  const viewport = document.getElementById('log-viewport');
-  if (!viewport) return;
-  if (smooth) {
-    viewport.scrollTo({ top: 0, behavior: 'smooth' });
-  } else {
-    viewport.scrollTop = 0;
-  }
-  const autoScroll = document.getElementById('log-autoscroll');
-  if (autoScroll) {
-    autoScroll.checked = false;
-  }
-  updateLogJumpPillVisibility();
-};
-
-function updateLogJumpPillVisibility() {
-  const viewport = document.getElementById('log-viewport');
-  const pill = document.getElementById('btn-logs-jump-bottom');
-  if (!viewport || !pill) return;
-  
-  const distanceFromBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
-  const isScrollable = viewport.scrollHeight > viewport.clientHeight + 60;
-  
-  if (isScrollable && distanceFromBottom > 140) {
-    pill.classList.add('visible');
-  } else {
-    pill.classList.remove('visible');
-  }
-}
-
-function setupLogsControls() {
-  const logViewport = document.getElementById('log-viewport');
-  if (logViewport && !logViewport._scrollHandlerAttached) {
-    logViewport._scrollHandlerAttached = true;
-    let scrollRaf = null;
-
-    logViewport.addEventListener('wheel', (e) => {
-      if (e.deltaY < 0) {
-        _isProgrammaticBottomScroll = false;
-        const autoScrollEl = document.getElementById('log-autoscroll');
-        if (autoScrollEl && autoScrollEl.checked) {
-          autoScrollEl.checked = false;
-        }
-      }
-    }, { passive: true });
-
-    logViewport.addEventListener('scroll', () => {
-      if (scrollRaf) return;
-      scrollRaf = requestAnimationFrame(() => {
-        scrollRaf = null;
-        const autoScrollEl = document.getElementById('log-autoscroll');
-        const distanceFromBottom = logViewport.scrollHeight - logViewport.scrollTop - logViewport.clientHeight;
-        if (!_isProgrammaticBottomScroll && distanceFromBottom > 140) {
-          if (autoScrollEl && autoScrollEl.checked) {
-            autoScrollEl.checked = false;
-          }
-        }
-        updateLogJumpPillVisibility();
-      });
-    }, { passive: true });
-  }
-
-  const autoScrollEl = document.getElementById('log-autoscroll');
-  if (autoScrollEl && !autoScrollEl._changeHandlerAttached) {
-    autoScrollEl._changeHandlerAttached = true;
-    autoScrollEl.addEventListener('change', () => {
-      if (autoScrollEl.checked) {
-        window.scrollLogsToBottom(true);
-      }
-    });
-  }
-}
-
-window.filterLogs = function(category) {
-  activeLogCategory = category;
-  
-  // Toggle filter tabs
-  const filters = document.querySelectorAll('.filter-btn');
-  filters.forEach(btn => {
-    btn.classList.remove('active');
-    if (btn.id === `log-filter-${category}`) {
-      btn.classList.add('active');
-    }
-  });
-  
-  redrawLogsViewport();
-};
-
-window.handleLogSearch = function() {
-  const searchInput = document.getElementById('log-search');
-  if (searchInput) applyDynamicDirection(searchInput);
-  if (window.handleLogSearch._timer) clearTimeout(window.handleLogSearch._timer);
-  window.handleLogSearch._timer = setTimeout(() => {
-    window.handleLogSearch._timer = null;
-    logSearchQuery = searchInput ? searchInput.value.toLowerCase().trim() : '';
-    redrawLogsViewport();
-  }, 120);
-};
-
-function getFilteredLogs() {
-  if (!allLogsArray || allLogsArray.length === 0) return [];
-  let logs = allLogsArray;
-  if (activeLogCategory !== 'All') {
-    logs = logs.filter(l => l.category === activeLogCategory);
-  }
-  if (logSearchQuery) {
-    const query = logSearchQuery.toLowerCase();
-    logs = logs.filter(l => 
-      (l.message && l.message.toLowerCase().includes(query)) || 
-      (l.category && l.category.toLowerCase().includes(query))
-    );
-  }
-  return logs;
-}
-
-let _updateLogsButtonsTimer = null;
-function scheduleUpdateLogsButtonsState() {
-  if (_updateLogsButtonsTimer) return;
-  _updateLogsButtonsTimer = setTimeout(() => {
-    _updateLogsButtonsTimer = null;
-    updateLogsButtonsState();
-  }, 100);
-}
-
-function updateLogsButtonsState() {
-  const hasAnyLogs = Boolean(allLogsArray && allLogsArray.length > 0);
-  const filteredLogs = getFilteredLogs();
-  const hasFilteredLogs = filteredLogs.length > 0;
-
-  const btnScrollTop = document.getElementById('btn-scroll-top-logs');
-  if (btnScrollTop) {
-    btnScrollTop.disabled = !hasFilteredLogs;
-  }
-  const btnScrollBottom = document.getElementById('btn-scroll-bottom-logs');
-  if (btnScrollBottom) {
-    btnScrollBottom.disabled = !hasFilteredLogs;
-  }
-
-  const btnCopy = document.getElementById('btn-copy-all-logs');
-  if (btnCopy) {
-    btnCopy.disabled = !hasFilteredLogs;
-    let copyTitle = t('logs.copyBtn');
-    if (!hasAnyLogs) {
-      copyTitle = t('toasts.noLogsToCopy');
-    } else if (!hasFilteredLogs) {
-      copyTitle = t('toasts.noMatchingLogsToCopy');
-    }
-    btnCopy.setAttribute('title', copyTitle);
-  }
-  const btnClear = document.getElementById('btn-clear-all-logs');
-  if (btnClear) {
-    btnClear.disabled = !hasAnyLogs;
-    btnClear.setAttribute('title', hasAnyLogs ? t('logs.clearBtn') : t('toasts.noLogsToCopy'));
-  }
-}
-
-function redrawLogsViewport() {
-  if (_updateLogsButtonsTimer) {
-    clearTimeout(_updateLogsButtonsTimer);
-    _updateLogsButtonsTimer = null;
-  }
-  lastAppendedCategory = null;
-  const viewport = document.getElementById('log-viewport');
-  updateLogsButtonsState();
-  if (!viewport) return;
-  viewport.innerHTML = '';
-  
-  // Render the last 1500 logs to ensure responsive DOM performance
-  const logsToRender = allLogsArray.slice(-1500);
-  logsToRender.forEach(payload => {
-    appendLogToViewport(payload, true);
-  });
-
-  if (viewport.children.length === 0) {
-    const hasAnyLogs = Boolean(allLogsArray && allLogsArray.length > 0);
-    const emptyKey = hasAnyLogs ? 'logs.noMatchingLogs' : 'logs.emptyLogs';
-    viewport.innerHTML = `
-      <div class="log-empty-state">
-        <svg class="log-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
-        </svg>
-        <div class="log-empty-text" data-i18n="${emptyKey}">${escapeHTML(t(emptyKey))}</div>
-      </div>
-    `;
-  }
-
-  const autoScroll = document.getElementById('log-autoscroll');
-  if (autoScroll && autoScroll.checked) {
-    requestAnimationFrame(() => {
-      viewport.scrollTop = viewport.scrollHeight;
-      updateLogJumpPillVisibility();
-    });
-  } else {
-    updateLogJumpPillVisibility();
-  }
-}
-
-window.copyAllLogs = async function() {
-  const filteredLogs = getFilteredLogs();
-  if (!filteredLogs || filteredLogs.length === 0) {
-    const hasAnyLogs = Boolean(allLogsArray && allLogsArray.length > 0);
-    showNotification(hasAnyLogs ? t('toasts.noMatchingLogsToCopy') : t('toasts.noLogsToCopy'), "warning");
-    return;
-  }
-  const rawLogs = filteredLogs.map(l => `[${l.timestamp}] [${l.category}] ${l.message}`).join('\n');
-  if (!rawLogs.trim()) {
-    showNotification(t('toasts.noLogsToCopy'), "warning");
-    return;
-  }
-  try {
-    await copyToClipboard(rawLogs);
-    if (activeLogCategory === 'Whisper') {
-      showNotification(t('toasts.logsCopiedWhisper'), "success");
-    } else if (activeLogCategory === 'Translate') {
-      showNotification(t('toasts.logsCopiedTranslate'), "success");
-    } else if (activeLogCategory !== 'All' || logSearchQuery) {
-      showNotification(t('toasts.logsCopiedFiltered', { count: filteredLogs.length }), "success");
-    } else {
-      showNotification(t('toasts.logsCopied'), "success");
-    }
-  } catch (e) {
-    const msg = (e && (e.message || e.toString())) || String(e);
-    showNotification(t('toasts.logsCopyError', { error: msg }), "error");
-  }
-};
-
-window.clearLogsHistory = async function() {
-  if (!allLogsArray || allLogsArray.length === 0) return;
-  const confirmed = await showConfirmModal(
-    t('modals.confirmClearLogsTitle'),
-    t('modals.confirmClearLogsDesc'),
-    t('modals.confirmClearLogsBtn')
-  );
-  if (!confirmed) return;
-  allLogsArray = [];
-  lastAppendedCategory = null;
-  await invoke('clear_logs');
-  redrawLogsViewport();
 };
 
 // ----------------- Batch Processing Queue Helpers & Engine -----------------
@@ -7901,9 +7218,6 @@ async function handleDroppedFiles(rawFiles) {
 }
 
 
-// ----------------- Models Logic -----------------
-// ----------------- Models Logic -----------------
-let currentCategoryFilter = 'recommended';
 let currentModelQuickFilter = 'all';
 
 /**
@@ -9222,6 +8536,8 @@ window.copyLiveTranscriptToClipboard = async function() {
 };
 
 window.copyEditorTranscriptToClipboard = window.copyLiveTranscriptToClipboard;
+
+
 
 // ----------------- AI Translation Configuration & Providers Handling -----------------
 window.populateProvidersDropdown = function() {
