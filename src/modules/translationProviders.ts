@@ -75,7 +75,7 @@ declare global {
     toggleTranslationSubSettingsVisibility: () => void;
     translationStudioController?: any;
     settingsState: any;
-    saveCurrentSettings: () => void;
+    saveCurrentSettings: (immediate?: boolean) => any;
     showNotification: (msg: string, type: string) => void;
     showConfirmModal: (title: string, message: string, confirmButtonText?: string | null) => Promise<boolean>;
     updateTranscribeUIConfigs: () => void;

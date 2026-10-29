@@ -45,7 +45,7 @@ declare global {
     setTranscribeStatusBadge: (status: string, text: string) => void;
     updateTranscribeWorkflowButtons: () => void;
     updateTranscribeActionButtons: (running: boolean) => void;
-    saveCurrentSettings: () => void;
+    saveCurrentSettings: (immediate?: boolean) => any;
     showNotification: (msg: string, type: string) => void;
     switchView: (view: string) => void;
     sendTranscribeToTranslationStudio: () => Promise<void>;
