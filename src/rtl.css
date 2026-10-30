@@ -176,7 +176,7 @@ html[dir="rtl"] .setting-desc-point::before {
 /* 4. Form Controls & Inputs */
 /* Fields that carry their own direction — dir="auto" in the markup, or one set
    from the content by the shared direction helper (applyTextDirection in i18n,
-   applyDynamicDirection in main.js) — are excluded here: an author rule outranks
+   applyDynamicDirection in main.ts / appNavigation) — are excluded here: an author rule outranks
    the dir attribute, which was forcing English subtitle cues and prompt text to
    render right-to-left inside the RTL interface. Leaving them to their attribute
    is also what keeps Persian cues right-aligned, since dir="auto" resolves from

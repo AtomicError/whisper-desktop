@@ -2,35 +2,32 @@
  * Whisper Desktop - Main Application Bootstrap & Entry Point
  */
 
-import { hardsubController } from './hardsub.ts';
-import { translationStudioController } from './translationStudio.ts';
-import { logsController } from './modules/logsController.ts';
-import { themeManager } from './modules/themeManager.ts';
-import { modelHub } from './modules/modelHub.ts';
-import { transcriptViewer } from './modules/transcriptViewer.ts';
-import { customSelectsMap, initializeCustomSelects, syncCustomSelects } from './modules/customSelect.ts';
+import './hardsub';
+import './translationStudio';
+import { logsController } from './modules/logsController';
+import { themeManager } from './modules/themeManager';
+import { modelHub } from './modules/modelHub';
+import { transcriptViewer } from './modules/transcriptViewer';
+import { initializeCustomSelects, syncCustomSelects } from './modules/customSelect';
 import {
   batchProcessor,
   updateBatchSpecs,
   renderBatchQueueTable
-} from './modules/batchProcessor.ts';
+} from './modules/batchProcessor';
 import {
   translationProviders,
   setupTranslationEventListeners
-} from './modules/translationProviders.ts';
+} from './modules/translationProviders';
 import {
-  appModal,
   syncAppVersionUI,
   renderUpdateCheckerUI
-} from './modules/appModal.ts';
+} from './modules/appModal';
 import {
-  nativeWindow,
   setupTitlebar,
   formatLocalizedTimeDuration,
   updateMediaCardName
-} from './modules/nativeWindow.ts';
+} from './modules/nativeWindow';
 import {
-  settingsManager,
   settingsState,
   refreshSettings,
   refreshBuildStatuses,
@@ -39,14 +36,11 @@ import {
   updateTranscribeUIConfigs,
   setupQuickConfigDeckEventListeners,
   saveCurrentSettings
-} from './modules/settingsManager.ts';
+} from './modules/settingsManager';
 import {
-  workflowBridge,
-  updateTranscribeWorkflowButtons,
   updateTranscribeActionButtons
-} from './modules/workflowBridge.ts';
+} from './modules/workflowBridge';
 import {
-  transcribePipeline,
   getSelectedMediaFile,
   getProbedMetadata,
   getWavPathForTranscription,
@@ -57,14 +51,13 @@ import {
   setIsTranscribing,
   setupTranscribeDragAndDrop,
   renderMediaMetadata
-} from './modules/transcribePipeline.ts';
+} from './modules/transcribePipeline';
 import {
   invoke,
   listen,
   openUrl,
-  setupTauriListeners,
-  cleanupTauriListeners
-} from './modules/tauriEvents.ts';
+  setupTauriListeners
+} from './modules/tauriEvents';
 import {
   getActiveView,
   switchView,
@@ -76,30 +69,33 @@ import {
   refreshDynamicDirectionInputs,
   applyDynamicDirection,
   getCurrentSourceMediaFile
-} from './modules/appNavigation.ts';
-import { initI18n, t, getLanguage, isRtlLanguage, isolateDirection, APP_NAME } from './i18n/index.ts';
+} from './modules/appNavigation';
+import { initI18n, t, getLanguage, isRtlLanguage } from './i18n/index';
+import type { SystemSpecs } from './modelRecommender';
 
 // Global error catcher for visual debugging in frontend
-window.onerror = function(message, source, lineno, colno, error) {
-  const errDiv = document.createElement('div');
-  errDiv.style.position = 'fixed';
-  errDiv.style.top = '0';
-  errDiv.style.left = '0';
-  errDiv.style.width = '100%';
-  errDiv.style.background = '#ef4444';
-  errDiv.style.color = 'white';
-  errDiv.style.zIndex = '100000';
-  errDiv.style.padding = '16px';
-  errDiv.style.fontFamily = 'monospace';
-  errDiv.style.fontSize = '14px';
-  errDiv.style.boxShadow = '0 4px 12px rgba(0,0,0,0.5)';
-  errDiv.innerHTML = `<strong>Frontend Error:</strong> ${message}<br><small>at ${source}:${lineno}:${colno}</small>`;
-  document.body.appendChild(errDiv);
-  return false;
-};
+if (typeof window !== 'undefined') {
+  window.onerror = function(message: string | Event, source?: string, lineno?: number, colno?: number, error?: Error): boolean {
+    const errDiv = document.createElement('div');
+    errDiv.style.position = 'fixed';
+    errDiv.style.top = '0';
+    errDiv.style.left = '0';
+    errDiv.style.width = '100%';
+    errDiv.style.background = '#ef4444';
+    errDiv.style.color = 'white';
+    errDiv.style.zIndex = '100000';
+    errDiv.style.padding = '16px';
+    errDiv.style.fontFamily = 'monospace';
+    errDiv.style.fontSize = '14px';
+    errDiv.style.boxShadow = '0 4px 12px rgba(0,0,0,0.5)';
+    errDiv.innerHTML = `<strong>Frontend Error:</strong> ${message}<br><small>at ${source}:${lineno}:${colno}</small>`;
+    document.body.appendChild(errDiv);
+    return false;
+  };
+}
 
 // Global system specifications cache
-let systemSpecs = null;
+let systemSpecs: SystemSpecs | null = null;
 
 // Cross-module backward compatibility proxies on window
 if (typeof window !== 'undefined') {
@@ -115,62 +111,62 @@ if (typeof window !== 'undefined') {
   Object.defineProperties(window, {
     transcriptLines: {
       get() { return transcriptViewer.lines; },
-      set(val) { transcriptViewer.lines = val; },
+      set(val: any[]) { transcriptViewer.lines = val; },
       configurable: true
     },
     wavPathForTranscription: {
       get() { return getWavPathForTranscription(); },
-      set(val) { setWavPathForTranscription(val); },
+      set(val: string | null) { setWavPathForTranscription(val); },
       configurable: true
     },
     isTranscribing: {
       get() { return getIsTranscribing(); },
-      set(val) { setIsTranscribing(val); },
+      set(val: boolean) { setIsTranscribing(val); },
       configurable: true
     },
     selectedMediaFile: {
       get() { return getSelectedMediaFile(); },
-      set(val) { setSelectedMediaFile(val); },
+      set(val: string | null) { setSelectedMediaFile(val); },
       configurable: true
     },
     probedMetadata: {
       get() { return getProbedMetadata(); },
-      set(val) { setProbedMetadata(val); },
+      set(val: any) { setProbedMetadata(val); },
       configurable: true
     },
     isBatchMode: {
       get() { return batchProcessor.getIsBatchMode(); },
-      set(val) { batchProcessor.setIsBatchMode(val); },
+      set(val: boolean) { batchProcessor.setIsBatchMode(val); },
       configurable: true
     },
     isBatchExtracting: {
       get() { return batchProcessor.getIsExtracting(); },
-      set(val) { batchProcessor.setIsExtracting(val); },
+      set(val: boolean) { batchProcessor.setIsExtracting(val); },
       configurable: true
     },
     batchItems: {
       get() { return batchProcessor.getItems(); },
-      set(val) { batchProcessor.setItems(val); },
+      set(val: any[]) { batchProcessor.setItems(val); },
       configurable: true
     },
     batchProcessingIndex: {
       get() { return batchProcessor.getProcessingIndex(); },
-      set(val) { batchProcessor.setProcessingIndex(val); },
+      set(val: number) { batchProcessor.setProcessingIndex(val); },
       configurable: true
     },
     activeBatchViewerIndex: {
       get() { return batchProcessor.getActiveViewerIndex(); },
-      set(val) { batchProcessor.setActiveViewerIndex(val); },
+      set(val: number) { batchProcessor.setActiveViewerIndex(val); },
       configurable: true
     },
     selectedMediaFiles: {
       get() { return batchProcessor.getSelectedFiles(); },
-      set(val) { batchProcessor.setSelectedFiles(val); },
+      set(val: string[]) { batchProcessor.setSelectedFiles(val); },
       configurable: true
     },
     systemSpecs: {
       get() { return systemSpecs; },
-      set(val) { systemSpecs = val; },
+      set(val: SystemSpecs | null) { systemSpecs = val; },
       configurable: true
     }
   });
@@ -194,13 +190,10 @@ window.addEventListener('whisper:languageChanged', () => {
     renderMediaMetadata(curMetadata);
   }
 
-  if (batchProcessor.getIsBatchMode() && Array.isArray(batchProcessor.getItems()) && batchProcessor.getItems().length > 0) {
-    const fileNameEl = document.getElementById('lbl-file-name');
-    if (fileNameEl) {
-      fileNameEl.textContent = t('transcribe.batchModeActive');
-      fileNameEl.removeAttribute('title');
-    }
+  const hasBatchItems = batchProcessor.getIsBatchMode() && Array.isArray(batchProcessor.getItems()) && batchProcessor.getItems().length > 0;
+  if (hasBatchItems) {
     renderBatchQueueTable();
+    updateBatchSpecs();
   }
 
   const msgEl = document.getElementById('lbl-radial-msg');
@@ -239,6 +232,7 @@ window.addEventListener('whisper:languageChanged', () => {
       filePathEl.textContent = t('transcribe.selectFilePrompt');
     } else if (batchProcessor.getIsBatchMode() && batchProcessor.getItems().length > 0) {
       fileNameEl.textContent = `${batchProcessor.getItems().length} ${t('transcribe.queueFiles')}`;
+      fileNameEl.removeAttribute('title');
     }
   }
 
@@ -251,15 +245,10 @@ window.addEventListener('whisper:languageChanged', () => {
     }
   }
 
-  if (batchProcessor.getItems() && batchProcessor.getItems().length > 0) {
-    renderBatchQueueTable();
-    updateBatchSpecs();
-  }
-
   updateTranscribeUIConfigs();
   refreshDynamicDirectionInputs();
 
-  const settingsBackendSelect = document.getElementById('opt-selectedBackend');
+  const settingsBackendSelect = document.getElementById('opt-selectedBackend') as HTMLSelectElement | null;
   if (settingsBackendSelect) {
     Array.from(settingsBackendSelect.options).forEach(opt => {
       if (opt.value === 'Standard') opt.textContent = t('transcribe.backendCpu');
@@ -275,7 +264,7 @@ window.addEventListener('whisper:languageChanged', () => {
     window.filterModelsTable(0);
   }
 
-  const settingsSearchInput = document.getElementById('settings-search-input');
+  const settingsSearchInput = document.getElementById('settings-search-input') as HTMLInputElement | null;
   if (settingsSearchInput && settingsSearchInput.value && typeof window.filterSettings === 'function') {
     window.filterSettings(settingsSearchInput.value);
   }
@@ -286,12 +275,12 @@ window.addEventListener('whisper:languageChanged', () => {
 /**
  * Main application initializer
  */
-export async function initApp() {
+export async function initApp(): Promise<void> {
   console.log("Whisper Desktop UI Initialized!");
 
   const splashStartTime = performance.now();
   let splashDismissed = false;
-  let splashFailSafeTimer = null;
+  let splashFailSafeTimer: ReturnType<typeof setTimeout> | null = null;
 
   const dismissSplashCurtain = () => {
     if (splashDismissed) return;
@@ -331,8 +320,8 @@ export async function initApp() {
   initI18n();
 
   // Desktop native feel: disable context menu outside inputs/textareas
-  document.addEventListener('contextmenu', e => {
-    const target = e.target;
+  document.addEventListener('contextmenu', (e: MouseEvent) => {
+    const target = e.target as HTMLElement | null;
     if (!target || !target.closest('input, textarea')) {
       e.preventDefault();
     }
@@ -342,8 +331,8 @@ export async function initApp() {
   setupTitlebar();
 
   // Scroll active class helper
-  document.addEventListener('scroll', (e) => {
-    const target = e.target;
+  document.addEventListener('scroll', (e: Event) => {
+    const target = e.target as (HTMLElement & { _scrollTimer?: ReturnType<typeof setTimeout> }) | null;
     if (target && target.classList && typeof target.classList.add === 'function') {
       target.classList.add('scrolling-active');
       clearTimeout(target._scrollTimer);
@@ -383,7 +372,7 @@ export async function initApp() {
   // Load existing logs
   try {
     const logs = await invoke('get_logs');
-    if (logs) {
+    if (logs && typeof logs === 'string') {
       const lines = logs.trim().split('\n');
       for (const line of lines) {
         if (line.trim()) {

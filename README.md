@@ -420,7 +420,7 @@ The interface never talks to an engine directly: every action goes through Rust 
 whisper-desktop/
 ├── src/                                   # Frontend
 │   ├── index.html                         # Application shell and all views
-│   ├── main.js                            # UI state, i18n wiring, Tauri IPC bridge
+│   ├── main.ts                            # UI state, i18n wiring, Tauri IPC bridge
 │   ├── styles.css                         # Design system and theme tokens
 │   ├── rtl.css                            # Right-to-left layout overrides
 │   ├── hardsub.ts                         # Hardsub preview renderer and controller

@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
@@ -929,8 +929,9 @@ describe('Transcription Studio Output Directory & Workflow Logic', () => {
     expect(rtlContent).toContain('.batch-card-duration');
   });
 
-  it('verifies interactive batch item selection, transcript switching, and toolbar bridging in main.js and locales', () => {
-    const mainJsContent = readFileSync(resolve(__dirname, 'main.js'), 'utf-8');
+  it('verifies interactive batch item selection, transcript switching, and toolbar bridging in main.ts and locales', () => {
+    const mainPath = existsSync(resolve(__dirname, 'main.ts')) ? resolve(__dirname, 'main.ts') : resolve(__dirname, 'main.js');
+    const mainContent = readFileSync(mainPath, 'utf-8');
     const batchContent = readFileSync(resolve(__dirname, 'modules/batchProcessor.ts'), 'utf-8');
 
     // Verification of active batch viewer state tracking and select function
@@ -974,7 +975,7 @@ When you cut off the root of an onion,
 it releases chemicals that hit your eyes
 `;
 
-    // Simulate SRT parser logic implemented in main.js
+    // Simulate SRT parser logic implemented in main.ts / transcriptViewer
     const lines = rawSrt.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
     let i = 0;
     const total = lines.length;
@@ -1461,9 +1462,18 @@ it releases chemicals that hit your eyes
     }
   });
 
-  it('guarantees src/main.js has zero parse or syntax errors for runtime load stability', () => {
-    const mainJsPath = resolve(__dirname, 'main.js');
-    expect(() => execSync(`node --check "${mainJsPath}"`, { stdio: 'pipe' })).not.toThrow();
+  it('guarantees src/main.ts has zero parse or syntax errors for runtime load stability', () => {
+    const mainPath = existsSync(resolve(__dirname, 'main.ts')) ? resolve(__dirname, 'main.ts') : resolve(__dirname, 'main.js');
+    if (mainPath.endsWith('.ts')) {
+      try {
+        execSync(`node --check "${mainPath}"`, { stdio: 'pipe' });
+      } catch {
+        // Fallback for Node 22 requiring explicit experimental strip types flag
+        expect(() => execSync(`node --experimental-strip-types --check "${mainPath}"`, { stdio: 'pipe' })).not.toThrow();
+      }
+    } else {
+      expect(() => execSync(`node --check "${mainPath}"`, { stdio: 'pipe' })).not.toThrow();
+    }
   });
 });
 

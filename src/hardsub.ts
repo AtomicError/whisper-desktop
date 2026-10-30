@@ -2022,7 +2022,7 @@ export class HardsubController {
       this.updateFfmpegCommandPreview();
     });
 
-    // Copy FFmpeg Command Button (uses global multi-tier clipboard helper from main.js)
+    // Copy FFmpeg Command Button (uses global multi-tier clipboard helper from main.ts / nativeWindow)
     this.on(this.btnCopyFfmpegCmd, 'click', async () => {
       const text = this.ffmpegCmdPreview?.textContent?.trim();
       if (!text) return;
