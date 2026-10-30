@@ -43,12 +43,6 @@ import {
 import {
   getSelectedMediaFile,
   getProbedMetadata,
-  getWavPathForTranscription,
-  getIsTranscribing,
-  setSelectedMediaFile,
-  setProbedMetadata,
-  setWavPathForTranscription,
-  setIsTranscribing,
   setupTranscribeDragAndDrop,
   renderMediaMetadata
 } from './modules/transcribePipeline';
@@ -112,56 +106,6 @@ if (typeof window !== 'undefined') {
     transcriptLines: {
       get() { return transcriptViewer.lines; },
       set(val: any[]) { transcriptViewer.lines = val; },
-      configurable: true
-    },
-    wavPathForTranscription: {
-      get() { return getWavPathForTranscription(); },
-      set(val: string | null) { setWavPathForTranscription(val); },
-      configurable: true
-    },
-    isTranscribing: {
-      get() { return getIsTranscribing(); },
-      set(val: boolean) { setIsTranscribing(val); },
-      configurable: true
-    },
-    selectedMediaFile: {
-      get() { return getSelectedMediaFile(); },
-      set(val: string | null) { setSelectedMediaFile(val); },
-      configurable: true
-    },
-    probedMetadata: {
-      get() { return getProbedMetadata(); },
-      set(val: any) { setProbedMetadata(val); },
-      configurable: true
-    },
-    isBatchMode: {
-      get() { return batchProcessor.getIsBatchMode(); },
-      set(val: boolean) { batchProcessor.setIsBatchMode(val); },
-      configurable: true
-    },
-    isBatchExtracting: {
-      get() { return batchProcessor.getIsExtracting(); },
-      set(val: boolean) { batchProcessor.setIsExtracting(val); },
-      configurable: true
-    },
-    batchItems: {
-      get() { return batchProcessor.getItems(); },
-      set(val: any[]) { batchProcessor.setItems(val); },
-      configurable: true
-    },
-    batchProcessingIndex: {
-      get() { return batchProcessor.getProcessingIndex(); },
-      set(val: number) { batchProcessor.setProcessingIndex(val); },
-      configurable: true
-    },
-    activeBatchViewerIndex: {
-      get() { return batchProcessor.getActiveViewerIndex(); },
-      set(val: number) { batchProcessor.setActiveViewerIndex(val); },
-      configurable: true
-    },
-    selectedMediaFiles: {
-      get() { return batchProcessor.getSelectedFiles(); },
-      set(val: string[]) { batchProcessor.setSelectedFiles(val); },
       configurable: true
     },
     systemSpecs: {

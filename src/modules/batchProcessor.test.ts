@@ -246,7 +246,16 @@ describe('batchProcessor module', () => {
       expect(batchProcessor.getItems()).toHaveLength(1);
       expect(batchProcessor.getItems()[0].name).toBe('test.mp4');
 
-      window.selectedMediaFiles = ['/test.mp4'];
+      // Verify defensive copy prevents external mutation
+      sampleItems.push({ path: '/mutated.mp4', name: 'mutated.mp4', status: 'pending' as const });
+      expect(batchProcessor.getItems()).toHaveLength(1);
+
+      window.selectedMediaFiles = ['  /test.mp4  ', '', '   ', 123 as any];
+      expect(batchProcessor.getSelectedFiles()).toEqual(['/test.mp4']);
+
+      // Verify defensive copy prevents external mutation on selectedMediaFiles
+      const filesRef = batchProcessor.getSelectedFiles();
+      filesRef.push('/pushed.mp4');
       expect(batchProcessor.getSelectedFiles()).toEqual(['/test.mp4']);
 
       window.activeBatchViewerIndex = 0;

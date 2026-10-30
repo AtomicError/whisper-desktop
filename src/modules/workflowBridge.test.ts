@@ -14,7 +14,9 @@ import {
   updateTranscribeWorkflowButtons,
   updateTranscribeActionButtons,
   sendTranscribeToTranslationStudio,
-  sendTranscribeToHardsubStudio
+  sendTranscribeToHardsubStudio,
+  isSupportedVideoFile,
+  SUPPORTED_COMPANION_VIDEO_EXTENSIONS
 } from './workflowBridge';
 
 class MockElement {
@@ -152,6 +154,10 @@ describe('workflowBridge module', () => {
       expect(getLastTranscribedOutputFiles()).toEqual(files);
       expect((globalThis as any).window.lastTranscribedOutputFiles).toEqual(files);
 
+      // Verify defensive copy prevents external mutation
+      files.push({ name: 'mutation.srt', path: '/mutation.srt', type: 'subtitle' });
+      expect(getLastTranscribedOutputFiles()).toHaveLength(1);
+
       // Test reverse reactivity from window mutation (e.g. from batchProcessor)
       const batchFiles = [{ name: 'batch.srt', path: '/batch.srt', type: 'subtitle' }];
       (globalThis as any).window.lastTranscribedOutputFiles = batchFiles;
@@ -159,6 +165,78 @@ describe('workflowBridge module', () => {
 
       setLastTranscribedOutputFiles(null as any);
       expect(getLastTranscribedOutputFiles()).toEqual([]);
+    });
+
+    it('normalizes non-string path arguments to null defensively and trims strings', () => {
+      setLastTranscribedSubtitlePath(123 as any);
+      expect(getLastTranscribedSubtitlePath()).toBe(null);
+
+      setLastTranscribedSubtitlePath('');
+      expect(getLastTranscribedSubtitlePath()).toBe(null);
+
+      setLastTranscribedSubtitlePath('   ');
+      expect(getLastTranscribedSubtitlePath()).toBe(null);
+
+      setLastTranscribedSubtitlePath('  /output/trimmed.srt  ');
+      expect(getLastTranscribedSubtitlePath()).toBe('/output/trimmed.srt');
+
+      setLastTranscribedVideoPath({ invalid: true } as any);
+      expect(getLastTranscribedVideoPath()).toBe(null);
+
+      setLastTranscribedVideoPath('');
+      expect(getLastTranscribedVideoPath()).toBe(null);
+
+      setLastTranscribedVideoPath('  /media/trimmed.mp4  ');
+      expect(getLastTranscribedVideoPath()).toBe('/media/trimmed.mp4');
+
+      setLastTranscribedOutputDir(undefined as any);
+      expect(getLastTranscribedOutputDir()).toBe(null);
+
+      setLastTranscribedOutputDir('   ');
+      expect(getLastTranscribedOutputDir()).toBe(null);
+
+      setLastTranscribedOutputDir('  /output/trimmed_dir  ');
+      expect(getLastTranscribedOutputDir()).toBe('/output/trimmed_dir');
+    });
+
+    it('prevents maximum call stack recursion when window properties delegate to getters/setters', () => {
+      Object.defineProperties(globalThis, {
+        lastTranscribedSubtitlePath: {
+          get() { return getLastTranscribedSubtitlePath(); },
+          set(val: string | null) { setLastTranscribedSubtitlePath(val); },
+          configurable: true
+        },
+        lastTranscribedVideoPath: {
+          get() { return getLastTranscribedVideoPath(); },
+          set(val: string | null) { setLastTranscribedVideoPath(val); },
+          configurable: true
+        },
+        lastTranscribedOutputDir: {
+          get() { return getLastTranscribedOutputDir(); },
+          set(val: string | null) { setLastTranscribedOutputDir(val); },
+          configurable: true
+        },
+        lastTranscribedOutputFiles: {
+          get() { return getLastTranscribedOutputFiles(); },
+          set(val: any[]) { setLastTranscribedOutputFiles(val); },
+          configurable: true
+        }
+      });
+
+      // Calling getters must not trigger RangeError: Maximum call stack size exceeded
+      expect(() => getLastTranscribedSubtitlePath()).not.toThrow();
+      expect(() => getLastTranscribedVideoPath()).not.toThrow();
+      expect(() => getLastTranscribedOutputDir()).not.toThrow();
+      expect(() => getLastTranscribedOutputFiles()).not.toThrow();
+
+      // Setting via function or window must synchronize without recursion
+      setLastTranscribedSubtitlePath('/output/recursion_test.srt');
+      expect(getLastTranscribedSubtitlePath()).toBe('/output/recursion_test.srt');
+      expect((globalThis as any).window.lastTranscribedSubtitlePath).toBe('/output/recursion_test.srt');
+
+      (globalThis as any).window.lastTranscribedVideoPath = '/media/recursion_test.mp4';
+      expect(getLastTranscribedVideoPath()).toBe('/media/recursion_test.mp4');
+      expect((globalThis as any).window.lastTranscribedVideoPath).toBe('/media/recursion_test.mp4');
     });
   });
 
@@ -306,6 +384,54 @@ describe('workflowBridge module', () => {
 
       expect(mockPrefill).toHaveBeenCalledWith('/media/interview.mkv', '/output/interview.srt');
       expect(mockSwitchView).toHaveBeenCalledWith('hardsub');
+    });
+
+    it('supports extended video formats and suppresses audio-only formats for companion video', async () => {
+      expect(isSupportedVideoFile('/media/clip.ts')).toBe(true);
+      expect(isSupportedVideoFile('/media/clip.WMV')).toBe(true);
+      expect(isSupportedVideoFile('/media/clip.flv')).toBe(true);
+      expect(isSupportedVideoFile('/media/clip.m4v')).toBe(true);
+      expect(isSupportedVideoFile('  /media/clip.mp4  ')).toBe(true);
+      expect(isSupportedVideoFile('   ')).toBe(false);
+      expect(isSupportedVideoFile('/media/audio.mp3')).toBe(false);
+      expect(isSupportedVideoFile('/media/voice.wav')).toBe(false);
+      expect(isSupportedVideoFile('')).toBe(false);
+      expect(isSupportedVideoFile(null)).toBe(false);
+
+      // Verify extended video format (.ts) is forwarded to Translation Studio
+      setLastTranscribedSubtitlePath('/output/broadcast.srt');
+      setLastTranscribedVideoPath('/media/broadcast.ts');
+      const mockSetCompanionTs = vi.fn();
+      (globalThis as any).window.translationStudioController = {
+        loadSubtitleFile: vi.fn().mockResolvedValue(undefined),
+        setCompanionVideo: mockSetCompanionTs
+      };
+      await sendTranscribeToTranslationStudio();
+      expect(mockSetCompanionTs).toHaveBeenCalledWith('/media/broadcast.ts');
+
+      // Verify audio-only file (.wav) is NOT set as companion video in Translation Studio
+      setLastTranscribedVideoPath('/media/podcast.wav');
+      const mockSetCompanionAudio = vi.fn();
+      (globalThis as any).window.translationStudioController = {
+        loadSubtitleFile: vi.fn().mockResolvedValue(undefined),
+        setCompanionVideo: mockSetCompanionAudio
+      };
+      await sendTranscribeToTranslationStudio();
+      expect(mockSetCompanionAudio).not.toHaveBeenCalled();
+
+      // Verify extended video format (.wmv) is forwarded to Hardsub Studio
+      setLastTranscribedVideoPath('/media/presentation.wmv');
+      const mockPrefillVideo = vi.fn();
+      (globalThis as any).window.hardsubController = { prefillFilePaths: mockPrefillVideo };
+      sendTranscribeToHardsubStudio();
+      expect(mockPrefillVideo).toHaveBeenCalledWith('/media/presentation.wmv', '/output/broadcast.srt');
+
+      // Verify audio-only file (.mp3) is cleared before prefilling Hardsub Studio
+      setLastTranscribedVideoPath('/media/song.mp3');
+      const mockPrefillAudio = vi.fn();
+      (globalThis as any).window.hardsubController = { prefillFilePaths: mockPrefillAudio };
+      sendTranscribeToHardsubStudio();
+      expect(mockPrefillAudio).toHaveBeenCalledWith('', '/output/broadcast.srt');
     });
   });
 });

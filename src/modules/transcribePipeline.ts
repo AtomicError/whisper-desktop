@@ -101,67 +101,35 @@ export let wavPathForTranscription: string | null = null;
 export let isTranscribing: boolean = false;
 
 export function getSelectedMediaFile(): string | null {
-  const win = getGlobal();
-  if (win && 'selectedMediaFile' in win && win.selectedMediaFile !== undefined) {
-    return win.selectedMediaFile;
-  }
   return selectedMediaFile;
 }
 
 export function setSelectedMediaFile(path: string | null): void {
-  selectedMediaFile = path;
-  const win = getGlobal();
-  if (win) {
-    win.selectedMediaFile = path;
-  }
+  selectedMediaFile = typeof path === 'string' && path.trim() !== '' ? path.trim() : null;
 }
 
 export function getProbedMetadata(): any {
-  const win = getGlobal();
-  if (win && 'probedMetadata' in win && win.probedMetadata !== undefined) {
-    return win.probedMetadata;
-  }
   return probedMetadata;
 }
 
 export function setProbedMetadata(meta: any): void {
-  probedMetadata = meta;
-  const win = getGlobal();
-  if (win) {
-    win.probedMetadata = meta;
-  }
+  probedMetadata = meta && typeof meta === 'object' && !Array.isArray(meta) ? meta : null;
 }
 
 export function getWavPathForTranscription(): string | null {
-  const win = getGlobal();
-  if (win && 'wavPathForTranscription' in win && win.wavPathForTranscription !== undefined) {
-    return win.wavPathForTranscription;
-  }
   return wavPathForTranscription;
 }
 
 export function setWavPathForTranscription(path: string | null): void {
-  wavPathForTranscription = path;
-  const win = getGlobal();
-  if (win) {
-    win.wavPathForTranscription = path;
-  }
+  wavPathForTranscription = typeof path === 'string' && path.trim() !== '' ? path.trim() : null;
 }
 
 export function getIsTranscribing(): boolean {
-  const win = getGlobal();
-  if (win && 'isTranscribing' in win && win.isTranscribing !== undefined) {
-    return Boolean(win.isTranscribing);
-  }
   return isTranscribing;
 }
 
 export function setIsTranscribing(val: boolean): void {
   isTranscribing = Boolean(val);
-  const win = getGlobal();
-  if (win) {
-    win.isTranscribing = isTranscribing;
-  }
 }
 
 // ----------------- Accordion Wizard Controls -----------------
@@ -352,8 +320,10 @@ export async function browseMediaFile(): Promise<void> {
     return;
   }
   const rawFiles = await invoke('select_files');
-  if (rawFiles && rawFiles.length > 0) {
-    const files = Array.from(new Set(rawFiles as string[]));
+  const files = Array.isArray(rawFiles)
+    ? Array.from(new Set(rawFiles.map(f => (typeof f === 'string' ? f.trim() : '')).filter(f => f.length > 0)))
+    : [];
+  if (files.length > 0) {
     if (batchProcessor.getIsBatchMode() && batchProcessor.getItems().length > 0) {
       await addBatchFiles(files);
       return;
@@ -1042,7 +1012,9 @@ export async function handleDroppedFiles(rawFiles: string[]): Promise<void> {
     return;
   }
 
-  const files = Array.isArray(rawFiles) ? Array.from(new Set(rawFiles)) : [];
+  const files = Array.isArray(rawFiles)
+    ? Array.from(new Set(rawFiles.map(f => (typeof f === 'string' ? f.trim() : '')).filter(f => f.length > 0)))
+    : [];
   if (files.length === 0) return;
 
   const win = getGlobal();
@@ -1126,51 +1098,58 @@ export async function handleDroppedFiles(rawFiles: string[]): Promise<void> {
 }
 
 // ----------------- Window Global Bindings -----------------
-if (typeof window !== 'undefined') {
+export function syncTranscribePipelineWindowBindings(): void {
+  const win = getGlobal();
+  if (!win) return;
+
   try {
-    Object.defineProperties(window, {
+    Object.defineProperties(win, {
       selectedMediaFile: {
         get() { return selectedMediaFile; },
-        set(val: string | null) { selectedMediaFile = val; },
+        set(val: string | null) { setSelectedMediaFile(val); },
         configurable: true
       },
       probedMetadata: {
         get() { return probedMetadata; },
-        set(val: any) { probedMetadata = val; },
+        set(val: any) { setProbedMetadata(val); },
         configurable: true
       },
       wavPathForTranscription: {
         get() { return wavPathForTranscription; },
-        set(val: string | null) { wavPathForTranscription = val; },
+        set(val: string | null) { setWavPathForTranscription(val); },
         configurable: true
       },
       isTranscribing: {
         get() { return isTranscribing; },
-        set(val: boolean) { isTranscribing = Boolean(val); },
+        set(val: boolean) { setIsTranscribing(val); },
         configurable: true
       }
     });
   } catch {
-    window.selectedMediaFile = selectedMediaFile;
-    window.probedMetadata = probedMetadata;
-    window.wavPathForTranscription = wavPathForTranscription;
-    window.isTranscribing = isTranscribing;
+    win.selectedMediaFile = selectedMediaFile;
+    win.probedMetadata = probedMetadata;
+    win.wavPathForTranscription = wavPathForTranscription;
+    win.isTranscribing = isTranscribing;
   }
-  window.toggleWizardAccordion = toggleWizardAccordion;
-  window.openWizardStep = openWizardStep;
-  window.setWizardStepCompleted = setWizardStepCompleted;
-  window.clearSingleMediaFile = clearSingleMediaFile;
-  window.browseMediaFile = browseMediaFile;
-  window.renderMediaMetadata = renderMediaMetadata;
-  window.probeSelectedFile = probeSelectedFile;
-  window.toggleTelemetryHudCollapse = toggleTelemetryHudCollapse;
-  window.runWhisperTranscription = runWhisperTranscription;
-  window.abortTranscription = abortTranscription;
-  window.copyMainTranscriptToClipboard = copyMainTranscriptToClipboard;
-  window.openOutputFolder = openOutputFolder;
-  window.copyTranscriptToClipboard = copyTranscriptToClipboard;
-  window.setupTranscribeDragAndDrop = setupTranscribeDragAndDrop;
-  window.handleDroppedFiles = handleDroppedFiles;
+  win.toggleWizardAccordion = toggleWizardAccordion;
+  win.openWizardStep = openWizardStep;
+  win.setWizardStepCompleted = setWizardStepCompleted;
+  win.clearSingleMediaFile = clearSingleMediaFile;
+  win.browseMediaFile = browseMediaFile;
+  win.renderMediaMetadata = renderMediaMetadata;
+  win.probeSelectedFile = probeSelectedFile;
+  win.toggleTelemetryHudCollapse = toggleTelemetryHudCollapse;
+  win.runWhisperTranscription = runWhisperTranscription;
+  win.abortTranscription = abortTranscription;
+  win.copyMainTranscriptToClipboard = copyMainTranscriptToClipboard;
+  win.openOutputFolder = openOutputFolder;
+  win.copyTranscriptToClipboard = copyTranscriptToClipboard;
+  win.setupTranscribeDragAndDrop = setupTranscribeDragAndDrop;
+  win.handleDroppedFiles = handleDroppedFiles;
+}
+
+if (typeof window !== 'undefined') {
+  syncTranscribePipelineWindowBindings();
 }
 
 export const transcribePipeline = {
@@ -1196,7 +1175,8 @@ export const transcribePipeline = {
   openOutputFolder,
   copyTranscriptToClipboard,
   setupTranscribeDragAndDrop,
-  handleDroppedFiles
+  handleDroppedFiles,
+  syncWindowBindings: syncTranscribePipelineWindowBindings
 };
 
 export default transcribePipeline;

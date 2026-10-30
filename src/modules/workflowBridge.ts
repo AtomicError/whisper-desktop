@@ -43,67 +43,35 @@ export let lastTranscribedOutputDir: string | null = null;
 export let lastTranscribedOutputFiles: any[] = [];
 
 export function getLastTranscribedSubtitlePath(): string | null {
-  const win = getGlobal();
-  if (win && 'lastTranscribedSubtitlePath' in win && win.lastTranscribedSubtitlePath !== undefined) {
-    return win.lastTranscribedSubtitlePath;
-  }
   return lastTranscribedSubtitlePath;
 }
 
 export function setLastTranscribedSubtitlePath(path: string | null): void {
-  lastTranscribedSubtitlePath = path;
-  const win = getGlobal();
-  if (win) {
-    win.lastTranscribedSubtitlePath = path;
-  }
+  lastTranscribedSubtitlePath = typeof path === 'string' && path.trim() !== '' ? path.trim() : null;
 }
 
 export function getLastTranscribedVideoPath(): string | null {
-  const win = getGlobal();
-  if (win && 'lastTranscribedVideoPath' in win && win.lastTranscribedVideoPath !== undefined) {
-    return win.lastTranscribedVideoPath;
-  }
   return lastTranscribedVideoPath;
 }
 
 export function setLastTranscribedVideoPath(path: string | null): void {
-  lastTranscribedVideoPath = path;
-  const win = getGlobal();
-  if (win) {
-    win.lastTranscribedVideoPath = path;
-  }
+  lastTranscribedVideoPath = typeof path === 'string' && path.trim() !== '' ? path.trim() : null;
 }
 
 export function getLastTranscribedOutputDir(): string | null {
-  const win = getGlobal();
-  if (win && 'lastTranscribedOutputDir' in win && win.lastTranscribedOutputDir !== undefined) {
-    return win.lastTranscribedOutputDir;
-  }
   return lastTranscribedOutputDir;
 }
 
 export function setLastTranscribedOutputDir(dir: string | null): void {
-  lastTranscribedOutputDir = dir;
-  const win = getGlobal();
-  if (win) {
-    win.lastTranscribedOutputDir = dir;
-  }
+  lastTranscribedOutputDir = typeof dir === 'string' && dir.trim() !== '' ? dir.trim() : null;
 }
 
 export function getLastTranscribedOutputFiles(): any[] {
-  const win = getGlobal();
-  if (win && 'lastTranscribedOutputFiles' in win && Array.isArray(win.lastTranscribedOutputFiles)) {
-    return win.lastTranscribedOutputFiles;
-  }
-  return lastTranscribedOutputFiles;
+  return [...lastTranscribedOutputFiles];
 }
 
 export function setLastTranscribedOutputFiles(files: any[]): void {
-  lastTranscribedOutputFiles = Array.isArray(files) ? files : [];
-  const win = getGlobal();
-  if (win) {
-    win.lastTranscribedOutputFiles = lastTranscribedOutputFiles;
-  }
+  lastTranscribedOutputFiles = Array.isArray(files) ? [...files] : [];
 }
 
 // ----------------- Output Files Dropdown & Actions -----------------
@@ -365,6 +333,17 @@ export function updateTranscribeActionButtons(isTranscribingParam?: boolean): vo
 }
 
 // ----------------- Studio Bridging (Translation & Hardsub) -----------------
+export const SUPPORTED_COMPANION_VIDEO_EXTENSIONS: string[] = [
+  '.mp4', '.mkv', '.avi', '.mov', '.flv', '.webm', '.m4v', '.wmv',
+  '.ts', '.mts', '.m2ts', '.3gp', '.3g2', '.mpeg', '.mpg', '.vob', '.ogv', '.f4v'
+];
+
+export function isSupportedVideoFile(filePath: string | null | undefined): boolean {
+  if (!filePath || typeof filePath !== 'string') return false;
+  const lower = filePath.trim().toLowerCase();
+  return SUPPORTED_COMPANION_VIDEO_EXTENSIONS.some(ext => lower.endsWith(ext));
+}
+
 export async function sendTranscribeToTranslationStudio(): Promise<void> {
   const subToLoad = getLastTranscribedSubtitlePath();
   if (!subToLoad) {
@@ -378,8 +357,7 @@ export async function sendTranscribeToTranslationStudio(): Promise<void> {
     await controller.loadSubtitleFile(subToLoad);
     const videoToLoad = getLastTranscribedVideoPath();
     if (videoToLoad && typeof controller.setCompanionVideo === 'function') {
-      const isVideo = ['.mp4', '.mkv', '.mov', '.avi', '.webm'].some(ext => videoToLoad.toLowerCase().endsWith(ext));
-      if (isVideo) {
+      if (isSupportedVideoFile(videoToLoad)) {
         controller.setCompanionVideo(videoToLoad);
       }
     }
@@ -400,9 +378,8 @@ export function sendTranscribeToHardsubStudio(): void {
 
   const win = getGlobal();
   let videoToLoad = getLastTranscribedVideoPath() || '';
-  if (videoToLoad) {
-    const isVideo = ['.mp4', '.mkv', '.mov', '.avi', '.webm'].some(ext => videoToLoad.toLowerCase().endsWith(ext));
-    if (!isVideo) videoToLoad = '';
+  if (videoToLoad && !isSupportedVideoFile(videoToLoad)) {
+    videoToLoad = '';
   }
 
   const controller = win.hardsubController;
@@ -427,43 +404,50 @@ if (typeof document !== 'undefined' && typeof document.addEventListener === 'fun
 }
 
 // ----------------- Window Global Bindings -----------------
-if (typeof window !== 'undefined') {
+export function syncWorkflowBridgeWindowBindings(): void {
+  const win = getGlobal();
+  if (!win) return;
+
   try {
-    Object.defineProperties(window, {
+    Object.defineProperties(win, {
       lastTranscribedSubtitlePath: {
         get() { return lastTranscribedSubtitlePath; },
-        set(val: string | null) { lastTranscribedSubtitlePath = val; },
+        set(val: string | null) { setLastTranscribedSubtitlePath(val); },
         configurable: true
       },
       lastTranscribedVideoPath: {
         get() { return lastTranscribedVideoPath; },
-        set(val: string | null) { lastTranscribedVideoPath = val; },
+        set(val: string | null) { setLastTranscribedVideoPath(val); },
         configurable: true
       },
       lastTranscribedOutputDir: {
         get() { return lastTranscribedOutputDir; },
-        set(val: string | null) { lastTranscribedOutputDir = val; },
+        set(val: string | null) { setLastTranscribedOutputDir(val); },
         configurable: true
       },
       lastTranscribedOutputFiles: {
-        get() { return lastTranscribedOutputFiles; },
-        set(val: any[]) { lastTranscribedOutputFiles = Array.isArray(val) ? val : []; },
+        get() { return [...lastTranscribedOutputFiles]; },
+        set(val: any[]) { setLastTranscribedOutputFiles(val); },
         configurable: true
       }
     });
   } catch {
-    window.lastTranscribedSubtitlePath = lastTranscribedSubtitlePath;
-    window.lastTranscribedVideoPath = lastTranscribedVideoPath;
-    window.lastTranscribedOutputDir = lastTranscribedOutputDir;
-    window.lastTranscribedOutputFiles = lastTranscribedOutputFiles;
+    win.lastTranscribedSubtitlePath = lastTranscribedSubtitlePath;
+    win.lastTranscribedVideoPath = lastTranscribedVideoPath;
+    win.lastTranscribedOutputDir = lastTranscribedOutputDir;
+    win.lastTranscribedOutputFiles = lastTranscribedOutputFiles;
   }
-  window.handleOutputFileButtonClick = handleOutputFileButtonClick;
-  window.toggleOutputFilesDropdown = toggleOutputFilesDropdown;
-  window.renderOutputFilesDropdown = renderOutputFilesDropdown;
-  window.updateTranscribeWorkflowButtons = updateTranscribeWorkflowButtons;
-  window.updateTranscribeActionButtons = updateTranscribeActionButtons;
-  window.sendTranscribeToTranslationStudio = sendTranscribeToTranslationStudio;
-  window.sendTranscribeToHardsubStudio = sendTranscribeToHardsubStudio;
+  win.handleOutputFileButtonClick = handleOutputFileButtonClick;
+  win.toggleOutputFilesDropdown = toggleOutputFilesDropdown;
+  win.renderOutputFilesDropdown = renderOutputFilesDropdown;
+  win.updateTranscribeWorkflowButtons = updateTranscribeWorkflowButtons;
+  win.updateTranscribeActionButtons = updateTranscribeActionButtons;
+  win.sendTranscribeToTranslationStudio = sendTranscribeToTranslationStudio;
+  win.sendTranscribeToHardsubStudio = sendTranscribeToHardsubStudio;
+}
+
+if (typeof window !== 'undefined') {
+  syncWorkflowBridgeWindowBindings();
 }
 
 export const workflowBridge = {
@@ -481,7 +465,10 @@ export const workflowBridge = {
   updateTranscribeWorkflowButtons,
   updateTranscribeActionButtons,
   sendTranscribeToTranslationStudio,
-  sendTranscribeToHardsubStudio
+  sendTranscribeToHardsubStudio,
+  SUPPORTED_COMPANION_VIDEO_EXTENSIONS,
+  isSupportedVideoFile,
+  syncWindowBindings: syncWorkflowBridgeWindowBindings
 };
 
 export default workflowBridge;

@@ -1150,7 +1150,9 @@ window.abortBatchExtraction = async function(): Promise<void> {
 
 export async function addBatchFiles(files: string[]): Promise<boolean> {
   if (isBatchExtracting) return false;
-  const rawList = Array.isArray(files) ? files : [];
+  const rawList = Array.isArray(files)
+    ? files.map(f => (typeof f === 'string' ? f.trim() : '')).filter(f => f.length > 0)
+    : [];
   if (rawList.length === 0) return false;
 
   const uniqueFiles = Array.from(new Set(rawList));
@@ -1340,8 +1342,8 @@ export function syncBatchProcessorWindowBindings(): void {
         configurable: true
       },
       batchItems: {
-        get() { return batchItems; },
-        set(val: BatchItem[]) { batchItems = Array.isArray(val) ? val : []; },
+        get() { return [...batchItems]; },
+        set(val: BatchItem[]) { batchItems = Array.isArray(val) ? [...val] : []; },
         configurable: true
       },
       batchProcessingIndex: {
@@ -1355,8 +1357,12 @@ export function syncBatchProcessorWindowBindings(): void {
         configurable: true
       },
       selectedMediaFiles: {
-        get() { return selectedMediaFiles; },
-        set(val: string[]) { selectedMediaFiles = Array.isArray(val) ? val : []; },
+        get() { return [...selectedMediaFiles]; },
+        set(val: string[]) {
+          selectedMediaFiles = Array.isArray(val)
+            ? val.map(f => (typeof f === 'string' ? f.trim() : '')).filter(f => f.length > 0)
+            : [];
+        },
         configurable: true
       },
       userExplicitlySelectedBatchItem: {
@@ -1385,10 +1391,14 @@ export const abortBatchExtraction = window.abortBatchExtraction;
 export { renderBatchQueueTable };
 
 export const batchProcessor = {
-  getItems: () => batchItems,
-  setItems: (items: BatchItem[]) => { batchItems = Array.isArray(items) ? items : []; },
-  getSelectedFiles: () => selectedMediaFiles,
-  setSelectedFiles: (files: string[]) => { selectedMediaFiles = Array.isArray(files) ? files : []; },
+  getItems: () => [...batchItems],
+  setItems: (items: BatchItem[]) => { batchItems = Array.isArray(items) ? [...items] : []; },
+  getSelectedFiles: () => [...selectedMediaFiles],
+  setSelectedFiles: (files: string[]) => {
+    selectedMediaFiles = Array.isArray(files)
+      ? files.map(f => (typeof f === 'string' ? f.trim() : '')).filter(f => f.length > 0)
+      : [];
+  },
   getIsBatchMode: () => isBatchMode,
   setIsBatchMode: (val: boolean) => { isBatchMode = Boolean(val); },
   getIsExtracting: () => isBatchExtracting,

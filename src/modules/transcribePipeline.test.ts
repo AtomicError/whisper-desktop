@@ -13,6 +13,8 @@ import {
   openWizardStep,
   setWizardStepCompleted,
   clearSingleMediaFile,
+  browseMediaFile,
+  handleDroppedFiles,
   renderMediaMetadata,
   toggleTelemetryHudCollapse
 } from './transcribePipeline';
@@ -159,6 +161,82 @@ describe('transcribePipeline module', () => {
       expect(getIsTranscribing()).toBe(false);
       expect((globalThis as any).window.isTranscribing).toBe(false);
     });
+
+    it('normalizes invalid or non-string paths and metadata defensively', () => {
+      setSelectedMediaFile(12345 as any);
+      expect(getSelectedMediaFile()).toBe(null);
+
+      setSelectedMediaFile('');
+      expect(getSelectedMediaFile()).toBe(null);
+
+      setSelectedMediaFile('   ');
+      expect(getSelectedMediaFile()).toBe(null);
+
+      setSelectedMediaFile('  /media/trimmed.mp4  ');
+      expect(getSelectedMediaFile()).toBe('/media/trimmed.mp4');
+
+      setWavPathForTranscription({ bad: true } as any);
+      expect(getWavPathForTranscription()).toBe(null);
+
+      setWavPathForTranscription('');
+      expect(getWavPathForTranscription()).toBe(null);
+
+      setWavPathForTranscription('  /tmp/trimmed.wav  ');
+      expect(getWavPathForTranscription()).toBe('/tmp/trimmed.wav');
+
+      setProbedMetadata('not-an-object' as any);
+      expect(getProbedMetadata()).toBe(null);
+
+      setProbedMetadata(['array-not-allowed'] as any);
+      expect(getProbedMetadata()).toBe(null);
+
+      setIsTranscribing('truthy-string' as any);
+      expect(getIsTranscribing()).toBe(true);
+
+      setIsTranscribing(null as any);
+      expect(getIsTranscribing()).toBe(false);
+    });
+
+    it('prevents maximum call stack recursion when window properties delegate to getters/setters', () => {
+      // Simulate main.ts Object.defineProperties proxying
+      Object.defineProperties(globalThis, {
+        selectedMediaFile: {
+          get() { return getSelectedMediaFile(); },
+          set(val: string | null) { setSelectedMediaFile(val); },
+          configurable: true
+        },
+        probedMetadata: {
+          get() { return getProbedMetadata(); },
+          set(val: any) { setProbedMetadata(val); },
+          configurable: true
+        },
+        wavPathForTranscription: {
+          get() { return getWavPathForTranscription(); },
+          set(val: string | null) { setWavPathForTranscription(val); },
+          configurable: true
+        },
+        isTranscribing: {
+          get() { return getIsTranscribing(); },
+          set(val: boolean) { setIsTranscribing(val); },
+          configurable: true
+        }
+      });
+
+      // Calling getters must not trigger RangeError: Maximum call stack size exceeded
+      expect(() => getProbedMetadata()).not.toThrow();
+      expect(() => getSelectedMediaFile()).not.toThrow();
+      expect(() => getWavPathForTranscription()).not.toThrow();
+      expect(() => getIsTranscribing()).not.toThrow();
+
+      // Setting via function or window must synchronize without recursion
+      setProbedMetadata({ exists: true, durationSec: 42 });
+      expect(getProbedMetadata()).toEqual({ exists: true, durationSec: 42 });
+      expect((globalThis as any).window.probedMetadata).toEqual({ exists: true, durationSec: 42 });
+
+      (globalThis as any).window.selectedMediaFile = '/path/proxy_test.mp4';
+      expect(getSelectedMediaFile()).toBe('/path/proxy_test.mp4');
+      expect((globalThis as any).window.selectedMediaFile).toBe('/path/proxy_test.mp4');
+    });
   });
 
   describe('Accordion Wizard Navigation', () => {
@@ -247,6 +325,33 @@ describe('transcribePipeline module', () => {
       expect(getProbedMetadata()).toBe(null);
       expect(dropZone.classList.contains('has-file')).toBe(false);
       expect(metaType.textContent).toBe('-');
+    });
+
+    it('defensively sanitizes and trims paths from browseMediaFile', async () => {
+      (globalThis as any).window.invoke = vi.fn((cmd: string) => {
+        if (cmd === 'select_files') {
+          return Promise.resolve(['  /media/selected_spaced.mp4  ', '', '   ', 123 as any]);
+        }
+        if (cmd === 'probe_media_file') {
+          return Promise.resolve({ exists: true, format: 'mp4', size: '10 MB', durationSec: 30 });
+        }
+        return Promise.resolve(null);
+      });
+
+      await browseMediaFile();
+      expect(getSelectedMediaFile()).toBe('/media/selected_spaced.mp4');
+    });
+
+    it('defensively sanitizes and trims dropped files in handleDroppedFiles', async () => {
+      (globalThis as any).window.invoke = vi.fn((cmd: string) => {
+        if (cmd === 'probe_media_file') {
+          return Promise.resolve({ exists: true, format: 'mp4', size: '10 MB', durationSec: 30 });
+        }
+        return Promise.resolve(null);
+      });
+
+      await handleDroppedFiles(['  /media/dropped_spaced.mp4  ', '', '   ', 999 as any]);
+      expect(getSelectedMediaFile()).toBe('/media/dropped_spaced.mp4');
     });
   });
 
