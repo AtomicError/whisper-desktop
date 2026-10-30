@@ -44,7 +44,7 @@ declare global {
     setWizardStepCompleted: (step: number, state: boolean) => void;
     setTranscribeStatusBadge: (status: string, text: string) => void;
     updateTranscribeWorkflowButtons: () => void;
-    updateTranscribeActionButtons: (running: boolean) => void;
+    updateTranscribeActionButtons: (running?: boolean) => void;
     saveCurrentSettings: (immediate?: boolean) => any;
     showNotification: (msg: string, type: string) => void;
     switchView: (view: string) => void;

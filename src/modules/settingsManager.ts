@@ -53,7 +53,7 @@ declare global {
     switchView: (view: string) => void;
     isBatchTranscribing?: boolean;
     updateTranscribeWorkflowButtons: () => void;
-    renderMediaMetadata?: (meta: any) => void;
+    renderMediaMetadata: (meta: any) => void;
     probedMetadata: any;
     __TAURI__?: any;
   }

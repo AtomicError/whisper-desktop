@@ -1240,16 +1240,17 @@ it releases chemicals that hit your eyes
     expect(en.settings.tabAutoTranslate).toBe('Auto-Transfer');
     expect(en.settings.aiTranslatePoints).toContain('Translation Studio');
 
-    // 3. Verify main.js contains the Auto-Transfer bridge calls and removed legacy headless translation loops
-    const mainJsContent = readFileSync(resolve(__dirname, 'main.js'), 'utf-8');
-    expect(mainJsContent).toContain('window.sendTranscribeToTranslationStudio()');
-    expect(mainJsContent).toContain('settingsState?.autoTransferToTranslate ?? settingsState?.translateAiEnabled');
-    expect(mainJsContent).not.toContain('translate_transcription_files');
+    // 3. Verify pipeline contains the Auto-Transfer bridge calls and removed legacy headless translation loops
+    const pipelineContent = readFileSync(resolve(__dirname, 'modules/transcribePipeline.ts'), 'utf-8');
+    expect(pipelineContent).toContain('sendTranscribeToTranslationStudio()');
+    expect(pipelineContent).toContain('currentSettings?.autoTransferToTranslate ?? currentSettings?.translateAiEnabled');
+    expect(pipelineContent).not.toContain('translate_transcription_files');
   });
 
   it('strictly protects subtitlePath for studio bridges and eliminates hallucinated .ass and .sub checks', () => {
-    const mainJsContent = readFileSync(resolve(__dirname, 'main.js'), 'utf-8');
+    const pipelineContent = readFileSync(resolve(__dirname, 'modules/transcribePipeline.ts'), 'utf-8');
     const batchContent = readFileSync(resolve(__dirname, 'modules/batchProcessor.ts'), 'utf-8');
+    const bridgeContent = readFileSync(resolve(__dirname, 'modules/workflowBridge.ts'), 'utf-8');
 
     // Verify .ass and .sub were completely cleaned up from batch file categorization
     expect(batchContent).not.toContain("f.endsWith('.ass')");
@@ -1264,14 +1265,14 @@ it releases chemicals that hit your eyes
     expect(batchContent).toContain("item.subtitlePath = subFileObj ? subFileObj.path : null;");
 
     // Verify single-mode output files categorization handles subtitle, json, and csv
-    expect(mainJsContent).toContain("if (f.endsWith('.srt') || f.endsWith('.vtt') || f.endsWith('.lrc')) {\n          type = 'subtitle';");
-    expect(mainJsContent).toContain("} else if (f.endsWith('.json')) {\n          type = 'json';");
-    expect(mainJsContent).toContain("} else if (f.endsWith('.csv')) {\n          type = 'csv';");
+    expect(pipelineContent).toContain("if (f.endsWith('.srt') || f.endsWith('.vtt') || f.endsWith('.lrc')) {\n          type = 'subtitle';");
+    expect(pipelineContent).toContain("} else if (f.endsWith('.json')) {\n          type = 'json';");
+    expect(pipelineContent).toContain("} else if (f.endsWith('.csv')) {\n          type = 'csv';");
 
     // Verify output files dropdown renders badges for subtitle, json, and csv
-    expect(mainJsContent).toContain("else if (file.type === 'original' || file.type === 'subtitle') {");
-    expect(mainJsContent).toContain("else if (file.type === 'json') {\n      badgeText = 'JSON';");
-    expect(mainJsContent).toContain("else if (file.type === 'csv') {\n      badgeText = 'CSV';");
+    expect(bridgeContent).toContain("else if (file.type === 'original' || file.type === 'subtitle') {");
+    expect(bridgeContent).toContain("else if (file.type === 'json') {\n      badgeText = 'JSON';");
+    expect(bridgeContent).toContain("else if (file.type === 'csv') {\n      badgeText = 'CSV';");
   });
 
   it('properly resets batch queue sort select and restores empty placeholder on item removal', () => {

@@ -169,11 +169,13 @@ export function showNotification(message: any, type = 'info', customDuration: nu
     startTime = Date.now();
     remainingTime = dur;
     isPaused = false;
-    progressBar.style.transition = 'none';
-    progressBar.style.width = '100%';
-    void progressBar.offsetWidth; // trigger reflow
-    progressBar.style.transition = `width ${dur}ms linear`;
-    progressBar.style.width = '0%';
+    if (progressBar) {
+      progressBar.style.transition = 'none';
+      progressBar.style.width = '100%';
+      void progressBar.offsetWidth; // trigger reflow
+      progressBar.style.transition = `width ${dur}ms linear`;
+      progressBar.style.width = '0%';
+    }
     if (timerId) clearTimeout(timerId);
     timerId = setTimeout(closeToast, dur);
   };
@@ -184,9 +186,11 @@ export function showNotification(message: any, type = 'info', customDuration: nu
     clearTimeout(timerId);
     remainingTime -= (Date.now() - startTime);
     if (remainingTime < 0) remainingTime = 0;
-    const computedWidth = getComputedStyle(progressBar).width;
-    progressBar.style.transition = 'none';
-    progressBar.style.width = computedWidth;
+    if (progressBar) {
+      const computedWidth = getComputedStyle(progressBar).width;
+      progressBar.style.transition = 'none';
+      progressBar.style.width = computedWidth;
+    }
   };
 
   const resumeTimer = () => {
@@ -194,8 +198,10 @@ export function showNotification(message: any, type = 'info', customDuration: nu
     isPaused = false;
     if (remainingTime > 0) {
       startTime = Date.now();
-      progressBar.style.transition = `width ${remainingTime}ms linear`;
-      progressBar.style.width = '0%';
+      if (progressBar) {
+        progressBar.style.transition = `width ${remainingTime}ms linear`;
+        progressBar.style.width = '0%';
+      }
       timerId = setTimeout(closeToast, remainingTime);
     } else {
       closeToast();
