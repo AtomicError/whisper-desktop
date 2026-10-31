@@ -4,10 +4,13 @@ import { escapeHTML } from './logsController';
 import { transcriptViewer, loadTranscriptFromFile } from './transcriptViewer';
 import { customSelectsMap } from './customSelect';
 import {
-  settingsState,
+  getSettingsState,
+  saveCurrentSettings,
   compiledBackends,
-  localScannedTransModels
+  localScannedTransModels,
+  SettingsState
 } from './settingsManager';
+import type { ProbedMediaMetadata } from './transcribePipeline';
 
 if (typeof window === 'undefined') {
   (globalThis as any).window = globalThis;
@@ -42,7 +45,7 @@ declare global {
     lastTranscribedOutputDir: string | null;
     lastTranscribedOutputFiles: any[];
     customSelectsMap: any;
-    probedMetadata: any;
+    probedMetadata: ProbedMediaMetadata | null;
     selectedMediaFile: string | null;
     transcriptLines: any[];
     updateMediaCardName: (name: string | null) => void;
@@ -54,9 +57,9 @@ declare global {
     showNotification: (msg: string, type: string) => void;
     switchView: (view: string) => void;
     sendTranscribeToTranslationStudio: () => Promise<void>;
-    settingsState: any;
-    compiledBackends: any;
-    localScannedTransModels: any[];
+    settingsState: SettingsState | null;
+    compiledBackends: Record<string, boolean>;
+    localScannedTransModels: string[];
   }
 }
 
@@ -155,7 +158,7 @@ export function updateBatchSpecs(): void {
   }
 }
 
-window.removeFileFromBatch = function(index: number) {
+export function removeFileFromBatch(index: number): void {
   if (isBatchExtracting) return;
   if (index < 0 || index >= batchItems.length) return;
 
@@ -165,13 +168,13 @@ window.removeFileFromBatch = function(index: number) {
   const win = getGlobal();
 
   if (batchItems.length === 0) {
-    window.clearBatchQueue();
+    clearBatchQueue();
   } else {
     if (activeBatchViewerIndex === index) {
       activeBatchViewerIndex = -1;
       const nextCompleted = batchItems.findIndex(it => it.status === 'completed');
-      if (nextCompleted !== -1 && typeof window.selectBatchItemTranscript === 'function') {
-        window.selectBatchItemTranscript(nextCompleted);
+      if (nextCompleted !== -1) {
+        selectBatchItemTranscript(nextCompleted);
       } else {
         transcriptLines = [];
         transcriptViewer.lines = [];
@@ -219,7 +222,7 @@ window.removeFileFromBatch = function(index: number) {
   }
 };
 
-window.clearBatchQueue = function() {
+export function clearBatchQueue(): void {
   if (isBatchExtracting) return;
   batchItems = [];
   selectedMediaFiles = [];
@@ -365,19 +368,18 @@ window.clearBatchQueue = function() {
     window.updateTranscribeActionButtons(false);
   }
 
-  if (win.settingsState) {
-    win.settingsState.inputFile = "";
-    if (typeof win.saveCurrentSettings === 'function') {
-      win.saveCurrentSettings();
-    }
+  const currentSettings = getSettingsState();
+  if (currentSettings) {
+    currentSettings.inputFile = "";
+    saveCurrentSettings();
   }
 
   if (typeof win.showNotification === 'function') {
     win.showNotification(t('toasts.queueCleared'), "info");
   }
-};
+}
 
-window.moveBatchItemUp = function(index: number) {
+export function moveBatchItemUp(index: number): void {
   if (isBatchExtracting) return;
   if (index <= 0 || index >= batchItems.length) return;
 
@@ -396,9 +398,9 @@ window.moveBatchItemUp = function(index: number) {
   }
 
   renderBatchQueueTable();
-};
+}
 
-window.moveBatchItemDown = function(index: number) {
+export function moveBatchItemDown(index: number): void {
   if (isBatchExtracting) return;
   if (index < 0 || index >= batchItems.length - 1) return;
 
@@ -417,9 +419,9 @@ window.moveBatchItemDown = function(index: number) {
   }
 
   renderBatchQueueTable();
-};
+}
 
-window.sortBatchQueue = function(criteria: string) {
+export function sortBatchQueue(criteria: string): void {
   if (isBatchExtracting) return;
   if (batchItems.length <= 1) return;
 
@@ -478,9 +480,9 @@ window.sortBatchQueue = function(criteria: string) {
   if (typeof win.showNotification === 'function') {
     win.showNotification(t('toasts.queueSorted'), "success");
   }
-};
+}
 
-window.selectBatchItemTranscript = async function(index: number): Promise<void> {
+export async function selectBatchItemTranscript(index: number): Promise<void> {
   if (index < 0 || index >= batchItems.length) return;
   const item = batchItems[index];
   if (!item) return;
@@ -573,7 +575,7 @@ window.selectBatchItemTranscript = async function(index: number): Promise<void> 
   if (typeof window.updateTranscribeWorkflowButtons === 'function') {
     window.updateTranscribeWorkflowButtons();
   }
-};
+}
 
 function renderBatchQueueTable(): void {
   if (typeof document === 'undefined') return;
@@ -605,12 +607,12 @@ function renderBatchQueueTable(): void {
       card.setAttribute('aria-label', `${item.name} - ${viewHint}`);
 
       card.onclick = () => {
-        window.selectBatchItemTranscript(index);
+        selectBatchItemTranscript(index);
       };
       card.onkeydown = (e: KeyboardEvent) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          window.selectBatchItemTranscript(index);
+          selectBatchItemTranscript(index);
         }
       };
     } else {
@@ -708,7 +710,7 @@ function renderBatchQueueTable(): void {
     } else {
       upBtn.onclick = (e: MouseEvent) => {
         e.stopPropagation();
-        window.moveBatchItemUp(index);
+        moveBatchItemUp(index);
       };
     }
 
@@ -725,7 +727,7 @@ function renderBatchQueueTable(): void {
     } else {
       downBtn.onclick = (e: MouseEvent) => {
         e.stopPropagation();
-        window.moveBatchItemDown(index);
+        moveBatchItemDown(index);
       };
     }
 
@@ -742,7 +744,7 @@ function renderBatchQueueTable(): void {
     } else {
       deleteBtn.onclick = (e: MouseEvent) => {
         e.stopPropagation();
-        window.removeFileFromBatch(index);
+        removeFileFromBatch(index);
       };
     }
 
@@ -756,16 +758,16 @@ function renderBatchQueueTable(): void {
   });
 }
 
-window.runBatchExtraction = async function(): Promise<void> {
+export async function runBatchExtraction(): Promise<void> {
   if (isBatchExtracting || !isBatchMode || batchItems.length === 0) return;
 
   const win = getGlobal();
   const invoke = getTauriInvoke();
   if (!invoke) return;
 
-  const settings = settingsState || win.settingsState || {};
+  const settings = getSettingsState() || {};
   const backend = settings.selectedBackend || 'Standard';
-  const isCompiled = backend === 'Standard' || Boolean(compiledBackends[backend] || (win.compiledBackends || {})[backend]);
+  const isCompiled = backend === 'Standard' || Boolean(compiledBackends[backend]);
   if (!isCompiled) {
     if (typeof win.showNotification === 'function') {
       win.showNotification(t('toasts.backendNotFound', { backend }), "error");
@@ -1148,9 +1150,9 @@ window.runBatchExtraction = async function(): Promise<void> {
   if (typeof win.setWizardStepCompleted === 'function') {
     win.setWizardStepCompleted(3, !wasCancelled && successCount > 0);
   }
-};
+}
 
-window.abortBatchExtraction = async function(): Promise<void> {
+export async function abortBatchExtraction(): Promise<void> {
   if (!isBatchExtracting || batchCancelActive) return;
   const doc = typeof document !== 'undefined' ? document : null;
   const cancelBtn = doc ? (doc.getElementById('btn-cancel-batch') as HTMLButtonElement | null) : null;
@@ -1380,15 +1382,15 @@ export function syncBatchProcessorWindowBindings(): void {
   const win = getGlobal();
   if (!win) return;
 
-  win.removeFileFromBatch = window.removeFileFromBatch;
-  win.clearBatchQueue = window.clearBatchQueue;
-  win.moveBatchItemUp = window.moveBatchItemUp;
-  win.moveBatchItemDown = window.moveBatchItemDown;
-  win.sortBatchQueue = window.sortBatchQueue;
-  win.selectBatchItemTranscript = window.selectBatchItemTranscript;
+  win.removeFileFromBatch = removeFileFromBatch;
+  win.clearBatchQueue = clearBatchQueue;
+  win.moveBatchItemUp = moveBatchItemUp;
+  win.moveBatchItemDown = moveBatchItemDown;
+  win.sortBatchQueue = sortBatchQueue;
+  win.selectBatchItemTranscript = selectBatchItemTranscript;
   win.renderBatchQueueTable = renderBatchQueueTable;
-  win.runBatchExtraction = window.runBatchExtraction;
-  win.abortBatchExtraction = window.abortBatchExtraction;
+  win.runBatchExtraction = runBatchExtraction;
+  win.abortBatchExtraction = abortBatchExtraction;
   win.updateBatchSpecs = updateBatchSpecs;
   win.formatDuration = formatDuration;
   win.addBatchFiles = addBatchFiles;
@@ -1398,7 +1400,8 @@ export function syncBatchProcessorWindowBindings(): void {
       isBatchMode: {
         get() { return isBatchMode; },
         set(val: boolean) { isBatchMode = Boolean(val); },
-        configurable: true
+        configurable: true,
+        enumerable: true
       },
       isBatchExtracting: {
         get() { return isBatchExtracting; },
@@ -1408,22 +1411,26 @@ export function syncBatchProcessorWindowBindings(): void {
             batchCancelActive = false;
           }
         },
-        configurable: true
+        configurable: true,
+        enumerable: true
       },
       batchItems: {
         get() { return [...batchItems]; },
         set(val: BatchItem[]) { batchItems = Array.isArray(val) ? [...val] : []; },
-        configurable: true
+        configurable: true,
+        enumerable: true
       },
       batchProcessingIndex: {
         get() { return batchProcessingIndex; },
         set(val: number) { batchProcessingIndex = Number(val); },
-        configurable: true
+        configurable: true,
+        enumerable: true
       },
       activeBatchViewerIndex: {
         get() { return activeBatchViewerIndex; },
         set(val: number) { activeBatchViewerIndex = Number(val); },
-        configurable: true
+        configurable: true,
+        enumerable: true
       },
       selectedMediaFiles: {
         get() { return [...selectedMediaFiles]; },
@@ -1432,12 +1439,14 @@ export function syncBatchProcessorWindowBindings(): void {
             ? val.map(f => (typeof f === 'string' ? f.trim() : '')).filter(f => f.length > 0)
             : [];
         },
-        configurable: true
+        configurable: true,
+        enumerable: true
       },
       userExplicitlySelectedBatchItem: {
         get() { return userExplicitlySelectedBatchItem; },
         set(val: boolean) { userExplicitlySelectedBatchItem = Boolean(val); },
-        configurable: true
+        configurable: true,
+        enumerable: true
       }
     });
   } catch {
@@ -1449,14 +1458,6 @@ if (typeof window !== 'undefined') {
   syncBatchProcessorWindowBindings();
 }
 
-export const removeFileFromBatch = window.removeFileFromBatch;
-export const clearBatchQueue = window.clearBatchQueue;
-export const moveBatchItemUp = window.moveBatchItemUp;
-export const moveBatchItemDown = window.moveBatchItemDown;
-export const sortBatchQueue = window.sortBatchQueue;
-export const selectBatchItemTranscript = window.selectBatchItemTranscript;
-export const runBatchExtraction = window.runBatchExtraction;
-export const abortBatchExtraction = window.abortBatchExtraction;
 export { renderBatchQueueTable };
 
 export const batchProcessor = {
@@ -1485,15 +1486,15 @@ export const batchProcessor = {
   setProcessingIndex: (idx: number) => { batchProcessingIndex = idx; },
   formatDuration,
   updateSpecs: updateBatchSpecs,
-  removeFile: window.removeFileFromBatch,
-  clearQueue: window.clearBatchQueue,
-  moveUp: window.moveBatchItemUp,
-  moveDown: window.moveBatchItemDown,
-  sortQueue: window.sortBatchQueue,
-  selectTranscript: window.selectBatchItemTranscript,
+  removeFile: removeFileFromBatch,
+  clearQueue: clearBatchQueue,
+  moveUp: moveBatchItemUp,
+  moveDown: moveBatchItemDown,
+  sortQueue: sortBatchQueue,
+  selectTranscript: selectBatchItemTranscript,
   renderTable: renderBatchQueueTable,
-  runExtraction: window.runBatchExtraction,
-  abortExtraction: window.abortBatchExtraction,
+  runExtraction: runBatchExtraction,
+  abortExtraction: abortBatchExtraction,
   addFiles: addBatchFiles,
   syncWindowBindings: syncBatchProcessorWindowBindings
 };

@@ -356,11 +356,10 @@
   border-color: var(--color-royal-blue);
   color: #fff;
   box-shadow: 0 3px 12px rgba(var(--color-royal-blue-rgb), 0.35);
-  transform: translateY(-1px);
 }
 
 .model-btn-download:active:not(:disabled) {
-  transform: translateY(1px);
+  background: rgba(var(--color-royal-blue-rgb), 0.35);
 }
 
 /* Delete / Discard Action Button */
@@ -375,11 +374,10 @@
   border-color: var(--color-red);
   color: #fff;
   box-shadow: 0 3px 12px rgba(var(--color-red-rgb), 0.3);
-  transform: translateY(-1px);
 }
 
 .model-btn-delete:active:not(:disabled) {
-  transform: translateY(1px);
+  background: rgba(var(--color-red-rgb), 0.3);
 }
 
 /* Pause Action Button */
@@ -394,7 +392,6 @@
   border-color: var(--color-gold);
   color: #fff;
   box-shadow: 0 3px 12px rgba(var(--color-gold-rgb), 0.3);
-  transform: translateY(-1px);
 }
 
 /* Resume Action Button */
@@ -409,7 +406,6 @@
   border-color: var(--color-cyan);
   color: #fff;
   box-shadow: 0 3px 12px rgba(var(--color-cyan-rgb), 0.3);
-  transform: translateY(-1px);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -707,7 +703,6 @@
   border-color: var(--color-royal-blue) !important;
   background: rgba(var(--color-royal-blue-rgb), 0.25) !important;
   box-shadow: 0 0 8px rgba(var(--color-royal-blue-rgb), 0.4) !important;
-  transform: scale(1.15);
 }
 
 /* Active Default Model Indicator Neon Badge */
@@ -1222,7 +1217,7 @@ select.pagination-size-select {
   padding: 0;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.15s ease, color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
+  transition: opacity 0.15s ease, color 0.15s ease, background-color 0.15s ease;
 }
 
 .model-btn-trash svg {
@@ -1246,7 +1241,6 @@ select.pagination-size-select {
   opacity: 1 !important;
   background: rgba(239, 68, 68, 0.15) !important;
   color: #ef4444 !important;
-  transform: scale(1.1);
 }
 
 /* Models Empty State */

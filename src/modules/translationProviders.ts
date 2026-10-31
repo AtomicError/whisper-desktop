@@ -2,6 +2,8 @@
 import { t, isRtlLanguage, getLanguage, firstStrongDirection } from '../i18n/index';
 import { escapeHTML } from './logsController';
 import { CustomSelect, customSelectsMap } from './customSelect';
+import { getSettingsState, type SettingsState } from './settingsManager';
+import { showBatchErrorDialog } from './appModal';
 
 if (typeof window === 'undefined') {
   (globalThis as any).window = globalThis;
@@ -74,7 +76,7 @@ declare global {
     testTranslationConnection: () => Promise<void>;
     toggleTranslationSubSettingsVisibility: () => void;
     translationStudioController?: any;
-    settingsState: any;
+    settingsState: SettingsState | null;
     saveCurrentSettings: (immediate?: boolean) => any;
     showNotification: (msg: string, type: string) => void;
     showConfirmModal: (title: string, message: string, confirmButtonText?: string | null) => Promise<boolean>;
@@ -100,11 +102,6 @@ const invoke = async (cmd: string, args?: any): Promise<any> => {
   const inv = getTauriInvoke();
   if (inv) return inv(cmd, args);
   throw new Error(`Tauri invoke not available for ${cmd}`);
-};
-
-const getSettingsState = (): any => {
-  const win = getGlobal();
-  return win.settingsState || null;
 };
 
 const saveSettings = async (): Promise<void> => {
@@ -193,7 +190,6 @@ let modelSaveDebounceTimer: any = null;
 let isPreviewTesting = false;
 let previewTestId = 0;
 let _providerModalTrap: any = null;
-let _batchErrorModalTrap: any = null;
 
 export function toEnglishDigits(str: any): string {
   const persianMap: Record<string, string> = { '۰':'0', '۱':'1', '۲':'2', '۳':'3', '۴':'4', '۵':'5', '۶':'6', '۷':'7', '۸':'8', '۹':'9' };
@@ -2165,52 +2161,8 @@ export async function saveProviderConfig(): Promise<void> {
   notify(t('toasts.providerAddedSuccess'), "success");
 }
 
-// ----------------- Batch Error Dialog -----------------
-export function showBatchErrorDialog(fileName: string, errorMsg: string): Promise<string> {
-  return new Promise((resolve) => {
-    if (typeof document === 'undefined') {
-      resolve('abort');
-      return;
-    }
-    if (_batchErrorModalTrap) {
-      _batchErrorModalTrap.release();
-      _batchErrorModalTrap = null;
-    }
-    const modal = document.getElementById('batch-error-modal');
-    const msgEl = document.getElementById('batch-error-message');
-    if (msgEl) {
-      msgEl.textContent = t('modals.batchErrorFormatted', { file: fileName, error: errorMsg });
-    }
-    
-    if (modal) {
-      modal.style.display = 'flex';
-      setTimeout(() => modal.classList.add('show'), 10);
-      
-      _batchErrorModalTrap = _trapModalFocus(modal, () => {
-        if (window.resolveBatchError) window.resolveBatchError('abort');
-      });
-    }
-
-    window.resolveBatchError = function(choice: string) {
-      if (_batchErrorModalTrap) {
-        _batchErrorModalTrap.release();
-        _batchErrorModalTrap = null;
-      }
-      if (modal) {
-        modal.classList.remove('show');
-        setTimeout(() => { modal.style.display = 'none'; }, 300);
-      }
-      resolve(choice);
-    };
-
-    requestAnimationFrame(() => {
-      if (modal) {
-        const retryBtn = (modal.querySelector('button.btn-primary') || modal.querySelector('button')) as HTMLButtonElement | null;
-        if (retryBtn) retryBtn.focus();
-      }
-    });
-  });
-}
+// ----------------- Batch Error Dialog (Delegated to appModal) -----------------
+export { showBatchErrorDialog };
 
 // ----------------- Event Listeners Setup -----------------
 export function setupTranslationEventListeners(): void {

@@ -6,17 +6,83 @@ import { applyMonochromeCanvas, applyTheme, switchTheme, applyUiZoom } from './t
 import { initLanguageSelects, renderLanguageSelect } from '../languageSelect';
 import { invalidateModelStatusesCache } from './modelHub';
 import type { ProviderConfig } from './translationProviders';
+import type { ProbedMediaMetadata } from './transcribePipeline';
 
 if (typeof window === 'undefined') {
   (globalThis as any).window = globalThis;
 }
 
+export interface SettingsState {
+  modelsDir?: string;
+  modelPath?: string;
+  selectedBackend?: string;
+  ffmpegSource?: string;
+  ffmpegCustomPath?: string;
+  outputDirType?: string;
+  outputDirCustom?: string;
+  inputFile?: string;
+  threads?: number;
+  processors?: number;
+  offsetT?: number;
+  duration?: number;
+  maxContext?: number;
+  maxLen?: number;
+  bestOf?: number;
+  beamSize?: number;
+  audioCtx?: number;
+  deviceId?: number;
+  flashAttn?: boolean;
+  gpuDevice?: number;
+  language?: string;
+  translate?: boolean;
+  diarize?: boolean;
+  tinydiarize?: boolean;
+  noTimestamps?: boolean;
+  splitOnWord?: boolean;
+  wordTimestamps?: boolean;
+  printColors?: boolean;
+  suppressBlank?: boolean;
+  suppressNonSpeech?: boolean;
+  initialPrompt?: string;
+  prompt?: string;
+  carryOverPrompt?: boolean;
+  wordThold?: number;
+  entropyThold?: number;
+  logprobThold?: number;
+  noSpeechThold?: number;
+  temperature?: number;
+  temperatureInc?: number;
+  vad?: boolean;
+  vadModelPath?: string;
+  vadThold?: number;
+  vadMinSpeech?: number;
+  vadMaxSpeech?: number;
+  vadMinSil?: number;
+  vadSpeechPad?: number;
+  vadOverlap?: number;
+  outputTxt?: boolean;
+  outputVtt?: boolean;
+  outputSrt?: boolean;
+  outputLrc?: boolean;
+  outputCsv?: boolean;
+  outputJson?: boolean;
+  outputJsonFull?: boolean;
+  uiLanguage?: string;
+  theme?: string;
+  uiScale?: number;
+  monochromeCanvas?: boolean;
+  autoTransferToTranslate?: boolean;
+  translateAiEnabled?: boolean;
+  translateAiPolish?: boolean;
+  [key: string]: any;
+}
+
 declare global {
   interface Window {
-    settingsState: any;
-    compiledBackends: any;
+    settingsState: SettingsState | null;
+    compiledBackends: Record<string, boolean>;
     activeSettingsCat: string;
-    localScannedTransModels: any[];
+    localScannedTransModels: string[];
     localScannedVadModels: string[];
     selectBackend: (backend: string, isInitialSelection?: boolean) => void;
     openModelsDirectory: () => Promise<void>;
@@ -54,7 +120,7 @@ declare global {
     isBatchTranscribing?: boolean;
     updateTranscribeWorkflowButtons: () => void;
     renderMediaMetadata: (meta: any) => void;
-    probedMetadata: any;
+    probedMetadata: ProbedMediaMetadata | null;
     __TAURI__?: any;
   }
 }
@@ -87,74 +153,129 @@ const invoke = async (cmd: string, args?: any): Promise<any> => {
 };
 
 // ----------------- Global Settings States -----------------
-export let settingsState: any = null;
+export let settingsState: SettingsState | null = null;
 export let compiledBackends: Record<string, boolean> = {};
 export let activeSettingsCat: string = 'app';
 export let localScannedTransModels: string[] = [];
 export let localScannedVadModels: string[] = [];
 
-export function getSettingsState(): any {
+export function getSettingsState(): SettingsState | null {
   const win = getGlobal();
-  if (win && win.settingsState) {
-    settingsState = win.settingsState;
-    return settingsState;
+  if (win && win.settingsState !== undefined) {
+    return win.settingsState;
   }
   return settingsState || null;
 }
 
-export function setSettingsState(state: any): void {
+export function setSettingsState(state: SettingsState | null): void {
   settingsState = state;
   const win = getGlobal();
   if (win) {
-    win.settingsState = state;
+    if (!Object.getOwnPropertyDescriptor(win, 'settingsState')?.set) {
+      syncSettingsManagerWindowBindings();
+    } else {
+      try {
+        win.settingsState = state;
+      } catch {
+        // fallback
+      }
+    }
   }
 }
 
 export function getCompiledBackends(): Record<string, boolean> {
+  const win = getGlobal();
+  if (win && win.compiledBackends !== undefined) {
+    return win.compiledBackends;
+  }
   return compiledBackends;
 }
 
 export function setCompiledBackends(backends: Record<string, boolean>): void {
-  compiledBackends = backends;
+  compiledBackends = backends && typeof backends === 'object' ? backends : {};
   const win = getGlobal();
   if (win) {
-    win.compiledBackends = backends;
+    if (!Object.getOwnPropertyDescriptor(win, 'compiledBackends')?.set) {
+      syncSettingsManagerWindowBindings();
+    } else {
+      try {
+        win.compiledBackends = compiledBackends;
+      } catch {
+        // fallback
+      }
+    }
   }
 }
 
 export function getActiveSettingsCat(): string {
+  const win = getGlobal();
+  if (win && win.activeSettingsCat !== undefined) {
+    return win.activeSettingsCat;
+  }
   return activeSettingsCat;
 }
 
 export function setActiveSettingsCat(cat: string): void {
-  activeSettingsCat = cat;
+  activeSettingsCat = typeof cat === 'string' ? cat : 'app';
   const win = getGlobal();
   if (win) {
-    win.activeSettingsCat = cat;
+    if (!Object.getOwnPropertyDescriptor(win, 'activeSettingsCat')?.set) {
+      syncSettingsManagerWindowBindings();
+    } else {
+      try {
+        win.activeSettingsCat = activeSettingsCat;
+      } catch {
+        // fallback
+      }
+    }
   }
 }
 
 export function getLocalScannedTransModels(): string[] {
-  return localScannedTransModels;
+  const win = getGlobal();
+  if (win && win.localScannedTransModels !== undefined) {
+    return win.localScannedTransModels;
+  }
+  return [...localScannedTransModels];
 }
 
 export function setLocalScannedTransModels(models: string[]): void {
-  localScannedTransModels = models;
+  localScannedTransModels = Array.isArray(models) ? [...models] : [];
   const win = getGlobal();
   if (win) {
-    win.localScannedTransModels = models;
+    if (!Object.getOwnPropertyDescriptor(win, 'localScannedTransModels')?.set) {
+      syncSettingsManagerWindowBindings();
+    } else {
+      try {
+        win.localScannedTransModels = localScannedTransModels;
+      } catch {
+        // fallback
+      }
+    }
   }
 }
 
 export function getLocalScannedVadModels(): string[] {
-  return localScannedVadModels;
+  const win = getGlobal();
+  if (win && win.localScannedVadModels !== undefined) {
+    return win.localScannedVadModels;
+  }
+  return [...localScannedVadModels];
 }
 
 export function setLocalScannedVadModels(models: string[]): void {
-  localScannedVadModels = models;
+  localScannedVadModels = Array.isArray(models) ? [...models] : [];
   const win = getGlobal();
   if (win) {
-    win.localScannedVadModels = models;
+    if (!Object.getOwnPropertyDescriptor(win, 'localScannedVadModels')?.set) {
+      syncSettingsManagerWindowBindings();
+    } else {
+      try {
+        win.localScannedVadModels = localScannedVadModels;
+      } catch {
+        // fallback
+      }
+    }
   }
 }
 
@@ -1821,36 +1942,96 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
 }
 
 // ----------------- Bindings to Window Global Object -----------------
+export function syncSettingsManagerWindowBindings(): void {
+  const win = getGlobal();
+  if (!win) return;
+
+  win.selectBackend = selectBackend;
+  win.openModelsDirectory = openModelsDirectory;
+  win.browseModelsDirectory = browseModelsDirectory;
+  win.switchSettingsCategory = switchSettingsCategory;
+  win.clearSettingsSearch = clearSettingsSearch;
+  win.filterSettings = filterSettings;
+  win.confirmResetWhisperEngine = confirmResetWhisperEngine;
+  win.incrementNumber = incrementNumber;
+  win.decrementNumber = decrementNumber;
+  win.scanAndPopulateModels = scanAndPopulateModels;
+  win.toggleOutputDirCustomField = toggleOutputDirCustomField;
+  win.openCustomOutputDir = openCustomOutputDir;
+  win.browseOutputDir = browseOutputDir;
+  win.browseTranscribeOutputDir = browseTranscribeOutputDir;
+  win.resetTranscribeOutputDir = resetTranscribeOutputDir;
+  win.updateTranscribeOutputDirUI = updateTranscribeOutputDirUI;
+  win.updateTranscribeUIConfigs = updateTranscribeUIConfigs;
+  win.openTranscriptionSettings = openTranscriptionSettings;
+  win.toggleQuickVad = toggleQuickVad;
+  win.saveCurrentSettings = saveCurrentSettings;
+  win.refreshSettings = refreshSettings;
+  win.refreshBuildStatuses = refreshBuildStatuses;
+  win.setupNumberInputControls = setupNumberInputControls;
+  win.setupQuickConfigDeckEventListeners = setupQuickConfigDeckEventListeners;
+
+  try {
+    const descSettings = Object.getOwnPropertyDescriptor(win, 'settingsState');
+    if (descSettings && !descSettings.get && win.settingsState !== undefined && settingsState === null) {
+      settingsState = win.settingsState;
+    }
+    const descBackends = Object.getOwnPropertyDescriptor(win, 'compiledBackends');
+    if (descBackends && !descBackends.get && win.compiledBackends !== undefined && Object.keys(compiledBackends).length === 0) {
+      compiledBackends = win.compiledBackends;
+    }
+    const descTrans = Object.getOwnPropertyDescriptor(win, 'localScannedTransModels');
+    if (descTrans && !descTrans.get && Array.isArray(win.localScannedTransModels) && localScannedTransModels.length === 0) {
+      localScannedTransModels = [...win.localScannedTransModels];
+    }
+    const descVad = Object.getOwnPropertyDescriptor(win, 'localScannedVadModels');
+    if (descVad && !descVad.get && Array.isArray(win.localScannedVadModels) && localScannedVadModels.length === 0) {
+      localScannedVadModels = [...win.localScannedVadModels];
+    }
+
+    Object.defineProperties(win, {
+      settingsState: {
+        get() { return settingsState; },
+        set(val: SettingsState | null) { settingsState = val; },
+        configurable: true,
+        enumerable: true
+      },
+      compiledBackends: {
+        get() { return compiledBackends; },
+        set(val: Record<string, boolean>) { compiledBackends = val && typeof val === 'object' ? val : {}; },
+        configurable: true,
+        enumerable: true
+      },
+      activeSettingsCat: {
+        get() { return activeSettingsCat; },
+        set(val: string) { activeSettingsCat = typeof val === 'string' ? val : 'app'; },
+        configurable: true,
+        enumerable: true
+      },
+      localScannedTransModels: {
+        get() { return [...localScannedTransModels]; },
+        set(val: string[]) { localScannedTransModels = Array.isArray(val) ? [...val] : []; },
+        configurable: true,
+        enumerable: true
+      },
+      localScannedVadModels: {
+        get() { return [...localScannedVadModels]; },
+        set(val: string[]) { localScannedVadModels = Array.isArray(val) ? [...val] : []; },
+        configurable: true,
+        enumerable: true
+      }
+    });
+  } catch {
+    win.settingsState = settingsState;
+    win.compiledBackends = compiledBackends;
+    win.activeSettingsCat = activeSettingsCat;
+    win.localScannedTransModels = localScannedTransModels;
+    win.localScannedVadModels = localScannedVadModels;
+  }
+}
+
 if (typeof window !== 'undefined') {
-  window.settingsState = settingsState;
-  window.compiledBackends = compiledBackends;
-  window.activeSettingsCat = activeSettingsCat;
-  window.localScannedTransModels = localScannedTransModels;
-  window.localScannedVadModels = localScannedVadModels;
-  window.selectBackend = selectBackend;
-  window.openModelsDirectory = openModelsDirectory;
-  window.browseModelsDirectory = browseModelsDirectory;
-  window.switchSettingsCategory = switchSettingsCategory;
-  window.clearSettingsSearch = clearSettingsSearch;
-  window.filterSettings = filterSettings;
-  window.confirmResetWhisperEngine = confirmResetWhisperEngine;
-  window.incrementNumber = incrementNumber;
-  window.decrementNumber = decrementNumber;
-  window.scanAndPopulateModels = scanAndPopulateModels;
-  window.toggleOutputDirCustomField = toggleOutputDirCustomField;
-  window.openCustomOutputDir = openCustomOutputDir;
-  window.browseOutputDir = browseOutputDir;
-  window.browseTranscribeOutputDir = browseTranscribeOutputDir;
-  window.resetTranscribeOutputDir = resetTranscribeOutputDir;
-  window.updateTranscribeOutputDirUI = updateTranscribeOutputDirUI;
-  window.updateTranscribeUIConfigs = updateTranscribeUIConfigs;
-  window.openTranscriptionSettings = openTranscriptionSettings;
-  window.toggleQuickVad = toggleQuickVad;
-  window.saveCurrentSettings = saveCurrentSettings;
-  window.refreshSettings = refreshSettings;
-  window.refreshBuildStatuses = refreshBuildStatuses;
-  window.setupNumberInputControls = setupNumberInputControls;
-  window.setupQuickConfigDeckEventListeners = setupQuickConfigDeckEventListeners;
+  syncSettingsManagerWindowBindings();
 }
 
 export const settingsManager = {
@@ -1864,6 +2045,7 @@ export const settingsManager = {
   setLocalScannedTransModels,
   getLocalScannedVadModels,
   setLocalScannedVadModels,
+  syncWindowBindings: syncSettingsManagerWindowBindings,
   selectBackend,
   refreshBuildStatuses,
   openModelsDirectory,

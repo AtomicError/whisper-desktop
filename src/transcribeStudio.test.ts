@@ -936,7 +936,7 @@ describe('Transcription Studio Output Directory & Workflow Logic', () => {
 
     // Verification of active batch viewer state tracking and select function
     expect(batchContent).toContain('let activeBatchViewerIndex = -1;');
-    expect(batchContent).toContain('window.selectBatchItemTranscript = async function(');
+    expect(batchContent).toMatch(/(?:export\s+async\s+function\s+|window\.)selectBatchItemTranscript/);
     expect(batchContent).toContain('activeBatchViewerIndex = index;');
 
     // Verification of card selection and visual indicators in queue renderer
@@ -1300,8 +1300,9 @@ it releases chemicals that hit your eyes
     expect(batchContent).toContain('let userExplicitlySelectedBatchItem = false;');
 
     // 2. Verify selectBatchItemTranscript allows viewing completed and active items without isBatchExtracting lockout
+    const selectBatchStart = batchContent.search(/(?:export\s+async\s+function|window\.selectBatchItemTranscript\s*=\s*async\s+function)\s*selectBatchItemTranscript/);
     const selectBatchFunc = batchContent.slice(
-      batchContent.indexOf('window.selectBatchItemTranscript = async function'),
+      selectBatchStart,
       batchContent.indexOf('function renderBatchQueueTable()')
     );
     expect(selectBatchFunc).not.toContain('if (isBatchExtracting) return;');
@@ -1419,9 +1420,9 @@ it releases chemicals that hit your eyes
     const batchContent = readFileSync(resolve(__dirname, 'modules/batchProcessor.ts'), 'utf-8');
 
     // Verify moveBatchItemUp, moveBatchItemDown, sortBatchQueue are guarded against active extraction
-    expect(batchContent).toMatch(/window\.moveBatchItemUp\s*=\s*function\s*\([^)]*\)\s*\{\s*if\s*\(\s*isBatchExtracting\s*\)\s*return;/);
-    expect(batchContent).toMatch(/window\.moveBatchItemDown\s*=\s*function\s*\([^)]*\)\s*\{\s*if\s*\(\s*isBatchExtracting\s*\)\s*return;/);
-    expect(batchContent).toMatch(/window\.sortBatchQueue\s*=\s*function\s*\([^)]*\)\s*\{\s*if\s*\(\s*isBatchExtracting\s*\)\s*return;/);
+    expect(batchContent).toMatch(/(?:export\s+function\s+|window\.)moveBatchItemUp(?:\s*=\s*function)?\s*\([^)]*\)(?:\s*:\s*void)?\s*\{\s*if\s*\(\s*isBatchExtracting\s*\)\s*return;/);
+    expect(batchContent).toMatch(/(?:export\s+function\s+|window\.)moveBatchItemDown(?:\s*=\s*function)?\s*\([^)]*\)(?:\s*:\s*void)?\s*\{\s*if\s*\(\s*isBatchExtracting\s*\)\s*return;/);
+    expect(batchContent).toMatch(/(?:export\s+function\s+|window\.)sortBatchQueue(?:\s*=\s*function)?\s*\([^)]*\)(?:\s*:\s*void)?\s*\{\s*if\s*\(\s*isBatchExtracting\s*\)\s*return;/);
   });
 
   it('supports all fallback subtitle and text formats in batch extraction with single-mode parity', () => {

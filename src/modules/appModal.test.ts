@@ -8,7 +8,8 @@ import {
   showAppModal,
   closeAppModal,
   showConfirmModal,
-  resolveAppConfirm
+  resolveAppConfirm,
+  showBatchErrorDialog
 } from './appModal';
 
 // Resilient headless DOM mock for Node Vitest runner
@@ -135,7 +136,9 @@ class MockNode {
   }
 
   focus() {
-    (globalThis as any).document.activeElement = this;
+    if ((globalThis as any).document) {
+      (globalThis as any).document.activeElement = this;
+    }
   }
 
   contains(other: any): boolean {
@@ -389,6 +392,58 @@ describe('appModal & Feedback Module', () => {
     });
   });
 
+  describe('showBatchErrorDialog', () => {
+    it('sets error message, shows modal, and resolves with user choice', async () => {
+      const modal = new MockNode('DIV') as any;
+      modal.id = 'batch-error-modal';
+      modal.style.display = 'none';
+
+      const msgEl = new MockNode('DIV') as any;
+      msgEl.id = 'batch-error-message';
+      modal.appendChild(msgEl);
+
+      const retryBtn = new MockNode('BUTTON') as any;
+      retryBtn.className = 'btn-primary';
+      modal.appendChild(retryBtn);
+
+      const skipBtn = new MockNode('BUTTON') as any;
+      skipBtn.className = 'btn-secondary';
+      modal.appendChild(skipBtn);
+
+      const body = (globalThis as any).document.body;
+      body.appendChild(modal);
+
+      const promise = showBatchErrorDialog('interview.mp4', 'CUDA out of memory');
+      expect(modal.style.display).toBe('flex');
+      expect(msgEl.textContent).toContain('interview.mp4');
+
+      expect(typeof (window as any).resolveBatchError).toBe('function');
+      (window as any).resolveBatchError('retry');
+
+      const result = await promise;
+      expect(result).toBe('retry');
+      await new Promise(r => setTimeout(r, 10));
+    });
+
+    it('resolves with skip and abort choices accurately', async () => {
+      const modal = new MockNode('DIV') as any;
+      modal.id = 'batch-error-modal';
+      const msgEl = new MockNode('DIV') as any;
+      msgEl.id = 'batch-error-message';
+      modal.appendChild(msgEl);
+      (globalThis as any).document.body.appendChild(modal);
+
+      const skipPromise = showBatchErrorDialog('audio1.wav', 'Decode failure');
+      (window as any).resolveBatchError('skip');
+      expect(await skipPromise).toBe('skip');
+
+      const abortPromise = showBatchErrorDialog('audio2.wav', 'Fatal pipeline panic');
+      (window as any).resolveBatchError('abort');
+      expect(await abortPromise).toBe('abort');
+      await new Promise(r => setTimeout(r, 10));
+    });
+  });
+
   describe('appModal controller namespace export', () => {
     it('exposes all expected functions and window bindings', () => {
       expect(typeof appModal.notify).toBe('function');
@@ -399,6 +454,7 @@ describe('appModal & Feedback Module', () => {
       expect(typeof (window as any).showNotification).toBe('function');
       expect(typeof (window as any).showAppModal).toBe('function');
       expect(typeof (window as any).showConfirmModal).toBe('function');
+      expect(typeof (window as any).showBatchErrorDialog).toBe('function');
     });
   });
 });

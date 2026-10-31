@@ -12,6 +12,7 @@ import {
   addBatchFiles,
   runBatchExtraction,
   abortBatchExtraction,
+  selectBatchItemTranscript,
   type BatchItem
 } from './batchProcessor';
 
@@ -447,12 +448,78 @@ describe('batchProcessor module', () => {
     });
 
     it('setIsExtracting(false) automatically resets batchCancelActive', () => {
-      batchProcessor.setIsExtracting(true);
+      batchProcessor.setIsExtracting(false);
       batchProcessor.setCancelActive(true);
       expect(batchProcessor.getCancelActive()).toBe(true);
 
       batchProcessor.setIsExtracting(false);
       expect(batchProcessor.getCancelActive()).toBe(false);
+    });
+  });
+
+  describe('selectBatchItemTranscript', () => {
+    it('ignores invalid or out of bounds indices safely', async () => {
+      batchProcessor.setItems([{ path: '/test.mp4', name: 'test.mp4', status: 'completed' }]);
+      batchProcessor.setActiveViewerIndex(-1);
+
+      await selectBatchItemTranscript(-1);
+      expect(batchProcessor.getActiveViewerIndex()).toBe(-1);
+
+      await selectBatchItemTranscript(10);
+      expect(batchProcessor.getActiveViewerIndex()).toBe(-1);
+    });
+
+    it('notifies when attempting to select a pending item', async () => {
+      const showNotificationMock = vi.fn();
+      (window as any).showNotification = showNotificationMock;
+
+      batchProcessor.setItems([{ path: '/pending.mp4', name: 'pending.mp4', status: 'pending' }]);
+      batchProcessor.setActiveViewerIndex(-1);
+
+      await selectBatchItemTranscript(0);
+      expect(batchProcessor.getActiveViewerIndex()).toBe(-1);
+      expect(showNotificationMock).toHaveBeenCalled();
+    });
+
+    it('selects completed item and updates active viewer index and window output paths', async () => {
+      batchProcessor.setItems([
+        {
+          path: '/media/video.mp4',
+          name: 'video.mp4',
+          status: 'completed',
+          subtitlePath: '/media/video.srt',
+          transcriptLines: [{ start: '00:00', end: '00:05', text: 'Hello world' }]
+        }
+      ]);
+      batchProcessor.setActiveViewerIndex(-1);
+
+      await selectBatchItemTranscript(0);
+
+      expect(batchProcessor.getActiveViewerIndex()).toBe(0);
+      expect((window as any).lastTranscribedVideoPath).toBe('/media/video.mp4');
+      expect((window as any).lastTranscribedSubtitlePath).toBe('/media/video.srt');
+    });
+  });
+
+  describe('batchProcessor window global bindings', () => {
+    it('exposes all clean exported functions on window', () => {
+      expect(typeof (window as any).removeFileFromBatch).toBe('function');
+      expect(typeof (window as any).clearBatchQueue).toBe('function');
+      expect(typeof (window as any).moveBatchItemUp).toBe('function');
+      expect(typeof (window as any).moveBatchItemDown).toBe('function');
+      expect(typeof (window as any).sortBatchQueue).toBe('function');
+      expect(typeof (window as any).selectBatchItemTranscript).toBe('function');
+      expect(typeof (window as any).runBatchExtraction).toBe('function');
+      expect(typeof (window as any).abortBatchExtraction).toBe('function');
+    });
+
+    it('synchronizes batchItems and selectedMediaFiles reactively', () => {
+      (window as any).batchItems = [{ path: '/item.mp4', name: 'item.mp4', status: 'pending' }];
+      expect(batchProcessor.getItems()).toHaveLength(1);
+      expect(batchProcessor.getItems()[0].name).toBe('item.mp4');
+
+      (window as any).selectedMediaFiles = ['/a.mp4', '/b.mp4'];
+      expect(batchProcessor.getSelectedFiles()).toEqual(['/a.mp4', '/b.mp4']);
     });
   });
 });

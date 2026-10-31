@@ -540,7 +540,7 @@
   font-weight: 600;
   font-size: 0.88rem;
   border-radius: 8px;
-  transition-property: transform, box-shadow, filter;
+  transition-property: box-shadow, filter, background-color, border-color, opacity;
   transition-duration: 0.15s;
   transition-timing-function: ease;
   white-space: nowrap;
@@ -553,7 +553,7 @@
 }
 
 .btn-start-translation:active:not(:disabled) {
-  transform: scale(0.97);
+  filter: brightness(0.92);
 }
 
 .btn-cancel-translation {
@@ -583,7 +583,7 @@
 }
 
 .btn-cancel-translation:active {
-  transform: scale(0.97);
+  background: rgba(239, 68, 68, 0.2);
 }
 
 .translate-telemetry {

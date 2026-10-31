@@ -1,6 +1,7 @@
 // Native OS Controls, Titlebar Management, Taskbar Progress, Clipboard, and File Helpers
 import { t, applyContentDirection, clearContentDirection } from '../i18n/index';
 import { showNotification, showConfirmModal } from './appModal';
+import type { SettingsState } from './settingsManager';
 
 if (typeof window === 'undefined') {
   (globalThis as any).window = globalThis;
@@ -24,7 +25,7 @@ declare global {
     hasActiveBackgroundJob: () => boolean;
     updateTaskbarProgress: (progressFraction: number, active: boolean, statusType?: string) => void;
     setupTitlebar: () => void;
-    settingsState: any;
+    settingsState: SettingsState | null;
     __TAURI__?: any;
   }
 }

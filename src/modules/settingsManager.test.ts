@@ -33,7 +33,8 @@ import {
   clearSettingsSearch,
   executeFilterSettings,
   refreshBuildStatuses,
-  toggleQuickVad
+  toggleQuickVad,
+  syncSettingsManagerWindowBindings
 } from './settingsManager';
 
 // Headless DOM mock for Node runner
@@ -653,6 +654,61 @@ describe('settingsManager module', () => {
 
       toggleQuickVad(false);
       expect(state.vad).toBe(false);
+    });
+  });
+
+  describe('Window bindings reactive sync', () => {
+    beforeEach(() => {
+      syncSettingsManagerWindowBindings();
+    });
+
+    it('synchronizes settingsState bidirectionally via getters and setters', () => {
+      const win = (globalThis as any).window;
+      expect(win).toBeDefined();
+
+      // Setting via module setter reflects on window.settingsState
+      setSettingsState({ language: 'fa', selectedBackend: 'Vulkan' });
+      expect(win.settingsState).toBeDefined();
+      expect(win.settingsState.language).toBe('fa');
+      expect(win.settingsState.selectedBackend).toBe('Vulkan');
+
+      // Setting via window.settingsState reflects in getSettingsState()
+      win.settingsState = { language: 'en', selectedBackend: 'CPU' };
+      expect(getSettingsState().language).toBe('en');
+      expect(getSettingsState().selectedBackend).toBe('CPU');
+    });
+
+    it('synchronizes compiledBackends, scanned models, and active category bidirectionally', () => {
+      const win = (globalThis as any).window;
+
+      // compiledBackends
+      win.compiledBackends = { Vulkan: true, CUDA: false };
+      expect(getCompiledBackends().Vulkan).toBe(true);
+      expect(getCompiledBackends().CUDA).toBe(false);
+
+      setCompiledBackends({ Metal: true });
+      expect(win.compiledBackends.Metal).toBe(true);
+
+      // localScannedTransModels
+      win.localScannedTransModels = ['model-a.bin', 'model-b.bin'];
+      expect(getLocalScannedTransModels()).toEqual(['model-a.bin', 'model-b.bin']);
+
+      setLocalScannedTransModels(['model-c.bin']);
+      expect(win.localScannedTransModels).toEqual(['model-c.bin']);
+
+      // localScannedVadModels
+      win.localScannedVadModels = ['vad-1.onnx'];
+      expect(getLocalScannedVadModels()).toEqual(['vad-1.onnx']);
+
+      setLocalScannedVadModels(['vad-2.onnx']);
+      expect(win.localScannedVadModels).toEqual(['vad-2.onnx']);
+
+      // activeSettingsCat
+      win.activeSettingsCat = 'general';
+      expect(getActiveSettingsCat()).toBe('general');
+
+      setActiveSettingsCat('advanced');
+      expect(win.activeSettingsCat).toBe('advanced');
     });
   });
 });

@@ -797,7 +797,6 @@ header {
 .path-action-btn:hover .path-open-icon {
   opacity: 1;
   stroke: var(--color-royal-blue);
-  transform: scale(1.12);
 }
 
 .path-action-btn:focus-visible {
@@ -949,7 +948,6 @@ header {
 }
 
 .btn-primary:hover:not(:disabled) {
-  transform: translateY(-1px);
   background: var(--primary-btn-hover-bg);
   border-color: var(--primary-btn-hover-border);
   box-shadow: 
@@ -960,7 +958,6 @@ header {
 }
 
 .btn-primary:active:not(:disabled) {
-  transform: translateY(1px);
   background: var(--primary-btn-active-bg);
   border-color: var(--primary-btn-active-border);
   box-shadow: 

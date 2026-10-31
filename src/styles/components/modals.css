@@ -242,7 +242,7 @@
   border: 1.5px solid rgba(255, 255, 255, 0.12);
   border-radius: 6px;
   position: relative;
-  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
   display: inline-block;
   flex-shrink: 0;
   box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.04), 0 2px 4px rgba(0, 0, 0, 0.2);
@@ -252,7 +252,6 @@
 .checkbox-container:hover .custom-checkmark {
   border-color: rgba(var(--color-royal-blue-rgb), 0.4);
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.08) 100%);
-  transform: scale(1.04);
   box-shadow: 0 0 6px rgba(var(--color-royal-blue-rgb), 0.12);
 }
 
@@ -260,12 +259,11 @@
 .checkbox-container input:checked ~ .custom-checkmark {
   background: linear-gradient(135deg, var(--color-royal-blue) 0%, var(--color-royal-blue-dark) 100%);
   border-color: var(--color-royal-blue);
-  transform: scale(1.05);
   box-shadow: 0 0 8px rgba(var(--color-royal-blue-rgb), 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.3);
 }
 
 .checkbox-container input:active ~ .custom-checkmark {
-  transform: scale(0.95);
+  opacity: 0.85;
 }
 
 /* Animated Tick Mark */
@@ -454,11 +452,12 @@
   overflow: visible;
   /* Clean dark elevation shadow without any artificial colored halo or border */
   filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.6)) !important;
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: filter 0.25s ease, opacity 0.25s ease;
 }
 
 .about-brand-icon:hover {
-  transform: scale(1.05);
+  filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.75)) !important;
+  opacity: 0.95;
 }
 
 @media (prefers-reduced-motion: reduce) {

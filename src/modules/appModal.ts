@@ -16,6 +16,8 @@ declare global {
     showConfirmModal: (title: string, message: string, confirmButtonText?: string | null) => Promise<boolean>;
     resolveAppConfirm: (value: boolean) => void;
     _confirmModalResolve?: ((value: boolean) => void) | null;
+    showBatchErrorDialog: (fileName: string, errorMsg: string) => Promise<string>;
+    resolveBatchError?: (choice: string) => void;
     openAboutModal: () => void;
     closeAboutModal: () => void;
     checkForAppUpdates: () => Promise<void>;
@@ -854,20 +856,75 @@ export function setupAboutModalEvents(): void {
   });
 }
 
+// ----------------- Batch Error Dialog -----------------
+let _batchErrorModalTrap: { release: () => void } | null = null;
+
+export function showBatchErrorDialog(fileName: string, errorMsg: string): Promise<string> {
+  return new Promise((resolve) => {
+    if (typeof document === 'undefined') {
+      resolve('abort');
+      return;
+    }
+    if (_batchErrorModalTrap) {
+      _batchErrorModalTrap.release();
+      _batchErrorModalTrap = null;
+    }
+    const modal = document.getElementById('batch-error-modal');
+    const msgEl = document.getElementById('batch-error-message');
+    if (msgEl) {
+      msgEl.textContent = t('modals.batchErrorFormatted', { file: fileName, error: errorMsg });
+    }
+
+    if (modal) {
+      modal.style.display = 'flex';
+      setTimeout(() => modal.classList.add('show'), 10);
+
+      _batchErrorModalTrap = _trapModalFocus(modal, () => {
+        const win = getGlobal();
+        if (typeof win.resolveBatchError === 'function') {
+          win.resolveBatchError('abort');
+        }
+      });
+    }
+
+    const win = getGlobal();
+    win.resolveBatchError = function(choice: string) {
+      if (_batchErrorModalTrap) {
+        _batchErrorModalTrap.release();
+        _batchErrorModalTrap = null;
+      }
+      if (modal) {
+        modal.classList.remove('show');
+        setTimeout(() => { modal.style.display = 'none'; }, 300);
+      }
+      resolve(choice);
+    };
+
+    safeRaf(() => {
+      if (modal) {
+        const retryBtn = (modal.querySelector('button.btn-primary') || modal.querySelector('button')) as HTMLButtonElement | null;
+        if (retryBtn) retryBtn.focus();
+      }
+    });
+  });
+}
+
 // ----------------- Synchronize Window Bindings -----------------
 export function syncAppModalWindowBindings(): void {
-  if (typeof window === 'undefined') return;
+  const win = getGlobal();
+  if (!win) return;
 
-  window.showNotification = showNotification;
-  window.showAppModal = showAppModal;
-  window.closeAppModal = closeAppModal;
-  window.showConfirmModal = showConfirmModal;
-  window.resolveAppConfirm = resolveAppConfirm;
-  window.openAboutModal = openAboutModal;
-  window.closeAboutModal = closeAboutModal;
-  window.checkForAppUpdates = checkForAppUpdates;
-  window.renderUpdateCheckerUI = renderUpdateCheckerUI;
-  window.syncAppVersionUI = syncAppVersionUI;
+  win.showNotification = showNotification;
+  win.showAppModal = showAppModal;
+  win.closeAppModal = closeAppModal;
+  win.showConfirmModal = showConfirmModal;
+  win.resolveAppConfirm = resolveAppConfirm;
+  win.showBatchErrorDialog = showBatchErrorDialog;
+  win.openAboutModal = openAboutModal;
+  win.closeAboutModal = closeAboutModal;
+  win.checkForAppUpdates = checkForAppUpdates;
+  win.renderUpdateCheckerUI = renderUpdateCheckerUI;
+  win.syncAppVersionUI = syncAppVersionUI;
 }
 
 if (typeof window !== 'undefined') {
@@ -883,6 +940,7 @@ export const appModal = {
   close: closeAppModal,
   confirm: showConfirmModal,
   resolveConfirm: resolveAppConfirm,
+  showBatchErrorDialog,
   compareSemver,
   renderUpdateUI: renderUpdateCheckerUI,
   checkUpdates: checkForAppUpdates,

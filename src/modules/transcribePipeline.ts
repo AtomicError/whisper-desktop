@@ -11,7 +11,7 @@ import {
   copyToClipboard
 } from './nativeWindow';
 import {
-  settingsState,
+  getSettingsState,
   saveCurrentSettings,
   compiledBackends,
   localScannedTransModels
@@ -31,6 +31,15 @@ import {
 } from './workflowBridge';
 import { formatLocalizedNumber } from './translationProviders';
 
+export interface ProbedMediaMetadata {
+  exists?: boolean;
+  format?: string;
+  size?: string;
+  durationSec?: number;
+  recommendation?: string;
+  [key: string]: any;
+}
+
 if (typeof window === 'undefined') {
   (globalThis as any).window = globalThis;
 }
@@ -38,7 +47,7 @@ if (typeof window === 'undefined') {
 declare global {
   interface Window {
     selectedMediaFile: string | null;
-    probedMetadata: any;
+    probedMetadata: ProbedMediaMetadata | null;
     wavPathForTranscription: string | null;
     isTranscribing: boolean;
     toggleWizardAccordion: (stepNum: number) => void;
@@ -96,7 +105,7 @@ const listen = (event: string, handler: (e: any) => void): Promise<() => void> =
 
 // ----------------- State Variables -----------------
 export let selectedMediaFile: string | null = null;
-export let probedMetadata: any = null;
+export let probedMetadata: ProbedMediaMetadata | null = null;
 export let wavPathForTranscription: string | null = null;
 export let isTranscribing: boolean = false;
 export let isTranscriptionCancelActive: boolean = false;
@@ -109,11 +118,11 @@ export function setSelectedMediaFile(path: string | null): void {
   selectedMediaFile = typeof path === 'string' && path.trim() !== '' ? path.trim() : null;
 }
 
-export function getProbedMetadata(): any {
+export function getProbedMetadata(): ProbedMediaMetadata | null {
   return probedMetadata;
 }
 
-export function setProbedMetadata(meta: any): void {
+export function setProbedMetadata(meta: ProbedMediaMetadata | null): void {
   probedMetadata = meta && typeof meta === 'object' && !Array.isArray(meta) ? meta : null;
 }
 
@@ -271,7 +280,7 @@ export function clearSingleMediaFile(): void {
   const recEl = document.getElementById('meta-recommendation');
   if (recEl) recEl.textContent = '-';
 
-  const currentSettings = settingsState || getGlobal().settingsState;
+  const currentSettings = getSettingsState();
   if (currentSettings) {
     currentSettings.inputFile = '';
     saveCurrentSettings();
@@ -409,7 +418,7 @@ export async function browseMediaFile(): Promise<void> {
       setWavPathForTranscription(null);
       updateTranscribeActionButtons(false);
 
-      const currentSettings = settingsState || getGlobal().settingsState;
+      const currentSettings = getSettingsState();
       if (currentSettings) {
         currentSettings.inputFile = files[0];
         saveCurrentSettings();
@@ -508,7 +517,7 @@ export function renderMediaMetadata(meta: any): void {
   }
 
   // 4. Engine / Backend & Threads
-  const currentSettings = settingsState || getGlobal().settingsState;
+  const currentSettings = getSettingsState();
   if (recEl && currentSettings) {
     const backendRaw = currentSettings.selectedBackend || 'Standard';
     const backendName = backendRaw === 'Standard' ? t('transcribe.backendStandard') : backendRaw;
@@ -603,9 +612,9 @@ export async function runWhisperTranscription(): Promise<void> {
     return;
   }
 
-  const currentSettings = settingsState || win.settingsState;
+  const currentSettings = getSettingsState();
   const backend = currentSettings?.selectedBackend || 'Standard';
-  const isCompiled = backend === 'Standard' || Boolean(compiledBackends[backend] || (win.compiledBackends || {})[backend]);
+  const isCompiled = backend === 'Standard' || Boolean(compiledBackends[backend]);
   if (!isCompiled) {
     showNotification(t('toasts.backendNotFound', { backend }), "error");
     if (typeof win.switchView === 'function') {
@@ -995,7 +1004,7 @@ export async function copyMainTranscriptToClipboard(): Promise<void> {
 
 export async function openOutputFolder(): Promise<void> {
   const currentMedia = getSelectedMediaFile();
-  const currentSettings = settingsState || getGlobal().settingsState;
+  const currentSettings = getSettingsState();
   const dir = workflowBridge.getLastTranscribedOutputDir() || (currentSettings && currentSettings.inputFile ? getParentDir(currentSettings.inputFile) : (currentMedia ? getParentDir(currentMedia) : null));
   if (dir) {
     try {
@@ -1132,7 +1141,7 @@ export async function handleDroppedFiles(rawFiles: string[]): Promise<void> {
     setWavPathForTranscription(null);
     updateTranscribeActionButtons(false);
 
-    const currentSettings = settingsState || win.settingsState;
+    const currentSettings = getSettingsState();
     if (currentSettings) {
       currentSettings.inputFile = files[0];
       saveCurrentSettings();
