@@ -10,6 +10,8 @@ import {
   clearBatchQueue,
   removeFileFromBatch,
   addBatchFiles,
+  runBatchExtraction,
+  abortBatchExtraction,
   type BatchItem
 } from './batchProcessor';
 
@@ -263,6 +265,194 @@ describe('batchProcessor module', () => {
 
       window.batchProcessingIndex = 0;
       expect(batchProcessor.getProcessingIndex()).toBe(0);
+    });
+  });
+
+  describe('batch extraction runner & abort guards', () => {
+    it('runBatchExtraction blocks re-entrant calls when extraction is already in progress', async () => {
+      batchProcessor.setIsExtracting(true);
+      batchProcessor.setIsBatchMode(true);
+      batchProcessor.setItems([{ path: '/test.mp4', name: 'test.mp4', status: 'pending' }]);
+
+      const invokeMock = vi.fn();
+      (window as any).invoke = invokeMock;
+
+      await runBatchExtraction();
+      expect(invokeMock).not.toHaveBeenCalled();
+
+      batchProcessor.setIsExtracting(false);
+    });
+
+    it('abortBatchExtraction ignores execution when no extraction is active', async () => {
+      batchProcessor.setIsExtracting(false);
+      const invokeMock = vi.fn();
+      (window as any).invoke = invokeMock;
+
+      await abortBatchExtraction();
+      expect(invokeMock).not.toHaveBeenCalled();
+    });
+
+    it('abortBatchExtraction resets cancel lock and allows retry when backend invoke fails', async () => {
+      batchProcessor.setIsExtracting(true);
+      const invokeMock = vi.fn().mockRejectedValueOnce(new Error('IPC failure')).mockResolvedValueOnce('ok');
+      (window as any).invoke = invokeMock;
+
+      const notifyMock = vi.fn();
+      (window as any).showNotification = notifyMock;
+
+      const span = {
+        setAttribute: vi.fn(),
+        textContent: ''
+      };
+      const cancelBtn = {
+        id: 'btn-cancel-batch',
+        disabled: true,
+        style: { display: 'inline-flex' },
+        querySelector: vi.fn().mockImplementation((sel: string) => (sel === 'span' ? span : null))
+      };
+      const prevDoc = (globalThis as any).document;
+      (globalThis as any).document = {
+        getElementById: vi.fn().mockImplementation((id: string) => (id === 'btn-cancel-batch' ? cancelBtn : null))
+      };
+
+      try {
+        // First attempt fails
+        await abortBatchExtraction();
+        expect(invokeMock).toHaveBeenCalledTimes(1);
+        expect(notifyMock).toHaveBeenCalled();
+        expect(cancelBtn.style.display).toBe('inline-flex');
+        expect(cancelBtn.disabled).toBe(false);
+        expect(span.setAttribute).toHaveBeenCalledWith('data-i18n', 'transcribe.aborting');
+        expect(span.setAttribute).toHaveBeenCalledWith('data-i18n', 'transcribe.cancelBatch');
+
+        // Second attempt is allowed because lock was released on failure
+        await abortBatchExtraction();
+        expect(invokeMock).toHaveBeenCalledTimes(2);
+      } finally {
+        (globalThis as any).document = prevDoc;
+        batchProcessor.setIsExtracting(false);
+        batchProcessor.setCancelActive(false);
+      }
+    });
+
+    it('abortBatchExtraction preserves cancel state and hides telemetry when backend reports no active session', async () => {
+      batchProcessor.setIsExtracting(true);
+      batchProcessor.setCancelActive(false);
+      const invokeMock = vi.fn().mockRejectedValueOnce('No active transcription or translation session');
+      (window as any).invoke = invokeMock;
+
+      const notifyMock = vi.fn();
+      (window as any).showNotification = notifyMock;
+
+      const telemetryCard = { style: { display: 'block' } };
+      const cancelBtn = {
+        id: 'btn-cancel-batch',
+        disabled: true,
+        style: { display: 'inline-flex' },
+        querySelector: vi.fn().mockReturnValue(null)
+      };
+      const prevDoc = (globalThis as any).document;
+      (globalThis as any).document = {
+        getElementById: vi.fn().mockImplementation((id: string) => {
+          if (id === 'btn-cancel-batch') return cancelBtn;
+          if (id === 'telemetry-hud-card') return telemetryCard;
+          return null;
+        })
+      };
+
+      try {
+        await abortBatchExtraction();
+        expect(invokeMock).toHaveBeenCalledTimes(1);
+        expect(notifyMock).toHaveBeenCalled();
+        expect(telemetryCard.style.display).toBe('none');
+
+        // Subsequent abort is blocked because batchCancelActive remains true
+        await abortBatchExtraction();
+        expect(invokeMock).toHaveBeenCalledTimes(1);
+      } finally {
+        (globalThis as any).document = prevDoc;
+        batchProcessor.setIsExtracting(false);
+        batchProcessor.setCancelActive(false);
+      }
+    });
+
+    it('runBatchExtraction marks current item as aborted and resets radial HUD message and cancel flag on cancel', async () => {
+      batchProcessor.setIsBatchMode(true);
+      batchProcessor.setItems([
+        { path: '/test1.mp4', name: 'test1.mp4', status: 'pending' },
+        { path: '/test2.mp4', name: 'test2.mp4', status: 'pending' }
+      ]);
+
+      (window as any).settingsState = {
+        selectedBackend: 'Standard',
+        modelPath: '/model.bin'
+      };
+      (window as any).localScannedTransModels = ['/model.bin'];
+
+      const invokeMock = vi.fn().mockImplementation((cmd: string) => {
+        if (cmd === 'convert_media_file') {
+          return Promise.resolve('/test1.wav');
+        }
+        if (cmd === 'start_transcription_task') {
+          // Simulate user cancelling during the task
+          batchProcessor.setCancelActive(true);
+          return Promise.reject(new Error('Process was cancelled by the user'));
+        }
+        return Promise.resolve('ok');
+      });
+      (window as any).invoke = invokeMock;
+
+      const msgEl = {
+        textContent: '',
+        setAttribute: vi.fn(),
+        removeAttribute: vi.fn(),
+        dataset: { batchSummarySuccess: '1' }
+      };
+      const fillBar = { style: { width: '50%' } };
+      const pctEl = { textContent: '50%' };
+      const telemetryCard = { style: { display: 'block' } };
+      const cancelSpan = { setAttribute: vi.fn(), textContent: '' };
+      const cancelBtn = {
+        style: { display: 'inline-flex' },
+        disabled: false,
+        querySelector: vi.fn().mockReturnValue(cancelSpan)
+      };
+
+      const prevDoc = (globalThis as any).document;
+      (globalThis as any).document = {
+        getElementById: vi.fn().mockImplementation((id: string) => {
+          if (id === 'lbl-radial-msg') return msgEl;
+          if (id === 'progress-linear-fill') return fillBar;
+          if (id === 'lbl-radial-pct') return pctEl;
+          if (id === 'telemetry-hud-card') return telemetryCard;
+          if (id === 'btn-cancel-batch') return cancelBtn;
+          return null;
+        })
+      };
+
+      try {
+        await runBatchExtraction();
+
+        const items = batchProcessor.getItems();
+        expect(items[0].status).toBe('aborted');
+        expect(items[1].status).toBe('aborted');
+        expect(batchProcessor.getCancelActive()).toBe(false);
+        expect(batchProcessor.getIsExtracting()).toBe(false);
+        expect(msgEl.setAttribute).toHaveBeenCalledWith('data-i18n', 'transcribe.standingBy');
+        expect(cancelSpan.setAttribute).toHaveBeenCalledWith('data-i18n', 'transcribe.cancelBatch');
+        expect((msgEl.dataset as any).batchSummarySuccess).toBeUndefined();
+      } finally {
+        (globalThis as any).document = prevDoc;
+      }
+    });
+
+    it('setIsExtracting(false) automatically resets batchCancelActive', () => {
+      batchProcessor.setIsExtracting(true);
+      batchProcessor.setCancelActive(true);
+      expect(batchProcessor.getCancelActive()).toBe(true);
+
+      batchProcessor.setIsExtracting(false);
+      expect(batchProcessor.getCancelActive()).toBe(false);
     });
   });
 });

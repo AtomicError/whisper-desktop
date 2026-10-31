@@ -16,7 +16,11 @@ import {
 } from './modules/batchProcessor';
 import {
   translationProviders,
-  setupTranslationEventListeners
+  setupTranslationEventListeners,
+  updateFilterCounts,
+  renderProvidersGrid,
+  applyModelsFilterAndRender,
+  filterModelsTable
 } from './modules/translationProviders';
 import {
   syncAppVersionUI,
@@ -35,7 +39,8 @@ import {
   setupNumberInputControls,
   updateTranscribeUIConfigs,
   setupQuickConfigDeckEventListeners,
-  saveCurrentSettings
+  saveCurrentSettings,
+  filterSettings
 } from './modules/settingsManager';
 import {
   updateTranscribeActionButtons
@@ -119,14 +124,12 @@ if (typeof window !== 'undefined') {
 // Unified language change coordinator
 window.addEventListener('whisper:languageChanged', () => {
   renderUpdateCheckerUI();
-  if (typeof window.updateFilterCounts === 'function') {
-    window.updateFilterCounts();
+  updateFilterCounts();
+  if (settingsState) {
+    renderProvidersGrid();
   }
-  if (settingsState && typeof window.renderProvidersGrid === 'function') {
-    window.renderProvidersGrid();
-  }
-  if (settingsState && typeof window.applyModelsFilterAndRender === 'function' && translationProviders.getModels().length > 0) {
-    window.applyModelsFilterAndRender(0);
+  if (settingsState && translationProviders.getModels().length > 0) {
+    applyModelsFilterAndRender(0);
   }
 
   const curMetadata = getProbedMetadata();
@@ -204,13 +207,13 @@ window.addEventListener('whisper:languageChanged', () => {
 
   syncCustomSelects();
 
-  if (getActiveView() === 'settings' && typeof window.filterModelsTable === 'function') {
-    window.filterModelsTable(0);
+  if (getActiveView() === 'settings') {
+    filterModelsTable(0);
   }
 
   const settingsSearchInput = document.getElementById('settings-search-input') as HTMLInputElement | null;
-  if (settingsSearchInput && settingsSearchInput.value && typeof window.filterSettings === 'function') {
-    window.filterSettings(settingsSearchInput.value);
+  if (settingsSearchInput && settingsSearchInput.value) {
+    filterSettings(settingsSearchInput.value);
   }
 
   updateTranscribeActionButtons();

@@ -9,7 +9,13 @@ import {
 import { modelHub } from './modelHub';
 import { batchProcessor } from './batchProcessor';
 import { transcriptViewer } from './transcriptViewer';
-import { setTranscribeStatusBadge, updateTaskbarProgress } from './nativeWindow';
+import {
+  setTranscribeStatusBadge,
+  updateTaskbarProgress,
+  setIsTranscriptionRunning,
+  setIsTranslationRunning,
+  setIsDownloadingModelRunning
+} from './nativeWindow';
 import { showNotification } from './appModal';
 import { scanAndPopulateModels } from './settingsManager';
 import { formatNumberForLang } from './translationProviders';
@@ -291,9 +297,7 @@ export function setupTauriListeners(): void {
   on('transcribe-status', (event: any) => {
     const payload = event?.payload;
     if (!payload) return;
-    if (typeof window !== 'undefined') {
-      window.isTranscriptionRunning = !!payload.active;
-    }
+    setIsTranscriptionRunning(!!payload.active);
     updateTaskbarProgress(payload.progress, payload.active);
 
     const fillBar = document.getElementById('progress-linear-fill');
@@ -347,9 +351,7 @@ export function setupTauriListeners(): void {
   on('translation-status', (event: any) => {
     const payload = event?.payload;
     if (!payload) return;
-    if (typeof window !== 'undefined') {
-      window.isTranslationRunning = !!payload.active;
-    }
+    setIsTranslationRunning(!!payload.active);
     updateTaskbarProgress(payload.progress, payload.active);
 
     const fillBar = document.getElementById('progress-linear-fill');
@@ -399,9 +401,7 @@ export function setupTauriListeners(): void {
     if (!payload || !payload.modelName) return;
 
     if (payload.phase === 'starting' || payload.phase === 'downloading') {
-      if (typeof window !== 'undefined') {
-        window.isDownloadingModelRunning = true;
-      }
+      setIsDownloadingModelRunning(true);
       updateTaskbarProgress(payload.progress, true);
 
       // CSS.escape prevents selector breakage from special chars in names
@@ -541,9 +541,7 @@ export function setupTauriListeners(): void {
         clearTimeout(window._modelStallTimers[payload.modelName]);
         delete window._modelStallTimers[payload.modelName];
       }
-      if (typeof window !== 'undefined') {
-        window.isDownloadingModelRunning = false;
-      }
+      setIsDownloadingModelRunning(false);
       updateTaskbarProgress(0, false, payload.phase === 'failed' ? 'error' : 'normal');
 
       // Reload grid state once

@@ -326,8 +326,8 @@ export function updateTranscribeActionButtons(isTranscribingParam?: boolean): vo
   if (cancelBatchBtn) {
     const cancelBatchSpan = cancelBatchBtn.querySelector('span');
     if (cancelBatchSpan) {
-      cancelBatchSpan.setAttribute('data-i18n', 'transcribe.cancelTranscription');
-      cancelBatchSpan.textContent = t('transcribe.cancelTranscription');
+      cancelBatchSpan.setAttribute('data-i18n', 'transcribe.cancelBatch');
+      cancelBatchSpan.textContent = t('transcribe.cancelBatch');
     }
   }
 }

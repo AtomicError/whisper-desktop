@@ -3,6 +3,11 @@ import { t, applyContentDirection, isolateLtr, isolateDirection } from '../i18n/
 import { escapeHTML } from './logsController';
 import { transcriptViewer, loadTranscriptFromFile } from './transcriptViewer';
 import { customSelectsMap } from './customSelect';
+import {
+  settingsState,
+  compiledBackends,
+  localScannedTransModels
+} from './settingsManager';
 
 if (typeof window === 'undefined') {
   (globalThis as any).window = globalThis;
@@ -752,23 +757,24 @@ function renderBatchQueueTable(): void {
 }
 
 window.runBatchExtraction = async function(): Promise<void> {
-  if (!isBatchMode || batchItems.length === 0) return;
+  if (isBatchExtracting || !isBatchMode || batchItems.length === 0) return;
 
   const win = getGlobal();
   const invoke = getTauriInvoke();
   if (!invoke) return;
 
-  const settings = win.settingsState || {};
-  const isCompiled = settings.selectedBackend === 'Standard' || Boolean((win.compiledBackends || {})[settings.selectedBackend]);
+  const settings = settingsState || win.settingsState || {};
+  const backend = settings.selectedBackend || 'Standard';
+  const isCompiled = backend === 'Standard' || Boolean(compiledBackends[backend] || (win.compiledBackends || {})[backend]);
   if (!isCompiled) {
     if (typeof win.showNotification === 'function') {
-      win.showNotification(t('toasts.backendNotFound', { backend: settings.selectedBackend }), "error");
+      win.showNotification(t('toasts.backendNotFound', { backend }), "error");
     }
     if (typeof win.switchView === 'function') win.switchView('settings');
     return;
   }
 
-  const scannedModels = win.localScannedTransModels || [];
+  const scannedModels = localScannedTransModels.length > 0 ? localScannedTransModels : (win.localScannedTransModels || []);
   const modelExists = scannedModels.includes(settings.modelPath);
   if (!modelExists) {
     if (typeof win.showNotification === 'function') {
@@ -795,7 +801,12 @@ window.runBatchExtraction = async function(): Promise<void> {
   if (cancelBtn) {
     cancelBtn.style.display = 'inline-flex';
     cancelBtn.disabled = false;
-    if (cancelBtnSpan) cancelBtnSpan.textContent = t('transcribe.cancelBatch'); else cancelBtn.textContent = t('transcribe.cancelBatch');
+    if (cancelBtnSpan) {
+      cancelBtnSpan.setAttribute('data-i18n', 'transcribe.cancelBatch');
+      cancelBtnSpan.textContent = t('transcribe.cancelBatch');
+    } else {
+      cancelBtn.textContent = t('transcribe.cancelBatch');
+    }
   }
 
   batchCancelActive = false;
@@ -994,31 +1005,60 @@ window.runBatchExtraction = async function(): Promise<void> {
       }
 
       renderBatchQueueTable();
-    } catch (err) {
-      item.status = 'failed';
-      renderBatchQueueTable();
-      if (typeof win.showNotification === 'function') {
-        win.showNotification(t('toasts.batchItemError', { name: item.name, error: String(err) }), "error");
+    } catch (err: any) {
+      const errMsg = (typeof err === 'string') ? err : (err && err.toString ? err.toString() : '');
+      const isCancelled = batchCancelActive ||
+        errMsg.toLowerCase().includes('cancelled') ||
+        errMsg.toLowerCase().includes('aborted');
+
+      if (isCancelled) {
+        item.status = 'aborted';
+        renderBatchQueueTable();
+      } else {
+        item.status = 'failed';
+        renderBatchQueueTable();
+        if (typeof win.showNotification === 'function') {
+          win.showNotification(t('toasts.batchItemError', { name: item.name, error: String(err) }), "error");
+        }
       }
     } finally {
       settings.inputFile = originalInputFile;
     }
   }
 
+  const wasCancelled = batchCancelActive;
   isBatchExtracting = false;
+  batchCancelActive = false;
   batchProcessingIndex = -1;
   if (typeof window.updateTranscribeActionButtons === 'function') {
     window.updateTranscribeActionButtons(false);
   }
-  if (cancelBtn) cancelBtn.style.display = 'none';
+  if (cancelBtn) {
+    cancelBtn.disabled = false;
+    const cancelSpan = cancelBtn.querySelector('span');
+    if (cancelSpan) {
+      cancelSpan.setAttribute('data-i18n', 'transcribe.cancelBatch');
+      cancelSpan.textContent = t('transcribe.cancelBatch');
+    } else {
+      cancelBtn.textContent = t('transcribe.cancelBatch');
+    }
+    cancelBtn.style.display = 'none';
+  }
   if (sortSelect) sortSelect.disabled = false;
   if (clearBtn) clearBtn.disabled = false;
 
-  if (batchCancelActive) {
+  if (wasCancelled) {
     if (telemetryCard) telemetryCard.style.display = 'none';
     if (fillBar) fillBar.style.width = '0%';
     if (pctEl) pctEl.textContent = '0%';
     if (metricsEl) metricsEl.style.display = 'none';
+    if (msgEl) {
+      delete (msgEl.dataset as any).batchSummarySuccess;
+      delete (msgEl.dataset as any).batchSummaryTotal;
+      delete (msgEl.dataset as any).statusCompleted;
+      msgEl.setAttribute('data-i18n', 'transcribe.standingBy');
+      msgEl.textContent = t('transcribe.standingBy');
+    }
     if (typeof win.setTranscribeStatusBadge === 'function') {
       win.setTranscribeStatusBadge('', 'transcribe.standingBy');
     }
@@ -1099,23 +1139,30 @@ window.runBatchExtraction = async function(): Promise<void> {
   renderBatchQueueTable();
 
   const autoTransferEnabled = Boolean(settings?.autoTransferToTranslate ?? settings?.translateAiEnabled);
-  if (!batchCancelActive && successCount > 0 && autoTransferEnabled && window.lastTranscribedSubtitlePath) {
+  if (!wasCancelled && successCount > 0 && autoTransferEnabled && window.lastTranscribedSubtitlePath) {
     if (typeof window.sendTranscribeToTranslationStudio === 'function') {
       await window.sendTranscribeToTranslationStudio();
     }
   }
 
   if (typeof win.setWizardStepCompleted === 'function') {
-    win.setWizardStepCompleted(3, true);
+    win.setWizardStepCompleted(3, !wasCancelled && successCount > 0);
   }
 };
 
 window.abortBatchExtraction = async function(): Promise<void> {
-  const cancelBtn = document.getElementById('btn-cancel-batch') as HTMLButtonElement | null;
+  if (!isBatchExtracting || batchCancelActive) return;
+  const doc = typeof document !== 'undefined' ? document : null;
+  const cancelBtn = doc ? (doc.getElementById('btn-cancel-batch') as HTMLButtonElement | null) : null;
   const cancelBtnSpan = cancelBtn?.querySelector('span');
   if (cancelBtn) {
     cancelBtn.disabled = true;
-    if (cancelBtnSpan) cancelBtnSpan.textContent = t('transcribe.aborting'); else cancelBtn.textContent = t('transcribe.aborting');
+    if (cancelBtnSpan) {
+      cancelBtnSpan.setAttribute('data-i18n', 'transcribe.aborting');
+      cancelBtnSpan.textContent = t('transcribe.aborting');
+    } else {
+      cancelBtn.textContent = t('transcribe.aborting');
+    }
   }
 
   batchCancelActive = true;
@@ -1126,24 +1173,41 @@ window.abortBatchExtraction = async function(): Promise<void> {
     if (invoke) {
       await invoke('cancel_transcription');
     }
-    const telemetryCard = document.getElementById('telemetry-hud-card');
+    const telemetryCard = doc ? doc.getElementById('telemetry-hud-card') : null;
     if (telemetryCard) telemetryCard.style.display = 'none';
     if (typeof win.showNotification === 'function') {
       win.showNotification(t('toasts.cancellingTask'), "info");
     }
-  } catch (err) {
+  } catch (err: any) {
+    const errMsg = (typeof err === 'string') ? err : (err && err.toString ? err.toString() : '');
+    const isNoActiveSession = errMsg.includes("No active transcription or translation session");
+
+    if (isNoActiveSession) {
+      // Backend was not actively running whisper (e.g. converting audio via ffmpeg or between batch items).
+      // Cancellation of the batch should STILL proceed cleanly!
+      const telemetryCard = doc ? doc.getElementById('telemetry-hud-card') : null;
+      if (telemetryCard) telemetryCard.style.display = 'none';
+      if (typeof win.showNotification === 'function') {
+        win.showNotification(t('toasts.cancellingTask'), "info");
+      }
+      return;
+    }
+
+    batchCancelActive = false;
     console.error("Failed to cancel active whisper process:", err);
-  } finally {
+    if (typeof win.showNotification === 'function') {
+      win.showNotification(t('toasts.cancelProcessError', { error: errMsg }), "error");
+    }
     if (cancelBtn) {
       cancelBtn.disabled = false;
       const cancelSpan = cancelBtn.querySelector('span');
       if (cancelSpan) {
-        cancelSpan.setAttribute('data-i18n', 'transcribe.cancelTranscription');
-        cancelSpan.textContent = t('transcribe.cancelTranscription');
+        cancelSpan.setAttribute('data-i18n', 'transcribe.cancelBatch');
+        cancelSpan.textContent = t('transcribe.cancelBatch');
       } else {
-        cancelBtn.innerHTML = `<span data-i18n="transcribe.cancelTranscription">${t('transcribe.cancelTranscription')}</span>`;
+        cancelBtn.textContent = t('transcribe.cancelBatch');
       }
-      cancelBtn.style.display = 'none';
+      cancelBtn.style.display = 'inline-flex';
     }
   }
 };
@@ -1338,7 +1402,12 @@ export function syncBatchProcessorWindowBindings(): void {
       },
       isBatchExtracting: {
         get() { return isBatchExtracting; },
-        set(val: boolean) { isBatchExtracting = Boolean(val); },
+        set(val: boolean) {
+          isBatchExtracting = Boolean(val);
+          if (!isBatchExtracting) {
+            batchCancelActive = false;
+          }
+        },
         configurable: true
       },
       batchItems: {
@@ -1402,7 +1471,14 @@ export const batchProcessor = {
   getIsBatchMode: () => isBatchMode,
   setIsBatchMode: (val: boolean) => { isBatchMode = Boolean(val); },
   getIsExtracting: () => isBatchExtracting,
-  setIsExtracting: (val: boolean) => { isBatchExtracting = Boolean(val); },
+  setIsExtracting: (val: boolean) => {
+    isBatchExtracting = Boolean(val);
+    if (!isBatchExtracting) {
+      batchCancelActive = false;
+    }
+  },
+  getCancelActive: () => batchCancelActive,
+  setCancelActive: (val: boolean) => { batchCancelActive = Boolean(val); },
   getActiveViewerIndex: () => activeBatchViewerIndex,
   setActiveViewerIndex: (idx: number) => { activeBatchViewerIndex = idx; },
   getProcessingIndex: () => batchProcessingIndex,

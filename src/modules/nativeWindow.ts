@@ -251,55 +251,65 @@ let isHardsubRunningState = false;
 let isDownloadingModelRunningState = false;
 
 export function getIsTranscriptionRunning(): boolean {
-  const win = getGlobal();
-  return win.isTranscriptionRunning ?? isTranscriptionRunningState;
+  return isTranscriptionRunningState;
 }
 
 export function setIsTranscriptionRunning(val: boolean): void {
-  isTranscriptionRunningState = val;
-  const win = getGlobal();
-  win.isTranscriptionRunning = val;
+  isTranscriptionRunningState = Boolean(val);
 }
 
 export function getIsTranslationRunning(): boolean {
-  const win = getGlobal();
-  return win.isTranslationRunning ?? isTranslationRunningState;
+  return isTranslationRunningState;
 }
 
 export function setIsTranslationRunning(val: boolean): void {
-  isTranslationRunningState = val;
-  const win = getGlobal();
-  win.isTranslationRunning = val;
+  isTranslationRunningState = Boolean(val);
 }
 
 export function getIsHardsubRunning(): boolean {
-  const win = getGlobal();
-  return win.isHardsubRunning ?? isHardsubRunningState;
+  return isHardsubRunningState;
 }
 
 export function setIsHardsubRunning(val: boolean): void {
-  isHardsubRunningState = val;
-  const win = getGlobal();
-  win.isHardsubRunning = val;
+  isHardsubRunningState = Boolean(val);
 }
 
 export function getIsDownloadingModelRunning(): boolean {
-  const win = getGlobal();
-  return win.isDownloadingModelRunning ?? isDownloadingModelRunningState;
+  return isDownloadingModelRunningState;
 }
 
 export function setIsDownloadingModelRunning(val: boolean): void {
-  isDownloadingModelRunningState = val;
+  isDownloadingModelRunningState = Boolean(val);
+}
+
+export function getIsBatchExtracting(): boolean {
   const win = getGlobal();
-  win.isDownloadingModelRunning = val;
+  return Boolean(
+    win && (
+      win.isBatchExtracting ||
+      (win.batchProcessor && typeof win.batchProcessor.getIsExtracting === 'function' && win.batchProcessor.getIsExtracting())
+    )
+  );
+}
+
+export function getIsTranscribingActive(): boolean {
+  const win = getGlobal();
+  return Boolean(
+    win && (
+      win.isTranscribing ||
+      (win.transcribePipeline && typeof win.transcribePipeline.getIsTranscribing === 'function' && win.transcribePipeline.getIsTranscribing())
+    )
+  );
 }
 
 export function hasActiveBackgroundJob(): boolean {
   return !!(
     getIsTranscriptionRunning() ||
+    getIsTranscribingActive() ||
     getIsTranslationRunning() ||
     getIsHardsubRunning() ||
-    getIsDownloadingModelRunning()
+    getIsDownloadingModelRunning() ||
+    getIsBatchExtracting()
   );
 }
 
@@ -429,25 +439,53 @@ export function setupTitlebar(): void {
 
 // ----------------- Synchronize Window Bindings -----------------
 export function syncNativeWindowBindings(): void {
-  if (typeof window === 'undefined') return;
+  const win = getGlobal();
+  if (!win) return;
 
-  window.getBasename = getBasename;
-  window.getParentDir = getParentDir;
-  window.splitFileNameAndExt = splitFileNameAndExt;
-  window.formatFileNameMiddleTruncate = formatFileNameMiddleTruncate;
-  window.updateMediaCardName = updateMediaCardName;
-  window.formatLocalizedTimeDuration = formatLocalizedTimeDuration;
-  window.setTranscribeStatusBadge = setTranscribeStatusBadge;
-  window.copyToClipboard = copyToClipboard;
-  window.openFileInEditor = openFileInEditor;
-  window.hasActiveBackgroundJob = hasActiveBackgroundJob;
-  window.updateTaskbarProgress = updateTaskbarProgress;
-  window.setupTitlebar = setupTitlebar;
+  win.getBasename = getBasename;
+  win.getParentDir = getParentDir;
+  win.splitFileNameAndExt = splitFileNameAndExt;
+  win.formatFileNameMiddleTruncate = formatFileNameMiddleTruncate;
+  win.updateMediaCardName = updateMediaCardName;
+  win.formatLocalizedTimeDuration = formatLocalizedTimeDuration;
+  win.setTranscribeStatusBadge = setTranscribeStatusBadge;
+  win.copyToClipboard = copyToClipboard;
+  win.openFileInEditor = openFileInEditor;
+  win.hasActiveBackgroundJob = hasActiveBackgroundJob;
+  win.getIsBatchExtracting = getIsBatchExtracting;
+  win.getIsTranscribingActive = getIsTranscribingActive;
+  win.updateTaskbarProgress = updateTaskbarProgress;
+  win.setupTitlebar = setupTitlebar;
 
-  if (window.isTranscriptionRunning === undefined) window.isTranscriptionRunning = false;
-  if (window.isTranslationRunning === undefined) window.isTranslationRunning = false;
-  if (window.isHardsubRunning === undefined) window.isHardsubRunning = false;
-  if (window.isDownloadingModelRunning === undefined) window.isDownloadingModelRunning = false;
+  try {
+    Object.defineProperties(win, {
+      isTranscriptionRunning: {
+        get() { return isTranscriptionRunningState; },
+        set(val: boolean) { isTranscriptionRunningState = Boolean(val); },
+        configurable: true
+      },
+      isTranslationRunning: {
+        get() { return isTranslationRunningState; },
+        set(val: boolean) { isTranslationRunningState = Boolean(val); },
+        configurable: true
+      },
+      isHardsubRunning: {
+        get() { return isHardsubRunningState; },
+        set(val: boolean) { isHardsubRunningState = Boolean(val); },
+        configurable: true
+      },
+      isDownloadingModelRunning: {
+        get() { return isDownloadingModelRunningState; },
+        set(val: boolean) { isDownloadingModelRunningState = Boolean(val); },
+        configurable: true
+      }
+    });
+  } catch {
+    win.isTranscriptionRunning = isTranscriptionRunningState;
+    win.isTranslationRunning = isTranslationRunningState;
+    win.isHardsubRunning = isHardsubRunningState;
+    win.isDownloadingModelRunning = isDownloadingModelRunningState;
+  }
 }
 
 if (typeof window !== 'undefined') {
@@ -472,6 +510,8 @@ export const nativeWindow = {
   setIsHardsubRunning,
   isDownloadingModelRunning: getIsDownloadingModelRunning,
   setIsDownloadingModelRunning,
+  getIsBatchExtracting,
+  getIsTranscribingActive,
   hasActiveJob: hasActiveBackgroundJob,
   updateTaskbarProgress,
   setupTitlebar,

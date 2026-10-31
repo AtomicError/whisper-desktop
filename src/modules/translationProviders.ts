@@ -155,72 +155,8 @@ export function formatLocalizedNumber(num: any, lang = getLanguage(), maxFrac = 
   return Number(num).toLocaleString('en-US', { maximumFractionDigits: maxFrac });
 }
 
-export function _trapModalFocus(modalEl: HTMLElement, closeCallback: () => void): { release: () => void } {
-  const previousActiveElement = (typeof document !== 'undefined' ? document.activeElement : null) as HTMLElement | null;
-
-  const isVisible = (el: any): boolean => {
-    if (el.disabled || el.getAttribute('aria-hidden') === 'true') return false;
-    if (el.style && (el.style.display === 'none' || el.style.visibility === 'hidden')) return false;
-    if (el.closest && el.closest('[style*="display: none"], [style*="display:none"], [hidden]')) return false;
-    if (typeof el.checkVisibility === 'function') {
-      try {
-        return el.checkVisibility({ checkVisibilityCSS: true });
-      } catch (_) {}
-    }
-    return el.offsetParent !== null;
-  };
-
-  const keyHandler = (e: KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      e.stopPropagation();
-      closeCallback();
-      return;
-    }
-
-    if (e.key === 'Tab') {
-      const candidates = Array.from(modalEl.querySelectorAll(
-        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-      ));
-      const focusable = candidates.filter(isVisible) as HTMLElement[];
-      if (!focusable.length) {
-        e.preventDefault();
-        return;
-      }
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-
-      if (e.shiftKey) {
-        if (document.activeElement === first || !modalEl.contains(document.activeElement)) {
-          e.preventDefault();
-          last.focus();
-        }
-      } else {
-        if (document.activeElement === last || !modalEl.contains(document.activeElement)) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    }
-  };
-
-  if (typeof document !== 'undefined') {
-    document.addEventListener('keydown', keyHandler);
-  }
-
-  return {
-    release: () => {
-      if (typeof document !== 'undefined') {
-        document.removeEventListener('keydown', keyHandler);
-      }
-      if (previousActiveElement && typeof previousActiveElement.focus === 'function') {
-        try {
-          previousActiveElement.focus();
-        } catch (_) {}
-      }
-    }
-  };
-}
+import { _trapModalFocus } from './appModal';
+export { _trapModalFocus };
 
 // ----------------- State & Helpers -----------------
 export const POPULAR_PROVIDER_FILTERS = [

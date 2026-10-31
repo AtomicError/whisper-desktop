@@ -99,6 +99,7 @@ export let selectedMediaFile: string | null = null;
 export let probedMetadata: any = null;
 export let wavPathForTranscription: string | null = null;
 export let isTranscribing: boolean = false;
+export let isTranscriptionCancelActive: boolean = false;
 
 export function getSelectedMediaFile(): string | null {
   return selectedMediaFile;
@@ -130,6 +131,17 @@ export function getIsTranscribing(): boolean {
 
 export function setIsTranscribing(val: boolean): void {
   isTranscribing = Boolean(val);
+  if (!isTranscribing) {
+    isTranscriptionCancelActive = false;
+  }
+}
+
+export function getIsTranscriptionCancelActive(): boolean {
+  return isTranscriptionCancelActive;
+}
+
+export function setIsTranscriptionCancelActive(val: boolean): void {
+  isTranscriptionCancelActive = Boolean(val);
 }
 
 // ----------------- Accordion Wizard Controls -----------------
@@ -195,6 +207,15 @@ export function setWizardStepCompleted(stepNum: number, isCompleted: boolean): v
 // ----------------- Media File Selection & Reset -----------------
 export function clearSingleMediaFile(): void {
   if (typeof document === 'undefined') return;
+  if (getIsTranscribing() || batchProcessor.getIsExtracting()) {
+    showNotification(
+      batchProcessor.getIsExtracting()
+        ? t('toasts.batchActiveSelectBlocked')
+        : t('toasts.taskRunningWarning'),
+      "info"
+    );
+    return;
+  }
   setSelectedMediaFile(null);
   batchProcessor.setSelectedFiles([]);
   setWavPathForTranscription(null);
@@ -314,9 +335,57 @@ export function clearSingleMediaFile(): void {
   if (searchInput) searchInput.value = '';
 }
 
+export function applySingleFileSelectedUI(filePath: string): void {
+  if (typeof document === 'undefined') return;
+  const dropZone = document.getElementById('transcribe-drop-zone');
+  if (dropZone) dropZone.classList.add('has-file');
+
+  // Update UI for Single-file Mode
+  const fileNameEl = document.getElementById('lbl-file-name');
+  const filePathEl = document.getElementById('lbl-file-path');
+  if (fileNameEl) fileNameEl.style.display = 'block';
+  if (filePathEl) filePathEl.style.display = 'block';
+  updateMediaCardName(filePath);
+  if (filePathEl) {
+    filePathEl.textContent = filePath;
+    filePathEl.title = isolateLtr(filePath);
+  }
+
+  const clearBtn = document.getElementById('btn-clear-media');
+  if (clearBtn) clearBtn.style.display = 'inline-flex';
+
+  const batchQueueContainer = document.getElementById('batch-queue-container');
+  if (batchQueueContainer) batchQueueContainer.style.display = 'none';
+
+  const metaBox = document.getElementById('media-meta-box');
+  if (metaBox) metaBox.style.display = 'flex';
+  const batchSpecsBox = document.getElementById('batch-specs-box');
+  if (batchSpecsBox) batchSpecsBox.style.display = 'none';
+
+  const nextStepBtn = document.getElementById('btn-next-step-2');
+  if (nextStepBtn) nextStepBtn.textContent = t('transcribe.continueToTranscription');
+
+  const batchControlsBox = document.getElementById('batch-controls-box');
+  if (batchControlsBox) batchControlsBox.style.display = 'none';
+  const singleActions = document.getElementById('single-transcribe-actions');
+  if (singleActions) singleActions.style.display = 'flex';
+  const runBtn = document.getElementById('btn-run-transcribe');
+  if (runBtn) runBtn.style.display = 'inline-flex';
+  const cancelBtn = document.getElementById('btn-cancel-transcribe');
+  if (cancelBtn) cancelBtn.style.display = 'none';
+
+  const wizardStep3 = document.getElementById('wizard-step-3');
+  if (wizardStep3) wizardStep3.style.display = 'block';
+}
+
 export async function browseMediaFile(): Promise<void> {
   if (batchProcessor.getIsExtracting() || getIsTranscribing()) {
-    showNotification(t('toasts.batchActiveSelectBlocked'), "info");
+    showNotification(
+      batchProcessor.getIsExtracting()
+        ? t('toasts.batchActiveSelectBlocked')
+        : t('toasts.taskRunningWarning'),
+      "info"
+    );
     return;
   }
   const rawFiles = await invoke('select_files');
@@ -335,47 +404,7 @@ export async function browseMediaFile(): Promise<void> {
       batchProcessor.setIsBatchMode(false);
       setSelectedMediaFile(files[0]);
 
-      if (typeof document !== 'undefined') {
-        const dropZone = document.getElementById('transcribe-drop-zone');
-        if (dropZone) dropZone.classList.add('has-file');
-
-        // Update UI for Single-file Mode
-        const fileNameEl = document.getElementById('lbl-file-name');
-        const filePathEl = document.getElementById('lbl-file-path');
-        if (fileNameEl) fileNameEl.style.display = 'block';
-        if (filePathEl) filePathEl.style.display = 'block';
-        updateMediaCardName(files[0]);
-        if (filePathEl) {
-          filePathEl.textContent = files[0];
-          filePathEl.title = isolateLtr(files[0]);
-        }
-
-        const clearBtn = document.getElementById('btn-clear-media');
-        if (clearBtn) clearBtn.style.display = 'inline-flex';
-
-        const batchQueueContainer = document.getElementById('batch-queue-container');
-        if (batchQueueContainer) batchQueueContainer.style.display = 'none';
-
-        const metaBox = document.getElementById('media-meta-box');
-        if (metaBox) metaBox.style.display = 'flex';
-        const batchSpecsBox = document.getElementById('batch-specs-box');
-        if (batchSpecsBox) batchSpecsBox.style.display = 'none';
-
-        const nextStepBtn = document.getElementById('btn-next-step-2');
-        if (nextStepBtn) nextStepBtn.textContent = t('transcribe.continueToTranscription');
-
-        const batchControlsBox = document.getElementById('batch-controls-box');
-        if (batchControlsBox) batchControlsBox.style.display = 'none';
-        const singleActions = document.getElementById('single-transcribe-actions');
-        if (singleActions) singleActions.style.display = 'flex';
-        const runBtn = document.getElementById('btn-run-transcribe');
-        if (runBtn) runBtn.style.display = 'inline-flex';
-        const cancelBtn = document.getElementById('btn-cancel-transcribe');
-        if (cancelBtn) cancelBtn.style.display = 'none';
-
-        const wizardStep3 = document.getElementById('wizard-step-3');
-        if (wizardStep3) wizardStep3.style.display = 'block';
-      }
+      applySingleFileSelectedUI(files[0]);
 
       setWavPathForTranscription(null);
       updateTranscribeActionButtons(false);
@@ -551,6 +580,10 @@ export function toggleTelemetryHudCollapse(): void {
 // ----------------- Whisper Transcription Engine -----------------
 export async function runWhisperTranscription(): Promise<void> {
   if (typeof document === 'undefined') return;
+  if (getIsTranscribing() || batchProcessor.getIsExtracting()) {
+    showNotification(t('toasts.taskRunningWarning'), "info");
+    return;
+  }
   const win = getGlobal();
 
   const btn = document.getElementById('btn-run-transcribe') as HTMLButtonElement | null;
@@ -572,7 +605,7 @@ export async function runWhisperTranscription(): Promise<void> {
 
   const currentSettings = settingsState || win.settingsState;
   const backend = currentSettings?.selectedBackend || 'Standard';
-  const isCompiled = compiledBackends[backend];
+  const isCompiled = backend === 'Standard' || Boolean(compiledBackends[backend] || (win.compiledBackends || {})[backend]);
   if (!isCompiled) {
     showNotification(t('toasts.backendNotFound', { backend }), "error");
     if (typeof win.switchView === 'function') {
@@ -581,16 +614,18 @@ export async function runWhisperTranscription(): Promise<void> {
     return;
   }
 
-  const modelExists = localScannedTransModels.includes(currentSettings?.modelPath);
+  const scannedModels = localScannedTransModels.length > 0 ? localScannedTransModels : (win.localScannedTransModels || []);
+  const modelExists = scannedModels.includes(currentSettings?.modelPath);
   if (!modelExists) {
     showNotification(t('toasts.noModelFound'), "error");
-    if (!localScannedTransModels || localScannedTransModels.length === 0) {
+    if (!scannedModels || scannedModels.length === 0) {
       if (typeof win.switchView === 'function') win.switchView('models');
     }
     return;
   }
 
   setIsTranscribing(true);
+  setIsTranscriptionCancelActive(false);
   updateTranscribeActionButtons(true);
 
   const analyticsBox = document.getElementById('analytics-box');
@@ -624,6 +659,17 @@ export async function runWhisperTranscription(): Promise<void> {
 
   try {
     // Phase 1: Auto-convert to WAV if not already done
+    if (cancelBtn) {
+      cancelBtn.style.display = 'inline-flex';
+      cancelBtn.disabled = false;
+      if (cancelBtnSpan) {
+        cancelBtnSpan.setAttribute('data-i18n', 'transcribe.cancelTranscription');
+        cancelBtnSpan.textContent = t('transcribe.cancelTranscription');
+      } else {
+        cancelBtn.textContent = t('transcribe.cancelTranscription');
+      }
+    }
+
     if (!currentWav) {
       if (btnSpan) {
         btnSpan.setAttribute('data-i18n', 'transcribe.convertingToWav');
@@ -654,12 +700,18 @@ export async function runWhisperTranscription(): Promise<void> {
       }
     }
 
+    if (isTranscriptionCancelActive) {
+      throw new Error('Process was cancelled by the user');
+    }
+
     // Phase 2: Run Whisper transcription
     if (cancelBtn) {
       cancelBtn.style.display = 'inline-flex';
       if (cancelBtnSpan) {
         cancelBtnSpan.setAttribute('data-i18n', 'transcribe.cancelTranscription');
         cancelBtnSpan.textContent = t('transcribe.cancelTranscription');
+      } else {
+        cancelBtn.textContent = t('transcribe.cancelTranscription');
       }
     }
     const transcribingText = t('transcribe.statusExtracting') || 'Extracting...';
@@ -764,13 +816,22 @@ export async function runWhisperTranscription(): Promise<void> {
   } catch (e: any) {
     const errMsg = (typeof e === 'string') ? e : (e && e.toString ? e.toString() : '');
     setWizardStepCompleted(3, false);
-    const isCancelled = errMsg.toLowerCase().includes('cancelled by the user') || errMsg.toLowerCase().includes('was cancelled by the user') || errMsg.toLowerCase().includes('aborted');
+    const isCancelled = isTranscriptionCancelActive ||
+      errMsg.toLowerCase().includes('cancelled') ||
+      errMsg.toLowerCase().includes('aborted');
     if (isCancelled) {
       if (telemetryCard) telemetryCard.style.display = 'none';
       if (fillBar) fillBar.style.width = '0%';
       if (pctEl) pctEl.textContent = '0%';
       if (metricsEl) metricsEl.style.display = 'none';
       setTranscribeStatusBadge('', 'transcribe.standingBy');
+      if (msgEl) {
+        delete (msgEl.dataset as any).batchSummarySuccess;
+        delete (msgEl.dataset as any).batchSummaryTotal;
+        delete (msgEl.dataset as any).statusCompleted;
+        msgEl.setAttribute('data-i18n', 'transcribe.standingBy');
+        msgEl.textContent = t('transcribe.standingBy');
+      }
       showNotification(t('toasts.transcriptionCancelled'), "info");
       const viewport = document.getElementById('transcript-viewport');
       if (viewport && viewport.querySelector('.transcript-initializing-state')) {
@@ -801,6 +862,7 @@ export async function runWhisperTranscription(): Promise<void> {
     }
   } finally {
     setIsTranscribing(false);
+    setIsTranscriptionCancelActive(false);
     setWavPathForTranscription(null);
     updateTranscribeActionButtons(false);
     if (fillBar) fillBar.classList.remove('indeterminate');
@@ -819,28 +881,56 @@ export async function runWhisperTranscription(): Promise<void> {
 }
 
 export async function abortTranscription(): Promise<void> {
-  const cancelBtn = document.getElementById('btn-cancel-transcribe') as HTMLButtonElement | null;
+  if (!getIsTranscribing() || isTranscriptionCancelActive) return;
+  setIsTranscriptionCancelActive(true);
+
+  const doc = typeof document !== 'undefined' ? document : null;
+  const cancelBtn = doc ? (doc.getElementById('btn-cancel-transcribe') as HTMLButtonElement | null) : null;
   const cancelBtnSpan = cancelBtn?.querySelector('span');
   if (cancelBtn) {
     cancelBtn.disabled = true;
-    if (cancelBtnSpan) cancelBtnSpan.textContent = t('transcribe.cancelling'); else cancelBtn.textContent = t('transcribe.cancelling');
+    if (cancelBtnSpan) {
+      cancelBtnSpan.setAttribute('data-i18n', 'transcribe.cancelling');
+      cancelBtnSpan.textContent = t('transcribe.cancelling');
+    } else {
+      cancelBtn.textContent = t('transcribe.cancelling');
+    }
   }
 
   try {
     await invoke('cancel_transcription');
-    const telemetryCard = document.getElementById('telemetry-hud-card');
+    const telemetryCard = doc ? doc.getElementById('telemetry-hud-card') : null;
     if (telemetryCard) telemetryCard.style.display = 'none';
-    const metricsEl = document.getElementById('transcribe-metrics');
+    const metricsEl = doc ? doc.getElementById('transcribe-metrics') : null;
     if (metricsEl) metricsEl.style.display = 'none';
     setTranscribeStatusBadge('', 'transcribe.standingBy');
+    showNotification(t('toasts.cancellingTask'), "info");
   } catch (e: any) {
     const errMsg = (typeof e === 'string') ? e : (e && e.toString ? e.toString() : '');
-    if (!errMsg.includes("No active transcription or translation session")) {
-      showNotification(t('toasts.cancelProcessError', { error: errMsg }), "error");
+    const isNoActiveSession = errMsg.includes("No active transcription or translation session");
+
+    if (isNoActiveSession) {
+      // Backend had no active Whisper process (e.g. was converting audio or already stopped).
+      // Keep isTranscriptionCancelActive = true so the pipeline aborts cleanly and does not start Whisper!
+      const telemetryCard = doc ? doc.getElementById('telemetry-hud-card') : null;
+      if (telemetryCard) telemetryCard.style.display = 'none';
+      const metricsEl = doc ? doc.getElementById('transcribe-metrics') : null;
+      if (metricsEl) metricsEl.style.display = 'none';
+      setTranscribeStatusBadge('', 'transcribe.standingBy');
+      showNotification(t('toasts.cancellingTask'), "info");
+      return;
     }
+
+    setIsTranscriptionCancelActive(false);
+    showNotification(t('toasts.cancelProcessError', { error: errMsg }), "error");
     if (cancelBtn) {
       cancelBtn.disabled = false;
-      if (cancelBtnSpan) cancelBtnSpan.textContent = t('transcribe.cancelTranscription'); else cancelBtn.textContent = t('transcribe.cancelTranscription');
+      if (cancelBtnSpan) {
+        cancelBtnSpan.setAttribute('data-i18n', 'transcribe.cancelTranscription');
+        cancelBtnSpan.textContent = t('transcribe.cancelTranscription');
+      } else {
+        cancelBtn.textContent = t('transcribe.cancelTranscription');
+      }
     }
   }
 }
@@ -1008,7 +1098,12 @@ export function setupTranscribeDragAndDrop(): void {
 
 export async function handleDroppedFiles(rawFiles: string[]): Promise<void> {
   if (batchProcessor.getIsExtracting() || getIsTranscribing()) {
-    showNotification(t('toasts.batchActiveDropBlocked'), "info");
+    showNotification(
+      batchProcessor.getIsExtracting()
+        ? t('toasts.batchActiveDropBlocked')
+        : t('toasts.taskRunningWarning'),
+      "info"
+    );
     return;
   }
 
@@ -1032,46 +1127,7 @@ export async function handleDroppedFiles(rawFiles: string[]): Promise<void> {
     batchProcessor.setIsBatchMode(false);
     setSelectedMediaFile(files[0]);
 
-    if (typeof document !== 'undefined') {
-      const dropZone = document.getElementById('transcribe-drop-zone');
-      if (dropZone) dropZone.classList.add('has-file');
-
-      const fileNameEl = document.getElementById('lbl-file-name');
-      const filePathEl = document.getElementById('lbl-file-path');
-      if (fileNameEl) fileNameEl.style.display = 'block';
-      if (filePathEl) filePathEl.style.display = 'block';
-      updateMediaCardName(files[0]);
-      if (filePathEl) {
-        filePathEl.textContent = files[0];
-        filePathEl.title = isolateLtr(files[0]);
-      }
-
-      const clearBtn = document.getElementById('btn-clear-media');
-      if (clearBtn) clearBtn.style.display = 'inline-flex';
-
-      const batchQueueContainer = document.getElementById('batch-queue-container');
-      if (batchQueueContainer) batchQueueContainer.style.display = 'none';
-
-      const metaBox = document.getElementById('media-meta-box');
-      if (metaBox) metaBox.style.display = 'flex';
-      const batchSpecsBox = document.getElementById('batch-specs-box');
-      if (batchSpecsBox) batchSpecsBox.style.display = 'none';
-
-      const nextStepBtn = document.getElementById('btn-next-step-2');
-      if (nextStepBtn) nextStepBtn.textContent = t('transcribe.continueToTranscription');
-
-      const batchControlsBox = document.getElementById('batch-controls-box');
-      if (batchControlsBox) batchControlsBox.style.display = 'none';
-      const singleActions = document.getElementById('single-transcribe-actions');
-      if (singleActions) singleActions.style.display = 'flex';
-      const runBtn = document.getElementById('btn-run-transcribe');
-      if (runBtn) runBtn.style.display = 'inline-flex';
-      const cancelBtn = document.getElementById('btn-cancel-transcribe');
-      if (cancelBtn) cancelBtn.style.display = 'none';
-
-      const wizardStep3 = document.getElementById('wizard-step-3');
-      if (wizardStep3) wizardStep3.style.display = 'block';
-    }
+    applySingleFileSelectedUI(files[0]);
 
     setWavPathForTranscription(null);
     updateTranscribeActionButtons(false);
@@ -1134,6 +1190,7 @@ export function syncTranscribePipelineWindowBindings(): void {
   win.toggleWizardAccordion = toggleWizardAccordion;
   win.openWizardStep = openWizardStep;
   win.setWizardStepCompleted = setWizardStepCompleted;
+  win.applySingleFileSelectedUI = applySingleFileSelectedUI;
   win.clearSingleMediaFile = clearSingleMediaFile;
   win.browseMediaFile = browseMediaFile;
   win.renderMediaMetadata = renderMediaMetadata;
@@ -1161,9 +1218,12 @@ export const transcribePipeline = {
   setWavPathForTranscription,
   getIsTranscribing,
   setIsTranscribing,
+  getIsTranscriptionCancelActive,
+  setIsTranscriptionCancelActive,
   toggleWizardAccordion,
   openWizardStep,
   setWizardStepCompleted,
+  applySingleFileSelectedUI,
   clearSingleMediaFile,
   browseMediaFile,
   renderMediaMetadata,

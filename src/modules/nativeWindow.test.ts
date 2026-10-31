@@ -11,7 +11,12 @@ import {
   setIsTranscriptionRunning,
   setIsTranslationRunning,
   setIsHardsubRunning,
-  setIsDownloadingModelRunning
+  setIsDownloadingModelRunning,
+  getIsTranscriptionRunning,
+  getIsTranslationRunning,
+  getIsHardsubRunning,
+  getIsDownloadingModelRunning,
+  getIsTranscribingActive
 } from './nativeWindow';
 
 class MockElement {
@@ -177,6 +182,51 @@ describe('nativeWindow & OS Module', () => {
 
       setIsDownloadingModelRunning(false);
       expect(hasActiveBackgroundJob()).toBe(false);
+
+      (window as any).isBatchExtracting = true;
+      expect(hasActiveBackgroundJob()).toBe(true);
+      (window as any).isBatchExtracting = false;
+      expect(hasActiveBackgroundJob()).toBe(false);
+
+      (window as any).isTranscribing = true;
+      expect(getIsTranscribingActive()).toBe(true);
+      expect(hasActiveBackgroundJob()).toBe(true);
+      (window as any).isTranscribing = false;
+      expect(getIsTranscribingActive()).toBe(false);
+      expect(hasActiveBackgroundJob()).toBe(false);
+    });
+
+    it('synchronizes window job properties with module state without recursive loops', () => {
+      // Direct setter synchronizes to window
+      setIsTranscriptionRunning(true);
+      expect(getIsTranscriptionRunning()).toBe(true);
+      expect((window as any).isTranscriptionRunning).toBe(true);
+
+      // Window assignment synchronizes to module state
+      (window as any).isTranscriptionRunning = false;
+      expect(getIsTranscriptionRunning()).toBe(false);
+      expect((window as any).isTranscriptionRunning).toBe(false);
+
+      // Translation state
+      setIsTranslationRunning(true);
+      expect(getIsTranslationRunning()).toBe(true);
+      expect((window as any).isTranslationRunning).toBe(true);
+      (window as any).isTranslationRunning = false;
+      expect(getIsTranslationRunning()).toBe(false);
+
+      // Hardsub state
+      setIsHardsubRunning(true);
+      expect(getIsHardsubRunning()).toBe(true);
+      expect((window as any).isHardsubRunning).toBe(true);
+      (window as any).isHardsubRunning = false;
+      expect(getIsHardsubRunning()).toBe(false);
+
+      // Downloading model state
+      setIsDownloadingModelRunning(true);
+      expect(getIsDownloadingModelRunning()).toBe(true);
+      expect((window as any).isDownloadingModelRunning).toBe(true);
+      (window as any).isDownloadingModelRunning = false;
+      expect(getIsDownloadingModelRunning()).toBe(false);
     });
   });
 
