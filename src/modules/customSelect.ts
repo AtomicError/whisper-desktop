@@ -84,6 +84,10 @@ export class CustomSelect {
     this.trigger.setAttribute('aria-haspopup', 'listbox');
     this.trigger.setAttribute('aria-expanded', 'false');
     this.trigger.setAttribute('aria-controls', `options-for-${this.instanceId}`);
+    const initialAriaLabel = this.select.getAttribute('aria-label');
+    if (initialAriaLabel) {
+      this.trigger.setAttribute('aria-label', initialAriaLabel);
+    }
 
     this.trigger.innerHTML = `
       <span class="custom-select-value"></span>
@@ -386,13 +390,15 @@ export class CustomSelect {
 
     let optionIdx = 0;
     const appendOption = (opt: HTMLOptionElement) => {
+      if (opt.hidden || (opt.disabled && opt.value === '')) {
+        return;
+      }
       const optDiv = document.createElement('div');
       optDiv.className = 'custom-select-option';
       optDiv.id = `opt-${this.instanceId}-${optionIdx++}`;
       optDiv.setAttribute('role', 'option');
       optDiv.setAttribute('aria-selected', opt.value === this.select.value ? 'true' : 'false');
       optDiv.textContent = opt.textContent;
-      optDiv.title = opt.textContent || '';
       optDiv.dataset.value = opt.value;
       const searchData = opt.dataset.search || opt.getAttribute('data-search');
       if (searchData) {
@@ -594,11 +600,28 @@ export class CustomSelect {
     }
     const valText = (selectedOpt && selectedOpt.textContent) ? selectedOpt.textContent : this.getPlaceholder();
     const valEl = this.trigger.querySelector('.custom-select-value') as HTMLElement | null;
+    const allowTooltip = !this.select.hasAttribute('data-no-tooltip');
+    const isTruncated = Boolean(valEl && valEl.scrollWidth > valEl.clientWidth);
     if (valEl) {
       valEl.textContent = valText;
-      valEl.title = valText;
+      if (allowTooltip && isTruncated) {
+        valEl.title = valText;
+      } else {
+        valEl.removeAttribute('title');
+      }
     }
-    this.trigger.title = valText;
+    if (allowTooltip && isTruncated) {
+      this.trigger.title = valText;
+    } else {
+      this.trigger.removeAttribute('title');
+    }
+
+    const currentAriaLabel = this.select.getAttribute('aria-label');
+    if (currentAriaLabel) {
+      this.trigger.setAttribute('aria-label', currentAriaLabel);
+    } else {
+      this.trigger.removeAttribute('aria-label');
+    }
 
     if (this.optionsContainer.children) {
       Array.from(this.optionsContainer.children).forEach((child: any) => {

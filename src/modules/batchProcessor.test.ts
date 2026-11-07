@@ -136,6 +136,29 @@ describe('batchProcessor module', () => {
       moveBatchItemDown(10);
       expect(batchProcessor.getItems()[2].name).toBe('3.mp4');
     });
+
+    it('resets batch-sort-select to empty when user manually moves an item up or down', () => {
+      const select = { id: 'batch-sort-select', value: 'name-asc' };
+      const prevDoc = (globalThis as any).document;
+      (globalThis as any).document = {
+        getElementById: vi.fn().mockImplementation((id: string) => (id === 'batch-sort-select' ? select : null))
+      };
+
+      let syncCalled = false;
+      (window as any).customSelectsMap = new Map();
+      (window as any).customSelectsMap.set('batch-sort-select', {
+        syncSelectedValue: () => { syncCalled = true; }
+      });
+
+      try {
+        moveBatchItemDown(0);
+        expect(select.value).toBe('');
+        expect(syncCalled).toBe(true);
+      } finally {
+        (globalThis as any).document = prevDoc;
+        delete (window as any).customSelectsMap;
+      }
+    });
   });
 
   describe('queue sorting (sortBatchQueue)', () => {
@@ -171,6 +194,56 @@ describe('batchProcessor module', () => {
       sortBatchQueue('duration-desc');
       const durations = batchProcessor.getItems().map(it => it.durationSec);
       expect(durations).toEqual([300, 150, 50]);
+    });
+
+    it('sets batch-sort-select value to criteria and calls syncSelectedValue', () => {
+      const select = { id: 'batch-sort-select', value: '' };
+      const prevDoc = (globalThis as any).document;
+      const prevShowNotify = (window as any).showNotification;
+      (window as any).showNotification = vi.fn();
+      (globalThis as any).document = {
+        getElementById: vi.fn().mockImplementation((id: string) => (id === 'batch-sort-select' ? select : null))
+      };
+
+      let syncCalled = false;
+      (window as any).customSelectsMap = new Map();
+      (window as any).customSelectsMap.set('batch-sort-select', {
+        syncSelectedValue: () => { syncCalled = true; }
+      });
+
+      try {
+        sortBatchQueue('name-asc');
+        expect(select.value).toBe('name-asc');
+        expect(syncCalled).toBe(true);
+      } finally {
+        (globalThis as any).document = prevDoc;
+        (window as any).showNotification = prevShowNotify;
+        delete (window as any).customSelectsMap;
+      }
+    });
+
+    it('resets batch-sort-select when sortBatchQueue is called with 0 or 1 item', () => {
+      batchProcessor.setItems([{ path: '/part1.mp4', name: 'part1.mp4', status: 'pending' }]);
+      const select = { id: 'batch-sort-select', value: 'name-asc' };
+      const prevDoc = (globalThis as any).document;
+      (globalThis as any).document = {
+        getElementById: vi.fn().mockImplementation((id: string) => (id === 'batch-sort-select' ? select : null))
+      };
+
+      let syncCalled = false;
+      (window as any).customSelectsMap = new Map();
+      (window as any).customSelectsMap.set('batch-sort-select', {
+        syncSelectedValue: () => { syncCalled = true; }
+      });
+
+      try {
+        sortBatchQueue('name-asc');
+        expect(select.value).toBe('');
+        expect(syncCalled).toBe(true);
+      } finally {
+        (globalThis as any).document = prevDoc;
+        delete (window as any).customSelectsMap;
+      }
     });
   });
 

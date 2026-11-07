@@ -23,6 +23,7 @@ class MockDOMNode {
   public tabIndex = 0;
   public placeholder = '';
   public disabled = false;
+  public hidden = false;
   public selected = false;
   public selectedIndex = 0;
   public options: any[] = [];
@@ -427,6 +428,67 @@ describe('CustomSelect Module', () => {
 
       expect(selectEl.value).toBe('opt1');
       expect(changeFired).toBe(false);
+    });
+
+    it('skips hidden options and empty disabled placeholder options during rendering', () => {
+      const parent = new MockDOMNode('DIV');
+      mockBody.appendChild(parent);
+
+      const sel = new MockDOMNode('SELECT');
+      sel.id = 'placeholder-test-select';
+      parent.appendChild(sel);
+
+      const phOpt = new MockDOMNode('OPTION');
+      phOpt.value = '';
+      phOpt.textContent = 'Sort...';
+      phOpt.disabled = true;
+      phOpt.hidden = true;
+      sel.appendChild(phOpt);
+
+      const realOpt1 = new MockDOMNode('OPTION');
+      realOpt1.value = 'name-asc';
+      realOpt1.textContent = 'Alphabetical (A-Z)';
+      sel.appendChild(realOpt1);
+
+      const realOpt2 = new MockDOMNode('OPTION');
+      realOpt2.value = 'name-desc';
+      realOpt2.textContent = 'Alphabetical (Z-A)';
+      sel.appendChild(realOpt2);
+
+      sel.selectedIndex = 0;
+      sel.value = '';
+
+      const cs = new CustomSelect(sel as any);
+      const optionDivs = cs.getOptionDivs();
+
+      expect(optionDivs).toHaveLength(2);
+      expect(optionDivs[0].dataset.value).toBe('name-asc');
+      expect(optionDivs[1].dataset.value).toBe('name-desc');
+      // Options should not carry redundant title attributes
+      expect(optionDivs[0].title).toBeFalsy();
+    });
+
+    it('does not assign native title tooltips when text is not truncated or data-no-tooltip is present', () => {
+      const selectEl = createTestSelect('no-tooltip-select');
+      selectEl.setAttribute('data-no-tooltip', 'true');
+      const cs = new CustomSelect(selectEl);
+
+      cs.syncSelectedValue();
+      const valEl = cs.trigger?.querySelector('.custom-select-value');
+      expect(valEl?.hasAttribute('title')).toBe(false);
+      expect(cs.trigger?.hasAttribute('title')).toBe(false);
+    });
+
+    it('propagates and synchronizes aria-label on combobox trigger', () => {
+      const selectEl = createTestSelect('aria-label-select');
+      selectEl.setAttribute('aria-label', 'Sort queue');
+      const cs = new CustomSelect(selectEl);
+
+      expect(cs.trigger?.getAttribute('aria-label')).toBe('Sort queue');
+
+      selectEl.setAttribute('aria-label', 'Updated sort label');
+      cs.syncSelectedValue();
+      expect(cs.trigger?.getAttribute('aria-label')).toBe('Updated sort label');
     });
   });
 

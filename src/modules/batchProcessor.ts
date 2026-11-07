@@ -377,6 +377,17 @@ export function clearBatchQueue(): void {
   }
 }
 
+function resetBatchSortSelect(): void {
+  if (typeof document === 'undefined') return;
+  const sortSelect = document.getElementById('batch-sort-select') as HTMLSelectElement | null;
+  if (sortSelect && sortSelect.value) {
+    sortSelect.value = '';
+    if (window.customSelectsMap && window.customSelectsMap.get('batch-sort-select')) {
+      window.customSelectsMap.get('batch-sort-select').syncSelectedValue();
+    }
+  }
+}
+
 export function moveBatchItemUp(index: number): void {
   if (isBatchExtracting) return;
   if (index <= 0 || index >= batchItems.length) return;
@@ -395,6 +406,7 @@ export function moveBatchItemUp(index: number): void {
     activeBatchViewerIndex = index;
   }
 
+  resetBatchSortSelect();
   renderBatchQueueTable();
 }
 
@@ -416,12 +428,16 @@ export function moveBatchItemDown(index: number): void {
     activeBatchViewerIndex = index;
   }
 
+  resetBatchSortSelect();
   renderBatchQueueTable();
 }
 
 export function sortBatchQueue(criteria: string): void {
   if (isBatchExtracting) return;
-  if (batchItems.length <= 1) return;
+  if (batchItems.length <= 1) {
+    resetBatchSortSelect();
+    return;
+  }
 
   const selectedPath = activeBatchViewerIndex >= 0 && batchItems[activeBatchViewerIndex] ? batchItems[activeBatchViewerIndex].path : null;
 
@@ -465,9 +481,9 @@ export function sortBatchQueue(criteria: string): void {
 
   const win = getGlobal();
   if (typeof document !== 'undefined') {
-    const sortSelect = document.getElementById('batch-sort-select');
+    const sortSelect = document.getElementById('batch-sort-select') as HTMLSelectElement | null;
     if (sortSelect) {
-      sortSelect.value = '';
+      sortSelect.value = criteria;
       if (window.customSelectsMap && window.customSelectsMap.get('batch-sort-select')) {
         window.customSelectsMap.get('batch-sort-select').syncSelectedValue();
       }
@@ -1258,6 +1274,7 @@ export async function addBatchFiles(files: string[]): Promise<boolean> {
 
     batchItems = batchItems.concat(newItems);
     selectedMediaFiles = batchItems.map(item => item.path);
+    resetBatchSortSelect();
 
     if (typeof document !== 'undefined') {
       const fileNameEl = document.getElementById('lbl-file-name');
@@ -1361,6 +1378,7 @@ export async function addBatchFiles(files: string[]): Promise<boolean> {
     outputs: []
   }));
   selectedMediaFiles = batchItems.map(item => item.path);
+  resetBatchSortSelect();
 
   renderBatchQueueTable();
   updateBatchSpecs();

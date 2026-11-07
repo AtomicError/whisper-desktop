@@ -84,8 +84,8 @@
                         </div>
                         <div class="batch-queue-actions">
                           <div class="batch-sort-wrapper">
-                            <select id="batch-sort-select" class="select-control batch-sort-control" onchange="sortBatchQueue(this.value)">
-                              <option value="" disabled selected data-i18n="transcribe.sortQueue">Sort...</option>
+                            <select id="batch-sort-select" class="select-control batch-sort-control" data-no-tooltip aria-label="Sort queue" data-i18n-aria="transcribe.sortQueue" onchange="sortBatchQueue(this.value)">
+                              <option value="" disabled selected hidden data-i18n="transcribe.sortQueue">Sort...</option>
                               <option value="name-asc" data-i18n="transcribe.sortNameAsc">Alphabetical (A-Z)</option>
                               <option value="name-desc" data-i18n="transcribe.sortNameDesc">Alphabetical (Z-A)</option>
                               <option value="duration-asc" data-i18n="transcribe.sortDurationAsc">Duration (Shortest first)</option>
