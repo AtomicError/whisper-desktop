@@ -1209,7 +1209,6 @@
   background: var(--bg-card);
   border-color: var(--border-glass);
   box-shadow: var(--shadow-glass);
-  transform: translateZ(0);
 }
 
 /* Premium Unified Batch Queue Panel Styling */

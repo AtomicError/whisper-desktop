@@ -797,6 +797,7 @@ header {
 .path-action-btn:hover .path-open-icon {
   opacity: 1;
   stroke: var(--color-royal-blue);
+  transform: scale(1.12);
 }
 
 .path-action-btn:focus-visible {

@@ -67,6 +67,7 @@ declare global {
     handleDroppedFiles: (rawFiles: string[]) => Promise<void>;
     switchView: (view: string) => void;
     listen?: (event: string, handler: (e: any) => void) => Promise<() => void>;
+    transcribePipeline?: TranscribePipeline;
     __TAURI__?: any;
   }
 }
@@ -1151,6 +1152,38 @@ export async function handleDroppedFiles(rawFiles: string[]): Promise<void> {
   showNotification(t('toasts.filesLoaded', { count: files.length }), "success");
 }
 
+export const transcribePipeline = {
+  getSelectedMediaFile,
+  setSelectedMediaFile,
+  getProbedMetadata,
+  setProbedMetadata,
+  getWavPathForTranscription,
+  setWavPathForTranscription,
+  getIsTranscribing,
+  setIsTranscribing,
+  getIsTranscriptionCancelActive,
+  setIsTranscriptionCancelActive,
+  toggleWizardAccordion,
+  openWizardStep,
+  setWizardStepCompleted,
+  applySingleFileSelectedUI,
+  clearSingleMediaFile,
+  browseMediaFile,
+  renderMediaMetadata,
+  probeSelectedFile,
+  toggleTelemetryHudCollapse,
+  runWhisperTranscription,
+  abortTranscription,
+  copyMainTranscriptToClipboard,
+  openOutputFolder,
+  copyTranscriptToClipboard,
+  setupTranscribeDragAndDrop,
+  handleDroppedFiles,
+  syncWindowBindings: syncTranscribePipelineWindowBindings
+};
+
+export type TranscribePipeline = typeof transcribePipeline;
+
 // ----------------- Window Global Bindings -----------------
 export function syncTranscribePipelineWindowBindings(): void {
   const win = getGlobal();
@@ -1201,40 +1234,11 @@ export function syncTranscribePipelineWindowBindings(): void {
   win.copyTranscriptToClipboard = copyTranscriptToClipboard;
   win.setupTranscribeDragAndDrop = setupTranscribeDragAndDrop;
   win.handleDroppedFiles = handleDroppedFiles;
+  win.transcribePipeline = transcribePipeline;
 }
 
 if (typeof window !== 'undefined') {
   syncTranscribePipelineWindowBindings();
 }
-
-export const transcribePipeline = {
-  getSelectedMediaFile,
-  setSelectedMediaFile,
-  getProbedMetadata,
-  setProbedMetadata,
-  getWavPathForTranscription,
-  setWavPathForTranscription,
-  getIsTranscribing,
-  setIsTranscribing,
-  getIsTranscriptionCancelActive,
-  setIsTranscriptionCancelActive,
-  toggleWizardAccordion,
-  openWizardStep,
-  setWizardStepCompleted,
-  applySingleFileSelectedUI,
-  clearSingleMediaFile,
-  browseMediaFile,
-  renderMediaMetadata,
-  probeSelectedFile,
-  toggleTelemetryHudCollapse,
-  runWhisperTranscription,
-  abortTranscription,
-  copyMainTranscriptToClipboard,
-  openOutputFolder,
-  copyTranscriptToClipboard,
-  setupTranscribeDragAndDrop,
-  handleDroppedFiles,
-  syncWindowBindings: syncTranscribePipelineWindowBindings
-};
 
 export default transcribePipeline;

@@ -144,6 +144,8 @@ html[dir="rtl"] .settings-cat-icon {
 
 html[dir="rtl"] .btn-settings-reset-engine:hover:not(:disabled) svg.btn-reset-icon:not(.is-spinning) {
   transform: rotate(60deg);
+  color: var(--color-red, #ff5555);
+  opacity: 1;
 }
 
 html[dir="rtl"] .btn-settings-reset-engine svg.btn-reset-icon.is-spinning {
@@ -230,6 +232,7 @@ html[dir="rtl"] .custom-select-trigger {
 html[dir="rtl"] .custom-select-option {
   padding: 10px 20px 10px 14px;
   text-align: right;
+  transition: background-color 0.15s ease, color 0.15s ease, padding 0.15s ease;
 }
 
 html[dir="rtl"] .custom-select-option::before {
@@ -241,12 +244,15 @@ html[dir="rtl"] .custom-select-option:hover,
 html[dir="rtl"] .custom-select-option.focused {
   padding-left: 14px;
   padding-right: 24px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
 }
 
 html[dir="rtl"] .custom-select-option.selected {
   padding-left: 14px;
   padding-right: 24px;
   background: linear-gradient(270deg, rgba(var(--color-royal-blue-rgb), 0.12) 0%, transparent 100%);
+  color: #fff;
 }
 
 /* 5. Toast Notifications (Anchored on bottom-left away from right-hand sidebar) */

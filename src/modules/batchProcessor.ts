@@ -60,6 +60,7 @@ declare global {
     settingsState: SettingsState | null;
     compiledBackends: Record<string, boolean>;
     localScannedTransModels: string[];
+    batchProcessor?: BatchProcessor;
   }
 }
 
@@ -1386,6 +1387,49 @@ export async function addBatchFiles(files: string[]): Promise<boolean> {
   return true;
 }
 
+export const batchProcessor = {
+  getItems: () => [...batchItems],
+  setItems: (items: BatchItem[]) => { batchItems = Array.isArray(items) ? [...items] : []; },
+  getSelectedFiles: () => [...selectedMediaFiles],
+  setSelectedFiles: (files: string[]) => {
+    selectedMediaFiles = Array.isArray(files)
+      ? files.map(f => (typeof f === 'string' ? f.trim() : '')).filter(f => f.length > 0)
+      : [];
+  },
+  getIsBatchMode: () => isBatchMode,
+  setIsBatchMode: (val: boolean) => { isBatchMode = Boolean(val); },
+  getIsExtracting: () => isBatchExtracting,
+  setIsExtracting: (val: boolean) => {
+    isBatchExtracting = Boolean(val);
+    if (!isBatchExtracting) {
+      batchCancelActive = false;
+    }
+  },
+  getCancelActive: () => batchCancelActive,
+  setCancelActive: (val: boolean) => { batchCancelActive = Boolean(val); },
+  getActiveViewerIndex: () => activeBatchViewerIndex,
+  setActiveViewerIndex: (idx: number) => { activeBatchViewerIndex = idx; },
+  getProcessingIndex: () => batchProcessingIndex,
+  setProcessingIndex: (idx: number) => { batchProcessingIndex = idx; },
+  formatDuration,
+  updateSpecs: updateBatchSpecs,
+  removeFile: removeFileFromBatch,
+  clearQueue: clearBatchQueue,
+  moveUp: moveBatchItemUp,
+  moveDown: moveBatchItemDown,
+  sortQueue: sortBatchQueue,
+  selectTranscript: selectBatchItemTranscript,
+  renderTable: renderBatchQueueTable,
+  runExtraction: runBatchExtraction,
+  abortExtraction: abortBatchExtraction,
+  addFiles: addBatchFiles,
+  syncWindowBindings: syncBatchProcessorWindowBindings
+};
+
+export type BatchProcessor = typeof batchProcessor;
+
+export { renderBatchQueueTable };
+
 export function syncBatchProcessorWindowBindings(): void {
   const win = getGlobal();
   if (!win) return;
@@ -1402,6 +1446,7 @@ export function syncBatchProcessorWindowBindings(): void {
   win.updateBatchSpecs = updateBatchSpecs;
   win.formatDuration = formatDuration;
   win.addBatchFiles = addBatchFiles;
+  win.batchProcessor = batchProcessor;
 
   try {
     Object.defineProperties(win, {
@@ -1465,44 +1510,3 @@ export function syncBatchProcessorWindowBindings(): void {
 if (typeof window !== 'undefined') {
   syncBatchProcessorWindowBindings();
 }
-
-export { renderBatchQueueTable };
-
-export const batchProcessor = {
-  getItems: () => [...batchItems],
-  setItems: (items: BatchItem[]) => { batchItems = Array.isArray(items) ? [...items] : []; },
-  getSelectedFiles: () => [...selectedMediaFiles],
-  setSelectedFiles: (files: string[]) => {
-    selectedMediaFiles = Array.isArray(files)
-      ? files.map(f => (typeof f === 'string' ? f.trim() : '')).filter(f => f.length > 0)
-      : [];
-  },
-  getIsBatchMode: () => isBatchMode,
-  setIsBatchMode: (val: boolean) => { isBatchMode = Boolean(val); },
-  getIsExtracting: () => isBatchExtracting,
-  setIsExtracting: (val: boolean) => {
-    isBatchExtracting = Boolean(val);
-    if (!isBatchExtracting) {
-      batchCancelActive = false;
-    }
-  },
-  getCancelActive: () => batchCancelActive,
-  setCancelActive: (val: boolean) => { batchCancelActive = Boolean(val); },
-  getActiveViewerIndex: () => activeBatchViewerIndex,
-  setActiveViewerIndex: (idx: number) => { activeBatchViewerIndex = idx; },
-  getProcessingIndex: () => batchProcessingIndex,
-  setProcessingIndex: (idx: number) => { batchProcessingIndex = idx; },
-  formatDuration,
-  updateSpecs: updateBatchSpecs,
-  removeFile: removeFileFromBatch,
-  clearQueue: clearBatchQueue,
-  moveUp: moveBatchItemUp,
-  moveDown: moveBatchItemDown,
-  sortQueue: sortBatchQueue,
-  selectTranscript: selectBatchItemTranscript,
-  renderTable: renderBatchQueueTable,
-  runExtraction: runBatchExtraction,
-  abortExtraction: abortBatchExtraction,
-  addFiles: addBatchFiles,
-  syncWindowBindings: syncBatchProcessorWindowBindings
-};

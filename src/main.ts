@@ -32,7 +32,7 @@ import {
   updateMediaCardName
 } from './modules/nativeWindow';
 import {
-  settingsState,
+  getSettingsState,
   refreshSettings,
   refreshBuildStatuses,
   scanAndPopulateModels,
@@ -125,10 +125,11 @@ if (typeof window !== 'undefined') {
 window.addEventListener('whisper:languageChanged', () => {
   renderUpdateCheckerUI();
   updateFilterCounts();
-  if (settingsState) {
+  const currentSettings = getSettingsState();
+  if (currentSettings) {
     renderProvidersGrid();
   }
-  if (settingsState && translationProviders.getModels().length > 0) {
+  if (currentSettings && translationProviders.getModels().length > 0) {
     applyModelsFilterAndRender(0);
   }
 

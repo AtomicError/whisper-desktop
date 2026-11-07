@@ -144,12 +144,13 @@
   width: 14px;
   height: 14px;
   flex-shrink: 0;
-  transition: color 0.2s ease, opacity 0.2s ease;
+  transition: transform 0.3s ease, color 0.2s ease, opacity 0.2s ease;
 }
 
 .btn-settings-reset-engine:hover:not(:disabled) svg.btn-reset-icon:not(.is-spinning) {
-  color: var(--color-royal-blue);
-  opacity: 0.95;
+  transform: rotate(-60deg);
+  color: var(--color-red, #ff5555);
+  opacity: 1;
 }
 
 .btn-settings-reset-engine svg.btn-reset-icon.is-spinning {
@@ -168,6 +169,11 @@
 @media (prefers-reduced-motion: reduce) {
   .btn-settings-reset-engine svg.btn-reset-icon.is-spinning {
     animation: none !important;
+  }
+
+  .btn-settings-reset-engine:hover:not(:disabled) svg.btn-reset-icon:not(.is-spinning),
+  html[dir="rtl"] .btn-settings-reset-engine:hover:not(:disabled) svg.btn-reset-icon:not(.is-spinning) {
+    transform: none !important;
   }
 }
 
@@ -1217,11 +1223,12 @@ select.select-control {
   width: 15px;
   height: 15px;
   flex-shrink: 0;
-  transition: color 0.2s ease;
+  transition: transform 0.25s ease, color 0.2s ease;
 }
 
 .btn-model-action:hover svg.btn-action-icon {
   color: var(--color-royal-blue);
+  transform: scale(1.1);
 }
 
 /* Models Filter & Stats Header Bar (Always Clean Single Line) */
@@ -1394,6 +1401,7 @@ select.select-control {
 }
 
 .provider-tile:hover .provider-tile-icon-wrapper {
+  transform: scale(1.05);
   border-color: rgba(255, 255, 255, 0.15);
 }
 
@@ -1544,6 +1552,7 @@ select.select-control {
 }
 
 .provider-tile-add:hover svg {
+  transform: scale(1.15) rotate(90deg);
   color: var(--color-royal-blue);
 }
 
@@ -1600,18 +1609,20 @@ select.select-control {
   border: 1.5px solid rgba(255, 255, 255, 0.12);
   border-radius: 50%;
   position: relative;
-  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
   display: inline-block;
   box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.04), 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .radio-container:hover .custom-radio {
   border-color: rgba(var(--color-royal-blue-rgb), 0.5);
+  transform: scale(1.04);
 }
 
 .radio-container input:checked ~ .custom-radio {
   background: linear-gradient(135deg, var(--color-royal-blue) 0%, var(--color-royal-blue-dark) 100%);
   border-color: var(--color-royal-blue);
+  transform: scale(1.05);
   box-shadow: 0 0 12px rgba(var(--color-royal-blue-rgb), 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.3);
 }
 

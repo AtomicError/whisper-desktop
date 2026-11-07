@@ -1217,7 +1217,7 @@ select.pagination-size-select {
   padding: 0;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+  transition: opacity 0.15s ease, color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
 }
 
 .model-btn-trash svg {
@@ -1241,6 +1241,7 @@ select.pagination-size-select {
   opacity: 1 !important;
   background: rgba(239, 68, 68, 0.15) !important;
   color: #ef4444 !important;
+  transform: scale(1.1);
 }
 
 /* Models Empty State */
@@ -1720,17 +1721,6 @@ html[dir="rtl"] .custom-select-options[class*="options-for-models-page-size-sele
 .rtl-layout .custom-select-options[class*="options-for-models-page-size-select"] .custom-select-option::before,
 .custom-select-options[class*="options-for-models-page-size-select"] .custom-select-option::before {
   display: none !important;
-}
-
-html[dir="rtl"] .custom-select-options[class*="options-for-models-page-size-select"] .custom-select-option.selected,
-html[dir="rtl"] .custom-select-options[class*="options-for-models-page-size-select"] .custom-select-option:hover,
-html[dir="rtl"] .custom-select-options[class*="options-for-models-page-size-select"].custom-select-ltr .custom-select-option.selected,
-html[dir="rtl"] .custom-select-options[class*="options-for-models-page-size-select"].custom-select-ltr .custom-select-option:hover,
-.rtl-layout .custom-select-options[class*="options-for-models-page-size-select"] .custom-select-option.selected,
-.rtl-layout .custom-select-options[class*="options-for-models-page-size-select"] .custom-select-option:hover,
-.custom-select-options[class*="options-for-models-page-size-select"] .custom-select-option.selected,
-.custom-select-options[class*="options-for-models-page-size-select"] .custom-select-option:hover {
-  padding: 5px 12px !important;
 }
 
 /* Search Inputs RTL overrides (Settings & Models & All App Search Fields) */
