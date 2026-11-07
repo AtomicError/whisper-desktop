@@ -300,6 +300,7 @@ export function _trapModalFocus(modalEl: HTMLElement, closeCallback: () => void)
 }
 
 let _appModalTrap: { release: () => void } | null = null;
+let _confirmModalResolve: ((value: boolean) => void) | null = null;
 
 export function showAppModal(title: string, message: string, details = ''): void {
   if (typeof document === 'undefined') return;
@@ -335,7 +336,7 @@ export function showAppModal(title: string, message: string, details = ''): void
 
     _appModalTrap = _trapModalFocus(overlay, () => {
       const win = getGlobal();
-      if (win._confirmModalResolve) {
+      if (_confirmModalResolve || win._confirmModalResolve) {
         resolveAppConfirm(false);
       } else {
         closeAppModal();
@@ -363,8 +364,9 @@ export function closeAppModal(): void {
     _appModalTrap = null;
   }
   const win = getGlobal();
-  if (win._confirmModalResolve) {
-    const resolve = win._confirmModalResolve;
+  const resolve = _confirmModalResolve || win._confirmModalResolve;
+  if (resolve) {
+    _confirmModalResolve = null;
     win._confirmModalResolve = null;
     resolve(false);
   }
@@ -380,8 +382,6 @@ export function closeAppModal(): void {
     }, 300);
   }
 }
-
-let _confirmModalResolve: ((value: boolean) => void) | null = null;
 
 export function showConfirmModal(title: string, message: string, confirmButtonText: string | null = null): Promise<boolean> {
   const win = getGlobal();

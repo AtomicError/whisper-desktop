@@ -18,7 +18,7 @@ import {
 } from './nativeWindow';
 import { showNotification } from './appModal';
 import { scanAndPopulateModels } from './settingsManager';
-import { formatNumberForLang } from './translationProviders';
+import { formatNumberForLang } from '../i18n/formatters';
 
 declare global {
   interface Window {

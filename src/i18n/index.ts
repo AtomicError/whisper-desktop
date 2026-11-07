@@ -450,3 +450,5 @@ if (typeof window !== 'undefined') {
   (window as any).SUPPORTED_LANGUAGES = SUPPORTED_LANGUAGES;
   (window as any).RTL_LANGUAGES = RTL_LANGUAGES;
 }
+
+export * from './formatters';

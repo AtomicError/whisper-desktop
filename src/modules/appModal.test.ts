@@ -390,6 +390,44 @@ describe('appModal & Feedback Module', () => {
       const result = await confirmPromise;
       expect(result).toBe(true);
     });
+
+    it('resolves false and allows subsequent confirm modals when closed directly via closeAppModal', async () => {
+      const overlay = new MockNode('DIV') as any;
+      overlay.id = 'app-modal-overlay';
+      const titleEl = new MockNode('DIV') as any;
+      titleEl.id = 'app-modal-title';
+      const msgEl = new MockNode('DIV') as any;
+      msgEl.id = 'app-modal-message';
+      const detailsEl = new MockNode('DIV') as any;
+      detailsEl.id = 'app-modal-details';
+      const okFooter = new MockNode('DIV') as any;
+      okFooter.id = 'app-modal-ok-footer';
+      const confirmFooter = new MockNode('DIV') as any;
+      confirmFooter.id = 'app-modal-confirm-footer';
+      const deleteBtn = new MockNode('BUTTON') as any;
+      deleteBtn.id = 'app-modal-delete-btn';
+      confirmFooter.appendChild(deleteBtn);
+
+      overlay.appendChild(titleEl);
+      overlay.appendChild(msgEl);
+      overlay.appendChild(detailsEl);
+      overlay.appendChild(okFooter);
+      overlay.appendChild(confirmFooter);
+      body.appendChild(overlay);
+
+      // First confirm modal closed directly via closeAppModal (e.g., Escape key)
+      const firstPromise = showConfirmModal('First title', 'First question');
+      closeAppModal();
+      const firstResult = await firstPromise;
+      expect(firstResult).toBe(false);
+
+      // Second confirm modal must open successfully and not be blocked by stale state
+      const secondPromise = showConfirmModal('Second title', 'Second question');
+      expect(titleEl.textContent).toBe('Second title');
+      resolveAppConfirm(true);
+      const secondResult = await secondPromise;
+      expect(secondResult).toBe(true);
+    });
   });
 
   describe('showBatchErrorDialog', () => {

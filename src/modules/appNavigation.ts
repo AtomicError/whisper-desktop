@@ -199,7 +199,7 @@ export function setupHorizontalTabScroll(): void {
     }
   };
 
-  const containers = document.querySelectorAll('.settings-categories, .trans-cfg-status-bar, .compact-outputs');
+  const containers = document.querySelectorAll('.settings-categories, .compact-outputs');
   containers.forEach(el => {
     el.addEventListener('wheel', scrollWheel as EventListener, { passive: false });
   });

@@ -283,9 +283,6 @@ export function clearBatchQueue(): void {
     const cancelBtn = document.getElementById('btn-cancel-transcribe');
     if (cancelBtn) cancelBtn.style.display = 'none';
 
-    const wizardStep3 = document.getElementById('wizard-step-3');
-    if (wizardStep3) wizardStep3.style.display = 'block';
-
     if (typeof win.setWizardStepCompleted === 'function') {
       win.setWizardStepCompleted(1, false);
       win.setWizardStepCompleted(2, false);
@@ -759,9 +756,23 @@ function renderBatchQueueTable(): void {
 }
 
 export async function runBatchExtraction(): Promise<void> {
-  if (isBatchExtracting || !isBatchMode || batchItems.length === 0) return;
-
   const win = getGlobal();
+  // Concurrency guard: Mutual exclusion with single-file pipeline without direct circular import
+  const isSingleTranscribing = Boolean(
+    win && (
+      win.isTranscribing ||
+      (win.transcribePipeline && typeof win.transcribePipeline.getIsTranscribing === 'function' && win.transcribePipeline.getIsTranscribing())
+    )
+  );
+
+  if (isBatchExtracting || isSingleTranscribing) {
+    if (typeof win.showNotification === 'function') {
+      win.showNotification(t('toasts.taskRunningWarning'), "info");
+    }
+    return;
+  }
+  if (!isBatchMode || batchItems.length === 0) return;
+
   const invoke = getTauriInvoke();
   if (!invoke) return;
 
@@ -812,9 +823,6 @@ export async function runBatchExtraction(): Promise<void> {
   }
 
   batchCancelActive = false;
-  const analyticsBox = document.getElementById('analytics-box');
-  if (analyticsBox) analyticsBox.style.display = 'none';
-
   const telemetryCard = document.getElementById('telemetry-hud-card');
   if (telemetryCard) telemetryCard.style.display = 'block';
   if (typeof win.setTranscribeStatusBadge === 'function') {

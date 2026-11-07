@@ -104,7 +104,7 @@
 }
 
 .log-nav-btn:active:not(:disabled) {
-  transform: translateY(1px);
+  background: rgba(255, 255, 255, 0.14) !important;
 }
 
 .log-nav-btn:disabled {
@@ -162,7 +162,8 @@
 }
 
 .log-jump-bottom-pill:active {
-  transform: translate(-50%, 2px);
+  background: rgba(var(--color-royal-blue-rgb), 0.4);
+  border-color: rgba(var(--color-royal-blue-rgb), 1);
 }
 
 .log-viewport {

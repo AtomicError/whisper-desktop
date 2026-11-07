@@ -1688,11 +1688,6 @@ export function updateTranscribeUIConfigs(): void {
   if (!current) return;
 
   const backend = current.selectedBackend || 'Standard';
-  const backendEl = document.getElementById('trans-cfg-backend');
-  if (backendEl) {
-    backendEl.textContent = backend;
-    backendEl.title = backend;
-  }
 
   const win = getGlobal();
   const probed = win.probedMetadata;
@@ -1735,13 +1730,6 @@ export function updateTranscribeUIConfigs(): void {
     quickBackendSelect.value = backend;
   }
 
-  const model = getBasename(current.modelPath) || 'None';
-  const modelEl = document.getElementById('trans-cfg-model');
-  if (modelEl) {
-    modelEl.textContent = model;
-    modelEl.title = model;
-  }
-
   // 2. Sync Quick Model Select
   const quickModelSelect = document.getElementById('quick-opt-model') as HTMLSelectElement | null;
   if (quickModelSelect && current.modelPath) {
@@ -1759,13 +1747,6 @@ export function updateTranscribeUIConfigs(): void {
   const vadActive = Boolean(current.vad && hasVadModel);
   const vadModelName = current.vadModel ? getBasename(current.vadModel) : 'Default';
 
-  const vadEl = document.getElementById('trans-cfg-vad');
-  if (vadEl) {
-    vadEl.textContent = vadActive ? 'ON' : 'OFF';
-    vadEl.className = vadActive ? 'val-gold' : 'val-muted';
-    vadEl.title = vadActive ? `${t('transcribe.vadActive')} (${vadModelName})` : t('transcribe.vadDisabled');
-  }
-
   const quickVadBtn = document.getElementById('quick-toggle-vad') as HTMLInputElement | null;
   if (quickVadBtn) {
     if ('checked' in quickVadBtn) {
@@ -1782,20 +1763,6 @@ export function updateTranscribeUIConfigs(): void {
         quickVadBtn.title = t('toasts.noVadFound') || 'No Silero VAD model found on system';
       }
     }
-  }
-
-  const transCfgTranslation = document.getElementById('trans-cfg-translation');
-  if (transCfgTranslation) {
-    const translationEnabled = Boolean(current?.autoTransferToTranslate ?? current?.translateAiEnabled);
-    let translationText = 'OFF';
-    let fullTitle = 'Auto-Transfer to Translation Studio Disabled';
-    if (translationEnabled) {
-      translationText = 'ON';
-      fullTitle = 'Auto-Transfer to Translation Studio Active';
-    }
-    transCfgTranslation.textContent = translationText;
-    transCfgTranslation.title = fullTitle;
-    transCfgTranslation.className = translationEnabled ? 'val-green' : 'val-muted';
   }
 
   updateTranscribeOutputDirUI();

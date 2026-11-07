@@ -502,6 +502,23 @@ describe('batchProcessor module', () => {
   });
 
   describe('batchProcessor window global bindings', () => {
+    it('blocks runBatchExtraction when single transcription is already active', async () => {
+      batchProcessor.setIsBatchMode(true);
+      batchProcessor.setItems([{ path: '/file.mp4', name: 'file.mp4', status: 'pending' }]);
+      (window as any).isTranscribing = true;
+
+      const notifyMock = vi.fn();
+      (window as any).showNotification = notifyMock;
+      const invokeMock = vi.fn();
+      (window as any).invoke = invokeMock;
+
+      await runBatchExtraction();
+
+      expect(invokeMock).not.toHaveBeenCalled();
+      expect(notifyMock).toHaveBeenCalled();
+      (window as any).isTranscribing = false;
+    });
+
     it('exposes all clean exported functions on window', () => {
       expect(typeof (window as any).removeFileFromBatch).toBe('function');
       expect(typeof (window as any).clearBatchQueue).toBe('function');

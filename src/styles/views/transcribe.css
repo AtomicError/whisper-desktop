@@ -1189,68 +1189,6 @@
   opacity: 0.8;
 }
 
-/* Minimal IDE-Style Configuration Status Bar in Step 3 */
-.trans-cfg-status-bar {
-  display: flex;
-  align-items: center;
-  flex-wrap: nowrap;
-  gap: 14px;
-  font-size: 0.85rem;
-  color: var(--color-text-muted);
-  margin-bottom: 16px;
-  padding: 2px 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.trans-cfg-status-bar::-webkit-scrollbar {
-  display: none;
-}
-
-.cfg-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.cfg-item strong {
-  font-family: var(--font-mono);
-  font-weight: 600;
-  white-space: nowrap;
-  display: inline-block;
-}
-
-.cfg-divider {
-  color: rgba(255, 255, 255, 0.25);
-  font-size: 0.85rem;
-  font-weight: 300;
-  user-select: none;
-  flex-shrink: 0;
-}
-
-.val-cyan {
-  color: var(--color-cyan) !important;
-}
-
-.val-blue {
-  color: var(--color-royal-blue) !important;
-}
-
-.val-gold {
-  color: var(--color-gold) !important;
-}
-
-.val-green {
-  color: var(--color-green) !important;
-}
-
-.val-muted {
-  color: var(--color-text-muted) !important;
-}
-
 /* Compact Telemetry HUD (Right Panel) */
 .telemetry-hud {
   display: flex;

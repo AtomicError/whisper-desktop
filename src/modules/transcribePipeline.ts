@@ -29,7 +29,7 @@ import {
   setLastTranscribedVideoPath,
   setLastTranscribedOutputFiles
 } from './workflowBridge';
-import { formatLocalizedNumber } from './translationProviders';
+import { formatLocalizedNumber } from '../i18n/formatters';
 
 export interface ProbedMediaMetadata {
   exists?: boolean;
@@ -299,9 +299,6 @@ export function clearSingleMediaFile(): void {
     msgEl.textContent = t('transcribe.standingBy');
   }
 
-  const analyticsBox = document.getElementById('analytics-box');
-  if (analyticsBox) analyticsBox.style.display = 'none';
-
   const telemetryCard = document.getElementById('telemetry-hud-card');
   if (telemetryCard) telemetryCard.style.display = 'none';
   setTranscribeStatusBadge('', 'transcribe.standingBy');
@@ -382,9 +379,6 @@ export function applySingleFileSelectedUI(filePath: string): void {
   if (runBtn) runBtn.style.display = 'inline-flex';
   const cancelBtn = document.getElementById('btn-cancel-transcribe');
   if (cancelBtn) cancelBtn.style.display = 'none';
-
-  const wizardStep3 = document.getElementById('wizard-step-3');
-  if (wizardStep3) wizardStep3.style.display = 'block';
 }
 
 export async function browseMediaFile(): Promise<void> {
@@ -562,8 +556,6 @@ export async function probeSelectedFile(): Promise<void> {
         }
 
         setWizardStepCompleted(3, false);
-        const analyticsBox = document.getElementById('analytics-box');
-        if (analyticsBox) analyticsBox.style.display = 'none';
       }
     } else {
       showNotification(t('toasts.fileNotFoundOrInvalid'), "error");
@@ -636,9 +628,6 @@ export async function runWhisperTranscription(): Promise<void> {
   setIsTranscribing(true);
   setIsTranscriptionCancelActive(false);
   updateTranscribeActionButtons(true);
-
-  const analyticsBox = document.getElementById('analytics-box');
-  if (analyticsBox) analyticsBox.style.display = 'none';
 
   const telemetryCard = document.getElementById('telemetry-hud-card');
   if (telemetryCard) telemetryCard.style.display = 'block';
