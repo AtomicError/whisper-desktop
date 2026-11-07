@@ -1050,6 +1050,104 @@ pub fn build_audio_encoder_flags(settings: &HardsubSettings) -> Vec<String> {
     args
 }
 
+/// Stream and geometry metadata required for hardsub encoding
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct HardsubStreamInfo {
+    pub video_stream_index: u32,
+    pub audio_stream_index: Option<u32>,
+    pub normalized_rotation: u32,
+    /// Effective video display width after applying rotation normalization
+    pub video_width: u32,
+    /// Effective video display height after applying rotation normalization
+    pub video_height: u32,
+}
+
+/// Builds the complete FFmpeg argument list for a hardsub task.
+pub fn build_hardsub_ffmpeg_args(
+    settings: &HardsubSettings,
+    stream_info: &HardsubStreamInfo,
+    sub_filter: &str,
+    vaapi_device: Option<&str>,
+) -> Vec<String> {
+    let mut ffmpeg_args: Vec<String> = Vec::new();
+
+    // Pass global non-interactive flags and machine-readable progress on stdout
+    ffmpeg_args.push("-nostdin".to_string());
+    ffmpeg_args.push("-progress".to_string());
+    ffmpeg_args.push("pipe:1".to_string());
+
+    // 1. Hardware acceleration flags before -i
+    if settings.hw_accel == "vaapi" {
+        if let Some(dev) = vaapi_device {
+            ffmpeg_args.push("-vaapi_device".to_string());
+            ffmpeg_args.push(dev.to_string());
+        }
+    }
+
+    // Disable FFmpeg auto-rotation so that we can rotate manually at the start of the filtergraph.
+    // This ensures libass renders subtitles on the rotated vertical frame at the correct aspect ratio.
+    ffmpeg_args.push("-noautorotate".to_string());
+    ffmpeg_args.push("-y".to_string());
+    ffmpeg_args.push("-i".to_string());
+    ffmpeg_args.push(settings.video_path.clone());
+
+    ffmpeg_args.push("-map".to_string());
+    ffmpeg_args.push(format!("0:{}", stream_info.video_stream_index));
+    if settings.audio_codec != "mute" {
+        if let Some(audio_idx) = stream_info.audio_stream_index {
+            ffmpeg_args.push("-map".to_string());
+            ffmpeg_args.push(format!("0:{}", audio_idx));
+        }
+    }
+
+    // 2. Video Filter
+    let mut vf_filters = Vec::new();
+    if stream_info.normalized_rotation == 90 {
+        vf_filters.push("transpose=1".to_string());
+    } else if stream_info.normalized_rotation == 180 {
+        vf_filters.push("transpose=1,transpose=1".to_string());
+    } else if stream_info.normalized_rotation == 270 {
+        vf_filters.push("transpose=2".to_string());
+    }
+    vf_filters.push(sub_filter.to_string());
+
+    // Optional Resolution Downscaling Filter
+    if let Some(scale_filter) = get_resolution_scale_filter(&settings.resolution_scale, stream_info.video_width, stream_info.video_height) {
+        vf_filters.push(scale_filter);
+    }
+
+    // If using VA-API hardware encoder, upload processed frames to VAAPI GPU surface
+    if settings.hw_accel == "vaapi" {
+        vf_filters.push("format=nv12,hwupload".to_string());
+    }
+
+    let vf_arg = vf_filters.join(",");
+
+    ffmpeg_args.push("-vf".to_string());
+    ffmpeg_args.push(vf_arg);
+
+    // After a manual transpose, clear the source rotation metadata: mp4 muxers
+    // drop it, but matroska copies the ROTATE tag into the output, which would
+    // rotate the already-transposed video a second time in players.
+    if stream_info.normalized_rotation != 0 {
+        ffmpeg_args.push("-metadata:s:v".to_string());
+        ffmpeg_args.push("rotate=0".to_string());
+    }
+
+    // 3. Video Encoder Selection & Quality Parameters
+    let video_encoder_flags = build_video_encoder_flags(settings);
+    ffmpeg_args.extend(video_encoder_flags);
+
+    // 4. Audio Codec & Bitrate Selection
+    let audio_encoder_flags = build_audio_encoder_flags(settings);
+    ffmpeg_args.extend(audio_encoder_flags);
+
+    // 5. Output file
+    ffmpeg_args.push(settings.output_path.clone());
+
+    ffmpeg_args
+}
+
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct HardsubErrorPayload {
@@ -1535,6 +1633,194 @@ mod tests {
         merge_codecs(&mut status.vaapi_codecs, vec!["h264".to_string(), "h265".to_string(), "av1".to_string()]);
         assert_eq!(status.vaapi_codecs, vec!["h264".to_string(), "h265".to_string(), "av1".to_string()]);
     }
+
+    fn dummy_hardsub_settings() -> HardsubSettings {
+        HardsubSettings {
+            video_path: "input.mp4".to_string(),
+            subtitle_path: "sub.srt".to_string(),
+            output_path: "output.mp4".to_string(),
+            output_format: "mp4".to_string(),
+            video_codec: "h264".to_string(),
+            hw_accel: "cpu".to_string(),
+            video_quality_mode: "preset".to_string(),
+            video_quality_preset: "balanced".to_string(),
+            video_quality_value: 22,
+            video_preset_speed: "medium".to_string(),
+            resolution_scale: "original".to_string(),
+            font_name: "Vazirmatn".to_string(),
+            font_size: 24,
+            primary_color: "#FFFFFF".to_string(),
+            outline_color: "#000000".to_string(),
+            outline_size: 2,
+            bg_box: false,
+            bg_box_color: "#000000".to_string(),
+            bg_box_opacity: 50,
+            bg_box_radius: 0,
+            position_y: 30,
+            width_margin: 90,
+            bold: true,
+            italic: false,
+            alignment: 2,
+            audio_codec: "aac".to_string(),
+            audio_bitrate: "192k".to_string(),
+        }
+    }
+
+    #[test]
+    fn test_build_hardsub_ffmpeg_args_basic_cpu() {
+        let settings = dummy_hardsub_settings();
+        let stream_info = HardsubStreamInfo {
+            video_stream_index: 0,
+            audio_stream_index: Some(1),
+            normalized_rotation: 0,
+            video_width: 1920,
+            video_height: 1080,
+        };
+        let args = build_hardsub_ffmpeg_args(
+            &settings,
+            &stream_info,
+            "subtitles='sub.srt'",
+            None,
+        );
+
+        assert_eq!(args[0], "-nostdin");
+        assert_eq!(args[1], "-progress");
+        assert_eq!(args[2], "pipe:1");
+        assert!(args.contains(&"-noautorotate".to_string()));
+        assert!(args.contains(&"-y".to_string()));
+        assert!(args.contains(&"-i".to_string()));
+        assert!(args.contains(&"input.mp4".to_string()));
+        assert!(args.contains(&"0:0".to_string()));
+        assert!(args.contains(&"0:1".to_string()));
+        assert!(args.contains(&"-vf".to_string()));
+        assert!(args.contains(&"subtitles='sub.srt'".to_string()));
+        assert!(args.contains(&"libx264".to_string()));
+        assert!(args.contains(&"aac".to_string()));
+        assert_eq!(*args.last().unwrap(), "output.mp4".to_string());
+    }
+
+    #[test]
+    fn test_build_hardsub_ffmpeg_args_with_rotation_and_downscale() {
+        let mut settings = dummy_hardsub_settings();
+        settings.resolution_scale = "720p".to_string();
+
+        let stream_info = HardsubStreamInfo {
+            video_stream_index: 0,
+            audio_stream_index: Some(1),
+            normalized_rotation: 90,
+            video_width: 1920,
+            video_height: 1080,
+        };
+        let args = build_hardsub_ffmpeg_args(
+            &settings,
+            &stream_info,
+            "subtitles='sub.srt'",
+            None,
+        );
+
+        let vf_idx = args.iter().position(|a| a == "-vf").expect("must have -vf");
+        let vf_val = &args[vf_idx + 1];
+        assert!(vf_val.starts_with("transpose=1,subtitles='sub.srt',scale="));
+        assert!(args.contains(&"-metadata:s:v".to_string()));
+        assert!(args.contains(&"rotate=0".to_string()));
+    }
+
+    #[test]
+    fn test_build_hardsub_ffmpeg_args_vaapi_and_mute_audio() {
+        let mut settings = dummy_hardsub_settings();
+        settings.hw_accel = "vaapi".to_string();
+        settings.audio_codec = "mute".to_string();
+
+        let stream_info = HardsubStreamInfo {
+            video_stream_index: 0,
+            audio_stream_index: Some(1),
+            normalized_rotation: 0,
+            video_width: 1920,
+            video_height: 1080,
+        };
+        let args = build_hardsub_ffmpeg_args(
+            &settings,
+            &stream_info,
+            "subtitles='sub.srt'",
+            Some("/dev/dri/renderD128"),
+        );
+
+        assert!(args.contains(&"-vaapi_device".to_string()));
+        assert!(args.contains(&"/dev/dri/renderD128".to_string()));
+
+        let vf_idx = args.iter().position(|a| a == "-vf").expect("must have -vf");
+        let vf_val = &args[vf_idx + 1];
+        assert!(vf_val.ends_with("format=nv12,hwupload"));
+
+        // When audio_codec is mute, audio stream mapping (-map 0:1) should NOT be present
+        assert!(!args.contains(&"0:1".to_string()));
+        assert!(args.contains(&"-an".to_string()));
+    }
+
+    #[test]
+    fn test_build_hardsub_ffmpeg_args_rotations_and_no_audio_stream() {
+        let settings = dummy_hardsub_settings();
+
+        // 180 degree rotation without audio stream
+        let stream_info_180 = HardsubStreamInfo {
+            video_stream_index: 0,
+            audio_stream_index: None,
+            normalized_rotation: 180,
+            video_width: 1920,
+            video_height: 1080,
+        };
+        let args_180 = build_hardsub_ffmpeg_args(
+            &settings,
+            &stream_info_180,
+            "subtitles='sub.srt'",
+            None,
+        );
+        let vf_idx = args_180.iter().position(|a| a == "-vf").expect("must have -vf");
+        assert!(args_180[vf_idx + 1].starts_with("transpose=1,transpose=1,subtitles='sub.srt'"));
+        assert!(!args_180.contains(&"0:1".to_string()), "must not map audio when stream index is None");
+
+        // 270 degree rotation
+        let stream_info_270 = HardsubStreamInfo {
+            video_stream_index: 0,
+            audio_stream_index: Some(2),
+            normalized_rotation: 270,
+            video_width: 1080,
+            video_height: 1920,
+        };
+        let args_270 = build_hardsub_ffmpeg_args(
+            &settings,
+            &stream_info_270,
+            "subtitles='sub.srt'",
+            None,
+        );
+        let vf_idx_270 = args_270.iter().position(|a| a == "-vf").expect("must have -vf");
+        assert!(args_270[vf_idx_270 + 1].starts_with("transpose=2,subtitles='sub.srt'"));
+        assert!(args_270.contains(&"0:2".to_string()));
+    }
+
+    #[test]
+    fn test_build_hardsub_ffmpeg_args_vaapi_without_device() {
+        let mut settings = dummy_hardsub_settings();
+        settings.hw_accel = "vaapi".to_string();
+
+        let stream_info = HardsubStreamInfo {
+            video_stream_index: 0,
+            audio_stream_index: Some(1),
+            normalized_rotation: 0,
+            video_width: 1920,
+            video_height: 1080,
+        };
+        let args = build_hardsub_ffmpeg_args(
+            &settings,
+            &stream_info,
+            "subtitles='sub.srt'",
+            None,
+        );
+
+        assert!(!args.contains(&"-vaapi_device".to_string()), "must not include -vaapi_device when None");
+        let vf_idx = args.iter().position(|a| a == "-vf").expect("must have -vf");
+        assert!(args[vf_idx + 1].ends_with("format=nv12,hwupload"));
+    }
 }
 
 #[tauri::command]
@@ -1810,84 +2096,28 @@ pub async fn run_hardsub_task(
         format!("subtitles='{}':original_size={}x{}{}:force_style='{}'", escaped_sub_path, ref_width, ref_height, fonts_dir_opt, force_style)
     };
 
-    // Build FFmpeg Arguments
-    let mut ffmpeg_args: Vec<String> = Vec::new();
-
-    // Pass global non-interactive flags and machine-readable progress on stdout
-    ffmpeg_args.push("-nostdin".to_string());
-    ffmpeg_args.push("-progress".to_string());
-    ffmpeg_args.push("pipe:1".to_string());
-
-    // 1. Hardware acceleration flags before -i
-    let vaapi_dev = find_vaapi_render_device();
-    if settings.hw_accel == "vaapi" {
-        if let Some(ref dev) = vaapi_dev {
-            ffmpeg_args.push("-vaapi_device".to_string());
-            ffmpeg_args.push(dev.clone());
-        }
-    }
-
-    // Disable FFmpeg auto-rotation so that we can rotate manually at the start of the filtergraph.
-    // This ensures libass renders subtitles on the rotated vertical frame at the correct aspect ratio.
-    ffmpeg_args.push("-noautorotate".to_string());
-    ffmpeg_args.push("-y".to_string());
-    ffmpeg_args.push("-i".to_string());
-    ffmpeg_args.push(settings.video_path.clone());
-
-    ffmpeg_args.push("-map".to_string());
-    ffmpeg_args.push(format!("0:{}", source.video_stream_index));
-    if settings.audio_codec != "mute" {
-        if let Some(audio_stream_index) = source.audio_stream_index {
-            ffmpeg_args.push("-map".to_string());
-            ffmpeg_args.push(format!("0:{}", audio_stream_index));
-        }
-    }
-
-    // 2. Video Filter
-    let mut vf_filters = Vec::new();
-    if normalized_rotation == 90 {
-        vf_filters.push("transpose=1".to_string());
-    } else if normalized_rotation == 180 {
-        vf_filters.push("transpose=1,transpose=1".to_string());
-    } else if normalized_rotation == 270 {
-        vf_filters.push("transpose=2".to_string());
-    }
-    vf_filters.push(sub_filter);
-
-    // Optional Resolution Downscaling Filter
     if let Some(scale_filter) = get_resolution_scale_filter(&settings.resolution_scale, video_width, video_height) {
         logs.log(&app, "Hardsub", &format!("Applying resolution scale filter: '{}' for target '{}'", scale_filter, settings.resolution_scale));
-        vf_filters.push(scale_filter);
     }
 
-    // If using VA-API hardware encoder, upload processed frames to VAAPI GPU surface
-    if settings.hw_accel == "vaapi" {
-        vf_filters.push("format=nv12,hwupload".to_string());
-    }
-    
-    let vf_arg = vf_filters.join(",");
-
-    ffmpeg_args.push("-vf".to_string());
-    ffmpeg_args.push(vf_arg);
-
-    // After a manual transpose, clear the source rotation metadata: mp4 muxers
-    // drop it, but matroska copies the ROTATE tag into the output, which would
-    // rotate the already-transposed video a second time in players.
-    if normalized_rotation != 0 {
-        ffmpeg_args.push("-metadata:s:v".to_string());
-        ffmpeg_args.push("rotate=0".to_string());
-    }
-
-    // 3. Video Encoder Selection & Quality Parameters
-    let video_encoder_flags = build_video_encoder_flags(&settings);
-    ffmpeg_args.extend(video_encoder_flags);
-
-    // 4. Audio Codec & Bitrate Selection
-    let audio_encoder_flags = build_audio_encoder_flags(&settings);
-    ffmpeg_args.extend(audio_encoder_flags);
-
-    // 5. Output file
-    ffmpeg_args.push(settings.output_path.clone());
+    let stream_info = HardsubStreamInfo {
+        video_stream_index: source.video_stream_index,
+        audio_stream_index: source.audio_stream_index,
+        normalized_rotation,
+        video_width,
+        video_height,
+    };
+    let vaapi_dev = if settings.hw_accel == "vaapi" {
+        find_vaapi_render_device()
+    } else {
+        None
+    };
+    let ffmpeg_args = build_hardsub_ffmpeg_args(
+        &settings,
+        &stream_info,
+        &sub_filter,
+        vaapi_dev.as_deref(),
+    );
 
     // Check if cancellation was requested while preparing probing/subtitles
     if session.lock().map(|l| l.cancel_requested).unwrap_or(false) {
