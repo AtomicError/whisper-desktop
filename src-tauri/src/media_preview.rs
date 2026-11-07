@@ -797,8 +797,15 @@ mod tests {
         (directory, state, path)
     }
 
+    fn test_http_client() -> reqwest::Client {
+        reqwest::Client::builder()
+            .no_proxy()
+            .build()
+            .unwrap_or_else(|_| reqwest::Client::new())
+    }
+
     async fn response_status(url: &str) -> reqwest::StatusCode {
-        reqwest::get(url).await.unwrap().status()
+        test_http_client().get(url).send().await.unwrap().status()
     }
 
     #[tokio::test]
@@ -976,7 +983,7 @@ mod tests {
                 let state = PreviewState::new(server.clone(), directory.path().join("direct-cache"));
                 let candidate = state.begin(1, input.clone()).await.unwrap();
                 assert_eq!(candidate.stage, Stage::Direct);
-                assert_eq!(reqwest::get(&candidate.url).await.unwrap().bytes().await.unwrap().as_ref(), original_bytes);
+                assert_eq!(test_http_client().get(&candidate.url).send().await.unwrap().bytes().await.unwrap().as_ref(), original_bytes);
                 state.release(1).await;
                 server.shutdown().await;
             }

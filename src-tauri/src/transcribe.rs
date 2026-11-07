@@ -97,6 +97,8 @@ pub async fn probe_file_metadata(app: Option<&AppHandle>, file_path: &str) -> Fi
     let mut probe_cmd = tokio::process::Command::new(&ffprobe_bin);
     #[cfg(target_os = "windows")]
     probe_cmd.creation_flags(0x08000000);
+    #[cfg(target_os = "linux")]
+    crate::hardsub::apply_linux_media_env_tokio(&mut probe_cmd);
     probe_cmd
         .args([
             "-v", "error",
@@ -104,6 +106,7 @@ pub async fn probe_file_metadata(app: Option<&AppHandle>, file_path: &str) -> Fi
             "-of", "default=noprint_wrappers=1:nokey=1",
             &probe_path,
         ])
+        .stdin(Stdio::null())
         .kill_on_drop(true);
 
     let probe_res = tokio::time::timeout(
@@ -135,6 +138,19 @@ impl Drop for ActiveSessionGuard {
             lock.cancel_requested = false;
         }
     }
+}
+
+pub fn build_wav_conversion_args<'a>(input: &'a str, output: &'a str, diarize: bool) -> Vec<&'a str> {
+    let audio_channels = if diarize { "2" } else { "1" };
+    vec![
+        "-nostdin",
+        "-y",
+        "-i", input,
+        "-ar", "16000",
+        "-ac", audio_channels,
+        "-c:a", "pcm_s16le",
+        output,
+    ]
 }
 
 pub async fn convert_to_wav(
@@ -193,21 +209,15 @@ pub async fn convert_to_wav(
     }
 
     let settings = crate::settings::load_settings_file();
-    let audio_channels = if settings.diarize { "2" } else { "1" };
+    let wav_args = build_wav_conversion_args(&safe_input, &tmp_wav_str, settings.diarize);
     let mut cmd = Command::new(&ffmpeg_bin);
     #[cfg(target_os = "windows")]
     cmd.creation_flags(0x08000000);
-    cmd.args([
-        "-y",
-        "-i", &safe_input,
-        "-ar", "16000",
-        "-ac", audio_channels,
-        "-c:a", "pcm_s16le",
-        &tmp_wav_str,
-    ])
-    .stdout(Stdio::piped())
-    .stderr(Stdio::piped())
-    .kill_on_drop(true);
+    cmd.args(&wav_args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
 
     #[cfg(unix)]
     {
@@ -288,7 +298,7 @@ pub async fn convert_to_wav(
         return Err(format!("FFmpeg failed with exit code: {:?}", status.code()));
     }
     
-    let channel_desc = if audio_channels == "2" { "Stereo" } else { "Mono" };
+    let channel_desc = if settings.diarize { "Stereo" } else { "Mono" };
     logs.log(&app, "FFmpeg", &format!("WAV conversion finished successfully! Format: PCM 16-bit, 16kHz, {}.", channel_desc));
     let _ = app.emit("transcribe-status", TranscribeProgress {
         progress: 1.0,
@@ -784,6 +794,7 @@ pub async fn run_transcription(
     #[cfg(target_os = "windows")]
     cmd.creation_flags(0x08000000);
     cmd.args(&args)
+        .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true);
@@ -1489,6 +1500,26 @@ mod tests {
         assert!(cache_dir.join("cuda").join("whisper-cli-cuda").exists(), "CUDA binary must remain cached");
         assert!(cache_dir.join("cuda").join("libggml-cuda.so").exists(), "CUDA companion library must remain cached");
         assert!(cache_dir.join("cuda").join("cache.json").exists(), "CUDA companion config must remain cached");
+    }
+
+    #[test]
+    fn test_build_wav_conversion_args_includes_nostdin_and_pcm() {
+        let args_mono = build_wav_conversion_args("input.mp4", "output.wav", false);
+        assert_eq!(args_mono[0], "-nostdin");
+        assert!(args_mono.contains(&"-y"));
+        assert!(args_mono.contains(&"-i"));
+        assert!(args_mono.contains(&"input.mp4"));
+        assert!(args_mono.contains(&"-ar"));
+        assert!(args_mono.contains(&"16000"));
+        assert!(args_mono.contains(&"-ac"));
+        assert!(args_mono.contains(&"1"));
+        assert!(args_mono.contains(&"-c:a"));
+        assert!(args_mono.contains(&"pcm_s16le"));
+        assert_eq!(*args_mono.last().unwrap(), "output.wav");
+
+        let args_stereo = build_wav_conversion_args("input.mp4", "output.wav", true);
+        assert_eq!(args_stereo[0], "-nostdin");
+        assert!(args_stereo.contains(&"2"));
     }
 }
 

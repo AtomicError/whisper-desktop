@@ -493,6 +493,7 @@ pub fn probe_single_encoder(bin: &Path, hw_accel: &str, codec: &str) -> bool {
         use std::os::windows::process::CommandExt;
         cmd.creation_flags(0x08000000);
     }
+    cmd.stdin(std::process::Stdio::null());
     match (hw_accel, codec) {
         ("qsv", "h264") => {
             cmd.args(["-nostdin", "-f", "lavfi", "-i", "nullsrc", "-frames:v", "1", "-vf", "format=nv12", "-c:v", "h264_qsv", "-f", "null", "-"]);
@@ -1912,6 +1913,7 @@ pub async fn run_hardsub_task(
     #[cfg(target_os = "linux")]
     apply_linux_media_env_tokio(&mut cmd);
     cmd.args(&ffmpeg_args)
+        .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true);
