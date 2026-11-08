@@ -1724,7 +1724,9 @@ export class HardsubController {
 
     this.on(this.bgBoxToggle, 'change', () => {
       this.state.bgBox = this.bgBoxToggle!.checked;
-      this.updateLivePreview();
+      setTimeout(() => {
+        this.updateLivePreview();
+      }, 240);
     });
     this.on(this.bgBoxColorPicker, 'input', () => {
       this.state.bgBoxColor = this.bgBoxColorPicker!.value.toUpperCase();

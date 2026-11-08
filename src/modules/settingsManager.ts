@@ -949,7 +949,9 @@ export function bindSettingsToDOM(): void {
     autoTransferCheckbox.onchange = () => {
       current.autoTransferToTranslate = autoTransferCheckbox.checked;
       current.translateAiEnabled = autoTransferCheckbox.checked;
-      saveCurrentSettings();
+      setTimeout(() => {
+        saveCurrentSettings();
+      }, 240);
     };
   }
 
@@ -966,21 +968,27 @@ export function bindSettingsToDOM(): void {
             current.autoTransferToTranslate = chk.checked;
             current.translateAiEnabled = chk.checked;
           }
-          if (key === 'monochromeCanvas') {
-            applyMonochromeCanvas(chk.checked, true);
-          }
-          saveCurrentSettings();
           if (key === 'vad') {
             const quickVadInput = document.getElementById('quick-toggle-vad') as HTMLInputElement | null;
             if (quickVadInput) quickVadInput.checked = chk.checked;
-            updateTranscribeUIConfigs();
           }
-          if (key === 'translateAiPolish' && win.translationStudioController?.syncFromGlobalSettings) {
-            win.translationStudioController.syncFromGlobalSettings();
-          }
-          if (key === 'outputJson' || key === 'outputJsonFull') {
-            syncJsonConfidenceDependency();
-          }
+
+          // Defer heavy side-effects so the 220ms toggle CSS transition completes at pure 60fps
+          setTimeout(() => {
+            if (key === 'monochromeCanvas') {
+              applyMonochromeCanvas(chk.checked, true);
+            }
+            saveCurrentSettings();
+            if (key === 'vad') {
+              updateTranscribeUIConfigs();
+            }
+            if (key === 'translateAiPolish' && win.translationStudioController?.syncFromGlobalSettings) {
+              win.translationStudioController.syncFromGlobalSettings();
+            }
+            if (key === 'outputJson' || key === 'outputJsonFull') {
+              syncJsonConfidenceDependency();
+            }
+          }, 240);
         };
       } else if (el.tagName === 'SELECT' || el.tagName === 'TEXTAREA' || (el as HTMLInputElement).type === 'text' || (el as HTMLInputElement).type === 'number') {
         el.value = current[key] ?? '';
@@ -1232,10 +1240,9 @@ export async function saveCurrentSettings(immediate = false): Promise<void> {
     }
   }
 
-  updateTranscribeUIConfigs();
-
   const doSave = async () => {
     try {
+      updateTranscribeUIConfigs();
       const cleanPayload = sanitizeSettingsPayload(current);
       await invoke('save_settings', { settings: cleanPayload });
     } catch (e) {
@@ -1751,7 +1758,12 @@ export function updateTranscribeUIConfigs(): void {
   // 3. Sync Quick Language Select
   const quickLangSelect = document.getElementById('quick-opt-language') as HTMLSelectElement | null;
   if (quickLangSelect) {
-    renderLanguageSelect(quickLangSelect, 'spoken', (current.language || 'auto').trim());
+    const targetLang = (current.language || 'auto').trim();
+    if (!quickLangSelect.options || quickLangSelect.options.length === 0) {
+      renderLanguageSelect(quickLangSelect, 'spoken', targetLang);
+    } else if (quickLangSelect.value !== targetLang) {
+      quickLangSelect.value = targetLang;
+    }
   }
 
   // 4. Sync Quick VAD Button State & Tooltip
@@ -1761,7 +1773,7 @@ export function updateTranscribeUIConfigs(): void {
 
   const quickVadBtn = document.getElementById('quick-toggle-vad') as HTMLInputElement | null;
   if (quickVadBtn) {
-    if ('checked' in quickVadBtn) {
+    if ('checked' in quickVadBtn && quickVadBtn.checked !== vadActive) {
       quickVadBtn.checked = vadActive;
     }
     if (vadActive) {
@@ -1882,11 +1894,28 @@ export function toggleQuickVad(forceVal?: boolean): void {
   const quickVadInput = document.getElementById('quick-toggle-vad') as HTMLInputElement | null;
   if (quickVadInput) {
     quickVadInput.checked = current.vad;
+    const vadModelName = current.vadModel ? getBasename(current.vadModel) : 'Default';
+    if (current.vad) {
+      quickVadInput.classList.add('active');
+      quickVadInput.title = `${t('transcribe.vadActive')} (${vadModelName}) - ${t('transcribe.vadDisableHint') || 'Click to disable'}`;
+    } else {
+      quickVadInput.classList.remove('active');
+      quickVadInput.title = `${t('transcribe.vadDisabled')} (${vadModelName}) - ${t('transcribe.vadEnableHint') || 'Click to enable'}`;
+    }
   }
-  saveCurrentSettings();
-  updateTranscribeUIConfigs();
+
   const vadModelName = current.vadModel ? getBasename(current.vadModel) : 'Silero VAD';
-  showNotification(current.vad ? t('toasts.vadEnabled', { model: vadModelName }) : t('toasts.vadDisabled'), "info");
+  const notifyMsg = current.vad ? t('toasts.vadEnabled', { model: vadModelName }) : t('toasts.vadDisabled');
+
+  if (typeof setTimeout === 'function') {
+    setTimeout(() => {
+      saveCurrentSettings();
+      showNotification(notifyMsg, "info");
+    }, 240);
+  } else {
+    saveCurrentSettings();
+    showNotification(notifyMsg, "info");
+  }
 }
 
 // ----------------- Auto Unload / Disposal Event Listeners -----------------

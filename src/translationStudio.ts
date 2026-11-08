@@ -494,7 +494,9 @@ export class TranslationStudioController {
           const globalPolish = document.getElementById('opt-translateAiPolish') as HTMLInputElement;
           if (globalPolish) globalPolish.checked = this.state.polishPass;
           if (typeof win.saveCurrentSettings === 'function') {
-            win.saveCurrentSettings();
+            setTimeout(() => {
+              win.saveCurrentSettings();
+            }, 240);
           }
         }
       }
