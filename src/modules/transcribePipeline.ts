@@ -956,39 +956,97 @@ export async function copyMainTranscriptToClipboard(): Promise<void> {
     }
   };
 
+  // 1. Prefer live/edited transcript lines in memory if available
+  const liveLines = transcriptViewer.getLines();
+  if (Array.isArray(liveLines) && liveLines.length > 0) {
+    const textToCopy = liveLines.map(l => l.text).join('\n');
+    try {
+      await copyToClipboard(textToCopy);
+      triggerFeedback();
+      showNotification(t('toasts.liveTranscriptCopied') || t('toasts.fileCopied'), "success");
+    } catch (err: any) {
+      const msg = (err && (err.message || err.toString())) || String(err);
+      showNotification(t('toasts.copyTranscriptError', { error: msg }), "error");
+    }
+    return;
+  }
+
+  // 2. Collect candidate output files from workflowBridge and currentMedia
   const currentMedia = getSelectedMediaFile();
-  if (!currentMedia) {
+  const outputFiles = workflowBridge.getLastTranscribedOutputFiles();
+  const lastSubPath = workflowBridge.getLastTranscribedSubtitlePath();
+  const lastOutputDir = workflowBridge.getLastTranscribedOutputDir();
+
+  if (!currentMedia && outputFiles.length === 0 && !lastSubPath) {
     showNotification(t('toasts.noMediaOrTranscribe'), "info");
     return;
   }
 
-  const base = currentMedia.substring(0, currentMedia.lastIndexOf('.')) || currentMedia;
-  const txtFile = `${base}.txt`;
-
-  try {
-    const content = await invoke('read_text_file_content', { filePath: txtFile });
-    await copyToClipboard(content);
-    triggerFeedback();
-    showNotification(t('toasts.fileCopied'), "success");
-  } catch (e) {
-    // Fallback: copy Whisper logs
-    const fallback = logsController.allLogs
-      .filter((l: any) => l.category === 'Whisper')
-      .map((l: any) => l.message)
-      .join('\n');
-    if (fallback) {
-      try {
-        await copyToClipboard(fallback);
-        triggerFeedback();
-        showNotification(t('toasts.transcriptNotFoundFallback'), "info");
-      } catch (e2: any) {
-        const msg = (e2 && (e2.message || e2.toString())) || String(e2);
-        showNotification(t('toasts.copyTranscriptError', { error: msg }), "error");
-      }
-    } else {
-      const msg = (e && ((e as any).message || (e as any).toString())) || String(e);
-      showNotification(t('toasts.copyTranscriptError', { error: msg }), "error");
+  const candidatePaths: string[] = [];
+  const pushUnique = (p: string | null | undefined) => {
+    if (typeof p === 'string' && p.trim() && !candidatePaths.includes(p.trim())) {
+      candidatePaths.push(p.trim());
     }
+  };
+
+  // Prefer .txt outputs first, then subtitle/structured outputs from workflowBridge
+  outputFiles.forEach((f: any) => {
+    if (f && (f.type === 'text' || String(f.path || '').toLowerCase().endsWith('.txt'))) {
+      pushUnique(f.path);
+    }
+  });
+  pushUnique(lastSubPath);
+  outputFiles.forEach((f: any) => {
+    if (f && f.path) pushUnique(f.path);
+  });
+
+  if (currentMedia) {
+    const mediaName = getBasename(currentMedia);
+    const stem = mediaName.lastIndexOf('.') > 0 ? mediaName.substring(0, mediaName.lastIndexOf('.')) : mediaName;
+    if (lastOutputDir) {
+      const sep = lastOutputDir.includes('\\') && !lastOutputDir.includes('/') ? '\\' : '/';
+      pushUnique(`${lastOutputDir}${sep}${stem}.txt`);
+      pushUnique(`${lastOutputDir}${sep}${stem}.srt`);
+      pushUnique(`${lastOutputDir}${sep}${stem}.vtt`);
+    }
+    const base = currentMedia.lastIndexOf('.') > 0 ? currentMedia.substring(0, currentMedia.lastIndexOf('.')) : currentMedia;
+    pushUnique(`${base}.txt`);
+    pushUnique(`${base}.srt`);
+    pushUnique(`${base}.vtt`);
+  }
+
+  let lastError: any = null;
+  for (const filePath of candidatePaths) {
+    const ext = (filePath.split('.').pop() || '').toLowerCase();
+    try {
+      if (ext === 'txt') {
+        const content = await invoke('read_text_file_content', { filePath });
+        if (typeof content === 'string' && content.trim().length > 0) {
+          await copyToClipboard(content);
+          triggerFeedback();
+          showNotification(t('toasts.fileCopied'), "success");
+          return;
+        }
+      } else {
+        const parsed = await loadTranscriptFromFile(filePath, false);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const textToCopy = parsed.map(l => l.text).join('\n');
+          await copyToClipboard(textToCopy);
+          triggerFeedback();
+          showNotification(t('toasts.fileCopied'), "success");
+          return;
+        }
+      }
+    } catch (e) {
+      lastError = e;
+    }
+  }
+
+  if (lastError) {
+    const msg = (lastError && (lastError.message || lastError.toString())) || String(lastError);
+    showNotification(t('toasts.copyTranscriptError', { error: msg }), "error");
+  } else {
+    showNotification(t('toasts.noTranscriptToCopy'), "info");
   }
 }
 

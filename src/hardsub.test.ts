@@ -1686,6 +1686,54 @@ describe('hardsub output directory management', () => {
       expect(ass).toContain('\\i0');
     });
   });
+
+  describe('subtitle format preservation and temp ASS fallback on export', () => {
+    it('saves modified VTT subtitles in WebVTT format and does not corrupt ASS subtitles with SRT', async () => {
+      const { internal } = fixture();
+      await flush();
+
+      const writes: Array<{ filePath: string; content: string }> = [];
+      invoke.mockImplementation(async (command: string, args?: any) => {
+        if (command === 'get_font_render_scale') return { scale: 1.0, ascentRatio: 0.78, descentRatio: 0.22 };
+        if (command === 'write_text_file_content') {
+          writes.push(args);
+          return undefined;
+        }
+        if (command === 'start_hardsub_task') {
+          return { outputPath: '/out/video_hardsub.mp4', durationMs: 1000, outputSizeMb: 5 };
+        }
+        return undefined;
+      });
+
+      (internal as any).directSourceGeometry = { width: 1920, height: 1080 };
+      internal.state.videoPath = '/media/video.mp4';
+      (internal as any).subtitlePathInput = { value: '/media/captions.vtt' };
+      internal.state.subtitlePath = '/media/captions.vtt';
+      internal.subtitleCues = [{ id: 1, startMs: 1000, endMs: 3500, startTimeStr: '00:00:01.000', endTimeStr: '00:00:03.500', text: 'Edited VTT cue' } as any];
+      (internal as any).isSubtitlesModified = true;
+
+      await (internal as any).startHardsub();
+
+      const vttWrite = writes.find(w => w.filePath === '/media/captions.vtt');
+      expect(vttWrite).toBeDefined();
+      expect(vttWrite?.content).toBe('WEBVTT\n\n1\n00:00:01.000 --> 00:00:03.500\nEdited VTT cue\n');
+      expect((internal as any).isSubtitlesModified).toBe(false);
+
+      // Now test with an .ass file: must not overwrite original .ass file with SRT
+      writes.length = 0;
+      (internal as any).subtitlePathInput = { value: '/media/styled.ass' };
+      internal.state.subtitlePath = '/media/styled.ass';
+      (internal as any).isSubtitlesModified = true;
+
+      await (internal as any).startHardsub();
+
+      const assOriginalWrite = writes.find(w => w.filePath === '/media/styled.ass');
+      expect(assOriginalWrite).toBeUndefined();
+      const tempAssWrite = writes.find(w => w.filePath === '/media/video.temp.ass');
+      expect(tempAssWrite).toBeDefined();
+      expect((internal as any).isSubtitlesModified).toBe(false);
+    });
+  });
 });
 
 

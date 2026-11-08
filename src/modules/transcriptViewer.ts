@@ -9,6 +9,11 @@ export interface TranscriptLine {
 }
 
 let transcriptLines: TranscriptLine[] = [];
+let transcriptDirty = false;
+let transcriptSaveTimer: ReturnType<typeof setTimeout> | null = null;
+let inFlightSavePromise: Promise<void> | null = null;
+
+const TRANSCRIPT_SAVE_DEBOUNCE_MS = 350;
 
 const getGlobal = (): any => (typeof window !== 'undefined' ? window : globalThis);
 
@@ -145,6 +150,7 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
   };
   textarea.onchange = () => {
     updateTranscriptLineText(lineObj.id, textarea.value);
+    void flushPendingTranscriptEdits();
   };
   bodyEl.appendChild(textarea);
 
@@ -240,9 +246,196 @@ export function appendTranscriptLine(timeRange: string, text: string): void {
   }, 80);
 }
 
+function extractLineStartEndMs(line: TranscriptLine, fallbackIndex: number): { startMs: number; endMs: number } {
+  const match = (line.timeRange || '').match(
+    /(\d{2}:\d{2}:\d{2}(?:[.,]\d{1,3})?)\s*(?:-->|→)\s*(\d{2}:\d{2}:\d{2}(?:[.,]\d{1,3})?)/
+  );
+  if (match) {
+    const startMs = parseTimestampStringToMs(match[1]);
+    const endMs = parseTimestampStringToMs(match[2]);
+    if (startMs !== null && endMs !== null) {
+      return { startMs, endMs: Math.max(startMs, endMs) };
+    }
+  }
+  const fallbackStart = fallbackIndex * 2000;
+  return { startMs: fallbackStart, endMs: fallbackStart + 2000 };
+}
+
+function formatMsToSrtTimestamp(ms: number): string {
+  return formatMsToTimestamp(ms).replace('.', ',');
+}
+
+function formatMsToLrcTimestamp(ms: number): string {
+  const totalMs = Math.max(0, Math.round(Number(ms) || 0));
+  const totalSec = Math.floor(totalMs / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  const hundredths = Math.floor((totalMs % 1000) / 10);
+  return `[${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${hundredths.toString().padStart(2, '0')}]`;
+}
+
+export function serializeTranscriptLinesForFile(lines: TranscriptLine[], filePath: string): string | null {
+  if (!filePath || !Array.isArray(lines) || lines.length === 0) return null;
+  const ext = (filePath.split('.').pop() || '').toLowerCase();
+
+  if (ext === 'srt') {
+    return lines
+      .map((line, idx) => {
+        const { startMs, endMs } = extractLineStartEndMs(line, idx);
+        return `${idx + 1}\n${formatMsToSrtTimestamp(startMs)} --> ${formatMsToSrtTimestamp(endMs)}\n${line.text}\n`;
+      })
+      .join('\n');
+  }
+
+  if (ext === 'vtt') {
+    const body = lines
+      .map((line, idx) => {
+        const { startMs, endMs } = extractLineStartEndMs(line, idx);
+        return `${idx + 1}\n${formatMsToTimestamp(startMs)} --> ${formatMsToTimestamp(endMs)}\n${line.text}\n`;
+      })
+      .join('\n');
+    return `WEBVTT\n\n${body}`;
+  }
+
+  if (ext === 'lrc') {
+    return (
+      lines
+        .map((line, idx) => {
+          const { startMs } = extractLineStartEndMs(line, idx);
+          const singleLine = (line.text || '').replace(/\r?\n/g, ' ').trim();
+          return `${formatMsToLrcTimestamp(startMs)}${singleLine}`;
+        })
+        .join('\n') + '\n'
+    );
+  }
+
+  if (ext === 'txt') {
+    return lines.map(l => l.text).join('\n') + '\n';
+  }
+
+  if (ext === 'csv') {
+    const rows = lines.map((line, idx) => {
+      const { startMs, endMs } = extractLineStartEndMs(line, idx);
+      const escaped = (line.text || '').replace(/"/g, '""').replace(/\r?\n/g, ' ');
+      return `${startMs},${endMs},"${escaped}"`;
+    });
+    return `start,end,text\n${rows.join('\n')}\n`;
+  }
+
+  if (ext === 'tsv') {
+    const rows = lines.map((line, idx) => {
+      const { startMs, endMs } = extractLineStartEndMs(line, idx);
+      const escaped = (line.text || '').replace(/\t/g, ' ').replace(/\r?\n/g, ' ');
+      return `${startMs}\t${endMs}\t${escaped}`;
+    });
+    return `start\tend\ttext\n${rows.join('\n')}\n`;
+  }
+
+  return null;
+}
+
+function collectActiveTranscriptTargetFiles(): string[] {
+  const win = getGlobal();
+  const targets = new Set<string>();
+
+  const addIfSupported = (p: unknown) => {
+    if (typeof p !== 'string' || !p.trim()) return;
+    const clean = p.trim();
+    const ext = (clean.split('.').pop() || '').toLowerCase();
+    if (['srt', 'vtt', 'lrc', 'txt', 'csv', 'tsv'].includes(ext)) {
+      targets.add(clean);
+    }
+  };
+
+  if (win.isBatchMode && win.activeBatchViewerIndex >= 0 && Array.isArray(win.batchItems)) {
+    const item = win.batchItems[win.activeBatchViewerIndex];
+    if (item) {
+      if (Array.isArray(item.outputFiles)) {
+        item.outputFiles.forEach((f: any) => {
+          if (f && f.type !== 'translated') addIfSupported(f.path);
+        });
+      }
+      addIfSupported(item.subtitlePath);
+      addIfSupported(item.txtPath);
+    }
+  }
+
+  if (Array.isArray(win.lastTranscribedOutputFiles)) {
+    win.lastTranscribedOutputFiles.forEach((f: any) => {
+      if (f && f.type !== 'translated') addIfSupported(f.path);
+    });
+  }
+  addIfSupported(win.lastTranscribedSubtitlePath);
+
+  return Array.from(targets);
+}
+
+export async function persistTranscriptLinesToDisk(): Promise<void> {
+  if (!transcriptDirty) return;
+  const invoke = getTauriInvoke();
+  if (!invoke) {
+    transcriptDirty = false;
+    return;
+  }
+
+  const targetFiles = collectActiveTranscriptTargetFiles();
+  if (targetFiles.length === 0 || transcriptLines.length === 0) {
+    transcriptDirty = false;
+    return;
+  }
+
+  const linesSnapshot = transcriptLines.map(l => ({ ...l }));
+  transcriptDirty = false;
+
+  for (const filePath of targetFiles) {
+    const content = serializeTranscriptLinesForFile(linesSnapshot, filePath);
+    if (content !== null) {
+      try {
+        await invoke('write_text_file_content', { filePath, content });
+      } catch (err) {
+        console.warn('Failed to persist transcript edits to file:', filePath, err);
+      }
+    }
+  }
+}
+
+function scheduleTranscriptDiskSync(): void {
+  if (transcriptSaveTimer !== null) {
+    clearTimeout(transcriptSaveTimer);
+  }
+  transcriptSaveTimer = setTimeout(() => {
+    transcriptSaveTimer = null;
+    inFlightSavePromise = persistTranscriptLinesToDisk().finally(() => {
+      inFlightSavePromise = null;
+    });
+  }, TRANSCRIPT_SAVE_DEBOUNCE_MS);
+}
+
+export function hasPendingTranscriptEdits(): boolean {
+  return transcriptDirty || transcriptSaveTimer !== null || inFlightSavePromise !== null;
+}
+
+export async function flushPendingTranscriptEdits(): Promise<void> {
+  if (transcriptSaveTimer !== null) {
+    clearTimeout(transcriptSaveTimer);
+    transcriptSaveTimer = null;
+  }
+  if (inFlightSavePromise) {
+    await inFlightSavePromise;
+  }
+  if (transcriptDirty) {
+    inFlightSavePromise = persistTranscriptLinesToDisk().finally(() => {
+      inFlightSavePromise = null;
+    });
+    await inFlightSavePromise;
+  }
+}
+
 export function updateTranscriptLineText(id: number, value: string): void {
+  let changed = false;
   const line = transcriptLines.find(l => l.id === id);
   if (line) {
+    if (line.text !== value) changed = true;
     line.text = value;
   }
   const win = getGlobal();
@@ -251,9 +444,14 @@ export function updateTranscriptLineText(id: number, value: string): void {
     if (item.transcriptLines) {
       const itemLine = item.transcriptLines.find((l: any) => l.id === id);
       if (itemLine) {
+        if (itemLine.text !== value) changed = true;
         itemLine.text = value;
       }
     }
+  }
+  if (changed) {
+    transcriptDirty = true;
+    scheduleTranscriptDiskSync();
   }
 }
 
@@ -371,6 +569,19 @@ export async function loadTranscriptFromFile(fullPath: string, shouldRender = tr
     const parsedLines: TranscriptLine[] = [];
     const ext = (fullPath.split('.').pop() || '').toLowerCase();
 
+    const applyParsedIfRender = (lines: TranscriptLine[]): TranscriptLine[] => {
+      if (shouldRender) {
+        if (transcriptSaveTimer !== null) {
+          clearTimeout(transcriptSaveTimer);
+          transcriptSaveTimer = null;
+        }
+        transcriptDirty = false;
+        transcriptLines = lines;
+        renderTranscriptLines(transcriptLines);
+      }
+      return lines;
+    };
+
     // 1. JSON Parser
     if (ext === 'json' || text.trim().startsWith('{') || text.trim().startsWith('[')) {
       try {
@@ -399,11 +610,7 @@ export async function loadTranscriptFromFile(fullPath: string, shouldRender = tr
             }
           });
           if (parsedLines.length > 0) {
-            if (shouldRender) {
-              transcriptLines = parsedLines;
-              renderTranscriptLines(transcriptLines);
-            }
-            return parsedLines;
+            return applyParsedIfRender(parsedLines);
           }
         }
       } catch (_) {}
@@ -433,11 +640,7 @@ export async function loadTranscriptFromFile(fullPath: string, shouldRender = tr
           const timeRange = `[${formatMsToTimestamp(cue.ms)} --> ${formatMsToTimestamp(nextMs)}]`;
           parsedLines.push({ timeRange, text: cue.text, id: idx });
         });
-        if (shouldRender) {
-          transcriptLines = parsedLines;
-          renderTranscriptLines(transcriptLines);
-        }
-        return parsedLines;
+        return applyParsedIfRender(parsedLines);
       }
     }
 
@@ -487,11 +690,7 @@ export async function loadTranscriptFromFile(fullPath: string, shouldRender = tr
         }
       });
       if (parsedLines.length > 0) {
-        if (shouldRender) {
-          transcriptLines = parsedLines;
-          renderTranscriptLines(transcriptLines);
-        }
-        return parsedLines;
+        return applyParsedIfRender(parsedLines);
       }
     }
 
@@ -550,11 +749,7 @@ export async function loadTranscriptFromFile(fullPath: string, shouldRender = tr
       });
     }
 
-    if (shouldRender) {
-      transcriptLines = parsedLines;
-      renderTranscriptLines(transcriptLines);
-    }
-    return parsedLines;
+    return applyParsedIfRender(parsedLines);
   } catch (err) {
     console.error("Failed to load transcript file:", err);
     return [];
@@ -644,6 +839,11 @@ export function getTranscriptLines(): TranscriptLine[] {
 }
 
 export function clearTranscriptLines(): void {
+  if (transcriptSaveTimer !== null) {
+    clearTimeout(transcriptSaveTimer);
+    transcriptSaveTimer = null;
+  }
+  transcriptDirty = false;
   transcriptLines = [];
   renderTranscriptLines([]);
 }
@@ -655,6 +855,9 @@ if (typeof window !== 'undefined') {
   (window as any).renderTranscriptLines = renderTranscriptLines;
   (window as any).appendTranscriptLine = appendTranscriptLine;
   (window as any).updateTranscriptLineText = updateTranscriptLineText;
+  (window as any).flushPendingTranscriptEdits = flushPendingTranscriptEdits;
+  (window as any).hasPendingTranscriptEdits = hasPendingTranscriptEdits;
+  (window as any).serializeTranscriptLinesForFile = serializeTranscriptLinesForFile;
   (window as any).filterTranscriptLines = filterTranscriptLines;
   (window as any).formatMsToTimestamp = formatMsToTimestamp;
   (window as any).parseTimestampStringToMs = parseTimestampStringToMs;
@@ -669,13 +872,23 @@ if (typeof window !== 'undefined') {
 
 export const transcriptViewer = {
   get lines() { return transcriptLines; },
-  set lines(val: TranscriptLine[]) { transcriptLines = val; },
+  set lines(val: TranscriptLine[]) {
+    if (transcriptSaveTimer !== null) {
+      clearTimeout(transcriptSaveTimer);
+      transcriptSaveTimer = null;
+    }
+    transcriptDirty = false;
+    transcriptLines = val;
+  },
   getLines: getTranscriptLines,
   clear: clearTranscriptLines,
   appendLine: appendTranscriptLine,
   render: renderTranscriptLines,
   createCard: createTranscriptCardElement,
   updateLineText: updateTranscriptLineText,
+  flushEdits: flushPendingTranscriptEdits,
+  hasPendingEdits: hasPendingTranscriptEdits,
+  serializeForFile: serializeTranscriptLinesForFile,
   filter: filterTranscriptLines,
   copy: copyLiveTranscriptToClipboard,
   loadFromFile: loadTranscriptFromFile,

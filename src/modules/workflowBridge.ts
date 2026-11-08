@@ -4,6 +4,7 @@ import { showNotification } from './appModal';
 import { openFileInEditor, getBasename, formatFileNameMiddleTruncate } from './nativeWindow';
 import { escapeHTML } from './logsController';
 import { batchProcessor } from './batchProcessor';
+import { flushPendingTranscriptEdits, hasPendingTranscriptEdits } from './transcriptViewer';
 
 if (typeof window === 'undefined') {
   (globalThis as any).window = globalThis;
@@ -85,10 +86,17 @@ export function handleOutputFileButtonClick(event?: any): void {
   if (files.length <= 1) {
     const targetPath = files.length === 1 ? files[0].path : getLastTranscribedSubtitlePath();
     if (targetPath) {
-      openFileInEditor(targetPath).catch((e: any) => {
-        const msg = (e && (e.message || e.toString())) || String(e);
-        showNotification(t('toasts.openFileError', { error: msg }) || msg, "error");
-      });
+      const openTarget = () => {
+        openFileInEditor(targetPath).catch((e: any) => {
+          const msg = (e && (e.message || e.toString())) || String(e);
+          showNotification(t('toasts.openFileError', { error: msg }) || msg, "error");
+        });
+      };
+      if (hasPendingTranscriptEdits()) {
+        void flushPendingTranscriptEdits().then(openTarget);
+      } else {
+        openTarget();
+      }
     }
   } else {
     toggleOutputFilesDropdown();
@@ -148,10 +156,17 @@ export function renderOutputFilesDropdown(): void {
     item.onclick = (e) => {
       e.stopPropagation();
       toggleOutputFilesDropdown(true);
-      openFileInEditor(file.path).catch((err: any) => {
-        const msg = (err && (err.message || err.toString())) || String(err);
-        showNotification(t('toasts.openFileError', { error: msg }) || msg, "error");
-      });
+      const openItem = () => {
+        openFileInEditor(file.path).catch((err: any) => {
+          const msg = (err && (err.message || err.toString())) || String(err);
+          showNotification(t('toasts.openFileError', { error: msg }) || msg, "error");
+        });
+      };
+      if (hasPendingTranscriptEdits()) {
+        void flushPendingTranscriptEdits().then(openItem);
+      } else {
+        openItem();
+      }
     };
 
     dropdown.appendChild(item);
@@ -351,6 +366,10 @@ export async function sendTranscribeToTranslationStudio(): Promise<void> {
     return;
   }
 
+  if (hasPendingTranscriptEdits()) {
+    await flushPendingTranscriptEdits();
+  }
+
   const win = getGlobal();
   const controller = win.translationStudioController;
   if (controller && typeof controller.loadSubtitleFile === 'function') {
@@ -369,7 +388,7 @@ export async function sendTranscribeToTranslationStudio(): Promise<void> {
   showNotification(t('transcribe.sendToTranslationDesc') || 'Generated subtitle loaded into Translation Studio.', 'info');
 }
 
-export function sendTranscribeToHardsubStudio(): void {
+export function sendTranscribeToHardsubStudio(): Promise<void> | void {
   const subToLoad = getLastTranscribedSubtitlePath();
   if (!subToLoad) {
     showNotification(t('transcribe.noSubGeneratedYet') || 'No generated subtitle yet', 'error');
@@ -382,15 +401,22 @@ export function sendTranscribeToHardsubStudio(): void {
     videoToLoad = '';
   }
 
-  const controller = win.hardsubController;
-  if (controller && typeof controller.prefillFilePaths === 'function') {
-    controller.prefillFilePaths(videoToLoad, subToLoad);
-  }
+  const executeTransfer = () => {
+    const controller = win.hardsubController;
+    if (controller && typeof controller.prefillFilePaths === 'function') {
+      controller.prefillFilePaths(videoToLoad, subToLoad);
+    }
 
-  if (typeof win.switchView === 'function') {
-    win.switchView('hardsub');
+    if (typeof win.switchView === 'function') {
+      win.switchView('hardsub');
+    }
+    showNotification(t('transcribe.sendToHardsubDesc') || t('translate.sendToHardsubDesc') || 'Loaded into Hardsub Studio', 'info');
+  };
+
+  if (hasPendingTranscriptEdits()) {
+    return flushPendingTranscriptEdits().then(executeTransfer);
   }
-  showNotification(t('transcribe.sendToHardsubDesc') || t('translate.sendToHardsubDesc') || 'Loaded into Hardsub Studio', 'info');
+  executeTransfer();
 }
 
 // ----------------- Document Click Outside Listener -----------------

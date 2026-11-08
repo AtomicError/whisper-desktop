@@ -18,6 +18,11 @@ import {
   isSupportedVideoFile,
   SUPPORTED_COMPANION_VIDEO_EXTENSIONS
 } from './workflowBridge';
+import {
+  transcriptViewer,
+  updateTranscriptLineText,
+  serializeTranscriptLinesForFile
+} from './transcriptViewer';
 
 class MockElement {
   public tagName: string;
@@ -432,6 +437,58 @@ describe('workflowBridge module', () => {
       (globalThis as any).window.hardsubController = { prefillFilePaths: mockPrefillAudio };
       sendTranscribeToHardsubStudio();
       expect(mockPrefillAudio).toHaveBeenCalledWith('', '/output/broadcast.srt');
+    });
+
+    it('flushes live transcript edits to disk before sending to Translation or Hardsub Studio', async () => {
+      const writeCalls: Array<{ filePath: string; content: string }> = [];
+      (globalThis as any).window.invoke = vi.fn(async (cmd: string, args: any) => {
+        if (cmd === 'write_text_file_content') {
+          writeCalls.push(args);
+        }
+        return undefined;
+      });
+
+      setLastTranscribedSubtitlePath('/output/edited.srt');
+      setLastTranscribedOutputFiles([
+        { name: 'edited.srt', path: '/output/edited.srt', type: 'subtitle' },
+        { name: 'edited.txt', path: '/output/edited.txt', type: 'text' }
+      ]);
+
+      transcriptViewer.lines = [
+        { id: 0, timeRange: '[00:00:01.000 --> 00:00:03.500]', text: 'Original typo text' }
+      ];
+
+      // User edits line in Live Transcript Viewer
+      updateTranscriptLineText(0, 'Corrected subtitle text');
+      expect(transcriptViewer.hasPendingEdits()).toBe(true);
+
+      let subtitleWrittenBeforeLoad = false;
+      (globalThis as any).window.translationStudioController = {
+        loadSubtitleFile: vi.fn(async () => {
+          subtitleWrittenBeforeLoad = writeCalls.some(c => c.filePath === '/output/edited.srt');
+        })
+      };
+
+      await sendTranscribeToTranslationStudio();
+
+      expect(subtitleWrittenBeforeLoad).toBe(true);
+      expect(writeCalls).toEqual(
+        expect.arrayContaining([
+          {
+            filePath: '/output/edited.srt',
+            content: '1\n00:00:01,000 --> 00:00:03,500\nCorrected subtitle text\n'
+          },
+          {
+            filePath: '/output/edited.txt',
+            content: 'Corrected subtitle text\n'
+          }
+        ])
+      );
+      expect(transcriptViewer.hasPendingEdits()).toBe(false);
+
+      // Verify VTT serialization format as well
+      const vttContent = serializeTranscriptLinesForFile(transcriptViewer.getLines(), '/output/edited.vtt');
+      expect(vttContent).toBe('WEBVTT\n\n1\n00:00:01.000 --> 00:00:03.500\nCorrected subtitle text\n');
     });
   });
 });

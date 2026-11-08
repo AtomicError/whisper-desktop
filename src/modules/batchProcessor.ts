@@ -512,6 +512,10 @@ export async function selectBatchItemTranscript(index: number): Promise<void> {
     return;
   }
 
+  if (activeBatchViewerIndex !== index && transcriptViewer.hasPendingEdits()) {
+    await transcriptViewer.flushEdits();
+  }
+
   activeBatchViewerIndex = index;
   userExplicitlySelectedBatchItem = !isActive;
 

@@ -20,10 +20,13 @@ import {
   applySingleFileSelectedUI,
   runWhisperTranscription,
   abortTranscription,
+  copyMainTranscriptToClipboard,
   getIsTranscriptionCancelActive,
   setIsTranscriptionCancelActive
 } from './transcribePipeline';
 import { batchProcessor } from './batchProcessor';
+import { transcriptViewer } from './transcriptViewer';
+import { workflowBridge } from './workflowBridge';
 
 class MockElement {
   public tagName: string;
@@ -706,6 +709,44 @@ describe('transcribePipeline module', () => {
       expect(container).toBeDefined();
       const lastToast = container?.children[container.children.length - 1];
       expect(lastToast?.className).toContain('toast-info');
+    });
+  });
+
+  describe('copyMainTranscriptToClipboard', () => {
+    it('prefers live transcript lines in memory and never copies raw Whisper logs on failure', async () => {
+      let copiedText = '';
+      (globalThis as any).window.invoke = vi.fn(async (cmd: string, args: any) => {
+        if (cmd === 'copy_to_clipboard') {
+          copiedText = args?.text ?? '';
+          return;
+        }
+        if (cmd === 'read_text_file_content' && args?.filePath === '/custom/out/lecture.srt') {
+          return '1\n00:00:00,000 --> 00:00:02,000\nParsed from custom SRT\n';
+        }
+        throw new Error(`Unexpected command: ${cmd}`);
+      });
+
+      // 1. Live lines available in memory
+      transcriptViewer.lines = [
+        { id: 0, timeRange: '[00:00:00.000 --> 00:00:02.000]', text: 'First edited line' },
+        { id: 1, timeRange: '[00:00:02.000 --> 00:00:04.000]', text: 'Second edited line' }
+      ];
+
+      await copyMainTranscriptToClipboard();
+      expect(copiedText).toBe('First edited line\nSecond edited line');
+
+      // 2. Empty live lines -> reads from custom output directory SRT file without falling back to Whisper logs
+      transcriptViewer.clear();
+      copiedText = '';
+      setSelectedMediaFile('/media/lecture.mp4');
+      workflowBridge.setLastTranscribedOutputDir('/custom/out');
+      workflowBridge.setLastTranscribedSubtitlePath('/custom/out/lecture.srt');
+      workflowBridge.setLastTranscribedOutputFiles([
+        { name: 'lecture.srt', path: '/custom/out/lecture.srt', type: 'subtitle' }
+      ]);
+
+      await copyMainTranscriptToClipboard();
+      expect(copiedText).toBe('Parsed from custom SRT');
     });
   });
 });

@@ -387,12 +387,21 @@ export function findCueAtTimeBinary(cues: SubtitleCue[], curMs: number, maxDurat
   return undefined;
 }
 
-function convertCuesToSrt(cues: SubtitleCue[]): string {
+export function convertCuesToSrt(cues: SubtitleCue[]): string {
   return cues
     .map((cue, idx) => {
       return `${idx + 1}\n${msToSrtTime(cue.startMs)} --> ${msToSrtTime(cue.endMs)}\n${cue.text}\n`;
     })
     .join('\n');
+}
+
+export function convertCuesToVtt(cues: SubtitleCue[]): string {
+  const body = cues
+    .map((cue, idx) => {
+      return `${idx + 1}\n${msToSrtTime(cue.startMs).replace(',', '.')} --> ${msToSrtTime(cue.endMs).replace(',', '.')}\n${cue.text}\n`;
+    })
+    .join('\n');
+  return `WEBVTT\n\n${body}`;
 }
 
 interface TextSpan {
@@ -5029,39 +5038,31 @@ ${events}`;
     }
 
     if (this.isSubtitlesModified && this.subtitleCues.length > 0) {
-      try {
-        const srtContent = convertCuesToSrt(this.subtitleCues);
-        await invoke('write_text_file_content', {
-          filePath: originalSubPath,
-          content: srtContent,
-        });
-        if (!current()) return;
-        console.log('Saved modified subtitle content to disk');
-      } catch (e) {
-        console.warn('Failed to save edited subtitles to disk:', e);
+      const subExt = (originalSubPath.split('.').pop() || '').toLowerCase();
+      if (subExt === 'srt' || subExt === 'vtt') {
+        try {
+          const updatedContent = subExt === 'vtt'
+            ? convertCuesToVtt(this.subtitleCues)
+            : convertCuesToSrt(this.subtitleCues);
+          await invoke('write_text_file_content', {
+            filePath: originalSubPath,
+            content: updatedContent,
+          });
+          this.isSubtitlesModified = false;
+          if (!current()) return;
+          console.log('Saved modified subtitle content to disk');
+        } catch (e) {
+          console.warn('Failed to save edited subtitles to disk:', e);
+        }
+      } else {
+        // For .ass/.ssa files, avoid overwriting native script styles with SRT;
+        // edited cues are burned directly via the generated .temp.ass script below.
+        this.isSubtitlesModified = false;
       }
     }
 
     if (!this.state.outputPath) {
       this.autoSuggestSubtitleAndOutput(originalVideoPath, true);
-    }
-
-    if (this.subtitleCues.length > 0) {
-      try {
-        const lastDot = originalVideoPath.lastIndexOf('.');
-        const tempAssPath = originalVideoPath.substring(0, lastDot) + '.temp.ass';
-        const assContent = this.generateAssContent();
-        await invoke('write_text_file_content', {
-          filePath: tempAssPath,
-          content: assContent,
-        });
-        if (!current()) return;
-
-        console.log('Generated temporary ASS subtitle file with styled vector boxes');
-        exportSubtitlePath = tempAssPath;
-      } catch (e) {
-        console.warn('Failed to generate temporary ASS subtitles, falling back to original:', e);
-      }
     }
 
       // Ensure all export settings dropdown values and slider values are synced with state
@@ -5116,6 +5117,41 @@ ${events}`;
       this.updateComputedOutputPath();
 
       if (!current()) return;
+
+      if (this.subtitleCues.length > 0) {
+        try {
+          const assContent = this.generateAssContent();
+          const lastDot = originalVideoPath.lastIndexOf('.');
+          const primaryTempAssPath = (lastDot > 0 ? originalVideoPath.substring(0, lastDot) : originalVideoPath) + '.temp.ass';
+          let writtenTempAssPath: string | null = null;
+          try {
+            await invoke('write_text_file_content', {
+              filePath: primaryTempAssPath,
+              content: assContent,
+            });
+            writtenTempAssPath = primaryTempAssPath;
+          } catch (writeErr) {
+            if (this.state.outputPath && this.state.outputPath !== originalVideoPath) {
+              const outDot = this.state.outputPath.lastIndexOf('.');
+              const fallbackTempAssPath = (outDot > 0 ? this.state.outputPath.substring(0, outDot) : this.state.outputPath) + '.temp.ass';
+              await invoke('write_text_file_content', {
+                filePath: fallbackTempAssPath,
+                content: assContent,
+              });
+              writtenTempAssPath = fallbackTempAssPath;
+            } else {
+              throw writeErr;
+            }
+          }
+          if (!current()) return;
+
+          console.log('Generated temporary ASS subtitle file with styled vector boxes');
+          exportSubtitlePath = writtenTempAssPath;
+        } catch (e) {
+          console.warn('Failed to generate temporary ASS subtitles, falling back to original:', e);
+        }
+      }
+
       const result = await invoke<{ outputPath: string; durationMs: number; outputSizeMb: number }>('start_hardsub_task', {
         settings: { ...this.state, videoPath: originalVideoPath, subtitlePath: exportSubtitlePath },
       });

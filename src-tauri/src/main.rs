@@ -49,6 +49,7 @@ pub struct TranscriptionSession {
     pub child_pid: Option<u32>,
     pub phase: SessionPhase,
     pub cancel_requested: bool,
+    pub pending_wav_path: Option<std::path::PathBuf>,
 }
 pub struct TranscriptionState(pub Arc<Mutex<TranscriptionSession>>);
 
@@ -151,14 +152,23 @@ async fn start_transcription_task(
 
 #[tauri::command]
 async fn cancel_transcription(session_state: State<'_, TranscriptionState>) -> Result<(), String> {
-    let pid_to_kill = {
+    let (pid_to_kill, stale_wav) = {
         let mut lock = session_state.0.lock().map_err(|e| format!("Lock error: {}", e))?;
+        let pending_wav = lock.pending_wav_path.take();
         if lock.phase == SessionPhase::Idle {
+            if let Some(wav_path) = pending_wav {
+                let _ = std::fs::remove_file(&wav_path);
+                return Ok(());
+            }
             return Err("No active transcription or translation session".to_string());
         }
         lock.cancel_requested = true;
-        lock.child_pid
+        (lock.child_pid, pending_wav)
     };
+
+    if let Some(wav_path) = stale_wav {
+        let _ = std::fs::remove_file(&wav_path);
+    }
 
     if let Some(pid) = pid_to_kill {
         // Graceful escalation: ask the process to terminate gracefully first (SIGTERM / taskkill),
@@ -1002,6 +1012,7 @@ fn main() {
         child_pid: None,
         phase: SessionPhase::Idle,
         cancel_requested: false,
+        pending_wav_path: None,
     }));
     let hardsub_session = Arc::new(Mutex::new(HardsubSession {
         child_pid: None,

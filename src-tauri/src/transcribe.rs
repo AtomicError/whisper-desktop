@@ -161,8 +161,8 @@ pub async fn convert_to_wav(
 ) -> Result<String, String> {
     logs.log(&app, "FFmpeg", &format!("Starting conversion for: {}", file_path));
     
-    // Register phase in session
-    {
+    // Register phase in session and clean up any unconsumed temp WAV from an aborted prior run
+    let stale_wav = {
         let mut lock = session.lock().map_err(|e| format!("Lock error: {}", e))?;
         if lock.phase != crate::SessionPhase::Idle {
             return Err("Another transcription, translation, or encoding task is already running.".to_string());
@@ -170,6 +170,10 @@ pub async fn convert_to_wav(
         lock.phase = crate::SessionPhase::Transcribing;
         lock.cancel_requested = false;
         lock.child_pid = None;
+        lock.pending_wav_path.take()
+    };
+    if let Some(old_wav) = stale_wav {
+        let _ = fs::remove_file(old_wav);
     }
     let _session_guard = ActiveSessionGuard { session: session.clone() };
 
@@ -296,6 +300,20 @@ pub async fn convert_to_wav(
     if !status.success() {
         let _ = fs::remove_file(&tmp_wav);
         return Err(format!("FFmpeg failed with exit code: {:?}", status.code()));
+    }
+
+    if let Ok(mut lock) = session.lock() {
+        if lock.cancel_requested {
+            let _ = fs::remove_file(&tmp_wav);
+            let _ = app.emit("transcribe-status", TranscribeProgress {
+                progress: 0.0,
+                message: "Aborted".to_string(),
+                active: false,
+                stage: Some("aborted".to_string()),
+            });
+            return Err("WAV conversion was cancelled by the user.".to_string());
+        }
+        lock.pending_wav_path = Some(tmp_wav.clone());
     }
     
     let channel_desc = if settings.diarize { "Stereo" } else { "Mono" };
@@ -496,7 +514,9 @@ pub async fn run_transcription(
     wav_path: String,
     mut duration_sec: f64,
 ) -> Result<TranscriptionResult, String> {
-    {
+    let wav_path_buf = std::path::PathBuf::from(&wav_path);
+    let _wav_guard = FileGuard(wav_path_buf.clone());
+    let stale_wav = {
         let mut lock = session.lock().map_err(|e| format!("Session lock error: {}", e))?;
         if lock.phase != crate::SessionPhase::Idle {
             return Err("Another transcription, translation, or encoding task is already running.".to_string());
@@ -504,9 +524,14 @@ pub async fn run_transcription(
         lock.phase = crate::SessionPhase::Transcribing;
         lock.cancel_requested = false;
         lock.child_pid = None;
+        lock.pending_wav_path.take()
+    };
+    if let Some(old_wav) = stale_wav {
+        if old_wav != wav_path_buf {
+            let _ = fs::remove_file(old_wav);
+        }
     }
     let _guard = ActiveSessionGuard { session: session.clone() };
-    let _wav_guard = FileGuard(std::path::PathBuf::from(&wav_path));
     let start_time = Instant::now();
     let file_name = Path::new(&settings.input_file)
         .file_name()
@@ -1520,6 +1545,18 @@ mod tests {
         let args_stereo = build_wav_conversion_args("input.mp4", "output.wav", true);
         assert_eq!(args_stereo[0], "-nostdin");
         assert!(args_stereo.contains(&"2"));
+    }
+
+    #[test]
+    fn test_file_guard_removes_temporary_wav_on_drop() {
+        let tmp_dir = std::env::temp_dir();
+        let test_wav = tmp_dir.join(format!("whisper_guard_test_{}.wav", std::process::id()));
+        std::fs::write(&test_wav, b"RIFF_DUMMY_WAV").unwrap();
+        assert!(test_wav.exists());
+        {
+            let _guard = FileGuard(test_wav.clone());
+        }
+        assert!(!test_wav.exists(), "FileGuard must delete temporary wav file when dropped");
     }
 }
 
