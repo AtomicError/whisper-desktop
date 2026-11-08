@@ -192,13 +192,29 @@ jobs:
             openvino-libs/**
             cuda-dlls/**
             cuda-libs/**
-          key: whisper-bin-${{ matrix.platform }}-${{ matrix.arch }}-${{ steps.whisper_tag.outputs.tag }}-v10
+          key: whisper-bin-${{ matrix.platform }}-${{ matrix.arch }}-${{ steps.whisper_tag.outputs.tag }}-v11
 
       - name: Clone whisper.cpp
         if: steps.whisper-cache.outputs.cache-hit != 'true'
         shell: bash
         run: |
           git clone --depth 1 --branch "${{ steps.whisper_tag.outputs.tag }}" https://github.com/ggml-org/whisper.cpp.git whisper.cpp-src
+
+          # Force FP32 inference precision for OpenVINO encoder
+          # Prevents FP16 catastrophic cancellation and overflow (NaN / upbeat music) on GPU/accelerators
+          python3 -c "
+          import glob
+          for fpath in glob.glob('whisper.cpp-src/**/whisper-openvino-encoder.cpp', recursive=True):
+              with open(fpath, 'r', encoding='utf-8') as f:
+                  content = f.read()
+              old_call = 'auto compiledModel = core.compile_model(model, device);'
+              new_call = 'core.set_property(ov::hint::inference_precision(ov::element::f32));\n        auto compiledModel = core.compile_model(model, device);'
+              if old_call in content:
+                  content = content.replace(old_call, new_call)
+                  with open(fpath, 'w', encoding='utf-8') as f:
+                      f.write(content)
+                  print(f'Successfully patched {fpath} with FP32 precision hint')
+          "
 
       - name: Compile Whisper CLI (Linux x86_64)
         if: matrix.platform == 'ubuntu-22.04' && steps.whisper-cache.outputs.cache-hit != 'true'
