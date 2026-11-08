@@ -1913,17 +1913,16 @@ pub async fn run_hardsub_task(
 
     impl Drop for HardsubSessionGuard {
         fn drop(&mut self) {
-            if let Ok(mut lock) = self.session.lock() {
-                lock.child_pid = None;
-                lock.is_running = false;
-                lock.cancel_requested = false;
-            }
+            let mut lock = self.session.lock().unwrap_or_else(|e| e.into_inner());
+            lock.child_pid = None;
+            lock.is_running = false;
+            lock.cancel_requested = false;
         }
     }
 
     // Register pid and set phase
     {
-        let mut lock = session.lock().map_err(|e| format!("Session lock failed: {}", e))?;
+        let mut lock = session.lock().unwrap_or_else(|e| e.into_inner());
         if lock.is_running {
             return Err("Another video hardsubbing task is already running.".to_string());
         }

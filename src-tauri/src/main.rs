@@ -270,6 +270,8 @@ async fn cancel_hardsub_task(
 
     if let Some(pid) = pid_to_kill {
         log_state.0.log(&app, "Hardsub", &format!("Cancellation requested for hardsub task (PID: {})", pid));
+        const GRACE_DURATION: std::time::Duration = std::time::Duration::from_millis(1500);
+
         #[cfg(unix)]
         {
             let _ = tokio::process::Command::new("kill")
@@ -282,9 +284,59 @@ async fn cancel_hardsub_task(
             let mut cmd = tokio::process::Command::new("taskkill");
             cmd.creation_flags(0x08000000);
             let _ = cmd
-                .args(["/F", "/T", "/PID", &pid.to_string()])
+                .args(["/T", "/PID", &pid.to_string()])
                 .status()
                 .await;
+        }
+
+        let deadline = std::time::Instant::now() + GRACE_DURATION;
+        let mut session_ended = false;
+
+        while std::time::Instant::now() < deadline {
+            tokio::time::sleep(std::time::Duration::from_millis(75)).await;
+            if let Ok(lock) = state.0.lock() {
+                if !lock.is_running {
+                    session_ended = true;
+                    break;
+                }
+            }
+        }
+
+        if !session_ended {
+            let pid_still_ours = if let Ok(lock) = state.0.lock() {
+                lock.is_running && lock.child_pid == Some(pid)
+            } else {
+                false
+            };
+
+            #[cfg(unix)]
+            let process_alive = {
+                tokio::process::Command::new("kill")
+                    .args(["-0", &pid.to_string()])
+                    .status()
+                    .await
+                    .map(|s| s.success())
+                    .unwrap_or(false)
+            };
+
+            #[cfg(unix)]
+            if pid_still_ours && process_alive {
+                log_state.0.log(&app, "Hardsub", &format!("Escalating hardsub cancellation to SIGKILL (PID: {})", pid));
+                let _ = tokio::process::Command::new("kill")
+                    .args(["-KILL", "--", &format!("-{}", pid), &pid.to_string()])
+                    .status()
+                    .await;
+            }
+
+            #[cfg(windows)]
+            if pid_still_ours {
+                let mut cmd = tokio::process::Command::new("taskkill");
+                cmd.creation_flags(0x08000000);
+                let _ = cmd
+                    .args(["/F", "/T", "/PID", &pid.to_string()])
+                    .status()
+                    .await;
+            }
         }
     }
     Ok(())
@@ -545,9 +597,13 @@ async fn verify_directory_writable(dir_path: String) -> Result<(), String> {
 #[tauri::command]
 fn read_text_file_content(file_path: String) -> Result<String, String> {
     let path = std::path::Path::new(&file_path);
-    let allowed_exts = ["txt", "srt", "vtt", "lrc", "ass"];
-    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-    if !allowed_exts.contains(&ext) {
+    let allowed_exts = ["txt", "srt", "vtt", "lrc", "ass", "ssa", "csv", "tsv"];
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if !allowed_exts.contains(&ext.as_str()) {
         return Err("File type not allowed".into());
     }
     let canonical = path.canonicalize().map_err(|_| "Invalid file path".to_string())?;
@@ -569,13 +625,18 @@ fn get_file_size(file_path: String) -> Result<u64, String> {
 #[tauri::command]
 fn write_text_file_content(file_path: String, content: String) -> Result<(), String> {
     let path = std::path::Path::new(&file_path);
-    let allowed_exts = ["txt", "srt", "vtt", "lrc", "ass"];
-    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-    if !allowed_exts.contains(&ext) {
+    let allowed_exts = ["txt", "srt", "vtt", "lrc", "ass", "ssa", "csv", "tsv"];
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if !allowed_exts.contains(&ext.as_str()) {
         return Err("File type not allowed for writing".into());
     }
-    // Atomic write: stage into a sibling .tmp file then rename over the target,
-    // so a crash or disk-full mid-write cannot truncate the user's transcript.
+    // Atomic write: stage into a sibling .tmp file then atomically replace the target
+    // (with Windows retry/copy fallback), so a crash, disk-full, or AV lock mid-write
+    // cannot truncate or fail the user's transcript.
     let tmp_path = path.with_file_name({
         let mut name = path.file_name().unwrap_or_default().to_os_string();
         name.push(format!(".tmp.{}", std::process::id()));
@@ -583,7 +644,7 @@ fn write_text_file_content(file_path: String, content: String) -> Result<(), Str
     });
     std::fs::write(&tmp_path, content)
         .map_err(|e| format!("Failed to write temp file {}: {}", tmp_path.display(), e))?;
-    match std::fs::rename(&tmp_path, path) {
+    match crate::settings::atomic_replace_file(&tmp_path, path) {
         Ok(()) => Ok(()),
         Err(e) => {
             let _ = std::fs::remove_file(&tmp_path);
@@ -1353,5 +1414,32 @@ mod main_tests {
             "The following commands in allow-all-custom.toml are not registered in generate_handler!: {:?}",
             obsolete
         );
+    }
+
+    #[test]
+    fn test_write_and_read_text_file_content_atomic_and_case_insensitive() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let temp_dir = std::env::temp_dir().join(format!("whisper_text_io_test_{}", nonce));
+        std::fs::create_dir_all(&temp_dir).unwrap();
+
+        let srt_path = temp_dir.join("TEST_SUB.SRT");
+        let srt_str = srt_path.to_string_lossy().to_string();
+
+        write_text_file_content(srt_str.clone(), "Initial content".to_string())
+            .expect("First write should succeed");
+        write_text_file_content(srt_str.clone(), "Updated atomic content".to_string())
+            .expect("Overwrite via atomic_replace_file should succeed");
+
+        let read_back = read_text_file_content(srt_str)
+            .expect("Reading uppercase .SRT extension should succeed");
+        assert_eq!(read_back, "Updated atomic content");
+
+        let disallowed_path = temp_dir.join("script.exe").to_string_lossy().to_string();
+        assert!(write_text_file_content(disallowed_path, "bad".to_string()).is_err());
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 }

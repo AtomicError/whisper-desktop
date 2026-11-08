@@ -4,7 +4,7 @@
 
 import './hardsub';
 import './translationStudio';
-import { logsController } from './modules/logsController';
+import { logsController, reportGlobalFrontendError } from './modules/logsController';
 import { themeManager } from './modules/themeManager';
 import { modelHub } from './modules/modelHub';
 import { transcriptViewer } from './modules/transcriptViewer';
@@ -72,25 +72,9 @@ import {
 import { initI18n, t, getLanguage, isRtlLanguage } from './i18n/index';
 import type { SystemSpecs } from './modelRecommender';
 
-// Global error catcher for visual debugging in frontend
+// Global error catcher integrated with application logger and toast system
 if (typeof window !== 'undefined') {
-  window.onerror = function(message: string | Event, source?: string, lineno?: number, colno?: number, error?: Error): boolean {
-    const errDiv = document.createElement('div');
-    errDiv.style.position = 'fixed';
-    errDiv.style.top = '0';
-    errDiv.style.left = '0';
-    errDiv.style.width = '100%';
-    errDiv.style.background = '#ef4444';
-    errDiv.style.color = 'white';
-    errDiv.style.zIndex = '100000';
-    errDiv.style.padding = '16px';
-    errDiv.style.fontFamily = 'monospace';
-    errDiv.style.fontSize = '14px';
-    errDiv.style.boxShadow = '0 4px 12px rgba(0,0,0,0.5)';
-    errDiv.innerHTML = `<strong>Frontend Error:</strong> ${message}<br><small>at ${source}:${lineno}:${colno}</small>`;
-    document.body.appendChild(errDiv);
-    return false;
-  };
+  window.onerror = reportGlobalFrontendError;
 }
 
 // Global system specifications cache

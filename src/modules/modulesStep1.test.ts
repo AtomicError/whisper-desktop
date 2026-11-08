@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { logsController, stripAnsi, escapeHTML, clearLogsArray, pushLogEntry, getLogs, getFilteredLogs } from './logsController';
+import { logsController, stripAnsi, escapeHTML, clearLogsArray, pushLogEntry, getLogs, getFilteredLogs, reportGlobalFrontendError } from './logsController';
 import { themeManager, resolveThemeConfig, THEME_REGISTRY, MONOCHROME_META_COLORS } from './themeManager';
 
 describe('logsController', () => {
@@ -63,6 +63,26 @@ describe('logsController', () => {
     expect(typeof logsController.scrollTop).toBe('function');
     expect(typeof logsController.updateLogJumpPillVisibility).toBe('function');
     expect(typeof logsController.getFilteredLogs).toBe('function');
+    expect(typeof logsController.reportGlobalFrontendError).toBe('function');
+  });
+
+  it('logs uncaught frontend errors into System category and ignores benign ResizeObserver warnings', () => {
+    logsController.clear();
+    const notifySpy = vi.fn();
+    vi.stubGlobal('window', { showNotification: notifySpy });
+    vi.stubGlobal('document', { getElementById: () => null });
+
+    reportGlobalFrontendError('ResizeObserver loop completed with undelivered notifications.');
+    expect(logsController.allLogs.length).toBe(0);
+    expect(notifySpy).not.toHaveBeenCalled();
+
+    reportGlobalFrontendError('Unexpected null reference', 'app.ts', 42, 10);
+    expect(logsController.allLogs.length).toBe(1);
+    expect(logsController.allLogs[0].category).toBe('System');
+    expect(logsController.allLogs[0].message).toContain('Unexpected null reference (app.ts:42:10)');
+    expect(notifySpy).toHaveBeenCalledWith('Unexpected null reference', 'error');
+
+    vi.unstubAllGlobals();
   });
 });
 

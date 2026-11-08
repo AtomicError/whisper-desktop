@@ -400,6 +400,60 @@ export async function clearLogsHistory(invokeFn?: any): Promise<void> {
   redrawLogsViewport();
 }
 
+let _lastGlobalErrorToastAt = 0;
+
+export function reportGlobalFrontendError(
+  message: string | Event,
+  source?: string,
+  lineno?: number,
+  colno?: number,
+  error?: Error
+): boolean {
+  const msgText = typeof message === 'string'
+    ? message
+    : (error?.message || 'Unexpected frontend error');
+
+  if (msgText.includes('ResizeObserver loop')) {
+    return false;
+  }
+
+  const locationParts = [source, lineno, colno].filter(v => v !== undefined && v !== null && v !== '');
+  const locationSuffix = locationParts.length > 0 ? ` (${locationParts.join(':')})` : '';
+  const formattedLog = `Frontend error: ${msgText}${locationSuffix}`;
+
+  const now = new Date();
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  const timestamp = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  const entry: LogEntry = {
+    category: 'System',
+    message: formattedLog,
+    timestamp
+  };
+
+  try {
+    pushLogEntry(entry);
+    scheduleUpdateLogsButtonsState();
+    appendLogToViewport(entry);
+  } catch (_) {
+    // Ignore secondary logging errors
+  }
+
+  const nowMs = Date.now();
+  if (nowMs - _lastGlobalErrorToastAt > 3000) {
+    _lastGlobalErrorToastAt = nowMs;
+    try {
+      const showNotification = typeof window !== 'undefined' ? (window as any).showNotification : null;
+      if (typeof showNotification === 'function') {
+        showNotification(msgText, 'error');
+      }
+    } catch (_) {
+      // Ignore secondary notification errors
+    }
+  }
+
+  return false;
+}
+
 // Bind to window for global inline HTML onclick handlers
 if (typeof window !== 'undefined') {
   (window as any).scrollLogsToBottom = scrollLogsToBottom;
@@ -435,5 +489,6 @@ export const logsController = {
   updateLogJumpPillVisibility,
   getFilteredLogs,
   stripAnsi,
-  escapeHTML
+  escapeHTML,
+  reportGlobalFrontendError
 };
