@@ -329,7 +329,7 @@ export function refreshDynamicDirectionInputs(): void {
 export function setupDynamicDirectionInputs(): void {
   refreshDynamicDirectionInputs();
 
-  const promptInput = document.getElementById('opt-prompt') as (HTMLInputElement & { _hasDynamicDirListener?: boolean }) | null;
+  const promptInput = document.getElementById('opt-prompt') as ((HTMLInputElement | HTMLTextAreaElement) & { _hasDynamicDirListener?: boolean }) | null;
   if (promptInput && !promptInput._hasDynamicDirListener) {
     promptInput._hasDynamicDirListener = true;
     promptInput.addEventListener('input', () => applyDynamicDirection(promptInput));

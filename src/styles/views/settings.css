@@ -519,10 +519,51 @@
 }
 
 .setting-card:has(#opt-translateAiTargetLang) .setting-control,
-.setting-control.setting-control-wide,
-.setting-card:has(#opt-prompt) .setting-control,
-.setting-control:has(#opt-prompt) {
+.setting-control.setting-control-wide {
   width: 250px;
+}
+
+/* Initial Prompt Setting Card */
+.setting-card.prompt-setting-card,
+.setting-card:has(#opt-prompt) {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+}
+
+.setting-card.prompt-setting-card .setting-info,
+.setting-card:has(#opt-prompt) .setting-info {
+  width: 100%;
+}
+
+.setting-card.prompt-setting-card .setting-control,
+.setting-control.prompt-setting-control,
+.setting-control:has(#opt-prompt) {
+  width: 100%;
+  display: flex;
+}
+
+.prompt-textarea {
+  width: 100%;
+  min-height: 80px;
+  max-height: 320px;
+  resize: vertical;
+  line-height: 1.55;
+  font-family: var(--font-sans);
+  font-size: 0.92rem;
+  padding: 10px 14px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-glass);
+  border-radius: 8px;
+  color: var(--color-text);
+  box-sizing: border-box;
+  transition: border-color var(--transition-smooth), box-shadow var(--transition-smooth);
+}
+
+.prompt-textarea:focus {
+  outline: none;
+  border-color: var(--color-royal-blue);
+  box-shadow: 0 0 10px rgba(var(--color-royal-blue-rgb), 0.15);
 }
 
 /* Theme Setting Card & Rich Theme Picker Grid */

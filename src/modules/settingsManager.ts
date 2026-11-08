@@ -955,7 +955,7 @@ export function bindSettingsToDOM(): void {
 
   const keys = Object.keys(current);
   keys.forEach(key => {
-    const el = document.getElementById(`opt-${key}`) as HTMLInputElement | HTMLSelectElement | null;
+    const el = document.getElementById(`opt-${key}`) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null;
     if (el) {
       if ((el as HTMLInputElement).type === 'checkbox') {
         const chk = el as HTMLInputElement;
@@ -982,13 +982,19 @@ export function bindSettingsToDOM(): void {
             syncJsonConfidenceDependency();
           }
         };
-      } else if (el.tagName === 'SELECT' || (el as HTMLInputElement).type === 'text' || (el as HTMLInputElement).type === 'number') {
-        el.value = current[key];
+      } else if (el.tagName === 'SELECT' || el.tagName === 'TEXTAREA' || (el as HTMLInputElement).type === 'text' || (el as HTMLInputElement).type === 'number') {
+        el.value = current[key] ?? '';
         if (key === 'prompt' || el.id === 'opt-prompt' || el.hasAttribute('dir')) {
           safeApplyDynamicDirection(el as HTMLElement);
           if (!(el as any)._hasDynamicDirListener) {
             (el as any)._hasDynamicDirListener = true;
             el.addEventListener('input', () => safeApplyDynamicDirection(el as HTMLElement));
+          }
+          if (key === 'prompt' || el.id === 'opt-prompt') {
+            el.addEventListener('input', () => {
+              current.prompt = el.value;
+              saveCurrentSettings(false);
+            });
           }
         }
         el.onchange = () => {
