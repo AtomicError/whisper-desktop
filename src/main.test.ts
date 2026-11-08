@@ -1061,7 +1061,7 @@ describe('Model Download Progress and Zero-Byte State Formatting', () => {
 });
 
 describe('Splash Screen GPU Choreography & Non-Blocking Boot Contract', () => {
-  it('renders separate GPU-composited word spans with explicit flex gap and zero clip-path animation', async () => {
+  it('renders the acoustic resonance stage, GPU-composited word spans, and zero horizontal slide or clip-path', async () => {
     // Arrange
     const fsModuleName = 'node:' + 'fs';
     const urlModuleName = 'node:' + 'url';
@@ -1075,12 +1075,18 @@ describe('Splash Screen GPU Choreography & Non-Blocking Boot Contract', () => {
     const indexHtml: string = fs.readFileSync(indexPath, 'utf-8');
 
     // Assert
+    expect(splashHtml).toContain('class="splash-emblem-stage"');
     expect(splashHtml).toContain('class="splash-word splash-word-primary">Whisper</span>');
     expect(splashHtml).toContain('class="splash-word splash-word-secondary">Desktop</span>');
+    expect(splashHtml).toContain('class="splash-wave-bars"');
     expect(indexHtml).toContain('@keyframes splash-icon-enter');
+    expect(indexHtml).toContain('@keyframes splash-wave-crest');
     expect(indexHtml).toContain('@keyframes splash-word-enter');
+    expect(indexHtml).toContain('@keyframes splash-eq-pulse');
     expect(indexHtml).not.toContain('clip-path: inset');
     expect(indexHtml).not.toContain('translate3d(95px');
+    expect(indexHtml).not.toContain('translate3d(-12px');
+    expect(indexHtml).not.toContain('translate3d(-10px');
   });
 });
 

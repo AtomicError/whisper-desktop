@@ -245,9 +245,9 @@ export async function initApp(): Promise<void> {
 
   const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // Phase 1: Keep main thread completely idle while GPU-composited splash entrance animation completes (0ms -> 720ms)
+  // Phase 1: Keep main thread completely idle while GPU-composited splash entrance choreography completes
   if (!prefersReducedMotion) {
-    await new Promise(resolve => setTimeout(resolve, 820));
+    await new Promise(resolve => setTimeout(resolve, 920));
   }
 
   // Phase 2: Hydrate core UI & settings while the completed splash lockup holds steady on screen
@@ -303,9 +303,9 @@ export async function initApp(): Promise<void> {
   updateTranscribeActionButtons(false);
 
   // Guarantee a clean visual hold after DOM hydration so layout commits before crossfade starts
-  const targetSplashDuration = prefersReducedMotion ? 100 : 1080;
+  const targetSplashDuration = prefersReducedMotion ? 100 : 1280;
   const elapsed = performance.now() - splashStartTime;
-  const minPostHydrationHold = prefersReducedMotion ? 0 : 120;
+  const minPostHydrationHold = prefersReducedMotion ? 0 : 160;
   const remaining = Math.max(minPostHydrationHold, targetSplashDuration - elapsed);
 
   if (remaining > 0) {
