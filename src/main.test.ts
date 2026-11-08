@@ -1060,5 +1060,30 @@ describe('Model Download Progress and Zero-Byte State Formatting', () => {
   });
 });
 
+describe('Splash Screen GPU Choreography & Non-Blocking Boot Contract', () => {
+  it('renders separate GPU-composited word spans with explicit flex gap and zero clip-path animation', async () => {
+    // Arrange
+    const fsModuleName = 'node:' + 'fs';
+    const urlModuleName = 'node:' + 'url';
+    const fs: any = await import(/* @vite-ignore */ fsModuleName);
+    const url: any = await import(/* @vite-ignore */ urlModuleName);
+    const splashPath = url.fileURLToPath(new URL('./components/splash-brand.html', import.meta.url));
+    const indexPath = url.fileURLToPath(new URL('./index.html', import.meta.url));
+
+    // Act
+    const splashHtml: string = fs.readFileSync(splashPath, 'utf-8');
+    const indexHtml: string = fs.readFileSync(indexPath, 'utf-8');
+
+    // Assert
+    expect(splashHtml).toContain('class="splash-word splash-word-primary">Whisper</span>');
+    expect(splashHtml).toContain('class="splash-word splash-word-secondary">Desktop</span>');
+    expect(indexHtml).toContain('@keyframes splash-icon-enter');
+    expect(indexHtml).toContain('@keyframes splash-word-enter');
+    expect(indexHtml).not.toContain('clip-path: inset');
+    expect(indexHtml).not.toContain('translate3d(95px');
+  });
+});
+
+
 
 

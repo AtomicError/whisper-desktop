@@ -1108,7 +1108,15 @@ export class HardsubController {
       ].forEach((slider) => {
         if (slider) this.updateSliderBackground(slider);
       });
-      this.loadFontsAndHardware();
+      const isSplashActive =
+        typeof document !== 'undefined' &&
+        Boolean(document.getElementById('splash-curtain')) &&
+        !document.documentElement?.classList?.contains('app-ready');
+      if (!isSplashActive) {
+        this.loadFontsAndHardware();
+      } else {
+        this.updateSupportedCodecs();
+      }
       this.loadExportSettingsFromStorage();
       this.setupEventListeners();
       this.setupExportEventListeners();
@@ -1324,7 +1332,7 @@ export class HardsubController {
     this.btnPlayVideo = document.getElementById('btn-play-hardsub-video') as HTMLButtonElement;
   }
 
-  private async loadFontsAndHardware() {
+  public async loadFontsAndHardware() {
     try {
       const fonts = await invoke<FontItem[]>('get_system_fonts');
       if (this.fontSelect && fonts.length > 0) {

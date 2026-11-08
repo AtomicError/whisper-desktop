@@ -269,7 +269,21 @@ export async function applyUiZoom(scale: number | string, persist = true, showTo
 
   let nativeZoomSuccess = false;
   const invoke = getNativeTauriInvoke();
-  if (invoke) {
+  const isSplashBootHydration =
+    !persist &&
+    !showToast &&
+    typeof document !== 'undefined' &&
+    Boolean(document.getElementById('splash-curtain')) &&
+    !document.documentElement?.classList?.contains('app-ready');
+
+  if (invoke && isSplashBootHydration) {
+    // Native WebKit zoom was already applied synchronously by Tauri's Rust .setup() hook at window creation.
+    nativeZoomSuccess = true;
+    if (typeof document !== 'undefined') {
+      if (document.documentElement) document.documentElement.style.zoom = '';
+      if (document.body) document.body.style.zoom = '';
+    }
+  } else if (invoke) {
     try {
       await invoke('set_window_zoom', { scale: numScale });
       nativeZoomSuccess = true;

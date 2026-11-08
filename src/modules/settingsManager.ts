@@ -1061,7 +1061,13 @@ export function bindSettingsToDOM(): void {
 
   syncJsonConfidenceDependency();
   selectBackend(current.selectedBackend, true);
-  refreshFFmpegStatus(current.ffmpegSource, false);
+  const isSplashActive =
+    typeof document !== 'undefined' &&
+    Boolean(document.getElementById('splash-curtain')) &&
+    !document.documentElement?.classList?.contains('app-ready');
+  if (!isSplashActive) {
+    refreshFFmpegStatus(current.ffmpegSource, false);
+  }
   toggleOutputDirCustomField();
 
   if (typeof win.syncCustomSelects === 'function') {

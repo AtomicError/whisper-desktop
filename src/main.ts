@@ -2,7 +2,7 @@
  * Whisper Desktop - Main Application Bootstrap & Entry Point
  */
 
-import './hardsub';
+import { hardsubController } from './hardsub';
 import './translationStudio';
 import { logsController, reportGlobalFrontendError } from './modules/logsController';
 import { themeManager } from './modules/themeManager';
@@ -35,6 +35,7 @@ import {
   getSettingsState,
   refreshSettings,
   refreshBuildStatuses,
+  refreshFFmpegStatus,
   scanAndPopulateModels,
   setupNumberInputControls,
   updateTranscribeUIConfigs,
@@ -244,11 +245,12 @@ export async function initApp(): Promise<void> {
 
   const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  // Phase 1: Keep main thread completely idle while GPU-composited splash entrance animation completes (0ms -> 720ms)
   if (!prefersReducedMotion) {
-    await new Promise(resolve => setTimeout(resolve, 850));
+    await new Promise(resolve => setTimeout(resolve, 820));
   }
 
-  // Initialize internationalization (i18n) and translate DOM
+  // Phase 2: Hydrate core UI & settings while the completed splash lockup holds steady on screen
   initI18n();
 
   // Desktop native feel: disable context menu outside inputs/textareas
@@ -274,26 +276,53 @@ export async function initApp(): Promise<void> {
     }
   }, { capture: true, passive: true });
 
-  // Custom UI components initialization
+  // Custom UI components & lightweight event listeners initialization
   initializeCustomSelects();
   setupNumberInputControls();
   setupTauriListeners();
+  logsController.setup();
+  setupTranslationEventListeners();
+  setupTranscribeDragAndDrop();
+  transcriptViewer.setupDirection();
+  setupQuickConfigDeckEventListeners();
+  setupResponsiveMenuFadeIn();
+  setupHorizontalTabScroll();
+  themeManager.setupShortcuts();
+  setupVerticalTabKeyboardNavigation();
+  setupSearchShortcuts();
+  setupDynamicDirectionInputs();
+  syncAppVersionUI();
 
   // Initial settings load
   await refreshSettings();
 
-  // Zero-FOUC Reveal
-  const targetSplashDuration = prefersReducedMotion ? 100 : 1150;
+  // Prepare initial view and sync localized dynamic labels while curtain is still opaque
+  const isRtl = typeof isRtlLanguage === 'function' ? isRtlLanguage(getLanguage()) : (getLanguage() === 'fa' || getLanguage() === 'ar');
+  window.dispatchEvent(new CustomEvent('whisper:languageChanged', { detail: { language: getLanguage(), isRtl } }));
+  switchView('transcribe');
+  updateTranscribeActionButtons(false);
+
+  // Guarantee a clean visual hold after DOM hydration so layout commits before crossfade starts
+  const targetSplashDuration = prefersReducedMotion ? 100 : 1080;
   const elapsed = performance.now() - splashStartTime;
-  const remaining = Math.max(0, targetSplashDuration - elapsed);
+  const minPostHydrationHold = prefersReducedMotion ? 0 : 120;
+  const remaining = Math.max(minPostHydrationHold, targetSplashDuration - elapsed);
 
   if (remaining > 0) {
     await new Promise(resolve => setTimeout(resolve, remaining));
   }
 
+  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+
+  // Phase 3: Trigger smooth GPU crossfade of #splash-curtain -> #app-container
   dismissSplashCurtain();
 
-  // Load system specs
+  // Wait for the 350ms splash fade-out transition to finish completely before starting background IPC/process probes
+  if (!prefersReducedMotion) {
+    await new Promise(resolve => setTimeout(resolve, 360));
+  }
+
+  // Phase 4: Non-blocking post-boot background hydration
   try {
     systemSpecs = await invoke('get_system_specs');
   } catch (e) {
@@ -301,7 +330,6 @@ export async function initApp(): Promise<void> {
     systemSpecs = { total_ram_gb: 8.0, cpu_cores: 4, gpu_type: 'unknown' };
   }
 
-  // Load existing logs
   try {
     const logs = await invoke('get_logs');
     if (logs && typeof logs === 'string') {
@@ -324,31 +352,9 @@ export async function initApp(): Promise<void> {
   }
 
   logsController.redraw();
-  logsController.setup();
-  setupTranslationEventListeners();
   await refreshBuildStatuses();
-
-  // Transcribe drag & drop & UI listeners
-  setupTranscribeDragAndDrop();
-  transcriptViewer.setupDirection();
-  setupQuickConfigDeckEventListeners();
-  setupResponsiveMenuFadeIn();
-  setupHorizontalTabScroll();
-  themeManager.setupShortcuts();
-  setupVerticalTabKeyboardNavigation();
-  setupSearchShortcuts();
-  setupDynamicDirectionInputs();
-
-  // Initial sync of dynamic components
-  const isRtl = typeof isRtlLanguage === 'function' ? isRtlLanguage(getLanguage()) : (getLanguage() === 'fa' || getLanguage() === 'ar');
-  window.dispatchEvent(new CustomEvent('whisper:languageChanged', { detail: { language: getLanguage(), isRtl } }));
-
-  // Dynamic version synchronization
-  syncAppVersionUI();
-
-  // Default view
-  switchView('transcribe');
-  updateTranscribeActionButtons(false);
+  void refreshFFmpegStatus();
+  void hardsubController.loadFontsAndHardware();
 
   // Unfreeze theme transitions
   requestAnimationFrame(() => {

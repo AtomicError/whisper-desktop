@@ -1609,6 +1609,24 @@ describe('hardsub output directory management', () => {
       const systemNames = systemGroup.children.map((c: any) => c.value);
       expect(systemNames).toEqual(['Arial']);
     });
+
+    it('defers loadFontsAndHardware during active splash screen until post-splash hydration', () => {
+      // Arrange
+      const splashCurtain = new Control();
+      doc.elements.set('splash-curtain', splashCurtain);
+      doc.readyState = 'complete';
+      invoke.mockClear();
+
+      // Act
+      const deferredController = new Controller();
+      controllers.push(deferredController);
+
+      // Assert
+      const invokedCommands = invoke.mock.calls.map(c => c[0]);
+      expect(invokedCommands).not.toContain('get_system_fonts');
+      expect(invokedCommands).not.toContain('check_hardware_encoders');
+      doc.elements.delete('splash-curtain');
+    });
   });
 
   describe('font style formatting (bold and italic toggles)', () => {

@@ -86,8 +86,7 @@ pub struct FontItem {
 }
 
 /// Scans installed fonts on Linux using `fc-list` and returns unique font names.
-#[tauri::command]
-pub fn get_system_fonts(_app: AppHandle) -> Vec<FontItem> {
+pub fn collect_system_fonts() -> Vec<FontItem> {
     let mut fonts = Vec::new();
     
     // 1. Add bundled English & Persian fonts
@@ -177,6 +176,13 @@ pub fn get_system_fonts(_app: AppHandle) -> Vec<FontItem> {
     }
 
     fonts
+}
+
+#[tauri::command]
+pub async fn get_system_fonts(_app: AppHandle) -> Vec<FontItem> {
+    tokio::task::spawn_blocking(collect_system_fonts)
+        .await
+        .unwrap_or_default()
 }
 
 
@@ -396,9 +402,8 @@ pub struct FontMetrics {
 ///
 /// Returns the scaling factor to match Canvas/CSS em semantics with libass cell height,
 /// as well as the relative ascent and descent ratios from the font file.
-#[tauri::command]
-pub fn get_font_render_scale(app: AppHandle, font_name: String, bold: bool, italic: bool) -> FontMetrics {
-    let Some(path) = resolve_font_file(&font_name, bold, italic, &app) else {
+pub fn compute_font_render_scale(app: &AppHandle, font_name: &str, bold: bool, italic: bool) -> FontMetrics {
+    let Some(path) = resolve_font_file(font_name, bold, italic, app) else {
         return FontMetrics { scale: 1.0, ascent_ratio: 0.78, descent_ratio: 0.22 };
     };
     let Some((upem, ascent, descent)) = read_font_metrics(&path) else {
@@ -413,6 +418,22 @@ pub fn get_font_render_scale(app: AppHandle, font_name: String, bold: bool, ital
         ascent_ratio: ascent as f64 / height as f64,
         descent_ratio: descent as f64 / height as f64,
     }
+}
+
+#[tauri::command]
+pub async fn get_font_render_scale(
+    app: AppHandle,
+    font_name: String,
+    bold: bool,
+    italic: bool,
+) -> FontMetrics {
+    tokio::task::spawn_blocking(move || compute_font_render_scale(&app, &font_name, bold, italic))
+        .await
+        .unwrap_or(FontMetrics {
+            scale: 1.0,
+            ascent_ratio: 0.78,
+            descent_ratio: 0.22,
+        })
 }
 
 pub fn find_vaapi_render_device() -> Option<String> {
@@ -2040,7 +2061,7 @@ pub async fn run_hardsub_task(
         raw_safe_font
     };
 
-    let font_metrics = get_font_render_scale(app.clone(), settings.font_name.clone(), settings.bold, settings.italic);
+    let font_metrics = compute_font_render_scale(&app, &settings.font_name, settings.bold, settings.italic);
     let compensated_font_size = ((settings.font_size as f64) / font_metrics.scale).round() as u32;
     logs.log(&app, "Hardsub", &format!("Font render scale for '{}' (bold={}, italic={}): {:.4} -> FontSize {} -> {}", settings.font_name, settings.bold, settings.italic, font_metrics.scale, settings.font_size, compensated_font_size));
 

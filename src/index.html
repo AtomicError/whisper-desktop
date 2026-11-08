@@ -102,6 +102,13 @@
       })();
     </script>
     <style>
+      @font-face {
+        font-family: 'Inter';
+        src: url('fonts/Inter.ttf') format('truetype');
+        font-weight: 100 900;
+        font-style: normal;
+        font-display: block;
+      }
       /* Zero-FOUC Splash Boot Curtain (100% Solid Dark & GPU Off-Thread Composited) */
       #splash-curtain {
         position: fixed;
@@ -171,14 +178,14 @@
       #splash-curtain .splash-brand-icon g:nth-of-type(22) { fill: #ffffff !important; }
       #splash-curtain.splash-leaving .splash-lockup {
         opacity: 0 !important;
-        transform: scale(0.98);
-        transition: opacity 0.32s cubic-bezier(0.16, 1, 0.3, 1), transform 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+        transform: translate3d(0, 0, 0) scale(0.985) !important;
+        transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
       }
       #splash-curtain.splash-leaving {
         opacity: 0 !important;
         pointer-events: none !important;
         visibility: hidden;
-        transition: opacity 0.35s ease-out 0.05s, visibility 0.35s 0.05s;
+        transition: opacity 0.32s cubic-bezier(0.16, 1, 0.3, 1) 0.03s, visibility 0.32s 0.03s;
       }
       .splash-lockup {
         position: relative;
@@ -187,8 +194,10 @@
         direction: ltr !important;
         align-items: center;
         justify-content: center;
-        gap: 16px;
-        will-change: transform, opacity;
+        gap: 18px;
+        transform: translate3d(0, 0, 0);
+        backface-visibility: hidden;
+        -webkit-backface-visibility: hidden;
       }
       #splash-curtain .splash-brand-icon {
         width: 72px !important;
@@ -202,72 +211,73 @@
         flex-shrink: 0;
         position: relative;
         z-index: 2;
-        will-change: transform, opacity;
-        transform: translate3d(95px, 0, 0);
-        animation: splash-icon-glide 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both;
+        opacity: 0;
+        transform: translate3d(-12px, 0, 0) scale(0.92);
+        backface-visibility: hidden;
+        -webkit-backface-visibility: hidden;
+        animation: splash-icon-enter 0.56s cubic-bezier(0.16, 1, 0.3, 1) 0.04s forwards;
       }
       html[dir="rtl"] #splash-curtain .splash-brand-icon {
-        transform: translate3d(95px, 0, 0);
-        animation-name: splash-icon-glide;
+        transform: translate3d(-12px, 0, 0) scale(0.92);
+        animation: splash-icon-enter 0.56s cubic-bezier(0.16, 1, 0.3, 1) 0.04s forwards;
       }
       .splash-text-reveal {
         display: flex;
         direction: ltr !important;
         align-items: center;
-        overflow: hidden;
         white-space: nowrap;
         position: relative;
         z-index: 1;
-        will-change: transform, opacity, clip-path;
-        animation: splash-text-reveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both;
       }
       .splash-brand-name {
-        font-family: var(--font-sans, 'Inter', system-ui, -apple-system, sans-serif) !important;
-        font-size: 1.6rem;
+        display: inline-flex;
+        align-items: baseline;
+        gap: 0.32em;
+        font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+        font-size: 1.65rem;
         font-weight: 700;
-        letter-spacing: -0.015em;
-        background: linear-gradient(135deg, #ffffff 15%, #e2e8f0 35%, #94a3b8 65%, #64748b 95%) !important;
-        -webkit-background-clip: text !important;
-        -webkit-text-fill-color: transparent !important;
+        letter-spacing: -0.01em;
         white-space: nowrap;
         line-height: 1.2;
         direction: ltr !important;
-        will-change: transform, opacity;
-        animation: splash-text-drift 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both;
       }
-      @keyframes splash-icon-glide {
+      .splash-word {
+        display: inline-block;
+        opacity: 0;
+        transform: translate3d(-10px, 0, 0);
+        backface-visibility: hidden;
+        -webkit-backface-visibility: hidden;
+      }
+      .splash-word-primary {
+        background: linear-gradient(135deg, #ffffff 20%, #f1f5f9 55%, #cbd5e1 100%) !important;
+        -webkit-background-clip: text !important;
+        background-clip: text !important;
+        -webkit-text-fill-color: transparent !important;
+        color: #f8fafc;
+        animation: splash-word-enter 0.54s cubic-bezier(0.16, 1, 0.3, 1) 0.10s forwards;
+      }
+      .splash-word-secondary {
+        background: linear-gradient(135deg, #e2e8f0 10%, #94a3b8 55%, #64748b 95%) !important;
+        -webkit-background-clip: text !important;
+        background-clip: text !important;
+        -webkit-text-fill-color: transparent !important;
+        color: #94a3b8;
+        animation: splash-word-enter 0.54s cubic-bezier(0.16, 1, 0.3, 1) 0.18s forwards;
+      }
+      @keyframes splash-icon-enter {
         0% {
           opacity: 0;
-          transform: translate3d(95px, 0, 0);
-        }
-        20% {
-          opacity: 1;
+          transform: translate3d(-12px, 0, 0) scale(0.92);
         }
         100% {
           opacity: 1;
-          transform: translate3d(0, 0, 0);
+          transform: translate3d(0, 0, 0) scale(1);
         }
       }
-      @keyframes splash-text-reveal {
+      @keyframes splash-word-enter {
         0% {
           opacity: 0;
-          clip-path: inset(0 100% 0 0);
-        }
-        15% {
-          opacity: 1;
-        }
-        100% {
-          opacity: 1;
-          clip-path: inset(0 0 0 0);
-        }
-      }
-      @keyframes splash-text-drift {
-        0% {
-          opacity: 0;
-          transform: translate3d(-16px, 0, 0);
-        }
-        20% {
-          opacity: 1;
+          transform: translate3d(-10px, 0, 0);
         }
         100% {
           opacity: 1;
@@ -275,13 +285,13 @@
         }
       }
       @media (prefers-reduced-motion: reduce) {
-        .splash-brand-icon,
+        #splash-curtain .splash-brand-icon,
         .splash-text-reveal,
-        .splash-brand-name {
+        .splash-brand-name,
+        .splash-word {
           animation: none !important;
           opacity: 1 !important;
           transform: none !important;
-          clip-path: none !important;
         }
         #splash-curtain {
           transition: opacity 0.08s linear !important;

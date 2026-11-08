@@ -61,8 +61,10 @@ pub struct HardsubSession {
 pub struct HardsubState(pub Arc<Mutex<HardsubSession>>);
 
 #[tauri::command]
-fn load_settings() -> WhisperSettings {
-    load_settings_file()
+async fn load_settings() -> WhisperSettings {
+    tokio::task::spawn_blocking(load_settings_file)
+        .await
+        .unwrap_or_else(|_| load_settings_file())
 }
 
 #[tauri::command]
@@ -81,8 +83,10 @@ fn reset_whisper_core_settings() -> Result<WhisperSettings, String> {
 }
 
 #[tauri::command]
-fn check_build(app: AppHandle, backend: String) -> bool {
-    check_build_exists(&app, &backend)
+async fn check_build(app: AppHandle, backend: String) -> bool {
+    tokio::task::spawn_blocking(move || check_build_exists(&app, &backend))
+        .await
+        .unwrap_or(false)
 }
 
 #[tauri::command]
@@ -664,8 +668,12 @@ fn start_download_model_task(
 }
 
 #[tauri::command]
-fn get_ffmpeg_status(app: AppHandle, source: Option<String>) -> crate::ffmpeg_resolver::FFmpegStatus {
-    crate::ffmpeg_resolver::get_current_ffmpeg_status(Some(&app), source)
+async fn get_ffmpeg_status(app: AppHandle, source: Option<String>) -> crate::ffmpeg_resolver::FFmpegStatus {
+    tokio::task::spawn_blocking(move || {
+        crate::ffmpeg_resolver::get_current_ffmpeg_status(Some(&app), source)
+    })
+    .await
+    .unwrap_or_else(|_| crate::ffmpeg_resolver::get_current_ffmpeg_status(None, None))
 }
 
 #[tauri::command]
