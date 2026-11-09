@@ -41,13 +41,15 @@ export const ko: Translations = {
   },
   theme: {
     royal: '로열 블루',
-    carbon: '카본',
+    ruby: '루비 레드',
+    carbon: '루비 레드',
     fire: '파이어리 오렌지',
     emerald: '에메랄드',
-    royalDesc: '일렉트릭 네온 블루 악센트의 사이버펑크 다크 네이비 캔버스',
-    carbonDesc: '선명한 화이트 타이포그래피와 크림슨 레드 악센트의 미니멀 중립 다크 캔버스',
-    fireDesc: '생생한 앰버 및 파이어리 오렌지 악센트의 따뜻한 다크 캔버스',
-    emeraldDesc: '사이버 민트와 편안한 에메랄드 악센트의 옵시디언 스튜디오 캔버스'
+    royalDesc: '선명한 블루 악센트가 돋보이는 세련된 로열 블루',
+    rubyDesc: '깊이 있고 세련된 루비 레드 악센트',
+    carbonDesc: '깊이 있고 세련된 루비 레드 악센트',
+    fireDesc: '따뜻한 앰버와 에너지 넘치는 파이어리 오렌지',
+    emeraldDesc: '편안하고 차분한 에메랄드 그린 스튜디오 테마' 
   },
   common: {
     save: '변경 사항 저장',

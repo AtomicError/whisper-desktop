@@ -31,39 +31,45 @@
             'royal-blue': '#070913',
             'royal': '#070913',
             'cyber-blue': '#070913',
-            'carbon': '#121214',
+            'ruby-red': '#120707',
+            'ruby': '#120707',
+            'carbon': '#120707',
             'fire-orange': '#0c0a09',
             'fire': '#0c0a09',
             'emerald': '#060e0a'
           };
           const themeMetaMapMonochrome = {
-            'royal-blue': '#101114',
-            'royal': '#101114',
-            'cyber-blue': '#101114',
-            'carbon': '#121214',
-            'fire-orange': '#121111',
-            'fire': '#121111',
-            'emerald': '#101211'
+            'royal-blue': '#0a0a0c',
+            'royal': '#0a0a0c',
+            'cyber-blue': '#0a0a0c',
+            'ruby-red': '#0a0a0c',
+            'ruby': '#0a0a0c',
+            'carbon': '#0a0a0c',
+            'fire-orange': '#0a0a0c',
+            'fire': '#0a0a0c',
+            'emerald': '#0a0a0c'
           };
           const themeCardIdMap = {
             'royal-blue': 'theme-card-royal',
             'royal': 'theme-card-royal',
             'cyber-blue': 'theme-card-royal',
-            'carbon': 'theme-card-carbon',
+            'ruby-red': 'theme-card-ruby',
+            'ruby': 'theme-card-ruby',
+            'carbon': 'theme-card-ruby',
             'fire-orange': 'theme-card-fire',
             'fire': 'theme-card-fire',
             'emerald': 'theme-card-emerald'
           };
 
           if (cachedTheme && cachedTheme !== 'royal-blue' && cachedTheme !== 'royal' && cachedTheme !== 'cyber-blue') {
-            const dataTheme = (cachedTheme === 'fire') ? 'fire-orange' : cachedTheme;
+            const dataTheme = (cachedTheme === 'fire') ? 'fire-orange' : (cachedTheme === 'carbon' || cachedTheme === 'ruby' || cachedTheme === 'ruby-red') ? 'ruby-red' : cachedTheme;
             document.documentElement.setAttribute('data-theme', dataTheme);
           } else {
             document.documentElement.removeAttribute('data-theme');
           }
 
           const bg = isMonochrome
-            ? (themeMetaMapMonochrome[cachedTheme] || '#101114')
+            ? (themeMetaMapMonochrome[cachedTheme] || '#0a0a0c')
             : (themeMetaMap[cachedTheme] || '#070913');
           document.documentElement.style.setProperty('--bg-space', bg);
           const meta = document.querySelector('meta[name="theme-color"]');
@@ -71,10 +77,10 @@
 
           const updateInitialThemeCards = function() {
             const activeId = themeCardIdMap[cachedTheme] || 'theme-card-royal';
-            ['theme-card-royal', 'theme-card-carbon', 'theme-card-fire', 'theme-card-emerald'].forEach(function(cardId) {
+            ['theme-card-royal', 'theme-card-ruby', 'theme-card-carbon', 'theme-card-fire', 'theme-card-emerald'].forEach(function(cardId) {
               const card = document.getElementById(cardId);
               if (card) {
-                const isActive = (cardId === activeId);
+                const isActive = (cardId === activeId || (activeId === 'theme-card-ruby' && cardId === 'theme-card-carbon'));
                 card.classList.toggle('active', isActive);
                 card.setAttribute('aria-checked', isActive ? 'true' : 'false');
               }

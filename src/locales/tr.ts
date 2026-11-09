@@ -41,13 +41,15 @@ export const tr: Translations = {
   },
   theme: {
     royal: 'Kraliyet Mavisi',
-    carbon: 'Karbon',
+    ruby: 'Yakut Kırmızısı',
+    carbon: 'Yakut Kırmızısı',
     fire: 'Ateş Turuncusu',
     emerald: 'Zümrüt',
-    royalDesc: 'Elektrik neon mavi vurgulu siberpunk koyu lacivert tuval',
-    carbonDesc: 'Net beyaz tipografi ve karmen kırmızısı vurgulu minimalist nötr koyu tuval',
-    fireDesc: 'Canlı kehribar ve ateş turuncusu vurgulu sıcak koyu tuval',
-    emeraldDesc: 'Siber nane ve rahatlatıcı zümrüt vurgulu obsidyen stüdyo tuvali'
+    royalDesc: 'Canlı mavi detaylara sahip şık Kraliyet Mavisi tasarımı',
+    rubyDesc: 'Derin ve zarif yakut kırmızısı vurgular',
+    carbonDesc: 'Derin ve zarif yakut kırmızısı vurgular',
+    fireDesc: 'Kehribar ve ateş turuncusu vurgularla sıcak ve dinamik tema',
+    emeraldDesc: 'Zümrüt yeşili vurgularla dinlendirici stüdyo teması' 
   },
   common: {
     save: 'Değişiklikleri Kaydet',

@@ -39,13 +39,15 @@ export const en = {
   },
   theme: {
     royal: 'Royal Blue',
-    carbon: 'Carbon',
+    ruby: 'Ruby Red',
+    carbon: 'Ruby Red',
     fire: 'Fiery Orange',
     emerald: 'Emerald',
-    royalDesc: 'Cyberpunk dark navy canvas with electric neon blue accents',
-    carbonDesc: 'Minimal neutral dark canvas with crisp white typography and crimson red accents',
-    fireDesc: 'Warm dark canvas with vibrant amber and fiery orange accents',
-    emeraldDesc: 'Obsidian studio canvas with cyber mint and relaxing emerald accents'
+    royalDesc: 'Sleek Royal Blue design with vivid blue highlights',
+    rubyDesc: 'Deep sophisticated design with vibrant ruby red accents',
+    carbonDesc: 'Deep sophisticated design with vibrant ruby red accents',
+    fireDesc: 'Warm energetic theme with amber and fiery orange accents',
+    emeraldDesc: 'Calming studio theme with refined emerald green accents' 
   },
   common: {
     save: 'Save Changes',

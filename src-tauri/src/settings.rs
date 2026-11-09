@@ -344,7 +344,7 @@ impl WhisperSettings {
         self.theme = match self.theme.as_str() {
             "fire-orange" | "fire" => "fire-orange".to_string(),
             "cyber-blue" | "royal-blue" | "royal" => "royal-blue".to_string(),
-            "carbon" => "carbon".to_string(),
+            "ruby-red" | "ruby" | "carbon" => "ruby-red".to_string(),
             "emerald" => "emerald".to_string(),
             _ => "royal-blue".to_string(),
         };
@@ -1078,10 +1078,20 @@ mod tests {
         settings.sanitize_and_validate();
         assert_eq!(settings.theme, "fire-orange");
 
-        // Valid carbon theme
+        // Valid ruby-red theme
+        settings.theme = "ruby-red".to_string();
+        settings.sanitize_and_validate();
+        assert_eq!(settings.theme, "ruby-red");
+
+        // Legacy ruby alias migration
+        settings.theme = "ruby".to_string();
+        settings.sanitize_and_validate();
+        assert_eq!(settings.theme, "ruby-red");
+
+        // Legacy carbon theme migration to ruby-red
         settings.theme = "carbon".to_string();
         settings.sanitize_and_validate();
-        assert_eq!(settings.theme, "carbon");
+        assert_eq!(settings.theme, "ruby-red");
 
         // Valid emerald theme
         settings.theme = "emerald".to_string();
@@ -1200,7 +1210,7 @@ mod tests {
         let mut settings = WhisperSettings::default_settings();
         // Modify user preferences
         settings.models_dir = "/custom/models/path".to_string();
-        settings.theme = "carbon".to_string();
+        settings.theme = "ruby-red".to_string();
         settings.ui_language = "fa".to_string();
         settings.ui_scale = 1.25;
         settings.output_dir_path = "/custom/output".to_string();
@@ -1231,7 +1241,7 @@ mod tests {
 
         // User preferences and credentials remain intact!
         assert_eq!(settings.models_dir, "/custom/models/path");
-        assert_eq!(settings.theme, "carbon");
+        assert_eq!(settings.theme, "ruby-red");
         assert_eq!(settings.ui_language, "fa");
         assert_eq!(settings.ui_scale, 1.25);
         assert_eq!(settings.output_dir_path, "/custom/output");

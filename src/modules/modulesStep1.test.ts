@@ -90,18 +90,21 @@ describe('themeManager', () => {
   it('resolves registered themes and fallback properly', () => {
     expect(resolveThemeConfig('royal-blue').id).toBe('royal-blue');
     expect(resolveThemeConfig('cyber-blue').id).toBe('royal-blue');
-    expect(resolveThemeConfig('carbon').id).toBe('carbon');
+    expect(resolveThemeConfig('ruby-red').id).toBe('ruby-red');
+    expect(resolveThemeConfig('ruby').id).toBe('ruby-red');
+    expect(resolveThemeConfig('carbon').id).toBe('ruby-red');
     expect(resolveThemeConfig('fire-orange').id).toBe('fire-orange');
     expect(resolveThemeConfig('fire').id).toBe('fire-orange');
     expect(resolveThemeConfig('emerald').id).toBe('emerald');
     expect(resolveThemeConfig('non-existent-theme').id).toBe('royal-blue');
   });
 
-  it('defines distinct monochrome metadata colors for each theme', () => {
-    expect(MONOCHROME_META_COLORS['royal-blue']).toBe('#101114');
-    expect(MONOCHROME_META_COLORS['carbon']).toBe('#121214');
-    expect(MONOCHROME_META_COLORS['fire-orange']).toBe('#121111');
-    expect(MONOCHROME_META_COLORS['emerald']).toBe('#101211');
+  it('defines unified monochrome metadata colors for all themes', () => {
+    expect(MONOCHROME_META_COLORS['royal-blue']).toBe('#0a0a0c');
+    expect(MONOCHROME_META_COLORS['ruby-red']).toBe('#0a0a0c');
+    expect(MONOCHROME_META_COLORS['carbon']).toBe('#0a0a0c');
+    expect(MONOCHROME_META_COLORS['fire-orange']).toBe('#0a0a0c');
+    expect(MONOCHROME_META_COLORS['emerald']).toBe('#0a0a0c');
   });
 
   it('exposes all required themeManager controller methods', () => {

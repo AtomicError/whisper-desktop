@@ -41,13 +41,15 @@ export const de: Translations = {
   },
   theme: {
     royal: 'Königsblau',
-    carbon: 'Karbon',
+    ruby: 'Rubinrot',
+    carbon: 'Rubinrot',
     fire: 'Feuerorange',
     emerald: 'Smaragd',
-    royalDesc: 'Cyberpunk-Dunkelblau mit elektrisierenden neonblauen Akzenten',
-    carbonDesc: 'Minimalistisch neutrales dunkles Design mit klarer weißer Typografie und karmesinroten Akzenten',
-    fireDesc: 'Warmes dunkles Design mit lebhaften Bernstein- und feurigen Orange-Akzenten',
-    emeraldDesc: 'Obsidian-Studio-Design mit Cyber-Minze und entspannenden Smaragd-Akzenten'
+    royalDesc: 'Elegantes Königsblau-Design mit lebendigen blauen Akzenten',
+    rubyDesc: 'Tiefes, edles Design mit rubinroten Akzenten',
+    carbonDesc: 'Tiefes, edles Design mit rubinroten Akzenten',
+    fireDesc: 'Warmes, dynamisches Design mit Bernstein- und feurigen Orange-Akzenten',
+    emeraldDesc: 'Beruhigendes Studio-Design mit smaragdgrünen Akzenten' 
   },
   common: {
     save: 'Änderungen Speichern',

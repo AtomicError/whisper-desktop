@@ -128,7 +128,7 @@
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  background: rgba(18, 22, 34, 0.85);
+  background: var(--bg-dropdown, rgba(18, 22, 34, 0.85));
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(var(--color-royal-blue-rgb), 0.45);

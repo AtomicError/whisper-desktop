@@ -641,7 +641,7 @@ html[dir="rtl"] .cat-match-badge {
   border: 1px solid rgba(255, 255, 255, 0.12);
   overflow: hidden;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-  background: rgba(15, 23, 42, 0.9);
+  background: var(--bg-player-stage, rgba(15, 23, 42, 0.9));
 }
 
 @media (max-width: 960px) {
@@ -1142,7 +1142,7 @@ body.hardsub-fullscreen-active #app-container {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  background: rgba(15, 23, 42, 0.9);
+  background: var(--bg-player-controls, rgba(15, 23, 42, 0.9));
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 0 0 10px 10px;
   padding: 10px 14px;

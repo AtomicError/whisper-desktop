@@ -252,6 +252,8 @@ sidebar.sidebar-collapsed .nav-divider {
   filter: drop-shadow(0 0 8px rgba(255, 107, 0, 0.5));
 }
 
+:root[data-theme="ruby-red"] .brand-icon,
+:root[data-theme="ruby"] .brand-icon,
 :root[data-theme="carbon"] .brand-icon {
   --brand-icon-f1: #761e1e;
   --brand-icon-f2: #94201f;
@@ -496,9 +498,10 @@ a:focus:not(:focus-visible),
   box-shadow: 0 0 6px rgba(45, 127, 255, 0.5);
 }
 
+.orb-ruby,
 .orb-carbon {
-  background: linear-gradient(135deg, #18181b 0%, #18181b 50%, #ef4444 50%, #ef4444 100%);
-  box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
+  background: linear-gradient(135deg, #e11d48 0%, #e11d48 50%, #fb7185 50%, #fb7185 100%);
+  box-shadow: 0 0 6px rgba(244, 63, 94, 0.5);
 }
 
 .orb-fire {

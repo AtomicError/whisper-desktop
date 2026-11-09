@@ -728,24 +728,22 @@ describe('formatFFmpegVersion', () => {
 
 describe('Monochrome Canvas Engine', () => {
   const MONOCHROME_META_COLORS = {
-    'royal-blue': '#101114',
-    'cyber-blue': '#101114',
-    'carbon': '#121214',
-    'fire-orange': '#121111',
-    'fire': '#121111',
-    'emerald': '#101211'
+    'royal-blue': '#0a0a0c',
+    'cyber-blue': '#0a0a0c',
+    'ruby-red': '#0a0a0c',
+    'ruby': '#0a0a0c',
+    'carbon': '#0a0a0c',
+    'fire-orange': '#0a0a0c',
+    'fire': '#0a0a0c',
+    'emerald': '#0a0a0c'
   };
 
-  it('provides distinct, dedicated monochrome surfaces for each theme', () => {
-    expect(MONOCHROME_META_COLORS['royal-blue']).toBe('#101114');
-    expect(MONOCHROME_META_COLORS['carbon']).toBe('#121214');
-    expect(MONOCHROME_META_COLORS['fire-orange']).toBe('#121111');
-    expect(MONOCHROME_META_COLORS['emerald']).toBe('#101211');
-
-    // Royal Blue and Fire Orange have distinct surface hues
-    expect(MONOCHROME_META_COLORS['royal-blue']).not.toBe(MONOCHROME_META_COLORS['fire-orange']);
-    // Royal Blue and Emerald have distinct surface hues
-    expect(MONOCHROME_META_COLORS['royal-blue']).not.toBe(MONOCHROME_META_COLORS['emerald']);
+  it('provides unified #0a0a0c studio matte monochrome surfaces for all themes', () => {
+    expect(MONOCHROME_META_COLORS['royal-blue']).toBe('#0a0a0c');
+    expect(MONOCHROME_META_COLORS['ruby-red']).toBe('#0a0a0c');
+    expect(MONOCHROME_META_COLORS['carbon']).toBe('#0a0a0c');
+    expect(MONOCHROME_META_COLORS['fire-orange']).toBe('#0a0a0c');
+    expect(MONOCHROME_META_COLORS['emerald']).toBe('#0a0a0c');
   });
 
   it('updates DOM attributes and localStorage correctly when toggling', () => {

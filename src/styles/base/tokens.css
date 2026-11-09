@@ -175,6 +175,8 @@ html {
   --bg-glass-card: rgba(15, 20, 38, 0.65);
   --border-glass: rgba(255, 255, 255, 0.06);
   --border-glass-active: rgba(45, 127, 255, 0.4);
+  --bg-player-stage: rgba(15, 23, 42, 0.9);
+  --bg-player-controls: rgba(15, 23, 42, 0.9);
   
   --color-accent: #2d7fff;
   --color-accent-rgb: 45, 127, 255;
@@ -339,35 +341,41 @@ html {
   --nav-active-hover-shadow: 0 6px 20px rgba(255, 107, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2), inset 0 0 16px rgba(255, 107, 0, 0.15);
 }
 
+:root[data-theme="ruby-red"],
+:root[data-theme="ruby"],
 :root[data-theme="carbon"] {
-  /* Surfaces & Canvas (Neutral monochrome canvas without color cast) */
-  --bg-space: #121214;                      /* Main application canvas */
-  --bg-deep: #18181b;                       /* Sidebar and deep containers */
-  --bg-card: rgba(28, 28, 32, 0.75);        /* Floating cards and panels */
-  --bg-card-hover: rgba(38, 38, 44, 0.88);  /* Card hover state */
-  --bg-input: #161619;                      /* Form input fields */
-  --bg-dropdown: #1c1c20;                   /* Dropdown selection menus */
-  --bg-titlebar: rgba(18, 18, 20, 0.98);    /* Window titlebar */
-  --bg-table-head: #17171a;                 /* History and models table headers */
-  --bg-table-body: rgba(20, 20, 23, 0.85);  /* Table row background */
-  --bg-glass-card: rgba(28, 28, 32, 0.75);
+  /* Surfaces & Canvas (Dark ruby noir tint mirroring Royal Blue's dark navy blueprint) */
+  --bg-space: #120707;                      /* Main application canvas (deep muted ruby noir, mirroring #070913) */
+  --bg-deep: #190909;                       /* Sidebar and deep containers (mirroring #0b0e1b) */
+  --bg-card: rgba(28, 10, 13, 0.55);        /* Floating cards and panels (mirroring rgba(15, 20, 38, 0.55)) */
+  --bg-card-hover: rgba(42, 14, 18, 0.75);  /* Card hover state (mirroring rgba(22, 29, 54, 0.75)) */
+  --bg-input: rgba(20, 8, 10, 0.80);        /* Form input fields (mirroring rgba(10, 13, 28, 0.8)) */
+  --bg-dropdown: #1a090c;                   /* Dropdown selection menus (mirroring #111427) */
+  --bg-titlebar: rgba(21, 8, 9, 0.98);      /* Window titlebar & sidebar (mirroring rgba(9, 11, 23, 0.98)) */
+  --bg-table-head: #16080a;                 /* History and models table headers (mirroring #0d1021) */
+  --bg-table-body: rgba(18, 8, 10, 0.85);   /* Table row background (mirroring rgba(9, 12, 24, 0.85)) */
+  --bg-glass-card: rgba(28, 10, 13, 0.65);  /* Glass cards (mirroring rgba(15, 20, 38, 0.65)) */
+  --border-glass: rgba(255, 255, 255, 0.06);
+  --border-glass-active: rgba(244, 63, 94, 0.40); /* Active card border */
+  --bg-player-stage: rgba(18, 8, 10, 0.90);
+  --bg-player-controls: rgba(16, 7, 9, 0.90);
 
-  /* Borders & Dividers */
-  --border-glass: rgba(255, 255, 255, 0.08);
-  --border-glass-active: rgba(239, 68, 68, 0.50);
+  /* Actionable Ruby Red Accent */
+  --color-accent: #f43f5e;
+  --color-accent-rgb: 244, 63, 94;
+  --color-accent-dark: #e11d48;
+  --color-accent-dark-rgb: 225, 29, 72;
+  --shadow-neon-accent: 0 0 20px rgba(244, 63, 94, 0.25);
 
-  /* Actionable Crimson / Racing Red Accent */
-  --color-accent: #ef4444;
-  --color-accent-rgb: 239, 68, 68;
-  --color-accent-dark: #dc2626;
-  --color-accent-dark-rgb: 220, 38, 38;
-  --shadow-neon-accent: 0 0 20px rgba(239, 68, 68, 0.28);
-
-  /* Base Semantic Colors */
-  --color-cyan: #f43f5e;
-  --color-cyan-rgb: 244, 63, 94;
-  --color-sky: #f87171;
-  --color-sky-rgb: 248, 113, 113;
+  /* Harmonized Ruby Rose Accents (Replaces blue with radiant rose) */
+  --color-cyan: #fb7185;
+  --color-cyan-rgb: 251, 113, 133;
+  --color-sky: #fda4af;
+  --color-sky-rgb: 253, 164, 175;
+  --color-royal-blue: #f43f5e;
+  --color-royal-blue-rgb: 244, 63, 94;
+  --color-royal-blue-dark: #e11d48;
+  --color-royal-blue-dark-rgb: 225, 29, 72;
   --color-gold: #f59e0b;
   --color-gold-rgb: 245, 158, 11;
   --color-warm: #f59e0b;
@@ -377,56 +385,53 @@ html {
   --color-red-rgb: 239, 68, 68;
   --color-hot: #f43f5e;
 
-  /* Legacy & Shadowing Tokens (Brand icon/name and signature accents in vibrant crimson) */
-  --color-royal-blue: #ef4444;
-  --color-royal-blue-rgb: 239, 68, 68;
-  --color-royal-blue-dark: #dc2626;
-  --color-royal-blue-dark-rgb: 220, 38, 38;
-
-  /* High Contrast Neutral Typography (WCAG AAA compliant) */
-  --color-text: #f4f4f5;
-  --color-text-main: #f4f4f5;
-  --color-text-muted: #a1a1aa;
+  /* Typography Design Tokens — 100% NEUTRAL & HIGH CONTRAST (EXACTLY LIKE ROYAL BLUE) */
+  --color-text: #f3f4f6;
+  --color-text-main: #f3f4f6;
+  --color-text-muted: #9ca3af;
   --color-text-dim: #94a3b8;
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
 
   /* Theme-specific Accent Token Overrides */
   --accent-primary: var(--color-accent);
   --accent-hover: var(--color-accent-dark);
 
-  /* Model Family Palette Accents (Obsidian Cherry to Platinum Spectrum) */
-  --color-model-large: #ef4444;
-  --color-model-large-rgb: 239, 68, 68;
-  --color-model-medium: #f43f5e;
-  --color-model-medium-rgb: 244, 63, 94;
-  --color-model-small: #fb7185;
-  --color-model-small-rgb: 251, 113, 133;
-  --color-model-base: #e4e4e7;
-  --color-model-base-rgb: 228, 228, 231;
+  /* Model Family Palette Accents */
+  --color-model-large: #f43f5e;
+  --color-model-large-rgb: 244, 63, 94;
+  --color-model-medium: #fb7185;
+  --color-model-medium-rgb: 251, 113, 133;
+  --color-model-small: #10b981;
+  --color-model-small-rgb: 16, 185, 129;
+  --color-model-base: #f59e0b;
+  --color-model-base-rgb: 245, 158, 11;
 
-  --shadow-neon-cyan: 0 0 12px rgba(244, 63, 94, 0.20);
-  --shadow-neon-royal-blue: 0 0 20px rgba(239, 68, 68, 0.28);
-  --shadow-neon-gold: 0 0 15px rgba(244, 63, 94, 0.15);
+  --shadow-neon-cyan: 0 0 15px rgba(251, 113, 133, 0.20);
+  --shadow-neon-royal-blue: 0 0 20px rgba(244, 63, 94, 0.25);
+  --shadow-neon-gold: 0 0 15px rgba(245, 158, 11, 0.15);
 
-  --bg-radial-1: rgba(255, 255, 255, 0.02);
-  --bg-radial-2: rgba(255, 255, 255, 0.01);
+  --bg-radial-1: rgba(244, 63, 94, 0.065);
+  --bg-radial-2: rgba(225, 29, 72, 0.04);
 
   /* Buttons & Action Elements */
-  --primary-btn-bg: linear-gradient(135deg, #ef4444, #dc2626);
-  --primary-btn-border: #b91c1c;
-  --primary-btn-shadow: 0 4px 16px 0 rgba(220, 38, 38, 0.30);
-  --primary-btn-hover-bg: linear-gradient(135deg, #f87171, #ef4444);
-  --primary-btn-hover-border: #dc2626;
-  --primary-btn-hover-shadow: 0 6px 20px 0 rgba(220, 38, 38, 0.40);
-  --primary-btn-active-bg: linear-gradient(135deg, #dc2626, #991b1b);
-  --primary-btn-active-border: #7f1d1d;
+  --primary-btn-bg: linear-gradient(135deg, #f43f5e, #be123c);
+  --primary-btn-border: #9f1239;
+  --primary-btn-shadow: 0 4px 16px 0 rgba(190, 18, 60, 0.25);
+  --primary-btn-hover-bg: linear-gradient(135deg, #fb7185, #e11d48);
+  --primary-btn-hover-border: #be123c;
+  --primary-btn-hover-shadow: 0 6px 20px 0 rgba(244, 63, 94, 0.35);
+  --primary-btn-active-bg: linear-gradient(135deg, #be123c, #881337);
+  --primary-btn-active-border: #4c0519;
 
   /* Navigation Item States */
-  --nav-active-bg: linear-gradient(135deg, rgba(239, 68, 68, 0.16) 0%, rgba(239, 68, 68, 0.04) 100%);
-  --nav-active-border: rgba(239, 68, 68, 0.45);
-  --nav-active-shadow: 0 4px 16px rgba(239, 68, 68, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.15);
-  --nav-active-hover-bg: linear-gradient(135deg, rgba(239, 68, 68, 0.22) 0%, rgba(239, 68, 68, 0.08) 100%);
-  --nav-active-hover-border: rgba(239, 68, 68, 0.60);
-  --nav-active-hover-shadow: 0 6px 20px rgba(239, 68, 68, 0.28);
+  --nav-active-bg: linear-gradient(135deg, rgba(244, 63, 94, 0.16) 0%, rgba(244, 63, 94, 0.06) 100%);
+  --nav-active-border: rgba(244, 63, 94, 0.40);
+  --nav-active-shadow: 0 4px 16px rgba(244, 63, 94, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.15), inset 0 0 12px rgba(244, 63, 94, 0.10);
+  --nav-active-hover-bg: linear-gradient(135deg, rgba(244, 63, 94, 0.22) 0%, rgba(244, 63, 94, 0.10) 100%);
+  --nav-active-hover-border: rgba(244, 63, 94, 0.58);
+  --nav-active-hover-shadow: 0 6px 20px rgba(244, 63, 94, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2), inset 0 0 16px rgba(244, 63, 94, 0.15);
 }
 
 :root[data-theme="emerald"] {
@@ -443,6 +448,8 @@ html {
 
   --border-glass: rgba(255, 255, 255, 0.07);
   --border-glass-active: rgba(16, 185, 129, 0.45);
+  --bg-player-stage: rgba(8, 20, 14, 0.90);
+  --bg-player-controls: rgba(6, 16, 11, 0.90);
 
   --color-accent: #10b981;
   --color-accent-rgb: 16, 185, 129;
@@ -533,81 +540,50 @@ html {
 }
 
 /* ==========================================================================
-   MONOCHROME CANVAS ENGINE (TINT-FREE STUDIO SURFACES)
-   Subtle studio matte charcoal surfaces with full preservation of
-   theme accent colors, typography, buttons, and semantic states.
+   NEUTRAL CANVAS / MONOCHROME STUDIO ENGINE (TINT-FREE UNIFIED SURFACES)
+   Centralized design tokens for neutral matte studio canvas (#0A0A0C).
+   Seamlessly applies to canvas, titlebar, sidebar, glass-cards, inputs,
+   tables, and media stages across all views while preserving theme accent colors.
    ========================================================================== */
 
-/* 1. Base & Royal Blue with Monochrome Canvas (Deep studio graphite with zero navy/cyan cast) */
+:root {
+  /* Neutral Canvas Master Palette Tokens (Single Source of Truth) */
+  --canvas-neutral-bg: #0a0a0c;
+  --canvas-neutral-titlebar: rgba(10, 10, 12, 0.98);
+  --canvas-neutral-deep: #0e0e12;
+  --canvas-neutral-card: rgba(18, 18, 22, 0.72);
+  --canvas-neutral-card-hover: rgba(26, 26, 32, 0.85);
+  --canvas-neutral-input: #121215;
+  --canvas-neutral-dropdown: #151519;
+  --canvas-neutral-table-head: #111115;
+  --canvas-neutral-table-body: rgba(14, 14, 18, 0.85);
+  --canvas-neutral-surface: #101014;
+  --canvas-neutral-elevated: #15151a;
+  --canvas-neutral-hover: #1e1e24;
+  --canvas-neutral-border: rgba(255, 255, 255, 0.06);
+  --canvas-neutral-player-stage: rgba(12, 12, 15, 0.95);
+  --canvas-neutral-player-controls: rgba(10, 10, 12, 0.95);
+}
+
 :root[data-canvas="monochrome"],
-:root[data-theme="royal-blue"][data-canvas="monochrome"],
-:root[data-theme="cyber-blue"][data-canvas="monochrome"] {
-  --bg-space: #101114;
-  --bg-deep: #16171b;
-  --bg-card: rgba(26, 27, 32, 0.72);
-  --bg-card-hover: rgba(36, 37, 44, 0.85);
-  --bg-input: #151619;
-  --bg-dropdown: #1b1c20;
-  --bg-titlebar: rgba(16, 17, 20, 0.98);
-  --bg-table-head: #16171a;
-  --bg-table-body: rgba(18, 19, 23, 0.85);
-  --bg-glass-card: rgba(26, 27, 32, 0.72);
-  --border-glass: rgba(255, 255, 255, 0.07);
-
-  --bg-radial-1: rgba(255, 255, 255, 0.015);
-  --bg-radial-2: rgba(255, 255, 255, 0.01);
-}
-
-/* 2. Fiery Orange with Monochrome Canvas (Volcanic obsidian matte with zero muddy brown cast) */
-:root[data-theme="fire-orange"][data-canvas="monochrome"],
-:root[data-theme="fire"][data-canvas="monochrome"] {
-  --bg-space: #121111;
-  --bg-deep: #171515;
-  --bg-card: rgba(30, 26, 26, 0.72);
-  --bg-card-hover: rgba(40, 35, 35, 0.85);
-  --bg-input: #171515;
-  --bg-dropdown: #1d1a1a;
-  --bg-titlebar: rgba(18, 17, 17, 0.98);
-  --bg-table-head: #181616;
-  --bg-table-body: rgba(20, 18, 18, 0.85);
-  --bg-glass-card: rgba(30, 26, 26, 0.72);
-  --border-glass: rgba(255, 255, 255, 0.07);
-
-  --bg-radial-1: rgba(255, 255, 255, 0.015);
-  --bg-radial-2: rgba(255, 255, 255, 0.01);
-}
-
-/* 3. Emerald with Monochrome Canvas (Titanium charcoal matte with zero marshy green cast) */
-:root[data-theme="emerald"][data-canvas="monochrome"] {
-  --bg-space: #101211;
-  --bg-deep: #151816;
-  --bg-card: rgba(24, 29, 26, 0.72);
-  --bg-card-hover: rgba(34, 40, 36, 0.85);
-  --bg-input: #141715;
-  --bg-dropdown: #1a1e1c;
-  --bg-titlebar: rgba(16, 18, 17, 0.98);
-  --bg-table-head: #151917;
-  --bg-table-body: rgba(18, 22, 20, 0.85);
-  --bg-glass-card: rgba(24, 29, 26, 0.72);
-  --border-glass: rgba(255, 255, 255, 0.07);
-
-  --bg-radial-1: rgba(255, 255, 255, 0.015);
-  --bg-radial-2: rgba(255, 255, 255, 0.01);
-}
-
-/* 4. Carbon with Monochrome Canvas (Maintains native neutral obsidian surfaces) */
-:root[data-theme="carbon"][data-canvas="monochrome"] {
-  --bg-space: #121214;
-  --bg-deep: #18181b;
-  --bg-card: rgba(28, 28, 32, 0.75);
-  --bg-card-hover: rgba(38, 38, 44, 0.88);
-  --bg-input: #161619;
-  --bg-dropdown: #1c1c20;
-  --bg-titlebar: rgba(18, 18, 20, 0.98);
-  --bg-table-head: #17171a;
-  --bg-table-body: rgba(20, 20, 23, 0.85);
-  --bg-glass-card: rgba(28, 28, 32, 0.75);
-  --border-glass: rgba(255, 255, 255, 0.08);
+:root[data-canvas="monochrome"][data-theme] {
+  --bg-space: var(--canvas-neutral-bg);
+  --bg-app: var(--canvas-neutral-bg);
+  --bg-titlebar: var(--canvas-neutral-titlebar);
+  --bg-deep: var(--canvas-neutral-deep);
+  --bg-card: var(--canvas-neutral-card);
+  --bg-card-hover: var(--canvas-neutral-card-hover);
+  --bg-glass-card: var(--canvas-neutral-card);
+  --border-glass: var(--canvas-neutral-border);
+  --bg-input: var(--canvas-neutral-input);
+  --bg-dropdown: var(--canvas-neutral-dropdown);
+  --bg-table-head: var(--canvas-neutral-table-head);
+  --bg-table-body: var(--canvas-neutral-table-body);
+  --bg-surface: var(--canvas-neutral-surface);
+  --bg-elevated: var(--canvas-neutral-elevated);
+  --bg-hover: var(--canvas-neutral-hover);
+  --bg-player-stage: var(--canvas-neutral-player-stage);
+  --bg-player-controls: var(--canvas-neutral-player-controls);
 
   --bg-radial-1: rgba(255, 255, 255, 0.015);
   --bg-radial-2: rgba(255, 255, 255, 0.01);

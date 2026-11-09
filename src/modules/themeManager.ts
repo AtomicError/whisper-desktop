@@ -24,14 +24,38 @@ export const THEME_REGISTRY: Record<string, ThemeConfig> = {
       </svg>
     `
   },
-  'carbon': {
-    id: 'carbon',
-    label: 'Carbon',
-    dataTheme: 'carbon',
-    metaColor: '#121214',
-    toastName: 'Carbon',
+  'ruby-red': {
+    id: 'ruby-red',
+    label: 'Ruby Red',
+    dataTheme: 'ruby-red',
+    metaColor: '#120707',
+    toastName: 'Ruby Red',
     iconSvg: `
-      <svg class="theme-btn-icon icon-carbon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <svg class="theme-btn-icon icon-ruby" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="12 2 22 12 12 22 2 12 12 2"/>
+      </svg>
+    `
+  },
+  'ruby': {
+    id: 'ruby-red',
+    label: 'Ruby Red',
+    dataTheme: 'ruby-red',
+    metaColor: '#120707',
+    toastName: 'Ruby Red',
+    iconSvg: `
+      <svg class="theme-btn-icon icon-ruby" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="12 2 22 12 12 22 2 12 12 2"/>
+      </svg>
+    `
+  },
+  'carbon': {
+    id: 'ruby-red',
+    label: 'Ruby Red',
+    dataTheme: 'ruby-red',
+    metaColor: '#120707',
+    toastName: 'Ruby Red',
+    iconSvg: `
+      <svg class="theme-btn-icon icon-ruby" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polygon points="12 2 22 12 12 22 2 12 12 2"/>
       </svg>
     `
@@ -64,21 +88,25 @@ export const THEME_REGISTRY: Record<string, ThemeConfig> = {
   }
 };
 
+export const NEUTRAL_CANVAS_COLOR = '#0a0a0c';
+
 export const MONOCHROME_META_COLORS: Record<string, string> = {
-  'royal-blue': '#101114',
-  'cyber-blue': '#101114',
-  'carbon': '#121214',
-  'fire-orange': '#121111',
-  'fire': '#121111',
-  'emerald': '#101211'
+  'royal-blue': NEUTRAL_CANVAS_COLOR,
+  'cyber-blue': NEUTRAL_CANVAS_COLOR,
+  'ruby-red': NEUTRAL_CANVAS_COLOR,
+  'ruby': NEUTRAL_CANVAS_COLOR,
+  'carbon': NEUTRAL_CANVAS_COLOR,
+  'fire-orange': NEUTRAL_CANVAS_COLOR,
+  'fire': NEUTRAL_CANVAS_COLOR,
+  'emerald': NEUTRAL_CANVAS_COLOR
 };
 
 let currentUiZoom = 1.0;
 let zoomSaveTimeout: any = null;
 
 export function resolveThemeConfig(themeName: string): ThemeConfig {
-  if (themeName === 'carbon') {
-    return THEME_REGISTRY['carbon'];
+  if (themeName === 'ruby-red' || themeName === 'ruby' || themeName === 'carbon') {
+    return THEME_REGISTRY['ruby-red'];
   }
   if (themeName === 'fire' || themeName === 'fire-orange') {
     return THEME_REGISTRY['fire-orange'];
@@ -123,7 +151,7 @@ export function applyMonochromeCanvas(isMonochrome: boolean, persist = true): vo
   const config = resolveThemeConfig(currentThemeId);
 
   if (isMonochrome) {
-    const monoBg = MONOCHROME_META_COLORS[config.id] || '#101114';
+    const monoBg = MONOCHROME_META_COLORS[config.id] || NEUTRAL_CANVAS_COLOR;
     root.style.setProperty('--bg-space', monoBg);
     const metaTheme = document.querySelector('meta[name="theme-color"]');
     if (metaTheme) metaTheme.setAttribute('content', monoBg);
@@ -149,14 +177,14 @@ export function applyTheme(themeName: string): void {
   if (config.id === 'royal-blue') {
     root.removeAttribute('data-theme');
     if (isMonochrome) {
-      root.style.setProperty('--bg-space', MONOCHROME_META_COLORS['royal-blue'] || '#101114');
+      root.style.setProperty('--bg-space', MONOCHROME_META_COLORS['royal-blue'] || NEUTRAL_CANVAS_COLOR);
     } else {
       root.style.removeProperty('--bg-space');
     }
   } else {
     root.setAttribute('data-theme', config.dataTheme || config.id);
     if (isMonochrome) {
-      root.style.setProperty('--bg-space', MONOCHROME_META_COLORS[config.id] || '#101114');
+      root.style.setProperty('--bg-space', MONOCHROME_META_COLORS[config.id] || NEUTRAL_CANVAS_COLOR);
     } else if (config.metaColor) {
       root.style.setProperty('--bg-space', config.metaColor);
     }
@@ -169,7 +197,7 @@ export function applyTheme(themeName: string): void {
   const metaTheme = document.querySelector('meta[name="theme-color"]');
   if (metaTheme) {
     const effectiveColor = isMonochrome
-      ? (MONOCHROME_META_COLORS[config.id] || '#101114')
+      ? (MONOCHROME_META_COLORS[config.id] || NEUTRAL_CANVAS_COLOR)
       : config.metaColor;
     if (effectiveColor) {
       metaTheme.setAttribute('content', effectiveColor);
@@ -179,15 +207,17 @@ export function applyTheme(themeName: string): void {
   const activeThemeId = config.id;
   const themeCardMap: Record<string, string> = {
     'royal-blue': 'theme-card-royal',
-    'carbon': 'theme-card-carbon',
+    'ruby-red': 'theme-card-ruby',
+    'ruby': 'theme-card-ruby',
+    'carbon': 'theme-card-ruby',
     'fire-orange': 'theme-card-fire',
     'fire': 'theme-card-fire',
     'emerald': 'theme-card-emerald'
   };
-  const activeCardId = themeCardMap[activeThemeId] || 'theme-card-royal';
+  const targetCardId = themeCardMap[activeThemeId] || 'theme-card-royal';
 
   document.querySelectorAll('.theme-picker-card').forEach(card => {
-    const isActive = (card.id === activeCardId);
+    const isActive = (card.id === targetCardId || (targetCardId === 'theme-card-ruby' && card.id === 'theme-card-carbon'));
     card.classList.toggle('active', isActive);
     card.setAttribute('aria-checked', isActive ? 'true' : 'false');
   });
@@ -199,15 +229,15 @@ export function applyTheme(themeName: string): void {
 
 export function toggleTheme(): void {
   const currentThemeAttr = document.documentElement.getAttribute('data-theme') || 'royal-blue';
-  let nextTheme = 'carbon';
-  if (currentThemeAttr === 'carbon') {
+  let nextTheme = 'ruby-red';
+  if (currentThemeAttr === 'ruby-red' || currentThemeAttr === 'carbon') {
     nextTheme = 'fire-orange';
   } else if (currentThemeAttr === 'fire-orange' || currentThemeAttr === 'fire') {
     nextTheme = 'emerald';
   } else if (currentThemeAttr === 'emerald') {
     nextTheme = 'royal-blue';
   } else {
-    nextTheme = 'carbon';
+    nextTheme = 'ruby-red';
   }
   switchTheme(nextTheme);
 }
@@ -240,7 +270,13 @@ export function switchTheme(themeName: string, animated = true): void {
     applyTheme(config.id);
   }
 
-  const themeKey = (config.id === 'royal-blue') ? 'royal' : (config.id === 'fire-orange' || config.id === 'fire') ? 'fire' : config.id;
+  const themeKey = (config.id === 'royal-blue')
+    ? 'royal'
+    : (config.id === 'fire-orange' || config.id === 'fire')
+    ? 'fire'
+    : (config.id === 'ruby-red' || config.id === 'ruby' || config.id === 'carbon')
+    ? 'ruby'
+    : config.id;
   const localizedThemeName = (typeof t === 'function' && t(`theme.${themeKey}`) !== `theme.${themeKey}`)
     ? t(`theme.${themeKey}`)
     : (config.toastName || config.label);

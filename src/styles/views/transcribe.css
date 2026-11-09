@@ -1340,7 +1340,7 @@
   max-width: 215px !important;
   box-sizing: border-box !important;
   border-radius: 8px !important;
-  background: #141418 !important;
+  background: var(--bg-dropdown) !important;
   border: 1px solid var(--border-subtle, #27272a) !important;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
 }
@@ -1827,10 +1827,7 @@ html[dir="rtl"] #options-for-batch-sort-select .custom-select-option.selected {
   to { opacity: 1; transform: translateY(0); }
 }
 
-:root[data-theme="carbon"] .model-badge-vad {
-  background: rgba(251, 113, 133, 0.12);
-  color: #fb7185;
-}
+
 
 
 /* Live Transcript Search RTL */

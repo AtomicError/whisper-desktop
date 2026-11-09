@@ -41,13 +41,15 @@ export const es: Translations = {
   },
   theme: {
     royal: 'Azul Real',
-    carbon: 'Carbón',
+    ruby: 'Rojo Rubí',
+    carbon: 'Rojo Rubí',
     fire: 'Naranja Fuego',
     emerald: 'Esmeralda',
-    royalDesc: 'Lienzo azul marino oscuro cyberpunk con acentos en azul neón eléctrico',
-    carbonDesc: 'Lienzo oscuro neutro minimalista con tipografía blanca nítida y acentos rojo carmesí',
-    fireDesc: 'Lienzo oscuro cálido con acentos ámbar vibrantes y naranja fuego',
-    emeraldDesc: 'Lienzo de estudio obsidiana con acentos menta cibernética y esmeralda relajante'
+    royalDesc: 'Diseño elegante Azul Real con detalles en azul vívido',
+    rubyDesc: 'Diseño profundo y sofisticado con acentos rojo rubí',
+    carbonDesc: 'Diseño profundo y sofisticado con acentos rojo rubí',
+    fireDesc: 'Tema cálido y enérgico con acentos ámbar y naranja fuego',
+    emeraldDesc: 'Tema de estudio relajante con acentos verde esmeralda' 
   },
   common: {
     save: 'Guardar Cambios',

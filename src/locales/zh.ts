@@ -41,13 +41,15 @@ export const zh: Translations = {
   },
   theme: {
     royal: '皇家蓝',
-    carbon: '极简碳黑',
-    fire: '燃动落日',
-    emerald: '赛博翡翠',
-    royalDesc: '赛博朋克深海军蓝画布，搭配高光霓虹电光蓝',
-    carbonDesc: '极简中性暗黑背景，搭配纯白字符与深红点缀',
-    fireDesc: '温暖深邃黑底，搭配明亮琥珀与炙热橙色',
-    emeraldDesc: '曜石工作室黑底，搭配薄荷绿与放松翡翠绿'
+    ruby: '红宝石',
+    carbon: '红宝石',
+    fire: '炽烈橙',
+    emerald: '翡翠绿',
+    royalDesc: '典雅的皇家蓝设计，搭配鲜艳蓝色点缀',
+    rubyDesc: '深邃精致的设计，搭配典雅红宝石色点缀',
+    carbonDesc: '深邃精致的设计，搭配典雅红宝石色点缀',
+    fireDesc: '温暖明亮的主题，搭配琥珀色与炽烈橙色点缀',
+    emeraldDesc: '宁静舒适的工作室主题，搭配翡翠绿色点缀' 
   },
   common: {
     save: '保存更改',

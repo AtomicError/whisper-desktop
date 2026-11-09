@@ -41,13 +41,15 @@ export const pt: Translations = {
   },
   theme: {
     royal: 'Azul Real',
-    carbon: 'Carbono',
+    ruby: 'Vermelho Rubi',
+    carbon: 'Vermelho Rubi',
     fire: 'Laranja Fogo',
     emerald: 'Esmeralda',
-    royalDesc: 'Tema azul-marinho cyberpunk com detalhes em azul neon elétrico',
-    carbonDesc: 'Tema escuro neutro minimalista com tipografia branca nítida e detalhes em vermelho carmesim',
-    fireDesc: 'Tema escuro acolhedor com detalhes vibrantes em âmbar e laranja fogo',
-    emeraldDesc: 'Tema estúdio obsidiana com detalhes em menta cibernética e esmeralda relaxante'
+    royalDesc: 'Design elegante Azul Real com detalhes em azul vívido',
+    rubyDesc: 'Design profundo e sofisticado com detalhes em vermelho rubi',
+    carbonDesc: 'Design profundo e sofisticado com detalhes em vermelho rubi',
+    fireDesc: 'Tema caloroso e energético com detalhes em âmbar e laranja fogo',
+    emeraldDesc: 'Tema de estúdio relaxante com detalhes em verde esmeralda' 
   },
   common: {
     save: 'Salvar Alterações',

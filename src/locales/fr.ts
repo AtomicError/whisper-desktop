@@ -41,13 +41,15 @@ export const fr: Translations = {
   },
   theme: {
     royal: 'Bleu Royal',
-    carbon: 'Carbone',
+    ruby: 'Rouge Rubis',
+    carbon: 'Rouge Rubis',
     fire: 'Orange Feu',
     emerald: 'Émeraude',
-    royalDesc: 'Fond bleu nuit cyberpunk avec touches bleu néon électrique',
-    carbonDesc: 'Fond sombre neutre minimaliste avec typographie blanche nette et touches rouge cramoisi',
-    fireDesc: 'Fond sombre chaleureux avec touches ambrées vibrantes et orange feu',
-    emeraldDesc: 'Fond studio obsidienne avec touches menthe cyber et émeraude relaxante'
+    royalDesc: 'Design élégant Bleu Royal avec touches bleues vives',
+    rubyDesc: 'Design sombre et sophistiqué avec accents rouge rubis',
+    carbonDesc: 'Design sombre et sophistiqué avec accents rouge rubis',
+    fireDesc: 'Thème chaleureux et énergique avec touches ambrées et orange feu',
+    emeraldDesc: 'Thème studio apaisant avec touches vert émeraude' 
   },
   common: {
     save: 'Enregistrer les Modifications',
