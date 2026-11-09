@@ -9,7 +9,12 @@ import {
   closeAppModal,
   showConfirmModal,
   resolveAppConfirm,
-  showBatchErrorDialog
+  showBatchErrorDialog,
+  checkForAppUpdates,
+  fetchLatestRelease,
+  renderUpdateCheckerUI,
+  getUpdateCheckerState,
+  resetUpdateCheckerState
 } from './appModal';
 
 // Resilient headless DOM mock for Node Vitest runner
@@ -24,6 +29,7 @@ class MockNode {
   public textContent = '';
   private _innerHTML = '';
   public disabled = false;
+  public onclick: any = null;
   public _rawMessage = '';
   public _restartTimer: any = null;
   private attributes: Map<string, string> = new Map();
@@ -479,6 +485,180 @@ describe('appModal & Feedback Module', () => {
       (window as any).resolveBatchError('abort');
       expect(await abortPromise).toBe('abort');
       await new Promise(r => setTimeout(r, 10));
+    });
+  });
+
+  describe('fetchLatestRelease & Update Checker API', () => {
+    let origFetch: any;
+
+    beforeEach(() => {
+      origFetch = (globalThis as any).fetch;
+      resetUpdateCheckerState();
+    });
+
+    afterEach(() => {
+      (globalThis as any).fetch = origFetch;
+      resetUpdateCheckerState();
+    });
+
+    it('sends fetch request with cache: no-store and cache-busting timestamp', async () => {
+      let requestedUrl = '';
+      let requestOptions: any = null;
+
+      (globalThis as any).fetch = vi.fn().mockImplementation(async (url: string, opts: any) => {
+        requestedUrl = url;
+        requestOptions = opts;
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            tag_name: 'v3.1.0',
+            html_url: 'https://github.com/AtomicError/whisper-desktop/releases/latest'
+          })
+        };
+      });
+
+      const res = await fetchLatestRelease();
+      expect(res.latestTag).toBe('v3.1.0');
+      expect(requestedUrl).toContain('https://api.github.com/repos/AtomicError/whisper-desktop/releases/latest?t=');
+      expect(requestOptions.cache).toBe('no-store');
+      expect(requestOptions.headers['Cache-Control']).toBeUndefined();
+      expect(requestOptions.headers['Accept']).toBe('application/vnd.github.v3+json');
+    });
+
+    it('throws domain errors on HTTP 403 rate limits and 404 missing release', async () => {
+      (globalThis as any).fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403
+      });
+      await expect(fetchLatestRelease()).rejects.toThrow('Rate limit exceeded');
+
+      (globalThis as any).fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404
+      });
+      await expect(fetchLatestRelease()).rejects.toThrow('No release found');
+    });
+
+    it('executes consecutive update checks smoothly when button is clicked again', async () => {
+      // Arrange DOM tree for update checker card
+      const card = new MockNode('DIV');
+      card.id = 'about-update-card';
+      const iconWrapper = new MockNode('DIV');
+      iconWrapper.id = 'about-update-icon-wrapper';
+      const statusEl = new MockNode('SPAN');
+      statusEl.id = 'about-update-status';
+      const subtextEl = new MockNode('SPAN');
+      subtextEl.id = 'about-update-subtext';
+      const btn = new MockNode('BUTTON');
+      btn.id = 'about-update-btn';
+      const btnText = new MockNode('SPAN');
+      btnText.id = 'about-update-btn-text';
+      btn.appendChild(btnText);
+      card.appendChild(iconWrapper);
+      card.appendChild(statusEl);
+      card.appendChild(subtextEl);
+      card.appendChild(btn);
+      (globalThis as any).document.body.appendChild(card);
+
+      let fetchCallCount = 0;
+      (globalThis as any).fetch = vi.fn().mockImplementation(async () => {
+        fetchCallCount++;
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            tag_name: 'v3.1.0',
+            html_url: 'https://github.com/AtomicError/whisper-desktop/releases/latest'
+          })
+        };
+      });
+
+      renderUpdateCheckerUI();
+      expect(getUpdateCheckerState().status).toBe('idle');
+
+      // First check
+      await checkForAppUpdates();
+      expect(fetchCallCount).toBe(1);
+      expect(getUpdateCheckerState().status).toBe('up-to-date');
+      expect(card.classList.contains('state-up-to-date')).toBe(true);
+      expect(btn.disabled).toBe(false);
+      expect(typeof btn.onclick).toBe('function');
+
+      // Second check: simulate user clicking the button again
+      const secondCheckPromise = btn.onclick();
+      expect(getUpdateCheckerState().status).toBe('checking');
+      expect(card.classList.contains('state-checking')).toBe(true);
+      expect(btn.disabled).toBe(true);
+
+      await secondCheckPromise;
+      expect(fetchCallCount).toBe(2);
+      expect(getUpdateCheckerState().status).toBe('up-to-date');
+      expect(card.classList.contains('state-up-to-date')).toBe(true);
+      expect(btn.disabled).toBe(false);
+    });
+
+    it('sets available state when a newer version is released', async () => {
+      const card = new MockNode('DIV');
+      card.id = 'about-update-card';
+      const iconWrapper = new MockNode('DIV');
+      iconWrapper.id = 'about-update-icon-wrapper';
+      const statusEl = new MockNode('SPAN');
+      statusEl.id = 'about-update-status';
+      const subtextEl = new MockNode('SPAN');
+      subtextEl.id = 'about-update-subtext';
+      const btn = new MockNode('BUTTON');
+      btn.id = 'about-update-btn';
+      const btnText = new MockNode('SPAN');
+      btnText.id = 'about-update-btn-text';
+      btn.appendChild(btnText);
+      card.appendChild(iconWrapper);
+      card.appendChild(statusEl);
+      card.appendChild(subtextEl);
+      card.appendChild(btn);
+      (globalThis as any).document.body.appendChild(card);
+
+      (globalThis as any).fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          tag_name: 'v4.0.0',
+          html_url: 'https://github.com/AtomicError/whisper-desktop/releases/tag/v4.0.0'
+        })
+      });
+
+      await checkForAppUpdates();
+      expect(getUpdateCheckerState().status).toBe('available');
+      expect(getUpdateCheckerState().latestVersion).toBe('v4.0.0');
+      expect(card.classList.contains('state-update-available')).toBe(true);
+    });
+
+    it('sets error state when network request fails', async () => {
+      const card = new MockNode('DIV');
+      card.id = 'about-update-card';
+      const iconWrapper = new MockNode('DIV');
+      iconWrapper.id = 'about-update-icon-wrapper';
+      const statusEl = new MockNode('SPAN');
+      statusEl.id = 'about-update-status';
+      const subtextEl = new MockNode('SPAN');
+      subtextEl.id = 'about-update-subtext';
+      const btn = new MockNode('BUTTON');
+      btn.id = 'about-update-btn';
+      const btnText = new MockNode('SPAN');
+      btnText.id = 'about-update-btn-text';
+      btn.appendChild(btnText);
+      card.appendChild(iconWrapper);
+      card.appendChild(statusEl);
+      card.appendChild(subtextEl);
+      card.appendChild(btn);
+      (globalThis as any).document.body.appendChild(card);
+
+      (globalThis as any).fetch = vi.fn().mockRejectedValue(new Error('Network offline'));
+
+      await checkForAppUpdates();
+      expect(getUpdateCheckerState().status).toBe('error');
+      expect(getUpdateCheckerState().errorMsg).toBe('Network offline');
+      expect(card.classList.contains('state-error')).toBe(true);
     });
   });
 

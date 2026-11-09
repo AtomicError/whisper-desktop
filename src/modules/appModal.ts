@@ -476,6 +476,15 @@ export function getUpdateCheckerState(): UpdateCheckerState {
   return _updateCheckerState;
 }
 
+export function resetUpdateCheckerState(): void {
+  _updateCheckerState = {
+    status: 'idle',
+    latestVersion: null,
+    releaseUrl: null,
+    errorMsg: null
+  };
+}
+
 export function compareSemver(v1: string, v2: string): number {
   const clean = (v: string) => String(v || '').trim().replace(/^v/i, '');
   const [clean1, pre1] = clean(v1).split('-');
@@ -640,6 +649,48 @@ export function renderUpdateCheckerUI(): void {
   }
 }
 
+const MIN_UPDATE_CHECK_DELAY_MS = 600;
+const UPDATE_CHECK_TIMEOUT_MS = 8000;
+
+interface GitHubReleaseResponse {
+  tag_name?: string;
+  name?: string;
+  html_url?: string;
+}
+
+export async function fetchLatestRelease(signal?: AbortSignal): Promise<{ latestTag: string; releaseUrl: string }> {
+  const cacheBuster = `t=${Date.now()}`;
+  const targetUrl = `https://api.github.com/repos/AtomicError/whisper-desktop/releases/latest?${cacheBuster}`;
+
+  const res = await fetch(targetUrl, {
+    method: 'GET',
+    cache: 'no-store',
+    headers: {
+      'Accept': 'application/vnd.github.v3+json'
+    },
+    signal
+  });
+
+  if (!res.ok) {
+    if (res.status === 403) {
+      throw new Error('Rate limit exceeded');
+    } else if (res.status === 404) {
+      throw new Error('No release found');
+    }
+    throw new Error(`HTTP ${res.status}`);
+  }
+
+  const data: GitHubReleaseResponse = await res.json();
+  const latestTag = (data.tag_name || data.name || '').trim();
+  const releaseUrl = data.html_url || 'https://github.com/AtomicError/whisper-desktop/releases/latest';
+
+  if (!latestTag) {
+    throw new Error('Invalid release metadata');
+  }
+
+  return { latestTag, releaseUrl };
+}
+
 export async function checkForAppUpdates(): Promise<void> {
   if (_updateCheckerState.status === 'checking') return;
 
@@ -654,53 +705,41 @@ export async function checkForAppUpdates(): Promise<void> {
   let timeoutId: any = null;
   try {
     const controller = new AbortController();
-    timeoutId = setTimeout(() => controller.abort(), 8000);
+    timeoutId = setTimeout(() => controller.abort(), UPDATE_CHECK_TIMEOUT_MS);
 
-    const res = await fetch('https://api.github.com/repos/AtomicError/whisper-desktop/releases/latest', {
-      headers: {
-        'Accept': 'application/vnd.github.v3+json'
-      },
-      signal: controller.signal
-    });
+    const minDelay = new Promise(resolve => setTimeout(resolve, MIN_UPDATE_CHECK_DELAY_MS));
+    let fetchError: any = null;
+    let releaseData: { latestTag: string; releaseUrl: string } | null = null;
+
+    try {
+      releaseData = await fetchLatestRelease(controller.signal);
+    } catch (e) {
+      fetchError = e;
+    }
+
+    await minDelay;
+
+    if (fetchError) {
+      throw fetchError;
+    }
+
     if (timeoutId) {
       clearTimeout(timeoutId);
       timeoutId = null;
     }
 
-    if (!res.ok) {
-      if (res.status === 403) {
-        throw new Error('Rate limit exceeded');
-      } else if (res.status === 404) {
-        throw new Error('No release found');
-      }
-      throw new Error(`HTTP ${res.status}`);
-    }
-
-    const data = await res.json();
-    const latestTag = (data.tag_name || data.name || '').trim();
-    const releaseUrl = data.html_url || 'https://github.com/AtomicError/whisper-desktop/releases/latest';
-
-    if (!latestTag) {
-      throw new Error('Invalid release metadata');
-    }
-
+    const latestTag = releaseData?.latestTag || '';
+    const releaseUrl = releaseData?.releaseUrl || 'https://github.com/AtomicError/whisper-desktop/releases/latest';
     const currentVer = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '3.1.0';
+    const isNewer = compareSemver(latestTag, currentVer) > 0;
+    const formattedTag = latestTag.startsWith('v') ? latestTag : `v${latestTag}`;
 
-    if (compareSemver(latestTag, currentVer) > 0) {
-      _updateCheckerState = {
-        status: 'available',
-        latestVersion: latestTag.startsWith('v') ? latestTag : `v${latestTag}`,
-        releaseUrl: releaseUrl,
-        errorMsg: null
-      };
-    } else {
-      _updateCheckerState = {
-        status: 'up-to-date',
-        latestVersion: latestTag.startsWith('v') ? latestTag : `v${latestTag}`,
-        releaseUrl: releaseUrl,
-        errorMsg: null
-      };
-    }
+    _updateCheckerState = {
+      status: isNewer ? 'available' : 'up-to-date',
+      latestVersion: formattedTag,
+      releaseUrl,
+      errorMsg: null
+    };
   } catch (err: any) {
     if (timeoutId) {
       clearTimeout(timeoutId);
@@ -944,9 +983,11 @@ export const appModal = {
   compareSemver,
   renderUpdateUI: renderUpdateCheckerUI,
   checkUpdates: checkForAppUpdates,
+  fetchLatestRelease,
   syncVersionUI: syncAppVersionUI,
   openAbout: openAboutModal,
   closeAbout: closeAboutModal,
   getUpdateState: getUpdateCheckerState,
+  resetUpdateState: resetUpdateCheckerState,
   syncWindowBindings: syncAppModalWindowBindings
 };
