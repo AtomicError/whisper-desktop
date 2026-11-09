@@ -64,7 +64,7 @@ export const THEME_REGISTRY: Record<string, ThemeConfig> = {
     id: 'fire-orange',
     label: 'Fiery Orange',
     dataTheme: 'fire-orange',
-    metaColor: '#0c0a09',
+    metaColor: '#100803',
     toastName: 'Fiery Orange (Fire)',
     iconSvg: `
       <svg class="theme-btn-icon icon-fire" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

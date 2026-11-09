@@ -272,16 +272,16 @@ html {
 
 :root[data-theme="fire-orange"],
 :root[data-theme="fire"] {
-  --bg-space: #0c0a09;
-  --bg-deep: #140f0c;
-  --bg-card: rgba(28, 20, 16, 0.6);
-  --bg-card-hover: rgba(42, 28, 22, 0.75);
-  --bg-input: rgba(20, 14, 11, 0.85);
-  --bg-dropdown: #17120e;
-  --bg-titlebar: rgba(16, 12, 10, 0.98);
-  --bg-table-head: #16110d;
-  --bg-table-body: rgba(22, 17, 13, 0.85);
-  --bg-glass-card: rgba(28, 20, 16, 0.70);
+  --bg-space: #100803;
+  --bg-deep: #160c07;
+  --bg-card: rgba(28, 15, 8, 0.55);
+  --bg-card-hover: rgba(42, 22, 12, 0.75);
+  --bg-input: rgba(18, 9, 5, 0.80);
+  --bg-dropdown: #180d07;
+  --bg-titlebar: rgba(18, 11, 8, 0.98);
+  --bg-table-head: #160c06;
+  --bg-table-body: rgba(18, 9, 5, 0.85);
+  --bg-glass-card: rgba(28, 15, 8, 0.65);
   --border-glass: rgba(255, 255, 255, 0.07);
   --border-glass-active: rgba(255, 107, 0, 0.45);
   
@@ -321,8 +321,8 @@ html {
   --shadow-neon-royal-blue: 0 0 20px rgba(255, 107, 0, 0.3);
   --shadow-neon-gold: 0 0 15px rgba(251, 191, 36, 0.2);
   
-  --bg-radial-1: rgba(255, 107, 0, 0.10);
-  --bg-radial-2: rgba(251, 191, 36, 0.07);
+  --bg-radial-1: rgba(255, 107, 0, 0.08);
+  --bg-radial-2: rgba(251, 146, 60, 0.04);
 
   --primary-btn-bg: linear-gradient(135deg, #ff6b00, #d94800);
   --primary-btn-border: #b83800;
