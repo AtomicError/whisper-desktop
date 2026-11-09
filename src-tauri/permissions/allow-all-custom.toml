@@ -47,6 +47,7 @@ allow = [
   "get_ffmpeg_status",
   "copy_to_clipboard",
   "open_file_in_editor",
+  "show_in_folder",
   "exit_app",
   "hide_to_tray",
   "set_window_zoom"

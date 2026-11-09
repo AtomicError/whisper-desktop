@@ -1,7 +1,14 @@
 // Workflow Bridge, Output Files Management, and Studio Bridging (Transcribe -> Translation & Hardsub)
 import { t, isolateLtr } from '../i18n/index';
 import { showNotification } from './appModal';
-import { openFileInEditor, getBasename, formatFileNameMiddleTruncate } from './nativeWindow';
+import {
+  openFileInEditor,
+  getBasename,
+  getParentDir,
+  formatFileNameMiddleTruncate,
+  getIsTranscribingActive,
+  getIsBatchExtracting
+} from './nativeWindow';
 import { escapeHTML } from './logsController';
 import { batchProcessor } from './batchProcessor';
 import { flushPendingTranscriptEdits, hasPendingTranscriptEdits } from './transcriptViewer';
@@ -184,13 +191,17 @@ export function updateTranscribeWorkflowButtons(): void {
   const btnCopy = document.getElementById('btn-copy-transcript') as HTMLButtonElement | null;
 
   const win = getGlobal();
-  const hasOutputDir = Boolean(getLastTranscribedOutputDir());
+  const isRunning = getIsTranscribingActive() || getIsBatchExtracting();
+
+  const explicitOutputDir = getLastTranscribedOutputDir();
   const subtitlePath = getLastTranscribedSubtitlePath();
-  const hasSubtitle = Boolean(subtitlePath);
   const outputFiles = getLastTranscribedOutputFiles();
-  const hasFiles = outputFiles.length > 0 || hasSubtitle;
-  const transcriptLines = win.transcriptLines || [];
-  const hasTranscript = Boolean((Array.isArray(transcriptLines) && transcriptLines.length > 0) || hasSubtitle);
+  const effectiveOutputDir = explicitOutputDir || (subtitlePath ? getParentDir(subtitlePath) : (outputFiles[0]?.path ? getParentDir(outputFiles[0].path) : null));
+  const hasOutputDir = !isRunning && Boolean(effectiveOutputDir);
+  const hasSubtitle = !isRunning && Boolean(subtitlePath);
+  const hasFiles = !isRunning && (outputFiles.length > 0 || Boolean(subtitlePath));
+  const transcriptLines = win?.transcriptLines || [];
+  const hasTranscript = !isRunning && Boolean((Array.isArray(transcriptLines) && transcriptLines.length > 0) || Boolean(subtitlePath));
 
   if (btnCopy) {
     btnCopy.disabled = !hasTranscript;
@@ -216,9 +227,8 @@ export function updateTranscribeWorkflowButtons(): void {
 
   if (btnOpenFolder) {
     btnOpenFolder.disabled = !hasOutputDir;
-    const outputDir = getLastTranscribedOutputDir();
-    if (hasOutputDir && outputDir) {
-      btnOpenFolder.title = isolateLtr(outputDir);
+    if (hasOutputDir && effectiveOutputDir) {
+      btnOpenFolder.title = isolateLtr(effectiveOutputDir);
       btnOpenFolder.removeAttribute('data-i18n-title');
     } else {
       btnOpenFolder.setAttribute('title', t('transcribe.noOutputDirYet') || 'No output folder available yet');

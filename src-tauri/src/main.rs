@@ -794,6 +794,134 @@ pub fn sanitize_host_command(cmd: &mut std::process::Command) {
 }
 
 #[cfg(target_os = "linux")]
+fn is_text_or_subtitle_file(path_str: &str) -> bool {
+    let p = std::path::Path::new(path_str);
+    if let Some(ext) = p.extension().and_then(|e| e.to_str()) {
+        let ext_lower = ext.to_ascii_lowercase();
+        matches!(
+            ext_lower.as_str(),
+            "srt"
+                | "vtt"
+                | "lrc"
+                | "sub"
+                | "sbv"
+                | "ass"
+                | "ssa"
+                | "txt"
+                | "json"
+                | "csv"
+                | "tsv"
+                | "xml"
+                | "yaml"
+                | "yml"
+                | "md"
+                | "log"
+        )
+    } else {
+        false
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn try_spawn_linux_process(bin: &str, args: &[&str]) -> bool {
+    let mut cmd = std::process::Command::new(bin);
+    cmd.args(args);
+    sanitize_host_command(&mut cmd);
+    cmd.stdin(std::process::Stdio::null());
+    cmd.stdout(std::process::Stdio::null());
+    cmd.stderr(std::process::Stdio::null());
+
+    if let Ok(mut child) = cmd.spawn() {
+        std::thread::sleep(std::time::Duration::from_millis(60));
+        match child.try_wait() {
+            Ok(Some(status)) if status.success() => return true,
+            Ok(None) => return true,
+            _ => {}
+        }
+    }
+    false
+}
+
+#[cfg(target_os = "linux")]
+fn open_in_linux_text_editor(target_path: &str) -> bool {
+    let has_uwsm = std::path::Path::new("/usr/bin/uwsm-app").exists();
+
+    // 1. Query default application for text/plain via xdg-mime and launch with gtk-launch or gio launch
+    let mut mime_cmd = std::process::Command::new("xdg-mime");
+    mime_cmd.args(["query", "default", "text/plain"]);
+    sanitize_host_command(&mut mime_cmd);
+
+    if let Ok(output) = mime_cmd.output() {
+        if output.status.success() {
+            let default_desktop = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !default_desktop.is_empty() {
+                let stripped = default_desktop.strip_suffix(".desktop").unwrap_or(&default_desktop);
+
+                if try_spawn_linux_process("gtk-launch", &[&default_desktop, target_path]) {
+                    return true;
+                }
+                if try_spawn_linux_process("gio", &["launch", &default_desktop, target_path]) {
+                    return true;
+                }
+                if try_spawn_linux_process("gtk-launch", &[stripped, target_path]) {
+                    return true;
+                }
+                if try_spawn_linux_process("gio", &["launch", stripped, target_path]) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    // 2. Direct graphical text editors
+    const KNOWN_EDITORS: &[&str] = &[
+        "kate",
+        "gedit",
+        "gnome-text-editor",
+        "kwrite",
+        "code",
+        "codium",
+        "zed",
+        "subl",
+        "mousepad",
+        "xed",
+        "leafpad",
+        "pluma",
+        "featherpad",
+    ];
+
+    for editor in KNOWN_EDITORS {
+        if has_uwsm && try_spawn_linux_process("uwsm-app", &["--", editor, target_path]) {
+            return true;
+        }
+        if try_spawn_linux_process(editor, &[target_path]) {
+            return true;
+        }
+    }
+
+    // 3. Freedesktop fallbacks
+    if try_spawn_linux_process("gio", &["open", target_path]) {
+        return true;
+    }
+    try_spawn_linux_process("xdg-open", &[target_path])
+}
+
+#[cfg(target_os = "linux")]
+fn get_default_file_manager_desktop() -> Option<String> {
+    let mut cmd = std::process::Command::new("xdg-mime");
+    cmd.args(["query", "default", "inode/directory"]);
+    sanitize_host_command(&mut cmd);
+    let output = cmd.output().ok()?;
+    if output.status.success() {
+        let name = String::from_utf8_lossy(&output.stdout).trim().to_ascii_lowercase();
+        if !name.is_empty() {
+            return Some(name);
+        }
+    }
+    None
+}
+
+#[cfg(target_os = "linux")]
 fn open_in_linux_file_manager(target_path: &str) -> bool {
     let p = std::path::Path::new(target_path);
     let is_file = p.is_file();
@@ -803,67 +931,90 @@ fn open_in_linux_file_manager(target_path: &str) -> bool {
         target_path.to_string()
     };
 
-    // 1. Try standard freedesktop openers.
-    // If target is a file, xdg-open/gio open opens it in the default text editor/player.
-    // If target is a directory, xdg-open/gio open opens it in the default file manager.
+    let default_desktop = get_default_file_manager_desktop().unwrap_or_default();
+    let has_uwsm = std::path::Path::new("/usr/bin/uwsm-app").exists();
+    let mut fallback_managers: Vec<(&str, Vec<&str>)> = Vec::new();
+
+    // 1. Prioritize user's configured default file manager
+    if default_desktop.contains("dolphin") {
+        if has_uwsm {
+            fallback_managers.push(("uwsm-app", vec!["--", "dolphin", &parent_dir]));
+        }
+        fallback_managers.push(("dolphin", vec![&parent_dir]));
+    } else if default_desktop.contains("thunar") {
+        fallback_managers.push(("thunar", vec![&parent_dir]));
+    } else if default_desktop.contains("nemo") {
+        fallback_managers.push(("nemo", vec!["--no-desktop", &parent_dir]));
+    } else if default_desktop.contains("pcmanfm") {
+        fallback_managers.push(("pcmanfm", vec![&parent_dir]));
+    } else if default_desktop.contains("caja") {
+        fallback_managers.push(("caja", vec!["--no-desktop", &parent_dir]));
+    } else {
+        if has_uwsm {
+            fallback_managers.push(("uwsm-app", vec!["--", "nautilus", "--new-window", &parent_dir]));
+        }
+        fallback_managers.push(("nautilus", vec!["--new-window", &parent_dir]));
+    }
+
+    // 2. Add remaining known file managers
+    if !default_desktop.contains("nautilus") {
+        if has_uwsm {
+            fallback_managers.push(("uwsm-app", vec!["--", "nautilus", "--new-window", &parent_dir]));
+        }
+        fallback_managers.push(("nautilus", vec!["--new-window", &parent_dir]));
+    }
+    if !default_desktop.contains("dolphin") {
+        if has_uwsm {
+            fallback_managers.push(("uwsm-app", vec!["--", "dolphin", &parent_dir]));
+        }
+        fallback_managers.push(("dolphin", vec![&parent_dir]));
+    }
+    if !default_desktop.contains("thunar") {
+        fallback_managers.push(("thunar", vec![&parent_dir]));
+    }
+    if !default_desktop.contains("pcmanfm") {
+        fallback_managers.push(("pcmanfm", vec![&parent_dir]));
+    }
+    if !default_desktop.contains("nemo") {
+        fallback_managers.push(("nemo", vec!["--no-desktop", &parent_dir]));
+    }
+    if !default_desktop.contains("caja") {
+        fallback_managers.push(("caja", vec!["--no-desktop", &parent_dir]));
+    }
+
+    for (bin, args) in fallback_managers {
+        if try_spawn_linux_process(bin, &args) {
+            return true;
+        }
+    }
+
+    // 3. Standard freedesktop openers
+    let standard_openers: &[(&str, &[&str])] = &[
+        ("xdg-open", &[&parent_dir]),
+        ("gio", &["open", &parent_dir]),
+    ];
+
+    for (bin, args) in standard_openers {
+        if try_spawn_linux_process(bin, args) {
+            return true;
+        }
+    }
+
+    false
+}
+
+#[cfg(target_os = "linux")]
+fn open_in_linux_default_app(target_path: &str) -> bool {
     let standard_openers: &[(&str, &[&str])] = &[
         ("xdg-open", &[target_path]),
         ("gio", &["open", target_path]),
     ];
 
     for (bin, args) in standard_openers {
-        let mut cmd = std::process::Command::new(bin);
-        cmd.args(*args);
-        sanitize_host_command(&mut cmd);
-        cmd.stdin(std::process::Stdio::null());
-        cmd.stdout(std::process::Stdio::null());
-        cmd.stderr(std::process::Stdio::null());
-
-        if let Ok(mut child) = cmd.spawn() {
-            std::thread::sleep(std::time::Duration::from_millis(60));
-            match child.try_wait() {
-                Ok(Some(status)) if status.success() => return true,
-                Ok(None) => return true,
-                _ => {}
-            }
+        if try_spawn_linux_process(bin, args) {
+            return true;
         }
     }
-
-    // 2. Fallback to direct file manager binaries.
-    let fallback_managers: Vec<(&str, Vec<&str>)> = if is_file {
-        vec![
-            ("nautilus", vec!["--select", target_path]),
-            ("dolphin", vec!["--select", target_path]),
-            ("thunar", vec![&parent_dir]),
-            ("pcmanfm", vec![&parent_dir]),
-        ]
-    } else {
-        vec![
-            ("nautilus", vec![&parent_dir]),
-            ("dolphin", vec![&parent_dir]),
-            ("thunar", vec![&parent_dir]),
-            ("pcmanfm", vec![&parent_dir]),
-        ]
-    };
-
-    for (bin, args) in fallback_managers {
-        let mut cmd = std::process::Command::new(bin);
-        cmd.args(&args);
-        sanitize_host_command(&mut cmd);
-        cmd.stdin(std::process::Stdio::null());
-        cmd.stdout(std::process::Stdio::null());
-        cmd.stderr(std::process::Stdio::null());
-
-        if let Ok(mut child) = cmd.spawn() {
-            std::thread::sleep(std::time::Duration::from_millis(60));
-            match child.try_wait() {
-                Ok(Some(status)) if status.success() => return true,
-                Ok(None) => return true,
-                _ => {}
-            }
-        }
-    }
-
     false
 }
 
@@ -874,14 +1025,128 @@ fn open_file_in_editor(app: AppHandle, file_path: String) -> Result<(), String> 
 
     #[cfg(target_os = "linux")]
     {
-        if open_in_linux_file_manager(&file_path) {
-            return Ok(());
+        let p = std::path::Path::new(&file_path);
+        if p.is_dir() {
+            if open_in_linux_file_manager(&file_path) {
+                return Ok(());
+            }
+        } else if is_text_or_subtitle_file(&file_path) {
+            if open_in_linux_text_editor(&file_path) {
+                return Ok(());
+            }
+        } else {
+            if open_in_linux_default_app(&file_path) {
+                return Ok(());
+            }
         }
     }
 
     app.opener()
         .open_path(&file_path, None::<&str>)
         .map_err(|e| format!("Failed to open file in editor: {}", e))
+}
+
+#[cfg(target_os = "linux")]
+fn reveal_in_linux_file_manager(target_file: &str) -> bool {
+    let p = std::path::Path::new(target_file);
+    let parent_dir = p.parent().unwrap_or(p).to_string_lossy().to_string();
+
+    let default_desktop = get_default_file_manager_desktop().unwrap_or_default();
+    let has_uwsm = std::path::Path::new("/usr/bin/uwsm-app").exists();
+
+    // 1. If user's preferred default file manager is Thunar, PCManFM, or Caja:
+    // Thunar, PCManFM, and Caja do not provide a standardized --select CLI argument.
+    // Opening the parent directory in the user's preferred default file manager
+    // is strongly preferred over launching an unconfigured secondary file manager.
+    if (default_desktop.contains("thunar")
+        || default_desktop.contains("pcmanfm")
+        || default_desktop.contains("caja"))
+        && open_in_linux_file_manager(&parent_dir)
+    {
+        return true;
+    }
+
+    let preferred = if default_desktop.contains("dolphin") {
+        "dolphin"
+    } else if default_desktop.contains("nemo") {
+        "nemo"
+    } else {
+        "nautilus"
+    };
+
+    let order = match preferred {
+        "dolphin" => ["dolphin", "nautilus", "nemo"],
+        "nemo" => ["nemo", "nautilus", "dolphin"],
+        _ => ["nautilus", "dolphin", "nemo"],
+    };
+
+    let mut select_managers: Vec<(&str, Vec<&str>)> = Vec::new();
+
+    for mgr in order {
+        match mgr {
+            "dolphin" => {
+                if has_uwsm {
+                    select_managers.push(("uwsm-app", vec!["--", "dolphin", "--select", target_file]));
+                }
+                select_managers.push(("dolphin", vec!["--select", target_file]));
+            }
+            "nautilus" => {
+                if has_uwsm {
+                    select_managers.push(("uwsm-app", vec!["--", "nautilus", "--new-window", "--select", target_file]));
+                }
+                select_managers.push(("nautilus", vec!["--new-window", "--select", target_file]));
+            }
+            "nemo" => {
+                select_managers.push(("nemo", vec!["--no-desktop", target_file]));
+            }
+            _ => {}
+        }
+    }
+
+    for (bin, args) in select_managers {
+        if try_spawn_linux_process(bin, &args) {
+            return true;
+        }
+    }
+
+    // Fallback: open parent folder via standard openers or known file managers
+    open_in_linux_file_manager(&parent_dir)
+}
+
+#[tauri::command]
+fn show_in_folder(app: AppHandle, file_path: String) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    let path = std::path::Path::new(&file_path);
+
+    if !path.exists() {
+        if let Some(parent) = path.parent() {
+            if parent.exists() {
+                return open_file_in_editor(app, parent.to_string_lossy().to_string());
+            }
+        }
+        return Err(format!("Path does not exist: {}", file_path));
+    }
+
+    if path.is_dir() {
+        #[cfg(target_os = "linux")]
+        {
+            if open_in_linux_file_manager(&file_path) {
+                return Ok(());
+            }
+        }
+        return open_file_in_editor(app, file_path);
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        if reveal_in_linux_file_manager(&file_path) {
+            return Ok(());
+        }
+    }
+
+    app.opener()
+        .reveal_item_in_dir(&file_path)
+        .map_err(|e| format!("Failed to reveal item in folder: {}", e))
 }
 
 #[tauri::command]
@@ -1235,6 +1500,7 @@ fn main() {
             get_ffmpeg_status,
             copy_to_clipboard,
             open_file_in_editor,
+            show_in_folder,
             exit_app,
             hide_to_tray,
             set_window_zoom,
@@ -1449,5 +1715,20 @@ mod main_tests {
         assert!(write_text_file_content(disallowed_path, "bad".to_string()).is_err());
 
         let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn test_is_text_or_subtitle_file() {
+        assert!(is_text_or_subtitle_file("test.srt"));
+        assert!(is_text_or_subtitle_file("UPPERCASE.VTT"));
+        assert!(is_text_or_subtitle_file("/path/to/movie.ass"));
+        assert!(is_text_or_subtitle_file("/path/to/notes.txt"));
+        assert!(is_text_or_subtitle_file("export.json"));
+        assert!(is_text_or_subtitle_file("transcript.lrc"));
+        assert!(!is_text_or_subtitle_file("video.mp4"));
+        assert!(!is_text_or_subtitle_file("audio.wav"));
+        assert!(!is_text_or_subtitle_file("archive.tar.gz"));
+        assert!(!is_text_or_subtitle_file("binary.bin"));
     }
 }

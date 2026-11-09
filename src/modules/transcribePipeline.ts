@@ -3,6 +3,7 @@ import { t, getLanguage, isolateLtr } from '../i18n/index';
 import { showNotification } from './appModal';
 import {
   openFileInEditor,
+  showInFolder,
   getBasename,
   getParentDir,
   updateMediaCardName,
@@ -18,7 +19,7 @@ import {
 } from './settingsManager';
 import { batchProcessor, addBatchFiles, formatDuration } from './batchProcessor';
 import { escapeHTML, logsController } from './logsController';
-import { loadTranscriptFromFile, transcriptViewer } from './transcriptViewer';
+import { loadTranscriptFromFile, transcriptViewer, clearTranscriptLines } from './transcriptViewer';
 import {
   workflowBridge,
   updateTranscribeWorkflowButtons,
@@ -285,41 +286,63 @@ export function clearSingleMediaFile(): void {
     saveCurrentSettings();
   }
 
-  const fillBar = document.getElementById('progress-linear-fill');
-  if (fillBar) fillBar.style.width = '0%';
-  const pctEl = document.getElementById('lbl-radial-pct');
-  if (pctEl) {
-    pctEl.removeAttribute('data-i18n');
-    pctEl.textContent = '0%';
-  }
-  const msgEl = document.getElementById('lbl-radial-msg') as HTMLElement | null;
-  if (msgEl) {
-    msgEl.setAttribute('data-i18n', 'transcribe.standingBy');
-    msgEl.textContent = t('transcribe.standingBy');
-  }
-
-  const telemetryCard = document.getElementById('telemetry-hud-card');
-  if (telemetryCard) telemetryCard.style.display = 'none';
-  setTranscribeStatusBadge('', 'transcribe.standingBy');
-  const badgeEl = document.getElementById('hud-status-badge');
-  if (badgeEl) badgeEl.style.display = 'none';
-  const metricsEl = document.getElementById('transcribe-metrics');
-  if (metricsEl) metricsEl.style.display = 'none';
-  const analyticTimeEl = document.getElementById('analytic-time') as HTMLElement | null;
-  if (analyticTimeEl) delete (analyticTimeEl.dataset as any).elapsedSeconds;
-  if (msgEl) delete (msgEl.dataset as any).statusCompleted;
+  resetTelemetryHud();
 
   setLastTranscribedSubtitlePath(null);
   setLastTranscribedVideoPath(null);
   setLastTranscribedOutputDir(null);
   setLastTranscribedOutputFiles([]);
-  transcriptViewer.lines = [];
-  const win = getGlobal();
-  win.transcriptLines = [];
+  resetTranscriptViewport();
 
   updateTranscribeWorkflowButtons();
   updateTranscribeActionButtons(false);
+}
 
+export function resetTelemetryHud(): void {
+  if (typeof document === 'undefined') return;
+  const telemetryCard = document.getElementById('telemetry-hud-card');
+  if (telemetryCard) telemetryCard.style.display = 'none';
+
+  setTranscribeStatusBadge('', 'transcribe.standingBy');
+
+  const fillBar = document.getElementById('progress-linear-fill');
+  if (fillBar) {
+    fillBar.style.width = '0%';
+    fillBar.classList.remove('indeterminate');
+  }
+
+  const pctEl = document.getElementById('lbl-radial-pct');
+  if (pctEl) {
+    pctEl.removeAttribute('data-i18n');
+    pctEl.textContent = '0%';
+  }
+
+  const badgeEl = document.getElementById('hud-status-badge');
+  if (badgeEl) badgeEl.style.display = 'none';
+
+  const metricsEl = document.getElementById('transcribe-metrics');
+  if (metricsEl) metricsEl.style.display = 'none';
+
+  const analyticTimeEl = document.getElementById('analytic-time') as HTMLElement | null;
+  if (analyticTimeEl) delete (analyticTimeEl.dataset as any).elapsedSeconds;
+
+  const msgEl = document.getElementById('lbl-radial-msg') as HTMLElement | null;
+  if (msgEl) {
+    delete (msgEl.dataset as any).batchSummarySuccess;
+    delete (msgEl.dataset as any).batchSummaryTotal;
+    delete (msgEl.dataset as any).statusCompleted;
+    msgEl.setAttribute('data-i18n', 'transcribe.standingBy');
+    msgEl.textContent = t('transcribe.standingBy');
+  }
+}
+
+export function resetTranscriptViewport(): void {
+  clearTranscriptLines();
+  const win = getGlobal();
+  if (win) {
+    win.transcriptLines = [];
+  }
+  if (typeof document === 'undefined') return;
   const viewport = document.getElementById('transcript-viewport');
   if (viewport) {
     viewport.innerHTML = `
@@ -409,6 +432,13 @@ export async function browseMediaFile(): Promise<void> {
       applySingleFileSelectedUI(files[0]);
 
       setWavPathForTranscription(null);
+      setLastTranscribedSubtitlePath(null);
+      setLastTranscribedVideoPath(null);
+      setLastTranscribedOutputDir(null);
+      setLastTranscribedOutputFiles([]);
+      resetTranscriptViewport();
+      resetTelemetryHud();
+      updateTranscribeWorkflowButtons();
       updateTranscribeActionButtons(false);
 
       const currentSettings = getSettingsState();
@@ -628,6 +658,8 @@ export async function runWhisperTranscription(): Promise<void> {
   transcriptViewer.lines = [];
   win.transcriptLines = [];
   setLastTranscribedSubtitlePath(null);
+  setLastTranscribedVideoPath(null);
+  setLastTranscribedOutputDir(null);
   setLastTranscribedOutputFiles([]);
   updateTranscribeWorkflowButtons();
 
@@ -790,6 +822,7 @@ export async function runWhisperTranscription(): Promise<void> {
       setLastTranscribedSubtitlePath(`${outputDir}${sep}${subFile}`);
     }
     setLastTranscribedVideoPath(currentMedia || (currentSettings ? currentSettings.inputFile : null));
+    setIsTranscribing(false);
     updateTranscribeWorkflowButtons();
 
     // Auto-Transfer to Translation Studio if enabled
@@ -798,6 +831,10 @@ export async function runWhisperTranscription(): Promise<void> {
       await sendTranscribeToTranslationStudio();
     }
   } catch (e: any) {
+    setLastTranscribedOutputDir(null);
+    setLastTranscribedSubtitlePath(null);
+    setLastTranscribedVideoPath(null);
+    setLastTranscribedOutputFiles([]);
     const errMsg = (typeof e === 'string') ? e : (e && e.toString ? e.toString() : '');
     setWizardStepCompleted(3, false);
     const isCancelled = isTranscriptionCancelActive ||
@@ -819,19 +856,7 @@ export async function runWhisperTranscription(): Promise<void> {
       showNotification(t('toasts.transcriptionCancelled'), "info");
       const viewport = document.getElementById('transcript-viewport');
       if (viewport && viewport.querySelector('.transcript-initializing-state')) {
-        viewport.innerHTML = `
-          <div class="transcript-placeholder" id="transcript-placeholder">
-            <svg class="transcript-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-              <polyline points="14 2 14 8 20 8"></polyline>
-              <line x1="16" y1="13" x2="8" y2="13"></line>
-              <line x1="16" y1="17" x2="8" y2="17"></line>
-              <polyline points="10 9 9 9 8 9"></polyline>
-            </svg>
-            <div class="transcript-empty-title" data-i18n="transcribe.liveViewerTitle">${escapeHTML(t('transcribe.liveViewerTitle') || 'Live Transcript Viewer')}</div>
-            <div class="transcript-empty-desc" data-i18n="transcribe.streamNotice">${escapeHTML(t('transcribe.streamNotice') || 'Start transcription to stream live text preview.')}</div>
-          </div>
-        `;
+        resetTranscriptViewport();
       }
     } else {
       showNotification(t('toasts.transcriptionError', { error: errMsg }), "error");
@@ -849,6 +874,7 @@ export async function runWhisperTranscription(): Promise<void> {
     setIsTranscriptionCancelActive(false);
     setWavPathForTranscription(null);
     updateTranscribeActionButtons(false);
+    updateTranscribeWorkflowButtons();
     if (fillBar) fillBar.classList.remove('indeterminate');
     if (pulseDot) pulseDot.classList.remove('active');
     if (cancelBtn) {
@@ -890,6 +916,10 @@ export async function abortTranscription(): Promise<void> {
     setTranscribeStatusBadge('', 'transcribe.standingBy');
     showNotification(t('toasts.cancellingTask'), "info");
   } catch (e: any) {
+    setLastTranscribedOutputDir(null);
+    setLastTranscribedSubtitlePath(null);
+    setLastTranscribedVideoPath(null);
+    setLastTranscribedOutputFiles([]);
     const errMsg = (typeof e === 'string') ? e : (e && e.toString ? e.toString() : '');
     const isNoActiveSession = errMsg.includes("No active transcription or translation session");
 
@@ -1038,10 +1068,15 @@ export async function copyMainTranscriptToClipboard(): Promise<void> {
 export async function openOutputFolder(): Promise<void> {
   const currentMedia = getSelectedMediaFile();
   const currentSettings = getSettingsState();
-  const dir = workflowBridge.getLastTranscribedOutputDir() || (currentSettings && currentSettings.inputFile ? getParentDir(currentSettings.inputFile) : (currentMedia ? getParentDir(currentMedia) : null));
-  if (dir) {
+  const targetFile = workflowBridge.getLastTranscribedSubtitlePath() ||
+    (workflowBridge.getLastTranscribedOutputFiles()[0]?.path);
+  const dir = workflowBridge.getLastTranscribedOutputDir() ||
+    (currentSettings && currentSettings.inputFile ? getParentDir(currentSettings.inputFile) : (currentMedia ? getParentDir(currentMedia) : null));
+
+  const target = targetFile || dir;
+  if (target) {
     try {
-      await openFileInEditor(dir);
+      await showInFolder(target);
     } catch (e: any) {
       const msg = (e && (e.message || e.toString())) || String(e);
       showNotification(t('toasts.openFolderError', { error: msg }), "error");
@@ -1172,6 +1207,13 @@ export async function handleDroppedFiles(rawFiles: string[]): Promise<void> {
     applySingleFileSelectedUI(files[0]);
 
     setWavPathForTranscription(null);
+    setLastTranscribedSubtitlePath(null);
+    setLastTranscribedVideoPath(null);
+    setLastTranscribedOutputDir(null);
+    setLastTranscribedOutputFiles([]);
+    resetTranscriptViewport();
+    resetTelemetryHud();
+    updateTranscribeWorkflowButtons();
     updateTranscribeActionButtons(false);
 
     const currentSettings = getSettingsState();
@@ -1222,6 +1264,8 @@ export const transcribePipeline = {
   copyTranscriptToClipboard,
   setupTranscribeDragAndDrop,
   handleDroppedFiles,
+  resetTranscriptViewport,
+  resetTelemetryHud,
   syncWindowBindings: syncTranscribePipelineWindowBindings
 };
 
@@ -1277,6 +1321,10 @@ export function syncTranscribePipelineWindowBindings(): void {
   win.copyTranscriptToClipboard = copyTranscriptToClipboard;
   win.setupTranscribeDragAndDrop = setupTranscribeDragAndDrop;
   win.handleDroppedFiles = handleDroppedFiles;
+  win.resetTranscriptViewport = resetTranscriptViewport;
+  win.resetTelemetryHud = resetTelemetryHud;
+  win.getIsTranscribing = getIsTranscribing;
+  win.setIsTranscribing = setIsTranscribing;
   win.transcribePipeline = transcribePipeline;
 }
 

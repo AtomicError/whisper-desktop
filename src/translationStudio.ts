@@ -1629,17 +1629,29 @@ export class TranslationStudioController {
 
   public async openOutputFolder() {
     if (!this.state.translatedPath) return;
-    const targetFolder = getParentDir(this.state.translatedPath);
-    if (!targetFolder) return;
+    const target = this.state.translatedPath;
     try {
       const win = window as any;
-      if (typeof win.openFileInEditor === 'function') {
-        await win.openFileInEditor(targetFolder);
+      if (typeof win.showInFolder === 'function') {
+        await win.showInFolder(target);
         return;
       }
-      await invoke('open_file_in_editor', { filePath: targetFolder });
+      await invoke('show_in_folder', { filePath: target });
     } catch (err) {
+      try {
+        const win = window as any;
+        const targetFolder = getParentDir(target) || target;
+        if (typeof win.openFileInEditor === 'function') {
+          await win.openFileInEditor(targetFolder);
+          return;
+        }
+        await invoke('open_file_in_editor', { filePath: targetFolder });
+        return;
+      } catch (fallbackErr) {
+        console.error('Failed to open folder fallback:', fallbackErr);
+      }
       console.error('Failed to open folder:', err);
+      this.notify(t('toasts.openFolderError', { error: String(err) }) || String(err), 'error');
     }
   }
 

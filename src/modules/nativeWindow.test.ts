@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import {
   nativeWindow,
   getBasename,
@@ -16,7 +16,9 @@ import {
   getIsTranslationRunning,
   getIsHardsubRunning,
   getIsDownloadingModelRunning,
-  getIsTranscribingActive
+  getIsTranscribingActive,
+  showInFolder,
+  openFileInEditor
 } from './nativeWindow';
 
 class MockElement {
@@ -96,6 +98,8 @@ describe('nativeWindow & OS Module', () => {
     it('getParentDir extracts parent directory correctly', () => {
       expect(getParentDir('/home/user/media/audio.wav')).toBe('/home/user/media');
       expect(getParentDir('C:\\Users\\media\\audio.wav')).toBe('C:\\Users\\media');
+      expect(getParentDir('/audio.wav')).toBe('/');
+      expect(getParentDir('C:\\audio.wav')).toBe('C:\\');
       expect(getParentDir('audio.wav')).toBe('');
       expect(getParentDir('')).toBe('');
     });
@@ -230,6 +234,31 @@ describe('nativeWindow & OS Module', () => {
     });
   });
 
+  describe('showInFolder and openFileInEditor', () => {
+    it('invokes show_in_folder on native backend', async () => {
+      const mockInvoke = vi.fn().mockResolvedValue(undefined);
+      (window as any).__TAURI__ = { core: { invoke: mockInvoke } };
+
+      await showInFolder('/home/user/output.srt');
+      expect(mockInvoke).toHaveBeenCalledWith('show_in_folder', { filePath: '/home/user/output.srt' });
+    });
+
+    it('falls back to opener plugin and parent directory on IPC failures', async () => {
+      const mockInvoke = vi.fn().mockImplementation((cmd: string) => {
+        if (cmd === 'show_in_folder') throw new Error('Show in folder failed');
+        if (cmd === 'plugin:opener|reveal_item_in_dir') throw new Error('Plugin reveal failed');
+        if (cmd === 'open_file_in_editor') return Promise.resolve();
+        return Promise.resolve();
+      });
+      (window as any).__TAURI__ = { core: { invoke: mockInvoke } };
+
+      await showInFolder('/home/user/output.srt');
+      expect(mockInvoke).toHaveBeenCalledWith('show_in_folder', { filePath: '/home/user/output.srt' });
+      expect(mockInvoke).toHaveBeenCalledWith('plugin:opener|reveal_item_in_dir', { path: '/home/user/output.srt' });
+      expect(mockInvoke).toHaveBeenCalledWith('open_file_in_editor', { filePath: '/home/user' });
+    });
+  });
+
   describe('nativeWindow controller namespace export', () => {
     it('exposes all expected functions and window bindings', () => {
       expect(typeof nativeWindow.getBasename).toBe('function');
@@ -237,9 +266,13 @@ describe('nativeWindow & OS Module', () => {
       expect(typeof nativeWindow.splitFileNameAndExt).toBe('function');
       expect(typeof nativeWindow.truncateFileName).toBe('function');
       expect(typeof nativeWindow.copyToClipboard).toBe('function');
+      expect(typeof nativeWindow.showInFolder).toBe('function');
+      expect(typeof nativeWindow.openFileInEditor).toBe('function');
       expect(typeof (window as any).getBasename).toBe('function');
       expect(typeof (window as any).copyToClipboard).toBe('function');
       expect(typeof (window as any).setupTitlebar).toBe('function');
+      expect(typeof (window as any).showInFolder).toBe('function');
+      expect(typeof (window as any).openFileInEditor).toBe('function');
     });
   });
 });

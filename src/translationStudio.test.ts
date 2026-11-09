@@ -254,6 +254,27 @@ describe('subtitle loading', () => {
     expect(notifySpy).toHaveBeenCalledWith('Permission denied', 'error');
   });
 
+  it('openOutputFolder invokes show_in_folder with target translated file and handles fallback', async () => {
+    invoke.mockReset();
+    invoke.mockResolvedValue(null);
+    const controller = new TranslationStudioController();
+    controller.state.translatedPath = '/output/movie_persian.srt';
+
+    await controller.openOutputFolder();
+    expect(invoke).toHaveBeenCalledWith('show_in_folder', { filePath: '/output/movie_persian.srt' });
+
+    // Test fallback to open_file_in_editor when show_in_folder fails
+    invoke.mockReset();
+    invoke.mockImplementation((cmd) => {
+      if (cmd === 'show_in_folder') return Promise.reject(new Error('Show failed'));
+      return Promise.resolve(null);
+    });
+
+    await controller.openOutputFolder();
+    expect(invoke).toHaveBeenCalledWith('show_in_folder', { filePath: '/output/movie_persian.srt' });
+    expect(invoke).toHaveBeenCalledWith('open_file_in_editor', { filePath: '/output' });
+  });
+
   it('updates aria-selected and active classes on view mode buttons when switching view modes', () => {
     const controller = new TranslationStudioController();
     const createMockBtn = () => {

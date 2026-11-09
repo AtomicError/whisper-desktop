@@ -117,7 +117,11 @@ export function getParentDir(filePath: string): string {
   if (!filePath) return '';
   const clean = filePath.trim();
   const lastSlash = Math.max(clean.lastIndexOf('/'), clean.lastIndexOf('\\'));
-  return lastSlash >= 0 ? clean.substring(0, lastSlash) : '';
+  if (lastSlash === 0) return '/';
+  if (clean.length >= 3 && clean[1] === ':' && lastSlash === 2) {
+    return clean.substring(0, 3);
+  }
+  return lastSlash > 0 ? clean.substring(0, lastSlash) : '';
 }
 
 // ----------------- Batch Processing Queue Helpers & Engine -----------------

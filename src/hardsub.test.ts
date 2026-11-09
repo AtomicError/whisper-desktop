@@ -757,10 +757,20 @@ describe('hardsub output directory management', () => {
     expect(failed).toBeTruthy();
   });
 
-  it('openOutputFolder invokes open_file_in_editor with target directory', async () => {
+  it('openOutputFolder invokes show_in_folder with target file', async () => {
     const { internal } = fixture();
     internal.state.outputPath = '/media/movies/intro_hardsub.mp4';
     await internal.openOutputFolder();
+    expect(invoke).toHaveBeenCalledWith('show_in_folder', { filePath: '/media/movies/intro_hardsub.mp4' });
+
+    // Test fallback to open_file_in_editor when show_in_folder fails
+    invoke.mockReset();
+    invoke.mockImplementation((cmd: string) => {
+      if (cmd === 'show_in_folder') return Promise.reject(new Error('Show failed'));
+      return Promise.resolve(null);
+    });
+    await internal.openOutputFolder();
+    expect(invoke).toHaveBeenCalledWith('show_in_folder', { filePath: '/media/movies/intro_hardsub.mp4' });
     expect(invoke).toHaveBeenCalledWith('open_file_in_editor', { filePath: '/media/movies' });
   });
 

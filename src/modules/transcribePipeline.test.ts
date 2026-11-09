@@ -21,6 +21,7 @@ import {
   runWhisperTranscription,
   abortTranscription,
   copyMainTranscriptToClipboard,
+  openOutputFolder,
   getIsTranscriptionCancelActive,
   setIsTranscriptionCancelActive
 } from './transcribePipeline';
@@ -738,6 +739,55 @@ describe('transcribePipeline module', () => {
 
       await copyMainTranscriptToClipboard();
       expect(copiedText).toBe('Parsed from custom SRT');
+    });
+
+    it('clears previous output directory, subtitle files and resets transcript viewport and telemetry HUD when a new media file is selected via browseMediaFile', async () => {
+      workflowBridge.setLastTranscribedOutputDir('/old/output');
+      workflowBridge.setLastTranscribedSubtitlePath('/old/output/old.srt');
+      workflowBridge.setLastTranscribedOutputFiles([{ name: 'old.srt', path: '/old/output/old.srt', type: 'subtitle' }]);
+
+      const telemetryCard = new MockElement('DIV');
+      telemetryCard.id = 'telemetry-hud-card';
+      telemetryCard.style.display = 'block';
+      domMap.set(telemetryCard.id, telemetryCard);
+
+      transcriptViewer.lines = [
+        { id: 0, timeRange: '[00:00:00.000 --> 00:00:02.000]', text: 'Old line' }
+      ];
+
+      (globalThis as any).window.invoke = vi.fn((cmd: string) => {
+        if (cmd === 'select_files') return Promise.resolve(['/new/video.mp4']);
+        if (cmd === 'probe_media_file') return Promise.resolve({ exists: true, durationSec: 30, format: 'Video' });
+        return Promise.resolve(null);
+      });
+
+      await browseMediaFile();
+
+      expect(workflowBridge.getLastTranscribedOutputDir()).toBeNull();
+      expect(workflowBridge.getLastTranscribedSubtitlePath()).toBeNull();
+      expect(workflowBridge.getLastTranscribedOutputFiles()).toEqual([]);
+      expect(transcriptViewer.getLines().length).toBe(0);
+      expect(telemetryCard.style.display).toBe('none');
+    });
+
+    it('openOutputFolder invokes show_in_folder with subtitle path or fallback directory', async () => {
+      const mockInvoke = vi.fn().mockResolvedValue(null);
+      (globalThis as any).window.invoke = mockInvoke;
+
+      // 1. Target subtitle file takes precedence
+      workflowBridge.setLastTranscribedSubtitlePath('/media/subs/lecture.srt');
+      workflowBridge.setLastTranscribedOutputDir('/media/subs');
+
+      await openOutputFolder();
+      expect(mockInvoke).toHaveBeenCalledWith('show_in_folder', { filePath: '/media/subs/lecture.srt' });
+
+      // 2. Fallback to output directory when subtitle path is absent
+      mockInvoke.mockReset();
+      workflowBridge.setLastTranscribedSubtitlePath(null);
+      workflowBridge.setLastTranscribedOutputDir('/custom/output_folder');
+
+      await openOutputFolder();
+      expect(mockInvoke).toHaveBeenCalledWith('show_in_folder', { filePath: '/custom/output_folder' });
     });
   });
 });

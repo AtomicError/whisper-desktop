@@ -1178,9 +1178,10 @@
 
 .transcript-empty-desc {
   font-size: 0.78rem;
-  max-width: 260px;
-  line-height: 1.4;
+  max-width: 440px;
+  line-height: 1.45;
   opacity: 0.8;
+  text-wrap: balance;
 }
 
 /* Compact Telemetry HUD (Right Panel) */

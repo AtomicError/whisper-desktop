@@ -18,6 +18,7 @@ declare global {
     setTranscribeStatusBadge: (statusClass: string, text: string) => void;
     copyToClipboard: (text: any) => Promise<void>;
     openFileInEditor: (filePath: string) => Promise<void>;
+    showInFolder: (filePath: string) => Promise<void>;
     isTranscriptionRunning: boolean;
     isTranslationRunning: boolean;
     isHardsubRunning: boolean;
@@ -57,7 +58,11 @@ export function getParentDir(path: string): string {
   if (!path) return '';
   const clean = path.trim();
   const lastSlash = Math.max(clean.lastIndexOf('/'), clean.lastIndexOf('\\'));
-  return lastSlash >= 0 ? clean.substring(0, lastSlash) : '';
+  if (lastSlash === 0) return '/';
+  if (clean.length >= 3 && clean[1] === ':' && lastSlash === 2) {
+    return clean.substring(0, 3);
+  }
+  return lastSlash > 0 ? clean.substring(0, lastSlash) : '';
 }
 
 export function splitFileNameAndExt(filename: string): { base: string; ext: string } {
@@ -245,6 +250,21 @@ export async function openFileInEditor(filePath: string): Promise<void> {
   }
 }
 
+export async function showInFolder(filePath: string): Promise<void> {
+  if (!filePath) return;
+  try {
+    await invoke('show_in_folder', { filePath });
+  } catch (err) {
+    console.warn("show_in_folder fallback to opener / openFileInEditor:", err);
+    try {
+      await invoke('plugin:opener|reveal_item_in_dir', { path: filePath });
+    } catch {
+      const parentDir = getParentDir(filePath);
+      await openFileInEditor(parentDir || filePath);
+    }
+  }
+}
+
 // ----------------- Background Job Tracking & Taskbar Progress -----------------
 let isTranscriptionRunningState = false;
 let isTranslationRunningState = false;
@@ -297,6 +317,7 @@ export function getIsTranscribingActive(): boolean {
   const win = getGlobal();
   return Boolean(
     win && (
+      (typeof win.getIsTranscribing === 'function' ? win.getIsTranscribing() : false) ||
       win.isTranscribing ||
       (win.transcribePipeline && typeof win.transcribePipeline.getIsTranscribing === 'function' && win.transcribePipeline.getIsTranscribing())
     )
@@ -452,6 +473,7 @@ export function syncNativeWindowBindings(): void {
   win.setTranscribeStatusBadge = setTranscribeStatusBadge;
   win.copyToClipboard = copyToClipboard;
   win.openFileInEditor = openFileInEditor;
+  win.showInFolder = showInFolder;
   win.hasActiveBackgroundJob = hasActiveBackgroundJob;
   win.getIsBatchExtracting = getIsBatchExtracting;
   win.getIsTranscribingActive = getIsTranscribingActive;
@@ -503,6 +525,7 @@ export const nativeWindow = {
   setStatusBadge: setTranscribeStatusBadge,
   copyToClipboard,
   openFileInEditor,
+  showInFolder,
   isTranscriptionRunning: getIsTranscriptionRunning,
   setIsTranscriptionRunning,
   isTranslationRunning: getIsTranslationRunning,

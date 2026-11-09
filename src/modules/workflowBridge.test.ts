@@ -347,6 +347,55 @@ describe('workflowBridge module', () => {
       expect(btnCopy.disabled).toBe(false);
       expect(btnOpenFile.title).toContain('movie.srt');
     });
+
+    it('keeps workflow buttons disabled while transcription is actively running', () => {
+      const btnOpenFolder = new MockElement('BUTTON');
+      btnOpenFolder.id = 'btn-open-output-folder';
+      const btnOpenFile = new MockElement('BUTTON');
+      btnOpenFile.id = 'btn-open-output-file';
+      const btnSendTranslate = new MockElement('BUTTON');
+      btnSendTranslate.id = 'btn-send-to-translation';
+      const btnSendHardsub = new MockElement('BUTTON');
+      btnSendHardsub.id = 'btn-transcribe-send-to-hardsub';
+      const btnCopy = new MockElement('BUTTON');
+      btnCopy.id = 'btn-copy-transcript';
+
+      domMap.set(btnOpenFolder.id, btnOpenFolder);
+      domMap.set(btnOpenFile.id, btnOpenFile);
+      domMap.set(btnSendTranslate.id, btnSendTranslate);
+      domMap.set(btnSendHardsub.id, btnSendHardsub);
+      domMap.set(btnCopy.id, btnCopy);
+
+      setLastTranscribedSubtitlePath('/output/movie.srt');
+      setLastTranscribedOutputDir('/output');
+      setLastTranscribedOutputFiles([{ name: 'movie.srt', path: '/output/movie.srt', type: 'subtitle' }]);
+
+      // Simulate active transcription running
+      (globalThis as any).window.isTranscribing = true;
+
+      updateTranscribeWorkflowButtons();
+
+      expect(btnOpenFolder.disabled).toBe(true);
+      expect(btnOpenFile.disabled).toBe(true);
+      expect(btnSendTranslate.disabled).toBe(true);
+      expect(btnSendHardsub.disabled).toBe(true);
+      expect(btnCopy.disabled).toBe(true);
+
+      // Reset
+      (globalThis as any).window.isTranscribing = false;
+
+      // Simulate active batch extracting running
+      (globalThis as any).window.isBatchExtracting = true;
+      updateTranscribeWorkflowButtons();
+
+      expect(btnOpenFolder.disabled).toBe(true);
+      expect(btnOpenFile.disabled).toBe(true);
+      expect(btnSendTranslate.disabled).toBe(true);
+      expect(btnSendHardsub.disabled).toBe(true);
+      expect(btnCopy.disabled).toBe(true);
+
+      (globalThis as any).window.isBatchExtracting = false;
+    });
   });
 
   describe('Studio Bridging Operations', () => {

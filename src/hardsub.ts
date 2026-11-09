@@ -4152,16 +4152,28 @@ export class HardsubController {
 
   public async openOutputFolder() {
     const targetPath = this.lastExportedPath || this.state.outputPath;
-    const targetFolder = (targetPath ? getParentDir(targetPath) : '') || this.state.outputDir;
-    if (!targetFolder) return;
+    const target = targetPath || this.state.outputDir;
+    if (!target) return;
     try {
       const win = window as any;
-      if (typeof win.openFileInEditor === 'function') {
-        await win.openFileInEditor(targetFolder);
+      if (typeof win.showInFolder === 'function') {
+        await win.showInFolder(target);
         return;
       }
-      await invoke('open_file_in_editor', { filePath: targetFolder });
+      await invoke('show_in_folder', { filePath: target });
     } catch (err) {
+      try {
+        const win = window as any;
+        const targetFolder = getParentDir(target) || target;
+        if (typeof win.openFileInEditor === 'function') {
+          await win.openFileInEditor(targetFolder);
+          return;
+        }
+        await invoke('open_file_in_editor', { filePath: targetFolder });
+        return;
+      } catch (fallbackErr) {
+        console.error('Failed to open folder fallback:', fallbackErr);
+      }
       console.error('Failed to open folder:', err);
       const notifyFn = (window as any).showNotification;
       if (typeof notifyFn === 'function') {
