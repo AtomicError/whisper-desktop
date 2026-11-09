@@ -626,12 +626,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.transcribe-meta-badge.pill-engine {
-  color: var(--color-sky);
-  background: rgba(var(--color-royal-blue-rgb), 0.15);
-  border-color: rgba(var(--color-royal-blue-rgb), 0.3);
-}
-
 /* Batch Specs Badges Row (Embedded inside Dropzone Card) */
 .transcribe-dropzone-card .batch-specs-box {
   display: flex;

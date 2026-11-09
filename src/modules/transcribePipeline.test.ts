@@ -385,25 +385,17 @@ describe('transcribePipeline module', () => {
   });
 
   describe('Media Metadata Rendering', () => {
-    it('renders format, file size, duration, and backend info', () => {
+    it('renders format, file size, and duration', () => {
       const typeEl = new MockElement('SPAN');
       typeEl.id = 'meta-type';
       const sizeEl = new MockElement('SPAN');
       sizeEl.id = 'meta-size';
       const durEl = new MockElement('SPAN');
       durEl.id = 'meta-duration';
-      const recEl = new MockElement('SPAN');
-      recEl.id = 'meta-recommendation';
 
       domMap.set(typeEl.id, typeEl);
       domMap.set(sizeEl.id, sizeEl);
       domMap.set(durEl.id, durEl);
-      domMap.set(recEl.id, recEl);
-
-      (globalThis as any).window.settingsState = {
-        selectedBackend: 'Vulkan',
-        threads: 6
-      };
 
       const meta = {
         exists: true,
@@ -418,7 +410,6 @@ describe('transcribePipeline module', () => {
       expect(sizeEl.textContent).toContain('MB');
       expect(durEl.textContent.length).toBeGreaterThan(0);
       expect(durEl.title).toContain('00:02:05');
-      expect(recEl.textContent).toContain('Vulkan');
     });
   });
 

@@ -67,7 +67,7 @@ describe('Transcription Studio Unified Deck DOM Structure', () => {
     expect(html).toContain('id="meta-duration"');
     expect(html).toContain('id="meta-size"');
     expect(html).toContain('id="meta-target-format"');
-    expect(html).toContain('id="meta-recommendation"');
+    expect(html).not.toContain('id="meta-recommendation"');
   });
 
   it('contains quick configuration fields without removed task selection or duplicate diarization toggle', () => {
@@ -795,7 +795,7 @@ describe('Transcription Studio Output Directory & Workflow Logic', () => {
     expect(htmlContent).toContain('id="meta-duration" data-i18n-title="transcribe.duration"');
     expect(htmlContent).toContain('id="meta-size" data-i18n-title="transcribe.fileSize"');
     expect(htmlContent).toContain('id="meta-target-format" data-i18n-title="transcribe.targetFormat"');
-    expect(htmlContent).toContain('id="meta-recommendation" data-i18n-title="transcribe.activeExtractor"');
+    expect(htmlContent).not.toContain('id="meta-recommendation"');
 
     // Controls have localized aria attributes
     expect(htmlContent).toContain('id="quick-opt-model" data-searchable data-model-select data-i18n-aria="transcribe.aiModel"');

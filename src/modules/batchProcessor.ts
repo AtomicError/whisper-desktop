@@ -299,8 +299,6 @@ export function clearBatchQueue(): void {
       durEl.textContent = '-';
       durEl.removeAttribute('title');
     }
-    const metaRec = document.getElementById('meta-recommendation');
-    if (metaRec) metaRec.textContent = '-';
     win.probedMetadata = null;
 
     const fillBar = document.getElementById('progress-linear-fill');

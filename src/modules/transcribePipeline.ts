@@ -278,8 +278,6 @@ export function clearSingleMediaFile(): void {
     durEl.textContent = '-';
     durEl.removeAttribute('title');
   }
-  const recEl = document.getElementById('meta-recommendation');
-  if (recEl) recEl.textContent = '-';
 
   const currentSettings = getSettingsState();
   if (currentSettings) {
@@ -434,7 +432,6 @@ export function renderMediaMetadata(meta: any): void {
   const typeEl = document.getElementById('meta-type');
   const sizeEl = document.getElementById('meta-size');
   const durEl = document.getElementById('meta-duration');
-  const recEl = document.getElementById('meta-recommendation');
 
   const lang = getLanguage();
 
@@ -509,18 +506,6 @@ export function renderMediaMetadata(meta: any): void {
       durEl.textContent = text;
       durEl.title = t('transcribe.timecodeTooltip', { timecode: digitalTimecode });
     }
-  }
-
-  // 4. Engine / Backend & Threads
-  const currentSettings = getSettingsState();
-  if (recEl && currentSettings) {
-    const backendRaw = currentSettings.selectedBackend || 'Standard';
-    const backendName = backendRaw === 'Standard' ? t('transcribe.backendStandard') : backendRaw;
-    const threadsVal = formatLocalizedNumber(currentSettings.threads || 4, lang, 0);
-    recEl.textContent = t('transcribe.backendStatus', {
-      backend: backendName,
-      threads: threadsVal
-    });
   }
 }
 
