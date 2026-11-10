@@ -454,8 +454,16 @@ function formatMsToLrcTimestamp(ms: number): string {
 }
 
 export function serializeTranscriptLinesForFile(lines: TranscriptLine[], filePath: string): string | null {
-  if (!filePath || !Array.isArray(lines) || lines.length === 0) return null;
+  if (!filePath || !Array.isArray(lines)) return null;
   const ext = (filePath.split('.').pop() || '').toLowerCase();
+
+  if (lines.length === 0) {
+    if (ext === 'vtt') return 'WEBVTT\n\n';
+    if (ext === 'csv') return 'start,end,text\n';
+    if (ext === 'tsv') return 'start\tend\ttext\n';
+    if (['srt', 'lrc', 'txt'].includes(ext)) return '';
+    return null;
+  }
 
   if (ext === 'srt') {
     return lines
@@ -537,14 +545,14 @@ function collectActiveTranscriptTargetFiles(): string[] {
       addIfSupported(item.subtitlePath);
       addIfSupported(item.txtPath);
     }
+  } else {
+    if (Array.isArray(win.lastTranscribedOutputFiles)) {
+      win.lastTranscribedOutputFiles.forEach((f: any) => {
+        if (f && f.type !== 'translated') addIfSupported(f.path);
+      });
+    }
+    addIfSupported(win.lastTranscribedSubtitlePath);
   }
-
-  if (Array.isArray(win.lastTranscribedOutputFiles)) {
-    win.lastTranscribedOutputFiles.forEach((f: any) => {
-      if (f && f.type !== 'translated') addIfSupported(f.path);
-    });
-  }
-  addIfSupported(win.lastTranscribedSubtitlePath);
 
   return Array.from(targets);
 }
@@ -558,7 +566,7 @@ export async function persistTranscriptLinesToDisk(): Promise<void> {
   }
 
   const targetFiles = collectActiveTranscriptTargetFiles();
-  if (targetFiles.length === 0 || transcriptLines.length === 0) {
+  if (targetFiles.length === 0) {
     transcriptDirty = false;
     return;
   }
@@ -956,7 +964,10 @@ export function undoTranscriptOperation(): boolean {
   }
 
   const previous = undoStack.pop()!;
-  transcriptLines = previous.lines.map(l => ({ ...l }));
+  transcriptLines = previous.lines.map(l => ({
+    ...l,
+    words: Array.isArray(l.words) ? l.words.map(w => ({ ...w })) : undefined
+  }));
   transcriptLines.forEach((l, idx) => { l.id = idx; });
   transcriptDirty = true;
 
@@ -983,7 +994,10 @@ export function redoTranscriptOperation(): boolean {
   }
 
   const next = redoStack.pop()!;
-  transcriptLines = next.lines.map(l => ({ ...l }));
+  transcriptLines = next.lines.map(l => ({
+    ...l,
+    words: Array.isArray(l.words) ? l.words.map(w => ({ ...w })) : undefined
+  }));
   transcriptLines.forEach((l, idx) => { l.id = idx; });
   transcriptDirty = true;
 
@@ -1014,6 +1028,23 @@ export function deleteTranscriptSegment(lineId: number): boolean {
   }
 
   renderTranscriptLines(transcriptLines);
+
+  setTimeout(() => {
+    if (typeof document !== 'undefined') {
+      const targetIndex = Math.min(index, transcriptLines.length - 1);
+      if (targetIndex >= 0) {
+        const targetInput = document.querySelector(`.transcript-card[data-id="${targetIndex}"] .transcript-text-input`) as HTMLTextAreaElement | null;
+        if (targetInput && typeof targetInput.focus === 'function') {
+          targetInput.focus();
+          const card = targetInput.closest('.transcript-card');
+          if (card && typeof card.scrollIntoView === 'function') {
+            card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
+        }
+      }
+    }
+  }, 30);
+
   scheduleTranscriptDiskSync();
   return true;
 }

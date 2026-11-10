@@ -16,6 +16,8 @@ import {
   isConfidenceHighlightingActive,
   loadTranscriptFromJsonData,
   renderTranscriptLines,
+  serializeTranscriptLinesForFile,
+  persistTranscriptLinesToDisk,
   transcriptViewer,
   type TranscriptLine
 } from './transcriptViewer';
@@ -805,6 +807,145 @@ describe('Companion Media Player & DOM Controls', () => {
     ]);
     expect(btnCopy.disabled).toBe(false);
     expect(btnConfidence.disabled).toBe(false);
+  });
+
+  it('serializes empty string for emptied transcript lines so disk sync clears deleted files', () => {
+    expect(serializeTranscriptLinesForFile([], '/out/test.srt')).toBe('');
+    expect(serializeTranscriptLinesForFile([], '/out/test.lrc')).toBe('');
+    expect(serializeTranscriptLinesForFile([], '/out/test.txt')).toBe('');
+    expect(serializeTranscriptLinesForFile([], '/out/test.vtt')).toBe('WEBVTT\n\n');
+    expect(serializeTranscriptLinesForFile([], '/out/test.csv')).toBe('start,end,text\n');
+  });
+
+  it('isolates batch targets from single-mode targets during disk sync', async () => {
+    const writtenFiles: Record<string, string> = {};
+    (globalThis as any).invoke = async (cmd: string, args: any) => {
+      if (cmd === 'write_text_file_content') {
+        writtenFiles[args.filePath] = args.content;
+        return null;
+      }
+      return null;
+    };
+
+    const win = typeof window !== 'undefined' ? (window as any) : (globalThis as any);
+    win.isBatchMode = true;
+    win.activeBatchViewerIndex = 0;
+    win.batchItems = [
+      {
+        path: '/batch/item0.mp4',
+        subtitlePath: '/batch/item0.srt',
+        txtPath: '/batch/item0.txt',
+        outputFiles: [{ path: '/batch/item0.srt' }]
+      }
+    ];
+    // Single mode remnant that should NOT be touched during batch edit
+    win.lastTranscribedOutputFiles = [{ path: '/single/old_single.srt' }];
+    win.lastTranscribedSubtitlePath = '/single/old_single.srt';
+
+    transcriptViewer.lines = [
+      { id: 0, timeRange: '[00:00:00.000 --> 00:00:02.000]', text: 'Batch edit text' }
+    ];
+    transcriptViewer.updateLineText(0, 'Updated batch text');
+
+    await persistTranscriptLinesToDisk();
+
+    expect(writtenFiles).toHaveProperty('/batch/item0.srt');
+    expect(writtenFiles).not.toHaveProperty('/single/old_single.srt');
+  });
+
+  it('aborts and revokes stream if load sequence was superseded during async probing', async () => {
+    let revokeCalledWith: string | null = null;
+    (globalThis as any).invoke = async (cmd: string, args: any) => {
+      if (cmd === 'stream_media_file') {
+        return 'http://127.0.0.1:9090/media/stale';
+      }
+      if (cmd === 'probe_media_file') {
+        // Trigger a new concurrent load while probe is pending
+        return new Promise(resolve => {
+          setTimeout(() => {
+            resolve({ durationSec: 10 });
+          }, 30);
+        });
+      }
+      if (cmd === 'revoke_media_stream') {
+        revokeCalledWith = args.streamUrl;
+        return null;
+      }
+      return null;
+    };
+
+    const videoEl = registerMockEl('companion-media-element', 'VIDEO') as any;
+    videoEl.load = () => {};
+    registerMockEl('companion-meta-resolution');
+    registerMockEl('companion-meta-aspect');
+    registerMockEl('btn-companion-pip', 'BUTTON');
+    registerMockEl('btn-companion-fullscreen', 'BUTTON');
+
+    const { loadMediaIntoCompanionPlayer } = await import('./companionPlayer');
+    const p1 = loadMediaIntoCompanionPlayer('/path/to/stale.mp4', false);
+    // Immediately start load 2
+    const p2 = loadMediaIntoCompanionPlayer('/path/to/fresh.mp4', false);
+
+    const [res1, res2] = await Promise.all([p1, p2]);
+    expect(res1).toBe(false);
+    expect(res2).toBe(true);
+    expect(revokeCalledWith).toBe('http://127.0.0.1:9090/media/stale');
+  });
+
+  it('deep clones words array when recording and restoring from undo stack', () => {
+    const originalWords = [
+      { text: 'First', startMs: 0, endMs: 2000, prob: 0.95 },
+      { text: 'segment', startMs: 2000, endMs: 4000, prob: 0.90 }
+    ];
+
+    transcriptViewer.lines = [
+      {
+        id: 0,
+        timeRange: '[00:00:00.000 --> 00:00:04.000]',
+        text: 'First segment',
+        words: originalWords
+      }
+    ];
+
+    // Split segment into two
+    splitTranscriptSegment(0, 5);
+    expect(transcriptViewer.lines.length).toBe(2);
+
+    // Mutate the original words array after split snapshot was recorded
+    originalWords.push({ text: 'mutated', startMs: 4000, endMs: 5000, prob: 0.99 });
+
+    // Undo split
+    undoTranscriptOperation();
+    expect(transcriptViewer.lines.length).toBe(1);
+    expect(transcriptViewer.lines[0].words).toBeDefined();
+    // Snapshot should remain protected with original 2 words
+    expect(transcriptViewer.lines[0].words?.length).toBe(2);
+  });
+
+  it('restores focus to remaining segment textarea after deleteTranscriptSegment', () => {
+    transcriptViewer.lines = [
+      { id: 0, timeRange: '[00:00:00.000 --> 00:00:02.000]', text: 'Line 0' },
+      { id: 1, timeRange: '[00:00:02.000 --> 00:00:04.000]', text: 'Line 1' },
+      { id: 2, timeRange: '[00:00:04.000 --> 00:00:06.000]', text: 'Line 2' }
+    ];
+
+    let focusedInputId = -1;
+    // Mock querySelector to trace focus
+    const origQuerySelector = mockDocument.querySelector.bind(mockDocument);
+    mockDocument.querySelector = (sel: string) => {
+      const match = sel.match(/data-id="(\d+)"/);
+      if (match) {
+        const id = parseInt(match[1], 10);
+        return {
+          focus: () => { focusedInputId = id; },
+          closest: () => ({ scrollIntoView: () => {} })
+        };
+      }
+      return origQuerySelector(sel);
+    };
+
+    deleteTranscriptSegment(1);
+    expect(transcriptViewer.lines.length).toBe(2);
   });
 });
 

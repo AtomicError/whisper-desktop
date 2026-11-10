@@ -175,6 +175,13 @@ export async function loadMediaIntoCompanionPlayer(filePath: string, autoSwitchD
     }
   }
 
+  if (currentSeq !== activeLoadSequence) {
+    if (streamUrl && invoke) {
+      invoke('revoke_media_stream', { streamUrl }).catch(() => {});
+    }
+    return false;
+  }
+
   if (width > 0 && height > 0) {
     const ratio = width / height;
     if (ratio < 0.8) {
@@ -444,19 +451,65 @@ export function highlightActiveTranscriptSegment(currentSec: number): void {
   if (!lines || lines.length === 0) return;
 
   let matchingLineId: number | null = null;
-  for (const line of lines) {
-    let sMs = line.startMs;
-    let eMs = line.endMs;
-    if (sMs === undefined || eMs === undefined) {
-      const match = line.timeRange.match(/\[([\d:.,]+)\s*(?:-->|→)\s*([\d:.,]+)\]/);
+
+  // Fast path for continuous forward/current playback: check current or next segment first
+  if (currentHighlightedLineId !== null && currentHighlightedLineId >= 0 && currentHighlightedLineId < lines.length) {
+    const curLine = lines[currentHighlightedLineId];
+    let curStart = curLine.startMs;
+    let curEnd = curLine.endMs;
+    if (curStart === undefined || curEnd === undefined) {
+      const match = curLine.timeRange.match(/\[([\d:.,]+)\s*(?:-->|→)\s*([\d:.,]+)\]/);
       if (match) {
-        sMs = parseTimestampStringToMs(match[1]) ?? 0;
-        eMs = parseTimestampStringToMs(match[2]) ?? (sMs + 3000);
+        curStart = parseTimestampStringToMs(match[1]) ?? 0;
+        curEnd = parseTimestampStringToMs(match[2]) ?? (curStart + 3000);
       }
     }
-    if (sMs !== undefined && eMs !== undefined && currentMs >= sMs && currentMs <= eMs) {
-      matchingLineId = line.id;
-      break;
+    if (curStart !== undefined && curEnd !== undefined && currentMs >= curStart && currentMs <= curEnd) {
+      matchingLineId = curLine.id;
+    } else if (currentHighlightedLineId + 1 < lines.length) {
+      const nextLine = lines[currentHighlightedLineId + 1];
+      let nextStart = nextLine.startMs;
+      let nextEnd = nextLine.endMs;
+      if (nextStart === undefined || nextEnd === undefined) {
+        const match = nextLine.timeRange.match(/\[([\d:.,]+)\s*(?:-->|→)\s*([\d:.,]+)\]/);
+        if (match) {
+          nextStart = parseTimestampStringToMs(match[1]) ?? 0;
+          nextEnd = parseTimestampStringToMs(match[2]) ?? (nextStart + 3000);
+        }
+      }
+      if (nextStart !== undefined && nextEnd !== undefined && currentMs >= nextStart && currentMs <= nextEnd) {
+        matchingLineId = nextLine.id;
+      }
+    }
+  }
+
+  // Fallback: binary search if seek jumped or fast path did not match
+  if (matchingLineId === null) {
+    let low = 0;
+    let high = lines.length - 1;
+    while (low <= high) {
+      const mid = (low + high) >> 1;
+      const midLine = lines[mid];
+      let sMs = midLine.startMs;
+      let eMs = midLine.endMs;
+      if (sMs === undefined || eMs === undefined) {
+        const match = midLine.timeRange.match(/\[([\d:.,]+)\s*(?:-->|→)\s*([\d:.,]+)\]/);
+        if (match) {
+          sMs = parseTimestampStringToMs(match[1]) ?? 0;
+          eMs = parseTimestampStringToMs(match[2]) ?? (sMs + 3000);
+        } else {
+          sMs = mid * 2000;
+          eMs = sMs + 2000;
+        }
+      }
+      if (currentMs >= sMs && currentMs <= eMs) {
+        matchingLineId = midLine.id;
+        break;
+      } else if (currentMs < sMs) {
+        high = mid - 1;
+      } else {
+        low = mid + 1;
+      }
     }
   }
 
@@ -566,10 +619,18 @@ export function initCompanionPlayerDOM(): void {
       const isEditing = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable;
       if (isEditing) return;
 
+      // Do not intercept keyboard shortcuts if an application modal dialog is currently open
+      const modalOverlay = document.getElementById('app-modal-overlay');
+      if (modalOverlay && modalOverlay.style.display !== 'none') return;
+
       const transcribePanel = document.getElementById('panel-transcribe');
       if (!transcribePanel || !transcribePanel.classList.contains('active')) return;
 
       if (e.code === 'Space') {
+        // If a non-play button is focused, allow native button activation via Space
+        if (target?.tagName === 'BUTTON' && target.id !== 'btn-companion-play-toggle') {
+          return;
+        }
         const mediaDeck = document.getElementById('transcribe-media-deck');
         if (mediaDeck && mediaDeck.style.display !== 'none') {
           e.preventDefault();

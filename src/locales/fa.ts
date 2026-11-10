@@ -271,7 +271,7 @@ export const fa: Translations = {
     mergeSegment: 'ادغام با سگمنت قبلی (Backspace)',
     deleteSegment: 'حذف این سگمنت',
     undo: 'واگرد',
-    redo: 'ازنو',
+    redo: 'از‌نو',
     undoTooltip: 'واگرد تغییرات سگمنت (Ctrl+Z)',
     redoTooltip: 'انجام دوباره تغییرات (Ctrl+Shift+Z)',
     companionShortcutUndo: 'واگرد تغییرات',
