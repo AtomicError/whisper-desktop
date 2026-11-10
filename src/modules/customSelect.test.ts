@@ -414,6 +414,24 @@ describe('CustomSelect Module', () => {
       expect(cs.isOpen).toBe(false);
     });
 
+    it('does not dispatch change event when the currently active option is re-selected', () => {
+      const selectEl = createTestSelect();
+      const cs = new CustomSelect(selectEl);
+      expect(selectEl.value).toBe('opt1');
+
+      let changeFired = false;
+      selectEl.addEventListener('change', () => {
+        changeFired = true;
+      });
+
+      const optionDivs = cs.getOptionDivs();
+      (optionDivs[0] as any).click(); // optionDivs[0] is 'opt1' (already active)
+
+      expect(selectEl.value).toBe('opt1');
+      expect(changeFired).toBe(false);
+      expect(cs.isOpen).toBe(false);
+    });
+
     it('ignores clicks on disabled options', () => {
       const selectEl = createTestSelect();
       const cs = new CustomSelect(selectEl);
@@ -601,6 +619,26 @@ describe('CustomSelect Module', () => {
       expect(cs.isModelSelect()).toBe(true);
       expect(cs.getSearchPlaceholder()).toBe('settings.searchModelsPlaceholder');
     });
+
+    it('restores focus to trigger when closing or selecting from search input via Enter or Escape', () => {
+      const selectEl = createTestSelect();
+      selectEl.setAttribute('data-searchable', 'true');
+      const cs = new CustomSelect(selectEl);
+
+      const triggerFocusSpy = vi.spyOn(cs.trigger as any, 'focus');
+
+      // Test Escape when search query is empty
+      cs.open();
+      cs.handleSearchKeydown({ key: 'Escape', stopPropagation: vi.fn(), preventDefault: vi.fn() } as any);
+      expect(triggerFocusSpy).toHaveBeenCalled();
+
+      triggerFocusSpy.mockClear();
+
+      // Test Enter on active option
+      cs.open();
+      cs.handleSearchKeydown({ key: 'Enter', stopPropagation: vi.fn(), preventDefault: vi.fn() } as any);
+      expect(triggerFocusSpy).toHaveBeenCalled();
+    });
   });
 
   describe('Global Batch and Window Helpers', () => {
@@ -619,6 +657,24 @@ describe('CustomSelect Module', () => {
 
       const valEl = cs.trigger?.querySelector('.custom-select-value');
       expect(valEl?.textContent).toBe('Dynamic Option');
+    });
+
+    it('supports updateOptions flag in syncCustomSelects(updateOptions)', () => {
+      const selectEl = createTestSelect('sync-opt-flag');
+      const cs = new CustomSelect(selectEl);
+      const updateOptionsSpy = vi.spyOn(cs, 'updateOptions');
+      const syncSelectedValueSpy = vi.spyOn(cs, 'syncSelectedValue');
+
+      syncCustomSelects(false);
+      expect(updateOptionsSpy).not.toHaveBeenCalled();
+      expect(syncSelectedValueSpy).toHaveBeenCalled();
+
+      updateOptionsSpy.mockClear();
+      syncSelectedValueSpy.mockClear();
+
+      syncCustomSelects(true);
+      expect(updateOptionsSpy).toHaveBeenCalled();
+      expect(syncSelectedValueSpy).toHaveBeenCalled();
     });
 
     it('exposes global backwards compatibility shims and customSelect controller', () => {

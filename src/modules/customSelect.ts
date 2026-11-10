@@ -515,6 +515,9 @@ export class CustomSelect {
       } else {
         this.close();
       }
+      if (this.trigger && typeof this.trigger.focus === 'function') {
+        this.trigger.focus();
+      }
     } else if (e.key === 'Escape') {
       e.stopPropagation(); // keep the global close handler from firing on the clear step
       if (this.searchInput && this.searchInput.value) {
@@ -522,6 +525,9 @@ export class CustomSelect {
         this.applyFilter('');
       } else {
         this.close();
+        if (this.trigger && typeof this.trigger.focus === 'function') {
+          this.trigger.focus();
+        }
       }
     } else if (e.key === 'Tab') {
       this.close();
@@ -698,16 +704,22 @@ export class CustomSelect {
       return;
     }
     const newValue = optDiv.dataset.value;
-    this.select.value = newValue;
+    const oldValue = this.select.value;
+    const hasChanged = oldValue !== newValue;
 
-    // 1. Immediate visual and value synchronization (0ms feedback)
-    this.syncSelectedValue();
+    // 1. Immediate visual and value synchronization (0ms feedback) when value changes
+    if (hasChanged) {
+      this.select.value = newValue;
+      this.syncSelectedValue();
+    }
 
     // 2. Immediately initiate closing sequence so the dropdown starts closing at 0ms
     this.close();
 
-    // 3. Dispatch change event to all consumers
-    this.select.dispatchEvent(new Event('change'));
+    // 3. Dispatch change event to consumers only if value actually changed (HTML select standard)
+    if (hasChanged) {
+      this.select.dispatchEvent(new Event('change'));
+    }
   }
 
   public toggle(): void {
