@@ -275,6 +275,7 @@ export const ko: Translations = {
     undoTooltip: '세그먼트 편집 실행 취소 (Ctrl+Z)',
     redoTooltip: '세그먼트 편집 다시 실행 (Ctrl+Shift+Z)',
     companionShortcutUndo: '편집 실행 취소',
+    companionShortcutRedo: '편집 다시 실행',
     companionRewind5s: '5초 뒤로 (왼쪽 화살표)',
     companionForward5s: '5초 앞으로 (오른쪽 화살표)',
     companionPlayPause: '재생 / 일시정지 (스페이스)',

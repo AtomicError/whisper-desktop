@@ -275,6 +275,7 @@ export const ru: Translations = {
     undoTooltip: 'Отменить изменение сегмента (Ctrl+Z)',
     redoTooltip: 'Повторить изменение сегмента (Ctrl+Shift+Z)',
     companionShortcutUndo: 'Отменить изменение',
+    companionShortcutRedo: 'Повторить изменение',
     companionRewind5s: 'Перемотка назад 5с (Стрелка влево)',
     companionForward5s: 'Перемотка вперед 5с (Стрелка вправо)',
     companionPlayPause: 'Воспроизведение / Пауза (Пробел)',

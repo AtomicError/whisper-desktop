@@ -275,6 +275,7 @@ export const fa: Translations = {
     undoTooltip: 'واگرد تغییرات سگمنت (Ctrl+Z)',
     redoTooltip: 'انجام دوباره تغییرات (Ctrl+Shift+Z)',
     companionShortcutUndo: 'واگرد تغییرات',
+    companionShortcutRedo: 'انجام دوباره تغییرات',
     companionRewind5s: '۵ ثانیه به عقب (جهت‌نمای چپ)',
     companionForward5s: '۵ ثانیه به جلو (جهت‌نمای راست)',
     companionPlayPause: 'پخش / مکث (Space)',

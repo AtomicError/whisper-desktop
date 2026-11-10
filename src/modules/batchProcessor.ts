@@ -183,6 +183,9 @@ export function removeFileFromBatch(index: number): void {
       if (nextCompleted !== -1) {
         selectBatchItemTranscript(nextCompleted);
       } else {
+        if (typeof win.unloadCompanionPlayer === 'function') {
+          win.unloadCompanionPlayer();
+        }
         transcriptLines = [];
         transcriptViewer.lines = [];
         if (win) win.transcriptLines = [];
@@ -239,6 +242,9 @@ export function clearBatchQueue(): void {
   userExplicitlySelectedBatchItem = false;
 
   const win = getGlobal();
+  if (typeof win.unloadCompanionPlayer === 'function') {
+    win.unloadCompanionPlayer();
+  }
   win.selectedMediaFile = null;
   window.lastTranscribedSubtitlePath = null;
   window.lastTranscribedVideoPath = null;

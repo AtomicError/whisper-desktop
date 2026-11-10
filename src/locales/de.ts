@@ -275,6 +275,7 @@ export const de: Translations = {
     undoTooltip: 'Segmentbearbeitung rückgängig machen (Ctrl+Z)',
     redoTooltip: 'Segmentbearbeitung wiederholen (Ctrl+Shift+Z)',
     companionShortcutUndo: 'Bearbeitung rückgängig',
+    companionShortcutRedo: 'Bearbeitung wiederholen',
     companionRewind5s: '5s zurückspulen (Linker Pfeil)',
     companionForward5s: '5s vorspulen (Rechter Pfeil)',
     companionPlayPause: 'Wiedergabe / Pause (Leertaste)',

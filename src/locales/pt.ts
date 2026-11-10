@@ -275,6 +275,7 @@ export const pt: Translations = {
     undoTooltip: 'Desfazer edição de segmento (Ctrl+Z)',
     redoTooltip: 'Refazer edição de segmento (Ctrl+Shift+Z)',
     companionShortcutUndo: 'Desfazer edição',
+    companionShortcutRedo: 'Refazer edição',
     companionRewind5s: 'Retroceder 5s (Seta esquerda)',
     companionForward5s: 'Avançar 5s (Seta direita)',
     companionPlayPause: 'Reproduzir / Pausar (Espaço)',

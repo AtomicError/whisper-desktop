@@ -273,6 +273,7 @@ export const en = {
     undoTooltip: 'Undo segment edit (Ctrl+Z)',
     redoTooltip: 'Redo segment edit (Ctrl+Shift+Z)',
     companionShortcutUndo: 'Undo edit',
+    companionShortcutRedo: 'Redo edit',
     companionRewind5s: 'Rewind 5s (Left Arrow)',
     companionForward5s: 'Forward 5s (Right Arrow)',
     companionPlayPause: 'Play / Pause (Space)',

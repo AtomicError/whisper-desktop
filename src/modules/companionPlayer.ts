@@ -134,7 +134,11 @@ export async function loadMediaIntoCompanionPlayer(filePath: string, autoSwitchD
 
   // Detect extension and type
   const lowerPath = filePath.toLowerCase();
-  const isAudioOnly = ['.mp3', '.wav', '.ogg', '.opus', '.flac', '.m4a', '.aac'].some(ext => lowerPath.endsWith(ext));
+  const isAudioOnly = [
+    '.mp3', '.wav', '.m4a', '.aac', '.flac', '.ogg', '.opus',
+    '.wma', '.amr', '.3ga', '.aiff', '.aif', '.caf', '.ape',
+    '.alac', '.ac3', '.dts', '.oga'
+  ].some(ext => lowerPath.endsWith(ext));
   const fileName = filePath.split(/[/\\]/).pop() || 'Media file';
 
   const audioFallback = document.getElementById('companion-audio-fallback');

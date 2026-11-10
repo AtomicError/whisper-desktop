@@ -275,6 +275,7 @@ export const zh: Translations = {
     undoTooltip: '撤销分段编辑 (Ctrl+Z)',
     redoTooltip: '重做分段编辑 (Ctrl+Shift+Z)',
     companionShortcutUndo: '撤销编辑',
+    companionShortcutRedo: '重做编辑',
     companionRewind5s: '后退5秒 (左方向键)',
     companionForward5s: '前进5秒 (右方向键)',
     companionPlayPause: '播放 / 暂停 (空格键)',

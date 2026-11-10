@@ -275,6 +275,7 @@ export const it: Translations = {
     undoTooltip: 'Annulla modifica segmento (Ctrl+Z)',
     redoTooltip: 'Ripeti modifica segmento (Ctrl+Shift+Z)',
     companionShortcutUndo: 'Annulla modifica',
+    companionShortcutRedo: 'Ripeti modifica',
     companionRewind5s: 'Riavvolgi 5s (Freccia sinistra)',
     companionForward5s: 'Avanza 5s (Freccia destra)',
     companionPlayPause: 'Riproduci / Pausa (Spazio)',

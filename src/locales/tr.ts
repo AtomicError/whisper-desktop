@@ -275,6 +275,7 @@ export const tr: Translations = {
     undoTooltip: 'Segment düzenlemesini geri al (Ctrl+Z)',
     redoTooltip: 'Segment düzenlemesini yinele (Ctrl+Shift+Z)',
     companionShortcutUndo: 'Düzenlemeyi geri al',
+    companionShortcutRedo: 'Düzenlemeyi yinele',
     companionRewind5s: '5 sn geri sar (Sol Ok)',
     companionForward5s: '5 sn ileri sar (Sağ Ok)',
     companionPlayPause: 'Oynat / Duraklat (Boşluk)',

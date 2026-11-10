@@ -275,6 +275,7 @@ export const ja: Translations = {
     undoTooltip: 'セグメント編集を元に戻す (Ctrl+Z)',
     redoTooltip: 'セグメント編集をやり直す (Ctrl+Shift+Z)',
     companionShortcutUndo: '編集を元に戻す',
+    companionShortcutRedo: '編集をやり直す',
     companionRewind5s: '5秒戻る (左矢印)',
     companionForward5s: '5秒進む (右矢印)',
     companionPlayPause: '再生 / 一時停止 (Space)',

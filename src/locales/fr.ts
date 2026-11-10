@@ -275,6 +275,7 @@ export const fr: Translations = {
     undoTooltip: 'Annuler la modification du segment (Ctrl+Z)',
     redoTooltip: 'Rétablir la modification du segment (Ctrl+Shift+Z)',
     companionShortcutUndo: 'Annuler la modification',
+    companionShortcutRedo: 'Rétablir la modification',
     companionRewind5s: 'Reculer de 5s (Flèche gauche)',
     companionForward5s: 'Avancer de 5s (Flèche droite)',
     companionPlayPause: 'Lecture / Pause (Espace)',

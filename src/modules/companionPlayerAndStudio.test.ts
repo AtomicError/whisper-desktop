@@ -20,6 +20,7 @@ import {
   persistTranscriptLinesToDisk,
   getTranscriptHistory,
   setTranscriptHistory,
+  createTranscriptCardElement,
   transcriptViewer,
   type TranscriptLine
 } from './transcriptViewer';
@@ -36,6 +37,7 @@ import {
   updateCompanionMetadataUI,
   loadMediaIntoCompanionPlayer
 } from './companionPlayer';
+import { clearBatchQueue, removeFileFromBatch, batchProcessor } from './batchProcessor';
 
 // Minimal mock DOM for headless testing
 class MockElement {
@@ -1046,5 +1048,79 @@ describe('Studio Refinements, Isolation & Keyboard Accessibility', () => {
 
     highlightActiveTranscriptSegment(7.0);
     expect(scrolled).toBe(false);
+  });
+
+  it('focuses textarea and selects word range when clicking a word badge in wordsBar', () => {
+    let focused = false;
+    let selStart = -1;
+    let selEnd = -1;
+
+    const lineObj = {
+      id: 0,
+      timeRange: '[00:00:00.000 --> 00:00:03.000]',
+      text: 'Hello world again',
+      words: [
+        { text: 'Hello', startMs: 0, endMs: 1000, prob: 0.95 },
+        { text: 'world', startMs: 1000, endMs: 2000, prob: 0.45 },
+        { text: 'again', startMs: 2000, endMs: 3000, prob: 0.90 }
+      ]
+    };
+
+    const card = createTranscriptCardElement(lineObj as any);
+    const textarea = card.querySelector('.transcript-text-input') as any;
+    textarea.focus = () => { focused = true; };
+    textarea.setSelectionRange = (s: number, e: number) => {
+      selStart = s;
+      selEnd = e;
+    };
+
+    const words = card.querySelectorAll('.transcript-word');
+    expect(words.length).toBe(3);
+
+    // Click 'world' (2nd word)
+    const worldBadge = words[1];
+    worldBadge.onclick({ stopPropagation: () => {} });
+
+    expect(focused).toBe(true);
+    expect(selStart).toBe(6);
+    expect(selEnd).toBe(11);
+  });
+
+  it('unloads companion player when clearBatchQueue is called', () => {
+    const win = typeof window !== 'undefined' ? (window as any) : (globalThis as any);
+    let unloaded = false;
+    win.unloadCompanionPlayer = () => { unloaded = true; };
+    win.showNotification = () => {};
+    win.isBatchMode = true;
+    batchProcessor.setItems([{ path: '/test.mp4', status: 'completed' }] as any);
+
+    clearBatchQueue();
+    expect(unloaded).toBe(true);
+  });
+
+  it('unloads companion player when removeFileFromBatch deletes the active completed item without remaining completed items', () => {
+    const win = typeof window !== 'undefined' ? (window as any) : (globalThis as any);
+    let unloaded = false;
+    win.unloadCompanionPlayer = () => { unloaded = true; };
+    win.showNotification = () => {};
+    win.isBatchMode = true;
+    win.activeBatchViewerIndex = 0;
+    batchProcessor.setItems([
+      { path: '/test.mp4', status: 'completed' },
+      { path: '/test2.mp4', status: 'pending' }
+    ] as any);
+
+    removeFileFromBatch(0);
+    expect(unloaded).toBe(true);
+  });
+
+  it('recognizes extended audio formats (e.g. .wma, .aiff, .alac) as audio only in companion player', async () => {
+    const audioFallback = registerMockEl('companion-audio-fallback');
+    audioFallback.style.display = 'none';
+    const videoEl = registerMockEl('companion-media-element');
+    videoEl.load = () => {};
+
+    await loadMediaIntoCompanionPlayer('/media/sample_audio.aiff', false);
+    expect(audioFallback.style.display).toBe('flex');
   });
 });

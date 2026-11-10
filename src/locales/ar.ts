@@ -275,6 +275,7 @@ export const ar: Translations = {
     undoTooltip: 'تراجع عن تعديل المقطع (Ctrl+Z)',
     redoTooltip: 'إعادة تطبيق التعديل (Ctrl+Shift+Z)',
     companionShortcutUndo: 'تراجع عن التعديل',
+    companionShortcutRedo: 'إعادة التعديل',
     companionRewind5s: 'إرجاع 5 ثوانٍ (السهم الأيسر)',
     companionForward5s: 'تقديم 5 ثوانٍ (السهم الأيمن)',
     companionPlayPause: 'تشغيل / إيقاف مؤقت (Space)',

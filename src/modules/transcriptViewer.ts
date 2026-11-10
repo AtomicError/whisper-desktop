@@ -260,8 +260,10 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
   textarea.rows = 1;
   textarea.className = 'transcript-text-input';
   textarea.value = lineObj.text;
+  (textarea as any)._hasTyped = false;
   applyTextDirection(textarea);
   textarea.oninput = () => {
+    (textarea as any)._hasTyped = true;
     updateTranscriptLineText(lineObj.id, textarea.value);
   };
   textarea.onchange = () => {
@@ -306,6 +308,36 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
         const win = getGlobal();
         if (typeof win.seekCompanionPlayer === 'function') {
           win.seekCompanionPlayer(w.startMs);
+        }
+        if (textarea) {
+          const cleanWord = w.text.trim();
+          if (cleanWord) {
+            const textVal = textarea.value;
+            let occurrenceIndex = 0;
+            const wordsArr = lineObj.words || [];
+            const thisIdx = wordsArr.indexOf(w);
+            for (let wi = 0; wi < thisIdx; wi++) {
+              if (wordsArr[wi].text.trim() === cleanWord) {
+                occurrenceIndex++;
+              }
+            }
+            let searchFrom = 0;
+            let foundPos = -1;
+            for (let occ = 0; occ <= occurrenceIndex; occ++) {
+              foundPos = textVal.indexOf(cleanWord, searchFrom);
+              if (foundPos === -1) break;
+              searchFrom = foundPos + cleanWord.length;
+            }
+            if (foundPos === -1) {
+              foundPos = textVal.indexOf(cleanWord);
+            }
+            if (foundPos !== -1) {
+              textarea.focus();
+              if (typeof textarea.setSelectionRange === 'function') {
+                textarea.setSelectionRange(foundPos, foundPos + cleanWord.length);
+              }
+            }
+          }
         }
       };
       wordsBar.appendChild(wordSpan);
@@ -415,10 +447,6 @@ export function appendTranscriptLine(timeRange: string, text: string): void {
 
   const textarea = cardEl.querySelector('.transcript-text-input') as HTMLElement | null;
   if (textarea) autoResizeTranscriptField(textarea);
-
-  while (viewport.children.length > 2000) {
-    viewport.removeChild(viewport.firstElementChild!);
-  }
 
   clearTimeout(viewport._scrollDebounce);
   viewport._scrollDebounce = setTimeout(() => {
@@ -1560,15 +1588,18 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
     if (!transcribePanel || !transcribePanel.classList.contains('active')) return;
 
     const activeEl = document.activeElement;
-    const isTextEditing = activeEl instanceof HTMLInputElement || activeEl instanceof HTMLTextAreaElement || (activeEl as HTMLElement)?.isContentEditable;
+    const isTranscriptField = activeEl instanceof HTMLTextAreaElement && activeEl.classList.contains('transcript-text-input');
+    const isOtherInput = !isTranscriptField && (activeEl instanceof HTMLInputElement || activeEl instanceof HTMLTextAreaElement || (activeEl as HTMLElement)?.isContentEditable);
+    const hasTypedInCurrent = isTranscriptField && Boolean((activeEl as any)?._hasTyped);
+    const shouldBlockStudioUndo = isOtherInput || hasTypedInCurrent;
 
     if ((e.key.toLowerCase() === 'z' && e.shiftKey) || (e.key.toLowerCase() === 'y' && !e.shiftKey)) {
-      if (!isTextEditing && canRedoTranscript()) {
+      if (!shouldBlockStudioUndo && canRedoTranscript()) {
         e.preventDefault();
         redoTranscriptOperation();
       }
     } else if (e.key.toLowerCase() === 'z' && !e.shiftKey) {
-      if (!isTextEditing && canUndoTranscript()) {
+      if (!shouldBlockStudioUndo && canUndoTranscript()) {
         e.preventDefault();
         undoTranscriptOperation();
       }
