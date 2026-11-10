@@ -266,6 +266,9 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
     (textarea as any)._hasTyped = true;
     updateTranscriptLineText(lineObj.id, textarea.value);
   };
+  textarea.onblur = () => {
+    (textarea as any)._hasTyped = false;
+  };
   textarea.onchange = () => {
     updateTranscriptLineText(lineObj.id, textarea.value);
     void flushPendingTranscriptEdits();
@@ -278,11 +281,17 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
       e.preventDefault();
       mergeTranscriptSegmentWithPrevious(lineObj.id);
     } else if (e.key === 'Tab') {
-      const targetId = e.shiftKey ? lineObj.id - 1 : lineObj.id + 1;
-      const targetInput = document.querySelector(`.transcript-card[data-id="${targetId}"] .transcript-text-input`) as HTMLTextAreaElement | null;
-      if (targetInput) {
-        e.preventDefault();
-        targetInput.focus();
+      const allCards = Array.from(document.querySelectorAll('.transcript-card')) as HTMLElement[];
+      const visibleCards = allCards.filter(c => c.style.display !== 'none');
+      const currentCard = (e.target as HTMLElement).closest('.transcript-card') as HTMLElement;
+      const currentIndex = visibleCards.indexOf(currentCard);
+      if (currentIndex !== -1) {
+        const nextCard = e.shiftKey ? visibleCards[currentIndex - 1] : visibleCards[currentIndex + 1];
+        const targetInput = nextCard?.querySelector('.transcript-text-input') as HTMLTextAreaElement | null;
+        if (targetInput) {
+          e.preventDefault();
+          targetInput.focus();
+        }
       }
     }
   };
@@ -370,6 +379,7 @@ export function renderTranscriptLines(lines: TranscriptLine[]): void {
   if (typeof document === 'undefined') return;
   const viewport = document.getElementById('transcript-viewport');
   if (!viewport) return;
+  const prevScrollTop = viewport.scrollTop;
   viewport.innerHTML = '';
 
   const placeholder = document.getElementById('transcript-placeholder');
@@ -401,6 +411,10 @@ export function renderTranscriptLines(lines: TranscriptLine[]): void {
     applyTextDirection(input);
     autoResizeTranscriptField(input);
   });
+
+  if (prevScrollTop > 0) {
+    viewport.scrollTop = prevScrollTop;
+  }
 }
 
 export function appendTranscriptLine(timeRange: string, text: string): void {
@@ -896,6 +910,9 @@ export function mergeTranscriptSegmentWithPrevious(lineId: number): boolean {
     if (currTextarea && typeof currTextarea.value === 'string') currText = currTextarea.value;
     if (prevTextarea && typeof prevTextarea.value === 'string') prevText = prevTextarea.value;
   }
+
+  currLine.text = currText;
+  prevLine.text = prevText;
 
   const prevLen = prevText.length;
   let mergedText = prevText.trim();

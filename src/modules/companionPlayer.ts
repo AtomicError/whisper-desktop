@@ -345,6 +345,7 @@ export function pauseCompanionPlayer(): void {
 }
 
 export function unloadCompanionPlayer(): void {
+  activeLoadSequence++;
   pauseCompanionPlayer();
   pendingSeekTargetSec = null;
   hasMetadataSeekListener = false;
@@ -468,6 +469,10 @@ export function highlightActiveTranscriptSegment(currentSec: number): void {
         curStart = parseTimestampStringToMs(match[1]) ?? 0;
         curEnd = parseTimestampStringToMs(match[2]) ?? (curStart + 3000);
       }
+      if (curStart !== undefined && curEnd !== undefined) {
+        curLine.startMs = curStart;
+        curLine.endMs = curEnd;
+      }
     }
     if (curStart !== undefined && curEnd !== undefined && currentMs >= curStart && currentMs <= curEnd) {
       matchingLineId = curLine.id;
@@ -480,6 +485,10 @@ export function highlightActiveTranscriptSegment(currentSec: number): void {
         if (match) {
           nextStart = parseTimestampStringToMs(match[1]) ?? 0;
           nextEnd = parseTimestampStringToMs(match[2]) ?? (nextStart + 3000);
+        }
+        if (nextStart !== undefined && nextEnd !== undefined) {
+          nextLine.startMs = nextStart;
+          nextLine.endMs = nextEnd;
         }
       }
       if (nextStart !== undefined && nextEnd !== undefined && currentMs >= nextStart && currentMs <= nextEnd) {
@@ -505,6 +514,10 @@ export function highlightActiveTranscriptSegment(currentSec: number): void {
         } else {
           sMs = mid * 2000;
           eMs = sMs + 2000;
+        }
+        if (sMs !== undefined && eMs !== undefined) {
+          midLine.startMs = sMs;
+          midLine.endMs = eMs;
         }
       }
       if (currentMs >= sMs && currentMs <= eMs) {
@@ -533,8 +546,9 @@ export function highlightActiveTranscriptSegment(currentSec: number): void {
     const cardEl = document.querySelector(`.transcript-card[data-id="${matchingLineId}"]`) as HTMLElement | null;
     if (cardEl) {
       cardEl.classList.add('active-playback');
-      // Gentle auto-scroll into view if not active element and card is visible
-      if (cardEl.style.display !== 'none' && document.activeElement?.tagName !== 'TEXTAREA') {
+      // Gentle auto-scroll into view if not actively typing or searching and card is visible
+      const isUserEditing = document.activeElement?.tagName === 'TEXTAREA' || document.activeElement?.tagName === 'INPUT';
+      if (cardEl.style.display !== 'none' && !isUserEditing) {
         cardEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
     }

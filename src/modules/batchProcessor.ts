@@ -95,6 +95,7 @@ let isBatchMode = false;
 let isBatchExtracting = false;
 let batchCancelActive = false;
 let activeBatchViewerIndex = -1;
+let activeBatchSelectSeq = 0;
 let batchProcessingIndex = -1;
 let userExplicitlySelectedBatchItem = false;
 let transcriptLines: any[] = [];
@@ -511,6 +512,8 @@ export async function selectBatchItemTranscript(index: number): Promise<void> {
   const item = batchItems[index];
   if (!item) return;
 
+  const currentSeq = ++activeBatchSelectSeq;
+
   const win = getGlobal();
   const isActive = item.status === 'converting' || item.status === 'transcribing' || item.status === 'translating';
   const isCompleted = item.status === 'completed';
@@ -525,6 +528,7 @@ export async function selectBatchItemTranscript(index: number): Promise<void> {
   if (activeBatchViewerIndex !== index) {
     if (transcriptViewer.hasPendingEdits()) {
       await transcriptViewer.flushEdits();
+      if (currentSeq !== activeBatchSelectSeq) return;
     }
     if (activeBatchViewerIndex >= 0 && activeBatchViewerIndex < batchItems.length) {
       const prevItem = batchItems[activeBatchViewerIndex];
@@ -533,6 +537,8 @@ export async function selectBatchItemTranscript(index: number): Promise<void> {
       }
     }
   }
+
+  if (currentSeq !== activeBatchSelectSeq) return;
 
   activeBatchViewerIndex = index;
   userExplicitlySelectedBatchItem = !isActive;
@@ -586,8 +592,10 @@ export async function selectBatchItemTranscript(index: number): Promise<void> {
           const sessionJson: string = await invoke('get_transcript_session_data', {
             sessionFile: item.internalJsonPath
           });
+          if (currentSeq !== activeBatchSelectSeq) return;
           if (sessionJson) {
             const loaded = await loadTranscriptFromJsonData(sessionJson, true);
+            if (currentSeq !== activeBatchSelectSeq) return;
             if (loaded && loaded.length > 0) {
               item.transcriptLines = loaded.map((l: any) => ({ ...l }));
               transcriptLines = item.transcriptLines.map((l: any) => ({ ...l }));
@@ -604,6 +612,7 @@ export async function selectBatchItemTranscript(index: number): Promise<void> {
       if (item.subtitlePath) {
         try {
           const loaded = await loadTranscriptFromFile(item.subtitlePath, true);
+          if (currentSeq !== activeBatchSelectSeq) return;
           item.transcriptLines = (loaded || []).map((l: any) => ({ ...l }));
         } catch (e) {
           console.error("Failed to load batch item subtitle:", e);
@@ -611,6 +620,7 @@ export async function selectBatchItemTranscript(index: number): Promise<void> {
       } else if (item.txtPath) {
         try {
           const loaded = await loadTranscriptFromFile(item.txtPath, true);
+          if (currentSeq !== activeBatchSelectSeq) return;
           item.transcriptLines = (loaded || []).map((l: any) => ({ ...l }));
         } catch (e) {
           console.error("Failed to load batch item transcript:", e);
@@ -622,6 +632,7 @@ export async function selectBatchItemTranscript(index: number): Promise<void> {
         transcriptViewer.render([]);
       }
     }
+    if (currentSeq !== activeBatchSelectSeq) return;
     if (item.path && typeof win.loadMediaIntoCompanionPlayer === 'function') {
       try {
         void win.loadMediaIntoCompanionPlayer(item.path, false);

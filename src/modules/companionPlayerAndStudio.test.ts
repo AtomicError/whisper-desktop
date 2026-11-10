@@ -37,7 +37,7 @@ import {
   updateCompanionMetadataUI,
   loadMediaIntoCompanionPlayer
 } from './companionPlayer';
-import { clearBatchQueue, removeFileFromBatch, batchProcessor } from './batchProcessor';
+import { clearBatchQueue, removeFileFromBatch, selectBatchItemTranscript, batchProcessor } from './batchProcessor';
 
 // Minimal mock DOM for headless testing
 class MockElement {
@@ -174,6 +174,9 @@ class MockElement {
   }
 
   scrollIntoView() {}
+  pause() {}
+  play() { return Promise.resolve(); }
+  load() {}
 }
 
 class MockFragment {
@@ -1048,6 +1051,7 @@ describe('Studio Refinements, Isolation & Keyboard Accessibility', () => {
 
     highlightActiveTranscriptSegment(7.0);
     expect(scrolled).toBe(false);
+    mockDocument.querySelector = origQS;
   });
 
   it('focuses textarea and selects word range when clicking a word badge in wordsBar', () => {
@@ -1122,5 +1126,191 @@ describe('Studio Refinements, Isolation & Keyboard Accessibility', () => {
 
     await loadMediaIntoCompanionPlayer('/media/sample_audio.aiff', false);
     expect(audioFallback.style.display).toBe('flex');
+  });
+
+  it('unloadCompanionPlayer invalidates in-flight media load sequence so slow probes cannot resurrect player', async () => {
+    const videoEl = registerMockEl('companion-media-element');
+    videoEl.load = () => {};
+    let revoked = false;
+    const win = typeof window !== 'undefined' ? (window as any) : (globalThis as any);
+    win.__TAURI__ = {
+      core: {
+        invoke: async (cmd: string, args: any) => {
+          if (cmd === 'stream_media_file') return 'http://127.0.0.1:4000/media/slow.mp4';
+          if (cmd === 'revoke_media_stream') {
+            revoked = true;
+            return;
+          }
+          if (cmd === 'probe_media_file' || cmd === 'probe_hardsub_source') {
+            // Simulate delay
+            await new Promise(r => setTimeout(r, 20));
+            return { durationSec: 10, width: 1920, height: 1080 };
+          }
+          return null;
+        }
+      }
+    };
+
+    const loadPromise = loadMediaIntoCompanionPlayer('/slow.mp4', true);
+    // User unloads while load is in flight
+    unloadCompanionPlayer();
+
+    const result = await loadPromise;
+    expect(result).toBe(false);
+    expect(revoked).toBe(true);
+  });
+
+  it('selectBatchItemTranscript sequence guard ignores stale completions when switching items rapidly', async () => {
+    const win = typeof window !== 'undefined' ? (window as any) : (globalThis as any);
+    win.isBatchMode = true;
+    win.showNotification = () => {};
+
+    const item0 = {
+      path: '/file0.mp4',
+      status: 'completed',
+      internalJsonPath: '/cache/file0.json',
+      transcriptLines: [{ id: 0, text: 'Item 0 initial', timeRange: '[00:00:00.000 --> 00:00:02.000]' }]
+    };
+    const item1 = {
+      path: '/file1.mp4',
+      status: 'completed',
+      internalJsonPath: '/cache/file1.json',
+      transcriptLines: [{ id: 0, text: 'Item 1 final', timeRange: '[00:00:00.000 --> 00:00:02.000]' }]
+    };
+    batchProcessor.setItems([item0, item1] as any);
+
+    win.__TAURI__ = {
+      core: {
+        invoke: async (cmd: string, args: any) => {
+          if (cmd === 'get_transcript_session_data') {
+            if (args.sessionFile === '/cache/file0.json') {
+              // file0 is delayed
+              await new Promise(r => setTimeout(r, 40));
+              return JSON.stringify({ segments: [{ start: 0, end: 2, text: 'Item 0 delayed' }] });
+            }
+            if (args.sessionFile === '/cache/file1.json') {
+              return JSON.stringify({ segments: [{ start: 0, end: 2, text: 'Item 1 final' }] });
+            }
+          }
+          return null;
+        }
+      }
+    };
+
+    // User clicks item 0 then rapidly clicks item 1
+    const p0 = selectBatchItemTranscript(0);
+    const p1 = selectBatchItemTranscript(1);
+
+    await Promise.all([p0, p1]);
+    expect(batchProcessor.getActiveViewerIndex()).toBe(1);
+    expect(transcriptViewer.lines[0].text).toBe('Item 1 final');
+  });
+
+  it('Tab keyboard navigation skips cards with display: none in search-filtered views', () => {
+    const card0 = registerMockEl('card-tab-0', 'DIV', 'transcript-card', { id: '0' });
+    const card1 = registerMockEl('card-tab-1', 'DIV', 'transcript-card', { id: '1' });
+    const card2 = registerMockEl('card-tab-2', 'DIV', 'transcript-card', { id: '2' });
+    card1.style.display = 'none';
+
+    let card2Focused = false;
+    const card2Textarea = new MockElement('TEXTAREA');
+    card2Textarea.classList.add('transcript-text-input');
+    card2Textarea.focus = () => { card2Focused = true; };
+    card2.appendChild(card2Textarea);
+
+    const allCards = Array.from(document.querySelectorAll('.transcript-card')) as HTMLElement[];
+    const visibleCards = allCards.filter(c => c.style.display !== 'none');
+    const currentIndex = visibleCards.indexOf(card0 as any);
+    expect(currentIndex).not.toBe(-1);
+    const nextCard = visibleCards[currentIndex + 1];
+    expect(nextCard).toBe(card2);
+    const targetInput = nextCard?.querySelector('.transcript-text-input') as any;
+    targetInput.focus();
+
+    expect(card2Focused).toBe(true);
+  });
+
+  it('resets _hasTyped on textarea blur so studio structural undo is re-enabled on clean focus', () => {
+    const card = createTranscriptCardElement({ id: 0, text: 'Hello test', timeRange: '[00:00:00.000 --> 00:00:02.000]' });
+    const textarea = card.querySelector('.transcript-text-input') as any;
+
+    expect(textarea._hasTyped).toBe(false);
+    textarea.oninput();
+    expect(textarea._hasTyped).toBe(true);
+
+    textarea.onblur();
+    expect(textarea._hasTyped).toBe(false);
+  });
+
+  it('does not auto-scroll during playback when an INPUT element has active focus', () => {
+    transcriptViewer.lines = [
+      { id: 0, text: 'Line 0', startMs: 0, endMs: 2000, timeRange: '[00:00:00.000 --> 00:00:02.000]' },
+      { id: 1, text: 'Line 1', startMs: 2000, endMs: 4000, timeRange: '[00:00:02.000 --> 00:00:04.000]' }
+    ];
+
+    let scrolled = false;
+    const testCard0 = new MockElement('DIV');
+    testCard0.classList.add('transcript-card');
+    testCard0.dataset.id = '0';
+
+    const testCard1 = new MockElement('DIV');
+    testCard1.classList.add('transcript-card');
+    testCard1.dataset.id = '1';
+    testCard1.scrollIntoView = () => { scrolled = true; };
+
+    const origQS = mockDocument.querySelector.bind(mockDocument);
+    mockDocument.querySelector = (sel: string) => {
+      if (sel.includes('data-id="1"')) return testCard1;
+      if (sel.includes('data-id="0"')) return testCard0;
+      return origQS(sel);
+    };
+
+    // 1. When INPUT has active focus, it does not scroll
+    const mockInput = new MockElement('INPUT');
+    (document as any).activeElement = mockInput;
+    highlightActiveTranscriptSegment(2.5);
+    expect(scrolled).toBe(false);
+
+    // 2. Clear focus and advance segment so highlight triggers
+    (document as any).activeElement = null;
+    highlightActiveTranscriptSegment(0.5); // move to 0
+    highlightActiveTranscriptSegment(2.5); // move back to 1 without input focus
+    expect(scrolled).toBe(true);
+
+    mockDocument.querySelector = origQS;
+  });
+
+  it('caches parsed timestamps on line objects during highlightActiveTranscriptSegment', () => {
+    const lines = [
+      { id: 99, text: 'Line 99', timeRange: '[00:00:01.000 --> 00:00:03.000]' }
+    ];
+    transcriptViewer.lines = lines;
+
+    const cacheCard = new MockElement('DIV');
+    cacheCard.classList.add('transcript-card');
+    cacheCard.dataset.id = '99';
+
+    const origQS = mockDocument.querySelector.bind(mockDocument);
+    mockDocument.querySelector = (sel: string) => {
+      if (sel.includes('data-id="99"')) return cacheCard;
+      return origQS(sel);
+    };
+
+    expect(lines[0].startMs).toBeUndefined();
+    highlightActiveTranscriptSegment(1.5);
+    expect(lines[0].startMs).toBe(1000);
+    expect(lines[0].endMs).toBe(3000);
+
+    mockDocument.querySelector = origQS;
+  });
+
+  it('preserves viewport.scrollTop in renderTranscriptLines', () => {
+    const viewport = registerMockEl('transcript-viewport');
+    viewport.scrollTop = 150;
+
+    renderTranscriptLines([
+      { id: 0, text: 'Line 0', timeRange: '[00:00:00.000 --> 00:00:02.000]' }
+    ]);
+    expect(viewport.scrollTop).toBe(150);
   });
 });
