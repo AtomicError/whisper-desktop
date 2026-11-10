@@ -157,8 +157,9 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
   const playBtn = document.createElement('button');
   playBtn.type = 'button';
   playBtn.className = 'btn-card-action btn-card-play';
-  playBtn.title = 'Play segment';
-  playBtn.setAttribute('aria-label', 'Play segment');
+  const playTitle = t('transcribe.playSegment') || 'Play segment';
+  playBtn.title = playTitle;
+  playBtn.setAttribute('aria-label', playTitle);
   playBtn.innerHTML = `
     <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor">
       <polygon points="5 3 19 12 5 21 5 3"/>
@@ -176,8 +177,9 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
   const splitBtn = document.createElement('button');
   splitBtn.type = 'button';
   splitBtn.className = 'btn-card-action btn-card-split';
-  splitBtn.title = 'Split segment (Enter)';
-  splitBtn.setAttribute('aria-label', 'Split segment');
+  const splitTitle = t('transcribe.splitSegment') || 'Split segment (Enter)';
+  splitBtn.title = splitTitle;
+  splitBtn.setAttribute('aria-label', splitTitle);
   splitBtn.innerHTML = `
     <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/>
@@ -195,8 +197,9 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
     const mergeBtn = document.createElement('button');
     mergeBtn.type = 'button';
     mergeBtn.className = 'btn-card-action btn-card-merge';
-    mergeBtn.title = 'Merge with previous (Backspace)';
-    mergeBtn.setAttribute('aria-label', 'Merge with previous');
+    const mergeTitle = t('transcribe.mergeSegment') || 'Merge with previous (Backspace)';
+    mergeBtn.title = mergeTitle;
+    mergeBtn.setAttribute('aria-label', mergeTitle);
     mergeBtn.innerHTML = `
       <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="m8 6 4-4 4 4"/><path d="M12 2v10.3a4 4 0 0 1-1.172 2.872L4 22"/>

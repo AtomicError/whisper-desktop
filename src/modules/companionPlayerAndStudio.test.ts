@@ -529,7 +529,13 @@ describe('Companion Media Player & DOM Controls', () => {
     expect(cardSrt1.classList.contains('active-playback')).toBe(false);
   });
 
-  it('unloads companion player and resets UI deck state cleanly', () => {
+  it('unloads companion player, revokes stream and resets UI deck state cleanly', () => {
+    let revokedUrl: string | null = null;
+    (globalThis as any).invoke = async (cmd: string, args: any) => {
+      if (cmd === 'revoke_media_stream') {
+        revokedUrl = args.streamUrl;
+      }
+    };
     const videoEl = registerMockEl('companion-media-element', 'VIDEO') as any;
     videoEl.pause = () => {};
     videoEl.removeAttribute = () => {};
@@ -542,6 +548,18 @@ describe('Companion Media Player & DOM Controls', () => {
     expect(setupDeck.style.display).toBe('flex');
     expect(mediaDeck.style.display).toBe('none');
     expect(setupTabs.style.display).toBe('none');
+  });
+
+  it('safely exits early during silence without querySelectorAll thrashing', () => {
+    transcriptViewer.lines = [
+      { id: 0, timeRange: '[00:00:01.000 --> 00:00:02.000]', text: 'Line zero', startMs: 1000, endMs: 2000 }
+    ];
+    registerMockEl('card-silence-0', 'DIV', 'transcript-card', { id: '0' });
+
+    // Silence timestamp at 5.0s (no segment active)
+    expect(() => highlightActiveTranscriptSegment(5.0)).not.toThrow();
+    // Subsequent calls during silence should return early and not throw
+    expect(() => highlightActiveTranscriptSegment(5.1)).not.toThrow();
   });
 });
 

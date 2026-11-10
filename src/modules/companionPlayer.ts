@@ -56,12 +56,16 @@ export function showTranscribeSetupDeck(): void {
   const mediaDeck = document.getElementById('transcribe-media-deck');
   const tabSetup = document.getElementById('btn-tab-to-setup');
   const tabPlayer = document.getElementById('btn-tab-to-player');
+  const setupTabSetup = document.getElementById('btn-setup-tab-setup');
+  const setupTabPlayer = document.getElementById('btn-setup-tab-player');
   const setupDeckTabs = document.getElementById('setup-deck-mode-tabs');
 
   if (setupDeck) setupDeck.style.display = 'flex';
   if (mediaDeck) mediaDeck.style.display = 'none';
   if (tabSetup) tabSetup.classList.add('active');
   if (tabPlayer) tabPlayer.classList.remove('active');
+  if (setupTabSetup) setupTabSetup.classList.add('active');
+  if (setupTabPlayer) setupTabPlayer.classList.remove('active');
   if (setupDeckTabs && activeMediaInfo) {
     setupDeckTabs.style.display = 'inline-flex';
   }
@@ -73,18 +77,22 @@ export function showTranscribeMediaDeck(): void {
   const mediaDeck = document.getElementById('transcribe-media-deck');
   const tabSetup = document.getElementById('btn-tab-to-setup');
   const tabPlayer = document.getElementById('btn-tab-to-player');
+  const setupTabSetup = document.getElementById('btn-setup-tab-setup');
+  const setupTabPlayer = document.getElementById('btn-setup-tab-player');
   const setupDeckTabs = document.getElementById('setup-deck-mode-tabs');
 
   if (setupDeck) setupDeck.style.display = 'none';
   if (mediaDeck) mediaDeck.style.display = 'flex';
   if (tabSetup) tabSetup.classList.remove('active');
   if (tabPlayer) tabPlayer.classList.add('active');
+  if (setupTabSetup) setupTabSetup.classList.remove('active');
+  if (setupTabPlayer) setupTabPlayer.classList.add('active');
   if (setupDeckTabs) {
     setupDeckTabs.style.display = 'none';
   }
 }
 
-export async function loadMediaIntoCompanionPlayer(filePath: string): Promise<boolean> {
+export async function loadMediaIntoCompanionPlayer(filePath: string, autoSwitchDeck = true): Promise<boolean> {
   if (typeof document === 'undefined' || !filePath) return false;
   const invoke = getTauriInvoke();
   const videoEl = document.getElementById('companion-media-element') as HTMLVideoElement | null;
@@ -189,7 +197,12 @@ export async function loadMediaIntoCompanionPlayer(filePath: string): Promise<bo
   videoEl.src = streamUrl;
   videoEl.load();
 
-  showTranscribeMediaDeck();
+  if (autoSwitchDeck) {
+    showTranscribeMediaDeck();
+  } else {
+    const setupDeckTabs = document.getElementById('setup-deck-mode-tabs');
+    if (setupDeckTabs) setupDeckTabs.style.display = 'inline-flex';
+  }
   return true;
 }
 
@@ -213,7 +226,9 @@ export function updateCompanionMetadataUI(info: CompanionMediaInfo): void {
     aspectEl.textContent = info.aspectRatio || (info.isVideo ? '16:9' : 'Stereo');
   }
   if (formatEl) {
-    formatEl.textContent = info.isVideo ? 'Video' : 'Audio';
+    formatEl.textContent = info.isVideo
+      ? (t('transcribe.companionMetaVideo') || 'Video')
+      : (t('transcribe.companionMetaAudio') || 'Audio');
   }
 }
 
@@ -256,6 +271,11 @@ export function pauseCompanionPlayer(): void {
 
 export function unloadCompanionPlayer(): void {
   pauseCompanionPlayer();
+  const invoke = getTauriInvoke();
+  if (activeStreamUrl && invoke) {
+    invoke('revoke_media_stream', { streamUrl: activeStreamUrl }).catch(() => {});
+    activeStreamUrl = null;
+  }
   const videoEl = document.getElementById('companion-media-element') as HTMLVideoElement | null;
   if (videoEl) {
     videoEl.removeAttribute('src');
@@ -366,7 +386,8 @@ export function highlightActiveTranscriptSegment(currentSec: number): void {
   const currentActiveEl = document.querySelector('.transcript-card.active-playback') as HTMLElement | null;
   const isAlreadyActiveOnDOM = currentActiveEl && currentActiveEl.dataset.id === String(matchingLineId);
 
-  if (matchingLineId === currentHighlightedLineId && isAlreadyActiveOnDOM) return;
+  const isAlreadyIdle = matchingLineId === null && currentHighlightedLineId === null && !currentActiveEl;
+  if ((matchingLineId === currentHighlightedLineId && isAlreadyActiveOnDOM) || isAlreadyIdle) return;
   currentHighlightedLineId = matchingLineId;
 
   document.querySelectorAll('.transcript-card.active-playback').forEach(el => {
@@ -424,7 +445,9 @@ export function initCompanionPlayerDOM(): void {
       activeMediaInfo.width = videoEl.videoWidth;
       activeMediaInfo.height = videoEl.videoHeight;
       const ratio = videoEl.videoWidth / videoEl.videoHeight;
-      activeMediaInfo.aspectRatio = ratio < 0.8 ? '9:16' : (ratio > 1.2 ? '16:9' : '4:3');
+      activeMediaInfo.aspectRatio = ratio < 0.8
+        ? '9:16'
+        : (ratio >= 0.8 && ratio <= 1.2 ? '1:1' : (ratio > 1.2 && ratio < 1.5 ? '4:3' : '16:9'));
       updateCompanionMetadataUI(activeMediaInfo);
       const videoContainer = document.getElementById('companion-video-container');
       if (videoContainer) {

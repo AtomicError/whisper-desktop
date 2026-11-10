@@ -579,6 +579,11 @@ export async function selectBatchItemTranscript(index: number): Promise<void> {
       if (win) win.transcriptLines = [];
       transcriptViewer.render([]);
     }
+    if (item.path && typeof win.loadMediaIntoCompanionPlayer === 'function') {
+      try {
+        void win.loadMediaIntoCompanionPlayer(item.path, false);
+      } catch (_) {}
+    }
     if (typeof document !== 'undefined') {
       const btnCopy = document.getElementById('btn-copy-transcript') as HTMLButtonElement | null;
       if (btnCopy) btnCopy.disabled = (transcriptLines.length === 0);

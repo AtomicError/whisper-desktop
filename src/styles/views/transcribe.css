@@ -1963,6 +1963,7 @@ html[dir="rtl"] #transcript-search::placeholder,
   flex-direction: column;
   gap: 4px;
   width: 100%;
+  direction: ltr !important;
 }
 
 .companion-seek-slider {
@@ -1974,6 +1975,7 @@ html[dir="rtl"] #transcript-search::placeholder,
   border-radius: 4px;
   outline: none;
   cursor: pointer;
+  direction: ltr !important;
   transition: height 0.1s ease;
 }
 
@@ -2089,6 +2091,7 @@ html[dir="rtl"] #transcript-search::placeholder,
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  direction: ltr !important;
 }
 
 .companion-volume-slider {
@@ -2100,6 +2103,7 @@ html[dir="rtl"] #transcript-search::placeholder,
   border-radius: 2px;
   outline: none;
   cursor: pointer;
+  direction: ltr !important;
 }
 
 .companion-volume-slider::-webkit-slider-thumb {

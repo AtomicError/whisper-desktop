@@ -15,17 +15,17 @@
                       <span class="transcribe-deck-title" data-i18n="transcribe.deckTitle">Transcription Setup</span>
                     </div>
                     <div class="deck-mode-tabs" id="setup-deck-mode-tabs" style="display: none;">
-                      <button type="button" class="btn-deck-tab active" id="btn-setup-tab-setup" title="Transcription Setup">
+                      <button type="button" class="btn-deck-tab active" id="btn-setup-tab-setup" title="Transcription Setup" data-i18n-title="transcribe.deckTitle">
                         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
                           <path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
                         </svg>
-                        <span>Setup</span>
+                        <span data-i18n="transcribe.companionSetupTab">Setup</span>
                       </button>
-                      <button type="button" class="btn-deck-tab" id="btn-setup-tab-player" title="Return to Media Player" onclick="showTranscribeMediaDeck()">
+                      <button type="button" class="btn-deck-tab" id="btn-setup-tab-player" title="Return to Media Player" data-i18n-title="transcribe.companionPlayerTitle" onclick="showTranscribeMediaDeck()">
                         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
                           <polygon points="5 3 19 12 5 21 5 3"/>
                         </svg>
-                        <span>Player</span>
+                        <span data-i18n="transcribe.companionPlayerTab">Player</span>
                       </button>
                     </div>
                     <button type="button" class="btn-link-settings" id="btn-transcribe-manage-settings" title="Configure models and engines in Settings" data-i18n-title="transcribe.manageInSettings" onclick="openTranscriptionSettings()">
@@ -260,17 +260,17 @@
                       <span class="transcribe-deck-title" data-i18n="transcribe.companionPlayerTitle">Companion Player</span>
                     </div>
                     <div class="deck-mode-tabs">
-                      <button type="button" class="btn-deck-tab" id="btn-tab-to-setup" title="Return to Transcription Setup" onclick="showTranscribeSetupDeck()">
+                      <button type="button" class="btn-deck-tab" id="btn-tab-to-setup" title="Return to Transcription Setup" data-i18n-title="transcribe.deckTitle" onclick="showTranscribeSetupDeck()">
                         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
                           <path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
                         </svg>
-                        <span>Setup</span>
+                        <span data-i18n="transcribe.companionSetupTab">Setup</span>
                       </button>
-                      <button type="button" class="btn-deck-tab active" id="btn-tab-to-player" title="Media Companion Player">
+                      <button type="button" class="btn-deck-tab active" id="btn-tab-to-player" title="Media Companion Player" data-i18n-title="transcribe.companionPlayerTitle">
                         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
                           <polygon points="5 3 19 12 5 21 5 3"/>
                         </svg>
-                        <span>Player</span>
+                        <span data-i18n="transcribe.companionPlayerTab">Player</span>
                       </button>
                     </div>
                   </div>
@@ -348,12 +348,12 @@
                       </div>
 
                       <!-- PiP & Fullscreen -->
-                      <button type="button" class="btn-player-btn" id="btn-companion-pip" onclick="toggleCompanionPiP()" title="Picture-in-Picture">
+                      <button type="button" class="btn-player-btn" id="btn-companion-pip" onclick="toggleCompanionPiP()" title="Picture-in-Picture" data-i18n-title="transcribe.companionPip">
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                           <rect width="18" height="14" x="3" y="5" rx="2"/><rect width="6" height="4" x="13" y="13" rx="1"/>
                         </svg>
                       </button>
-                      <button type="button" class="btn-player-btn" id="btn-companion-fullscreen" onclick="toggleCompanionFullscreen()" title="Fullscreen">
+                      <button type="button" class="btn-player-btn" id="btn-companion-fullscreen" onclick="toggleCompanionFullscreen()" title="Fullscreen" data-i18n-title="transcribe.companionFullscreen">
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                           <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
                         </svg>
@@ -371,19 +371,19 @@
                     </div>
                     <div class="meta-chips-grid">
                       <div class="meta-chip">
-                        <span class="meta-chip-label">Duration:</span>
+                        <span class="meta-chip-label" data-i18n="transcribe.companionMetaDuration">Duration:</span>
                         <span class="meta-chip-val" id="companion-meta-duration">00:00</span>
                       </div>
                       <div class="meta-chip">
-                        <span class="meta-chip-label">Resolution:</span>
+                        <span class="meta-chip-label" data-i18n="transcribe.companionMetaResolution">Resolution:</span>
                         <span class="meta-chip-val" id="companion-meta-resolution">1920×1080</span>
                       </div>
                       <div class="meta-chip">
-                        <span class="meta-chip-label">Aspect:</span>
+                        <span class="meta-chip-label" data-i18n="transcribe.companionMetaAspect">Aspect:</span>
                         <span class="meta-chip-val" id="companion-meta-aspect">16:9</span>
                       </div>
                       <div class="meta-chip">
-                        <span class="meta-chip-label">Format:</span>
+                        <span class="meta-chip-label" data-i18n="transcribe.companionMetaFormat">Format:</span>
                         <span class="meta-chip-val" id="companion-meta-format">Video</span>
                       </div>
                     </div>
@@ -395,28 +395,28 @@
                       <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M8 16h8"/>
                       </svg>
-                      <span>Keyboard Shortcuts</span>
+                      <span data-i18n="transcribe.companionShortcutsTitle">Keyboard Shortcuts</span>
                     </div>
                     <div class="shortcuts-list">
                       <div class="shortcut-item">
                         <kbd>Space</kbd>
-                        <span>Play / Pause</span>
+                        <span data-i18n="transcribe.companionShortcutSpace">Play / Pause</span>
                       </div>
                       <div class="shortcut-item">
                         <kbd>Enter</kbd>
-                        <span>Split segment at cursor</span>
+                        <span data-i18n="transcribe.companionShortcutEnter">Split segment at cursor</span>
                       </div>
                       <div class="shortcut-item">
                         <kbd>Backspace</kbd>
-                        <span>Merge with previous</span>
+                        <span data-i18n="transcribe.companionShortcutBackspace">Merge with previous</span>
                       </div>
                       <div class="shortcut-item">
                         <kbd>Tab</kbd>
-                        <span>Next segment</span>
+                        <span data-i18n="transcribe.companionShortcutTab">Next segment</span>
                       </div>
                       <div class="shortcut-item">
                         <kbd>Click</kbd>
-                        <span>Seek to segment or word</span>
+                        <span data-i18n="transcribe.companionShortcutClick">Seek to segment or word</span>
                       </div>
                     </div>
                   </div>
@@ -427,7 +427,7 @@
                       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="margin-inline-end: 6px;">
                         <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" x2="12" y1="19" y2="22"/>
                       </svg>
-                      <span>Transcribe New File / Setup</span>
+                      <span data-i18n="transcribe.companionReturnSetup">Transcribe New File / Setup</span>
                     </button>
                   </div>
                 </div>
