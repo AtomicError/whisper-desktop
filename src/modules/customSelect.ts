@@ -154,10 +154,10 @@ export class CustomSelect {
         } else {
           const optDiv = this.getNavigableOptions()[this.focusedIndex];
           if (optDiv && optDiv.dataset.value !== undefined && !optDiv.classList.contains('disabled')) {
-            this.select.value = optDiv.dataset.value;
-            this.select.dispatchEvent(new Event('change'));
+            this.selectOption(optDiv);
+          } else {
+            this.close();
           }
-          this.close();
         }
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -277,9 +277,7 @@ export class CustomSelect {
       const optDiv = target.closest('.custom-select-option') as HTMLElement | null;
       if (optDiv && optDiv.dataset.value !== undefined && !optDiv.classList.contains('disabled')) {
         e.stopPropagation();
-        this.select.value = optDiv.dataset.value;
-        this.select.dispatchEvent(new Event('change'));
-        this.close();
+        this.selectOption(optDiv);
       }
     });
 
@@ -513,10 +511,10 @@ export class CustomSelect {
       const pickIdx = (this.focusedIndex >= 0 && this.focusedIndex < options.length) ? this.focusedIndex : 0;
       const optDiv = options[pickIdx];
       if (optDiv && optDiv.dataset.value !== undefined) {
-        this.select.value = optDiv.dataset.value;
-        this.select.dispatchEvent(new Event('change'));
+        this.selectOption(optDiv);
+      } else {
+        this.close();
       }
-      this.close();
     } else if (e.key === 'Escape') {
       e.stopPropagation(); // keep the global close handler from firing on the clear step
       if (this.searchInput && this.searchInput.value) {
@@ -695,6 +693,23 @@ export class CustomSelect {
     }
   }
 
+  public selectOption(optDiv: HTMLElement): void {
+    if (!optDiv || optDiv.classList.contains('disabled') || optDiv.dataset.value === undefined) {
+      return;
+    }
+    const newValue = optDiv.dataset.value;
+    this.select.value = newValue;
+
+    // 1. Immediate visual and value synchronization (0ms feedback)
+    this.syncSelectedValue();
+
+    // 2. Immediately initiate closing sequence so the dropdown starts closing at 0ms
+    this.close();
+
+    // 3. Dispatch change event to all consumers
+    this.select.dispatchEvent(new Event('change'));
+  }
+
   public toggle(): void {
     if (this.select && this.select.disabled) return;
     if (this.isOpen) {
@@ -742,8 +757,9 @@ export class CustomSelect {
     }
     this.setFocusedOptionIndex(selectedIdx);
 
-    // Searchable dropdowns put the caret in the filter box
+    // Searchable dropdowns put the caret in the filter box and reset filter
     if (this.isSearchable()) {
+      this.clearFilter();
       if (typeof applyTextDirection === 'function' && this.searchInput) {
         applyTextDirection(this.searchInput);
       }
@@ -754,15 +770,12 @@ export class CustomSelect {
       });
     }
 
-    // 3. Use double safeRaf to defer class additions to the next frames,
-    // avoiding layout thrashing/reflow block while starting CSS transitions.
+    // 3. Single safeRaf to activate open class on next animation frame for a snappy 60fps start
     safeRaf(() => {
-      safeRaf(() => {
-        if (this.isOpen && this.container && this.optionsContainer) {
-          this.container.classList.add('open');
-          this.optionsContainer.classList.add('open');
-        }
-      });
+      if (this.isOpen && this.container && this.optionsContainer) {
+        this.container.classList.add('open');
+        this.optionsContainer.classList.add('open');
+      }
     });
   }
 
@@ -776,7 +789,17 @@ export class CustomSelect {
     this.typeaheadBuffer = '';
     clearTimeout(this.typeaheadTimeout);
     if (this.isSearchable()) {
-      this.clearFilter();
+      if (this.searchInput && this.searchInput.value) {
+        this.searchInput.value = '';
+        if (typeof applyTextDirection === 'function') {
+          applyTextDirection(this.searchInput);
+        }
+      }
+      safeRaf(() => {
+        if (!this.isOpen) {
+          this.applyFilter('');
+        }
+      });
     }
 
     // Detach document, window, scroll, and resize listeners immediately on close
@@ -843,10 +866,12 @@ export function initializeCustomSelects(): void {
   });
 }
 
-export function syncCustomSelects(): void {
+export function syncCustomSelects(updateOptions = false): void {
   if (customSelectsMap) {
     customSelectsMap.forEach(cs => {
-      cs.updateOptions();
+      if (updateOptions) {
+        cs.updateOptions();
+      }
       cs.syncSelectedValue();
     });
   }

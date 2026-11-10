@@ -385,9 +385,9 @@ export function setLanguage(lang: SupportedLanguage, notify: boolean = true): vo
   // Update DOM translations
   translateDOM();
 
-  // Synchronize custom selects if initialized
+  // Synchronize custom selects and refresh localized option placeholders if initialized
   if (typeof (window as any).syncCustomSelects === 'function') {
-    (window as any).syncCustomSelects();
+    (window as any).syncCustomSelects(true);
   }
 
   // Synchronize current view title

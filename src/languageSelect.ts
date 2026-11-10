@@ -30,6 +30,17 @@ const LANGUAGE_SELECT_IDS: Record<LanguageSelectKind, string[]> = {
 
 const AUTO_LANGUAGE_VALUE = 'auto';
 
+const safeRaf = (cb: () => void) => {
+  const win = typeof window !== 'undefined' ? (window as any) : (globalThis as any);
+  if (typeof win.requestAnimationFrame === 'function') {
+    win.requestAnimationFrame(cb);
+  } else if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(cb);
+  } else {
+    setTimeout(cb, 0);
+  }
+};
+
 function getSettingsState(): any {
   return (window as any).settingsState || null;
 }
@@ -171,8 +182,10 @@ function attachRecentsListener(select: HTMLSelectElement, kind: LanguageSelectKi
     } else {
       state.recentTranslationTargets = pushRecentLanguage(state.recentTranslationTargets, select.value);
     }
-    // Refresh both twin dropdowns so their Recent group and selected option reflect the new pick.
-    reRenderKind(kind, select.value);
+    // Refresh both twin dropdowns asynchronously on next frame so the active dropdown closes with 0ms visual lag
+    safeRaf(() => {
+      reRenderKind(kind, select.value);
+    });
   });
 }
 
