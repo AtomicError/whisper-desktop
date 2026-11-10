@@ -257,7 +257,7 @@ export const fa: Translations = {
     companionMetaFormat: 'نوع فرمت:',
     companionMetaVideo: 'ویدیو',
     companionMetaAudio: 'صوت',
-    companionShortcutsTitle: 'کلیدهای میانبر سریع',
+    companionShortcutsTitle: 'کلیدهای میان‌بر سریع',
     companionShortcutSpace: 'پخش / مکث',
     companionShortcutEnter: 'تقسیم سگمنت در موقعیت مکان‌نما',
     companionShortcutBackspace: 'ادغام با سگمنت قبلی',

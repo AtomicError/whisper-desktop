@@ -26,8 +26,11 @@ export interface CompanionMediaInfo {
 
 let activeMediaInfo: CompanionMediaInfo | null = null;
 let activeStreamUrl: string | null = null;
+let activeLoadSequence = 0;
 let isSeeking = false;
 let currentHighlightedLineId: number | null = null;
+let pendingSeekTargetSec: number | null = null;
+let hasMetadataSeekListener = false;
 
 export function formatTimecodeDisplay(seconds: number): string {
   if (isNaN(seconds) || seconds < 0) seconds = 0;
@@ -98,6 +101,8 @@ export async function loadMediaIntoCompanionPlayer(filePath: string, autoSwitchD
   const videoEl = document.getElementById('companion-media-element') as HTMLVideoElement | null;
   if (!videoEl) return false;
 
+  const currentSeq = ++activeLoadSequence;
+
   // Clean up any previously registered streaming URL
   if (activeStreamUrl && invoke) {
     try {
@@ -110,6 +115,12 @@ export async function loadMediaIntoCompanionPlayer(filePath: string, autoSwitchD
   if (invoke) {
     try {
       streamUrl = await invoke('stream_media_file', { filePath });
+      if (currentSeq !== activeLoadSequence) {
+        if (streamUrl) {
+          invoke('revoke_media_stream', { streamUrl }).catch(() => {});
+        }
+        return false;
+      }
       activeStreamUrl = streamUrl;
     } catch (err) {
       console.warn('Failed to stream media file via local server, falling back to direct path:', err);
@@ -118,6 +129,8 @@ export async function loadMediaIntoCompanionPlayer(filePath: string, autoSwitchD
   } else {
     streamUrl = filePath;
   }
+
+  if (currentSeq !== activeLoadSequence) return false;
 
   // Detect extension and type
   const lowerPath = filePath.toLowerCase();
@@ -152,7 +165,7 @@ export async function loadMediaIntoCompanionPlayer(filePath: string, autoSwitchD
 
     if (!isAudioOnly) {
       try {
-        const sourceInfo = await invoke('probe_hardsub_source', { filePath });
+        const sourceInfo = await invoke('probe_hardsub_source', { sourcePath: filePath });
         if (sourceInfo) {
           width = sourceInfo.width || sourceInfo.displayWidth || 0;
           height = sourceInfo.height || sourceInfo.displayHeight || 0;
@@ -273,16 +286,27 @@ export function seekCompanionPlayer(targetMs: number, autoPlay: boolean = true):
   const targetSec = Math.max(0, targetMs / 1000);
   if (videoEl.readyState >= 1) {
     videoEl.currentTime = targetSec;
+    if (autoPlay && videoEl.paused) {
+      videoEl.play().catch(e => console.warn('Autoplay error:', e));
+    }
   } else {
-    videoEl.addEventListener('loadedmetadata', () => {
-      videoEl.currentTime = targetSec;
-    }, { once: true });
+    pendingSeekTargetSec = targetSec;
+    if (!hasMetadataSeekListener) {
+      hasMetadataSeekListener = true;
+      videoEl.addEventListener('loadedmetadata', () => {
+        hasMetadataSeekListener = false;
+        if (pendingSeekTargetSec !== null) {
+          videoEl.currentTime = pendingSeekTargetSec;
+          pendingSeekTargetSec = null;
+        }
+        if (autoPlay && videoEl.paused) {
+          videoEl.play().catch(e => console.warn('Autoplay error:', e));
+        }
+      }, { once: true });
+    }
   }
   if (activeMediaInfo) {
     showTranscribeMediaDeck();
-  }
-  if (autoPlay && videoEl.paused) {
-    videoEl.play().catch(e => console.warn('Autoplay error:', e));
   }
 }
 
@@ -295,6 +319,8 @@ export function pauseCompanionPlayer(): void {
 
 export function unloadCompanionPlayer(): void {
   pauseCompanionPlayer();
+  pendingSeekTargetSec = null;
+  hasMetadataSeekListener = false;
   const invoke = getTauriInvoke();
   if (activeStreamUrl && invoke) {
     invoke('revoke_media_stream', { streamUrl: activeStreamUrl }).catch(() => {});

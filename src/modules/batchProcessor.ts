@@ -883,6 +883,11 @@ export async function runBatchExtraction(): Promise<void> {
   }
 
   batchCancelActive = false;
+  if (typeof win.pauseCompanionPlayer === 'function') {
+    try {
+      win.pauseCompanionPlayer();
+    } catch (_) {}
+  }
   const telemetryCard = document.getElementById('telemetry-hud-card');
   if (telemetryCard) telemetryCard.style.display = 'block';
   if (typeof win.setTranscribeStatusBadge === 'function') {

@@ -289,9 +289,9 @@
                   </div>
 
                   <!-- Playback Timeline & Live Timecode -->
-                  <div class="companion-timeline-box">
-                    <input type="range" class="companion-seek-slider" id="companion-seek-slider" min="0" max="100" step="0.05" value="0" aria-label="Seek timeline" data-i18n-aria="transcribe.companionSeekAria" />
-                    <div class="companion-timecode-row">
+                  <div class="companion-timeline-box" dir="ltr">
+                    <input type="range" class="companion-seek-slider" id="companion-seek-slider" min="0" max="100" step="0.05" value="0" aria-label="Seek timeline" data-i18n-aria="transcribe.companionSeekAria" dir="ltr" />
+                    <div class="companion-timecode-row" dir="ltr">
                       <span class="companion-timecode" id="companion-time-current">00:00:00.000</span>
                       <span class="companion-timecode" id="companion-time-total">00:00:00.000</span>
                     </div>
@@ -335,7 +335,7 @@
                       </select>
 
                       <!-- Volume Control -->
-                      <div class="companion-volume-group">
+                      <div class="companion-volume-group" dir="ltr">
                         <button type="button" class="btn-player-btn" id="btn-companion-mute" onclick="toggleCompanionMute()" title="Mute / Unmute" data-i18n-title="transcribe.companionMute">
                           <svg id="icon-vol-high" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
@@ -344,7 +344,7 @@
                             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/>
                           </svg>
                         </button>
-                        <input type="range" class="companion-volume-slider" id="companion-volume-slider" min="0" max="1" step="0.05" value="1" oninput="changeCompanionVolume(this.value)" aria-label="Volume" data-i18n-aria="transcribe.companionVolumeAria" />
+                        <input type="range" class="companion-volume-slider" id="companion-volume-slider" min="0" max="1" step="0.05" value="1" oninput="changeCompanionVolume(this.value)" aria-label="Volume" data-i18n-aria="transcribe.companionVolumeAria" dir="ltr" />
                       </div>
 
                       <!-- PiP & Fullscreen -->

@@ -28,8 +28,13 @@ import {
 class MockElement {
   tagName: string;
   id = '';
-  className = '';
   _classes = new Set<string>();
+  get className(): string {
+    return Array.from(this._classes).join(' ');
+  }
+  set className(val: string) {
+    this._classes = new Set(String(val).split(/\s+/).filter(Boolean));
+  }
   classList: any;
   attributes = new Map<string, string>();
   children: MockElement[] = [];
@@ -122,12 +127,25 @@ class MockElement {
     }
   }
 
-  querySelectorAll(sel: string) {
+  querySelectorAll(sel: string): MockElement[] {
+    const res: MockElement[] = [];
+    const check = (node: MockElement) => {
+      if (sel.startsWith('.')) {
+        const classes = sel.split('.').filter(Boolean);
+        if (classes.every(c => node.classList.contains(c))) res.push(node);
+      } else if (sel.startsWith('#')) {
+        if (node.id === sel.slice(1)) res.push(node);
+      }
+      node.children.forEach(check);
+    };
+    this.children.forEach(check);
+    if (res.length > 0) return res;
     return mockDocument.querySelectorAll(sel);
   }
 
   querySelector(sel: string) {
-    return mockDocument.querySelector(sel);
+    const all = this.querySelectorAll(sel);
+    return all.length > 0 ? all[0] : null;
   }
 
   scrollIntoView() {}
@@ -598,6 +616,55 @@ describe('Companion Media Player & DOM Controls', () => {
     loadedListeners.forEach((fn: any) => fn());
 
     expect(videoEl.currentTime).toBe(2.5);
+  });
+
+  it('correctly passes sourcePath parameter when probing video geometry for companion player', async () => {
+    let capturedCmd: string | null = null;
+    let capturedArgs: any = null;
+    (globalThis as any).invoke = async (cmd: string, args: any) => {
+      if (cmd === 'probe_hardsub_source') {
+        capturedCmd = cmd;
+        capturedArgs = args;
+        return { width: 1080, height: 1920, durationSec: 15.0 }; // 9:16 vertical video
+      }
+      if (cmd === 'stream_media_file') return 'http://127.0.0.1:9090/media/test';
+      return null;
+    };
+
+    const videoEl = registerMockEl('companion-media-element', 'VIDEO') as any;
+    videoEl.load = () => {};
+    registerMockEl('companion-meta-resolution');
+    const aspectEl = registerMockEl('companion-meta-aspect');
+    registerMockEl('btn-companion-pip', 'BUTTON');
+    registerMockEl('btn-companion-fullscreen', 'BUTTON');
+    const videoContainer = registerMockEl('companion-video-container');
+
+    const { loadMediaIntoCompanionPlayer } = await import('./companionPlayer');
+    await loadMediaIntoCompanionPlayer('/path/to/reel.mp4', false);
+
+    expect(capturedCmd).toBe('probe_hardsub_source');
+    expect(capturedArgs).toHaveProperty('sourcePath', '/path/to/reel.mp4');
+    expect(aspectEl.textContent).toBe('9:16');
+    expect(videoContainer.classList.contains('aspect-vertical')).toBe(true);
+  });
+
+  it('ensures wordsBar always includes confidence-bar-dimmed class so toggling off works reliably', () => {
+    const cardEl = transcriptViewer.createCard({
+      id: 0,
+      timeRange: '[00:00:01.000 --> 00:00:03.000]',
+      text: 'Confidence test word',
+      startMs: 1000,
+      endMs: 3000,
+      words: [
+        { text: 'Confidence', startMs: 1000, endMs: 2000, prob: 0.95 },
+        { text: 'test', startMs: 2000, endMs: 2500, prob: 0.40 },
+        { text: 'word', startMs: 2500, endMs: 3000, prob: 0.98 }
+      ]
+    });
+
+    const wordsBar = cardEl.querySelector('.transcript-words-bar');
+    expect(wordsBar).not.toBeNull();
+    expect(wordsBar?.classList.contains('confidence-bar-dimmed')).toBe(true);
   });
 });
 

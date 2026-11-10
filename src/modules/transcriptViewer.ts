@@ -258,10 +258,7 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
   // Word-level confidence badges / clickable words bar
   if (Array.isArray(lineObj.words) && lineObj.words.length > 0) {
     const wordsBar = document.createElement('div');
-    wordsBar.className = 'transcript-words-bar';
-    if (!confidenceHighlightingActive) {
-      wordsBar.classList.add('confidence-bar-dimmed');
-    }
+    wordsBar.className = 'transcript-words-bar confidence-bar-dimmed';
     lineObj.words.forEach(w => {
       const wordSpan = document.createElement('span');
       wordSpan.className = 'transcript-word';
@@ -530,15 +527,24 @@ export async function persistTranscriptLinesToDisk(): Promise<void> {
   const linesSnapshot = transcriptLines.map(l => ({ ...l }));
   transcriptDirty = false;
 
+  let anySuccess = false;
+  let errorCount = 0;
   for (const filePath of targetFiles) {
     const content = serializeTranscriptLinesForFile(linesSnapshot, filePath);
     if (content !== null) {
       try {
         await invoke('write_text_file_content', { filePath, content });
+        anySuccess = true;
       } catch (err) {
+        errorCount++;
         console.warn('Failed to persist transcript edits to file:', filePath, err);
       }
     }
+  }
+
+  // If writes were attempted and all failed, keep dirty flag so pending changes are not lost
+  if (!anySuccess && errorCount > 0) {
+    transcriptDirty = true;
   }
 }
 

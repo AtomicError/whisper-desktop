@@ -56,6 +56,16 @@ if (typeof window !== 'undefined') {
 export function switchView(viewName: string): void {
   setActiveView(viewName);
 
+  // Pause companion player when navigating away from transcribe view
+  if (viewName !== 'transcribe') {
+    const win = typeof window !== 'undefined' ? (window as any) : null;
+    if (win && typeof win.pauseCompanionPlayer === 'function') {
+      try {
+        win.pauseCompanionPlayer();
+      } catch (_) {}
+    }
+  }
+
   // Close any open custom dropdowns cleanly via their lifecycle method
   if (customSelectsMap) {
     customSelectsMap.forEach(cs => {
