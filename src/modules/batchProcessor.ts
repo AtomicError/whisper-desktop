@@ -85,6 +85,7 @@ export interface BatchItem {
   txtPath?: string | null;
   internalJsonPath?: string | null;
   transcriptLines?: any[];
+  history?: { undoStack: any[]; redoStack: any[] };
 }
 
 // Module-level state tracking
@@ -515,12 +516,24 @@ export async function selectBatchItemTranscript(index: number): Promise<void> {
     return;
   }
 
-  if (activeBatchViewerIndex !== index && transcriptViewer.hasPendingEdits()) {
-    await transcriptViewer.flushEdits();
+  if (activeBatchViewerIndex !== index) {
+    if (transcriptViewer.hasPendingEdits()) {
+      await transcriptViewer.flushEdits();
+    }
+    if (activeBatchViewerIndex >= 0 && activeBatchViewerIndex < batchItems.length) {
+      const prevItem = batchItems[activeBatchViewerIndex];
+      if (prevItem && typeof transcriptViewer.getHistory === 'function') {
+        prevItem.history = transcriptViewer.getHistory();
+      }
+    }
   }
 
   activeBatchViewerIndex = index;
   userExplicitlySelectedBatchItem = !isActive;
+
+  if (typeof transcriptViewer.setHistory === 'function') {
+    transcriptViewer.setHistory(item.history || { undoStack: [], redoStack: [] });
+  }
 
   if (isActive) {
     if (item.transcriptLines && item.transcriptLines.length > 0) {

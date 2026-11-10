@@ -1190,14 +1190,18 @@ fn show_in_folder(app: AppHandle, file_path: String) -> Result<(), String> {
         .map_err(|e| format!("Failed to reveal item in folder: {}", e))
 }
 
-#[tauri::command]
-fn exit_app(app: AppHandle) {
+fn cleanup_transcript_cache(app: &AppHandle) {
     if let Ok(cache_dir) = app.path().app_cache_dir() {
         let transcripts_dir = cache_dir.join("transcripts");
         if transcripts_dir.exists() {
             let _ = std::fs::remove_dir_all(&transcripts_dir);
         }
     }
+}
+
+#[tauri::command]
+fn exit_app(app: AppHandle) {
+    cleanup_transcript_cache(&app);
     app.exit(0);
 }
 
@@ -1479,12 +1483,7 @@ fn main() {
                 }
             }
 
-            if let Ok(cache_dir) = _app.path().app_cache_dir() {
-                let transcripts_dir = cache_dir.join("transcripts");
-                if transcripts_dir.exists() {
-                    let _ = std::fs::remove_dir_all(&transcripts_dir);
-                }
-            }
+            cleanup_transcript_cache(&_app.handle());
 
             #[cfg(target_os = "linux")]
             {
@@ -1582,12 +1581,7 @@ fn main() {
             tauri::async_runtime::spawn(async move {
                 app.state::<media_preview::PreviewState>().shutdown().await;
                 app.state::<Arc<video_server::MediaServer>>().shutdown().await;
-                if let Ok(cache_dir) = app.path().app_cache_dir() {
-                    let transcripts_dir = cache_dir.join("transcripts");
-                    if transcripts_dir.exists() {
-                        let _ = std::fs::remove_dir_all(&transcripts_dir);
-                    }
-                }
+                cleanup_transcript_cache(&app);
                 exit_state.store(2, Ordering::Release);
                 app.exit(0);
             });

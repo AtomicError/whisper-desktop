@@ -80,10 +80,14 @@ export function setupTranscriptDirection(): void {
     });
   });
 
+  let resizeTimer: ReturnType<typeof setTimeout> | null = null;
   window.addEventListener('resize', () => {
-    viewport.querySelectorAll('.transcript-text-input').forEach((input: HTMLElement) => {
-      autoResizeTranscriptField(input);
-    });
+    if (resizeTimer) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      viewport.querySelectorAll('.transcript-text-input').forEach((input: HTMLElement) => {
+        autoResizeTranscriptField(input);
+      });
+    }, 100);
   });
 }
 
@@ -733,7 +737,7 @@ export function splitTranscriptSegment(lineId: number, cursorPosition?: number):
 
   const leftText = fullText.slice(0, splitPos).trim();
   const rightText = fullText.slice(splitPos).trim();
-  if (!leftText && !rightText) return false;
+  if (!leftText || !rightText) return false;
 
   recordTranscriptHistorySnapshot('Split');
 
@@ -941,6 +945,53 @@ export function canRedoTranscript(): boolean {
 export function clearTranscriptHistory(): void {
   undoStack.length = 0;
   redoStack.length = 0;
+  updateUndoRedoButtonsUI();
+}
+
+export function getTranscriptHistory(): { undoStack: UndoHistoryEntry[]; redoStack: UndoHistoryEntry[] } {
+  return {
+    undoStack: undoStack.map(entry => ({
+      description: entry.description,
+      lines: entry.lines.map(l => ({
+        ...l,
+        words: Array.isArray(l.words) ? l.words.map(w => ({ ...w })) : undefined
+      }))
+    })),
+    redoStack: redoStack.map(entry => ({
+      description: entry.description,
+      lines: entry.lines.map(l => ({
+        ...l,
+        words: Array.isArray(l.words) ? l.words.map(w => ({ ...w })) : undefined
+      }))
+    }))
+  };
+}
+
+export function setTranscriptHistory(history?: { undoStack?: UndoHistoryEntry[]; redoStack?: UndoHistoryEntry[] } | null): void {
+  undoStack.length = 0;
+  redoStack.length = 0;
+  if (history && Array.isArray(history.undoStack)) {
+    history.undoStack.forEach(entry => {
+      undoStack.push({
+        description: entry.description,
+        lines: entry.lines.map(l => ({
+          ...l,
+          words: Array.isArray(l.words) ? l.words.map(w => ({ ...w })) : undefined
+        }))
+      });
+    });
+  }
+  if (history && Array.isArray(history.redoStack)) {
+    history.redoStack.forEach(entry => {
+      redoStack.push({
+        description: entry.description,
+        lines: entry.lines.map(l => ({
+          ...l,
+          words: Array.isArray(l.words) ? l.words.map(w => ({ ...w })) : undefined
+        }))
+      });
+    });
+  }
   updateUndoRedoButtonsUI();
 }
 
@@ -1500,11 +1551,19 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
     const isCtrlOrCmd = e.ctrlKey || e.metaKey;
     if (!isCtrlOrCmd) return;
 
+    // Do not intercept if an application modal overlay is open
+    const modalOverlay = document.getElementById('app-modal-overlay');
+    if (modalOverlay && modalOverlay.style.display !== 'none') return;
+
+    // Only active when transcribe panel is active
+    const transcribePanel = document.getElementById('panel-transcribe');
+    if (!transcribePanel || !transcribePanel.classList.contains('active')) return;
+
     const activeEl = document.activeElement;
-    const isTextEditing = activeEl instanceof HTMLInputElement || activeEl instanceof HTMLTextAreaElement;
+    const isTextEditing = activeEl instanceof HTMLInputElement || activeEl instanceof HTMLTextAreaElement || (activeEl as HTMLElement)?.isContentEditable;
 
     if ((e.key.toLowerCase() === 'z' && e.shiftKey) || (e.key.toLowerCase() === 'y' && !e.shiftKey)) {
-      if (canRedoTranscript()) {
+      if (!isTextEditing && canRedoTranscript()) {
         e.preventDefault();
         redoTranscriptOperation();
       }
@@ -1542,6 +1601,8 @@ if (typeof window !== 'undefined') {
   (window as any).canUndoTranscript = canUndoTranscript;
   (window as any).canRedoTranscript = canRedoTranscript;
   (window as any).clearTranscriptHistory = clearTranscriptHistory;
+  (window as any).getTranscriptHistory = getTranscriptHistory;
+  (window as any).setTranscriptHistory = setTranscriptHistory;
   (window as any).toggleConfidenceHighlighting = toggleConfidenceHighlighting;
   (window as any).isConfidenceHighlightingActive = isConfidenceHighlightingActive;
   (window as any).copyLiveTranscriptToClipboard = copyLiveTranscriptToClipboard;
@@ -1574,6 +1635,8 @@ export const transcriptViewer = {
   canUndo: canUndoTranscript,
   canRedo: canRedoTranscript,
   clearHistory: clearTranscriptHistory,
+  getHistory: getTranscriptHistory,
+  setHistory: setTranscriptHistory,
   toggleConfidence: toggleConfidenceHighlighting,
   isConfidenceActive: isConfidenceHighlightingActive,
   loadFromJson: loadTranscriptFromJsonData,

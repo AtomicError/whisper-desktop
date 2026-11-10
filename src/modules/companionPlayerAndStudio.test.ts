@@ -18,6 +18,8 @@ import {
   renderTranscriptLines,
   serializeTranscriptLinesForFile,
   persistTranscriptLinesToDisk,
+  getTranscriptHistory,
+  setTranscriptHistory,
   transcriptViewer,
   type TranscriptLine
 } from './transcriptViewer';
@@ -30,7 +32,9 @@ import {
   toggleCompanionMute,
   showTranscribeSetupDeck,
   showTranscribeMediaDeck,
-  unloadCompanionPlayer
+  unloadCompanionPlayer,
+  updateCompanionMetadataUI,
+  loadMediaIntoCompanionPlayer
 } from './companionPlayer';
 
 // Minimal mock DOM for headless testing
@@ -964,5 +968,83 @@ describe('Settings Output Formats Cleanup Integrity', () => {
     expect(rustSource).not.toMatch(/pub\s+output_json:\s*bool/);
     expect(rustSource).not.toMatch(/pub\s+output_json_full:\s*bool/);
     expect(rustSource).not.toMatch(/pub\s+print_confidence:\s*bool/);
+  });
+});
+
+describe('Studio Refinements, Isolation & Keyboard Accessibility', () => {
+  it('rejects splitting when cursor position results in empty left or right slice', () => {
+    transcriptViewer.lines = [
+      { id: 0, timeRange: '[00:00:00.000 --> 00:00:05.000]', text: '   Leading spaces' }
+    ];
+
+    // Cursor at position 2 (inside leading spaces) -> leftText is empty
+    const splitResult = splitTranscriptSegment(0, 2);
+    expect(splitResult).toBe(false);
+    expect(transcriptViewer.lines.length).toBe(1);
+    expect(transcriptViewer.lines[0].text).toBe('   Leading spaces');
+  });
+
+  it('supports getTranscriptHistory and setTranscriptHistory for per-item batch isolation', () => {
+    transcriptViewer.lines = [
+      { id: 0, timeRange: '[00:00:00.000 --> 00:00:03.000]', text: 'First item segment' }
+    ];
+    clearTranscriptHistory();
+
+    // Perform an operation that creates history on item A
+    deleteTranscriptSegment(0);
+    expect(canUndoTranscript()).toBe(true);
+
+    const itemAHistory = getTranscriptHistory();
+    expect(itemAHistory.undoStack.length).toBe(1);
+
+    // Switch to item B (empty history)
+    setTranscriptHistory({ undoStack: [], redoStack: [] });
+    expect(canUndoTranscript()).toBe(false);
+
+    // Switch back to item A
+    setTranscriptHistory(itemAHistory);
+    expect(canUndoTranscript()).toBe(true);
+    undoTranscriptOperation();
+    expect(transcriptViewer.lines.length).toBe(1);
+    expect(transcriptViewer.lines[0].text).toBe('First item segment');
+  });
+
+  it('renders "—" for video resolution when dimensions are 0 (pending probe)', () => {
+    const resEl = registerMockEl('companion-meta-resolution');
+    updateCompanionMetadataUI({
+      filePath: '/media/pending.mp4',
+      fileName: 'pending.mp4',
+      streamUrl: 'http://127.0.0.1:4000/media/tok',
+      durationSec: 120,
+      width: 0,
+      height: 0,
+      isVideo: true
+    });
+
+    expect(resEl.textContent).toBe('—');
+  });
+
+  it('does not scroll hidden transcript cards into view during active playback search', () => {
+    transcriptViewer.lines = [
+      { id: 0, timeRange: '[00:00:00.000 --> 00:00:05.000]', text: 'Visible card' },
+      { id: 1, timeRange: '[00:00:05.000 --> 00:00:10.000]', text: 'Hidden card' }
+    ];
+
+    let scrolled = false;
+    const card1 = registerMockEl('transcript-card-1');
+    card1.classList.add('transcript-card');
+    card1.dataset.id = '1';
+    card1.style.display = 'none'; // Filtered out by search
+    card1.scrollIntoView = () => { scrolled = true; };
+
+    // Query selector mock returns card1
+    const origQS = mockDocument.querySelector.bind(mockDocument);
+    mockDocument.querySelector = (sel: string) => {
+      if (sel.includes('data-id="1"')) return card1;
+      return origQS(sel);
+    };
+
+    highlightActiveTranscriptSegment(7.0);
+    expect(scrolled).toBe(false);
   });
 });

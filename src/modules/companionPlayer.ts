@@ -243,6 +243,7 @@ export async function loadMediaIntoCompanionPlayer(filePath: string, autoSwitchD
     if (!isNaN(vol)) {
       videoEl.volume = Math.max(0, Math.min(1, vol));
       videoEl.muted = vol === 0;
+      updateVolumeIcons(videoEl.muted || videoEl.volume === 0);
     }
   }
 
@@ -271,7 +272,7 @@ export function updateCompanionMetadataUI(info: CompanionMediaInfo): void {
   if (resEl) {
     resEl.textContent = (info.width && info.height)
       ? `${info.width}×${info.height}`
-      : (info.isVideo ? '1920×1080' : (t('transcribe.companionMetaAudioOnly') || 'Audio Only'));
+      : (info.isVideo ? '—' : (t('transcribe.companionMetaAudioOnly') || 'Audio Only'));
   }
   if (aspectEl) {
     aspectEl.textContent = info.isVideo
@@ -528,8 +529,8 @@ export function highlightActiveTranscriptSegment(currentSec: number): void {
     const cardEl = document.querySelector(`.transcript-card[data-id="${matchingLineId}"]`) as HTMLElement | null;
     if (cardEl) {
       cardEl.classList.add('active-playback');
-      // Gentle auto-scroll into view if not active element
-      if (document.activeElement?.tagName !== 'TEXTAREA') {
+      // Gentle auto-scroll into view if not active element and card is visible
+      if (cardEl.style.display !== 'none' && document.activeElement?.tagName !== 'TEXTAREA') {
         cardEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
     }
