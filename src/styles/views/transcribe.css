@@ -2267,6 +2267,12 @@ html[dir="rtl"] #transcript-search::placeholder,
   color: #f59e0b;
 }
 
+.btn-card-action.btn-card-delete:hover {
+  color: var(--danger, #ef4444);
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.12);
+}
+
 /* Active Playback Segment Highlight */
 .transcript-card.active-playback {
   border-color: rgba(var(--color-royal-blue-rgb, 59, 130, 246), 0.85) !important;

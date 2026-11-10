@@ -418,6 +418,10 @@
                         <kbd>Click</kbd>
                         <span data-i18n="transcribe.companionShortcutClick">Seek to segment or word</span>
                       </div>
+                      <div class="shortcut-item">
+                        <kbd>Ctrl + Z</kbd>
+                        <span data-i18n="transcribe.companionShortcutUndo">Undo edit</span>
+                      </div>
                     </div>
                   </div>
 
@@ -448,6 +452,18 @@
                       <h3 class="transcript-viewer-title" data-i18n="transcribe.liveViewerTitle">Live Transcript Viewer</h3>
                     </div>
                     <div class="transcript-viewer-actions">
+                      <button class="btn-secondary btn-icon-text" id="btn-undo-transcript" type="button" disabled onclick="undoTranscriptOperation()" data-i18n-title="transcribe.undoTooltip" title="Undo segment edit (Ctrl+Z)">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-inline-end: 4px;">
+                          <path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/>
+                        </svg>
+                        <span data-i18n="transcribe.undo">Undo</span>
+                      </button>
+                      <button class="btn-secondary btn-icon-text" id="btn-redo-transcript" type="button" disabled onclick="redoTranscriptOperation()" data-i18n-title="transcribe.redoTooltip" title="Redo segment edit (Ctrl+Shift+Z)">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-inline-end: 4px;">
+                          <path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/>
+                        </svg>
+                        <span data-i18n="transcribe.redo">Redo</span>
+                      </button>
                       <button class="btn-secondary btn-copy-transcript" id="btn-copy-transcript" type="button" disabled onclick="copyLiveTranscriptToClipboard()" data-i18n-aria="transcribe.copyTranscript" aria-label="Copy transcript">
                         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-inline-end: 4px;">
                           <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>

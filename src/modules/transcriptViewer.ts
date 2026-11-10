@@ -24,6 +24,15 @@ let transcriptSaveTimer: ReturnType<typeof setTimeout> | null = null;
 let inFlightSavePromise: Promise<void> | null = null;
 let confidenceHighlightingActive = false;
 
+export interface UndoHistoryEntry {
+  lines: TranscriptLine[];
+  description: string;
+}
+
+const undoStack: UndoHistoryEntry[] = [];
+const redoStack: UndoHistoryEntry[] = [];
+const MAX_UNDO_DEPTH = 50;
+
 const TRANSCRIPT_SAVE_DEBOUNCE_MS = 350;
 
 const getGlobal = (): any => (typeof window !== 'undefined' ? window : globalThis);
@@ -213,6 +222,24 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
     actionsWrap.appendChild(mergeBtn);
   }
 
+  const deleteBtn = document.createElement('button');
+  deleteBtn.type = 'button';
+  deleteBtn.className = 'btn-card-action btn-card-delete';
+  const deleteTitle = t('transcribe.deleteSegment') || 'Delete segment';
+  deleteBtn.title = deleteTitle;
+  deleteBtn.setAttribute('aria-label', deleteTitle);
+  deleteBtn.innerHTML = `
+    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+      <line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
+    </svg>
+  `;
+  deleteBtn.onclick = (e) => {
+    e.stopPropagation();
+    deleteTranscriptSegment(lineObj.id);
+  };
+  actionsWrap.appendChild(deleteBtn);
+
   headerEl.appendChild(actionsWrap);
 
   headerEl.onclick = () => {
@@ -284,7 +311,14 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
 
   cardEl.ondblclick = (e: MouseEvent) => {
     const target = e.target as HTMLElement | null;
-    if (target?.closest('.btn-card-action')) return;
+    const isAction = typeof target?.closest === 'function' && target.closest('.btn-card-action');
+    const isWordsBar = typeof target?.closest === 'function' && target.closest('.transcript-words-bar');
+    const isTextarea = (typeof HTMLTextAreaElement !== 'undefined' && target instanceof HTMLTextAreaElement) ||
+      target?.tagName === 'TEXTAREA' ||
+      target?.classList?.contains('transcript-text-input');
+    if (isAction || isWordsBar || isTextarea) {
+      return;
+    }
     const win = getGlobal();
     if (typeof win.seekCompanionPlayer === 'function') {
       win.seekCompanionPlayer(startMs);
@@ -305,15 +339,20 @@ export function renderTranscriptLines(lines: TranscriptLine[]): void {
   const placeholder = document.getElementById('transcript-placeholder');
   if (placeholder) placeholder.remove();
 
+  const btnCopy = document.getElementById('btn-copy-transcript') as HTMLButtonElement | null;
+  const btnConfidence = document.getElementById('btn-toggle-confidence') as HTMLButtonElement | null;
+
   if (!lines || lines.length === 0) {
     viewport.innerHTML = `<div style="color: var(--color-text-dim); text-align: center; margin-top: 40px;" data-i18n="transcribe.noSegments">${escapeHTML(t('transcribe.noSegments') || 'No transcript segments generated yet.')}</div>`;
-    const btnCopy = document.getElementById('btn-copy-transcript') as HTMLButtonElement | null;
     if (btnCopy) btnCopy.disabled = true;
+    if (btnConfidence) btnConfidence.disabled = true;
+    updateUndoRedoButtonsUI();
     return;
   }
 
-  const btnCopy = document.getElementById('btn-copy-transcript') as HTMLButtonElement | null;
   if (btnCopy) btnCopy.disabled = false;
+  if (btnConfidence) btnConfidence.disabled = false;
+  updateUndoRedoButtonsUI();
 
   const frag = document.createDocumentFragment();
   lines.forEach((lineObj) => {
@@ -688,6 +727,8 @@ export function splitTranscriptSegment(lineId: number, cursorPosition?: number):
   const rightText = fullText.slice(splitPos).trim();
   if (!leftText && !rightText) return false;
 
+  recordTranscriptHistorySnapshot('Split');
+
   let splitEndMs = startMs;
   let splitStartMs = endMs;
   let leftWords: WordToken[] | undefined;
@@ -827,6 +868,8 @@ export function mergeTranscriptSegmentWithPrevious(lineId: number): boolean {
     mergedWords = [...(prevLine.words || []), ...(currLine.words || [])];
   }
 
+  recordTranscriptHistorySnapshot('Merge');
+
   prevLine.text = mergedText;
   prevLine.startMs = unifiedStartMs;
   prevLine.endMs = unifiedEndMs;
@@ -862,6 +905,115 @@ export function mergeTranscriptSegmentWithPrevious(lineId: number): boolean {
     }
   }, 30);
 
+  scheduleTranscriptDiskSync();
+  return true;
+}
+
+export function recordTranscriptHistorySnapshot(description = 'Edit'): void {
+  const snapshot: TranscriptLine[] = transcriptLines.map(l => ({
+    ...l,
+    words: Array.isArray(l.words) ? l.words.map(w => ({ ...w })) : undefined
+  }));
+  undoStack.push({ lines: snapshot, description });
+  if (undoStack.length > MAX_UNDO_DEPTH) {
+    undoStack.shift();
+  }
+  redoStack.length = 0;
+  updateUndoRedoButtonsUI();
+}
+
+export function canUndoTranscript(): boolean {
+  return undoStack.length > 0;
+}
+
+export function canRedoTranscript(): boolean {
+  return redoStack.length > 0;
+}
+
+export function clearTranscriptHistory(): void {
+  undoStack.length = 0;
+  redoStack.length = 0;
+  updateUndoRedoButtonsUI();
+}
+
+export function updateUndoRedoButtonsUI(): void {
+  if (typeof document === 'undefined') return;
+  const undoBtn = document.getElementById('btn-undo-transcript') as HTMLButtonElement | null;
+  const redoBtn = document.getElementById('btn-redo-transcript') as HTMLButtonElement | null;
+  if (undoBtn) undoBtn.disabled = undoStack.length === 0;
+  if (redoBtn) redoBtn.disabled = redoStack.length === 0;
+}
+
+export function undoTranscriptOperation(): boolean {
+  if (undoStack.length === 0) return false;
+  const currentSnapshot: TranscriptLine[] = transcriptLines.map(l => ({
+    ...l,
+    words: Array.isArray(l.words) ? l.words.map(w => ({ ...w })) : undefined
+  }));
+  redoStack.push({ lines: currentSnapshot, description: 'Revert' });
+  if (redoStack.length > MAX_UNDO_DEPTH) {
+    redoStack.shift();
+  }
+
+  const previous = undoStack.pop()!;
+  transcriptLines = previous.lines.map(l => ({ ...l }));
+  transcriptLines.forEach((l, idx) => { l.id = idx; });
+  transcriptDirty = true;
+
+  const win = getGlobal();
+  if (win.isBatchMode && win.activeBatchViewerIndex >= 0 && win.batchItems && win.batchItems[win.activeBatchViewerIndex]) {
+    win.batchItems[win.activeBatchViewerIndex].transcriptLines = transcriptLines.map(l => ({ ...l }));
+  }
+
+  renderTranscriptLines(transcriptLines);
+  scheduleTranscriptDiskSync();
+  updateUndoRedoButtonsUI();
+  return true;
+}
+
+export function redoTranscriptOperation(): boolean {
+  if (redoStack.length === 0) return false;
+  const currentSnapshot: TranscriptLine[] = transcriptLines.map(l => ({
+    ...l,
+    words: Array.isArray(l.words) ? l.words.map(w => ({ ...w })) : undefined
+  }));
+  undoStack.push({ lines: currentSnapshot, description: 'Undo' });
+  if (undoStack.length > MAX_UNDO_DEPTH) {
+    undoStack.shift();
+  }
+
+  const next = redoStack.pop()!;
+  transcriptLines = next.lines.map(l => ({ ...l }));
+  transcriptLines.forEach((l, idx) => { l.id = idx; });
+  transcriptDirty = true;
+
+  const win = getGlobal();
+  if (win.isBatchMode && win.activeBatchViewerIndex >= 0 && win.batchItems && win.batchItems[win.activeBatchViewerIndex]) {
+    win.batchItems[win.activeBatchViewerIndex].transcriptLines = transcriptLines.map(l => ({ ...l }));
+  }
+
+  renderTranscriptLines(transcriptLines);
+  scheduleTranscriptDiskSync();
+  updateUndoRedoButtonsUI();
+  return true;
+}
+
+export function deleteTranscriptSegment(lineId: number): boolean {
+  const index = transcriptLines.findIndex(l => l.id === lineId);
+  if (index === -1) return false;
+
+  recordTranscriptHistorySnapshot('Delete');
+
+  transcriptLines.splice(index, 1);
+  transcriptLines.forEach((l, idx) => { l.id = idx; });
+  transcriptDirty = true;
+
+  const win = getGlobal();
+  if (win.isBatchMode && win.activeBatchViewerIndex >= 0 && win.batchItems && win.batchItems[win.activeBatchViewerIndex]) {
+    win.batchItems[win.activeBatchViewerIndex].transcriptLines = transcriptLines.map(l => ({ ...l }));
+  }
+
+  renderTranscriptLines(transcriptLines);
   scheduleTranscriptDiskSync();
   return true;
 }
@@ -983,6 +1135,7 @@ export function parseAndApplyTranscriptContent(text: string, ext: string, should
       }
       transcriptDirty = false;
       transcriptLines = lines;
+      clearTranscriptHistory();
       renderTranscriptLines(transcriptLines);
     }
     return lines;
@@ -1297,6 +1450,7 @@ export function clearTranscriptLines(): void {
   }
   transcriptDirty = false;
   transcriptLines = [];
+  clearTranscriptHistory();
   renderTranscriptLines([]);
 }
 
@@ -1307,6 +1461,29 @@ export async function loadTranscriptFromJsonData(jsonData: string, shouldRender 
     console.error("Failed to load transcript from json data:", err);
     return [];
   }
+}
+
+// Keyboard shortcut listener for structural Undo/Redo
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('keydown', (e: KeyboardEvent) => {
+    const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+    if (!isCtrlOrCmd) return;
+
+    const activeEl = document.activeElement;
+    const isTextEditing = activeEl instanceof HTMLInputElement || activeEl instanceof HTMLTextAreaElement;
+
+    if ((e.key.toLowerCase() === 'z' && e.shiftKey) || (e.key.toLowerCase() === 'y' && !e.shiftKey)) {
+      if (canRedoTranscript()) {
+        e.preventDefault();
+        redoTranscriptOperation();
+      }
+    } else if (e.key.toLowerCase() === 'z' && !e.shiftKey) {
+      if (!isTextEditing && canUndoTranscript()) {
+        e.preventDefault();
+        undoTranscriptOperation();
+      }
+    }
+  });
 }
 
 // Bind to window for HTML onclick/oninput handlers
@@ -1328,6 +1505,12 @@ if (typeof window !== 'undefined') {
   (window as any).loadTranscriptFromJsonData = loadTranscriptFromJsonData;
   (window as any).splitTranscriptSegment = splitTranscriptSegment;
   (window as any).mergeTranscriptSegmentWithPrevious = mergeTranscriptSegmentWithPrevious;
+  (window as any).deleteTranscriptSegment = deleteTranscriptSegment;
+  (window as any).undoTranscriptOperation = undoTranscriptOperation;
+  (window as any).redoTranscriptOperation = redoTranscriptOperation;
+  (window as any).canUndoTranscript = canUndoTranscript;
+  (window as any).canRedoTranscript = canRedoTranscript;
+  (window as any).clearTranscriptHistory = clearTranscriptHistory;
   (window as any).toggleConfidenceHighlighting = toggleConfidenceHighlighting;
   (window as any).isConfidenceHighlightingActive = isConfidenceHighlightingActive;
   (window as any).copyLiveTranscriptToClipboard = copyLiveTranscriptToClipboard;
@@ -1354,6 +1537,12 @@ export const transcriptViewer = {
   updateLineText: updateTranscriptLineText,
   splitSegment: splitTranscriptSegment,
   mergeSegment: mergeTranscriptSegmentWithPrevious,
+  deleteSegment: deleteTranscriptSegment,
+  undo: undoTranscriptOperation,
+  redo: redoTranscriptOperation,
+  canUndo: canUndoTranscript,
+  canRedo: canRedoTranscript,
+  clearHistory: clearTranscriptHistory,
   toggleConfidence: toggleConfidenceHighlighting,
   isConfidenceActive: isConfidenceHighlightingActive,
   loadFromJson: loadTranscriptFromJsonData,

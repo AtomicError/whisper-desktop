@@ -6,9 +6,16 @@ import { resolve } from 'node:path';
 import {
   splitTranscriptSegment,
   mergeTranscriptSegmentWithPrevious,
+  deleteTranscriptSegment,
+  undoTranscriptOperation,
+  redoTranscriptOperation,
+  canUndoTranscript,
+  canRedoTranscript,
+  clearTranscriptHistory,
   toggleConfidenceHighlighting,
   isConfidenceHighlightingActive,
   loadTranscriptFromJsonData,
+  renderTranscriptLines,
   transcriptViewer,
   type TranscriptLine
 } from './transcriptViewer';
@@ -146,6 +153,16 @@ class MockElement {
   querySelector(sel: string) {
     const all = this.querySelectorAll(sel);
     return all.length > 0 ? all[0] : null;
+  }
+
+  closest(sel: string): MockElement | null {
+    let curr: MockElement | null = this;
+    while (curr) {
+      if (sel.startsWith('.') && curr.classList.contains(sel.slice(1))) return curr;
+      if (sel.startsWith('#') && curr.id === sel.slice(1)) return curr;
+      curr = curr.parentNode;
+    }
+    return null;
   }
 
   scrollIntoView() {}
@@ -384,6 +401,88 @@ describe('Transcript Segment Splitting & Merging with Word Timestamps', () => {
     expect(win.batchItems[0].transcriptLines.length).toBe(2);
 
     win.isBatchMode = false;
+  });
+
+  it('deletes a segment cleanly, re-indexes remaining segments, and records undo snapshot', () => {
+    transcriptViewer.lines = [
+      { id: 0, timeRange: '[00:00:01.000 --> 00:00:02.000]', text: 'First line', startMs: 1000, endMs: 2000 },
+      { id: 1, timeRange: '[00:00:02.000 --> 00:00:03.000]', text: 'Second to delete', startMs: 2000, endMs: 3000 },
+      { id: 2, timeRange: '[00:00:03.000 --> 00:00:04.000]', text: 'Third line', startMs: 3000, endMs: 4000 }
+    ];
+
+    clearTranscriptHistory();
+    expect(canUndoTranscript()).toBe(false);
+
+    const deleteOk = deleteTranscriptSegment(1);
+    expect(deleteOk).toBe(true);
+
+    const lines = transcriptViewer.lines;
+    expect(lines.length).toBe(2);
+    expect(lines[0].text).toBe('First line');
+    expect(lines[0].id).toBe(0);
+    expect(lines[1].text).toBe('Third line');
+    expect(lines[1].id).toBe(1);
+    expect(canUndoTranscript()).toBe(true);
+  });
+
+  it('supports structural undo (Ctrl+Z) and redo (Ctrl+Shift+Z) for segment modifications', () => {
+    transcriptViewer.lines = [
+      { id: 0, timeRange: '[00:00:01.000 --> 00:00:04.000]', text: 'Original line to split', startMs: 1000, endMs: 4000 }
+    ];
+
+    clearTranscriptHistory();
+    expect(canUndoTranscript()).toBe(false);
+    expect(canRedoTranscript()).toBe(false);
+
+    // 1. Perform split
+    splitTranscriptSegment(0, 8);
+    expect(transcriptViewer.lines.length).toBe(2);
+    expect(canUndoTranscript()).toBe(true);
+
+    // 2. Perform undo -> should restore to 1 segment
+    const undoOk = undoTranscriptOperation();
+    expect(undoOk).toBe(true);
+    expect(transcriptViewer.lines.length).toBe(1);
+    expect(transcriptViewer.lines[0].text).toBe('Original line to split');
+    expect(canRedoTranscript()).toBe(true);
+
+    // 3. Perform redo -> should re-split to 2 segments
+    const redoOk = redoTranscriptOperation();
+    expect(redoOk).toBe(true);
+    expect(transcriptViewer.lines.length).toBe(2);
+  });
+
+  it('ignores card double-click when initiated on textarea or confidence words', () => {
+    let seekTriggered = false;
+    const win = (globalThis as any);
+    win.seekCompanionPlayer = () => { seekTriggered = true; };
+
+    const cardEl = transcriptViewer.createCard({
+      id: 0,
+      timeRange: '[00:00:01.000 --> 00:00:03.000]',
+      text: 'Double click test',
+      startMs: 1000,
+      endMs: 3000,
+      words: [{ text: 'Double', startMs: 1000, endMs: 2000, prob: 0.9 }]
+    });
+
+    // Simulated double click on textarea
+    const textarea = cardEl.querySelector('.transcript-text-input') as any;
+    expect(textarea).not.toBeNull();
+    seekTriggered = false;
+    cardEl.ondblclick({ target: textarea } as any);
+    expect(seekTriggered).toBe(false);
+
+    // Simulated double click on words bar
+    const wordsBar = cardEl.querySelector('.transcript-words-bar') as any;
+    seekTriggered = false;
+    cardEl.ondblclick({ target: wordsBar } as any);
+    expect(seekTriggered).toBe(false);
+
+    // Simulated double click on card blank space (header/card background)
+    seekTriggered = false;
+    cardEl.ondblclick({ target: cardEl } as any);
+    expect(seekTriggered).toBe(true);
   });
 });
 
@@ -665,6 +764,47 @@ describe('Companion Media Player & DOM Controls', () => {
     const wordsBar = cardEl.querySelector('.transcript-words-bar');
     expect(wordsBar).not.toBeNull();
     expect(wordsBar?.classList.contains('confidence-bar-dimmed')).toBe(true);
+  });
+
+  it('retains user-chosen playbackRate and volume slider levels when loading new media', async () => {
+    const videoEl = registerMockEl('companion-media-element', 'VIDEO') as any;
+    videoEl.load = () => {};
+    const speedSelect = registerMockEl('companion-speed-select', 'SELECT') as any;
+    speedSelect.value = '1.5';
+    const volSlider = registerMockEl('companion-volume-slider', 'INPUT') as any;
+    volSlider.value = '0.75';
+
+    registerMockEl('companion-meta-resolution');
+    registerMockEl('companion-meta-aspect');
+    registerMockEl('btn-companion-pip', 'BUTTON');
+    registerMockEl('btn-companion-fullscreen', 'BUTTON');
+
+    const { loadMediaIntoCompanionPlayer } = await import('./companionPlayer');
+    await loadMediaIntoCompanionPlayer('/path/to/interview.mp4', false);
+
+    expect(videoEl.playbackRate).toBe(1.5);
+    expect(videoEl.volume).toBe(0.75);
+    expect(videoEl.muted).toBe(false);
+  });
+
+  it('updates confidence button and copy button disabled state on empty vs populated lines', () => {
+    registerMockEl('transcript-viewport');
+    const btnCopy = registerMockEl('btn-copy-transcript', 'BUTTON') as any;
+    const btnConfidence = registerMockEl('btn-toggle-confidence', 'BUTTON') as any;
+    registerMockEl('btn-undo-transcript', 'BUTTON');
+    registerMockEl('btn-redo-transcript', 'BUTTON');
+
+    // 1. Render empty
+    renderTranscriptLines([]);
+    expect(btnCopy.disabled).toBe(true);
+    expect(btnConfidence.disabled).toBe(true);
+
+    // 2. Render populated
+    renderTranscriptLines([
+      { id: 0, timeRange: '[00:00:01.000 --> 00:00:02.000]', text: 'Populated line' }
+    ]);
+    expect(btnCopy.disabled).toBe(false);
+    expect(btnConfidence.disabled).toBe(false);
   });
 });
 

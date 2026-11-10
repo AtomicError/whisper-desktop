@@ -704,6 +704,11 @@ pub async fn run_transcription(
         }
     }
 
+    // Reset previous transcript JSON memory state
+    if let Ok(mut lock) = LAST_TRANSCRIPT_JSON.lock() {
+        *lock = None;
+    }
+
     // Build arguments
     let mut args = vec![
         "-m".to_string(),
@@ -1054,7 +1059,12 @@ pub async fn run_transcription(
                 let transcripts_dir = cache_dir.join("transcripts");
                 let _ = fs::create_dir_all(&transcripts_dir);
                 let out_base = Path::new(&out_name_str).file_name().unwrap_or_default().to_string_lossy().to_string();
-                let target_file = transcripts_dir.join(format!("{}.json", out_base));
+                use std::collections::hash_map::DefaultHasher;
+                use std::hash::{Hash, Hasher};
+                let mut hasher = DefaultHasher::new();
+                out_name_str.hash(&mut hasher);
+                let path_hash = hasher.finish();
+                let target_file = transcripts_dir.join(format!("{}_{:016x}.json", out_base, path_hash));
                 if fs::write(&target_file, &json_content).is_ok() {
                     internal_json_path = Some(target_file.to_string_lossy().to_string());
                 }

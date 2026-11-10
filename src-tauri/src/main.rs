@@ -1192,6 +1192,12 @@ fn show_in_folder(app: AppHandle, file_path: String) -> Result<(), String> {
 
 #[tauri::command]
 fn exit_app(app: AppHandle) {
+    if let Ok(cache_dir) = app.path().app_cache_dir() {
+        let transcripts_dir = cache_dir.join("transcripts");
+        if transcripts_dir.exists() {
+            let _ = std::fs::remove_dir_all(&transcripts_dir);
+        }
+    }
     app.exit(0);
 }
 
@@ -1473,6 +1479,13 @@ fn main() {
                 }
             }
 
+            if let Ok(cache_dir) = _app.path().app_cache_dir() {
+                let transcripts_dir = cache_dir.join("transcripts");
+                if transcripts_dir.exists() {
+                    let _ = std::fs::remove_dir_all(&transcripts_dir);
+                }
+            }
+
             #[cfg(target_os = "linux")]
             {
                 use webkit2gtk::{WebViewExt, PermissionRequestExt, SettingsExt};
@@ -1569,6 +1582,12 @@ fn main() {
             tauri::async_runtime::spawn(async move {
                 app.state::<media_preview::PreviewState>().shutdown().await;
                 app.state::<Arc<video_server::MediaServer>>().shutdown().await;
+                if let Ok(cache_dir) = app.path().app_cache_dir() {
+                    let transcripts_dir = cache_dir.join("transcripts");
+                    if transcripts_dir.exists() {
+                        let _ = std::fs::remove_dir_all(&transcripts_dir);
+                    }
+                }
                 exit_state.store(2, Ordering::Release);
                 app.exit(0);
             });

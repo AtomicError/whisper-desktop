@@ -659,6 +659,7 @@ function renderBatchQueueTable(): void {
         selectBatchItemTranscript(index);
       };
       card.ondblclick = () => {
+        if (item.status !== 'completed') return;
         void selectBatchItemTranscript(index).then(() => {
           const win = getGlobal();
           if (typeof win.showTranscribeMediaDeck === 'function' && item.path) {

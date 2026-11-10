@@ -224,6 +224,21 @@ export async function loadMediaIntoCompanionPlayer(filePath: string, autoSwitchD
   videoEl.src = streamUrl;
   videoEl.load();
 
+  // Synchronize user-chosen playback rate and volume on the newly loaded media
+  const speedSelect = document.getElementById('companion-speed-select') as HTMLSelectElement | null;
+  if (speedSelect) {
+    const rate = parseFloat(speedSelect.value) || 1.0;
+    videoEl.playbackRate = rate;
+  }
+  const volSlider = document.getElementById('companion-volume-slider') as HTMLInputElement | null;
+  if (volSlider) {
+    const vol = parseFloat(volSlider.value);
+    if (!isNaN(vol)) {
+      videoEl.volume = Math.max(0, Math.min(1, vol));
+      videoEl.muted = vol === 0;
+    }
+  }
+
   if (autoSwitchDeck) {
     showTranscribeMediaDeck();
   } else {
