@@ -561,6 +561,44 @@ describe('Companion Media Player & DOM Controls', () => {
     // Subsequent calls during silence should return early and not throw
     expect(() => highlightActiveTranscriptSegment(5.1)).not.toThrow();
   });
+
+  it('correctly reports Stereo/Audio Only for audio files and does not default aspect ratio to 16:9', async () => {
+    const videoEl = registerMockEl('companion-media-element', 'VIDEO') as any;
+    videoEl.load = () => {};
+    const resEl = registerMockEl('companion-meta-resolution');
+    const aspectEl = registerMockEl('companion-meta-aspect');
+    const pipBtn = registerMockEl('btn-companion-pip', 'BUTTON') as any;
+    const fullscreenBtn = registerMockEl('btn-companion-fullscreen', 'BUTTON') as any;
+    registerMockEl('companion-audio-fallback');
+    registerMockEl('companion-audio-name');
+
+    const { loadMediaIntoCompanionPlayer } = await import('./companionPlayer');
+    await loadMediaIntoCompanionPlayer('/path/to/podcast.mp3', false);
+
+    expect(aspectEl.textContent).not.toBe('16:9');
+    expect(aspectEl.textContent).toBe('Stereo');
+    expect(resEl.textContent).toBe('Audio Only');
+    expect(pipBtn.disabled).toBe(true);
+    expect(fullscreenBtn.disabled).toBe(true);
+  });
+
+  it('defers seek setting until loadedmetadata if video is not ready yet', () => {
+    const videoEl = registerMockEl('companion-media-element', 'VIDEO') as any;
+    videoEl.readyState = 0; // HAVE_NOTHING
+    videoEl.currentTime = 0;
+    videoEl.paused = true;
+
+    seekCompanionPlayer(2500, false); // 2.5 seconds
+    expect(videoEl.currentTime).toBe(0);
+
+    // Simulate metadata loading event
+    videoEl.readyState = 1;
+    const loadedListeners = videoEl._listeners.get('loadedmetadata') || [];
+    expect(loadedListeners.length).toBeGreaterThan(0);
+    loadedListeners.forEach((fn: any) => fn());
+
+    expect(videoEl.currentTime).toBe(2.5);
+  });
 });
 
 describe('Settings Output Formats Cleanup Integrity', () => {

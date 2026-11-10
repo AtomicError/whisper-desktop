@@ -1428,8 +1428,8 @@ it releases chemicals that hit your eyes
   it('supports all fallback subtitle and text formats in batch extraction with single-mode parity', () => {
     const batchContent = readFileSync(resolve(__dirname, 'modules/batchProcessor.ts'), 'utf-8');
 
-    // Match all subtitle and text fallback formats in batch mode
-    expect(batchContent).toContain("result.generatedFiles.find((f: string) => f.endsWith('.lrc')) ||\n                        result.generatedFiles.find((f: string) => f.endsWith('.json')) ||\n                        result.generatedFiles.find((f: string) => f.endsWith('.csv')) ||\n                        result.generatedFiles.find((f: string) => f.endsWith('.txt'));");
+    // Match all subtitle and text fallback formats in batch mode with single-mode parity
+    expect(batchContent).toContain("result.generatedFiles.find((f: string) => f.endsWith('.lrc')) ||\n                        result.generatedFiles.find((f: string) => f.endsWith('.txt'));");
   });
 
   it('isolates duration display in RTL stylesheet and localizes pending status in formatDuration', () => {

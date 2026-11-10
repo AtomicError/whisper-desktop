@@ -1,7 +1,7 @@
 // Batch Processing Engine & Queue Controller for Whisper Desktop
 import { t, applyContentDirection, isolateLtr, isolateDirection } from '../i18n/index';
 import { escapeHTML } from './logsController';
-import { transcriptViewer, loadTranscriptFromFile } from './transcriptViewer';
+import { transcriptViewer, loadTranscriptFromFile, loadTranscriptFromJsonData } from './transcriptViewer';
 import { customSelectsMap } from './customSelect';
 import {
   getSettingsState,
@@ -83,6 +83,7 @@ export interface BatchItem {
   outputDir?: string | null;
   subtitlePath?: string | null;
   txtPath?: string | null;
+  internalJsonPath?: string | null;
   transcriptLines?: any[];
 }
 
@@ -559,25 +560,48 @@ export async function selectBatchItemTranscript(index: number): Promise<void> {
       transcriptViewer.lines = item.transcriptLines.map((l: any) => ({ ...l }));
       if (win) win.transcriptLines = transcriptLines;
       transcriptViewer.render(transcriptLines);
-    } else if (item.subtitlePath) {
-      try {
-        const loaded = await loadTranscriptFromFile(item.subtitlePath, true);
-        item.transcriptLines = (loaded || []).map((l: any) => ({ ...l }));
-      } catch (e) {
-        console.error("Failed to load batch item subtitle:", e);
+    } else if (item.internalJsonPath) {
+      const invoke = getTauriInvoke();
+      if (invoke) {
+        try {
+          const sessionJson: string = await invoke('get_transcript_session_data', {
+            sessionFile: item.internalJsonPath
+          });
+          if (sessionJson) {
+            const loaded = await loadTranscriptFromJsonData(sessionJson, true);
+            if (loaded && loaded.length > 0) {
+              item.transcriptLines = loaded.map((l: any) => ({ ...l }));
+              transcriptLines = item.transcriptLines.map((l: any) => ({ ...l }));
+              transcriptViewer.lines = item.transcriptLines.map((l: any) => ({ ...l }));
+              if (win) win.transcriptLines = transcriptLines;
+            }
+          }
+        } catch (jsonErr) {
+          console.warn('Could not load internal batch item session JSON:', jsonErr);
+        }
       }
-    } else if (item.txtPath) {
-      try {
-        const loaded = await loadTranscriptFromFile(item.txtPath, true);
-        item.transcriptLines = (loaded || []).map((l: any) => ({ ...l }));
-      } catch (e) {
-        console.error("Failed to load batch item transcript:", e);
+    }
+    if (!item.transcriptLines || item.transcriptLines.length === 0) {
+      if (item.subtitlePath) {
+        try {
+          const loaded = await loadTranscriptFromFile(item.subtitlePath, true);
+          item.transcriptLines = (loaded || []).map((l: any) => ({ ...l }));
+        } catch (e) {
+          console.error("Failed to load batch item subtitle:", e);
+        }
+      } else if (item.txtPath) {
+        try {
+          const loaded = await loadTranscriptFromFile(item.txtPath, true);
+          item.transcriptLines = (loaded || []).map((l: any) => ({ ...l }));
+        } catch (e) {
+          console.error("Failed to load batch item transcript:", e);
+        }
+      } else {
+        transcriptLines = [];
+        transcriptViewer.lines = [];
+        if (win) win.transcriptLines = [];
+        transcriptViewer.render([]);
       }
-    } else {
-      transcriptLines = [];
-      transcriptViewer.lines = [];
-      if (win) win.transcriptLines = [];
-      transcriptViewer.render([]);
     }
     if (item.path && typeof win.loadMediaIntoCompanionPlayer === 'function') {
       try {
@@ -633,6 +657,14 @@ function renderBatchQueueTable(): void {
 
       card.onclick = () => {
         selectBatchItemTranscript(index);
+      };
+      card.ondblclick = () => {
+        void selectBatchItemTranscript(index).then(() => {
+          const win = getGlobal();
+          if (typeof win.showTranscribeMediaDeck === 'function' && item.path) {
+            win.showTranscribeMediaDeck();
+          }
+        });
       };
       card.onkeydown = (e: KeyboardEvent) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -970,13 +1002,33 @@ export async function runBatchExtraction(): Promise<void> {
         durationSec: item.durationSec || 60.0
       });
 
-      if ((!item.transcriptLines || item.transcriptLines.length === 0) && result.generatedFiles && result.generatedFiles.length > 0) {
+      item.internalJsonPath = result.internalJsonPath || null;
+
+      // Populate transcript lines with exact word-level timestamps & confidence from internal JSON
+      let loadedFromInternalJson = false;
+      if (result.internalJsonPath) {
+        try {
+          const sessionJson: string = await invoke('get_transcript_session_data', {
+            sessionFile: result.internalJsonPath
+          });
+          if (sessionJson) {
+            const shouldRender = (activeBatchViewerIndex === i);
+            const parsedLines = await loadTranscriptFromJsonData(sessionJson, shouldRender);
+            if (parsedLines && parsedLines.length > 0) {
+              item.transcriptLines = parsedLines.map((l: any) => ({ ...l }));
+              loadedFromInternalJson = true;
+            }
+          }
+        } catch (jsonErr) {
+          console.warn('Could not load internal batch session JSON:', jsonErr);
+        }
+      }
+
+      if (!loadedFromInternalJson && (!item.transcriptLines || item.transcriptLines.length === 0) && result.generatedFiles && result.generatedFiles.length > 0) {
         const outputDir = result.outputDir || getParentDir(item.path);
         const subFile = result.generatedFiles.find((f: string) => f.endsWith('.srt')) ||
                         result.generatedFiles.find((f: string) => f.endsWith('.vtt')) ||
                         result.generatedFiles.find((f: string) => f.endsWith('.lrc')) ||
-                        result.generatedFiles.find((f: string) => f.endsWith('.json')) ||
-                        result.generatedFiles.find((f: string) => f.endsWith('.csv')) ||
                         result.generatedFiles.find((f: string) => f.endsWith('.txt'));
         if (subFile) {
           const sep = outputDir.includes('\\') && !outputDir.includes('/') ? '\\' : '/';
@@ -1010,10 +1062,6 @@ export async function runBatchExtraction(): Promise<void> {
           type = 'subtitle';
         } else if (f.endsWith('.txt')) {
           type = 'text';
-        } else if (f.endsWith('.json')) {
-          type = 'json';
-        } else if (f.endsWith('.csv')) {
-          type = 'csv';
         }
         outputFilesList.push({
           path: `${itemOutputDir}${sep}${f}`,
@@ -1028,8 +1076,7 @@ export async function runBatchExtraction(): Promise<void> {
                          outputFilesList.find(f => f.name.endsWith('.lrc'));
       item.subtitlePath = subFileObj ? subFileObj.path : null;
 
-      const txtFileObj = outputFilesList.find(f => f.name.endsWith('.txt')) ||
-                         outputFilesList.find(f => f.name.endsWith('.json') || f.name.endsWith('.csv'));
+      const txtFileObj = outputFilesList.find(f => f.name.endsWith('.txt'));
       item.txtPath = txtFileObj ? txtFileObj.path : (item.subtitlePath || null);
 
       if (activeBatchViewerIndex === i) {

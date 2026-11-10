@@ -140,7 +140,7 @@ export async function loadMediaIntoCompanionPlayer(filePath: string, autoSwitchD
   let durationSec = 0;
   let width = 0;
   let height = 0;
-  let aspectStr = '16:9';
+  let aspectStr: string | undefined = isAudioOnly ? undefined : '16:9';
 
   if (invoke) {
     try {
@@ -193,6 +193,20 @@ export async function loadMediaIntoCompanionPlayer(filePath: string, autoSwitchD
   // Update UI Metadata Card
   updateCompanionMetadataUI(activeMediaInfo);
 
+  // Update PiP and Fullscreen button availability based on audio vs video
+  const pipBtn = document.getElementById('btn-companion-pip') as HTMLButtonElement | null;
+  const fullscreenBtn = document.getElementById('btn-companion-fullscreen') as HTMLButtonElement | null;
+  if (pipBtn) {
+    pipBtn.disabled = isAudioOnly;
+    pipBtn.style.opacity = isAudioOnly ? '0.35' : '1';
+    pipBtn.style.cursor = isAudioOnly ? 'not-allowed' : 'pointer';
+  }
+  if (fullscreenBtn) {
+    fullscreenBtn.disabled = isAudioOnly;
+    fullscreenBtn.style.opacity = isAudioOnly ? '0.35' : '1';
+    fullscreenBtn.style.cursor = isAudioOnly ? 'not-allowed' : 'pointer';
+  }
+
   // Set video source and wire events
   videoEl.src = streamUrl;
   videoEl.load();
@@ -220,10 +234,14 @@ export function updateCompanionMetadataUI(info: CompanionMediaInfo): void {
   if (timeTotalEl) timeTotalEl.textContent = formatTimecodeDisplay(info.durationSec);
 
   if (resEl) {
-    resEl.textContent = (info.width && info.height) ? `${info.width}×${info.height}` : (info.isVideo ? '1920×1080' : 'Audio Only');
+    resEl.textContent = (info.width && info.height)
+      ? `${info.width}×${info.height}`
+      : (info.isVideo ? '1920×1080' : (t('transcribe.companionMetaAudioOnly') || 'Audio Only'));
   }
   if (aspectEl) {
-    aspectEl.textContent = info.aspectRatio || (info.isVideo ? '16:9' : 'Stereo');
+    aspectEl.textContent = info.isVideo
+      ? (info.aspectRatio || '16:9')
+      : (t('transcribe.companionMetaAudioChannel') || 'Stereo');
   }
   if (formatEl) {
     formatEl.textContent = info.isVideo
@@ -253,7 +271,13 @@ export function seekCompanionPlayer(targetMs: number, autoPlay: boolean = true):
   const videoEl = document.getElementById('companion-media-element') as HTMLVideoElement | null;
   if (!videoEl) return;
   const targetSec = Math.max(0, targetMs / 1000);
-  videoEl.currentTime = targetSec;
+  if (videoEl.readyState >= 1) {
+    videoEl.currentTime = targetSec;
+  } else {
+    videoEl.addEventListener('loadedmetadata', () => {
+      videoEl.currentTime = targetSec;
+    }, { once: true });
+  }
   if (activeMediaInfo) {
     showTranscribeMediaDeck();
   }
@@ -280,6 +304,18 @@ export function unloadCompanionPlayer(): void {
   if (videoEl) {
     videoEl.removeAttribute('src');
     videoEl.load();
+  }
+  const pipBtn = document.getElementById('btn-companion-pip') as HTMLButtonElement | null;
+  const fullscreenBtn = document.getElementById('btn-companion-fullscreen') as HTMLButtonElement | null;
+  if (pipBtn) {
+    pipBtn.disabled = false;
+    pipBtn.style.opacity = '1';
+    pipBtn.style.cursor = 'pointer';
+  }
+  if (fullscreenBtn) {
+    fullscreenBtn.disabled = false;
+    fullscreenBtn.style.opacity = '1';
+    fullscreenBtn.style.cursor = 'pointer';
   }
   activeMediaInfo = null;
   showTranscribeSetupDeck();

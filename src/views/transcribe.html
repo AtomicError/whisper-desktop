@@ -290,7 +290,7 @@
 
                   <!-- Playback Timeline & Live Timecode -->
                   <div class="companion-timeline-box">
-                    <input type="range" class="companion-seek-slider" id="companion-seek-slider" min="0" max="100" step="0.05" value="0" aria-label="Seek timeline" />
+                    <input type="range" class="companion-seek-slider" id="companion-seek-slider" min="0" max="100" step="0.05" value="0" aria-label="Seek timeline" data-i18n-aria="transcribe.companionSeekAria" />
                     <div class="companion-timecode-row">
                       <span class="companion-timecode" id="companion-time-current">00:00:00.000</span>
                       <span class="companion-timecode" id="companion-time-total">00:00:00.000</span>
@@ -300,14 +300,14 @@
                   <!-- Primary Playback Controls -->
                   <div class="companion-controls-bar">
                     <div class="companion-controls-left">
-                      <button type="button" class="btn-player-btn" id="btn-companion-jump-back" title="Rewind 5s (Left Arrow)" onclick="jumpCompanionPlayback(-5)">
+                      <button type="button" class="btn-player-btn" id="btn-companion-jump-back" title="Rewind 5s (Left Arrow)" data-i18n-title="transcribe.companionRewind5s" onclick="jumpCompanionPlayback(-5)">
                         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                           <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
                           <path d="M3 3v5h5"/>
                         </svg>
                         <span class="jump-badge">-5s</span>
                       </button>
-                      <button type="button" class="btn-player-play-main" id="btn-companion-play-toggle" title="Play / Pause (Space)" onclick="toggleCompanionPlayback()">
+                      <button type="button" class="btn-player-play-main" id="btn-companion-play-toggle" title="Play / Pause (Space)" data-i18n-title="transcribe.companionPlayPause" onclick="toggleCompanionPlayback()">
                         <svg id="icon-companion-play" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
                           <polygon points="5 3 19 12 5 21 5 3"/>
                         </svg>
@@ -315,7 +315,7 @@
                           <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
                         </svg>
                       </button>
-                      <button type="button" class="btn-player-btn" id="btn-companion-jump-fwd" title="Forward 5s (Right Arrow)" onclick="jumpCompanionPlayback(5)">
+                      <button type="button" class="btn-player-btn" id="btn-companion-jump-fwd" title="Forward 5s (Right Arrow)" data-i18n-title="transcribe.companionForward5s" onclick="jumpCompanionPlayback(5)">
                         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                           <path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
                           <path d="M21 3v5h-5"/>
@@ -326,7 +326,7 @@
 
                     <div class="companion-controls-right">
                       <!-- Playback Rate -->
-                      <select class="companion-speed-select" id="companion-speed-select" onchange="changeCompanionPlaybackRate(this.value)" aria-label="Playback speed" title="Playback speed">
+                      <select class="companion-speed-select" id="companion-speed-select" onchange="changeCompanionPlaybackRate(this.value)" aria-label="Playback speed" data-i18n-aria="transcribe.companionSpeedAria" title="Playback speed" data-i18n-title="transcribe.companionSpeedAria">
                         <option value="0.75">0.75x</option>
                         <option value="1.0" selected>1.0x</option>
                         <option value="1.25">1.25x</option>
@@ -336,7 +336,7 @@
 
                       <!-- Volume Control -->
                       <div class="companion-volume-group">
-                        <button type="button" class="btn-player-btn" id="btn-companion-mute" onclick="toggleCompanionMute()" title="Mute / Unmute">
+                        <button type="button" class="btn-player-btn" id="btn-companion-mute" onclick="toggleCompanionMute()" title="Mute / Unmute" data-i18n-title="transcribe.companionMute">
                           <svg id="icon-vol-high" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
                           </svg>
@@ -344,7 +344,7 @@
                             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/>
                           </svg>
                         </button>
-                        <input type="range" class="companion-volume-slider" id="companion-volume-slider" min="0" max="1" step="0.05" value="1" oninput="changeCompanionVolume(this.value)" aria-label="Volume" />
+                        <input type="range" class="companion-volume-slider" id="companion-volume-slider" min="0" max="1" step="0.05" value="1" oninput="changeCompanionVolume(this.value)" aria-label="Volume" data-i18n-aria="transcribe.companionVolumeAria" />
                       </div>
 
                       <!-- PiP & Fullscreen -->

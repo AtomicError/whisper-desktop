@@ -668,6 +668,8 @@ fn get_transcript_session_data(session_file: Option<String>) -> Result<String, S
             .unwrap_or(false);
         if is_json && path.exists() && path.is_file() {
             return std::fs::read_to_string(path).map_err(|e| format!("Failed to read session file: {}", e));
+        } else {
+            return Err(format!("Requested transcript session file does not exist or is not valid: {}", path_str));
         }
     }
     transcribe::get_last_transcript_json()
@@ -1772,5 +1774,35 @@ mod main_tests {
         assert!(!is_text_or_subtitle_file("audio.wav"));
         assert!(!is_text_or_subtitle_file("archive.tar.gz"));
         assert!(!is_text_or_subtitle_file("binary.bin"));
+    }
+
+    #[test]
+    fn test_get_transcript_session_data_explicit_contract() {
+        let temp_dir = std::env::temp_dir().join(format!("whisper_session_test_{}", std::process::id()));
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        let valid_json_path = temp_dir.join("sample.json");
+        std::fs::write(&valid_json_path, r#"{"test":"ok"}"#).unwrap();
+
+        // 1. Valid file path returns file content
+        let res = get_transcript_session_data(Some(valid_json_path.to_string_lossy().to_string()));
+        assert_eq!(res.unwrap(), r#"{"test":"ok"}"#);
+
+        // 2. Non-existent file path returns explicit Err, not falling back to memory
+        let res_err = get_transcript_session_data(Some(temp_dir.join("nonexistent.json").to_string_lossy().to_string()));
+        assert!(res_err.is_err());
+        assert!(res_err.unwrap_err().contains("does not exist"));
+
+        // 3. Non-json file path returns explicit Err
+        let txt_path = temp_dir.join("sample.txt");
+        std::fs::write(&txt_path, "hello").unwrap();
+        let res_non_json = get_transcript_session_data(Some(txt_path.to_string_lossy().to_string()));
+        assert!(res_non_json.is_err());
+
+        // 4. None falls back to memory cache
+        transcribe::set_last_transcript_json(r#"{"memory":"active"}"# .to_string());
+        let res_none = get_transcript_session_data(None);
+        assert_eq!(res_none.unwrap(), r#"{"memory":"active"}"#);
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 }
