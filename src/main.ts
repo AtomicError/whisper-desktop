@@ -8,6 +8,7 @@ import { logsController, reportGlobalFrontendError } from './modules/logsControl
 import { themeManager } from './modules/themeManager';
 import { modelHub } from './modules/modelHub';
 import { transcriptViewer } from './modules/transcriptViewer';
+import { initCompanionPlayerDOM } from './modules/companionPlayer';
 import { initializeCustomSelects, syncCustomSelects } from './modules/customSelect';
 import {
   batchProcessor,
@@ -284,6 +285,7 @@ export async function initApp(): Promise<void> {
   setupTranslationEventListeners();
   setupTranscribeDragAndDrop();
   transcriptViewer.setupDirection();
+  initCompanionPlayerDOM();
   setupQuickConfigDeckEventListeners();
   setupResponsiveMenuFadeIn();
   setupHorizontalTabScroll();

@@ -19,7 +19,8 @@ import {
 } from './settingsManager';
 import { batchProcessor, addBatchFiles, formatDuration } from './batchProcessor';
 import { escapeHTML, logsController } from './logsController';
-import { loadTranscriptFromFile, transcriptViewer, clearTranscriptLines } from './transcriptViewer';
+import { loadTranscriptFromFile, loadTranscriptFromJsonData, transcriptViewer, clearTranscriptLines } from './transcriptViewer';
+import { loadMediaIntoCompanionPlayer } from './companionPlayer';
 import {
   workflowBridge,
   updateTranscribeWorkflowButtons,
@@ -84,7 +85,7 @@ const getTauriInvoke = (): ((cmd: string, args?: any) => Promise<any>) | null =>
   return win.invoke || null;
 };
 
-const invoke = async (cmd: string, args?: any): Promise<any> => {
+const invoke = async <T = any>(cmd: string, args?: any): Promise<T> => {
   const inv = getTauriInvoke();
   if (inv) return inv(cmd, args);
   throw new Error(`Tauri invoke not available for ${cmd}`);
@@ -232,6 +233,11 @@ export function clearSingleMediaFile(): void {
   setWavPathForTranscription(null);
   setProbedMetadata(null);
   batchProcessor.setIsBatchMode(false);
+
+  const win = getGlobal();
+  if (typeof win.unloadCompanionPlayer === 'function') {
+    win.unloadCompanionPlayer();
+  }
 
   const dropZone = document.getElementById('transcribe-drop-zone');
   if (dropZone) dropZone.classList.remove('has-file');
@@ -644,6 +650,9 @@ export async function runWhisperTranscription(): Promise<void> {
   setIsTranscribing(true);
   setIsTranscriptionCancelActive(false);
   updateTranscribeActionButtons(true);
+  if (typeof win.pauseCompanionPlayer === 'function') {
+    win.pauseCompanionPlayer();
+  }
 
   const telemetryCard = document.getElementById('telemetry-hud-card');
   if (telemetryCard) telemetryCard.style.display = 'block';
@@ -772,16 +781,40 @@ export async function runWhisperTranscription(): Promise<void> {
       });
       setLastTranscribedOutputFiles(generatedOutputFiles);
 
-      // Fallback: If transcriptLines was not populated via live events, load from generated subtitle/text file
-      if ((!transcriptViewer.lines || transcriptViewer.lines.length === 0) && result.generatedFiles && result.generatedFiles.length > 0) {
+      // Populate transcript lines with exact word-level timestamps & confidence from internal JSON
+      let loadedFromInternalJson = false;
+      try {
+        const sessionJson = await invoke<string>('get_transcript_session_data', {
+          sessionFile: result.internalJsonPath || null
+        });
+        if (sessionJson) {
+          const parsedLines = await loadTranscriptFromJsonData(sessionJson);
+          if (parsedLines && parsedLines.length > 0) {
+            loadedFromInternalJson = true;
+          }
+        }
+      } catch (jsonErr) {
+        console.warn('Could not load internal session JSON:', jsonErr);
+      }
+
+      // Fallback: If transcriptLines was not populated via live events or internal JSON, load from generated subtitle/text file
+      if (!loadedFromInternalJson && (!transcriptViewer.lines || transcriptViewer.lines.length === 0) && result.generatedFiles && result.generatedFiles.length > 0) {
         const subFile = result.generatedFiles.find((f: string) => f.endsWith('.srt')) ||
                         result.generatedFiles.find((f: string) => f.endsWith('.vtt')) ||
                         result.generatedFiles.find((f: string) => f.endsWith('.lrc')) ||
-                        result.generatedFiles.find((f: string) => f.endsWith('.json')) ||
-                        result.generatedFiles.find((f: string) => f.endsWith('.csv')) ||
                         result.generatedFiles.find((f: string) => f.endsWith('.txt'));
         if (subFile) {
           await loadTranscriptFromFile(`${outputDir}${sep}${subFile}`);
+        }
+      }
+
+      // Initialize Companion Media Console Player in left deck
+      const mediaToPlay = currentMedia || (currentSettings ? currentSettings.inputFile : null);
+      if (mediaToPlay) {
+        try {
+          await loadMediaIntoCompanionPlayer(mediaToPlay);
+        } catch (playerErr) {
+          console.warn('Could not load media into companion player:', playerErr);
         }
       }
     }

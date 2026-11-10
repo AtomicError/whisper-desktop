@@ -2,16 +2,27 @@
 import { t, applyTextDirection } from '../i18n/index';
 import { escapeHTML } from './logsController';
 
+export interface WordToken {
+  text: string;
+  startMs: number;
+  endMs: number;
+  prob: number;
+}
+
 export interface TranscriptLine {
   id: number;
   timeRange: string;
   text: string;
+  startMs?: number;
+  endMs?: number;
+  words?: WordToken[];
 }
 
 let transcriptLines: TranscriptLine[] = [];
 let transcriptDirty = false;
 let transcriptSaveTimer: ReturnType<typeof setTimeout> | null = null;
 let inFlightSavePromise: Promise<void> | null = null;
+let confidenceHighlightingActive = false;
 
 const TRANSCRIPT_SAVE_DEBOUNCE_MS = 350;
 
@@ -137,6 +148,77 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
   headerEl.appendChild(badgeWrap);
   headerEl.appendChild(timeDiv);
 
+  const { startMs } = extractLineStartEndMs(lineObj, lineObj.id);
+
+  // Card Action Buttons (Play, Split, Merge)
+  const actionsWrap = document.createElement('div');
+  actionsWrap.className = 'transcript-card-actions';
+
+  const playBtn = document.createElement('button');
+  playBtn.type = 'button';
+  playBtn.className = 'btn-card-action btn-card-play';
+  playBtn.title = 'Play segment';
+  playBtn.setAttribute('aria-label', 'Play segment');
+  playBtn.innerHTML = `
+    <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor">
+      <polygon points="5 3 19 12 5 21 5 3"/>
+    </svg>
+  `;
+  playBtn.onclick = (e) => {
+    e.stopPropagation();
+    const win = getGlobal();
+    if (typeof win.seekCompanionPlayer === 'function') {
+      win.seekCompanionPlayer(startMs);
+    }
+  };
+  actionsWrap.appendChild(playBtn);
+
+  const splitBtn = document.createElement('button');
+  splitBtn.type = 'button';
+  splitBtn.className = 'btn-card-action btn-card-split';
+  splitBtn.title = 'Split segment (Enter)';
+  splitBtn.setAttribute('aria-label', 'Split segment');
+  splitBtn.innerHTML = `
+    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/>
+      <line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/>
+      <line x1="8.12" y1="8.12" x2="12" y2="12"/>
+    </svg>
+  `;
+  splitBtn.onclick = (e) => {
+    e.stopPropagation();
+    splitTranscriptSegment(lineObj.id);
+  };
+  actionsWrap.appendChild(splitBtn);
+
+  if (lineObj.id > 0) {
+    const mergeBtn = document.createElement('button');
+    mergeBtn.type = 'button';
+    mergeBtn.className = 'btn-card-action btn-card-merge';
+    mergeBtn.title = 'Merge with previous (Backspace)';
+    mergeBtn.setAttribute('aria-label', 'Merge with previous');
+    mergeBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m8 6 4-4 4 4"/><path d="M12 2v10.3a4 4 0 0 1-1.172 2.872L4 22"/>
+        <path d="m20 22-5-5"/>
+      </svg>
+    `;
+    mergeBtn.onclick = (e) => {
+      e.stopPropagation();
+      mergeTranscriptSegmentWithPrevious(lineObj.id);
+    };
+    actionsWrap.appendChild(mergeBtn);
+  }
+
+  headerEl.appendChild(actionsWrap);
+
+  headerEl.onclick = () => {
+    const win = getGlobal();
+    if (typeof win.seekCompanionPlayer === 'function') {
+      win.seekCompanionPlayer(startMs);
+    }
+  };
+
   const bodyEl = document.createElement('div');
   bodyEl.className = 'transcript-card-body';
 
@@ -152,7 +234,62 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
     updateTranscriptLineText(lineObj.id, textarea.value);
     void flushPendingTranscriptEdits();
   };
+  textarea.onkeydown = (e: KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      splitTranscriptSegment(lineObj.id, textarea.selectionStart);
+    } else if (e.key === 'Backspace' && textarea.selectionStart === 0 && textarea.selectionEnd === 0 && lineObj.id > 0) {
+      e.preventDefault();
+      mergeTranscriptSegmentWithPrevious(lineObj.id);
+    } else if (e.key === 'Tab') {
+      const targetId = e.shiftKey ? lineObj.id - 1 : lineObj.id + 1;
+      const targetInput = document.querySelector(`.transcript-card[data-id="${targetId}"] .transcript-text-input`) as HTMLTextAreaElement | null;
+      if (targetInput) {
+        e.preventDefault();
+        targetInput.focus();
+      }
+    }
+  };
   bodyEl.appendChild(textarea);
+
+  // Word-level confidence badges / clickable words bar
+  if (Array.isArray(lineObj.words) && lineObj.words.length > 0) {
+    const wordsBar = document.createElement('div');
+    wordsBar.className = 'transcript-words-bar';
+    if (!confidenceHighlightingActive) {
+      wordsBar.classList.add('confidence-bar-dimmed');
+    }
+    lineObj.words.forEach(w => {
+      const wordSpan = document.createElement('span');
+      wordSpan.className = 'transcript-word';
+      const isLow = w.prob < 0.60;
+      if (isLow) {
+        wordSpan.classList.add('low-confidence');
+        wordSpan.title = `Word: "${w.text.trim()}" • Confidence: ${Math.round(w.prob * 100)}% (Low certainty)`;
+      } else {
+        wordSpan.title = `Word: "${w.text.trim()}" • Confidence: ${Math.round(w.prob * 100)}%`;
+      }
+      wordSpan.textContent = w.text.trim();
+      wordSpan.onclick = (e) => {
+        e.stopPropagation();
+        const win = getGlobal();
+        if (typeof win.seekCompanionPlayer === 'function') {
+          win.seekCompanionPlayer(w.startMs);
+        }
+      };
+      wordsBar.appendChild(wordSpan);
+    });
+    bodyEl.appendChild(wordsBar);
+  }
+
+  cardEl.ondblclick = (e: MouseEvent) => {
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('.btn-card-action')) return;
+    const win = getGlobal();
+    if (typeof win.seekCompanionPlayer === 'function') {
+      win.seekCompanionPlayer(startMs);
+    }
+  };
 
   cardEl.appendChild(headerEl);
   cardEl.appendChild(bodyEl);
@@ -247,6 +384,9 @@ export function appendTranscriptLine(timeRange: string, text: string): void {
 }
 
 function extractLineStartEndMs(line: TranscriptLine, fallbackIndex: number): { startMs: number; endMs: number } {
+  if (typeof line.startMs === 'number' && typeof line.endMs === 'number') {
+    return { startMs: line.startMs, endMs: Math.max(line.startMs, line.endMs) };
+  }
   const match = (line.timeRange || '').match(
     /(\d{2}:\d{2}:\d{2}(?:[.,]\d{1,3})?)\s*(?:-->|→)\s*(\d{2}:\d{2}:\d{2}(?:[.,]\d{1,3})?)/
   );
@@ -455,6 +595,268 @@ export function updateTranscriptLineText(id: number, value: string): void {
   }
 }
 
+export function isConfidenceHighlightingActive(): boolean {
+  return confidenceHighlightingActive;
+}
+
+export function toggleConfidenceHighlighting(): boolean {
+  confidenceHighlightingActive = !confidenceHighlightingActive;
+  if (typeof document !== 'undefined') {
+    const btn = document.getElementById('btn-toggle-confidence');
+    const viewerCard = document.getElementById('transcribe-viewer-card');
+    const viewport = document.getElementById('transcript-viewport');
+    if (btn) {
+      if (confidenceHighlightingActive) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    }
+    if (viewerCard) {
+      if (confidenceHighlightingActive) {
+        viewerCard.classList.add('highlight-confidence-active');
+      } else {
+        viewerCard.classList.remove('highlight-confidence-active');
+      }
+    }
+    if (viewport) {
+      if (confidenceHighlightingActive) {
+        viewport.classList.add('highlight-confidence-active');
+      } else {
+        viewport.classList.remove('highlight-confidence-active');
+      }
+    }
+  }
+  return confidenceHighlightingActive;
+}
+
+export function splitTranscriptSegment(lineId: number, cursorPosition?: number): boolean {
+  const index = transcriptLines.findIndex(l => l.id === lineId);
+  if (index === -1) return false;
+  const line = transcriptLines[index];
+  const { startMs, endMs } = extractLineStartEndMs(line, line.id);
+
+  // Sync latest text from active DOM textarea if present
+  let fullText = line.text;
+  if (typeof document !== 'undefined') {
+    const domTextarea = document.querySelector(`.transcript-card[data-id="${line.id}"] .transcript-text-input`) as HTMLTextAreaElement | null;
+    if (domTextarea && typeof domTextarea.value === 'string') {
+      fullText = domTextarea.value;
+      line.text = fullText;
+    }
+  }
+
+  // Determine split character position
+  if (typeof cursorPosition === 'number' && (cursorPosition <= 0 || cursorPosition >= fullText.length)) {
+    return false;
+  }
+
+  let splitPos: number;
+  if (typeof cursorPosition === 'number') {
+    splitPos = cursorPosition;
+  } else {
+    // Button click: find natural whitespace boundary closest to the middle of fullText
+    const mid = Math.floor(fullText.length / 2);
+    let bestSpace = -1;
+    let bestDist = Infinity;
+    for (let i = 0; i < fullText.length; i++) {
+      if (/\s/.test(fullText[i])) {
+        const dist = Math.abs(i - mid);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestSpace = i;
+        }
+      }
+    }
+    splitPos = bestSpace !== -1 ? bestSpace : mid;
+  }
+
+  if (splitPos <= 0 || splitPos >= fullText.length) {
+    return false;
+  }
+
+  const leftText = fullText.slice(0, splitPos).trim();
+  const rightText = fullText.slice(splitPos).trim();
+  if (!leftText && !rightText) return false;
+
+  let splitEndMs = startMs;
+  let splitStartMs = endMs;
+  let leftWords: WordToken[] | undefined;
+  let rightWords: WordToken[] | undefined;
+
+  if (Array.isArray(line.words) && line.words.length > 1) {
+    let searchIdx = 0;
+    let splitWordIdx = -1;
+    for (let i = 0; i < line.words.length; i++) {
+      const wText = line.words[i].text.trim();
+      if (!wText) continue;
+      const foundPos = fullText.indexOf(wText, searchIdx);
+      if (foundPos !== -1) {
+        const wordEndPos = foundPos + wText.length;
+        searchIdx = wordEndPos;
+        if (splitPos <= foundPos) {
+          splitWordIdx = i - 1;
+          break;
+        } else if (splitPos <= wordEndPos) {
+          splitWordIdx = i;
+          break;
+        }
+      }
+    }
+    if (splitWordIdx === -1 && searchIdx > 0 && splitPos >= searchIdx) {
+      splitWordIdx = line.words.length - 1;
+    }
+    if (splitWordIdx < 0) {
+      splitWordIdx = 0;
+    } else if (splitWordIdx >= line.words.length - 1) {
+      splitWordIdx = line.words.length - 2;
+    }
+
+    leftWords = line.words.slice(0, splitWordIdx + 1);
+    rightWords = line.words.slice(splitWordIdx + 1);
+    if (leftWords.length > 0 && rightWords.length > 0) {
+      splitEndMs = leftWords[leftWords.length - 1].endMs;
+      splitStartMs = rightWords[0].startMs;
+    } else {
+      const ratio = Math.max(0.05, Math.min(0.95, splitPos / Math.max(1, fullText.length)));
+      const mid = Math.round(startMs + ratio * Math.max(0, endMs - startMs));
+      splitEndMs = mid;
+      splitStartMs = mid;
+    }
+  } else {
+    // Proportional character/punctuation interpolation fallback
+    const ratio = Math.max(0.05, Math.min(0.95, splitPos / Math.max(1, fullText.length)));
+    const mid = Math.round(startMs + ratio * Math.max(0, endMs - startMs));
+    splitEndMs = mid;
+    splitStartMs = mid;
+  }
+
+  // Ensure timestamps are monotonically non-decreasing and bounded by [startMs, endMs]
+  splitEndMs = Math.min(endMs, Math.max(startMs, splitEndMs));
+  splitStartMs = Math.max(splitEndMs, Math.min(endMs, splitStartMs));
+
+  const line1: TranscriptLine = {
+    id: line.id,
+    timeRange: `[${formatMsToTimestamp(startMs)} --> ${formatMsToTimestamp(splitEndMs)}]`,
+    text: leftText || fullText,
+    startMs,
+    endMs: splitEndMs,
+    words: leftWords,
+  };
+
+  const line2: TranscriptLine = {
+    id: line.id + 1,
+    timeRange: `[${formatMsToTimestamp(splitStartMs)} --> ${formatMsToTimestamp(endMs)}]`,
+    text: rightText || '',
+    startMs: splitStartMs,
+    endMs,
+    words: rightWords,
+  };
+
+  transcriptLines.splice(index, 1, line1, line2);
+  transcriptLines.forEach((l, idx) => { l.id = idx; });
+  transcriptDirty = true;
+
+  // Sync batch mode if active
+  const win = getGlobal();
+  if (win.isBatchMode && win.activeBatchViewerIndex >= 0 && win.batchItems && win.batchItems[win.activeBatchViewerIndex]) {
+    win.batchItems[win.activeBatchViewerIndex].transcriptLines = transcriptLines.map(l => ({ ...l }));
+  }
+
+  renderTranscriptLines(transcriptLines);
+
+  setTimeout(() => {
+    if (typeof document !== 'undefined') {
+      const nextInput = document.querySelector(`.transcript-card[data-id="${index + 1}"] .transcript-text-input`) as HTMLTextAreaElement | null;
+      if (nextInput && typeof nextInput.focus === 'function') {
+        nextInput.focus();
+        if (typeof nextInput.setSelectionRange === 'function') {
+          nextInput.setSelectionRange(0, 0);
+        }
+        const card = nextInput.closest('.transcript-card');
+        if (card && typeof card.scrollIntoView === 'function') {
+          card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }
+    }
+  }, 30);
+
+  scheduleTranscriptDiskSync();
+  return true;
+}
+
+export function mergeTranscriptSegmentWithPrevious(lineId: number): boolean {
+  const index = transcriptLines.findIndex(l => l.id === lineId);
+  if (index <= 0) return false;
+
+  const currLine = transcriptLines[index];
+  const prevLine = transcriptLines[index - 1];
+
+  const prevTimes = extractLineStartEndMs(prevLine, prevLine.id);
+  const currTimes = extractLineStartEndMs(currLine, currLine.id);
+
+  const unifiedStartMs = prevTimes.startMs;
+  const unifiedEndMs = Math.max(prevTimes.endMs, currTimes.endMs);
+
+  let currText = currLine.text;
+  let prevText = prevLine.text;
+  if (typeof document !== 'undefined') {
+    const currTextarea = document.querySelector(`.transcript-card[data-id="${currLine.id}"] .transcript-text-input`) as HTMLTextAreaElement | null;
+    const prevTextarea = document.querySelector(`.transcript-card[data-id="${prevLine.id}"] .transcript-text-input`) as HTMLTextAreaElement | null;
+    if (currTextarea && typeof currTextarea.value === 'string') currText = currTextarea.value;
+    if (prevTextarea && typeof prevTextarea.value === 'string') prevText = prevTextarea.value;
+  }
+
+  const prevLen = prevText.length;
+  let mergedText = prevText.trim();
+  if (currText.trim()) {
+    mergedText = mergedText ? `${mergedText} ${currText.trim()}` : currText.trim();
+  }
+
+  let mergedWords: WordToken[] | undefined;
+  if (Array.isArray(prevLine.words) || Array.isArray(currLine.words)) {
+    mergedWords = [...(prevLine.words || []), ...(currLine.words || [])];
+  }
+
+  prevLine.text = mergedText;
+  prevLine.startMs = unifiedStartMs;
+  prevLine.endMs = unifiedEndMs;
+  prevLine.timeRange = `[${formatMsToTimestamp(unifiedStartMs)} --> ${formatMsToTimestamp(unifiedEndMs)}]`;
+  prevLine.words = mergedWords;
+
+  transcriptLines.splice(index, 1);
+  transcriptLines.forEach((l, idx) => { l.id = idx; });
+  transcriptDirty = true;
+
+  // Sync batch mode if active
+  const win = getGlobal();
+  if (win.isBatchMode && win.activeBatchViewerIndex >= 0 && win.batchItems && win.batchItems[win.activeBatchViewerIndex]) {
+    win.batchItems[win.activeBatchViewerIndex].transcriptLines = transcriptLines.map(l => ({ ...l }));
+  }
+
+  renderTranscriptLines(transcriptLines);
+
+  setTimeout(() => {
+    if (typeof document !== 'undefined') {
+      const prevInput = document.querySelector(`.transcript-card[data-id="${index - 1}"] .transcript-text-input`) as HTMLTextAreaElement | null;
+      if (prevInput && typeof prevInput.focus === 'function') {
+        prevInput.focus();
+        if (typeof prevInput.setSelectionRange === 'function') {
+          const targetPos = Math.min(mergedText.length, prevLen + 1);
+          prevInput.setSelectionRange(targetPos, targetPos);
+        }
+        const card = prevInput.closest('.transcript-card');
+        if (card && typeof card.scrollIntoView === 'function') {
+          card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }
+    }
+  }, 30);
+
+  scheduleTranscriptDiskSync();
+  return true;
+}
+
 export function filterTranscriptLines(): void {
   if (typeof document === 'undefined') return;
   const searchInput = document.getElementById('transcript-search') as HTMLInputElement | null;
@@ -560,27 +962,22 @@ export function parseSegmentTimestamps(rawStart: any, rawEnd: any): { startMs: n
   }
 }
 
-export async function loadTranscriptFromFile(fullPath: string, shouldRender = true): Promise<TranscriptLine[]> {
+export function parseAndApplyTranscriptContent(text: string, ext: string, shouldRender = true): TranscriptLine[] {
   try {
-    const invoke = getTauriInvoke();
-    if (!invoke) return [];
-    const text: string = await invoke('read_text_file_content', { filePath: fullPath });
-    
     const parsedLines: TranscriptLine[] = [];
-    const ext = (fullPath.split('.').pop() || '').toLowerCase();
 
     const applyParsedIfRender = (lines: TranscriptLine[]): TranscriptLine[] => {
-      if (shouldRender) {
-        if (transcriptSaveTimer !== null) {
-          clearTimeout(transcriptSaveTimer);
-          transcriptSaveTimer = null;
-        }
-        transcriptDirty = false;
-        transcriptLines = lines;
-        renderTranscriptLines(transcriptLines);
+    if (shouldRender) {
+      if (transcriptSaveTimer !== null) {
+        clearTimeout(transcriptSaveTimer);
+        transcriptSaveTimer = null;
       }
-      return lines;
-    };
+      transcriptDirty = false;
+      transcriptLines = lines;
+      renderTranscriptLines(transcriptLines);
+    }
+    return lines;
+  };
 
     // 1. JSON Parser
     if (ext === 'json' || text.trim().startsWith('{') || text.trim().startsWith('[')) {
@@ -590,14 +987,22 @@ export async function loadTranscriptFromFile(fullPath: string, shouldRender = tr
         if (Array.isArray(segments) && segments.length > 0) {
           segments.forEach((seg: any, idx: number) => {
             let timeRange = '';
+            let startMs = 0;
+            let endMs = 0;
             if (seg.timestamps && seg.timestamps.from && seg.timestamps.to) {
               timeRange = `[${seg.timestamps.from.replace(',', '.')} --> ${seg.timestamps.to.replace(',', '.')}]`;
+              startMs = parseTimestampStringToMs(seg.timestamps.from) ?? 0;
+              endMs = parseTimestampStringToMs(seg.timestamps.to) ?? 0;
             } else if (seg.offsets && typeof seg.offsets.from === 'number' && typeof seg.offsets.to === 'number') {
-              timeRange = `[${formatMsToTimestamp(seg.offsets.from)} --> ${formatMsToTimestamp(seg.offsets.to)}]`;
+              startMs = seg.offsets.from;
+              endMs = seg.offsets.to;
+              timeRange = `[${formatMsToTimestamp(startMs)} --> ${formatMsToTimestamp(endMs)}]`;
             } else if ((typeof seg.start === 'number' || typeof seg.start === 'string') && (typeof seg.end === 'number' || typeof seg.end === 'string')) {
               const parsedTimes = parseSegmentTimestamps(seg.start, seg.end);
               if (parsedTimes) {
-                timeRange = `[${formatMsToTimestamp(parsedTimes.startMs)} --> ${formatMsToTimestamp(parsedTimes.endMs)}]`;
+                startMs = parsedTimes.startMs;
+                endMs = parsedTimes.endMs;
+                timeRange = `[${formatMsToTimestamp(startMs)} --> ${formatMsToTimestamp(endMs)}]`;
               } else {
                 timeRange = `Line ${idx + 1}`;
               }
@@ -605,8 +1010,33 @@ export async function loadTranscriptFromFile(fullPath: string, shouldRender = tr
               timeRange = `Line ${idx + 1}`;
             }
             const cleanText = (seg.text || seg.content || '').trim();
+
+            const words: WordToken[] = [];
+            if (Array.isArray(seg.tokens)) {
+              seg.tokens.forEach((tok: any) => {
+                const rawTok = tok.text || '';
+                if (!rawTok || rawTok.startsWith('[_') || rawTok.startsWith('<|')) return;
+                const tokStart = (tok.offsets && typeof tok.offsets.from === 'number') ? tok.offsets.from : (parseTimestampStringToMs(tok.timestamps?.from) ?? startMs);
+                const tokEnd = (tok.offsets && typeof tok.offsets.to === 'number') ? tok.offsets.to : (parseTimestampStringToMs(tok.timestamps?.to) ?? endMs);
+                const prob = (typeof tok.p === 'number') ? tok.p : (typeof tok.prob === 'number' ? tok.prob : (typeof tok.confidence === 'number' ? tok.confidence : 1.0));
+                words.push({
+                  text: rawTok,
+                  startMs: tokStart,
+                  endMs: tokEnd,
+                  prob,
+                });
+              });
+            }
+
             if (cleanText) {
-              parsedLines.push({ timeRange, text: cleanText, id: idx });
+              parsedLines.push({
+                timeRange,
+                text: cleanText,
+                id: parsedLines.length,
+                startMs,
+                endMs,
+                words: words.length > 0 ? words : undefined,
+              });
             }
           });
           if (parsedLines.length > 0) {
@@ -751,6 +1181,19 @@ export async function loadTranscriptFromFile(fullPath: string, shouldRender = tr
 
     return applyParsedIfRender(parsedLines);
   } catch (err) {
+    console.error("Failed to parse transcript content:", err);
+    return [];
+  }
+}
+
+export async function loadTranscriptFromFile(fullPath: string, shouldRender = true): Promise<TranscriptLine[]> {
+  try {
+    const invoke = getTauriInvoke();
+    if (!invoke) return [];
+    const text: string = await invoke('read_text_file_content', { filePath: fullPath });
+    const ext = (fullPath.split('.').pop() || '').toLowerCase();
+    return parseAndApplyTranscriptContent(text, ext, shouldRender);
+  } catch (err) {
     console.error("Failed to load transcript file:", err);
     return [];
   }
@@ -848,6 +1291,15 @@ export function clearTranscriptLines(): void {
   renderTranscriptLines([]);
 }
 
+export async function loadTranscriptFromJsonData(jsonData: string, shouldRender = true): Promise<TranscriptLine[]> {
+  try {
+    return parseAndApplyTranscriptContent(jsonData, 'json', shouldRender);
+  } catch (err) {
+    console.error("Failed to load transcript from json data:", err);
+    return [];
+  }
+}
+
 // Bind to window for HTML onclick/oninput handlers
 if (typeof window !== 'undefined') {
   (window as any).autoResizeTranscriptField = autoResizeTranscriptField;
@@ -864,6 +1316,11 @@ if (typeof window !== 'undefined') {
   (window as any).parseSegmentTimestamps = parseSegmentTimestamps;
   (window as any).parseTranscriptTimeRange = parseTranscriptTimeRange;
   (window as any).loadTranscriptFromFile = loadTranscriptFromFile;
+  (window as any).loadTranscriptFromJsonData = loadTranscriptFromJsonData;
+  (window as any).splitTranscriptSegment = splitTranscriptSegment;
+  (window as any).mergeTranscriptSegmentWithPrevious = mergeTranscriptSegmentWithPrevious;
+  (window as any).toggleConfidenceHighlighting = toggleConfidenceHighlighting;
+  (window as any).isConfidenceHighlightingActive = isConfidenceHighlightingActive;
   (window as any).copyLiveTranscriptToClipboard = copyLiveTranscriptToClipboard;
   (window as any).copyEditorTranscriptToClipboard = copyLiveTranscriptToClipboard;
   (window as any).getTranscriptLines = getTranscriptLines;
@@ -886,6 +1343,11 @@ export const transcriptViewer = {
   render: renderTranscriptLines,
   createCard: createTranscriptCardElement,
   updateLineText: updateTranscriptLineText,
+  splitSegment: splitTranscriptSegment,
+  mergeSegment: mergeTranscriptSegmentWithPrevious,
+  toggleConfidence: toggleConfidenceHighlighting,
+  isConfidenceActive: isConfidenceHighlightingActive,
+  loadFromJson: loadTranscriptFromJsonData,
   flushEdits: flushPendingTranscriptEdits,
   hasPendingEdits: hasPendingTranscriptEdits,
   serializeForFile: serializeTranscriptLinesForFile,

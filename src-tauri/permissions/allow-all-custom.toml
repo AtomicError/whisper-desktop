@@ -50,6 +50,9 @@ allow = [
   "show_in_folder",
   "exit_app",
   "hide_to_tray",
-  "set_window_zoom"
+  "set_window_zoom",
+  "get_transcript_session_data",
+  "stream_media_file",
+  "revoke_media_stream"
 ]
 

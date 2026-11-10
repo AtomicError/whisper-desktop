@@ -66,12 +66,8 @@ pub struct WhisperSettings {
     pub output_vtt: bool,
     pub output_srt: bool,
     pub output_lrc: bool,
-    pub output_csv: bool,
-    pub output_json: bool,
-    pub output_json_full: bool,
     pub no_prints: bool,
     pub print_colors: bool,
-    pub print_confidence: bool,
     pub print_progress: bool,
     pub language: String,
     pub prompt: String,
@@ -228,12 +224,8 @@ impl WhisperSettings {
             output_vtt: false,
             output_srt: true,
             output_lrc: false,
-            output_csv: false,
-            output_json: false,
-            output_json_full: false,
             no_prints: false,
             print_colors: false,
-            print_confidence: false,
             print_progress: false,
             language: "auto".to_string(),
             prompt: "".to_string(),
@@ -314,12 +306,8 @@ impl WhisperSettings {
         self.output_vtt = defaults.output_vtt;
         self.output_srt = defaults.output_srt;
         self.output_lrc = defaults.output_lrc;
-        self.output_csv = defaults.output_csv;
-        self.output_json = defaults.output_json;
-        self.output_json_full = defaults.output_json_full;
         self.no_prints = defaults.no_prints;
         self.print_colors = defaults.print_colors;
-        self.print_confidence = defaults.print_confidence;
         self.print_progress = defaults.print_progress;
 
         // GPU Execution & Acceleration
@@ -1224,7 +1212,7 @@ mod tests {
         settings.temperature = 0.8;
         settings.vad_thold = 0.9;
         settings.output_srt = false;
-        settings.output_json = true;
+        settings.output_vtt = true;
         settings.selected_backend = "CUDA".to_string();
 
         // Perform reset
@@ -1236,7 +1224,7 @@ mod tests {
         assert_eq!(settings.temperature, 0.0);
         assert_eq!(settings.vad_thold, 0.5);
         assert_eq!(settings.output_srt, true);
-        assert_eq!(settings.output_json, false);
+        assert_eq!(settings.output_vtt, false);
         assert_eq!(settings.selected_backend, "Standard");
 
         // User preferences and credentials remain intact!

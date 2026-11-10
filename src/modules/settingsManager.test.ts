@@ -426,58 +426,8 @@ describe('settingsManager module', () => {
   });
 
   describe('syncJsonConfidenceDependency', () => {
-    it('disables confidence option when both json switches are unchecked', () => {
-      const jsonOpt = new MockElement('INPUT');
-      jsonOpt.id = 'opt-outputJson';
-      jsonOpt.checked = false;
-
-      const jsonFullOpt = new MockElement('INPUT');
-      jsonFullOpt.id = 'opt-outputJsonFull';
-      jsonFullOpt.checked = false;
-
-      const confCard = new MockElement('DIV');
-      confCard.id = 'card-printConfidence';
-
-      const confInput = new MockElement('INPUT');
-      confInput.id = 'opt-printConfidence';
-      confInput.checked = true;
-
-      elementRegistry.set('opt-outputJson', jsonOpt);
-      elementRegistry.set('opt-outputJsonFull', jsonFullOpt);
-      elementRegistry.set('card-printConfidence', confCard);
-      elementRegistry.set('opt-printConfidence', confInput);
-
-      const state = { printConfidence: true };
-      setSettingsState(state);
-
-      syncJsonConfidenceDependency();
-
-      expect(confCard.style.opacity).toBe('0.45');
-      expect(confInput.disabled).toBe(true);
-      expect(confInput.checked).toBe(false);
-      expect(state.printConfidence).toBe(false);
-    });
-
-    it('enables confidence option when json output switch is active', () => {
-      const jsonOpt = new MockElement('INPUT');
-      jsonOpt.id = 'opt-outputJson';
-      jsonOpt.checked = true;
-
-      const confCard = new MockElement('DIV');
-      confCard.id = 'card-printConfidence';
-
-      const confInput = new MockElement('INPUT');
-      confInput.id = 'opt-printConfidence';
-      confInput.disabled = true;
-
-      elementRegistry.set('opt-outputJson', jsonOpt);
-      elementRegistry.set('card-printConfidence', confCard);
-      elementRegistry.set('opt-printConfidence', confInput);
-
-      syncJsonConfidenceDependency();
-
-      expect(confCard.style.opacity).toBe('1');
-      expect(confInput.disabled).toBe(false);
+    it('runs safely as a deprecated no-op without throwing', () => {
+      expect(() => syncJsonConfidenceDependency()).not.toThrow();
     });
   });
 

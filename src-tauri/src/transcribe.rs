@@ -44,13 +44,26 @@ pub struct TranscribeProgress {
     pub stage: Option<String>,
 }
 
-#[derive(serde::Serialize, Clone)]
+#[derive(serde::Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct TranscriptionResult {
     pub duration_ms: u64,
     pub speed_factor: f64,
     pub generated_files: Vec<String>,
     pub output_dir: String,
+    pub internal_json_path: Option<String>,
+}
+
+static LAST_TRANSCRIPT_JSON: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+pub fn set_last_transcript_json(content: String) {
+    if let Ok(mut lock) = LAST_TRANSCRIPT_JSON.lock() {
+        *lock = Some(content);
+    }
+}
+
+pub fn get_last_transcript_json() -> Option<String> {
+    LAST_TRANSCRIPT_JSON.lock().ok().and_then(|lock| lock.clone())
 }
 
 pub async fn probe_file_metadata(app: Option<&AppHandle>, file_path: &str) -> FileMetadata {
@@ -719,9 +732,10 @@ pub async fn run_transcription(
     if settings.output_vtt { args.push("-ovtt".to_string()); }
     if settings.output_srt { args.push("-osrt".to_string()); }
     if settings.output_lrc { args.push("-olrc".to_string()); }
-    if settings.output_csv { args.push("-ocsv".to_string()); }
-    if settings.output_json { args.push("-oj".to_string()); }
-    if settings.output_json_full { args.push("-ojf".to_string()); }
+    
+    // Always generate full detailed JSON with word-level confidence behind the scenes for UI/studio companion
+    args.push("-ojf".to_string());
+    args.push("--print-confidence".to_string());
     
     if settings.offset_t > 0 { args.push("-ot".to_string()); args.push(settings.offset_t.to_string()); }
     if settings.duration > 0 { args.push("-d".to_string()); args.push(settings.duration.to_string()); }
@@ -747,9 +761,6 @@ pub async fn run_transcription(
     
     if settings.no_prints { args.push("-np".to_string()); }
     if settings.print_colors { args.push("-pc".to_string()); }
-    if settings.print_confidence && (settings.output_json || settings.output_json_full) {
-        args.push("--print-confidence".to_string());
-    }
     if settings.print_progress { args.push("-pp".to_string()); }
     if settings.carry_prompt { args.push("--carry-initial-prompt".to_string()); }
     if settings.log_score { args.push("-ls".to_string()); }
@@ -1000,6 +1011,9 @@ pub async fn run_transcription(
     let _ = fs::remove_file(&wav_path); // Clean up converted WAV file
     
     if !status.success() {
+        // Clean up any internal json file that whisper may have created in the user directory
+        let _ = fs::remove_file(format!("{}.json", out_name_str));
+        
         // Distinguish a genuine user cancellation from a real failure so the UI
         // never labels an unexpected crash as "Aborted".
         let cancelled = session.lock().map(|l| l.cancel_requested).unwrap_or(false);
@@ -1028,10 +1042,31 @@ pub async fn run_transcription(
         0.0
     };
     
-    // Probe output directory for written formats
+    // Handle the internal full detailed JSON (-ojf):
+    // Stored in app internal cache directory or loaded into memory state,
+    // and purged immediately from the user's public output folder.
+    let public_json_path = std::path::PathBuf::from(format!("{}.json", out_name_str));
+    let mut internal_json_path: Option<String> = None;
+    if public_json_path.exists() {
+        if let Ok(json_content) = fs::read_to_string(&public_json_path) {
+            set_last_transcript_json(json_content.clone());
+            if let Ok(cache_dir) = app.path().app_cache_dir() {
+                let transcripts_dir = cache_dir.join("transcripts");
+                let _ = fs::create_dir_all(&transcripts_dir);
+                let out_base = Path::new(&out_name_str).file_name().unwrap_or_default().to_string_lossy().to_string();
+                let target_file = transcripts_dir.join(format!("{}.json", out_base));
+                if fs::write(&target_file, &json_content).is_ok() {
+                    internal_json_path = Some(target_file.to_string_lossy().to_string());
+                }
+            }
+        }
+        let _ = fs::remove_file(&public_json_path);
+    }
+
+    // Probe output directory for written formats (note: .json and .csv are excluded)
     let mut generated_files = Vec::new();
     let out_basename = Path::new(&out_name_str).file_name().unwrap_or_default().to_string_lossy().to_string();
-    let formats = [".txt", ".srt", ".vtt", ".lrc", ".csv", ".json"];
+    let formats = [".txt", ".srt", ".vtt", ".lrc"];
     for fmt in formats {
         let path = format!("{}{}", out_name_str, fmt);
         if Path::new(&path).exists() {
@@ -1076,6 +1111,7 @@ pub async fn run_transcription(
         speed_factor,
         generated_files,
         output_dir: out_dir.to_string_lossy().to_string(),
+        internal_json_path,
     })
 }
 
@@ -1304,6 +1340,13 @@ mod tests {
         // Access violation
         let err_access_viol = format_cli_exit_error("Standard", "whisper-cli-standard.exe", "ggml-base.bin", Some(-1073741819));
         assert!(err_access_viol.contains("STATUS_ACCESS_VIOLATION"));
+    }
+
+    #[test]
+    fn test_internal_transcript_json_memory_cache() {
+        let sample_json = r#"{"transcription":[{"text":"Hello world","tokens":[{"text":"Hello","p":0.98},{"text":"world","p":0.42}]}]}"#;
+        set_last_transcript_json(sample_json.to_string());
+        assert_eq!(get_last_transcript_json(), Some(sample_json.to_string()));
     }
 
     #[test]

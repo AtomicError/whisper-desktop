@@ -64,9 +64,6 @@ export interface SettingsState {
   outputVtt?: boolean;
   outputSrt?: boolean;
   outputLrc?: boolean;
-  outputCsv?: boolean;
-  outputJson?: boolean;
-  outputJsonFull?: boolean;
   uiLanguage?: string;
   theme?: string;
   uiScale?: number;
@@ -985,9 +982,6 @@ export function bindSettingsToDOM(): void {
             if (key === 'translateAiPolish' && win.translationStudioController?.syncFromGlobalSettings) {
               win.translationStudioController.syncFromGlobalSettings();
             }
-            if (key === 'outputJson' || key === 'outputJsonFull') {
-              syncJsonConfidenceDependency();
-            }
           }, 240);
         };
       } else if (el.tagName === 'SELECT' || el.tagName === 'TEXTAREA' || (el as HTMLInputElement).type === 'text' || (el as HTMLInputElement).type === 'number') {
@@ -1086,37 +1080,8 @@ export function bindSettingsToDOM(): void {
 }
 
 export function syncJsonConfidenceDependency(): void {
-  if (typeof document === 'undefined') return;
-  const jsonOpt = document.getElementById('opt-outputJson') as HTMLInputElement | null;
-  const jsonFullOpt = document.getElementById('opt-outputJsonFull') as HTMLInputElement | null;
-  const confCard = document.getElementById('card-printConfidence') as HTMLElement | null;
-  const confInput = document.getElementById('opt-printConfidence') as HTMLInputElement | null;
-
-  const isJsonActive = Boolean((jsonOpt && jsonOpt.checked) || (jsonFullOpt && jsonFullOpt.checked));
-
-  if (confCard) {
-    if (isJsonActive) {
-      confCard.style.opacity = '1';
-      confCard.style.cursor = 'default';
-      confCard.style.pointerEvents = 'auto';
-      if (confInput) confInput.disabled = false;
-      confCard.removeAttribute('title');
-    } else {
-      confCard.style.opacity = '0.45';
-      confCard.style.cursor = 'not-allowed';
-      confCard.style.pointerEvents = 'auto';
-      if (confInput) {
-        confInput.disabled = true;
-        confInput.checked = false;
-      }
-      const current = getSettingsState();
-      if (current && current.printConfidence) {
-        current.printConfidence = false;
-        saveCurrentSettings();
-      }
-      confCard.title = 'Requires JSON Formatted (.json) or Full Detailed JSON (-ojf) to be enabled';
-    }
-  }
+  // Deprecated: Internal full detailed JSON (-ojf) and word confidence are always generated automatically.
+  // Maintained as safe no-op for backward compatibility with external consumers.
 }
 
 // ----------------- FFmpeg Status & Version Formatting -----------------

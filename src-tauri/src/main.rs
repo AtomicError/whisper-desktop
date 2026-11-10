@@ -658,6 +658,45 @@ fn write_text_file_content(file_path: String, content: String) -> Result<(), Str
 }
 
 #[tauri::command]
+fn get_transcript_session_data(session_file: Option<String>) -> Result<String, String> {
+    if let Some(ref path_str) = session_file {
+        let path = std::path::Path::new(path_str);
+        let is_json = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.eq_ignore_ascii_case("json"))
+            .unwrap_or(false);
+        if is_json && path.exists() && path.is_file() {
+            return std::fs::read_to_string(path).map_err(|e| format!("Failed to read session file: {}", e));
+        }
+    }
+    transcribe::get_last_transcript_json()
+        .ok_or_else(|| "No transcript data available for this session".to_string())
+}
+
+#[tauri::command]
+async fn stream_media_file(
+    media_server: State<'_, Arc<video_server::MediaServer>>,
+    file_path: String,
+) -> Result<String, String> {
+    let path = std::path::PathBuf::from(&file_path);
+    if !path.exists() || !path.is_file() {
+        return Err("Media file does not exist or is not a regular file".to_string());
+    }
+    let mime = video_server::mime_for_path(&path).to_string();
+    media_server.register(path, mime, None).await
+}
+
+#[tauri::command]
+async fn revoke_media_stream(
+    media_server: State<'_, Arc<video_server::MediaServer>>,
+    stream_url: String,
+) -> Result<(), String> {
+    media_server.revoke(&stream_url).await;
+    Ok(())
+}
+
+#[tauri::command]
 fn start_download_model_task(
     app: AppHandle,
     download_state: State<'_, DownloadState>,
@@ -1508,6 +1547,9 @@ fn main() {
             media_preview::advance_hardsub_preview,
             media_preview::release_hardsub_preview,
             media_preview::probe_hardsub_source,
+            get_transcript_session_data,
+            stream_media_file,
+            revoke_media_stream,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
