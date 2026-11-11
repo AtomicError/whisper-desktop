@@ -1188,6 +1188,7 @@ export const ru: Translations = {
     modelDownloadPauseError: 'Не удалось поставить скачивание на паузу:\n{error}',
     modelDeleteError: 'Не удалось удалить модель:\n{error}',
     liveTranscriptCopied: 'Живой текст скопирован в буфер обмена!',
+    filteredTranscriptCopied: 'Отфильтрованный текст скопирован в буфер обмена ({count} строк)!',
     previewCopied: 'Текст предпросмотра скопирован в буфер обмена!',
     noTranscriptToCopy: 'Нет доступного текста для копирования.',
     keyringLoadError: 'Не удалось загрузить защищенный API ключ:\n{error}',

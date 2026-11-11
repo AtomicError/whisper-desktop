@@ -1188,6 +1188,7 @@ export const de: Translations = {
     modelDownloadPauseError: 'Download konnte nicht pausiert werden:\n{error}',
     modelDeleteError: 'Modell konnte nicht gelöscht werden:\n{error}',
     liveTranscriptCopied: 'Live-Transkript in die Zwischenablage kopiert!',
+    filteredTranscriptCopied: 'Gefiltertes Transkript in die Zwischenablage kopiert ({count} Zeilen)!',
     previewCopied: 'Transkript-Vorschau in die Zwischenablage kopiert!',
     noTranscriptToCopy: 'Kein Transkripttext zum Kopieren verfügbar.',
     keyringLoadError: 'Sicherer API-Schlüssel konnte nicht geladen werden:\n{error}',

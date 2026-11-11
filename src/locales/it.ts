@@ -1190,6 +1190,7 @@ export const it: Translations = {
     modelDownloadPauseError: 'Impossibile sospendere il download:\n{error}',
     modelDeleteError: 'Impossibile eliminare il modello:\n{error}',
     liveTranscriptCopied: 'Trascrizione in tempo reale copiata negli appunti!',
+    filteredTranscriptCopied: 'Trascrizione filtrata copiata negli appunti ({count} righe)!',
     previewCopied: 'Anteprima trascrizione copiata negli appunti!',
     noTranscriptToCopy: 'Nessun testo di trascrizione disponibile da copiare.',
     keyringLoadError: 'Impossibile caricare la chiave API protetta:\n{error}',

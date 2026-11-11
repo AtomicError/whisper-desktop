@@ -1188,6 +1188,7 @@ export const ar: Translations = {
     modelDownloadPauseError: 'فشل في إيقاف التنزيل مؤقتاً:\n{error}',
     modelDeleteError: 'فشل في حذف النموذج:\n{error}',
     liveTranscriptCopied: 'تم نسخ النص المباشر إلى الحافظة!',
+    filteredTranscriptCopied: 'تم نسخ النص المصفى إلى الحافظة ({count} مقطع)!',
     previewCopied: 'تم نسخ نص المعاينة إلى الحافظة!',
     noTranscriptToCopy: 'لا يوجد نص متاح للنسخ حالياً.',
     keyringLoadError: 'تعذر تحميل مفتاح API المحمي من سلسلة المفاتيح:\n{error}',

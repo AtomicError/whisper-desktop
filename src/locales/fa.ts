@@ -1190,6 +1190,7 @@ export const fa: Translations = {
     modelDownloadPauseError: 'خطا در توقف دانلود مدل:\n{error}',
     modelDeleteError: 'خطا در حذف مدل:\n{error}',
     liveTranscriptCopied: 'متن زنده در کلیپ‌بورد کپی شد!',
+    filteredTranscriptCopied: 'خطوط فیلترشده در کلیپ‌بورد کپی شد ({count} سگمنت)!',
     previewCopied: 'پیش‌نمایش متن در کلیپ‌بورد کپی شد!',
     noTranscriptToCopy: 'متنی برای کپی کردن وجود ندارد.',
     keyringLoadError: 'خطا در بارگذاری کلید امن API:\n{error}',

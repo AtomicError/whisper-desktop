@@ -1183,6 +1183,7 @@ export const fr: Translations = {
     modelDownloadPauseError: 'Échec de la mise en pause du téléchargement :\n{error}',
     modelDeleteError: 'Échec de la suppression du modèle :\n{error}',
     liveTranscriptCopied: 'Transcription en direct copiée dans le presse-papiers !',
+    filteredTranscriptCopied: 'Transcription filtrée copiée dans le presse-papiers ({count} lignes) !',
     previewCopied: 'Aperçu de la transcription copié dans le presse-papiers !',
     noTranscriptToCopy: 'Aucun texte de transcription disponible à copier.',
     keyringLoadError: 'Échec du chargement de la clé sécurisée de l\'API :\n{error}',

@@ -1190,6 +1190,7 @@ export const tr: Translations = {
     modelDownloadPauseError: 'İndirme duraklatılamadı:\n{error}',
     modelDeleteError: 'Model silinemedi:\n{error}',
     liveTranscriptCopied: 'Canlı deşifre panoya kopyalandı!',
+    filteredTranscriptCopied: 'Filtrelenen deşifre panoya kopyalandı ({count} satır)!',
     previewCopied: 'Deşifre önizlemesi panoya kopyalandı!',
     noTranscriptToCopy: 'Kopyalanacak deşifre metni yok.',
     keyringLoadError: 'Güvenli API anahtarı yüklenemedi:\n{error}',

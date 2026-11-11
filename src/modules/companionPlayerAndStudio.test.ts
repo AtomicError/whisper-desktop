@@ -22,6 +22,7 @@ import {
   getTranscriptHistory,
   setTranscriptHistory,
   createTranscriptCardElement,
+  copyLiveTranscriptToClipboard,
   transcriptViewer,
   type TranscriptLine
 } from './transcriptViewer';
@@ -1430,5 +1431,75 @@ describe('Studio Refinements, Isolation & Keyboard Accessibility', () => {
     }
 
     expect(defaultPrevented).toBe(false);
+  });
+
+  it('safely formats infinite or invalid seconds without producing NaN', () => {
+    expect(formatTimecodeDisplay(Infinity)).toBe('00:00.000');
+    expect(formatTimecodeDisplay(-Infinity)).toBe('00:00.000');
+    expect(formatTimecodeDisplay(NaN)).toBe('00:00.000');
+    expect(formatTimecodeDisplay(-5)).toBe('00:00.000');
+  });
+
+  it('matches Persian space vs ZWNJ variants bidirectionally in search', () => {
+    registerMockEl('transcript-viewport');
+    const searchInput = registerMockEl('transcript-search', 'INPUT') as any;
+
+    renderTranscriptLines([
+      { id: 0, text: 'این متن ذخیره می‌شود', timeRange: '[00:00:00.000 --> 00:00:02.000]' },
+      { id: 1, text: 'ثبت نام دوره جدید', timeRange: '[00:00:02.000 --> 00:00:04.000]' }
+    ]);
+
+    // 1. Search with regular space 'می رود' matches ZWNJ 'می‌شود'
+    searchInput.value = 'می شود';
+    filterTranscriptLines();
+    let cards = mockDocument.querySelectorAll('.transcript-line');
+    expect(cards[0].style.display).toBe('flex');
+    expect(cards[1].style.display).toBe('none');
+
+    // 2. Search with ZWNJ 'ثبت‌نام' matches regular space 'ثبت نام'
+    searchInput.value = 'ثبت‌نام';
+    filterTranscriptLines();
+    cards = mockDocument.querySelectorAll('.transcript-line');
+    expect(cards[0].style.display).toBe('none');
+    expect(cards[1].style.display).toBe('flex');
+
+    searchInput.value = '';
+  });
+
+  it('copies only filtered lines when search query is active in copyLiveTranscriptToClipboard', async () => {
+    registerMockEl('transcript-viewport');
+    const searchInput = registerMockEl('transcript-search', 'INPUT') as any;
+    registerMockEl('btn-copy-transcript', 'BUTTON');
+
+    let copiedText = '';
+    let notificationText = '';
+    (globalThis as any).window.copyToClipboard = async (text: string) => {
+      copiedText = text;
+    };
+    (globalThis as any).window.showNotification = (msg: string) => {
+      notificationText = msg;
+    };
+
+    const testLines = [
+      { id: 0, text: 'First matching line', timeRange: '[00:00:00.000 --> 00:00:02.000]' },
+      { id: 1, text: 'Second other line', timeRange: '[00:00:02.000 --> 00:00:04.000]' },
+      { id: 2, text: 'Third matching line', timeRange: '[00:00:04.000 --> 00:00:06.000]' }
+    ];
+    transcriptViewer.lines = testLines;
+    renderTranscriptLines(testLines);
+
+    // 1. Without search filter: copies all 3 lines
+    searchInput.value = '';
+    await copyLiveTranscriptToClipboard();
+    expect(copiedText).toBe('First matching line\nSecond other line\nThird matching line');
+
+    // 2. With search filter 'matching': copies only lines 0 and 2
+    searchInput.value = 'matching';
+    filterTranscriptLines();
+    await copyLiveTranscriptToClipboard();
+    expect(copiedText).toBe('First matching line\nThird matching line');
+    expect(notificationText).toContain('2');
+
+    searchInput.value = '';
   });
 });

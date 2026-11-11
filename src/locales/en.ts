@@ -1188,6 +1188,7 @@ export const en = {
     modelDownloadPauseError: 'Failed to pause download:\n{error}',
     modelDeleteError: 'Failed to delete model:\n{error}',
     liveTranscriptCopied: 'Live transcript copied to clipboard!',
+    filteredTranscriptCopied: 'Filtered transcript copied to clipboard ({count} lines)!',
     previewCopied: 'Transcript preview copied to clipboard!',
     noTranscriptToCopy: 'No transcript text available to copy.',
     keyringLoadError: 'Failed to load secure API key:\n{error}',

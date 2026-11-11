@@ -33,7 +33,7 @@ let pendingSeekTargetSec: number | null = null;
 let hasMetadataSeekListener = false;
 
 export function formatTimecodeDisplay(seconds: number): string {
-  if (isNaN(seconds) || seconds < 0) seconds = 0;
+  if (isNaN(seconds) || seconds < 0 || !isFinite(seconds)) seconds = 0;
   const totalMs = Math.floor(seconds * 1000);
   const ms = totalMs % 1000;
   const totalSec = Math.floor(totalMs / 1000);
@@ -183,6 +183,9 @@ export async function loadMediaIntoCompanionPlayer(filePath: string, autoSwitchD
   if (currentSeq !== activeLoadSequence) {
     if (streamUrl && invoke) {
       invoke('revoke_media_stream', { streamUrl }).catch(() => {});
+    }
+    if (activeStreamUrl === streamUrl) {
+      activeStreamUrl = null;
     }
     return false;
   }

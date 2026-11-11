@@ -1183,6 +1183,7 @@ export const zh: Translations = {
     modelDownloadPauseError: '暂停下载操作失败:\n{error}',
     modelDeleteError: '未能顺利删除模型文件:\n{error}',
     liveTranscriptCopied: '实时转录内容已复制至剪贴板！',
+    filteredTranscriptCopied: '已复制筛选后的文本至剪贴板（{count} 行）！',
     previewCopied: '预览文本已复制至剪贴板！',
     noTranscriptToCopy: '当前暂无可供复制的转录内容。',
     keyringLoadError: '从系统安全钥匙串提取密钥失败:\n{error}',

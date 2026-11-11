@@ -1183,6 +1183,7 @@ export const es: Translations = {
     modelDownloadPauseError: 'Error al pausar la descarga:\n{error}',
     modelDeleteError: 'Error al eliminar el modelo:\n{error}',
     liveTranscriptCopied: '¡Transcripción en vivo copiada al portapapeles!',
+    filteredTranscriptCopied: '¡Transcripción filtrada copiada al portapapeles ({count} líneas)!',
     previewCopied: '¡Vista previa de transcripción copiada al portapapeles!',
     noTranscriptToCopy: 'No hay texto de transcripción disponible para copiar.',
     keyringLoadError: 'Error al cargar la clave segura de la API:\n{error}',

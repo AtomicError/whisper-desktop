@@ -1156,6 +1156,7 @@ function normalizeSearchText(str: string): string {
     .replace(/ي/g, 'ی')
     .replace(/ك/g, 'ک')
     .replace(/[\u200C\u200B]/g, '')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
@@ -1168,6 +1169,7 @@ export function filterTranscriptLines(): void {
   }
   const rawQuery = searchInput ? searchInput.value.trim() : '';
   const query = normalizeSearchText(rawQuery);
+  const queryNoSpace = query.replace(/\s+/g, '');
   const lines = document.querySelectorAll('.transcript-line');
   const viewport = document.getElementById('transcript-viewport');
   let matchCount = 0;
@@ -1175,7 +1177,10 @@ export function filterTranscriptLines(): void {
   lines.forEach((lineEl: any) => {
     const textInput = lineEl.querySelector('.transcript-text-input');
     if (textInput) {
-      const match = !query || normalizeSearchText(textInput.value).includes(query);
+      const normText = normalizeSearchText(textInput.value);
+      const match = !query ||
+        normText.includes(query) ||
+        (queryNoSpace.length >= 2 && normText.replace(/\s+/g, '').includes(queryNoSpace));
       lineEl.style.display = match ? 'flex' : 'none';
       if (match) {
         matchCount++;
@@ -1541,14 +1546,47 @@ export async function copyLiveTranscriptToClipboard(): Promise<void> {
   };
 
   if (transcriptLines && transcriptLines.length > 0) {
-    const textToCopy = transcriptLines
+    const searchInput = typeof document !== 'undefined'
+      ? (document.getElementById('transcript-search') as HTMLInputElement | null)
+      : null;
+    const rawQuery = searchInput ? searchInput.value.trim() : '';
+
+    let linesToCopy = transcriptLines;
+    let isFiltered = false;
+
+    if (rawQuery && typeof document !== 'undefined') {
+      const visibleCards = Array.from(document.querySelectorAll('.transcript-line')) as HTMLElement[];
+      const filteredLines: TranscriptLine[] = [];
+      visibleCards.forEach(card => {
+        if (card.style.display !== 'none') {
+          const id = Number(card.dataset.id);
+          const line = transcriptLines.find(l => l.id === id);
+          if (line) filteredLines.push(line);
+        }
+      });
+      linesToCopy = filteredLines;
+      isFiltered = true;
+    }
+
+    if (isFiltered && linesToCopy.length === 0) {
+      if (showNotification) showNotification(t('transcribe.noMatchingTranscript'), "info");
+      return;
+    }
+
+    const textToCopy = linesToCopy
       .map(l => l.text)
       .join('\n');
       
     try {
       if (copyToClipboard) await copyToClipboard(textToCopy);
       triggerBtnFeedback();
-      if (showNotification) showNotification(t('toasts.liveTranscriptCopied'), "success");
+      if (showNotification) {
+        if (isFiltered) {
+          showNotification(t('toasts.filteredTranscriptCopied', { count: linesToCopy.length }), "success");
+        } else {
+          showNotification(t('toasts.liveTranscriptCopied'), "success");
+        }
+      }
       return;
     } catch (err: any) {
       const msg = (err && (err.message || err.toString())) || String(err);
@@ -1636,6 +1674,13 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
         undoTranscriptOperation();
       }
     }
+  });
+}
+
+// Guarantee in-flight debounced edits are flushed before window unloads
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('beforeunload', () => {
+    void flushPendingTranscriptEdits();
   });
 }
 

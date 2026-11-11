@@ -1190,6 +1190,7 @@ export const ko: Translations = {
     modelDownloadPauseError: '다운로드를 일시정지하지 못했습니다:\n{error}',
     modelDeleteError: '모델을 삭제하지 못했습니다:\n{error}',
     liveTranscriptCopied: '실시간 변환 텍스트가 클립보드에 복사되었습니다!',
+    filteredTranscriptCopied: '필터링된 텍스트가 클립보드에 복사되었습니다 ({count}줄)!',
     previewCopied: '텍스트 미리보기가 클립보드에 복사되었습니다!',
     noTranscriptToCopy: '복사할 텍스트가 없습니다.',
     keyringLoadError: '보안 API 키를 로드하지 못했습니다:\n{error}',

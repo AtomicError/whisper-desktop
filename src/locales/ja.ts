@@ -1188,6 +1188,7 @@ export const ja: Translations = {
     modelDownloadPauseError: 'ダウンロードの一時停止に失敗しました:\n{error}',
     modelDeleteError: 'モデルの削除に失敗しました:\n{error}',
     liveTranscriptCopied: 'リアルタイムテキストをクリップボードにコピーしました！',
+    filteredTranscriptCopied: '絞り込まれたテキストをクリップボードにコピーしました（{count}行）！',
     previewCopied: 'プレビューテキストをクリップボードにコピーしました！',
     noTranscriptToCopy: 'コピー可能なテキストがありません。',
     keyringLoadError: '安全な API キーの読み込みに失敗しました:\n{error}',
