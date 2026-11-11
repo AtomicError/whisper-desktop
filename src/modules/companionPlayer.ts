@@ -252,6 +252,11 @@ export async function loadMediaIntoCompanionPlayer(filePath: string, autoSwitchD
   videoEl.src = streamUrl;
   videoEl.load();
 
+  const seekSlider = document.getElementById('companion-seek-slider') as HTMLInputElement | null;
+  if (seekSlider) seekSlider.value = '0';
+  const timeCurrent = document.getElementById('companion-time-current');
+  if (timeCurrent) timeCurrent.textContent = formatTimecodeDisplay(0);
+
   // Synchronize user-chosen playback rate and volume on the newly loaded media
   const speedSelect = document.getElementById('companion-speed-select') as HTMLSelectElement | null;
   if (speedSelect) {
@@ -369,6 +374,7 @@ export function pauseCompanionPlayer(): void {
 
 export function unloadCompanionPlayer(): void {
   activeLoadSequence++;
+  activeMediaInfo = null;
   pauseCompanionPlayer();
   pendingSeekTargetSec = null;
   hasMetadataSeekListener = false;
@@ -378,6 +384,12 @@ export function unloadCompanionPlayer(): void {
       el.classList.remove('active-playback');
     });
   }
+  const seekSlider = document.getElementById('companion-seek-slider') as HTMLInputElement | null;
+  if (seekSlider) seekSlider.value = '0';
+  const timeCurrent = document.getElementById('companion-time-current');
+  if (timeCurrent) timeCurrent.textContent = formatTimecodeDisplay(0);
+  const timeTotal = document.getElementById('companion-time-total');
+  if (timeTotal) timeTotal.textContent = formatTimecodeDisplay(0);
   const invoke = getTauriInvoke();
   if (activeStreamUrl && invoke) {
     invoke('revoke_media_stream', { streamUrl: activeStreamUrl }).catch(() => {});
@@ -403,7 +415,6 @@ export function unloadCompanionPlayer(): void {
     fullscreenBtn.style.opacity = '1';
     fullscreenBtn.style.cursor = 'pointer';
   }
-  activeMediaInfo = null;
   showTranscribeSetupDeck();
   const setupDeckTabs = document.getElementById('setup-deck-mode-tabs');
   if (setupDeckTabs) setupDeckTabs.style.display = 'none';

@@ -19,7 +19,7 @@ import {
 } from './settingsManager';
 import { batchProcessor, addBatchFiles, formatDuration } from './batchProcessor';
 import { escapeHTML, logsController } from './logsController';
-import { loadTranscriptFromFile, loadTranscriptFromJsonData, transcriptViewer, clearTranscriptLines } from './transcriptViewer';
+import { loadTranscriptFromFile, loadTranscriptFromJsonData, transcriptViewer, clearTranscriptLines, flushPendingTranscriptEdits } from './transcriptViewer';
 import { loadMediaIntoCompanionPlayer } from './companionPlayer';
 import {
   workflowBridge,
@@ -228,6 +228,7 @@ export function clearSingleMediaFile(): void {
     );
     return;
   }
+  void (transcriptViewer.flushEdits ? transcriptViewer.flushEdits() : flushPendingTranscriptEdits());
   setSelectedMediaFile(null);
   batchProcessor.setSelectedFiles([]);
   setWavPathForTranscription(null);

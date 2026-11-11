@@ -95,13 +95,13 @@ export function setupTranscriptDirection(): void {
 
 export function parseTranscriptTimeRange(timeRange: string): { raw: string; durLabel: string } {
   if (!timeRange) return { raw: '', durLabel: '' };
-  const match = timeRange.match(/\[?(\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?)\s*(?:-->|→)\s*(\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?)\]?/);
+  const match = timeRange.match(/\[?(\d{2}:\d{2}:\d{2}(?:[.,]\d{1,3})?)\s*(?:-->|→)\s*(\d{2}:\d{2}:\d{2}(?:[.,]\d{1,3})?)\]?/);
   if (match) {
     const start = match[1];
     const end = match[2];
     const toSec = (str: string) => {
       const parts = str.split(':');
-      return parseFloat(parts[0]) * 3600 + parseFloat(parts[1]) * 60 + parseFloat(parts[2]);
+      return parseFloat(parts[0]) * 3600 + parseFloat(parts[1]) * 60 + parseFloat(parts[2].replace(',', '.'));
     };
     const diff = Math.max(0, Math.round(toSec(end) - toSec(start)));
     const durLabel = diff > 0 ? `${diff}s` : '';
@@ -768,12 +768,14 @@ export function updateTranscriptLineText(id: number, value: string): void {
     }
   }
   if (changed) {
-    if (typeof document !== 'undefined' && typeof document.getElementById === 'function') {
-      const cardEl = document.getElementById(`transcript-card-${id}`);
+    if (typeof document !== 'undefined' && typeof document.querySelector === 'function') {
+      const cardEl = (document.querySelector(`.transcript-card[data-id="${id}"]`) ||
+        (typeof document.getElementById === 'function' ? document.getElementById(`transcript-card-${id}`) : null)) as HTMLElement | null;
       if (cardEl && typeof cardEl.querySelector === 'function') {
-        const wordsContainer = cardEl.querySelector('.transcript-words-container') as HTMLElement | null;
-        if (wordsContainer) {
-          wordsContainer.style.display = 'none';
+        const wordsBar = (cardEl.querySelector('.transcript-words-bar') ||
+          cardEl.querySelector('.transcript-words-container')) as HTMLElement | null;
+        if (wordsBar) {
+          wordsBar.style.display = 'none';
         }
       }
     }
@@ -826,8 +828,9 @@ export function splitTranscriptSegment(lineId: number, cursorPosition?: number):
   // Sync latest text from active DOM textarea if present
   let fullText = line.text;
   if (typeof document !== 'undefined') {
-    const domTextarea = document.querySelector(`.transcript-card[data-id="${line.id}"] .transcript-text-input`) as HTMLTextAreaElement | null;
-    if (domTextarea && typeof domTextarea.value === 'string') {
+    const cardEl = document.querySelector(`.transcript-card[data-id="${line.id}"]`);
+    const domTextarea = (cardEl ? cardEl.querySelector('.transcript-text-input') : null) as HTMLTextAreaElement | null;
+    if (domTextarea && (domTextarea.tagName === 'TEXTAREA' || domTextarea.classList?.contains?.('transcript-text-input')) && typeof domTextarea.value === 'string') {
       fullText = domTextarea.value;
       line.text = fullText;
     }
@@ -914,6 +917,8 @@ export function splitTranscriptSegment(lineId: number, cursorPosition?: number):
         const mid = Math.round(startMs + ratio * Math.max(0, endMs - startMs));
         splitEndMs = mid;
         splitStartMs = mid;
+        leftWords = undefined;
+        rightWords = undefined;
       }
     }
   } else {
@@ -994,10 +999,16 @@ export function mergeTranscriptSegmentWithPrevious(lineId: number): boolean {
   let currText = currLine.text;
   let prevText = prevLine.text;
   if (typeof document !== 'undefined') {
-    const currTextarea = document.querySelector(`.transcript-card[data-id="${currLine.id}"] .transcript-text-input`) as HTMLTextAreaElement | null;
-    const prevTextarea = document.querySelector(`.transcript-card[data-id="${prevLine.id}"] .transcript-text-input`) as HTMLTextAreaElement | null;
-    if (currTextarea && typeof currTextarea.value === 'string') currText = currTextarea.value;
-    if (prevTextarea && typeof prevTextarea.value === 'string') prevText = prevTextarea.value;
+    const currCard = document.querySelector(`.transcript-card[data-id="${currLine.id}"]`);
+    const prevCard = document.querySelector(`.transcript-card[data-id="${prevLine.id}"]`);
+    const currTextarea = (currCard ? currCard.querySelector('.transcript-text-input') : null) as HTMLTextAreaElement | null;
+    const prevTextarea = (prevCard ? prevCard.querySelector('.transcript-text-input') : null) as HTMLTextAreaElement | null;
+    if (currTextarea && (currTextarea.tagName === 'TEXTAREA' || currTextarea.classList?.contains?.('transcript-text-input')) && typeof currTextarea.value === 'string') {
+      currText = currTextarea.value;
+    }
+    if (prevTextarea && (prevTextarea.tagName === 'TEXTAREA' || prevTextarea.classList?.contains?.('transcript-text-input')) && typeof prevTextarea.value === 'string') {
+      prevText = prevTextarea.value;
+    }
   }
 
   currLine.text = currText;
@@ -1010,8 +1021,10 @@ export function mergeTranscriptSegmentWithPrevious(lineId: number): boolean {
   }
 
   let mergedWords: WordToken[] | undefined;
-  if (Array.isArray(prevLine.words) || Array.isArray(currLine.words)) {
-    mergedWords = [...(prevLine.words || []), ...(currLine.words || [])];
+  if (Array.isArray(prevLine.words) && Array.isArray(currLine.words)) {
+    mergedWords = [...prevLine.words, ...currLine.words];
+  } else {
+    mergedWords = undefined;
   }
 
   recordTranscriptHistorySnapshot('Merge');

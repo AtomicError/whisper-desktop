@@ -357,6 +357,28 @@ describe('transcribePipeline module', () => {
       batchProcessor.setIsExtracting(false);
     });
 
+    it('flushes pending transcript edits when user clears single media file', () => {
+      setSelectedMediaFile('/media/to_clear.mp4');
+      const dropZone = new MockElement('DIV');
+      dropZone.id = 'transcribe-drop-zone';
+      domMap.set(dropZone.id, dropZone);
+
+      let flushCalled = false;
+      const origFlush = transcriptViewer.flushEdits;
+      (transcriptViewer as any).flushEdits = () => {
+        flushCalled = true;
+        return Promise.resolve();
+      };
+
+      try {
+        clearSingleMediaFile();
+        expect(getSelectedMediaFile()).toBe(null);
+        expect(flushCalled).toBe(true);
+      } finally {
+        (transcriptViewer as any).flushEdits = origFlush;
+      }
+    });
+
     it('defensively sanitizes and trims paths from browseMediaFile', async () => {
       (globalThis as any).window.invoke = vi.fn((cmd: string) => {
         if (cmd === 'select_files') {

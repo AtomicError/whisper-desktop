@@ -498,6 +498,13 @@ pub(crate) fn mime_for_path(path: &Path) -> &'static str {
     "flac" => "audio/flac",
     "aac" => "audio/aac",
     "m4a" => "audio/mp4",
+    "aiff" | "aif" => "audio/aiff",
+    "wma" => "audio/x-ms-wma",
+    "ac3" => "audio/ac3",
+    "dts" => "audio/vnd.dts",
+    "caf" => "audio/x-caf",
+    "ape" => "audio/x-ape",
+    "alac" => "audio/alac",
     _ => "application/octet-stream",
   }
 }
@@ -838,6 +845,14 @@ mod tests {
     assert_eq!(mime_for_path(Path::new("a.MP4")), "video/mp4");
     assert_eq!(mime_for_path(Path::new("movie.vob")), "video/mpeg");
     assert_eq!(mime_for_path(Path::new("song.flac")), "audio/flac");
+    assert_eq!(mime_for_path(Path::new("audio.aiff")), "audio/aiff");
+    assert_eq!(mime_for_path(Path::new("track.aif")), "audio/aiff");
+    assert_eq!(mime_for_path(Path::new("voice.wma")), "audio/x-ms-wma");
+    assert_eq!(mime_for_path(Path::new("sound.ac3")), "audio/ac3");
+    assert_eq!(mime_for_path(Path::new("surround.dts")), "audio/vnd.dts");
+    assert_eq!(mime_for_path(Path::new("recording.caf")), "audio/x-caf");
+    assert_eq!(mime_for_path(Path::new("lossless.ape")), "audio/x-ape");
+    assert_eq!(mime_for_path(Path::new("apple.alac")), "audio/alac");
     assert_eq!(mime_for_path(Path::new("unknown.xyz")), "application/octet-stream");
     assert_eq!(mime_for_path(Path::new("noext")), "application/octet-stream");
   }

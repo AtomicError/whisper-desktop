@@ -27,6 +27,7 @@ import {
   aggregateTokensIntoWords,
   flushPendingTranscriptEdits,
   hasPendingTranscriptEdits,
+  parseTranscriptTimeRange,
   transcriptViewer,
   type TranscriptLine
 } from './transcriptViewer';
@@ -63,6 +64,16 @@ class MockElement {
   parentNode: MockElement | null = null;
   textContent = '';
   value = '';
+  private _innerHTML = '';
+  get innerHTML(): string {
+    return this._innerHTML;
+  }
+  set innerHTML(val: string) {
+    this._innerHTML = String(val);
+    if (!val) {
+      this.children = [];
+    }
+  }
   style: Record<string, string> = {};
   dataset: Record<string, string> = {};
   _listeners = new Map<string, Array<(e: any) => void>>();
@@ -150,9 +161,28 @@ class MockElement {
   }
 
   querySelectorAll(sel: string): MockElement[] {
+    if (sel.includes(' ')) {
+      const parts = sel.split(/\s+/);
+      const parents = this.querySelectorAll(parts[0]);
+      const res: MockElement[] = [];
+      parents.forEach(p => {
+        res.push(...p.querySelectorAll(parts.slice(1).join(' ')));
+      });
+      return res;
+    }
     const res: MockElement[] = [];
+    const idMatch = sel.match(/\[data-id="([^"]+)"\]/);
     const check = (node: MockElement) => {
-      if (sel.startsWith('.')) {
+      if (idMatch) {
+        let matches = node.dataset.id === idMatch[1];
+        if (matches && sel.startsWith('.')) {
+          const className = sel.split('[')[0].slice(1);
+          if (className && !node.classList.contains(className)) {
+            matches = false;
+          }
+        }
+        if (matches) res.push(node);
+      } else if (sel.startsWith('.')) {
         const classes = sel.split('.').filter(Boolean);
         if (classes.every(c => node.classList.contains(c))) res.push(node);
       } else if (sel.startsWith('#')) {
@@ -161,8 +191,7 @@ class MockElement {
       node.children.forEach(check);
     };
     this.children.forEach(check);
-    if (res.length > 0) return res;
-    return mockDocument.querySelectorAll(sel);
+    return res;
   }
 
   querySelector(sel: string) {
@@ -205,11 +234,32 @@ const mockDocument = {
     return all.length > 0 ? all[0] : null;
   },
   querySelectorAll(sel: string) {
+    if (sel.includes(' ')) {
+      const parts = sel.split(/\s+/);
+      const parents = this.querySelectorAll(parts[0]);
+      const res: MockElement[] = [];
+      parents.forEach(p => {
+        res.push(...p.querySelectorAll(parts.slice(1).join(' ')));
+      });
+      return res;
+    }
+    const vp = elementRegistry.get('transcript-viewport');
+    if (vp && vp.children.length > 0 && (sel.includes('.transcript-card') || sel.includes('[data-id='))) {
+      const vpResults = vp.querySelectorAll(sel);
+      if (vpResults.length > 0) return vpResults;
+    }
     const results: MockElement[] = [];
     const idMatch = sel.match(/\[data-id="([^"]+)"\]/);
     const check = (el: MockElement) => {
       if (idMatch) {
-        if (el.dataset.id === idMatch[1]) {
+        let matches = el.dataset.id === idMatch[1];
+        if (matches && sel.startsWith('.')) {
+          const className = sel.split('[')[0].slice(1);
+          if (className && !el.classList.contains(className)) {
+            matches = false;
+          }
+        }
+        if (matches) {
           results.push(el);
         }
       } else if (sel.startsWith('#') && el.id === sel.slice(1)) {
@@ -965,6 +1015,7 @@ describe('Companion Media Player & DOM Controls', () => {
 
     deleteTranscriptSegment(1);
     expect(transcriptViewer.lines.length).toBe(2);
+    mockDocument.querySelector = origQuerySelector;
   });
 });
 
@@ -1775,6 +1826,13 @@ describe('Studio Refinements, Isolation & Keyboard Accessibility', () => {
   });
 
   it('invalidates stale word tokens and hides words bar container when line text is edited', () => {
+    // Clear any stale mock cards from earlier tests
+    const vp = document.getElementById('transcript-viewport');
+    if (vp) vp.children = [];
+    for (const [k, el] of Array.from(elementRegistry.entries())) {
+      if (el.dataset.id === '0') elementRegistry.delete(k);
+    }
+
     transcriptViewer.lines = [
       {
         id: 0,
@@ -1787,10 +1845,10 @@ describe('Studio Refinements, Isolation & Keyboard Accessibility', () => {
       }
     ];
 
-    const card = registerMockEl('transcript-card-0');
-    const wordsContainer = document.createElement('div');
-    wordsContainer.className = 'transcript-words-container';
-    card.appendChild(wordsContainer);
+    const card = registerMockEl('card-edit-test', 'DIV', 'transcript-card', { id: '0' });
+    const wordsBar = document.createElement('div');
+    wordsBar.className = 'transcript-words-bar';
+    card.appendChild(wordsBar);
 
     expect(transcriptViewer.lines[0].words).toBeDefined();
 
@@ -1798,7 +1856,7 @@ describe('Studio Refinements, Isolation & Keyboard Accessibility', () => {
 
     // Words should be invalidated so stale tokens are not preserved
     expect(transcriptViewer.lines[0].words).toBeUndefined();
-    expect(wordsContainer.style.display).toBe('none');
+    expect(wordsBar.style.display).toBe('none');
   });
 
   it('splitTranscriptSegment uses proportional interpolation and sets words to undefined when tokens do not match text', () => {
@@ -1958,5 +2016,167 @@ describe('Studio Refinements, Isolation & Keyboard Accessibility', () => {
     defaultPrevented = false;
     (keydownHandler as any)({ code: 'Space', preventDefault: () => { defaultPrevented = true; } });
     expect(defaultPrevented).toBe(true);
+  });
+
+  it('splitTranscriptSegment explicitly clears leftWords and rightWords when split occurs past the last token', () => {
+    transcriptViewer.lines = [
+      {
+        id: 0,
+        timeRange: '[00:00:00.000 --> 00:00:10.000]',
+        text: 'Hello world suffix trailing',
+        startMs: 0,
+        endMs: 10000,
+        // Only 2 words present in words array
+        words: [
+          { text: 'Hello', startMs: 0, endMs: 2000, prob: 0.9 },
+          { text: 'world', startMs: 2000, endMs: 4000, prob: 0.9 }
+        ]
+      }
+    ];
+    renderTranscriptLines(transcriptViewer.lines);
+
+    // Split at position 20 (inside "trailing", past all word tokens)
+    const splitSuccess = splitTranscriptSegment(0, 20);
+    expect(splitSuccess).toBe(true);
+    expect(transcriptViewer.lines.length).toBe(2);
+
+    // Tokens must not leak into segment 1 when the right slice is empty
+    expect(transcriptViewer.lines[0].words).toBeUndefined();
+    expect(transcriptViewer.lines[1].words).toBeUndefined();
+  });
+
+  it('mergeTranscriptSegmentWithPrevious sets mergedWords to undefined if either segment lacks word tokens', () => {
+    transcriptViewer.lines = [
+      {
+        id: 0,
+        timeRange: '[00:00:01.000 --> 00:00:03.000]',
+        text: 'Segment with words',
+        startMs: 1000,
+        endMs: 3000,
+        words: [
+          { text: 'Segment', startMs: 1000, endMs: 2000, prob: 0.9 },
+          { text: 'with', startMs: 2000, endMs: 2500, prob: 0.9 },
+          { text: 'words', startMs: 2500, endMs: 3000, prob: 0.9 }
+        ]
+      },
+      {
+        id: 1,
+        timeRange: '[00:00:03.500 --> 00:00:05.000]',
+        text: 'Segment edited without words',
+        startMs: 3500,
+        endMs: 5000,
+        words: undefined
+      }
+    ];
+    renderTranscriptLines(transcriptViewer.lines);
+
+    const merged = mergeTranscriptSegmentWithPrevious(1);
+    expect(merged).toBe(true);
+    expect(transcriptViewer.lines.length).toBe(1);
+    // Asymmetric words should not create partial token synchronization
+    expect(transcriptViewer.lines[0].words).toBeUndefined();
+    expect(transcriptViewer.lines[0].text).toBe('Segment with words Segment edited without words');
+  });
+
+  it('parseTranscriptTimeRange parses SRT timestamps with commas and computes durLabel', () => {
+    const srtRange = '[00:00:01,500 --> 00:00:04,500]';
+    const parsed = parseTranscriptTimeRange(srtRange);
+    expect(parsed.raw).toBe('00:00:01,500 → 00:00:04,500');
+    expect(parsed.durLabel).toBe('3s');
+
+    // Also handles arrow without brackets
+    const srtArrow = '00:01:10,200 → 00:01:25,800';
+    const parsedArrow = parseTranscriptTimeRange(srtArrow);
+    expect(parsedArrow.raw).toBe('00:01:10,200 → 00:01:25,800');
+    expect(parsedArrow.durLabel).toBe('16s');
+  });
+
+  it('resets companion seek slider and timecodes to zero on unload and load', async () => {
+    const seekSlider = registerMockEl('companion-seek-slider', 'INPUT') as any;
+    const timeCurrent = registerMockEl('companion-time-current') as any;
+    const timeTotal = registerMockEl('companion-time-total') as any;
+    const videoEl = registerMockEl('companion-media-element', 'VIDEO') as any;
+    videoEl.load = () => {};
+
+    seekSlider.value = '45';
+    timeCurrent.textContent = '00:45.000';
+    timeTotal.textContent = '02:00.000';
+
+    unloadCompanionPlayer();
+    expect(seekSlider.value).toBe('0');
+    expect(timeCurrent.textContent).toBe(formatTimecodeDisplay(0));
+    expect(timeTotal.textContent).toBe(formatTimecodeDisplay(0));
+
+    seekSlider.value = '25';
+    timeCurrent.textContent = '00:25.000';
+
+    (globalThis as any).invoke = async (cmd: string) => {
+      if (cmd === 'stream_media_file') return 'http://127.0.0.1:9000/stream/1';
+      if (cmd === 'probe_media_file') return { durationSec: 120 };
+      return null;
+    };
+
+    await loadMediaIntoCompanionPlayer('/path/to/test.mp4');
+    expect(seekSlider.value).toBe('0');
+    expect(timeCurrent.textContent).toBe(formatTimecodeDisplay(0));
+  });
+
+  it('mergeTranscriptSegmentWithPrevious respects empty textarea and does not resurrect deleted text', () => {
+    const vp = document.getElementById('transcript-viewport') || registerMockEl('transcript-viewport');
+    vp.children = [];
+
+    transcriptViewer.lines = [
+      {
+        id: 0,
+        timeRange: '[00:00:01.000 --> 00:00:03.000]',
+        text: 'Keep first',
+        startMs: 1000,
+        endMs: 3000
+      },
+      {
+        id: 1,
+        timeRange: '[00:00:03.500 --> 00:00:05.000]',
+        text: 'To be erased',
+        startMs: 3500,
+        endMs: 5000
+      }
+    ];
+    renderTranscriptLines(transcriptViewer.lines);
+
+    const card1 = document.querySelector('.transcript-card[data-id="1"]');
+    const textarea1 = card1?.querySelector('.transcript-text-input') as HTMLTextAreaElement;
+    expect(textarea1).not.toBeNull();
+    // Simulate user clearing text in the textarea
+    textarea1.value = '';
+
+    const merged = mergeTranscriptSegmentWithPrevious(1);
+    expect(merged).toBe(true);
+    expect(transcriptViewer.lines.length).toBe(1);
+    expect(transcriptViewer.lines[0].text).toBe('Keep first');
+  });
+
+  it('splitTranscriptSegment rejects splitting when textarea content was cleared to empty', () => {
+    const vp = document.getElementById('transcript-viewport') || registerMockEl('transcript-viewport');
+    vp.children = [];
+
+    transcriptViewer.lines = [
+      {
+        id: 0,
+        timeRange: '[00:00:00.000 --> 00:00:04.000]',
+        text: 'Will be cleared',
+        startMs: 0,
+        endMs: 4000
+      }
+    ];
+    renderTranscriptLines(transcriptViewer.lines);
+
+    const card0 = document.querySelector('.transcript-card[data-id="0"]');
+    const textarea0 = card0?.querySelector('.transcript-text-input') as HTMLTextAreaElement;
+    expect(textarea0).not.toBeNull();
+    textarea0.value = '';
+
+    const splitResult = splitTranscriptSegment(0);
+    expect(splitResult).toBe(false);
+    expect(transcriptViewer.lines.length).toBe(1);
   });
 });
