@@ -1502,4 +1502,133 @@ describe('Studio Refinements, Isolation & Keyboard Accessibility', () => {
 
     searchInput.value = '';
   });
+
+  it('hides video element for audio-only media and restores it for video media', async () => {
+    const videoEl = registerMockEl('companion-media-element', 'VIDEO') as any;
+    registerMockEl('companion-audio-fallback');
+    registerMockEl('companion-audio-name');
+    registerMockEl('companion-video-container');
+    registerMockEl('btn-companion-pip', 'BUTTON');
+    registerMockEl('btn-companion-fullscreen', 'BUTTON');
+
+    (globalThis as any).invoke = async (cmd: string) => {
+      if (cmd === 'stream_media_file') return 'http://127.0.0.1:1234/media/stream';
+      if (cmd === 'probe_media_file') return { durationSec: 120 };
+      if (cmd === 'probe_hardsub_source') return { width: 1920, height: 1080 };
+      return null;
+    };
+
+    // 1. Audio-only media (.mp3) hides video element
+    await loadMediaIntoCompanionPlayer('/path/to/song.mp3', false);
+    expect(videoEl.style.display).toBe('none');
+
+    // 2. Video media (.mp4) restores video element display
+    await loadMediaIntoCompanionPlayer('/path/to/clip.mp4', false);
+    expect(videoEl.style.display).toBe('block');
+  });
+
+  it('preserves paused state when seeking without explicit autoPlay argument', () => {
+    const videoEl = registerMockEl('companion-media-element', 'VIDEO') as any;
+    videoEl.readyState = 2; // HAVE_CURRENT_DATA
+    videoEl.currentTime = 0;
+    videoEl.paused = true;
+    let playCalled = false;
+    let pauseCalled = false;
+    videoEl.play = async () => { playCalled = true; };
+    videoEl.pause = () => { pauseCalled = true; };
+
+    // 1. Calling seek without autoPlay on paused video keeps it paused
+    seekCompanionPlayer(5000);
+    expect(videoEl.currentTime).toBe(5);
+    expect(playCalled).toBe(false);
+
+    // 2. Calling seek with explicit autoPlay = true plays it
+    seekCompanionPlayer(8000, true);
+    expect(videoEl.currentTime).toBe(8);
+    expect(playCalled).toBe(true);
+
+    // 3. Calling seek on actively playing video keeps it playing
+    videoEl.paused = false;
+    playCalled = false;
+    seekCompanionPlayer(12000);
+    expect(videoEl.currentTime).toBe(12);
+    expect(pauseCalled).toBe(false);
+  });
+
+  it('unloads companion player cleanly, clears active playback highlights and resets line id', () => {
+    registerMockEl('companion-media-element', 'VIDEO');
+    const card0 = registerMockEl('card-0');
+    card0.className = 'transcript-card active-playback';
+    mockDocument.elements.set('card-0', card0);
+
+    unloadCompanionPlayer();
+
+    expect(card0.classList.contains('active-playback')).toBe(false);
+  });
+
+  it('normalizes Persian digits, Arabic digits, and Alef/Taa variants in transcript search filter', () => {
+    const searchInput = registerMockEl('transcript-search', 'INPUT') as any;
+    registerMockEl('transcript-viewport');
+
+    const testLines = [
+      { id: 0, text: 'قسمت ۱۲: آغاز مسأله', timeRange: '[00:00:00.000 --> 00:00:02.000]' },
+      { id: 1, text: 'جلسهٔ سوم درباره مدیریت', timeRange: '[00:00:02.000 --> 00:00:04.000]' }
+    ];
+    transcriptViewer.lines = testLines;
+    renderTranscriptLines(testLines);
+
+    // 1. Searching English digits '12' matches Persian digits '۱۲'
+    searchInput.value = '12';
+    filterTranscriptLines();
+    let cards = mockDocument.querySelectorAll('.transcript-line');
+    expect(cards[0].style.display).toBe('flex');
+    expect(cards[1].style.display).toBe('none');
+
+    // 2. Searching plain Alef 'اغاز' matches Alef-with-madda 'آغاز'
+    searchInput.value = 'اغاز';
+    filterTranscriptLines();
+    cards = mockDocument.querySelectorAll('.transcript-line');
+    expect(cards[0].style.display).toBe('flex');
+    expect(cards[1].style.display).toBe('none');
+
+    searchInput.value = '';
+  });
+
+  it('matches whole word token boundaries when clicking word badges in studio', () => {
+    registerMockEl('companion-media-element', 'VIDEO');
+    const lineWithTokens = {
+      id: 0,
+      timeRange: '[00:00:00.000 --> 00:00:05.000]',
+      text: 'The beginning in the end',
+      words: [
+        { text: 'The', startMs: 0, endMs: 500, prob: 0.95 },
+        { text: 'beginning', startMs: 600, endMs: 1200, prob: 0.90 },
+        { text: 'in', startMs: 1300, endMs: 1600, prob: 0.50 }, // low confidence
+        { text: 'the', startMs: 1700, endMs: 2000, prob: 0.92 },
+        { text: 'end', startMs: 2100, endMs: 2500, prob: 0.98 },
+      ]
+    };
+
+    const card = createTranscriptCardElement(lineWithTokens);
+    const textarea = card.querySelector('.transcript-text-input') as any;
+    let selectedStart = -1;
+    let selectedEnd = -1;
+    textarea.setSelectionRange = (s: number, e: number) => {
+      selectedStart = s;
+      selectedEnd = e;
+    };
+
+    // Click the 3rd word badge ('in')
+    const wordsBar = card.querySelector('.transcript-words-bar');
+    const wordSpans = wordsBar?.querySelectorAll('.transcript-word') || [];
+    const inBadge = wordSpans[2] as HTMLElement; // word "in"
+    expect(inBadge.textContent).toBe('in');
+
+    inBadge.onclick!({ stopPropagation: () => {} } as any);
+
+    // 'The beginning in the end' -> 'The beginning ' is 14 chars. 'in' starts at 14, ends at 16.
+    // It should NOT match 'in' inside 'beginning' (which would be at index 7)!
+    expect(selectedStart).toBe(14);
+    expect(selectedEnd).toBe(16);
+  });
 });

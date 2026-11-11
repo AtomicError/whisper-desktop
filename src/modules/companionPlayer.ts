@@ -147,10 +147,12 @@ export async function loadMediaIntoCompanionPlayer(filePath: string, autoSwitchD
   const videoContainer = document.getElementById('companion-video-container');
 
   if (isAudioOnly) {
+    videoEl.style.display = 'none';
     if (audioFallback) audioFallback.style.display = 'flex';
     if (audioNameEl) audioNameEl.textContent = fileName;
     if (videoContainer) videoContainer.classList.remove('aspect-vertical');
   } else {
+    videoEl.style.display = 'block';
     if (audioFallback) audioFallback.style.display = 'none';
   }
 
@@ -311,14 +313,18 @@ export function jumpCompanionPlayback(seconds: number): void {
   videoEl.currentTime = targetTime;
 }
 
-export function seekCompanionPlayer(targetMs: number, autoPlay: boolean = true): void {
+export function seekCompanionPlayer(targetMs: number, autoPlay?: boolean): void {
   const videoEl = document.getElementById('companion-media-element') as HTMLVideoElement | null;
   if (!videoEl) return;
   const targetSec = Math.max(0, targetMs / 1000);
+  const shouldPlay = typeof autoPlay === 'boolean' ? autoPlay : !videoEl.paused;
+
   if (videoEl.readyState >= 1) {
     videoEl.currentTime = targetSec;
-    if (autoPlay && videoEl.paused) {
+    if (shouldPlay && videoEl.paused) {
       videoEl.play().catch(e => console.warn('Autoplay error:', e));
+    } else if (!shouldPlay && !videoEl.paused) {
+      videoEl.pause();
     }
   } else {
     pendingSeekTargetSec = targetSec;
@@ -330,8 +336,10 @@ export function seekCompanionPlayer(targetMs: number, autoPlay: boolean = true):
           videoEl.currentTime = pendingSeekTargetSec;
           pendingSeekTargetSec = null;
         }
-        if (autoPlay && videoEl.paused) {
+        if (shouldPlay && videoEl.paused) {
           videoEl.play().catch(e => console.warn('Autoplay error:', e));
+        } else if (!shouldPlay && !videoEl.paused) {
+          videoEl.pause();
         }
       }, { once: true });
     }
@@ -353,6 +361,12 @@ export function unloadCompanionPlayer(): void {
   pauseCompanionPlayer();
   pendingSeekTargetSec = null;
   hasMetadataSeekListener = false;
+  currentHighlightedLineId = null;
+  if (typeof document !== 'undefined' && typeof document.querySelectorAll === 'function') {
+    document.querySelectorAll('.transcript-card.active-playback').forEach(el => {
+      el.classList.remove('active-playback');
+    });
+  }
   const invoke = getTauriInvoke();
   if (activeStreamUrl && invoke) {
     invoke('revoke_media_stream', { streamUrl: activeStreamUrl }).catch(() => {});
@@ -361,8 +375,11 @@ export function unloadCompanionPlayer(): void {
   const videoEl = document.getElementById('companion-media-element') as HTMLVideoElement | null;
   if (videoEl) {
     videoEl.removeAttribute('src');
+    videoEl.style.display = 'block';
     videoEl.load();
   }
+  const audioFallback = document.getElementById('companion-audio-fallback');
+  if (audioFallback) audioFallback.style.display = 'none';
   const pipBtn = document.getElementById('btn-companion-pip') as HTMLButtonElement | null;
   const fullscreenBtn = document.getElementById('btn-companion-fullscreen') as HTMLButtonElement | null;
   if (pipBtn) {
@@ -594,22 +611,25 @@ export function initCompanionPlayerDOM(): void {
   videoEl.addEventListener('loadedmetadata', () => {
     const dur = videoEl.duration || activeMediaInfo?.durationSec || 0;
     if (timeTotalEl) timeTotalEl.textContent = formatTimecodeDisplay(dur);
-    if (activeMediaInfo && videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
-      activeMediaInfo.width = videoEl.videoWidth;
-      activeMediaInfo.height = videoEl.videoHeight;
-      const ratio = videoEl.videoWidth / videoEl.videoHeight;
-      activeMediaInfo.aspectRatio = ratio < 0.8
-        ? '9:16'
-        : (ratio >= 0.8 && ratio <= 1.2 ? '1:1' : (ratio > 1.2 && ratio < 1.5 ? '4:3' : '16:9'));
-      updateCompanionMetadataUI(activeMediaInfo);
-      const videoContainer = document.getElementById('companion-video-container');
-      if (videoContainer) {
-        if (ratio < 0.8) {
-          videoContainer.classList.add('aspect-vertical');
-        } else {
-          videoContainer.classList.remove('aspect-vertical');
+    if (activeMediaInfo) {
+      if (dur > 0) activeMediaInfo.durationSec = dur;
+      if (videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
+        activeMediaInfo.width = videoEl.videoWidth;
+        activeMediaInfo.height = videoEl.videoHeight;
+        const ratio = videoEl.videoWidth / videoEl.videoHeight;
+        activeMediaInfo.aspectRatio = ratio < 0.8
+          ? '9:16'
+          : (ratio >= 0.8 && ratio <= 1.2 ? '1:1' : (ratio > 1.2 && ratio < 1.5 ? '4:3' : '16:9'));
+        const videoContainer = document.getElementById('companion-video-container');
+        if (videoContainer) {
+          if (ratio < 0.8) {
+            videoContainer.classList.add('aspect-vertical');
+          } else {
+            videoContainer.classList.remove('aspect-vertical');
+          }
         }
       }
+      updateCompanionMetadataUI(activeMediaInfo);
     }
   });
 
@@ -621,6 +641,7 @@ export function initCompanionPlayerDOM(): void {
   videoEl.addEventListener('error', () => {
     const err = videoEl.error;
     console.warn('Companion media decoding error encountered:', err);
+    videoEl.style.display = 'none';
     const audioFallback = document.getElementById('companion-audio-fallback');
     const audioNameEl = document.getElementById('companion-audio-name');
     if (audioFallback && audioNameEl && activeMediaInfo) {

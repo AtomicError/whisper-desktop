@@ -182,7 +182,7 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
     e.stopPropagation();
     const win = getGlobal();
     if (typeof win.seekCompanionPlayer === 'function') {
-      win.seekCompanionPlayer(startMs);
+      win.seekCompanionPlayer(startMs, true);
     }
   };
   actionsWrap.appendChild(playBtn);
@@ -332,16 +332,37 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
             }
             let searchFrom = 0;
             let foundPos = -1;
-            for (let occ = 0; occ <= occurrenceIndex; occ++) {
-              foundPos = textVal.indexOf(cleanWord, searchFrom);
-              if (foundPos === -1) break;
-              searchFrom = foundPos + cleanWord.length;
+
+            // Match whole word with boundaries first to prevent substring collisions (e.g. "in" in "beginning")
+            const escapedWord = cleanWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const wordRegex = new RegExp(`(^|\\s|[.,!?;:،؛«»"'\`\\(\\)\\[\\]])${escapedWord}(?=$|\\s|[.,!?;:،؛«»"'\`\\(\\)\\[\\]])`, 'g');
+            let match: RegExpExecArray | null = null;
+            let currentOccurrence = 0;
+
+            while ((match = wordRegex.exec(textVal)) !== null) {
+              const matchWordStart = match.index + match[1].length;
+              if (currentOccurrence === occurrenceIndex) {
+                foundPos = matchWordStart;
+                break;
+              }
+              currentOccurrence++;
+            }
+
+            // Fallback to substring matching if punctuation or boundary pattern differed
+            if (foundPos === -1) {
+              for (let occ = 0; occ <= occurrenceIndex; occ++) {
+                foundPos = textVal.indexOf(cleanWord, searchFrom);
+                if (foundPos === -1) break;
+                searchFrom = foundPos + cleanWord.length;
+              }
             }
             if (foundPos === -1) {
               foundPos = textVal.indexOf(cleanWord);
             }
             if (foundPos !== -1) {
-              textarea.focus();
+              if (typeof textarea.focus === 'function') {
+                textarea.focus();
+              }
               if (typeof textarea.setSelectionRange === 'function') {
                 textarea.setSelectionRange(foundPos, foundPos + cleanWord.length);
               }
@@ -652,7 +673,15 @@ function scheduleTranscriptDiskSync(): void {
   }
   transcriptSaveTimer = setTimeout(() => {
     transcriptSaveTimer = null;
-    inFlightSavePromise = persistTranscriptLinesToDisk().finally(() => {
+    const runSave = async () => {
+      if (inFlightSavePromise) {
+        try {
+          await inFlightSavePromise;
+        } catch (_) {}
+      }
+      await persistTranscriptLinesToDisk();
+    };
+    inFlightSavePromise = runSave().finally(() => {
       inFlightSavePromise = null;
     });
   }, TRANSCRIPT_SAVE_DEBOUNCE_MS);
@@ -1155,7 +1184,11 @@ function normalizeSearchText(str: string): string {
     .toLowerCase()
     .replace(/ي/g, 'ی')
     .replace(/ك/g, 'ک')
+    .replace(/[آأإ]/g, 'ا')
+    .replace(/ة/g, 'ه')
     .replace(/[\u200C\u200B]/g, '')
+    .replace(/[۰-۹]/g, d => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
+    .replace(/[٠-٩]/g, d => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
     .replace(/\s+/g, ' ')
     .trim();
 }
