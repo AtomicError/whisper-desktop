@@ -415,6 +415,11 @@ export function renderTranscriptLines(lines: TranscriptLine[]): void {
   if (prevScrollTop > 0) {
     viewport.scrollTop = prevScrollTop;
   }
+
+  const searchInput = document.getElementById('transcript-search') as HTMLInputElement | null;
+  if (searchInput && searchInput.value.trim() !== '') {
+    filterTranscriptLines();
+  }
 }
 
 export function appendTranscriptLine(timeRange: string, text: string): void {
@@ -1145,6 +1150,15 @@ export function deleteTranscriptSegment(lineId: number): boolean {
   return true;
 }
 
+function normalizeSearchText(str: string): string {
+  return (str || '')
+    .toLowerCase()
+    .replace(/ي/g, 'ی')
+    .replace(/ك/g, 'ک')
+    .replace(/[\u200C\u200B]/g, '')
+    .trim();
+}
+
 export function filterTranscriptLines(): void {
   if (typeof document === 'undefined') return;
   const searchInput = document.getElementById('transcript-search') as HTMLInputElement | null;
@@ -1152,7 +1166,8 @@ export function filterTranscriptLines(): void {
   if (searchInput && win.applyDynamicDirection) {
     win.applyDynamicDirection(searchInput);
   }
-  const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+  const rawQuery = searchInput ? searchInput.value.trim() : '';
+  const query = normalizeSearchText(rawQuery);
   const lines = document.querySelectorAll('.transcript-line');
   const viewport = document.getElementById('transcript-viewport');
   let matchCount = 0;
@@ -1160,7 +1175,7 @@ export function filterTranscriptLines(): void {
   lines.forEach((lineEl: any) => {
     const textInput = lineEl.querySelector('.transcript-text-input');
     if (textInput) {
-      const match = !query || textInput.value.toLowerCase().includes(query);
+      const match = !query || normalizeSearchText(textInput.value).includes(query);
       lineEl.style.display = match ? 'flex' : 'none';
       if (match) {
         matchCount++;

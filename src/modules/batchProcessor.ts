@@ -580,56 +580,59 @@ export async function selectBatchItemTranscript(index: number): Promise<void> {
       if (btnCopy) btnCopy.disabled = (transcriptLines.length === 0);
     }
   } else if (isCompleted) {
-    if (item.transcriptLines && item.transcriptLines.length > 0) {
+    if (Array.isArray(item.transcriptLines)) {
       transcriptLines = item.transcriptLines.map((l: any) => ({ ...l }));
       transcriptViewer.lines = item.transcriptLines.map((l: any) => ({ ...l }));
       if (win) win.transcriptLines = transcriptLines;
       transcriptViewer.render(transcriptLines);
-    } else if (item.internalJsonPath) {
-      const invoke = getTauriInvoke();
-      if (invoke) {
-        try {
-          const sessionJson: string = await invoke('get_transcript_session_data', {
-            sessionFile: item.internalJsonPath
-          });
-          if (currentSeq !== activeBatchSelectSeq) return;
-          if (sessionJson) {
-            const loaded = await loadTranscriptFromJsonData(sessionJson, true);
+    } else {
+      if (item.internalJsonPath) {
+        const invoke = getTauriInvoke();
+        if (invoke) {
+          try {
+            const sessionJson: string = await invoke('get_transcript_session_data', {
+              sessionFile: item.internalJsonPath
+            });
             if (currentSeq !== activeBatchSelectSeq) return;
-            if (loaded && loaded.length > 0) {
-              item.transcriptLines = loaded.map((l: any) => ({ ...l }));
-              transcriptLines = item.transcriptLines.map((l: any) => ({ ...l }));
-              transcriptViewer.lines = item.transcriptLines.map((l: any) => ({ ...l }));
-              if (win) win.transcriptLines = transcriptLines;
+            if (sessionJson) {
+              const loaded = await loadTranscriptFromJsonData(sessionJson, true);
+              if (currentSeq !== activeBatchSelectSeq) return;
+              if (loaded && loaded.length > 0) {
+                item.transcriptLines = loaded.map((l: any) => ({ ...l }));
+                transcriptLines = item.transcriptLines.map((l: any) => ({ ...l }));
+                transcriptViewer.lines = item.transcriptLines.map((l: any) => ({ ...l }));
+                if (win) win.transcriptLines = transcriptLines;
+              }
             }
+          } catch (jsonErr) {
+            console.warn('Could not load internal batch item session JSON:', jsonErr);
           }
-        } catch (jsonErr) {
-          console.warn('Could not load internal batch item session JSON:', jsonErr);
         }
       }
-    }
-    if (!item.transcriptLines || item.transcriptLines.length === 0) {
-      if (item.subtitlePath) {
-        try {
-          const loaded = await loadTranscriptFromFile(item.subtitlePath, true);
-          if (currentSeq !== activeBatchSelectSeq) return;
-          item.transcriptLines = (loaded || []).map((l: any) => ({ ...l }));
-        } catch (e) {
-          console.error("Failed to load batch item subtitle:", e);
+      if (!Array.isArray(item.transcriptLines)) {
+        if (item.subtitlePath) {
+          try {
+            const loaded = await loadTranscriptFromFile(item.subtitlePath, true);
+            if (currentSeq !== activeBatchSelectSeq) return;
+            item.transcriptLines = (loaded || []).map((l: any) => ({ ...l }));
+          } catch (e) {
+            console.error("Failed to load batch item subtitle:", e);
+          }
+        } else if (item.txtPath) {
+          try {
+            const loaded = await loadTranscriptFromFile(item.txtPath, true);
+            if (currentSeq !== activeBatchSelectSeq) return;
+            item.transcriptLines = (loaded || []).map((l: any) => ({ ...l }));
+          } catch (e) {
+            console.error("Failed to load batch item transcript:", e);
+          }
+        } else {
+          item.transcriptLines = [];
         }
-      } else if (item.txtPath) {
-        try {
-          const loaded = await loadTranscriptFromFile(item.txtPath, true);
-          if (currentSeq !== activeBatchSelectSeq) return;
-          item.transcriptLines = (loaded || []).map((l: any) => ({ ...l }));
-        } catch (e) {
-          console.error("Failed to load batch item transcript:", e);
-        }
-      } else {
-        transcriptLines = [];
-        transcriptViewer.lines = [];
-        if (win) win.transcriptLines = [];
-        transcriptViewer.render([]);
+        transcriptLines = (item.transcriptLines || []).map((l: any) => ({ ...l }));
+        transcriptViewer.lines = (item.transcriptLines || []).map((l: any) => ({ ...l }));
+        if (win) win.transcriptLines = transcriptLines;
+        transcriptViewer.render(transcriptLines);
       }
     }
     if (currentSeq !== activeBatchSelectSeq) return;

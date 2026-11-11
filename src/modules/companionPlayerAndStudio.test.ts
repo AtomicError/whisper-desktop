@@ -15,6 +15,7 @@ import {
   toggleConfidenceHighlighting,
   isConfidenceHighlightingActive,
   loadTranscriptFromJsonData,
+  filterTranscriptLines,
   renderTranscriptLines,
   serializeTranscriptLinesForFile,
   persistTranscriptLinesToDisk,
@@ -31,6 +32,7 @@ import {
   highlightActiveTranscriptSegment,
   changeCompanionVolume,
   toggleCompanionMute,
+  pauseCompanionPlayer,
   showTranscribeSetupDeck,
   showTranscribeMediaDeck,
   unloadCompanionPlayer,
@@ -200,14 +202,12 @@ const mockDocument = {
   querySelectorAll(sel: string) {
     const results: MockElement[] = [];
     const idMatch = sel.match(/\[data-id="([^"]+)"\]/);
-    elementRegistry.forEach(el => {
+    const check = (el: MockElement) => {
       if (idMatch) {
         if (el.dataset.id === idMatch[1]) {
           results.push(el);
         }
-        return;
-      }
-      if (sel.startsWith('#') && el.id === sel.slice(1)) {
+      } else if (sel.startsWith('#') && el.id === sel.slice(1)) {
         results.push(el);
       } else if (sel.startsWith('.')) {
         const classes = sel.split('.').filter(Boolean);
@@ -215,7 +215,9 @@ const mockDocument = {
           results.push(el);
         }
       }
-    });
+      el.children.forEach(check);
+    };
+    elementRegistry.forEach(check);
     return results;
   },
   createElement(tag: string) {
@@ -239,6 +241,9 @@ function registerMockEl(id: string, tag = 'DIV', classes = '', dataset: Record<s
 
 // Attach document to globalThis
 (globalThis as any).document = mockDocument;
+if (typeof HTMLSelectElement === 'undefined') {
+  (globalThis as any).HTMLSelectElement = class HTMLSelectElement extends MockElement {};
+}
 
 describe('Transcript Segment Splitting & Merging with Word Timestamps', () => {
   beforeEach(() => {
@@ -1312,5 +1317,118 @@ describe('Studio Refinements, Isolation & Keyboard Accessibility', () => {
       { id: 0, text: 'Line 0', timeRange: '[00:00:00.000 --> 00:00:02.000]' }
     ]);
     expect(viewport.scrollTop).toBe(150);
+  });
+
+  it('automatically pauses companion player when switching to setup deck', () => {
+    const videoEl = registerMockEl('companion-media-element', 'VIDEO') as any;
+    let paused = false;
+    videoEl.paused = false;
+    videoEl.pause = () => {
+      videoEl.paused = true;
+      paused = true;
+    };
+    registerMockEl('transcribe-unified-deck');
+    registerMockEl('transcribe-media-deck');
+
+    showTranscribeSetupDeck();
+    expect(paused).toBe(true);
+    expect(videoEl.paused).toBe(true);
+  });
+
+  it('preserves empty item.transcriptLines in selectBatchItemTranscript without resurrecting from internal JSON', async () => {
+    const win = (globalThis as any).window || (globalThis as any);
+    win.isBatchMode = true;
+    let invokeCalled = false;
+    win.__TAURI__ = {
+      core: {
+        invoke: async (cmd: string) => {
+          if (cmd === 'get_transcript_session_data') {
+            invokeCalled = true;
+            return JSON.stringify({
+              transcription: [{ text: 'Resurrected Line', timestamps: { from: '00:00:01.000', to: '00:00:03.000' } }]
+            });
+          }
+          return null;
+        }
+      }
+    };
+
+    const emptyItem: any = {
+      path: '/media/empty_item.mp4',
+      status: 'completed',
+      internalJsonPath: '/cache/transcripts/item_hash.json',
+      transcriptLines: [],
+      outputFiles: []
+    };
+    batchProcessor.setItems([emptyItem]);
+    batchProcessor.setActiveViewerIndex(-1);
+
+    await selectBatchItemTranscript(0);
+
+    // It should NOT invoke get_transcript_session_data to overwrite user's deletion
+    expect(invokeCalled).toBe(false);
+    expect(transcriptViewer.lines.length).toBe(0);
+    expect(emptyItem.transcriptLines.length).toBe(0);
+  });
+
+  it('re-applies active search filter in renderTranscriptLines when search query exists', () => {
+    registerMockEl('transcript-viewport');
+    const searchInput = registerMockEl('transcript-search', 'INPUT') as any;
+    searchInput.value = 'banana';
+
+    renderTranscriptLines([
+      { id: 0, text: 'Apple fruit', timeRange: '[00:00:00.000 --> 00:00:02.000]' },
+      { id: 1, text: 'Yellow banana fruit', timeRange: '[00:00:02.000 --> 00:00:04.000]' }
+    ]);
+
+    const cards = mockDocument.querySelectorAll('.transcript-line');
+    expect(cards.length).toBe(2);
+    expect(cards[0].style.display).toBe('none');
+    expect(cards[1].style.display).toBe('flex');
+
+    searchInput.value = '';
+  });
+
+  it('normalizes Persian/Arabic characters and ZWNJ in filterTranscriptLines', () => {
+    registerMockEl('transcript-viewport');
+    const searchInput = registerMockEl('transcript-search', 'INPUT') as any;
+
+    renderTranscriptLines([
+      { id: 0, text: 'برنامه ذخیره می‌شود', timeRange: '[00:00:00.000 --> 00:00:02.000]' },
+      { id: 1, text: 'متن دیگر', timeRange: '[00:00:02.000 --> 00:00:04.000]' }
+    ]);
+
+    // Query uses Persian 'ی' and no ZWNJ 'میشود'
+    searchInput.value = 'میشود';
+    filterTranscriptLines();
+
+    const cards = mockDocument.querySelectorAll('.transcript-line');
+    expect(cards.length).toBe(2);
+    expect(cards[0].style.display).toBe('flex');
+    expect(cards[1].style.display).toBe('none');
+
+    searchInput.value = '';
+  });
+
+  it('guards Space and Arrow keys when an HTMLSelectElement is focused', () => {
+    const mediaDeck = registerMockEl('transcribe-media-deck');
+    mediaDeck.style.display = 'flex';
+    const panel = registerMockEl('panel-transcribe');
+    panel.classList.add('active');
+
+    const selectEl = new MockElement('SELECT') as any;
+    selectEl.id = 'companion-speed-select';
+
+    let defaultPrevented = false;
+    const listeners = (window as any)._listeners?.get('keydown') || [];
+    for (const fn of listeners) {
+      fn({
+        target: selectEl,
+        code: 'Space',
+        preventDefault: () => { defaultPrevented = true; }
+      });
+    }
+
+    expect(defaultPrevented).toBe(false);
   });
 });

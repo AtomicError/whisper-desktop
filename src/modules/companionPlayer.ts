@@ -55,6 +55,7 @@ export function getActiveMediaInfo(): CompanionMediaInfo | null {
 
 export function showTranscribeSetupDeck(): void {
   if (typeof document === 'undefined') return;
+  pauseCompanionPlayer();
   const setupDeck = document.getElementById('transcribe-unified-deck');
   const mediaDeck = document.getElementById('transcribe-media-deck');
   const tabSetup = document.getElementById('btn-tab-to-setup');
@@ -614,6 +615,17 @@ export function initCompanionPlayerDOM(): void {
     if (pauseIcon) pauseIcon.style.display = 'none';
   });
 
+  videoEl.addEventListener('error', () => {
+    const err = videoEl.error;
+    console.warn('Companion media decoding error encountered:', err);
+    const audioFallback = document.getElementById('companion-audio-fallback');
+    const audioNameEl = document.getElementById('companion-audio-name');
+    if (audioFallback && audioNameEl && activeMediaInfo) {
+      audioFallback.style.display = 'flex';
+      audioNameEl.textContent = `${activeMediaInfo.fileName} (${t('transcribe.taskFailed') || 'Playback error'})`;
+    }
+  });
+
   if (seekSlider) {
     seekSlider.addEventListener('input', () => {
       isSeeking = true;
@@ -635,7 +647,10 @@ export function initCompanionPlayerDOM(): void {
   if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
     window.addEventListener('keydown', (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
-      const isEditing = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable;
+      const isEditing = target instanceof HTMLInputElement ||
+                        target instanceof HTMLTextAreaElement ||
+                        (typeof HTMLSelectElement !== 'undefined' && target instanceof HTMLSelectElement) ||
+                        target?.isContentEditable;
       if (isEditing) return;
 
       // Do not intercept keyboard shortcuts if an application modal dialog is currently open
