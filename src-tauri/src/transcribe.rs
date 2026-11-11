@@ -704,12 +704,32 @@ pub async fn run_transcription(
         }
     }
 
+    // Create an isolated staging directory so intermediate files and the internal detailed JSON
+    // never touch or pollute the user's destination folder.
+    let staging_base = if let Ok(cache_dir) = app.path().app_cache_dir() {
+        cache_dir.join("staging")
+    } else {
+        std::env::temp_dir().join("whisper_desktop_staging")
+    };
+    let run_id = format!(
+        "run_{}_{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::SystemTime::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis()
+    );
+    let staging_dir = staging_base.join(&run_id);
+    let _ = fs::create_dir_all(&staging_dir);
+    let staging_out = staging_dir.join(&*base_name);
+    let staging_out_str = staging_out.to_string_lossy().to_string();
+
     // Reset previous transcript JSON memory state
     if let Ok(mut lock) = LAST_TRANSCRIPT_JSON.lock() {
         *lock = None;
     }
 
-    // Build arguments
+    // Build arguments - output to staging directory
     let mut args = vec![
         "-m".to_string(),
         model_full_path.to_string_lossy().to_string(),
@@ -720,7 +740,7 @@ pub async fn run_transcription(
         "-p".to_string(),
         settings.processors.to_string(),
         "-of".to_string(),
-        out_name_str.clone(),
+        staging_out_str.clone(),
     ];
     
     if !settings.language.is_empty() && settings.language != "auto" {
@@ -814,6 +834,7 @@ pub async fn run_transcription(
     
     // Check cancellation before spawning
     if session.lock().map(|l| l.cancel_requested).unwrap_or(false) {
+        let _ = fs::remove_dir_all(&staging_dir);
         let _ = app.emit("transcribe-status", TranscribeProgress {
             progress: 0.0,
             message: "Aborted".to_string(),
@@ -941,6 +962,7 @@ pub async fn run_transcription(
 
     if is_cancelled {
         let _ = child.kill().await;
+        let _ = fs::remove_dir_all(&staging_dir);
         let _ = app.emit("transcribe-status", TranscribeProgress {
             progress: 0.0,
             message: "Aborted".to_string(),
@@ -1016,8 +1038,7 @@ pub async fn run_transcription(
     let _ = fs::remove_file(&wav_path); // Clean up converted WAV file
     
     if !status.success() {
-        // Clean up any internal json file that whisper may have created in the user directory
-        let _ = fs::remove_file(format!("{}.json", out_name_str));
+        let _ = fs::remove_dir_all(&staging_dir);
         
         // Distinguish a genuine user cancellation from a real failure so the UI
         // never labels an unexpected crash as "Aborted".
@@ -1047,13 +1068,12 @@ pub async fn run_transcription(
         0.0
     };
     
-    // Handle the internal full detailed JSON (-ojf):
-    // Stored in app internal cache directory or loaded into memory state,
-    // and purged immediately from the user's public output folder.
-    let public_json_path = std::path::PathBuf::from(format!("{}.json", out_name_str));
+    // 1. Handle the internal full detailed JSON (-ojf) from isolated staging directory directly into app cache:
+    let staging_json_path = staging_dir.join(format!("{}.json", base_name));
     let mut internal_json_path: Option<String> = None;
-    if public_json_path.exists() {
-        if let Ok(json_content) = fs::read_to_string(&public_json_path) {
+    if staging_json_path.exists() {
+        if let Ok(bytes) = fs::read(&staging_json_path) {
+            let json_content = String::from_utf8_lossy(&bytes).into_owned();
             set_last_transcript_json(json_content.clone());
             if let Ok(cache_dir) = app.path().app_cache_dir() {
                 let transcripts_dir = cache_dir.join("transcripts");
@@ -1070,38 +1090,43 @@ pub async fn run_transcription(
                 }
             }
         }
-        let _ = fs::remove_file(&public_json_path);
     }
 
-    // Probe output directory for written formats (note: .json and .csv are excluded)
+    // 2. Safely transfer only user-requested subtitle formats to the user's destination folder
     let mut generated_files = Vec::new();
     let out_basename = Path::new(&out_name_str).file_name().unwrap_or_default().to_string_lossy().to_string();
-    let formats = [".txt", ".srt", ".vtt", ".lrc"];
-    for fmt in formats {
-        let path = format!("{}{}", out_name_str, fmt);
-        if Path::new(&path).exists() {
-            generated_files.push(format!("{}{}", out_basename, fmt));
+    let formats = [
+        (".txt", settings.output_txt),
+        (".srt", settings.output_srt),
+        (".vtt", settings.output_vtt),
+        (".lrc", settings.output_lrc),
+    ];
+    for (fmt, enabled) in formats {
+        if enabled {
+            let src_file = staging_dir.join(format!("{}{}", base_name, fmt));
+            if src_file.exists() {
+                let dest_file = std::path::PathBuf::from(format!("{}{}", out_name_str, fmt));
+                if copy_or_move_file(&src_file, &dest_file).is_ok() {
+                    generated_files.push(format!("{}{}", out_basename, fmt));
+                }
+            }
         }
     }
     
-    // Post-process the Karaoke video output format .wts if generated
-    let wts_path = format!("{}.wts", out_name_str);
-    if Path::new(&wts_path).exists() {
-        let wts_sh_path = format!("{}.wts.sh", out_name_str);
-        if let Ok(data) = fs::read_to_string(&wts_path) {
+    // 3. Post-process the Karaoke video output format .wts if generated
+    let staging_wts_path = staging_dir.join(format!("{}.wts", base_name));
+    if staging_wts_path.exists() {
+        let dest_wts_sh = std::path::PathBuf::from(format!("{}.wts.sh", out_name_str));
+        if let Ok(data) = fs::read_to_string(&staging_wts_path) {
             let updated_content = data.replace(&wav_path, &settings.input_file);
-            if fs::write(&wts_sh_path, updated_content).is_ok() {
-                let _ = fs::remove_file(&wts_path);
-                generated_files.push(format!("{}.wts.sh", out_basename));
-            } else {
-                let _ = fs::rename(&wts_path, &wts_sh_path);
+            if fs::write(&dest_wts_sh, updated_content).is_ok() {
                 generated_files.push(format!("{}.wts.sh", out_basename));
             }
-        } else {
-            let _ = fs::rename(&wts_path, &wts_sh_path);
-            generated_files.push(format!("{}.wts.sh", out_basename));
         }
     }
+
+    // 4. Clean up isolated staging directory
+    let _ = fs::remove_dir_all(&staging_dir);
     
     logs.log(&app, "Whisper", "Transcription completed successfully!");
     
@@ -1187,6 +1212,15 @@ pub(crate) async fn next_line_lossy<R: AsyncBufRead + Unpin>(
         }
         Err(_) => None,
     }
+}
+
+/// Moves or copies a file across filesystem boundaries safely.
+fn copy_or_move_file(from: &Path, to: &Path) -> std::io::Result<()> {
+    if fs::rename(from, to).is_err() {
+        fs::copy(from, to)?;
+        let _ = fs::remove_file(from);
+    }
+    Ok(())
 }
 
 /// Tests whether a directory is writable by creating and immediately removing a test file.
@@ -1610,6 +1644,26 @@ mod tests {
             let _guard = FileGuard(test_wav.clone());
         }
         assert!(!test_wav.exists(), "FileGuard must delete temporary wav file when dropped");
+    }
+
+    #[test]
+    fn test_copy_or_move_file_cross_filesystem_safety() {
+        let temp_dir = std::env::temp_dir().join(format!("whisper_move_test_{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&temp_dir);
+        let src = temp_dir.join("source.srt");
+        let dest = temp_dir.join("dest.srt");
+        std::fs::write(&src, b"1\n00:00:00,000 --> 00:00:01,000\nHello").unwrap();
+
+        assert!(src.exists());
+        assert!(!dest.exists());
+
+        let res = copy_or_move_file(&src, &dest);
+        assert!(res.is_ok());
+        assert!(!src.exists(), "Source file should have been moved/removed");
+        assert!(dest.exists(), "Destination file must exist");
+        assert_eq!(std::fs::read_to_string(&dest).unwrap(), "1\n00:00:00,000 --> 00:00:01,000\nHello");
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 }
 

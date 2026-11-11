@@ -302,6 +302,13 @@ export function setupSearchShortcuts(): void {
           input.focus();
           input.select();
         }
+      } else if (activeView === 'transcribe') {
+        const input = document.getElementById('transcript-search') as HTMLInputElement | null;
+        if (input && input.offsetParent !== null) {
+          e.preventDefault();
+          input.focus();
+          input.select();
+        }
       }
     }
   });

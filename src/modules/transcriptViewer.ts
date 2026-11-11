@@ -22,6 +22,8 @@ let transcriptLines: TranscriptLine[] = [];
 let transcriptDirty = false;
 let transcriptSaveTimer: ReturnType<typeof setTimeout> | null = null;
 let inFlightSavePromise: Promise<void> | null = null;
+let pendingTranscriptTargetFiles: string[] | null = null;
+let pendingTranscriptSnapshotLines: TranscriptLine[] | null = null;
 let confidenceHighlightingActive = false;
 
 export interface UndoHistoryEntry {
@@ -261,13 +263,22 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
   textarea.className = 'transcript-text-input';
   textarea.value = lineObj.text;
   (textarea as any)._hasTyped = false;
+  let sessionSnapshotTaken = false;
   applyTextDirection(textarea);
+  textarea.onfocus = () => {
+    sessionSnapshotTaken = false;
+  };
   textarea.oninput = () => {
+    if (!sessionSnapshotTaken) {
+      sessionSnapshotTaken = true;
+      recordTranscriptHistorySnapshot('Text Edit');
+    }
     (textarea as any)._hasTyped = true;
     updateTranscriptLineText(lineObj.id, textarea.value);
   };
   textarea.onblur = () => {
     (textarea as any)._hasTyped = false;
+    sessionSnapshotTaken = false;
   };
   textarea.onchange = () => {
     updateTranscriptLineText(lineObj.id, textarea.value);
@@ -305,13 +316,17 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
       const wordSpan = document.createElement('span');
       wordSpan.className = 'transcript-word';
       const isLow = w.prob < 0.60;
+      const cleanWordText = w.text.trim();
+      const percentStr = Math.round(w.prob * 100).toString();
       if (isLow) {
         wordSpan.classList.add('low-confidence');
-        wordSpan.title = `Word: "${w.text.trim()}" • Confidence: ${Math.round(w.prob * 100)}% (Low certainty)`;
+        wordSpan.title = t('transcribe.wordConfidenceLowTooltip', { word: cleanWordText, percent: percentStr })
+          || `Word: "${cleanWordText}" • Confidence: ${percentStr}% (Low certainty)`;
       } else {
-        wordSpan.title = `Word: "${w.text.trim()}" • Confidence: ${Math.round(w.prob * 100)}%`;
+        wordSpan.title = t('transcribe.wordConfidenceTooltip', { word: cleanWordText, percent: percentStr })
+          || `Word: "${cleanWordText}" • Confidence: ${percentStr}%`;
       }
-      wordSpan.textContent = w.text.trim();
+      wordSpan.textContent = cleanWordText;
       wordSpan.onclick = (e) => {
         e.stopPropagation();
         const win = getGlobal();
@@ -634,16 +649,26 @@ export async function persistTranscriptLinesToDisk(): Promise<void> {
   const invoke = getTauriInvoke();
   if (!invoke) {
     transcriptDirty = false;
+    pendingTranscriptTargetFiles = null;
+    pendingTranscriptSnapshotLines = null;
     return;
   }
 
-  const targetFiles = collectActiveTranscriptTargetFiles();
+  const targetFiles = (pendingTranscriptTargetFiles && pendingTranscriptTargetFiles.length > 0)
+    ? pendingTranscriptTargetFiles
+    : collectActiveTranscriptTargetFiles();
+  const linesSnapshot = (pendingTranscriptSnapshotLines && pendingTranscriptSnapshotLines.length > 0)
+    ? pendingTranscriptSnapshotLines
+    : transcriptLines.map(l => ({ ...l }));
+
+  pendingTranscriptTargetFiles = null;
+  pendingTranscriptSnapshotLines = null;
+
   if (targetFiles.length === 0) {
     transcriptDirty = false;
     return;
   }
 
-  const linesSnapshot = transcriptLines.map(l => ({ ...l }));
   transcriptDirty = false;
 
   let anySuccess = false;
@@ -668,6 +693,17 @@ export async function persistTranscriptLinesToDisk(): Promise<void> {
 }
 
 function scheduleTranscriptDiskSync(): void {
+  transcriptDirty = true;
+  if (!pendingTranscriptTargetFiles) {
+    const currentTargets = collectActiveTranscriptTargetFiles();
+    if (currentTargets.length > 0) {
+      pendingTranscriptTargetFiles = currentTargets;
+    }
+  }
+  pendingTranscriptSnapshotLines = transcriptLines.map(l => ({
+    ...l,
+    words: Array.isArray(l.words) ? l.words.map(w => ({ ...w })) : undefined
+  }));
   if (transcriptSaveTimer !== null) {
     clearTimeout(transcriptSaveTimer);
   }
@@ -711,7 +747,10 @@ export function updateTranscriptLineText(id: number, value: string): void {
   let changed = false;
   const line = transcriptLines.find(l => l.id === id);
   if (line) {
-    if (line.text !== value) changed = true;
+    if (line.text !== value) {
+      changed = true;
+      line.words = undefined;
+    }
     line.text = value;
   }
   const win = getGlobal();
@@ -720,12 +759,24 @@ export function updateTranscriptLineText(id: number, value: string): void {
     if (item.transcriptLines) {
       const itemLine = item.transcriptLines.find((l: any) => l.id === id);
       if (itemLine) {
-        if (itemLine.text !== value) changed = true;
+        if (itemLine.text !== value) {
+          changed = true;
+          itemLine.words = undefined;
+        }
         itemLine.text = value;
       }
     }
   }
   if (changed) {
+    if (typeof document !== 'undefined' && typeof document.getElementById === 'function') {
+      const cardEl = document.getElementById(`transcript-card-${id}`);
+      if (cardEl && typeof cardEl.querySelector === 'function') {
+        const wordsContainer = cardEl.querySelector('.transcript-words-container') as HTMLElement | null;
+        if (wordsContainer) {
+          wordsContainer.style.display = 'none';
+        }
+      }
+    }
     transcriptDirty = true;
     scheduleTranscriptDiskSync();
   }
@@ -844,22 +895,26 @@ export function splitTranscriptSegment(lineId: number, cursorPosition?: number):
     if (splitWordIdx === -1 && searchIdx > 0 && splitPos >= searchIdx) {
       splitWordIdx = line.words.length - 1;
     }
-    if (splitWordIdx < 0) {
-      splitWordIdx = 0;
-    } else if (splitWordIdx >= line.words.length - 1) {
-      splitWordIdx = line.words.length - 2;
-    }
 
-    leftWords = line.words.slice(0, splitWordIdx + 1);
-    rightWords = line.words.slice(splitWordIdx + 1);
-    if (leftWords.length > 0 && rightWords.length > 0) {
-      splitEndMs = leftWords[leftWords.length - 1].endMs;
-      splitStartMs = rightWords[0].startMs;
-    } else {
+    if (splitWordIdx === -1) {
       const ratio = Math.max(0.05, Math.min(0.95, splitPos / Math.max(1, fullText.length)));
       const mid = Math.round(startMs + ratio * Math.max(0, endMs - startMs));
       splitEndMs = mid;
       splitStartMs = mid;
+      leftWords = undefined;
+      rightWords = undefined;
+    } else {
+      leftWords = line.words.slice(0, splitWordIdx + 1);
+      rightWords = line.words.slice(splitWordIdx + 1);
+      if (leftWords.length > 0 && rightWords.length > 0) {
+        splitEndMs = leftWords[leftWords.length - 1].endMs;
+        splitStartMs = rightWords[0].startMs;
+      } else {
+        const ratio = Math.max(0.05, Math.min(0.95, splitPos / Math.max(1, fullText.length)));
+        const mid = Math.round(startMs + ratio * Math.max(0, endMs - startMs));
+        splitEndMs = mid;
+        splitStartMs = mid;
+      }
     }
   } else {
     // Proportional character/punctuation interpolation fallback
@@ -1303,6 +1358,102 @@ export function parseSegmentTimestamps(rawStart: any, rawEnd: any): { startMs: n
   }
 }
 
+export function aggregateTokensIntoWords(
+  tokens: any[],
+  segStartMs: number,
+  segEndMs: number,
+  cleanText?: string
+): WordToken[] {
+  if (!Array.isArray(tokens) || tokens.length === 0) return [];
+
+  const validTokens: Array<{ text: string; startMs: number; endMs: number; prob: number }> = [];
+  for (const tok of tokens) {
+    const rawTok = tok.text || '';
+    if (!rawTok || rawTok.startsWith('[_') || rawTok.startsWith('<|')) continue;
+    const tokStart = (tok.offsets && typeof tok.offsets.from === 'number')
+      ? tok.offsets.from
+      : (parseTimestampStringToMs(tok.timestamps?.from) ?? segStartMs);
+    const tokEnd = (tok.offsets && typeof tok.offsets.to === 'number')
+      ? tok.offsets.to
+      : (parseTimestampStringToMs(tok.timestamps?.to) ?? segEndMs);
+    const prob = (typeof tok.p === 'number')
+      ? tok.p
+      : (typeof tok.prob === 'number'
+          ? tok.prob
+          : (typeof tok.confidence === 'number' ? tok.confidence : 1.0));
+    validTokens.push({ text: rawTok, startMs: tokStart, endMs: tokEnd, prob });
+  }
+
+  if (validTokens.length === 0) return [];
+
+  const words: WordToken[] = [];
+  let currentWord: { text: string; startMs: number; endMs: number; prob: number } | null = null;
+  let textSearchIdx = 0;
+  let lastMatchedEndIdx = 0;
+
+  for (let i = 0; i < validTokens.length; i++) {
+    const tok = validTokens[i];
+    const tokTrimmed = tok.text.trim();
+    if (!tokTrimmed) continue;
+
+    let isContinuation = false;
+
+    if (cleanText && currentWord) {
+      const foundIdx = cleanText.indexOf(tokTrimmed, textSearchIdx);
+      if (foundIdx !== -1) {
+        const between = cleanText.slice(lastMatchedEndIdx, foundIdx);
+        if (between.length === 0 || !/\s/.test(between)) {
+          isContinuation = true;
+        }
+        lastMatchedEndIdx = foundIdx + tokTrimmed.length;
+        textSearchIdx = lastMatchedEndIdx;
+      } else {
+        isContinuation = !/^\s/.test(tok.text);
+      }
+    } else if (cleanText) {
+      const foundIdx = cleanText.indexOf(tokTrimmed, textSearchIdx);
+      if (foundIdx !== -1) {
+        lastMatchedEndIdx = foundIdx + tokTrimmed.length;
+        textSearchIdx = lastMatchedEndIdx;
+      }
+    } else if (currentWord) {
+      isContinuation = !/^\s/.test(tok.text);
+    }
+
+    if (isContinuation && currentWord) {
+      currentWord.text += tokTrimmed;
+      currentWord.endMs = Math.max(currentWord.endMs, tok.endMs);
+      currentWord.prob = Math.min(currentWord.prob, tok.prob);
+    } else {
+      if (currentWord && currentWord.text.trim()) {
+        words.push({
+          text: currentWord.text.trim(),
+          startMs: currentWord.startMs,
+          endMs: currentWord.endMs,
+          prob: currentWord.prob,
+        });
+      }
+      currentWord = {
+        text: tokTrimmed,
+        startMs: tok.startMs,
+        endMs: tok.endMs,
+        prob: tok.prob,
+      };
+    }
+  }
+
+  if (currentWord && currentWord.text.trim()) {
+    words.push({
+      text: currentWord.text.trim(),
+      startMs: currentWord.startMs,
+      endMs: currentWord.endMs,
+      prob: currentWord.prob,
+    });
+  }
+
+  return words;
+}
+
 export function parseAndApplyTranscriptContent(text: string, ext: string, shouldRender = true): TranscriptLine[] {
   try {
     const parsedLines: TranscriptLine[] = [];
@@ -1353,22 +1504,9 @@ export function parseAndApplyTranscriptContent(text: string, ext: string, should
             }
             const cleanText = (seg.text || seg.content || '').trim();
 
-            const words: WordToken[] = [];
-            if (Array.isArray(seg.tokens)) {
-              seg.tokens.forEach((tok: any) => {
-                const rawTok = tok.text || '';
-                if (!rawTok || rawTok.startsWith('[_') || rawTok.startsWith('<|')) return;
-                const tokStart = (tok.offsets && typeof tok.offsets.from === 'number') ? tok.offsets.from : (parseTimestampStringToMs(tok.timestamps?.from) ?? startMs);
-                const tokEnd = (tok.offsets && typeof tok.offsets.to === 'number') ? tok.offsets.to : (parseTimestampStringToMs(tok.timestamps?.to) ?? endMs);
-                const prob = (typeof tok.p === 'number') ? tok.p : (typeof tok.prob === 'number' ? tok.prob : (typeof tok.confidence === 'number' ? tok.confidence : 1.0));
-                words.push({
-                  text: rawTok,
-                  startMs: tokStart,
-                  endMs: tokEnd,
-                  prob,
-                });
-              });
-            }
+            const words = Array.isArray(seg.tokens)
+              ? aggregateTokensIntoWords(seg.tokens, startMs, endMs, cleanText)
+              : [];
 
             if (cleanText) {
               parsedLines.push({
@@ -1715,6 +1853,15 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
   window.addEventListener('beforeunload', () => {
     void flushPendingTranscriptEdits();
   });
+  window.addEventListener('pagehide', () => {
+    void flushPendingTranscriptEdits();
+  });
+  window.addEventListener('whisper:languageChanged', () => {
+    if (transcriptLines && transcriptLines.length > 0) {
+      renderTranscriptLines(transcriptLines);
+    }
+    updateUndoRedoButtonsUI();
+  });
 }
 
 // Bind to window for HTML onclick/oninput handlers
@@ -1734,6 +1881,7 @@ if (typeof window !== 'undefined') {
   (window as any).parseTranscriptTimeRange = parseTranscriptTimeRange;
   (window as any).loadTranscriptFromFile = loadTranscriptFromFile;
   (window as any).loadTranscriptFromJsonData = loadTranscriptFromJsonData;
+  (window as any).aggregateTokensIntoWords = aggregateTokensIntoWords;
   (window as any).splitTranscriptSegment = splitTranscriptSegment;
   (window as any).mergeTranscriptSegmentWithPrevious = mergeTranscriptSegmentWithPrevious;
   (window as any).deleteTranscriptSegment = deleteTranscriptSegment;
@@ -1781,6 +1929,7 @@ export const transcriptViewer = {
   toggleConfidence: toggleConfidenceHighlighting,
   isConfidenceActive: isConfidenceHighlightingActive,
   loadFromJson: loadTranscriptFromJsonData,
+  aggregateTokens: aggregateTokensIntoWords,
   flushEdits: flushPendingTranscriptEdits,
   hasPendingEdits: hasPendingTranscriptEdits,
   serializeForFile: serializeTranscriptLinesForFile,

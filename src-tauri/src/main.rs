@@ -667,7 +667,8 @@ fn get_transcript_session_data(session_file: Option<String>) -> Result<String, S
             .map(|e| e.eq_ignore_ascii_case("json"))
             .unwrap_or(false);
         if is_json && path.exists() && path.is_file() {
-            return std::fs::read_to_string(path).map_err(|e| format!("Failed to read session file: {}", e));
+            let bytes = std::fs::read(path).map_err(|e| format!("Failed to read session file: {}", e))?;
+            return Ok(String::from_utf8_lossy(&bytes).into_owned());
         } else {
             return Err(format!("Requested transcript session file does not exist or is not valid: {}", path_str));
         }
@@ -1195,6 +1196,10 @@ fn cleanup_transcript_cache(app: &AppHandle) {
         let transcripts_dir = cache_dir.join("transcripts");
         if transcripts_dir.exists() {
             let _ = std::fs::remove_dir_all(&transcripts_dir);
+        }
+        let staging_dir = cache_dir.join("staging");
+        if staging_dir.exists() {
+            let _ = std::fs::remove_dir_all(&staging_dir);
         }
     }
 }
@@ -1815,6 +1820,14 @@ mod main_tests {
         transcribe::set_last_transcript_json(r#"{"memory":"active"}"# .to_string());
         let res_none = get_transcript_session_data(None);
         assert_eq!(res_none.unwrap(), r#"{"memory":"active"}"#);
+
+        // 5. Handles invalid UTF-8 bytes gracefully via lossy decoding without failing
+        let lossy_json_path = temp_dir.join("lossy.json");
+        let invalid_utf8_bytes = vec![0x7b, 0x22, 0x74, 0x65, 0x73, 0x74, 0x22, 0x3a, 0x22, 0xff, 0xfe, 0x22, 0x7d];
+        std::fs::write(&lossy_json_path, &invalid_utf8_bytes).unwrap();
+        let res_lossy = get_transcript_session_data(Some(lossy_json_path.to_string_lossy().to_string()));
+        assert!(res_lossy.is_ok());
+        assert!(res_lossy.unwrap().contains(char::REPLACEMENT_CHARACTER));
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }

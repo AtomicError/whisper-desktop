@@ -170,6 +170,10 @@ export function removeFileFromBatch(index: number): void {
   if (isBatchExtracting) return;
   if (index < 0 || index >= batchItems.length) return;
 
+  if (transcriptViewer.hasPendingEdits()) {
+    void transcriptViewer.flushEdits();
+  }
+
   batchItems.splice(index, 1);
   selectedMediaFiles.splice(index, 1);
 
@@ -235,6 +239,9 @@ export function removeFileFromBatch(index: number): void {
 
 export function clearBatchQueue(): void {
   if (isBatchExtracting) return;
+  if (transcriptViewer.hasPendingEdits()) {
+    void transcriptViewer.flushEdits();
+  }
   batchItems = [];
   selectedMediaFiles = [];
   isBatchMode = false;
@@ -403,6 +410,10 @@ export function moveBatchItemUp(index: number): void {
   if (isBatchExtracting) return;
   if (index <= 0 || index >= batchItems.length) return;
 
+  if (transcriptViewer.hasPendingEdits()) {
+    void transcriptViewer.flushEdits();
+  }
+
   const tempItem = batchItems[index];
   batchItems[index] = batchItems[index - 1];
   batchItems[index - 1] = tempItem;
@@ -424,6 +435,10 @@ export function moveBatchItemUp(index: number): void {
 export function moveBatchItemDown(index: number): void {
   if (isBatchExtracting) return;
   if (index < 0 || index >= batchItems.length - 1) return;
+
+  if (transcriptViewer.hasPendingEdits()) {
+    void transcriptViewer.flushEdits();
+  }
 
   const tempItem = batchItems[index];
   batchItems[index] = batchItems[index + 1];
@@ -525,6 +540,11 @@ export async function selectBatchItemTranscript(index: number): Promise<void> {
     return;
   }
 
+  // Preserve user focus and editing state if this completed item is already active and loaded
+  if (activeBatchViewerIndex === index && isCompleted && userExplicitlySelectedBatchItem && Array.isArray(item.transcriptLines)) {
+    return;
+  }
+
   if (activeBatchViewerIndex !== index) {
     if (transcriptViewer.hasPendingEdits()) {
       await transcriptViewer.flushEdits();
@@ -548,6 +568,9 @@ export async function selectBatchItemTranscript(index: number): Promise<void> {
   }
 
   if (isActive) {
+    if (typeof win.unloadCompanionPlayer === 'function') {
+      win.unloadCompanionPlayer();
+    }
     if (item.transcriptLines && item.transcriptLines.length > 0) {
       transcriptLines = item.transcriptLines.map((l: any) => ({ ...l }));
       transcriptViewer.lines = item.transcriptLines.map((l: any) => ({ ...l }));

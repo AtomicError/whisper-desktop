@@ -102,6 +102,17 @@ export async function loadMediaIntoCompanionPlayer(filePath: string, autoSwitchD
   const videoEl = document.getElementById('companion-media-element') as HTMLVideoElement | null;
   if (!videoEl) return false;
 
+  // If already loaded for the same media file, preserve current playback and avoid redundant re-probing
+  if (activeMediaInfo && activeMediaInfo.filePath === filePath && videoEl.src) {
+    if (autoSwitchDeck) {
+      showTranscribeMediaDeck();
+    } else {
+      const setupDeckTabs = document.getElementById('setup-deck-mode-tabs');
+      if (setupDeckTabs) setupDeckTabs.style.display = 'inline-flex';
+    }
+    return true;
+  }
+
   const currentSeq = ++activeLoadSequence;
 
   // Clean up any previously registered streaming URL
@@ -646,7 +657,7 @@ export function initCompanionPlayerDOM(): void {
     const audioNameEl = document.getElementById('companion-audio-name');
     if (audioFallback && audioNameEl && activeMediaInfo) {
       audioFallback.style.display = 'flex';
-      audioNameEl.textContent = `${activeMediaInfo.fileName} (${t('transcribe.taskFailed') || 'Playback error'})`;
+      audioNameEl.textContent = `${activeMediaInfo.fileName} (${t('transcribe.companionPlaybackError') || 'Playback error'})`;
     }
   });
 
@@ -671,8 +682,8 @@ export function initCompanionPlayerDOM(): void {
   if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
     window.addEventListener('keydown', (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
-      const isEditing = target instanceof HTMLInputElement ||
-                        target instanceof HTMLTextAreaElement ||
+      const isEditing = (typeof HTMLInputElement !== 'undefined' && target instanceof HTMLInputElement) ||
+                        (typeof HTMLTextAreaElement !== 'undefined' && target instanceof HTMLTextAreaElement) ||
                         (typeof HTMLSelectElement !== 'undefined' && target instanceof HTMLSelectElement) ||
                         target?.isContentEditable;
       if (isEditing) return;
@@ -683,6 +694,9 @@ export function initCompanionPlayerDOM(): void {
 
       const transcribePanel = document.getElementById('panel-transcribe');
       if (!transcribePanel || !transcribePanel.classList.contains('active')) return;
+
+      // Do not intercept hotkeys if modifier keys (Ctrl, Alt, Meta, Shift) are held
+      if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
 
       if (e.code === 'Space') {
         // If a non-play button is focused, allow native button activation via Space
@@ -706,6 +720,12 @@ export function initCompanionPlayerDOM(): void {
           e.preventDefault();
           jumpCompanionPlayback(5);
         }
+      }
+    });
+
+    window.addEventListener('whisper:languageChanged', () => {
+      if (activeMediaInfo) {
+        updateCompanionMetadataUI(activeMediaInfo);
       }
     });
   }

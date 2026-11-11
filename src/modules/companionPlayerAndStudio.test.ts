@@ -23,6 +23,10 @@ import {
   setTranscriptHistory,
   createTranscriptCardElement,
   copyLiveTranscriptToClipboard,
+  updateTranscriptLineText,
+  aggregateTokensIntoWords,
+  flushPendingTranscriptEdits,
+  hasPendingTranscriptEdits,
   transcriptViewer,
   type TranscriptLine
 } from './transcriptViewer';
@@ -1417,13 +1421,28 @@ describe('Studio Refinements, Isolation & Keyboard Accessibility', () => {
     const panel = registerMockEl('panel-transcribe');
     panel.classList.add('active');
 
-    const selectEl = new MockElement('SELECT') as any;
+    const selectEl = new (globalThis as any).HTMLSelectElement('SELECT') as any;
     selectEl.id = 'companion-speed-select';
 
+    let keydownHandler: ((e: any) => void) | null = null;
+    const origAddEventListener = (window as any).addEventListener;
+    (window as any).addEventListener = ((evt: string, handler: any) => {
+      if (evt === 'keydown') keydownHandler = handler;
+      if (typeof origAddEventListener === 'function') {
+        origAddEventListener.call(window, evt, handler);
+      }
+    }) as any;
+
+    initCompanionPlayerDOM();
+    if (origAddEventListener) {
+      (window as any).addEventListener = origAddEventListener;
+    } else {
+      delete (window as any).addEventListener;
+    }
+
     let defaultPrevented = false;
-    const listeners = (window as any)._listeners?.get('keydown') || [];
-    for (const fn of listeners) {
-      fn({
+    if (keydownHandler) {
+      (keydownHandler as any)({
         target: selectEl,
         code: 'Space',
         preventDefault: () => { defaultPrevented = true; }
@@ -1630,5 +1649,314 @@ describe('Studio Refinements, Isolation & Keyboard Accessibility', () => {
     // It should NOT match 'in' inside 'beginning' (which would be at index 7)!
     expect(selectedStart).toBe(14);
     expect(selectedEnd).toBe(16);
+  });
+
+  it('aggregates subword BPE tokens into whole words for English and Persian', () => {
+    // English subwords: "Hello", "unbreakable", "world"
+    const englishTokens = [
+      { text: ' Hel', offsets: { from: 0, to: 200 }, p: 0.95 },
+      { text: 'lo', offsets: { from: 200, to: 400 }, p: 0.90 },
+      { text: ' un', offsets: { from: 500, to: 700 }, p: 0.85 },
+      { text: 'break', offsets: { from: 700, to: 1000 }, p: 0.80 },
+      { text: 'able', offsets: { from: 1000, to: 1200 }, p: 0.88 },
+      { text: ' world', offsets: { from: 1300, to: 1800 }, p: 0.99 }
+    ];
+    const enWords = aggregateTokensIntoWords(englishTokens, 0, 1800, 'Hello unbreakable world');
+    expect(enWords.length).toBe(3);
+    expect(enWords[0].text).toBe('Hello');
+    expect(enWords[0].startMs).toBe(0);
+    expect(enWords[0].endMs).toBe(400);
+    expect(enWords[0].prob).toBe(0.90);
+    expect(enWords[1].text).toBe('unbreakable');
+    expect(enWords[1].startMs).toBe(500);
+    expect(enWords[1].endMs).toBe(1200);
+    expect(enWords[1].prob).toBe(0.80);
+    expect(enWords[2].text).toBe('world');
+
+    // Persian subwords: "سلام", "برنامه"
+    const persianTokens = [
+      { text: ' سل', offsets: { from: 0, to: 200 }, p: 0.92 },
+      { text: 'ام', offsets: { from: 200, to: 400 }, p: 0.88 },
+      { text: ' بر', offsets: { from: 500, to: 800 }, p: 0.90 },
+      { text: 'نامه', offsets: { from: 800, to: 1100 }, p: 0.85 }
+    ];
+    const faWords = aggregateTokensIntoWords(persianTokens, 0, 1100, 'سلام برنامه');
+    expect(faWords.length).toBe(2);
+    expect(faWords[0].text).toBe('سلام');
+    expect(faWords[0].startMs).toBe(0);
+    expect(faWords[0].endMs).toBe(400);
+    expect(faWords[0].prob).toBe(0.88);
+    expect(faWords[1].text).toBe('برنامه');
+    expect(faWords[1].startMs).toBe(500);
+    expect(faWords[1].endMs).toBe(1100);
+  });
+
+  it('records undo snapshot on text edits and enables undo/redo of typed modifications', () => {
+    clearTranscriptHistory();
+    transcriptViewer.lines = [
+      { id: 0, timeRange: '[00:00:00.000 --> 00:00:03.000]', text: 'Original line text' }
+    ];
+
+    const card = createTranscriptCardElement(transcriptViewer.lines[0]);
+    const textarea = card.querySelector('.transcript-text-input') as any;
+
+    expect(canUndoTranscript()).toBe(false);
+
+    // Simulate focusing and typing a new text
+    textarea.onfocus();
+    textarea.value = 'Modified line text';
+    textarea.oninput();
+
+    expect(canUndoTranscript()).toBe(true);
+    expect(transcriptViewer.lines[0].text).toBe('Modified line text');
+
+    // Undo operation restores original text
+    const undone = undoTranscriptOperation();
+    expect(undone).toBe(true);
+    expect(transcriptViewer.lines[0].text).toBe('Original line text');
+    expect(canRedoTranscript()).toBe(true);
+
+    // Redo operation restores modified text
+    const redone = redoTranscriptOperation();
+    expect(redone).toBe(true);
+    expect(transcriptViewer.lines[0].text).toBe('Modified line text');
+  });
+
+  it('preserves target files snapshot during debounced save even when batch item selection changes', async () => {
+    await flushPendingTranscriptEdits();
+    let savedTargetFiles: string[] = [];
+    let savedContents: Record<string, string> = {};
+    (window as any).__TAURI__ = {
+      core: {
+        invoke: async (cmd: string, args: any) => {
+          if (cmd === 'write_text_file_content') {
+            savedTargetFiles.push(args.filePath);
+            savedContents[args.filePath] = args.content;
+            return true;
+          }
+          return null;
+        }
+      }
+    };
+
+    (window as any).isBatchMode = true;
+    (window as any).activeBatchViewerIndex = 0;
+    (window as any).batchItems = [
+      {
+        id: 0,
+        status: 'completed',
+        subtitlePath: '/path/to/batch0.srt',
+        transcriptLines: [{ id: 0, timeRange: '[00:00:00.000 --> 00:00:05.000]', text: 'Item 0 initial' }]
+      },
+      {
+        id: 1,
+        status: 'completed',
+        subtitlePath: '/path/to/batch1.srt',
+        transcriptLines: [{ id: 0, timeRange: '[00:00:00.000 --> 00:00:05.000]', text: 'Item 1 text' }]
+      }
+    ];
+
+    transcriptViewer.lines = [{ id: 0, timeRange: '[00:00:00.000 --> 00:00:05.000]', text: 'Item 0 initial' }];
+
+    // Edit Item 0's line text (schedules debounced save and snapshots batch0.srt and lines)
+    updateTranscriptLineText(0, 'Item 0 edited');
+
+    // User immediately switches active view to Item 1 within debounce interval
+    (window as any).activeBatchViewerIndex = 1;
+
+    // Flush edits
+    await flushPendingTranscriptEdits();
+
+    // Verify it saved to batch0.srt (Item 0's file), NOT batch1.srt, and with Item 0's edited content!
+    expect(savedTargetFiles).toContain('/path/to/batch0.srt');
+    expect(savedTargetFiles).not.toContain('/path/to/batch1.srt');
+    expect(savedContents['/path/to/batch0.srt']).toContain('Item 0 edited');
+    expect(savedContents['/path/to/batch0.srt']).not.toContain('Item 1 text');
+  });
+
+  it('invalidates stale word tokens and hides words bar container when line text is edited', () => {
+    transcriptViewer.lines = [
+      {
+        id: 0,
+        timeRange: '[00:00:00.000 --> 00:00:05.000]',
+        text: 'Initial text',
+        words: [
+          { text: 'Initial', startMs: 0, endMs: 2500, prob: 0.95 },
+          { text: 'text', startMs: 2500, endMs: 5000, prob: 0.90 }
+        ]
+      }
+    ];
+
+    const card = registerMockEl('transcript-card-0');
+    const wordsContainer = document.createElement('div');
+    wordsContainer.className = 'transcript-words-container';
+    card.appendChild(wordsContainer);
+
+    expect(transcriptViewer.lines[0].words).toBeDefined();
+
+    updateTranscriptLineText(0, 'Modified user text');
+
+    // Words should be invalidated so stale tokens are not preserved
+    expect(transcriptViewer.lines[0].words).toBeUndefined();
+    expect(wordsContainer.style.display).toBe('none');
+  });
+
+  it('splitTranscriptSegment uses proportional interpolation and sets words to undefined when tokens do not match text', () => {
+    transcriptViewer.lines = [
+      {
+        id: 0,
+        timeRange: '[00:00:00.000 --> 00:00:10.000]',
+        text: 'Hello brave new world of speech',
+        startMs: 0,
+        endMs: 10000,
+        // Tokens that do NOT match the modified text
+        words: [
+          { text: 'Completely', startMs: 0, endMs: 3000, prob: 0.9 },
+          { text: 'different', startMs: 3000, endMs: 7000, prob: 0.8 },
+          { text: 'tokens', startMs: 7000, endMs: 10000, prob: 0.85 }
+        ]
+      }
+    ];
+
+    const splitSuccess = splitTranscriptSegment(0, 11); // split after "Hello brave"
+    expect(splitSuccess).toBe(true);
+    expect(transcriptViewer.lines.length).toBe(2);
+
+    // Mismatched tokens must NOT be arbitrarily assigned to left or right slices
+    expect(transcriptViewer.lines[0].words).toBeUndefined();
+    expect(transcriptViewer.lines[1].words).toBeUndefined();
+
+    // Timestamps should be valid and within bounds
+    expect(transcriptViewer.lines[0].endMs).toBeGreaterThan(0);
+    expect(transcriptViewer.lines[0].endMs).toBeLessThan(10000);
+    expect(transcriptViewer.lines[1].startMs).toBe(transcriptViewer.lines[0].endMs);
+  });
+
+  it('preserves user focus and does not re-render transcript lines when clicking the currently active completed batch item', async () => {
+    let renderCalled = false;
+    transcriptViewer.render = () => { renderCalled = true; };
+
+    (window as any).isBatchMode = true;
+    (window as any).activeBatchViewerIndex = 0;
+    (window as any).batchItems = [
+      {
+        id: 0,
+        status: 'completed',
+        transcriptLines: [{ id: 0, timeRange: '[00:00:00.000 --> 00:00:05.000]', text: 'Active completed item' }]
+      }
+    ];
+
+    // First selection sets up explicit selection
+    await selectBatchItemTranscript(0);
+    renderCalled = false;
+
+    // Clicking the same active completed item again should return early without re-rendering
+    await selectBatchItemTranscript(0);
+    expect(renderCalled).toBe(false);
+  });
+
+  it('unloads companion player immediately when selecting an active in-progress batch item', async () => {
+    let unloaded = false;
+    (window as any).unloadCompanionPlayer = () => { unloaded = true; };
+
+    (window as any).batchItems = [
+      { id: 0, status: 'completed', path: '/audio/completed.mp3', transcriptLines: [] },
+      { id: 1, status: 'transcribing', path: '/audio/transcribing.mp3', transcriptLines: [] }
+    ];
+
+    await selectBatchItemTranscript(1);
+    expect(unloaded).toBe(true);
+  });
+
+  it('flushes pending edits when removing an item or clearing the batch queue', () => {
+    let flushed = false;
+    transcriptViewer.flushEdits = async () => { flushed = true; };
+    transcriptViewer.hasPendingEdits = () => true;
+
+    (window as any).batchItems = [
+      { id: 0, status: 'completed', path: '/a.mp3' },
+      { id: 1, status: 'completed', path: '/b.mp3' }
+    ];
+
+    removeFileFromBatch(0);
+    expect(flushed).toBe(true);
+
+    flushed = false;
+    clearBatchQueue();
+    expect(flushed).toBe(true);
+  });
+
+  it('skips redundant stream setup and re-probing when loading the already active file', async () => {
+    let streamCallCount = 0;
+    (window as any).__TAURI__ = {
+      core: {
+        invoke: async (cmd: string, args: any) => {
+          if (cmd === 'stream_media_file') {
+            streamCallCount++;
+            return 'http://127.0.0.1:4567/stream/1234';
+          }
+          if (cmd === 'probe_media_metadata') {
+            return { duration_sec: 60, width: 1920, height: 1080 };
+          }
+          return null;
+        }
+      }
+    };
+
+    const firstResult = await loadMediaIntoCompanionPlayer('/videos/podcast.mp4', false);
+    expect(firstResult).toBe(true);
+    expect(streamCallCount).toBe(1);
+
+    // Load the exact same file again
+    const secondResult = await loadMediaIntoCompanionPlayer('/videos/podcast.mp4', false);
+    expect(secondResult).toBe(true);
+    // Should NOT have called stream_media_file again!
+    expect(streamCallCount).toBe(1);
+  });
+
+  it('ignores companion playback shortcuts when modifier keys are held', () => {
+    let keydownHandler: ((e: any) => void) | null = null;
+    const origAddEventListener = (window as any).addEventListener;
+    (window as any).addEventListener = ((evt: string, handler: any) => {
+      if (evt === 'keydown') keydownHandler = handler;
+      if (typeof origAddEventListener === 'function') {
+        origAddEventListener.call(window, evt, handler);
+      }
+    }) as any;
+
+    const panel = registerMockEl('panel-transcribe');
+    panel.classList.add('active');
+
+    const mediaDeck = registerMockEl('transcribe-media-deck');
+    mediaDeck.style.display = 'flex';
+
+    initCompanionPlayerDOM();
+    if (origAddEventListener) {
+      (window as any).addEventListener = origAddEventListener;
+    } else {
+      delete (window as any).addEventListener;
+    }
+
+    expect(keydownHandler).not.toBeNull();
+
+    // Ctrl+Space should be ignored (no defaultPrevented)
+    let defaultPrevented = false;
+    (keydownHandler as any)({ code: 'Space', ctrlKey: true, preventDefault: () => { defaultPrevented = true; } });
+    expect(defaultPrevented).toBe(false);
+
+    // Alt+ArrowLeft should be ignored (no defaultPrevented)
+    defaultPrevented = false;
+    (keydownHandler as any)({ code: 'ArrowLeft', altKey: true, preventDefault: () => { defaultPrevented = true; } });
+    expect(defaultPrevented).toBe(false);
+
+    // Shift+ArrowRight should be ignored
+    defaultPrevented = false;
+    (keydownHandler as any)({ code: 'ArrowRight', shiftKey: true, preventDefault: () => { defaultPrevented = true; } });
+    expect(defaultPrevented).toBe(false);
+
+    // Plain Space without modifiers should be intercepted
+    defaultPrevented = false;
+    (keydownHandler as any)({ code: 'Space', preventDefault: () => { defaultPrevented = true; } });
+    expect(defaultPrevented).toBe(true);
   });
 });
