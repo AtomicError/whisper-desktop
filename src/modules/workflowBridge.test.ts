@@ -11,6 +11,8 @@ import {
   setLastTranscribedOutputFiles,
   toggleOutputFilesDropdown,
   renderOutputFilesDropdown,
+  handleSendToStudioButtonClick,
+  toggleWorkflowDropdown,
   updateTranscribeWorkflowButtons,
   updateTranscribeActionButtons,
   sendTranscribeToTranslationStudio,
@@ -262,6 +264,57 @@ describe('workflowBridge module', () => {
       expect(dropdown.style.display).toBe('none');
     });
 
+    it('toggles workflow dropdown display and closes output file dropdown when opened', () => {
+      const fileDropdown = new MockElement('DIV');
+      fileDropdown.id = 'transcribe-output-files-dropdown';
+      fileDropdown.style.display = 'flex';
+      domMap.set(fileDropdown.id, fileDropdown);
+
+      const workflowDropdown = new MockElement('DIV');
+      workflowDropdown.id = 'transcribe-workflow-dropdown';
+      workflowDropdown.style.display = 'none';
+      domMap.set(workflowDropdown.id, workflowDropdown);
+
+      const btnStudio = new MockElement('BUTTON');
+      btnStudio.id = 'btn-send-to-studio';
+      btnStudio.setAttribute('aria-expanded', 'false');
+      domMap.set(btnStudio.id, btnStudio);
+
+      toggleWorkflowDropdown();
+      expect(workflowDropdown.style.display).toBe('flex');
+      expect(fileDropdown.style.display).toBe('none');
+      expect(btnStudio.getAttribute('aria-expanded')).toBe('true');
+
+      toggleWorkflowDropdown();
+      expect(workflowDropdown.style.display).toBe('none');
+      expect(btnStudio.getAttribute('aria-expanded')).toBe('false');
+
+      toggleWorkflowDropdown(true);
+      expect(workflowDropdown.style.display).toBe('none');
+      expect(btnStudio.getAttribute('aria-expanded')).toBe('false');
+    });
+
+    it('handles send to studio button click correctly with Event parameter', () => {
+      const workflowDropdown = new MockElement('DIV');
+      workflowDropdown.id = 'transcribe-workflow-dropdown';
+      workflowDropdown.style.display = 'none';
+      domMap.set(workflowDropdown.id, workflowDropdown);
+
+      const btnStudio = new MockElement('BUTTON');
+      btnStudio.id = 'btn-send-to-studio';
+      btnStudio.disabled = true;
+      domMap.set(btnStudio.id, btnStudio);
+
+      const mockEvent = { stopPropagation: vi.fn() };
+      handleSendToStudioButtonClick(mockEvent as any);
+      expect(mockEvent.stopPropagation).toHaveBeenCalled();
+      expect(workflowDropdown.style.display).toBe('none');
+
+      btnStudio.disabled = false;
+      handleSendToStudioButtonClick(mockEvent as any);
+      expect(workflowDropdown.style.display).toBe('flex');
+    });
+
     it('renders output file buttons with appropriate badges', () => {
       const dropdown = new MockElement('DIV');
       dropdown.id = 'transcribe-output-files-dropdown';
@@ -293,6 +346,10 @@ describe('workflowBridge module', () => {
       btnSendTranslate.id = 'btn-send-to-translation';
       const btnSendHardsub = new MockElement('BUTTON');
       btnSendHardsub.id = 'btn-transcribe-send-to-hardsub';
+      const btnSendStudio = new MockElement('BUTTON');
+      btnSendStudio.id = 'btn-send-to-studio';
+      const btnConfidence = new MockElement('BUTTON');
+      btnConfidence.id = 'btn-toggle-confidence';
       const btnCopy = new MockElement('BUTTON');
       btnCopy.id = 'btn-copy-transcript';
 
@@ -300,6 +357,8 @@ describe('workflowBridge module', () => {
       domMap.set(btnOpenFile.id, btnOpenFile);
       domMap.set(btnSendTranslate.id, btnSendTranslate);
       domMap.set(btnSendHardsub.id, btnSendHardsub);
+      domMap.set(btnSendStudio.id, btnSendStudio);
+      domMap.set(btnConfidence.id, btnConfidence);
       domMap.set(btnCopy.id, btnCopy);
 
       setLastTranscribedSubtitlePath(null);
@@ -313,6 +372,8 @@ describe('workflowBridge module', () => {
       expect(btnOpenFile.disabled).toBe(true);
       expect(btnSendTranslate.disabled).toBe(true);
       expect(btnSendHardsub.disabled).toBe(true);
+      expect(btnSendStudio.disabled).toBe(true);
+      expect(btnConfidence.disabled).toBe(true);
       expect(btnCopy.disabled).toBe(true);
     });
 
@@ -325,6 +386,10 @@ describe('workflowBridge module', () => {
       btnSendTranslate.id = 'btn-send-to-translation';
       const btnSendHardsub = new MockElement('BUTTON');
       btnSendHardsub.id = 'btn-transcribe-send-to-hardsub';
+      const btnSendStudio = new MockElement('BUTTON');
+      btnSendStudio.id = 'btn-send-to-studio';
+      const btnConfidence = new MockElement('BUTTON');
+      btnConfidence.id = 'btn-toggle-confidence';
       const btnCopy = new MockElement('BUTTON');
       btnCopy.id = 'btn-copy-transcript';
 
@@ -332,6 +397,8 @@ describe('workflowBridge module', () => {
       domMap.set(btnOpenFile.id, btnOpenFile);
       domMap.set(btnSendTranslate.id, btnSendTranslate);
       domMap.set(btnSendHardsub.id, btnSendHardsub);
+      domMap.set(btnSendStudio.id, btnSendStudio);
+      domMap.set(btnConfidence.id, btnConfidence);
       domMap.set(btnCopy.id, btnCopy);
 
       setLastTranscribedSubtitlePath('/output/movie.srt');
@@ -344,6 +411,8 @@ describe('workflowBridge module', () => {
       expect(btnOpenFile.disabled).toBe(false);
       expect(btnSendTranslate.disabled).toBe(false);
       expect(btnSendHardsub.disabled).toBe(false);
+      expect(btnSendStudio.disabled).toBe(false);
+      expect(btnConfidence.disabled).toBe(false);
       expect(btnCopy.disabled).toBe(false);
       expect(btnOpenFile.title).toContain('movie.srt');
     });
@@ -357,6 +426,10 @@ describe('workflowBridge module', () => {
       btnSendTranslate.id = 'btn-send-to-translation';
       const btnSendHardsub = new MockElement('BUTTON');
       btnSendHardsub.id = 'btn-transcribe-send-to-hardsub';
+      const btnSendStudio = new MockElement('BUTTON');
+      btnSendStudio.id = 'btn-send-to-studio';
+      const btnConfidence = new MockElement('BUTTON');
+      btnConfidence.id = 'btn-toggle-confidence';
       const btnCopy = new MockElement('BUTTON');
       btnCopy.id = 'btn-copy-transcript';
 
@@ -364,6 +437,8 @@ describe('workflowBridge module', () => {
       domMap.set(btnOpenFile.id, btnOpenFile);
       domMap.set(btnSendTranslate.id, btnSendTranslate);
       domMap.set(btnSendHardsub.id, btnSendHardsub);
+      domMap.set(btnSendStudio.id, btnSendStudio);
+      domMap.set(btnConfidence.id, btnConfidence);
       domMap.set(btnCopy.id, btnCopy);
 
       setLastTranscribedSubtitlePath('/output/movie.srt');
@@ -379,6 +454,8 @@ describe('workflowBridge module', () => {
       expect(btnOpenFile.disabled).toBe(true);
       expect(btnSendTranslate.disabled).toBe(true);
       expect(btnSendHardsub.disabled).toBe(true);
+      expect(btnSendStudio.disabled).toBe(true);
+      expect(btnConfidence.disabled).toBe(true);
       expect(btnCopy.disabled).toBe(true);
 
       // Reset
@@ -392,6 +469,8 @@ describe('workflowBridge module', () => {
       expect(btnOpenFile.disabled).toBe(true);
       expect(btnSendTranslate.disabled).toBe(true);
       expect(btnSendHardsub.disabled).toBe(true);
+      expect(btnSendStudio.disabled).toBe(true);
+      expect(btnConfidence.disabled).toBe(true);
       expect(btnCopy.disabled).toBe(true);
 
       (globalThis as any).window.isBatchExtracting = false;

@@ -325,6 +325,7 @@ export const tr: Translations = {
     sameAsSource: 'Kaynak dosya klasörüyle aynı',
     changeFolder: 'Değiştir...',
     resetFolder: 'Sıfırla',
+    sendToStudio: 'Stüdyoya Gönder',
     sendToTranslation: 'Çeviri Stüdyosuna Gönder',
     sendToTranslationDesc: 'Oluşturulan altyazı Çeviri Stüdyosuna yüklendi.',
     sendToHardsub: 'Hardsub Stüdyosuna Gönder',

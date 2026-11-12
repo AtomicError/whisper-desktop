@@ -325,6 +325,7 @@ export const pt: Translations = {
     sameAsSource: 'Mesma pasta do arquivo original',
     changeFolder: 'Alterar...',
     resetFolder: 'Redefinir',
+    sendToStudio: 'Enviar para o Estúdio',
     sendToTranslation: 'Enviar para o Estúdio de Tradução',
     sendToTranslationDesc: 'Legenda gerada carregada no Estúdio de Tradução.',
     sendToHardsub: 'Enviar para o Hardsub Studio',

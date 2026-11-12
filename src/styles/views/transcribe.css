@@ -985,12 +985,15 @@
   border-bottom: 1px solid var(--border-glass);
   padding-bottom: 10px;
   flex-shrink: 0;
+  gap: 12px;
 }
 
 .transcript-viewer-title-group {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .transcript-viewer-icon {
@@ -1003,13 +1006,45 @@
   font-size: 0.95rem;
   margin: 0;
   color: var(--color-text);
+  white-space: nowrap;
 }
 
 .transcript-viewer-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.toolbar-btn-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.toolbar-history-group {
+  gap: 2px;
+}
+
+.btn-icon-only {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 16px;
+  background: var(--border-subtle, rgba(255, 255, 255, 0.08));
+  margin: 0 2px;
+  flex-shrink: 0;
 }
 
 .transcript-viewer-actions button {
@@ -1063,8 +1098,63 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  z-index: 1000;
+  z-index: var(--z-dropdown, 50);
   backdrop-filter: blur(12px);
+}
+
+/* Transcribe Workflow Dropdown */
+.transcribe-workflow-group {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.transcribe-workflow-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  inset-inline-end: 0;
+  min-width: 220px;
+  max-width: 300px;
+  background: var(--bg-surface, #121215);
+  border: 1px solid var(--border-subtle, #27272a);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: var(--z-dropdown, 50);
+  backdrop-filter: blur(14px);
+}
+
+.transcribe-workflow-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  font-size: 0.76rem;
+  border-radius: var(--radius-sm, 6px);
+  color: var(--text-primary, #fafafa);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  width: 100%;
+  text-align: start;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  box-sizing: border-box;
+  white-space: nowrap;
+}
+
+.transcribe-workflow-dropdown-item:hover:not(:disabled) {
+  background: var(--bg-hover, #27272a);
+  border-color: var(--border-focus, #3f3f46);
+}
+
+.transcribe-workflow-dropdown-item:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  color: var(--color-text-dim, #71717a);
+  filter: grayscale(1);
 }
 
 .transcribe-output-file-item {

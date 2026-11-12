@@ -325,6 +325,7 @@ export const fr: Translations = {
     sameAsSource: 'Même dossier que le fichier source',
     changeFolder: 'Modifier...',
     resetFolder: 'Réinitialiser',
+    sendToStudio: 'Envoyer au studio',
     sendToTranslation: 'Envoyer au studio de traduction',
     sendToTranslationDesc: 'Sous-titre généré chargé dans le studio de traduction.',
     sendToHardsub: 'Envoyer au studio Hardsub',

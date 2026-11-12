@@ -153,20 +153,27 @@ describe('Transcription Studio Unified Deck DOM Structure', () => {
     expect(rightPanelHtml).not.toContain('id="btn-export-transcript"');
     expect(rightPanelHtml).not.toContain('data-i18n="transcribe.exportTxt"');
     expect(rightPanelHtml).toContain('id="btn-copy-transcript"');
+    expect(rightPanelHtml).toContain('id="btn-toggle-confidence"');
     expect(rightPanelHtml).toContain('id="transcribe-output-file-group"');
     expect(rightPanelHtml).toContain('id="btn-open-output-file"');
     expect(rightPanelHtml).toContain('id="transcribe-output-files-dropdown"');
     expect(rightPanelHtml).toContain('id="btn-open-output-folder"');
+    expect(rightPanelHtml).toContain('id="transcribe-workflow-group"');
+    expect(rightPanelHtml).toContain('id="btn-send-to-studio"');
+    expect(rightPanelHtml).toContain('id="transcribe-workflow-dropdown"');
     expect(rightPanelHtml).toContain('id="btn-send-to-translation"');
     expect(rightPanelHtml).toContain('id="btn-transcribe-send-to-hardsub"');
 
-    // Both workflow send buttons share identical highlight styling classes
-    expect(rightPanelHtml).toMatch(/<button[^>]*class="[^"]*btn-toolbar-workflow[^"]*"[^>]*id="btn-send-to-translation"/);
-    expect(rightPanelHtml).toMatch(/<button[^>]*class="[^"]*btn-toolbar-workflow[^"]*"[^>]*id="btn-transcribe-send-to-hardsub"/);
+    // Workflow send trigger has highlight styling, and dropdown items use clean menu styling
+    expect(rightPanelHtml).toMatch(/<button[^>]*class="[^"]*btn-toolbar-workflow[^"]*"[^>]*id="btn-send-to-studio"/);
+    expect(rightPanelHtml).toMatch(/<button[^>]*class="[^"]*transcribe-workflow-dropdown-item[^"]*"[^>]*id="btn-send-to-translation"/);
+    expect(rightPanelHtml).toMatch(/<button[^>]*class="[^"]*transcribe-workflow-dropdown-item[^"]*"[^>]*id="btn-transcribe-send-to-hardsub"/);
 
     // Accessibility and initial disabled state checks
     expect(rightPanelHtml).toMatch(/<button[^>]*id="btn-copy-transcript"[^>]*type="button"[^>]*disabled/);
+    expect(rightPanelHtml).toMatch(/<button[^>]*id="btn-toggle-confidence"[^>]*type="button"[^>]*disabled/);
     expect(rightPanelHtml).toMatch(/<button[^>]*id="btn-open-output-file"[^>]*type="button"[^>]*disabled/);
+    expect(rightPanelHtml).toMatch(/<button[^>]*id="btn-send-to-studio"[^>]*type="button"[^>]*disabled[^>]*aria-haspopup="true"[^>]*aria-expanded="false"/);
     expect(rightPanelHtml).toContain('aria-label="Search transcript"');
     expect(rightPanelHtml).toContain('aria-label="Open File"');
     expect(rightPanelHtml).toContain('id="transcript-viewport" aria-live="polite"');
@@ -204,6 +211,7 @@ describe('Transcription Studio Locales & Symmetry', () => {
       expect(loc.transcribe.resetFolder, `Locale ${code}.transcribe.resetFolder should be non-empty string`).toBeTruthy();
       expect(loc.transcribe.sendToTranslation, `Locale ${code}.transcribe.sendToTranslation should be non-empty string`).toBeTruthy();
       expect(loc.transcribe.sendToTranslationDesc, `Locale ${code}.transcribe.sendToTranslationDesc should be non-empty string`).toBeTruthy();
+      expect(loc.transcribe.sendToStudio, `Locale ${code}.transcribe.sendToStudio should be non-empty string`).toBeTruthy();
       expect(loc.transcribe.sendToHardsub, `Locale ${code}.transcribe.sendToHardsub should be non-empty string`).toBeTruthy();
       expect(loc.transcribe.sendToHardsubDesc, `Locale ${code}.transcribe.sendToHardsubDesc should be non-empty string`).toBeTruthy();
       expect(loc.transcribe.noSubGeneratedYet, `Locale ${code}.transcribe.noSubGeneratedYet should be non-empty string`).toBeTruthy();

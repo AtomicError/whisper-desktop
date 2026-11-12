@@ -26,6 +26,8 @@ declare global {
     handleOutputFileButtonClick: (event?: any) => void;
     toggleOutputFilesDropdown: (forceClose?: boolean) => void;
     renderOutputFilesDropdown: () => void;
+    handleSendToStudioButtonClick: (event?: Event | MouseEvent) => void;
+    toggleWorkflowDropdown: (forceClose?: boolean) => void;
     updateTranscribeWorkflowButtons: () => void;
     updateTranscribeActionButtons: (running?: boolean) => void;
     sendTranscribeToTranslationStudio: () => Promise<void>;
@@ -91,6 +93,7 @@ export function handleOutputFileButtonClick(event?: any): void {
 
   const files = getLastTranscribedOutputFiles();
   if (files.length <= 1) {
+    toggleWorkflowDropdown(true);
     const targetPath = files.length === 1 ? files[0].path : getLastTranscribedSubtitlePath();
     if (targetPath) {
       const openTarget = () => {
@@ -113,14 +116,42 @@ export function handleOutputFileButtonClick(event?: any): void {
 export function toggleOutputFilesDropdown(forceClose = false): void {
   if (typeof document === 'undefined') return;
   const dropdown = document.getElementById('transcribe-output-files-dropdown');
+  const btn = document.getElementById('btn-open-output-file') as HTMLButtonElement | null;
   if (!dropdown) return;
   const isCurrentlyOpen = dropdown.style.display !== 'none';
   if (forceClose || isCurrentlyOpen) {
     dropdown.style.display = 'none';
+    if (btn) btn.setAttribute('aria-expanded', 'false');
     return;
   }
+  toggleWorkflowDropdown(true);
   renderOutputFilesDropdown();
   dropdown.style.display = 'flex';
+  if (btn) btn.setAttribute('aria-expanded', 'true');
+}
+
+export function handleSendToStudioButtonClick(event?: Event | MouseEvent): void {
+  event?.stopPropagation?.();
+  if (typeof document === 'undefined') return;
+  const btn = document.getElementById('btn-send-to-studio') as HTMLButtonElement | null;
+  if (!btn || btn.disabled) return;
+  toggleWorkflowDropdown();
+}
+
+export function toggleWorkflowDropdown(forceClose = false): void {
+  if (typeof document === 'undefined') return;
+  const dropdown = document.getElementById('transcribe-workflow-dropdown');
+  const btn = document.getElementById('btn-send-to-studio') as HTMLButtonElement | null;
+  if (!dropdown) return;
+  const isCurrentlyOpen = dropdown.style.display !== 'none';
+  if (forceClose || isCurrentlyOpen) {
+    dropdown.style.display = 'none';
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+    return;
+  }
+  toggleOutputFilesDropdown(true);
+  dropdown.style.display = 'flex';
+  if (btn) btn.setAttribute('aria-expanded', 'true');
 }
 
 export function renderOutputFilesDropdown(): void {
@@ -209,6 +240,9 @@ export function updateTranscribeWorkflowButtons(): void {
 
   if (btnOpenFile) {
     btnOpenFile.disabled = !hasFiles;
+    if (!hasFiles) {
+      btnOpenFile.setAttribute('aria-expanded', 'false');
+    }
     if (outputFiles.length > 1) {
       if (chevronOpenFile) chevronOpenFile.style.display = 'inline-block';
       btnOpenFile.title = t('transcribe.openFile');
@@ -256,6 +290,26 @@ export function updateTranscribeWorkflowButtons(): void {
       btnSendHardsub.setAttribute('title', t('transcribe.noSubGeneratedYet') || 'No generated subtitle yet');
       btnSendHardsub.setAttribute('data-i18n-title', 'transcribe.noSubGeneratedYet');
     }
+  }
+
+  const btnSendStudio = document.getElementById('btn-send-to-studio') as HTMLButtonElement | null;
+  if (btnSendStudio) {
+    btnSendStudio.disabled = !hasSubtitle;
+    if (!hasSubtitle) {
+      btnSendStudio.setAttribute('aria-expanded', 'false');
+    }
+    if (hasSubtitle) {
+      btnSendStudio.removeAttribute('title');
+      btnSendStudio.removeAttribute('data-i18n-title');
+    } else {
+      btnSendStudio.setAttribute('title', t('transcribe.noSubGeneratedYet') || 'No generated subtitle yet');
+      btnSendStudio.setAttribute('data-i18n-title', 'transcribe.noSubGeneratedYet');
+    }
+  }
+
+  const btnConfidence = document.getElementById('btn-toggle-confidence') as HTMLButtonElement | null;
+  if (btnConfidence) {
+    btnConfidence.disabled = !hasTranscript;
   }
 }
 
@@ -370,6 +424,7 @@ export function isSupportedVideoFile(filePath: string | null | undefined): boole
 }
 
 export async function sendTranscribeToTranslationStudio(): Promise<void> {
+  toggleWorkflowDropdown(true);
   const subToLoad = getLastTranscribedSubtitlePath();
   if (!subToLoad) {
     showNotification(t('transcribe.noSubGeneratedYet') || 'No generated subtitle yet', 'error');
@@ -399,6 +454,7 @@ export async function sendTranscribeToTranslationStudio(): Promise<void> {
 }
 
 export function sendTranscribeToHardsubStudio(): Promise<void> | void {
+  toggleWorkflowDropdown(true);
   const subToLoad = getLastTranscribedSubtitlePath();
   if (!subToLoad) {
     showNotification(t('transcribe.noSubGeneratedYet') || 'No generated subtitle yet', 'error');
@@ -429,12 +485,23 @@ export function sendTranscribeToHardsubStudio(): Promise<void> | void {
   executeTransfer();
 }
 
-// ----------------- Document Click Outside Listener -----------------
+// ----------------- Document Click Outside & Keydown Listeners -----------------
 if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
   document.addEventListener('click', (e) => {
-    const group = document.getElementById('transcribe-output-file-group');
-    if (group && !group.contains(e.target as Node)) {
+    const fileGroup = document.getElementById('transcribe-output-file-group');
+    if (fileGroup && !fileGroup.contains(e.target as Node)) {
       toggleOutputFilesDropdown(true);
+    }
+    const workflowGroup = document.getElementById('transcribe-workflow-group');
+    if (workflowGroup && !workflowGroup.contains(e.target as Node)) {
+      toggleWorkflowDropdown(true);
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      toggleOutputFilesDropdown(true);
+      toggleWorkflowDropdown(true);
     }
   });
 }
@@ -476,6 +543,8 @@ export function syncWorkflowBridgeWindowBindings(): void {
   win.handleOutputFileButtonClick = handleOutputFileButtonClick;
   win.toggleOutputFilesDropdown = toggleOutputFilesDropdown;
   win.renderOutputFilesDropdown = renderOutputFilesDropdown;
+  win.handleSendToStudioButtonClick = handleSendToStudioButtonClick;
+  win.toggleWorkflowDropdown = toggleWorkflowDropdown;
   win.updateTranscribeWorkflowButtons = updateTranscribeWorkflowButtons;
   win.updateTranscribeActionButtons = updateTranscribeActionButtons;
   win.sendTranscribeToTranslationStudio = sendTranscribeToTranslationStudio;
@@ -498,6 +567,8 @@ export const workflowBridge = {
   handleOutputFileButtonClick,
   toggleOutputFilesDropdown,
   renderOutputFilesDropdown,
+  handleSendToStudioButtonClick,
+  toggleWorkflowDropdown,
   updateTranscribeWorkflowButtons,
   updateTranscribeActionButtons,
   sendTranscribeToTranslationStudio,

@@ -325,6 +325,7 @@ export const zh: Translations = {
     sameAsSource: '保存至与源文件同目录',
     changeFolder: '更改...',
     resetFolder: '重置',
+    sendToStudio: '发送到工作室',
     sendToTranslation: '发送到翻译工作室',
     sendToTranslationDesc: '已将生成的字幕加载到翻译工作室。',
     sendToHardsub: '发送到压制字幕工作室',

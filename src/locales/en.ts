@@ -323,6 +323,7 @@ export const en = {
     sameAsSource: 'Same as source file folder',
     changeFolder: 'Change...',
     resetFolder: 'Reset',
+    sendToStudio: 'Send to Studio',
     sendToTranslation: 'Send to Translation Studio',
     sendToTranslationDesc: 'Generated subtitle loaded into Translation Studio.',
     sendToHardsub: 'Send to Hardsub Studio',

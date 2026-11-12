@@ -325,6 +325,7 @@ export const it: Translations = {
     sameAsSource: 'Stessa cartella del file sorgente',
     changeFolder: 'Modifica...',
     resetFolder: 'Reimposta',
+    sendToStudio: 'Invia a Studio',
     sendToTranslation: 'Invia a Studio di traduzione',
     sendToTranslationDesc: 'Sottotitolo generato caricato in Studio di traduzione.',
     sendToHardsub: 'Invia a Hardsub Studio',

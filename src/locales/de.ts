@@ -325,6 +325,7 @@ export const de: Translations = {
     sameAsSource: 'Gleicher Ordner wie Quelldatei',
     changeFolder: 'Ändern...',
     resetFolder: 'Zurücksetzen',
+    sendToStudio: 'An Studio senden',
     sendToTranslation: 'An Übersetzungsstudio senden',
     sendToTranslationDesc: 'Generierte Untertitel in das Übersetzungsstudio geladen.',
     sendToHardsub: 'An Hardsub-Studio senden',

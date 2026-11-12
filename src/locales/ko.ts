@@ -325,6 +325,7 @@ export const ko: Translations = {
     sameAsSource: '원본 파일 폴더와 동일',
     changeFolder: '변경...',
     resetFolder: '초기화',
+    sendToStudio: '스튜디오로 보내기',
     sendToTranslation: '번역 스튜디오로 보내기',
     sendToTranslationDesc: '생성된 자막이 번역 스튜디오에 로드되었습니다.',
     sendToHardsub: '하드서브 스튜디오로 보내기',

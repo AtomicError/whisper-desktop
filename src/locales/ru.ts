@@ -325,6 +325,7 @@ export const ru: Translations = {
     sameAsSource: 'В папку исходного файла',
     changeFolder: 'Изменить...',
     resetFolder: 'Сброс',
+    sendToStudio: 'Отправить в студию',
     sendToTranslation: 'Отправить в студию перевода',
     sendToTranslationDesc: 'Сгенерированные субтитры загружены в студию перевода.',
     sendToHardsub: 'Отправить в студию хардсаба',

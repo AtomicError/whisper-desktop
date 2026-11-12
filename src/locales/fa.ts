@@ -325,6 +325,7 @@ export const fa: Translations = {
     sameAsSource: 'مشابه پوشه فایل اصلی',
     changeFolder: 'تغییر...',
     resetFolder: 'بازنشانی',
+    sendToStudio: 'ارسال به استودیو',
     sendToTranslation: 'ارسال به استودیو ترجمه',
     sendToTranslationDesc: 'زیرنویس استخراج‌شده در استودیو ترجمه بارگذاری شد.',
     sendToHardsub: 'ارسال به استودیو هاردساب',

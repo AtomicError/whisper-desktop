@@ -1815,6 +1815,9 @@ export function clearTranscriptLines(): void {
   transcriptDirty = false;
   transcriptLines = [];
   clearTranscriptHistory();
+  if (confidenceHighlightingActive) {
+    toggleConfidenceHighlighting();
+  }
   renderTranscriptLines([]);
 }
 

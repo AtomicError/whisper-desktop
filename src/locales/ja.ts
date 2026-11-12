@@ -325,6 +325,7 @@ export const ja: Translations = {
     sameAsSource: '元ファイルと同じフォルダ',
     changeFolder: '変更...',
     resetFolder: 'リセット',
+    sendToStudio: 'スタジオへ送る',
     sendToTranslation: '翻訳スタジオへ送る',
     sendToTranslationDesc: '生成された字幕が翻訳スタジオに読み込まれました。',
     sendToHardsub: 'ハードサブスタジオへ送る',

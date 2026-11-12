@@ -325,6 +325,7 @@ export const ar: Translations = {
     sameAsSource: 'نفس مجلد الملف المصدر',
     changeFolder: 'تغيير...',
     resetFolder: 'إعادة ضبط',
+    sendToStudio: 'إرسال إلى الاستوديو',
     sendToTranslation: 'إرسال إلى استوديو الترجمة',
     sendToTranslationDesc: 'تم تحميل ملف الترجمة المُستخرج في استوديو الترجمة.',
     sendToHardsub: 'إرسال إلى استودیو هاردسب',

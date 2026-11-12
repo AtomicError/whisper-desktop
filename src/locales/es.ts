@@ -325,6 +325,7 @@ export const es: Translations = {
     sameAsSource: 'Misma carpeta que el archivo origen',
     changeFolder: 'Cambiar...',
     resetFolder: 'Restablecer',
+    sendToStudio: 'Enviar a Estudio',
     sendToTranslation: 'Enviar a Estudio de Traducción',
     sendToTranslationDesc: 'Subtítulo generado cargado en el Estudio de Traducción.',
     sendToHardsub: 'Enviar a Hardsub Studio',
