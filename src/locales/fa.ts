@@ -176,7 +176,7 @@ export const fa: Translations = {
     wizardStep2: 'مشخصات فایل رسانه',
     wizardStep3: 'شروع رونویسی',
     noFileLoaded: 'هیچ فایلی بارگذاری نشده',
-    selectFilePrompt: 'فایل صوتی یا ویدیویی (\u200E.mp4, .mkv, .mp3, .wav) را اینجا رها کنید',
+    selectFilePrompt: 'فایل صوتی یا ویدیویی را اینجا رها کنید',
     browseSystem: 'انتخاب',
     clearMedia: 'پاک‌کردن',
     deckTitle: 'تنظیمات رونویسی',

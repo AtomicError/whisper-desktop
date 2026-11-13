@@ -176,7 +176,7 @@ export const fr: Translations = {
     wizardStep2: 'Détails du Média',
     wizardStep3: 'Lancer la Transcription',
     noFileLoaded: 'Aucun Fichier Média Chargé',
-    selectFilePrompt: 'Glissez-déposez audio ou vidéo (.mp4, .mkv, .mp3, .wav)',
+    selectFilePrompt: 'Glissez-déposez audio ou vidéo',
     browseSystem: 'Parcourir',
     clearMedia: 'Effacer',
     deckTitle: 'Configuration de la transcription',

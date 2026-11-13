@@ -176,7 +176,7 @@ export const it: Translations = {
     wizardStep2: 'Dettagli Multimediali',
     wizardStep3: 'Avvia Trascrizione',
     noFileLoaded: 'Nessun File Multimediale Caricato',
-    selectFilePrompt: 'Trascina e rilascia audio o video (.mp4, .mkv, .mp3, .wav)',
+    selectFilePrompt: 'Trascina e rilascia audio o video',
     browseSystem: 'Sfoglia',
     clearMedia: 'Cancella',
     deckTitle: 'Configurazione trascrizione',

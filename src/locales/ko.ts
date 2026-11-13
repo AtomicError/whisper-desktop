@@ -176,7 +176,7 @@ export const ko: Translations = {
     wizardStep2: '미디어 상세 정보',
     wizardStep3: '음성 변환 실행',
     noFileLoaded: '로드된 미디어 파일 없음',
-    selectFilePrompt: '오디오 또는 비디오 파일 끌어다 놓기 (.mp4, .mkv, .mp3, .wav)',
+    selectFilePrompt: '오디오 또는 비디오 파일 끌어다 놓기',
     browseSystem: '찾아보기',
     clearMedia: '지우기',
     deckTitle: '전사 설정',

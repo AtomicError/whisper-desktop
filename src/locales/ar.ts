@@ -176,7 +176,7 @@ export const ar: Translations = {
     wizardStep2: 'تفاصيل الوسائط',
     wizardStep3: 'بدء التفريغ',
     noFileLoaded: 'لم يتم تحميل أي ملف',
-    selectFilePrompt: 'اسحب وأفلت ملف صوت أو فيديو (\u200E.mp4, .mkv, .mp3, .wav)',
+    selectFilePrompt: 'اسحب وأفلت ملف صوت أو فيديو',
     browseSystem: 'استعراض',
     clearMedia: 'مسح',
     deckTitle: 'إعدادات النسخ الصوتي',

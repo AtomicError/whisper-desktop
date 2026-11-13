@@ -59,7 +59,7 @@ describe('Transcription Studio Unified Deck DOM Structure', () => {
     expect(html).toContain('id="lbl-file-path"');
     expect(html).toContain('id="btn-browse-media"');
     expect(html).toMatch(/<button[^>]*id="btn-browse-media"[^>]*>Browse<\/button>/);
-    expect(html).toContain('Drag &amp; drop audio or video (.mp4, .mkv, .mp3, .wav)');
+    expect(html).toContain('Drag &amp; drop audio or video');
     expect(html).toContain('id="btn-clear-media"');
     expect(html).toContain('id="media-meta-box"');
     expect(html).toContain('transcribe-meta-badges-row');

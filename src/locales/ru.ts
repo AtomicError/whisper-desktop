@@ -176,7 +176,7 @@ export const ru: Translations = {
     wizardStep2: 'Сведения о медиафайле',
     wizardStep3: 'Запуск транскрипции',
     noFileLoaded: 'Файл не загружен',
-    selectFilePrompt: 'Перетащите аудио или видео сюда (.mp4, .mkv, .mp3, .wav)',
+    selectFilePrompt: 'Перетащите аудио или видео сюда',
     browseSystem: 'Обзор',
     clearMedia: 'Очистить',
     deckTitle: 'Настройка транскрибации',

@@ -274,7 +274,7 @@ describe('locale consistency for speed presets', () => {
     expect(fa.models.title).toBe('مرکز مدل‌های رونویسی');
     expect(fa.transcribe.modelLabel).toBe('مدل رونویسی');
     expect(fa.transcribe.browseSystem).toBe('انتخاب');
-    expect(fa.transcribe.selectFilePrompt).toContain('.mp4, .mkv, .mp3, .wav');
+    expect(fa.transcribe.selectFilePrompt).toBe('فایل صوتی یا ویدیویی را اینجا رها کنید');
     expect(fa.transcribe.clearMedia).toBe('پاک\u200cکردن');
     expect(fa.transcribe.deckTitle).toBe('تنظیمات رونویسی');
     expect(fa.transcribe.progressTranscribe).toBe('در حال تبدیل گفتار به متن...');

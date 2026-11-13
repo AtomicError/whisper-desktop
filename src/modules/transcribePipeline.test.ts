@@ -340,7 +340,10 @@ describe('transcribePipeline module', () => {
       expect(metaType.textContent).toBe('-');
     });
 
-    it('resets meta-type-text, meta-type-icon, and meta-duration-text when clearing media', () => {
+    it('resets meta-type-text, transcribe-media-icon, and meta-duration-text when clearing media', () => {
+      const mediaIcon = new MockElement('SVG');
+      mediaIcon.id = 'transcribe-media-icon';
+      mediaIcon.innerHTML = '<path d="audio-icon"/>';
       const typeIcon = new MockElement('SVG');
       typeIcon.id = 'meta-type-icon';
       typeIcon.innerHTML = '<path d="audio-icon"/>';
@@ -354,6 +357,7 @@ describe('transcribePipeline module', () => {
       durText.id = 'meta-duration-text';
       durText.textContent = '1 min';
 
+      domMap.set(mediaIcon.id, mediaIcon);
       domMap.set(typeIcon.id, typeIcon);
       domMap.set(typeText.id, typeText);
       domMap.set(durEl.id, durEl);
@@ -362,6 +366,7 @@ describe('transcribePipeline module', () => {
       clearSingleMediaFile();
 
       expect(typeText.textContent).toBe('-');
+      expect(mediaIcon.innerHTML).toContain('<rect');
       expect(typeIcon.innerHTML).toContain('<rect');
       expect(durText.textContent).toBe('-');
       expect(durEl.title).toBe('');
@@ -462,6 +467,8 @@ describe('transcribePipeline module', () => {
     });
 
     it('renders format text and SVG Lucide icons into sub-elements when present', () => {
+      const mediaIcon = new MockElement('SVG');
+      mediaIcon.id = 'transcribe-media-icon';
       const typeEl = new MockElement('SPAN');
       typeEl.id = 'meta-type';
       const typeText = new MockElement('SPAN');
@@ -473,6 +480,7 @@ describe('transcribePipeline module', () => {
       const durText = new MockElement('SPAN');
       durText.id = 'meta-duration-text';
 
+      domMap.set(mediaIcon.id, mediaIcon);
       domMap.set(typeEl.id, typeEl);
       domMap.set(typeText.id, typeText);
       domMap.set(typeIcon.id, typeIcon);
@@ -487,7 +495,7 @@ describe('transcribePipeline module', () => {
         durationSec: 3665
       });
       expect(typeText.textContent).toBe('Video');
-      expect(typeIcon.innerHTML).toContain('<rect');
+      expect(mediaIcon.innerHTML).toContain('<rect');
       expect(durText.textContent.length).toBeGreaterThan(0);
       expect(durEl.title).toContain('01:01:05');
 
@@ -499,7 +507,7 @@ describe('transcribePipeline module', () => {
         durationSec: 45
       });
       expect(typeText.textContent).toBe('Audio');
-      expect(typeIcon.innerHTML).toContain('<circle');
+      expect(mediaIcon.innerHTML).toContain('<circle');
       expect(durText.textContent.length).toBeGreaterThan(0);
       expect(durEl.title).toContain('00:00:45');
 
@@ -510,7 +518,7 @@ describe('transcribePipeline module', () => {
         durationSec: 0
       });
       expect(typeText.textContent).toBe('File');
-      expect(typeIcon.innerHTML).toContain('<polyline');
+      expect(mediaIcon.innerHTML).toContain('<polyline');
       expect(durText.textContent).toBe('-');
     });
   });

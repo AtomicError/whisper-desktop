@@ -176,7 +176,7 @@ export const zh: Translations = {
     wizardStep2: '媒体详细信息',
     wizardStep3: '执行转录',
     noFileLoaded: '尚未加载媒体文件',
-    selectFilePrompt: '拖拽音频或视频文件至此 (.mp4, .mkv, .mp3, .wav)',
+    selectFilePrompt: '拖拽音频或视频文件至此',
     browseSystem: '浏览选择',
     clearMedia: '清除',
     deckTitle: '转录设置',

@@ -176,7 +176,7 @@ export const tr: Translations = {
     wizardStep2: 'Medya Ayrıntıları',
     wizardStep3: 'Deşifreyi Başlat',
     noFileLoaded: 'Medya Dosyası Yüklenmedi',
-    selectFilePrompt: 'Ses veya video dosyasını sürükleyip bırakın (.mp4, .mkv, .mp3, .wav)',
+    selectFilePrompt: 'Ses veya video dosyasını sürükleyip bırakın',
     browseSystem: 'Gözat',
     clearMedia: 'Temizle',
     deckTitle: 'Döküm Kurulumu',

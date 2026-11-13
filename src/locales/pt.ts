@@ -176,7 +176,7 @@ export const pt: Translations = {
     wizardStep2: 'Detalhes da Mídia',
     wizardStep3: 'Executar Transcrição',
     noFileLoaded: 'Nenhum Arquivo Carregado',
-    selectFilePrompt: 'Arraste e solte áudio ou vídeo (.mp4, .mkv, .mp3, .wav)',
+    selectFilePrompt: 'Arraste e solte áudio ou vídeo',
     browseSystem: 'Procurar',
     clearMedia: 'Limpar',
     deckTitle: 'Configuração de Transcrição',

@@ -310,6 +310,10 @@ export function clearBatchQueue(): void {
       win.setWizardStepCompleted(3, false);
     }
 
+    const mediaIcon = document.getElementById('transcribe-media-icon');
+    if (mediaIcon) {
+      mediaIcon.innerHTML = '<rect width="20" height="20" x="2" y="2" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/>';
+    }
     const metaTypeIcon = document.getElementById('meta-type-icon');
     if (metaTypeIcon) {
       metaTypeIcon.innerHTML = '<rect width="20" height="20" x="2" y="2" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/>';

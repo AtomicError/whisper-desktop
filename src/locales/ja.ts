@@ -176,7 +176,7 @@ export const ja: Translations = {
     wizardStep2: 'メディアの詳細',
     wizardStep3: '文字起こしを実行',
     noFileLoaded: 'ファイルが読み込まれていません',
-    selectFilePrompt: '音声または動画ファイル (.mp4, .mkv, .mp3, .wav) をドロップ',
+    selectFilePrompt: '音声または動画ファイルをドロップ',
     browseSystem: '参照',
     clearMedia: 'クリア',
     deckTitle: '文字起こしセットアップ',

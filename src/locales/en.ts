@@ -174,7 +174,7 @@ export const en = {
     wizardStep2: 'Media Details',
     wizardStep3: 'Run Transcription',
     noFileLoaded: 'No Media File Loaded',
-    selectFilePrompt: 'Drag & drop audio or video (.mp4, .mkv, .mp3, .wav)',
+    selectFilePrompt: 'Drag & drop audio or video',
     browseSystem: 'Browse',
     clearMedia: 'Clear',
     deckTitle: 'Transcription Setup',

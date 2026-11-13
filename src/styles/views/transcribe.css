@@ -430,11 +430,12 @@
 /* 1. Smart Media Dropzone Card */
 #transcribe-drop-zone.transcribe-dropzone-card {
   border: 1.5px dashed rgba(255, 255, 255, 0.16);
-  border-radius: 10px;
+  border-radius: var(--radius-lg, 12px);
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  justify-content: center;
+  min-height: 68px;
   background: rgba(0, 0, 0, 0.2);
   text-align: start;
   cursor: pointer;
@@ -457,87 +458,90 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 14px;
   width: 100%;
 }
 
 .transcribe-dropzone-identity {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 14px;
   flex: 1;
   min-width: 0;
 }
 
 .transcribe-dropzone-card .transcribe-media-icon {
-  width: 22px;
-  height: 22px;
-  color: var(--color-royal-blue);
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  color: var(--color-cyan, #00d2ff);
   flex-shrink: 0;
-  transition: all 0.2s ease;
+  stroke-width: 1.8;
+  transition: color 0.2s ease, transform 0.2s ease;
 }
 
 .transcribe-media-titles {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  justify-content: center;
+  gap: 4px;
   flex: 1;
   min-width: 0;
 }
-
 .transcribe-dropzone-card .transcribe-media-name {
-  font-size: 0.88rem;
+  font-size: 0.92rem;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--text-primary, #fafafa);
   margin: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.25;
 }
 
 .transcribe-dropzone-card .transcribe-media-prompt {
-  font-size: 0.75rem;
-  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  color: var(--text-muted, #71717a);
   margin: 0;
-  width: 100%;
-  white-space: normal;
-  text-wrap: pretty;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
 }
 
 .transcribe-dropzone-card .transcribe-dropzone-actions {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
   flex-shrink: 0;
 }
 
 .transcribe-dropzone-card .btn-media-browse {
-  padding: 6px 14px;
-  font-size: 0.8rem;
+  padding: 0 12px;
+  font-size: 0.78rem;
   font-weight: 500;
-  border-radius: 6px;
-  height: 32px;
+  border-radius: var(--radius-sm, 6px);
+  height: 30px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
 .transcribe-dropzone-card .btn-clear-media {
-  padding: 0 10px;
-  font-size: 0.75rem;
+  padding: 0 12px;
+  font-size: 0.78rem;
   font-weight: 500;
-  border-radius: 6px;
-  height: 28px;
+  border-radius: var(--radius-sm, 6px);
+  height: 30px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: var(--color-text);
   transition: all 0.15s ease;
 }
-
 .transcribe-dropzone-card .btn-clear-media:hover {
   color: var(--danger, #ef4444);
-  border-color: rgba(239, 68, 68, 0.3);
+  border-color: rgba(239, 68, 68, 0.35);
   background: rgba(239, 68, 68, 0.08);
 }
 
@@ -554,10 +558,6 @@
   background: rgba(var(--color-royal-blue-rgb), 0.12);
 }
 
-#transcribe-drop-zone.transcribe-dropzone-card.has-file .transcribe-media-icon {
-  color: var(--color-cyan);
-}
-
 #transcribe-drop-zone.transcribe-dropzone-card.has-file .transcribe-media-prompt {
   display: none !important;
 }
@@ -567,52 +567,45 @@
 }
 
 #transcribe-drop-zone.transcribe-dropzone-card.has-file .btn-media-browse {
-  height: 28px;
-  padding: 0 10px;
-  font-size: 0.75rem;
+  height: 30px;
+  padding: 0 12px;
 }
 
-/* Embedded metadata badges row */
+/* Embedded metadata row (Clean inline text under filename) */
 .transcribe-meta-badges-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
-  width: 100%;
-  padding-top: 10px;
-  margin-top: 2px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  width: auto;
+  padding: 0;
+  margin: 0;
+  border: none;
+  line-height: 1.3;
 }
 
 .transcribe-meta-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 25px;
-  padding: 0 10px;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   font-weight: 500;
-  border-radius: var(--radius-sm, 6px);
+  color: var(--text-secondary, #a1a1aa);
+  background: none;
+  border: none;
+  padding: 0;
+  height: auto;
   white-space: nowrap;
   unicode-bidi: isolate;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.08));
-  color: var(--text-primary, #fafafa);
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
   font-variant-numeric: tabular-nums;
   user-select: none;
-  -webkit-user-select: none;
   cursor: default;
 }
 
-.transcribe-meta-badge .meta-badge-icon {
-  width: 13px;
-  height: 13px;
-  flex-shrink: 0;
-  stroke-width: 2;
-  color: var(--text-secondary, #a1a1aa);
+.transcribe-meta-bullet {
+  font-size: 0.65rem;
+  color: var(--text-muted, #71717a);
+  user-select: none;
+  line-height: 1;
 }
 
 .transcribe-meta-badge strong {
@@ -620,20 +613,17 @@
   color: var(--text-primary, #fafafa);
 }
 
-/* Batch Specs Badges Row (Embedded inside Dropzone Card) */
+/* Batch Specs Row */
 .transcribe-dropzone-card .batch-specs-box {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
-  width: 100%;
-  padding-top: 10px;
+  gap: 6px;
+  width: auto;
+  padding: 0;
   margin: 0;
   background: transparent;
   border: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 0;
-  box-shadow: none;
 }
 
 .batch-badge-mode {
