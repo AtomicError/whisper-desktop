@@ -310,15 +310,25 @@ export function clearBatchQueue(): void {
       win.setWizardStepCompleted(3, false);
     }
 
-    const metaType = document.getElementById('meta-type');
-    if (metaType) metaType.textContent = '-';
-    const metaSize = document.getElementById('meta-size');
-    if (metaSize) metaSize.textContent = '-';
-    const durEl = document.getElementById('meta-duration');
-    if (durEl) {
-      durEl.textContent = '-';
-      durEl.removeAttribute('title');
+    const metaTypeIcon = document.getElementById('meta-type-icon');
+    if (metaTypeIcon) {
+      metaTypeIcon.innerHTML = '<rect width="20" height="20" x="2" y="2" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/>';
     }
+    const metaTypeText = document.getElementById('meta-type-text');
+    if (metaTypeText) {
+      metaTypeText.textContent = '-';
+    } else {
+      const metaType = document.getElementById('meta-type');
+      if (metaType) metaType.textContent = '-';
+    }
+    const durEl = document.getElementById('meta-duration');
+    const durText = document.getElementById('meta-duration-text');
+    if (durText) {
+      durText.textContent = '-';
+    } else if (durEl) {
+      durEl.textContent = '-';
+    }
+    if (durEl) durEl.removeAttribute('title');
     win.probedMetadata = null;
 
     const fillBar = document.getElementById('progress-linear-fill');

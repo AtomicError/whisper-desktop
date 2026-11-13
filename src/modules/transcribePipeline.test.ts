@@ -87,6 +87,9 @@ class MockElement {
 
   removeAttribute(name: string) {
     this.attributes.delete(name);
+    if (name === 'title') {
+      this.title = '';
+    }
   }
 
   appendChild(child: MockElement) {
@@ -337,6 +340,33 @@ describe('transcribePipeline module', () => {
       expect(metaType.textContent).toBe('-');
     });
 
+    it('resets meta-type-text, meta-type-icon, and meta-duration-text when clearing media', () => {
+      const typeIcon = new MockElement('SVG');
+      typeIcon.id = 'meta-type-icon';
+      typeIcon.innerHTML = '<path d="audio-icon"/>';
+      const typeText = new MockElement('SPAN');
+      typeText.id = 'meta-type-text';
+      typeText.textContent = 'Audio';
+      const durEl = new MockElement('SPAN');
+      durEl.id = 'meta-duration';
+      durEl.title = 'Timecode: 00:01:00';
+      const durText = new MockElement('SPAN');
+      durText.id = 'meta-duration-text';
+      durText.textContent = '1 min';
+
+      domMap.set(typeIcon.id, typeIcon);
+      domMap.set(typeText.id, typeText);
+      domMap.set(durEl.id, durEl);
+      domMap.set(durText.id, durText);
+
+      clearSingleMediaFile();
+
+      expect(typeText.textContent).toBe('-');
+      expect(typeIcon.innerHTML).toContain('<rect');
+      expect(durText.textContent).toBe('-');
+      expect(durEl.title).toBe('');
+    });
+
     it('blocks clearing when transcription is actively running', () => {
       setSelectedMediaFile('/media/active.mp4');
       setIsTranscribing(true);
@@ -408,16 +438,13 @@ describe('transcribePipeline module', () => {
   });
 
   describe('Media Metadata Rendering', () => {
-    it('renders format, file size, and duration', () => {
+    it('renders format and duration cleanly without emoji', () => {
       const typeEl = new MockElement('SPAN');
       typeEl.id = 'meta-type';
-      const sizeEl = new MockElement('SPAN');
-      sizeEl.id = 'meta-size';
       const durEl = new MockElement('SPAN');
       durEl.id = 'meta-duration';
 
       domMap.set(typeEl.id, typeEl);
-      domMap.set(sizeEl.id, sizeEl);
       domMap.set(durEl.id, durEl);
 
       const meta = {
@@ -429,10 +456,62 @@ describe('transcribePipeline module', () => {
 
       renderMediaMetadata(meta);
 
-      expect(typeEl.textContent).toContain('🎥');
-      expect(sizeEl.textContent).toContain('MB');
+      expect(typeEl.textContent).toBe('Video');
       expect(durEl.textContent.length).toBeGreaterThan(0);
       expect(durEl.title).toContain('00:02:05');
+    });
+
+    it('renders format text and SVG Lucide icons into sub-elements when present', () => {
+      const typeEl = new MockElement('SPAN');
+      typeEl.id = 'meta-type';
+      const typeText = new MockElement('SPAN');
+      typeText.id = 'meta-type-text';
+      const typeIcon = new MockElement('SVG');
+      typeIcon.id = 'meta-type-icon';
+      const durEl = new MockElement('SPAN');
+      durEl.id = 'meta-duration';
+      const durText = new MockElement('SPAN');
+      durText.id = 'meta-duration-text';
+
+      domMap.set(typeEl.id, typeEl);
+      domMap.set(typeText.id, typeText);
+      domMap.set(typeIcon.id, typeIcon);
+      domMap.set(durEl.id, durEl);
+      domMap.set(durText.id, durText);
+
+      // Video test
+      renderMediaMetadata({
+        exists: true,
+        format: 'Video',
+        path: '/media/sample.mp4',
+        durationSec: 3665
+      });
+      expect(typeText.textContent).toBe('Video');
+      expect(typeIcon.innerHTML).toContain('<rect');
+      expect(durText.textContent.length).toBeGreaterThan(0);
+      expect(durEl.title).toContain('01:01:05');
+
+      // Audio test
+      renderMediaMetadata({
+        exists: true,
+        format: 'Audio',
+        path: '/media/sample.mp3',
+        durationSec: 45
+      });
+      expect(typeText.textContent).toBe('Audio');
+      expect(typeIcon.innerHTML).toContain('<circle');
+      expect(durText.textContent.length).toBeGreaterThan(0);
+      expect(durEl.title).toContain('00:00:45');
+
+      // Generic file test
+      renderMediaMetadata({
+        exists: true,
+        format: 'File',
+        durationSec: 0
+      });
+      expect(typeText.textContent).toBe('File');
+      expect(typeIcon.innerHTML).toContain('<polyline');
+      expect(durText.textContent).toBe('-');
     });
   });
 

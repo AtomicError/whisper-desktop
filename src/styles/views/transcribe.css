@@ -523,7 +523,7 @@
 }
 
 .transcribe-dropzone-card .btn-clear-media {
-  padding: 6px 10px;
+  padding: 0 10px;
   font-size: 0.75rem;
   font-weight: 500;
   border-radius: 6px;
@@ -531,13 +531,14 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-text-muted);
+  color: var(--color-text);
   transition: all 0.15s ease;
 }
 
 .transcribe-dropzone-card .btn-clear-media:hover {
-  color: #ef4444;
+  color: var(--danger, #ef4444);
   border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.08);
 }
 
 /* Loaded file state */
@@ -575,55 +576,48 @@
 .transcribe-meta-badges-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: wrap;
   width: 100%;
-  padding-top: 8px;
+  padding-top: 10px;
+  margin-top: 2px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .transcribe-meta-badge {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
+  height: 25px;
+  padding: 0 10px;
   font-size: 0.72rem;
-  font-weight: 600;
-  padding: 2.5px 8px;
-  border-radius: 5px;
+  font-weight: 500;
+  border-radius: var(--radius-sm, 6px);
   white-space: nowrap;
   unicode-bidi: isolate;
   background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border-glass);
-  color: var(--color-text-muted);
+  border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.08));
+  color: var(--text-primary, #fafafa);
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.transcribe-meta-badge.pill-type {
-  color: var(--color-cyan);
-  background: rgba(var(--color-cyan-rgb), 0.12);
-  border-color: rgba(var(--color-cyan-rgb), 0.25);
-}
-
-.transcribe-meta-badge.pill-duration {
-  color: var(--color-gold);
-  background: rgba(245, 158, 11, 0.12);
-  border-color: rgba(245, 158, 11, 0.25);
   font-variant-numeric: tabular-nums;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
 }
 
-.transcribe-meta-badge.pill-size {
-  color: var(--color-text);
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.12);
-  font-variant-numeric: tabular-nums;
+.transcribe-meta-badge .meta-badge-icon {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  stroke-width: 2;
+  color: var(--text-secondary, #a1a1aa);
 }
 
-.transcribe-meta-badge.pill-target {
-  color: var(--color-cyan);
-  background: rgba(var(--color-cyan-rgb), 0.12);
-  border-color: rgba(var(--color-cyan-rgb), 0.25);
-  font-variant-numeric: tabular-nums;
+.transcribe-meta-badge strong {
+  font-weight: 600;
+  color: var(--text-primary, #fafafa);
 }
 
 /* Batch Specs Badges Row (Embedded inside Dropzone Card) */
@@ -631,9 +625,9 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
   width: 100%;
-  padding-top: 8px;
+  padding-top: 10px;
   margin: 0;
   background: transparent;
   border: none;

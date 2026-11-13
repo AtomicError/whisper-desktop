@@ -65,8 +65,8 @@ describe('Transcription Studio Unified Deck DOM Structure', () => {
     expect(html).toContain('transcribe-meta-badges-row');
     expect(html).toContain('id="meta-type"');
     expect(html).toContain('id="meta-duration"');
-    expect(html).toContain('id="meta-size"');
-    expect(html).toContain('id="meta-target-format"');
+    expect(html).not.toContain('id="meta-size"');
+    expect(html).not.toContain('id="meta-target-format"');
     expect(html).not.toContain('id="meta-recommendation"');
   });
 
@@ -801,8 +801,8 @@ describe('Transcription Studio Output Directory & Workflow Logic', () => {
     // Badges in metadata row have localized title tags
     expect(htmlContent).toContain('id="meta-type" data-i18n-title="transcribe.fileType"');
     expect(htmlContent).toContain('id="meta-duration" data-i18n-title="transcribe.duration"');
-    expect(htmlContent).toContain('id="meta-size" data-i18n-title="transcribe.fileSize"');
-    expect(htmlContent).toContain('id="meta-target-format" data-i18n-title="transcribe.targetFormat"');
+    expect(htmlContent).not.toContain('id="meta-size"');
+    expect(htmlContent).not.toContain('id="meta-target-format"');
     expect(htmlContent).not.toContain('id="meta-recommendation"');
 
     // Controls have localized aria attributes

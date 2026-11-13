@@ -517,7 +517,7 @@ html[dir="rtl"] .transcript-card-time {
 
 html[dir="rtl"] .batch-card-duration,
 html[dir="rtl"] #batch-total-duration,
-html[dir="rtl"] .pill-duration strong {
+html[dir="rtl"] #meta-duration strong {
   unicode-bidi: isolate;
   text-align: end;
 }

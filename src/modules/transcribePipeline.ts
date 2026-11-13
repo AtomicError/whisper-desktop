@@ -277,15 +277,26 @@ export function clearSingleMediaFile(): void {
   const btnCancel = document.getElementById('btn-cancel-transcribe');
   if (btnCancel) btnCancel.style.display = 'none';
 
-  const typeEl = document.getElementById('meta-type');
-  if (typeEl) typeEl.textContent = '-';
-  const sizeEl = document.getElementById('meta-size');
-  if (sizeEl) sizeEl.textContent = '-';
-  const durEl = document.getElementById('meta-duration');
-  if (durEl) {
-    durEl.textContent = '-';
-    durEl.removeAttribute('title');
+  const typeIcon = document.getElementById('meta-type-icon');
+  if (typeIcon) {
+    typeIcon.innerHTML = '<rect width="20" height="20" x="2" y="2" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/>';
   }
+  const typeText = document.getElementById('meta-type-text');
+  if (typeText) {
+    typeText.textContent = '-';
+  } else {
+    const typeEl = document.getElementById('meta-type');
+    if (typeEl) typeEl.textContent = '-';
+  }
+
+  const durEl = document.getElementById('meta-duration');
+  const durText = document.getElementById('meta-duration-text');
+  if (durText) {
+    durText.textContent = '-';
+  } else if (durEl) {
+    durEl.textContent = '-';
+  }
+  if (durEl) durEl.removeAttribute('title');
 
   const currentSettings = getSettingsState();
   if (currentSettings) {
@@ -467,47 +478,37 @@ export function renderMediaMetadata(meta: any): void {
   if (typeof document === 'undefined' || !meta || !meta.exists) return;
 
   const typeEl = document.getElementById('meta-type');
-  const sizeEl = document.getElementById('meta-size');
+  const typeText = document.getElementById('meta-type-text');
+  const typeIcon = document.getElementById('meta-type-icon');
   const durEl = document.getElementById('meta-duration');
+  const durText = document.getElementById('meta-duration-text');
 
   const lang = getLanguage();
 
-  // 1. File Type (Localized with emoji)
-  if (typeEl) {
-    const rawFmt = meta.format || '';
-    if (rawFmt.includes('Video')) {
-      typeEl.textContent = `${t('transcribe.formatVideo')} 🎥`;
-    } else if (rawFmt.includes('Audio')) {
-      typeEl.textContent = `${t('transcribe.formatAudio')} 🎵`;
-    } else if (rawFmt.includes('File')) {
-      typeEl.textContent = `${t('transcribe.formatFile')} 📁`;
+  // 1. File Type (Localized without emoji, with SVG Lucide icon)
+  const rawFmt = meta.format || '';
+  const isVideo = rawFmt.includes('Video') || (meta.path && /\.(mp4|mkv|mov|avi|webm|flv|wmv|m4v)$/i.test(meta.path));
+  const isAudio = !isVideo && (rawFmt.includes('Audio') || (meta.path && /\.(mp3|wav|m4a|aac|ogg|flac|wma|opus)$/i.test(meta.path)));
+  const localizedType = isVideo ? t('transcribe.formatVideo') : isAudio ? t('transcribe.formatAudio') : (rawFmt.includes('File') ? t('transcribe.formatFile') : (rawFmt || '-'));
+
+  if (typeText) {
+    typeText.textContent = localizedType;
+  } else if (typeEl) {
+    typeEl.textContent = localizedType;
+  }
+
+  if (typeIcon) {
+    if (isVideo) {
+      typeIcon.innerHTML = '<rect width="20" height="20" x="2" y="2" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/>';
+    } else if (isAudio) {
+      typeIcon.innerHTML = '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>';
     } else {
-      typeEl.textContent = rawFmt || '-';
+      typeIcon.innerHTML = '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>';
     }
   }
 
-  // 2. File Size (Properly isolated RTL/LTR numbers and localized units)
-  if (sizeEl) {
-    const rawSize = meta.size || '';
-    const match = rawSize.match(/([\d.]+)\s*([A-Za-z]+)?/);
-    if (match) {
-      const num = parseFloat(match[1]);
-      const unitKey = (match[2] || 'MB').toUpperCase();
-      let localizedUnit = unitKey;
-      if (unitKey === 'GB') localizedUnit = t('transcribe.unitGB');
-      else if (unitKey === 'MB') localizedUnit = t('transcribe.unitMB');
-      else if (unitKey === 'KB') localizedUnit = t('transcribe.unitKB');
-      else if (unitKey === 'B') localizedUnit = t('transcribe.unitB');
-
-      const formattedNum = formatLocalizedNumber(num, lang, 1);
-      sizeEl.textContent = `${formattedNum} ${localizedUnit}`;
-    } else {
-      sizeEl.textContent = rawSize || '-';
-    }
-  }
-
-  // 3. Duration (Human conversational localized format + digital timecode tooltip)
-  if (durEl) {
+  // 2. Duration (Human conversational localized format + digital timecode tooltip)
+  if (durText || durEl) {
     const dur = Math.round(meta.durationSec || 0);
     const hours = Math.floor(dur / 3600);
     const minutes = Math.floor((dur % 3600) / 60);
@@ -515,8 +516,9 @@ export function renderMediaMetadata(meta: any): void {
     const digitalTimecode = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 
     if (dur <= 0) {
-      durEl.textContent = '-';
-      durEl.removeAttribute('title');
+      if (durText) durText.textContent = '-';
+      else if (durEl) durEl.textContent = '-';
+      if (durEl) durEl.removeAttribute('title');
     } else {
       const hStr = formatLocalizedNumber(hours, lang, 0);
       const mStr = formatLocalizedNumber(minutes, lang, 0);
@@ -540,8 +542,11 @@ export function renderMediaMetadata(meta: any): void {
       } else {
         text = t('transcribe.durationSeconds', { seconds: sStr });
       }
-      durEl.textContent = text;
-      durEl.title = t('transcribe.timecodeTooltip', { timecode: digitalTimecode });
+
+      if (durText) durText.textContent = text;
+      else if (durEl) durEl.textContent = text;
+
+      if (durEl) durEl.title = t('transcribe.timecodeTooltip', { timecode: digitalTimecode });
     }
   }
 }

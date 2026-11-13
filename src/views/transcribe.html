@@ -67,16 +67,44 @@
 
                       <!-- Loaded file metadata badges row (Single-file) -->
                       <div class="transcribe-meta-badges-row" id="media-meta-box" style="display:none;">
-                        <span class="transcribe-meta-badge pill-type" id="meta-type" data-i18n-title="transcribe.fileType" title="File Type">-</span>
-                        <span class="transcribe-meta-badge pill-duration" id="meta-duration" data-i18n-title="transcribe.duration" title="Duration">-</span>
-                        <span class="transcribe-meta-badge pill-size" id="meta-size" data-i18n-title="transcribe.fileSize" title="File Size">-</span>
-                        <span class="transcribe-meta-badge pill-target" id="meta-target-format" data-i18n-title="transcribe.targetFormat" title="Target Format" data-i18n="transcribe.targetFormatVal">16kHz Mono Target</span>
+                        <span class="transcribe-meta-badge" id="meta-type" data-i18n-title="transcribe.fileType" title="File Type">
+                          <svg class="meta-badge-icon" id="meta-type-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <rect width="20" height="20" x="2" y="2" rx="2.18" ry="2.18"/>
+                            <line x1="7" y1="2" x2="7" y2="22"/>
+                            <line x1="17" y1="2" x2="17" y2="22"/>
+                            <line x1="2" y1="12" x2="22" y2="12"/>
+                            <line x1="2" y1="7" x2="7" y2="7"/>
+                            <line x1="2" y1="17" x2="7" y2="17"/>
+                            <line x1="17" y1="17" x2="22" y2="17"/>
+                            <line x1="17" y1="7" x2="22" y2="7"/>
+                          </svg>
+                          <span id="meta-type-text">-</span>
+                        </span>
+                        <span class="transcribe-meta-badge" id="meta-duration" data-i18n-title="transcribe.duration" title="Duration">
+                          <svg class="meta-badge-icon" id="meta-duration-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <circle cx="12" cy="12" r="10"/>
+                            <polyline points="12 6 12 12 16 14"/>
+                          </svg>
+                          <span id="meta-duration-text">-</span>
+                        </span>
                       </div>
 
                       <!-- Batch Spec Badges Row (Embedded inside Dropzone Card when batch mode active) -->
                       <div class="transcribe-meta-badges-row batch-specs-box" id="batch-specs-box" style="display:none;">
-                        <span class="transcribe-meta-badge pill-size"><strong id="batch-files-count">0</strong>&nbsp;<span data-i18n="transcribe.batchFilesUnit">Files</span></span>
-                        <span class="transcribe-meta-badge pill-duration"><span data-i18n="transcribe.batchTotalDuration">Total Duration:</span>&nbsp;<strong id="batch-total-duration">--:--:--</strong></span>
+                        <span class="transcribe-meta-badge">
+                          <svg class="meta-badge-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                          </svg>
+                          <span><strong id="batch-files-count">0</strong>&nbsp;<span data-i18n="transcribe.batchFilesUnit">Files</span></span>
+                        </span>
+                        <span class="transcribe-meta-badge">
+                          <svg class="meta-badge-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <circle cx="12" cy="12" r="10"/>
+                            <polyline points="12 6 12 12 16 14"/>
+                          </svg>
+                          <span><span data-i18n="transcribe.batchTotalDuration">Total Duration:</span>&nbsp;<strong id="batch-total-duration">--:--:--</strong></span>
+                        </span>
                       </div>
                     </div>
 
