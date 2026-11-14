@@ -883,6 +883,84 @@ function renderBatchQueueTable(): void {
   });
 }
 
+function cleanupBatchExtractionState(
+  cancelBtn: HTMLButtonElement | null,
+  sortSelect: HTMLSelectElement | null,
+  clearBtn: HTMLButtonElement | null
+): void {
+  isBatchExtracting = false;
+  batchCancelActive = false;
+  batchProcessingIndex = -1;
+
+  const win = getGlobal();
+  if (win) {
+    try {
+      win.isBatchExtracting = false;
+      win.batchProcessingIndex = -1;
+    } catch (_) {}
+    if (typeof win.updateTranscribeActionButtons === 'function') {
+      try {
+        win.updateTranscribeActionButtons(false);
+      } catch (_) {}
+    }
+    if (typeof win.updateTranscribeWorkflowButtons === 'function') {
+      try {
+        win.updateTranscribeWorkflowButtons();
+      } catch (_) {}
+    }
+  }
+
+  const activeCancelBtn = cancelBtn || (typeof document !== 'undefined' ? (document.getElementById('btn-cancel-batch') as HTMLButtonElement | null) : null);
+  if (activeCancelBtn) {
+    try {
+      activeCancelBtn.disabled = false;
+      const cancelSpan = activeCancelBtn.querySelector('span');
+      if (cancelSpan) {
+        cancelSpan.setAttribute('data-i18n', 'transcribe.cancelBatch');
+        cancelSpan.textContent = t('transcribe.cancelBatch');
+      } else {
+        activeCancelBtn.textContent = t('transcribe.cancelBatch');
+      }
+      activeCancelBtn.style.display = 'none';
+    } catch (_) {}
+  }
+
+  const activeSortSelect = sortSelect || (typeof document !== 'undefined' ? (document.getElementById('batch-sort-select') as HTMLSelectElement | null) : null);
+  if (activeSortSelect) {
+    try {
+      activeSortSelect.disabled = false;
+    } catch (_) {}
+  }
+
+  const activeClearBtn = clearBtn || (typeof document !== 'undefined' ? (document.getElementById('btn-clear-batch') as HTMLButtonElement | null) : null);
+  if (activeClearBtn) {
+    try {
+      activeClearBtn.disabled = false;
+    } catch (_) {}
+  }
+
+  try {
+    const fillBar = typeof document !== 'undefined' ? document.getElementById('progress-linear-fill') : null;
+    if (fillBar) fillBar.classList.remove('indeterminate');
+  } catch (_) {}
+
+  try {
+    const pulseDot = typeof document !== 'undefined' ? document.getElementById('hud-pulse-dot') : null;
+    if (pulseDot) pulseDot.classList.remove('active');
+  } catch (_) {}
+
+  try {
+    const btnCopy = typeof document !== 'undefined' ? (document.getElementById('btn-copy-transcript') as HTMLButtonElement | null) : null;
+    if (btnCopy && transcriptLines.length === 0) {
+      btnCopy.disabled = true;
+    }
+  } catch (_) {}
+
+  try {
+    renderBatchQueueTable();
+  } catch (_) {}
+}
+
 export async function runBatchExtraction(): Promise<void> {
   const win = getGlobal();
   // Concurrency guard: Mutual exclusion with single-file pipeline without direct circular import
@@ -933,83 +1011,89 @@ export async function runBatchExtraction(): Promise<void> {
   const clearBtn = document.getElementById('btn-clear-batch') as HTMLButtonElement | null;
 
   isBatchExtracting = true;
-  if (typeof window.updateTranscribeActionButtons === 'function') {
-    window.updateTranscribeActionButtons(true);
-  }
-  if (sortSelect) sortSelect.disabled = true;
-  if (clearBtn) clearBtn.disabled = true;
-
-  if (cancelBtn) {
-    cancelBtn.style.display = 'inline-flex';
-    cancelBtn.disabled = false;
-    if (cancelBtnSpan) {
-      cancelBtnSpan.setAttribute('data-i18n', 'transcribe.cancelBatch');
-      cancelBtnSpan.textContent = t('transcribe.cancelBatch');
-    } else {
-      cancelBtn.textContent = t('transcribe.cancelBatch');
-    }
-  }
-
-  batchCancelActive = false;
-  if (typeof win.pauseCompanionPlayer === 'function') {
+  if (win) {
     try {
-      win.pauseCompanionPlayer();
+      win.isBatchExtracting = true;
     } catch (_) {}
   }
-  const telemetryCard = document.getElementById('telemetry-hud-card');
-  if (telemetryCard) telemetryCard.style.display = 'block';
-  if (typeof win.setTranscribeStatusBadge === 'function') {
-    win.setTranscribeStatusBadge('active', 'transcribe.batchRunning');
-  }
-  const metricsEl = document.getElementById('transcribe-metrics');
-  if (metricsEl) metricsEl.style.display = 'none';
-
-  batchProcessingIndex = -1;
-  userExplicitlySelectedBatchItem = false;
-  window.lastTranscribedSubtitlePath = null;
-  window.lastTranscribedOutputDir = null;
-  window.lastTranscribedVideoPath = null;
-  window.lastTranscribedOutputFiles = [];
-  transcriptLines = [];
-  transcriptViewer.lines = [];
-  if (win) win.transcriptLines = [];
-  activeBatchViewerIndex = 0; // Follow first item initially
-
-  batchItems.forEach(item => {
-    item.transcriptLines = [];
-    item.outputs = [];
-    item.outputFiles = [];
-    item.subtitlePath = null;
-    item.txtPath = null;
-    item.timeSec = 0;
-    item.speedFactor = 0.0;
-  });
-
-  if (typeof window.updateTranscribeWorkflowButtons === 'function') {
-    window.updateTranscribeWorkflowButtons();
-  }
-  renderBatchQueueTable();
-
-  if (typeof document !== 'undefined') {
-    const initialViewport = document.getElementById('transcript-viewport');
-    if (initialViewport) {
-      initialViewport.innerHTML = `
-        <div id="transcript-placeholder" class="transcript-initializing-state">
-          <div class="transcript-spinner"></div>
-          <div class="transcript-initializing-text" data-i18n="transcribe.aiModelInitializing">${escapeHTML(t('transcribe.aiModelInitializing'))}</div>
-        </div>
-      `;
+  try {
+    if (typeof window !== 'undefined' && typeof window.updateTranscribeActionButtons === 'function') {
+      window.updateTranscribeActionButtons(true);
     }
-  }
+    if (sortSelect) sortSelect.disabled = true;
+    if (clearBtn) clearBtn.disabled = true;
 
-  const fillBar = document.getElementById('progress-linear-fill');
-  const pctEl = document.getElementById('lbl-radial-pct');
-  const msgEl = document.getElementById('lbl-radial-msg') as HTMLElement | null;
+    if (cancelBtn) {
+      cancelBtn.style.display = 'inline-flex';
+      cancelBtn.disabled = false;
+      if (cancelBtnSpan) {
+        cancelBtnSpan.setAttribute('data-i18n', 'transcribe.cancelBatch');
+        cancelBtnSpan.textContent = t('transcribe.cancelBatch');
+      } else {
+        cancelBtn.textContent = t('transcribe.cancelBatch');
+      }
+    }
 
-  let successCount = 0;
-  const totalCount = batchItems.length;
+    batchCancelActive = false;
+    if (typeof win.pauseCompanionPlayer === 'function') {
+      try {
+        win.pauseCompanionPlayer();
+      } catch (_) {}
+    }
+    const telemetryCard = document.getElementById('telemetry-hud-card');
+    if (telemetryCard) telemetryCard.style.display = 'block';
+    if (typeof win.setTranscribeStatusBadge === 'function') {
+      win.setTranscribeStatusBadge('active', 'transcribe.batchRunning');
+    }
+    const metricsEl = document.getElementById('transcribe-metrics');
+    if (metricsEl) metricsEl.style.display = 'none';
 
-  for (let i = 0; i < totalCount; i++) {
+    batchProcessingIndex = -1;
+    userExplicitlySelectedBatchItem = false;
+    window.lastTranscribedSubtitlePath = null;
+    window.lastTranscribedOutputDir = null;
+    window.lastTranscribedVideoPath = null;
+    window.lastTranscribedOutputFiles = [];
+    transcriptLines = [];
+    transcriptViewer.lines = [];
+    if (win) win.transcriptLines = [];
+    activeBatchViewerIndex = 0; // Follow first item initially
+
+    batchItems.forEach(item => {
+      item.transcriptLines = [];
+      item.outputs = [];
+      item.outputFiles = [];
+      item.subtitlePath = null;
+      item.txtPath = null;
+      item.timeSec = 0;
+      item.speedFactor = 0.0;
+    });
+
+    if (typeof window !== 'undefined' && typeof window.updateTranscribeWorkflowButtons === 'function') {
+      window.updateTranscribeWorkflowButtons();
+    }
+    renderBatchQueueTable();
+
+    if (typeof document !== 'undefined') {
+      const initialViewport = document.getElementById('transcript-viewport');
+      if (initialViewport) {
+        initialViewport.innerHTML = `
+          <div id="transcript-placeholder" class="transcript-initializing-state">
+            <div class="transcript-spinner"></div>
+            <div class="transcript-initializing-text" data-i18n="transcribe.aiModelInitializing">${escapeHTML(t('transcribe.aiModelInitializing'))}</div>
+          </div>
+        `;
+      }
+    }
+
+    const fillBar = document.getElementById('progress-linear-fill');
+    const pctEl = document.getElementById('lbl-radial-pct');
+    const msgEl = document.getElementById('lbl-radial-msg') as HTMLElement | null;
+
+    let successCount = 0;
+    const totalCount = batchItems.length;
+
+    for (let i = 0; i < totalCount; i++) {
     batchProcessingIndex = i;
     if (batchCancelActive) {
       batchItems[i].status = 'aborted';
@@ -1053,7 +1137,7 @@ export async function runBatchExtraction(): Promise<void> {
         transcriptViewer.lines = [];
         if (win) win.transcriptLines = [];
         window.lastTranscribedSubtitlePath = null;
-        if (typeof window.updateTranscribeWorkflowButtons === 'function') {
+        if (typeof window !== 'undefined' && typeof window.updateTranscribeWorkflowButtons === 'function') {
           window.updateTranscribeWorkflowButtons();
         }
         if (typeof document !== 'undefined') {
@@ -1157,7 +1241,7 @@ export async function runBatchExtraction(): Promise<void> {
         window.lastTranscribedSubtitlePath = item.subtitlePath;
         window.lastTranscribedVideoPath = item.path;
         window.lastTranscribedOutputFiles = item.outputFiles;
-        if (typeof window.updateTranscribeWorkflowButtons === 'function') {
+        if (typeof window !== 'undefined' && typeof window.updateTranscribeWorkflowButtons === 'function') {
           window.updateTranscribeWorkflowButtons();
         }
       }
@@ -1184,94 +1268,177 @@ export async function runBatchExtraction(): Promise<void> {
     }
   }
 
-  const wasCancelled = batchCancelActive;
-  isBatchExtracting = false;
-  batchCancelActive = false;
-  batchProcessingIndex = -1;
-  if (typeof window.updateTranscribeActionButtons === 'function') {
-    window.updateTranscribeActionButtons(false);
-  }
-  if (cancelBtn) {
-    cancelBtn.disabled = false;
-    const cancelSpan = cancelBtn.querySelector('span');
-    if (cancelSpan) {
-      cancelSpan.setAttribute('data-i18n', 'transcribe.cancelBatch');
-      cancelSpan.textContent = t('transcribe.cancelBatch');
+    const wasCancelled = batchCancelActive;
+
+    if (wasCancelled) {
+      if (telemetryCard) telemetryCard.style.display = 'none';
+      if (fillBar) fillBar.style.width = '0%';
+      if (pctEl) pctEl.textContent = '0%';
+      if (metricsEl) metricsEl.style.display = 'none';
+      if (msgEl) {
+        delete (msgEl.dataset as any).batchSummarySuccess;
+        delete (msgEl.dataset as any).batchSummaryTotal;
+        delete (msgEl.dataset as any).statusCompleted;
+        msgEl.setAttribute('data-i18n', 'transcribe.standingBy');
+        msgEl.textContent = t('transcribe.standingBy');
+      }
+      if (typeof win.setTranscribeStatusBadge === 'function') {
+        win.setTranscribeStatusBadge('', 'transcribe.standingBy');
+      }
+      if (typeof win.showNotification === 'function') {
+        win.showNotification(t('toasts.batchCancelled'), "info");
+      }
     } else {
-      cancelBtn.textContent = t('transcribe.cancelBatch');
+      if (fillBar) fillBar.style.width = '100%';
+      if (pctEl) {
+        pctEl.removeAttribute('data-i18n');
+        pctEl.textContent = '100%';
+      }
+      if (msgEl) {
+        msgEl.removeAttribute('data-i18n');
+        msgEl.textContent = t('transcribe.batchCompletedSummary', { success: successCount, total: totalCount });
+        msgEl.dataset.batchSummarySuccess = String(successCount);
+        msgEl.dataset.batchSummaryTotal = String(totalCount);
+      }
+      if (typeof win.showNotification === 'function') {
+        win.showNotification(t('toasts.batchComplete', { success: successCount, total: totalCount }), "success");
+      }
+      if (typeof win.setTranscribeStatusBadge === 'function') {
+        win.setTranscribeStatusBadge('complete', 'transcribe.statusComplete');
+      }
     }
-    cancelBtn.style.display = 'none';
-  }
-  if (sortSelect) sortSelect.disabled = false;
-  if (clearBtn) clearBtn.disabled = false;
 
-  if (wasCancelled) {
-    if (telemetryCard) telemetryCard.style.display = 'none';
-    if (fillBar) fillBar.style.width = '0%';
-    if (pctEl) pctEl.textContent = '0%';
-    if (metricsEl) metricsEl.style.display = 'none';
-    if (msgEl) {
-      delete (msgEl.dataset as any).batchSummarySuccess;
-      delete (msgEl.dataset as any).batchSummaryTotal;
-      delete (msgEl.dataset as any).statusCompleted;
-      msgEl.setAttribute('data-i18n', 'transcribe.standingBy');
-      msgEl.textContent = t('transcribe.standingBy');
+    let latestCompletedIdx = -1;
+    for (let k = batchItems.length - 1; k >= 0; k--) {
+      if (batchItems[k].status === 'completed') {
+        latestCompletedIdx = k;
+        break;
+      }
     }
-    if (typeof win.setTranscribeStatusBadge === 'function') {
-      win.setTranscribeStatusBadge('', 'transcribe.standingBy');
-    }
-    if (typeof win.showNotification === 'function') {
-      win.showNotification(t('toasts.batchCancelled'), "info");
-    }
-  } else {
-    if (fillBar) fillBar.style.width = '100%';
-    if (pctEl) {
-      pctEl.removeAttribute('data-i18n');
-      pctEl.textContent = '100%';
-    }
-    if (msgEl) {
-      msgEl.removeAttribute('data-i18n');
-      msgEl.textContent = t('transcribe.batchCompletedSummary', { success: successCount, total: totalCount });
-      msgEl.dataset.batchSummarySuccess = String(successCount);
-      msgEl.dataset.batchSummaryTotal = String(totalCount);
-    }
-    if (typeof win.showNotification === 'function') {
-      win.showNotification(t('toasts.batchComplete', { success: successCount, total: totalCount }), "success");
-    }
-    if (typeof win.setTranscribeStatusBadge === 'function') {
-      win.setTranscribeStatusBadge('complete', 'transcribe.statusComplete');
-    }
-  }
 
-  let latestCompletedIdx = -1;
-  for (let k = batchItems.length - 1; k >= 0; k--) {
-    if (batchItems[k].status === 'completed') {
-      latestCompletedIdx = k;
-      break;
-    }
-  }
-
-  const isAlreadyViewingCompleted = activeBatchViewerIndex >= 0 &&
+    const isAlreadyViewingCompleted = activeBatchViewerIndex >= 0 &&
     batchItems[activeBatchViewerIndex] &&
     batchItems[activeBatchViewerIndex].status === 'completed';
 
-  if (!isAlreadyViewingCompleted && latestCompletedIdx !== -1 && typeof window.selectBatchItemTranscript === 'function') {
-    await window.selectBatchItemTranscript(latestCompletedIdx);
-  } else {
-    if (isAlreadyViewingCompleted) {
-      const viewedItem = batchItems[activeBatchViewerIndex];
-      window.lastTranscribedOutputDir = viewedItem.outputDir || getParentDir(viewedItem.path);
-      window.lastTranscribedSubtitlePath = viewedItem.subtitlePath || null;
-      window.lastTranscribedVideoPath = viewedItem.path;
-      window.lastTranscribedOutputFiles = viewedItem.outputFiles || [];
-    } else if (latestCompletedIdx === -1) {
-      activeBatchViewerIndex = -1;
-      transcriptLines = [];
-      transcriptViewer.lines = [];
-      if (win) win.transcriptLines = [];
+    if (!isAlreadyViewingCompleted && latestCompletedIdx !== -1 && typeof window.selectBatchItemTranscript === 'function') {
+      await window.selectBatchItemTranscript(latestCompletedIdx);
+    } else {
+      if (isAlreadyViewingCompleted) {
+        const viewedItem = batchItems[activeBatchViewerIndex];
+        window.lastTranscribedOutputDir = viewedItem.outputDir || getParentDir(viewedItem.path);
+        window.lastTranscribedSubtitlePath = viewedItem.subtitlePath || null;
+        window.lastTranscribedVideoPath = viewedItem.path;
+        window.lastTranscribedOutputFiles = viewedItem.outputFiles || [];
+      } else if (latestCompletedIdx === -1) {
+        activeBatchViewerIndex = -1;
+        transcriptLines = [];
+        transcriptViewer.lines = [];
+        if (win) win.transcriptLines = [];
+        if (typeof document !== 'undefined') {
+          const viewport = document.getElementById('transcript-viewport');
+          if (viewport) {
+            viewport.innerHTML = `
+              <div class="transcript-placeholder" id="transcript-placeholder">
+                <svg class="transcript-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="16" y1="13" x2="8" y2="13"></line>
+                  <line x1="16" y1="17" x2="8" y2="17"></line>
+                  <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+                <div class="transcript-empty-title" data-i18n="transcribe.liveViewerTitle">${escapeHTML(t('transcribe.liveViewerTitle') || 'Live Transcript Viewer')}</div>
+                <div class="transcript-empty-desc" data-i18n="transcribe.streamNotice">${escapeHTML(t('transcribe.streamNotice') || 'Start transcription to stream live text preview.')}</div>
+              </div>
+            `;
+          }
+        }
+      }
+      renderBatchQueueTable();
+      if (typeof window !== 'undefined' && typeof window.updateTranscribeWorkflowButtons === 'function') {
+        window.updateTranscribeWorkflowButtons();
+      }
+    }
+
+    renderBatchQueueTable();
+
+    const autoTransferEnabled = Boolean(settings?.autoTransferToTranslate ?? settings?.translateAiEnabled);
+    if (!wasCancelled && successCount > 0 && autoTransferEnabled && window.lastTranscribedSubtitlePath) {
+      if (typeof window.sendTranscribeToTranslationStudio === 'function') {
+        await window.sendTranscribeToTranslationStudio();
+      }
+    }
+
+    if (typeof win.setWizardStepCompleted === 'function') {
+      win.setWizardStepCompleted(3, !wasCancelled && successCount > 0);
+    }
+  } catch (outerErr: any) {
+    const errMsg = (typeof outerErr === 'string') ? outerErr : (outerErr?.message || (outerErr && outerErr.toString ? outerErr.toString() : ''));
+    console.error('Unhandled error during batch extraction:', outerErr);
+    const wasCancelled = batchCancelActive ||
+      errMsg.toLowerCase().includes('cancelled') ||
+      errMsg.toLowerCase().includes('aborted');
+
+    if (wasCancelled) {
+      batchItems.forEach(it => {
+        if (it.status === 'pending' || it.status === 'converting' || it.status === 'transcribing') {
+          it.status = 'aborted';
+        }
+      });
+    } else if (batchProcessingIndex >= 0 && batchProcessingIndex < batchItems.length) {
+      const activeItem = batchItems[batchProcessingIndex];
+      if (activeItem && (activeItem.status === 'converting' || activeItem.status === 'transcribing')) {
+        activeItem.status = 'failed';
+      }
+    }
+
+    try {
+      const telemetryCard = typeof document !== 'undefined' ? document.getElementById('telemetry-hud-card') : null;
+      const fillBar = typeof document !== 'undefined' ? document.getElementById('progress-linear-fill') : null;
+      const pctEl = typeof document !== 'undefined' ? document.getElementById('lbl-radial-pct') : null;
+      const metricsEl = typeof document !== 'undefined' ? document.getElementById('transcribe-metrics') : null;
+      const msgEl = typeof document !== 'undefined' ? (document.getElementById('lbl-radial-msg') as HTMLElement | null) : null;
+
+      if (wasCancelled) {
+        if (telemetryCard) telemetryCard.style.display = 'none';
+        if (fillBar) fillBar.style.width = '0%';
+        if (pctEl) pctEl.textContent = '0%';
+        if (metricsEl) metricsEl.style.display = 'none';
+        if (msgEl) {
+          delete (msgEl.dataset as any).batchSummarySuccess;
+          delete (msgEl.dataset as any).batchSummaryTotal;
+          delete (msgEl.dataset as any).statusCompleted;
+          if (typeof msgEl.setAttribute === 'function') {
+            msgEl.setAttribute('data-i18n', 'transcribe.standingBy');
+          }
+          msgEl.textContent = t('transcribe.standingBy');
+        }
+        if (typeof win.setTranscribeStatusBadge === 'function') {
+          win.setTranscribeStatusBadge('', 'transcribe.standingBy');
+        }
+        if (typeof win.showNotification === 'function') {
+          win.showNotification(t('toasts.batchCancelled'), "info");
+        }
+      } else {
+        if (typeof win.showNotification === 'function') {
+          win.showNotification(t('toasts.batchItemError', { name: 'Batch', error: errMsg || String(outerErr) }), "error");
+        }
+        if (typeof win.setTranscribeStatusBadge === 'function') {
+          win.setTranscribeStatusBadge('cancelled', 'transcribe.statusFailed');
+        }
+        if (msgEl) {
+          delete (msgEl.dataset as any).batchSummarySuccess;
+          delete (msgEl.dataset as any).batchSummaryTotal;
+          delete (msgEl.dataset as any).statusCompleted;
+          if (typeof msgEl.setAttribute === 'function') {
+            msgEl.setAttribute('data-i18n', 'transcribe.taskFailed');
+          }
+          msgEl.textContent = t('transcribe.taskFailed');
+        }
+      }
+
       if (typeof document !== 'undefined') {
         const viewport = document.getElementById('transcript-viewport');
-        if (viewport) {
+        if (viewport && viewport.querySelector('.transcript-initializing-state')) {
           viewport.innerHTML = `
             <div class="transcript-placeholder" id="transcript-placeholder">
               <svg class="transcript-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -1287,24 +1454,15 @@ export async function runBatchExtraction(): Promise<void> {
           `;
         }
       }
-    }
-    renderBatchQueueTable();
-    if (typeof window.updateTranscribeWorkflowButtons === 'function') {
-      window.updateTranscribeWorkflowButtons();
-    }
-  }
 
-  renderBatchQueueTable();
-
-  const autoTransferEnabled = Boolean(settings?.autoTransferToTranslate ?? settings?.translateAiEnabled);
-  if (!wasCancelled && successCount > 0 && autoTransferEnabled && window.lastTranscribedSubtitlePath) {
-    if (typeof window.sendTranscribeToTranslationStudio === 'function') {
-      await window.sendTranscribeToTranslationStudio();
+      if (typeof win.setWizardStepCompleted === 'function') {
+        win.setWizardStepCompleted(3, false);
+      }
+    } catch (hudErr) {
+      console.warn('Failed to update HUD on batch error:', hudErr);
     }
-  }
-
-  if (typeof win.setWizardStepCompleted === 'function') {
-    win.setWizardStepCompleted(3, !wasCancelled && successCount > 0);
+  } finally {
+    cleanupBatchExtractionState(cancelBtn, sortSelect, clearBtn);
   }
 }
 

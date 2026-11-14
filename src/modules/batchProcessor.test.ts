@@ -528,6 +528,290 @@ describe('batchProcessor module', () => {
       batchProcessor.setIsExtracting(false);
       expect(batchProcessor.getCancelActive()).toBe(false);
     });
+
+    it('guarantees finally block resets isBatchExtracting and re-enables UI controls when pre-loop setup throws', async () => {
+      // Arrange
+      batchProcessor.setIsBatchMode(true);
+      batchProcessor.setItems([
+        { path: '/preloop-error.mp4', name: 'preloop-error.mp4', status: 'pending' }
+      ]);
+      (window as any).settingsState = {
+        selectedBackend: 'Standard',
+        modelPath: '/model.bin'
+      };
+      (window as any).localScannedTransModels = ['/model.bin'];
+      (window as any).invoke = vi.fn().mockResolvedValue('ok');
+
+      let actionButtonsState: boolean | undefined;
+      (window as any).updateTranscribeActionButtons = vi.fn().mockImplementation((state: boolean) => {
+        actionButtonsState = state;
+      });
+
+      const cancelSpan = { setAttribute: vi.fn(), textContent: '' };
+      const cancelBtn = {
+        style: { display: 'none' },
+        disabled: false,
+        querySelector: vi.fn().mockReturnValue(cancelSpan)
+      };
+      const sortSelect = { disabled: false };
+      const clearBtn = { disabled: false };
+
+      const prevDoc = (globalThis as any).document;
+      (globalThis as any).document = {
+        getElementById: vi.fn().mockImplementation((id: string) => {
+          if (id === 'btn-cancel-batch') return cancelBtn;
+          if (id === 'batch-sort-select') return sortSelect;
+          if (id === 'btn-clear-batch') return clearBtn;
+          if (id === 'telemetry-hud-card') throw new Error('Simulated DOM access crash in pre-loop HUD setup');
+          return null;
+        })
+      };
+
+      try {
+        // Act
+        await runBatchExtraction();
+
+        // Assert
+        expect(batchProcessor.getIsExtracting()).toBe(false);
+        expect((window as any).isBatchExtracting).toBe(false);
+        expect(batchProcessor.getProcessingIndex()).toBe(-1);
+        expect(cancelBtn.style.display).toBe('none');
+        expect(sortSelect.disabled).toBe(false);
+        expect(clearBtn.disabled).toBe(false);
+        expect(actionButtonsState).toBe(false);
+      } finally {
+        (globalThis as any).document = prevDoc;
+      }
+    });
+
+    it('guarantees finally block resets isBatchExtracting when post-loop autoTransfer throws', async () => {
+      // Arrange
+      batchProcessor.setIsBatchMode(true);
+      batchProcessor.setItems([
+        { path: '/postloop-error.mp4', name: 'postloop-error.mp4', status: 'pending' }
+      ]);
+      (window as any).settingsState = {
+        selectedBackend: 'Standard',
+        modelPath: '/model.bin',
+        autoTransferToTranslate: true
+      };
+      (window as any).localScannedTransModels = ['/model.bin'];
+
+      const invokeMock = vi.fn().mockImplementation((cmd: string) => {
+        if (cmd === 'convert_media_file') return Promise.resolve('/postloop-error.wav');
+        if (cmd === 'start_transcription_task') {
+          return Promise.resolve({
+            outputDir: '/out',
+            generatedFiles: ['postloop-error.srt'],
+            durationMs: 1000,
+            speedFactor: 2.0
+          });
+        }
+        return Promise.resolve('ok');
+      });
+      (window as any).invoke = invokeMock;
+
+      (window as any).sendTranscribeToTranslationStudio = vi.fn().mockRejectedValue(
+        new Error('Unhandled network crash in translation studio transfer')
+      );
+
+      const cancelSpan = { setAttribute: vi.fn(), textContent: '' };
+      const cancelBtn = {
+        style: { display: 'none' },
+        disabled: false,
+        querySelector: vi.fn().mockReturnValue(cancelSpan)
+      };
+      const sortSelect = { disabled: false };
+      const clearBtn = { disabled: false };
+      const fillBar = { style: { width: '0%' }, classList: { remove: vi.fn() } };
+      const pctEl = { textContent: '0%', removeAttribute: vi.fn() };
+      const msgEl = { textContent: '', removeAttribute: vi.fn(), dataset: {} };
+
+      const prevDoc = (globalThis as any).document;
+      (globalThis as any).document = {
+        getElementById: vi.fn().mockImplementation((id: string) => {
+          if (id === 'btn-cancel-batch') return cancelBtn;
+          if (id === 'batch-sort-select') return sortSelect;
+          if (id === 'btn-clear-batch') return clearBtn;
+          if (id === 'progress-linear-fill') return fillBar;
+          if (id === 'lbl-radial-pct') return pctEl;
+          if (id === 'lbl-radial-msg') return msgEl;
+          return null;
+        })
+      };
+
+      try {
+        // Act
+        await runBatchExtraction();
+
+        // Assert
+        expect(batchProcessor.getIsExtracting()).toBe(false);
+        expect((window as any).isBatchExtracting).toBe(false);
+        expect(batchProcessor.getProcessingIndex()).toBe(-1);
+        expect(cancelBtn.style.display).toBe('none');
+        expect(sortSelect.disabled).toBe(false);
+        expect(clearBtn.disabled).toBe(false);
+      } finally {
+        (globalThis as any).document = prevDoc;
+      }
+    });
+
+    it('prevents permanent state lockup and permits immediate re-execution after an unhandled failure', async () => {
+      // Arrange
+      batchProcessor.setIsBatchMode(true);
+      batchProcessor.setItems([
+        { path: '/retry-test.mp4', name: 'retry-test.mp4', status: 'pending' }
+      ]);
+      (window as any).settingsState = {
+        selectedBackend: 'Standard',
+        modelPath: '/model.bin'
+      };
+      (window as any).localScannedTransModels = ['/model.bin'];
+
+      let shouldFail = true;
+      const invokeMock = vi.fn().mockImplementation((cmd: string) => {
+        if (cmd === 'convert_media_file') {
+          if (shouldFail) {
+            throw new Error('Fatal unhandled media convert crash');
+          }
+          return Promise.resolve('/retry-test.wav');
+        }
+        if (cmd === 'start_transcription_task') {
+          return Promise.resolve({
+            outputDir: '/out',
+            generatedFiles: ['retry-test.srt'],
+            durationMs: 1200,
+            speedFactor: 1.5
+          });
+        }
+        return Promise.resolve('ok');
+      });
+      (window as any).invoke = invokeMock;
+
+      const cancelSpan = { setAttribute: vi.fn(), textContent: '' };
+      const cancelBtn = {
+        style: { display: 'none' },
+        disabled: false,
+        querySelector: vi.fn().mockReturnValue(cancelSpan)
+      };
+      const sortSelect = { disabled: false };
+      const clearBtn = { disabled: false };
+      const fillBar = { style: { width: '0%' }, classList: { remove: vi.fn() } };
+      const pctEl = { textContent: '0%', removeAttribute: vi.fn() };
+      const msgEl = { textContent: '', removeAttribute: vi.fn(), dataset: {} };
+
+      const prevDoc = (globalThis as any).document;
+      (globalThis as any).document = {
+        getElementById: vi.fn().mockImplementation((id: string) => {
+          if (id === 'btn-cancel-batch') return cancelBtn;
+          if (id === 'batch-sort-select') return sortSelect;
+          if (id === 'btn-clear-batch') return clearBtn;
+          if (id === 'progress-linear-fill') return fillBar;
+          if (id === 'lbl-radial-pct') return pctEl;
+          if (id === 'lbl-radial-msg') return msgEl;
+          return null;
+        })
+      };
+
+      try {
+        // Act 1: Run with failure
+        await runBatchExtraction();
+
+        // Assert 1: Flag MUST NOT remain stuck at true
+        expect(batchProcessor.getIsExtracting()).toBe(false);
+        expect((window as any).isBatchExtracting).toBe(false);
+
+        // Act 2: Retry with successful backend
+        shouldFail = false;
+        batchProcessor.setItems([
+          { path: '/retry-test.mp4', name: 'retry-test.mp4', status: 'pending' }
+        ]);
+        await runBatchExtraction();
+
+        // Assert 2: Second run executed completely without being blocked
+        expect(batchProcessor.getItems()[0].status).toBe('completed');
+        expect(batchProcessor.getIsExtracting()).toBe(false);
+        expect(cancelBtn.style.display).toBe('none');
+      } finally {
+        (globalThis as any).document = prevDoc;
+      }
+    });
+
+    it('marks in-flight converting item as failed, clears pulse dot, and restores viewport on unhandled crash', async () => {
+      // Arrange
+      batchProcessor.setIsBatchMode(true);
+      batchProcessor.setItems([
+        { path: '/inflight-crash.mp4', name: 'inflight-crash.mp4', status: 'pending' },
+        { path: '/pending-next.mp4', name: 'pending-next.mp4', status: 'pending' }
+      ]);
+      (window as any).settingsState = {
+        selectedBackend: 'Standard',
+        modelPath: '/model.bin'
+      };
+      (window as any).localScannedTransModels = ['/model.bin'];
+
+      const cancelSpan = { setAttribute: vi.fn(), textContent: '' };
+      const cancelBtn = {
+        style: { display: 'none' },
+        disabled: false,
+        querySelector: vi.fn().mockReturnValue(cancelSpan)
+      };
+      const sortSelect = { disabled: false };
+      const clearBtn = { disabled: false };
+      let callCount = 0;
+      const fillBar = {
+        get style() {
+          callCount++;
+          if (callCount >= 1) {
+            throw new Error('Simulated DOM access crash during active item loop HUD update');
+          }
+          return { width: '0%' } as any;
+        },
+        classList: { remove: vi.fn() }
+      };
+      const pctEl = { textContent: '0%', removeAttribute: vi.fn() };
+      const msgEl = { textContent: '', removeAttribute: vi.fn(), dataset: {} };
+      const pulseDot = { classList: { add: vi.fn(), remove: vi.fn() } };
+      const viewport = {
+        innerHTML: '<div id="transcript-placeholder" class="transcript-initializing-state"><div class="transcript-spinner"></div></div>',
+        querySelector: vi.fn().mockImplementation((selector: string) => {
+          if (selector === '.transcript-initializing-state') return {};
+          return null;
+        })
+      };
+
+      const prevDoc = (globalThis as any).document;
+      (globalThis as any).document = {
+        getElementById: vi.fn().mockImplementation((id: string) => {
+          if (id === 'btn-cancel-batch') return cancelBtn;
+          if (id === 'batch-sort-select') return sortSelect;
+          if (id === 'btn-clear-batch') return clearBtn;
+          if (id === 'progress-linear-fill') return fillBar;
+          if (id === 'lbl-radial-pct') return pctEl;
+          if (id === 'lbl-radial-msg') return msgEl;
+          if (id === 'hud-pulse-dot') return pulseDot;
+          if (id === 'transcript-viewport') return viewport;
+          return null;
+        })
+      };
+
+      try {
+        // Act
+        await runBatchExtraction();
+
+        // Assert
+        expect(batchProcessor.getIsExtracting()).toBe(false);
+        expect((window as any).isBatchExtracting).toBe(false);
+        expect(batchProcessor.getProcessingIndex()).toBe(-1);
+        // Active item must NOT remain stuck in 'converting'
+        expect(batchProcessor.getItems()[0].status).toBe('failed');
+        expect(pulseDot.classList.remove).toHaveBeenCalledWith('active');
+        expect(viewport.innerHTML).toContain('transcript-placeholder');
+        expect(viewport.innerHTML).not.toContain('transcript-spinner');
+      } finally {
+        (globalThis as any).document = prevDoc;
+      }
+    });
   });
 
   describe('selectBatchItemTranscript', () => {
