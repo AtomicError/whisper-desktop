@@ -23,6 +23,7 @@ import {
   copyMainTranscriptToClipboard,
   openOutputFolder,
   getIsTranscriptionCancelActive,
+  MEDIA_ICON_SVGS,
   setIsTranscriptionCancelActive
 } from './transcribePipeline';
 import { batchProcessor } from './batchProcessor';
@@ -344,9 +345,6 @@ describe('transcribePipeline module', () => {
       const mediaIcon = new MockElement('SVG');
       mediaIcon.id = 'transcribe-media-icon';
       mediaIcon.innerHTML = '<path d="audio-icon"/>';
-      const typeIcon = new MockElement('SVG');
-      typeIcon.id = 'meta-type-icon';
-      typeIcon.innerHTML = '<path d="audio-icon"/>';
       const typeText = new MockElement('SPAN');
       typeText.id = 'meta-type-text';
       typeText.textContent = 'Audio';
@@ -358,7 +356,6 @@ describe('transcribePipeline module', () => {
       durText.textContent = '1 min';
 
       domMap.set(mediaIcon.id, mediaIcon);
-      domMap.set(typeIcon.id, typeIcon);
       domMap.set(typeText.id, typeText);
       domMap.set(durEl.id, durEl);
       domMap.set(durText.id, durText);
@@ -366,8 +363,7 @@ describe('transcribePipeline module', () => {
       clearSingleMediaFile();
 
       expect(typeText.textContent).toBe('-');
-      expect(mediaIcon.innerHTML).toContain('<rect');
-      expect(typeIcon.innerHTML).toContain('<rect');
+      expect(mediaIcon.innerHTML).toBe(MEDIA_ICON_SVGS.video);
       expect(durText.textContent).toBe('-');
       expect(durEl.title).toBe('');
     });
@@ -473,8 +469,6 @@ describe('transcribePipeline module', () => {
       typeEl.id = 'meta-type';
       const typeText = new MockElement('SPAN');
       typeText.id = 'meta-type-text';
-      const typeIcon = new MockElement('SVG');
-      typeIcon.id = 'meta-type-icon';
       const durEl = new MockElement('SPAN');
       durEl.id = 'meta-duration';
       const durText = new MockElement('SPAN');
@@ -483,7 +477,6 @@ describe('transcribePipeline module', () => {
       domMap.set(mediaIcon.id, mediaIcon);
       domMap.set(typeEl.id, typeEl);
       domMap.set(typeText.id, typeText);
-      domMap.set(typeIcon.id, typeIcon);
       domMap.set(durEl.id, durEl);
       domMap.set(durText.id, durText);
 
@@ -495,7 +488,7 @@ describe('transcribePipeline module', () => {
         durationSec: 3665
       });
       expect(typeText.textContent).toBe('Video');
-      expect(mediaIcon.innerHTML).toContain('<rect');
+      expect(mediaIcon.innerHTML).toBe(MEDIA_ICON_SVGS.video);
       expect(durText.textContent.length).toBeGreaterThan(0);
       expect(durEl.title).toContain('01:01:05');
 
@@ -507,7 +500,7 @@ describe('transcribePipeline module', () => {
         durationSec: 45
       });
       expect(typeText.textContent).toBe('Audio');
-      expect(mediaIcon.innerHTML).toContain('<circle');
+      expect(mediaIcon.innerHTML).toBe(MEDIA_ICON_SVGS.audio);
       expect(durText.textContent.length).toBeGreaterThan(0);
       expect(durEl.title).toContain('00:00:45');
 
@@ -518,7 +511,7 @@ describe('transcribePipeline module', () => {
         durationSec: 0
       });
       expect(typeText.textContent).toBe('File');
-      expect(mediaIcon.innerHTML).toContain('<polyline');
+      expect(mediaIcon.innerHTML).toBe(MEDIA_ICON_SVGS.file);
       expect(durText.textContent).toBe('-');
     });
   });

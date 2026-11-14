@@ -11,6 +11,7 @@ import {
   SettingsState
 } from './settingsManager';
 import type { ProbedMediaMetadata } from './transcribePipeline';
+import { MEDIA_ICON_SVGS } from './mediaIcons';
 
 if (typeof window === 'undefined') {
   (globalThis as any).window = globalThis;
@@ -312,11 +313,7 @@ export function clearBatchQueue(): void {
 
     const mediaIcon = document.getElementById('transcribe-media-icon');
     if (mediaIcon) {
-      mediaIcon.innerHTML = '<rect width="20" height="20" x="2" y="2" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/>';
-    }
-    const metaTypeIcon = document.getElementById('meta-type-icon');
-    if (metaTypeIcon) {
-      metaTypeIcon.innerHTML = '<rect width="20" height="20" x="2" y="2" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/>';
+      mediaIcon.innerHTML = MEDIA_ICON_SVGS.video;
     }
     const metaTypeText = document.getElementById('meta-type-text');
     if (metaTypeText) {
@@ -1473,6 +1470,10 @@ export async function addBatchFiles(files: string[]): Promise<boolean> {
 
     const metaBox = document.getElementById('media-meta-box');
     if (metaBox) metaBox.style.display = 'none';
+    const mediaIcon = document.getElementById('transcribe-media-icon');
+    if (mediaIcon) {
+      mediaIcon.innerHTML = MEDIA_ICON_SVGS.batch;
+    }
     const batchSpecsBox = document.getElementById('batch-specs-box');
     if (batchSpecsBox) batchSpecsBox.style.display = 'flex';
     const countEl = document.getElementById('batch-files-count');

@@ -563,7 +563,7 @@
 }
 
 #transcribe-drop-zone.transcribe-dropzone-card.has-file .transcribe-media-name {
-  text-align: left;
+  text-align: start;
 }
 
 #transcribe-drop-zone.transcribe-dropzone-card.has-file .btn-media-browse {
