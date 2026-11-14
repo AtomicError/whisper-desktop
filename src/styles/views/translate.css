@@ -64,15 +64,7 @@
 .translate-deck-title-group {
   display: flex;
   align-items: center;
-  gap: 8px;
   min-width: 0;
-}
-
-.translate-deck-icon {
-  width: 16px;
-  height: 16px;
-  color: var(--color-royal-blue);
-  flex-shrink: 0;
 }
 
 .translate-deck-title {

@@ -363,15 +363,7 @@
 .transcribe-deck-title-group {
   display: flex;
   align-items: center;
-  gap: 8px;
   min-width: 0;
-}
-
-.transcribe-deck-icon {
-  width: 16px;
-  height: 16px;
-  color: var(--color-cyan);
-  flex-shrink: 0;
 }
 
 .transcribe-deck-title {
