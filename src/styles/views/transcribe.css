@@ -474,7 +474,7 @@
   width: 28px;
   height: 28px;
   min-width: 28px;
-  color: var(--color-cyan, #00d2ff);
+  color: var(--color-royal-blue, #2d7fff);
   flex-shrink: 0;
   stroke-width: 1.8;
   transition: color 0.2s ease, transform 0.2s ease;

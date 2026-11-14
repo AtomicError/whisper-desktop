@@ -122,11 +122,12 @@
 /* 1. Smart Subtitle File Card */
 #translate-drop-zone.translate-dropzone-card {
   border: 1.5px dashed rgba(255, 255, 255, 0.16);
-  border-radius: 10px;
+  border-radius: var(--radius-lg, 12px);
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  justify-content: center;
+  min-height: 68px;
   background: rgba(0, 0, 0, 0.2);
   text-align: start;
   cursor: pointer;
@@ -153,89 +154,93 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 14px;
   width: 100%;
 }
 
 .translate-dropzone-identity {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 14px;
   flex: 1;
   min-width: 0;
 }
 
 .translate-dropzone-card .translate-sub-icon {
-  width: 22px;
-  height: 22px;
-  color: var(--color-royal-blue);
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  color: var(--color-royal-blue, #2d7fff);
   flex-shrink: 0;
-  transition: all 0.2s ease;
+  stroke-width: 1.8;
+  transition: color 0.2s ease, transform 0.2s ease;
 }
 
 .translate-sub-titles {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  justify-content: center;
+  gap: 4px;
   flex: 1;
   min-width: 0;
 }
 
 .translate-dropzone-card .translate-sub-name {
-  font-size: 0.88rem;
+  font-size: 0.92rem;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--text-primary, #fafafa);
   margin: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.25;
 }
 
-/* The empty-state prompt takes a line of the card rather than a place in the identity
-   column beside the icon (see the markup): that column is what the browse button leaves
-   of a 440px panel — 213px — and the sentence needs 251px in Persian, 223px in German
-   and 197px in English. Across the card it fits on one line in each of them. Two things
-   keep it honest when a translation does outgrow even that: it wraps instead of
-   eliding, because an ellipsis here was silently swallowing the end of an instruction
-   rather than the end of a file name, and `pretty` asks the engine to keep the last
-   line off a single word where it can (ignored where it is not understood). */
 .translate-dropzone-card .translate-sub-prompt {
-  font-size: 0.75rem;
-  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  color: var(--text-muted, #71717a);
   margin: 0;
-  /* A line of the card, not a chip in a centred column of items — `.media-drop-zone`
-     shrinks its children to their content, which would centre the hint in place. */
-  width: 100%;
-  white-space: normal;
-  text-wrap: pretty;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
 }
 
 .translate-dropzone-card .translate-dropzone-actions {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
   flex-shrink: 0;
 }
 
 .translate-dropzone-card .btn-sub-browse {
-  padding: 6px 14px;
-  font-size: 0.8rem;
+  padding: 0 12px;
+  font-size: 0.78rem;
   font-weight: 500;
-  border-radius: 6px;
-  height: 32px;
+  border-radius: var(--radius-sm, 6px);
+  height: 30px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
-.translate-dropzone-meta-row {
-  display: flex;
+.translate-dropzone-card .btn-clear-sub {
+  padding: 0 12px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  border-radius: var(--radius-sm, 6px);
+  height: 30px;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  width: 100%;
-  padding-top: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  justify-content: center;
+  color: var(--color-text);
+  transition: all 0.15s ease;
+}
+
+.translate-dropzone-card .btn-clear-sub:hover {
+  color: var(--danger, #ef4444);
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.08);
 }
 
 /* Loaded state styling */
@@ -252,109 +257,50 @@
 }
 
 #translate-drop-zone.translate-dropzone-card.has-file .translate-sub-icon {
-  color: var(--color-cyan);
+  color: var(--color-royal-blue, #2d7fff);
 }
 
 #translate-drop-zone.translate-dropzone-card.has-file .translate-sub-prompt {
   display: none !important;
 }
 
-/* Where a loaded name sits is the interface's to decide, and it belongs against the
-   icon of the identity block: the left in a left-to-right interface, the right in a
-   right-to-left one, which is the other half of this pair in the RTL stylesheet. The
-   direction the name itself reads in is not this rule's business — that comes from the
-   name (`dir` is set from it), so a Persian name keeps its extension at the end of its
-   own reading order and a Latin one at the end of this one, either way beside the icon. */
 #translate-drop-zone.translate-dropzone-card.has-file .translate-sub-name {
-  text-align: left;
+  text-align: start;
 }
 
-#translate-drop-zone.translate-dropzone-card.has-file .btn-sub-browse,
-#translate-drop-zone.translate-dropzone-card.has-file .btn-clear-sub {
-  height: 28px;
-  padding: 0 10px;
-  font-size: 0.75rem;
-  border-radius: 6px;
+#translate-drop-zone.translate-dropzone-card.has-file .btn-sub-browse {
+  height: 30px;
+  padding: 0 12px;
 }
 
-.btn-clear-sub {
-  color: var(--color-text-muted);
-  transition: all 0.15s ease;
-}
-
-.btn-clear-sub:hover {
-  color: #ef4444;
-  border-color: rgba(239, 68, 68, 0.3);
-}
-
-#btn-reset-hardsub-all {
-  color: var(--color-text-muted);
-  transition: all 0.15s ease;
-}
-
-#btn-reset-hardsub-all:hover {
-  color: #ef4444;
-  border-color: rgba(239, 68, 68, 0.35);
-  background: rgba(239, 68, 68, 0.08);
+.translate-dropzone-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  width: auto;
+  padding: 0;
+  margin: 0;
+  border: none;
+  line-height: 1.3;
 }
 
 .translate-sub-meta-badge {
   display: inline-flex;
   align-items: center;
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--color-cyan);
-  background: rgba(var(--color-cyan-rgb), 0.12);
-  border: 1px solid rgba(var(--color-cyan-rgb), 0.25);
-  padding: 3px 8px;
-  border-radius: 5px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-secondary, #a1a1aa);
+  background: none;
+  border: none;
+  padding: 0;
+  height: auto;
   white-space: nowrap;
   flex-shrink: 0;
-  /* The badge's direction is the interface's, so format, cue count and size are read in
-     the interface's own order — right to left in a Persian interface, where a Persian
-     reader takes the format first and the size last, exactly as they are written. What
-     holds that reading together is the isolation on the tokens themselves: the code
-     wraps each one in a bidi isolate of its own direction (see `isolateDirection`), so a
-     token of the other direction — a Persian cue count in an English badge, the size
-     with its unit in a Persian one — can neither be claimed by the token beside it nor
-     claim the neutral space between them. The isolate here keeps those three tokens a
-     single unit on the line rather than letting them interleave with what follows. */
   unicode-bidi: isolate;
-}
-
-.translate-companion-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 0.72rem;
-  font-weight: 500;
-  color: var(--color-sky);
-  background: rgba(var(--color-royal-blue-rgb), 0.15);
-  border: 1px solid rgba(var(--color-royal-blue-rgb), 0.3);
-  padding: 3px 8px;
-  border-radius: 5px;
-  max-width: 140px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  margin: 0;
-  /* The chip holds an icon and a file name, and the icon is the part that belongs to
-     the interface: it stays on the interface's own side of the chip while the name
-     takes its direction from the file itself (`dir` is set from the name), so a
-     Persian video name reads right to left with its extension at the end of the
-     reading order and a Latin one reads left to right. The isolate keeps the chip a
-     single unit on the metadata row rather than letting its name interleave with the
-     badge beside it. */
-  unicode-bidi: isolate;
-}
-
-/* A companion's name is as long as the file it came from and the chip is a fixed 140px,
-   so the name is the part that gives: without a shrinkable box it kept its full width and
-   was cut off at the chip's edge, mid-glyph and without a mark of any kind. */
-.translate-companion-badge #lbl-companion-video-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+  cursor: default;
 }
 
 /* 2. Target Language Selector */

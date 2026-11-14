@@ -27,7 +27,7 @@
                     <div class="media-drop-zone translate-dropzone-card" id="translate-drop-zone" title="Drag &amp; drop subtitle (.srt, .vtt, .lrc, .txt)" data-i18n-title="translate.dropSubPrompt">
                       <div class="translate-dropzone-main-row">
                         <div class="translate-dropzone-identity">
-                          <svg class="media-icon translate-sub-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                          <svg class="media-icon translate-sub-icon" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/>
                             <path d="M6 6h10"/>
                             <path d="M6 10h10"/>
@@ -35,31 +35,17 @@
                           </svg>
                           <div class="translate-sub-titles">
                             <p class="translate-sub-name" id="lbl-translate-sub-name" data-i18n="translate.noSubLoaded">No Subtitle Loaded</p>
+                            <p class="translate-sub-prompt" id="lbl-translate-sub-path" data-i18n="translate.dropSubPrompt">Drag &amp; drop subtitle (.srt, .vtt, .lrc, .txt)</p>
+
+                            <!-- Loaded subtitle metadata inline row -->
+                            <div class="translate-dropzone-meta-row" id="translate-dropzone-meta-row">
+                              <span class="translate-sub-meta-badge" id="lbl-translate-sub-meta" style="display:none;"></span>
+                            </div>
                           </div>
                         </div>
                         <div class="translate-dropzone-actions">
                           <button class="btn-secondary btn-sub-browse" id="btn-browse-translate-sub" data-i18n="translate.browseSub" type="button">Browse</button>
                           <button class="btn-secondary btn-clear-sub" id="btn-clear-translate-sub" data-i18n="translate.clearSub" type="button" style="display:none;">Clear</button>
-                        </div>
-                      </div>
-
-                      <!-- The empty-state prompt, on a line of the card's own rather than in the
-                           identity column beside the icon: that column is what the browse
-                           button leaves of a 440px panel (213px), and the sentence needs 251px
-                           in Persian, 223px in German, and 197px in English. Full width it
-                           fits on one line in every language, and it is hidden outright once
-                           a file is loaded — the loaded card puts the path in a tooltip and
-                           its name and size on the row above. -->
-                      <p class="translate-sub-prompt" id="lbl-translate-sub-path" data-i18n="translate.dropSubPrompt">Drag &amp; drop subtitle (.srt, .vtt, .lrc, .txt)</p>
-
-                      <div class="translate-dropzone-meta-row">
-                        <span class="translate-sub-meta-badge" id="lbl-translate-sub-meta" style="display:none;"></span>
-                        <div id="translate-companion-chip" class="translate-companion-badge" style="display:none;">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:11px; height:11px;">
-                            <polygon points="23 7 16 12 23 17 23 7"/>
-                            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
-                          </svg>
-                          <span id="lbl-companion-video-name"></span>
                         </div>
                       </div>
                     </div>

@@ -93,14 +93,6 @@ async function subtitleSizeInBytes(path: string, content: string): Promise<numbe
   }
 }
 
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
-}
-
 function getParentDir(filePath: string): string {
   if (!filePath) return '';
   const clean = filePath.trim();
@@ -1018,22 +1010,14 @@ export class TranslationStudioController {
       this.lblSubPath.title = isolateLtr(this.state.subtitlePath);
 
       const cueCount = this.state.sourceCues.length;
-      const sizeStr = formatBytes(this.state.subtitleSize);
       const extUpper = this.state.subtitleExt.toUpperCase();
-      // Format, cue count and size, one token each and each isolated in the direction
-      // it reads in. Run together they are a single line of mixed directions, and the
-      // bidi algorithm resolves it against whichever token happens to be there: the
-      // count's digits get claimed by the `SRT` beside them (UAX #9 W7) and surface on
-      // the far side of it, the space between the count and the size lands on the wrong
-      // token, and the separator the reader looks for never falls where it is written.
-      // Isolating each token keeps all three whole and hands the ` • ` between them to
+      // Format and cue count, each isolated in the direction it reads in.
+      // Isolating each token keeps both whole and hands the ` • ` between them to
       // the interface, so the badge reads in the interface's own order in every
-      // language and a Persian reader gets the count as `12 قطعه`, not `قطعه 12` split
-      // across the line.
+      // language and a Persian reader gets the count as `12 قطعه`, not `قطعه 12`.
       this.lblSubMeta.textContent = [
         isolateDirection(extUpper),
         isolateDirection(t('translate.cuesCount', { count: cueCount })),
-        isolateDirection(sizeStr),
       ].join(' • ');
       this.lblSubMeta.style.display = 'inline-flex';
 

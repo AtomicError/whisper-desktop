@@ -22,6 +22,17 @@
   color: var(--color-text-dim);
 }
 
+#btn-reset-hardsub-all {
+  color: var(--color-text-muted);
+  transition: all 0.15s ease;
+}
+
+#btn-reset-hardsub-all:hover {
+  color: var(--danger, #ef4444);
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.08);
+}
+
 .media-metadata-box {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
