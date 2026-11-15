@@ -33,6 +33,8 @@ import {
 } from './transcriptViewer';
 import {
   formatTimecodeDisplay,
+  formatTimecodeHTML,
+  updateCompanionTimeDisplay,
   initCompanionPlayerDOM,
   seekCompanionPlayer,
   highlightActiveTranscriptSegment,
@@ -43,7 +45,12 @@ import {
   showTranscribeMediaDeck,
   unloadCompanionPlayer,
   updateCompanionMetadataUI,
-  loadMediaIntoCompanionPlayer
+  loadMediaIntoCompanionPlayer,
+  toggleCompanionFullscreen,
+  updateFullscreenUI,
+  cycleCompanionPlaybackRate,
+  updateSliderTrackProgress,
+  COMPANION_SPEEDS
 } from './companionPlayer';
 import { clearBatchQueue, removeFileFromBatch, selectBatchItemTranscript, batchProcessor } from './batchProcessor';
 
@@ -62,14 +69,30 @@ class MockElement {
   attributes = new Map<string, string>();
   children: MockElement[] = [];
   parentNode: MockElement | null = null;
-  textContent = '';
   value = '';
+  private _textContent: string | null = null;
   private _innerHTML = '';
+
+  get textContent(): string {
+    if (this._textContent !== null) return this._textContent;
+    if (this._innerHTML) {
+      return this._innerHTML.replace(/<[^>]*>/g, '');
+    }
+    return '';
+  }
+
+  set textContent(val: string) {
+    this._textContent = String(val);
+    this._innerHTML = String(val);
+  }
+
   get innerHTML(): string {
     return this._innerHTML;
   }
+
   set innerHTML(val: string) {
     this._innerHTML = String(val);
+    this._textContent = null;
     if (!val) {
       this.children = [];
     }
@@ -625,6 +648,62 @@ describe('Companion Media Player & DOM Controls', () => {
     expect(formatTimecodeDisplay(3665)).toBe('01:01:05.000');
   });
 
+  it('formats HTML timecodes with subtle millisecond typography', () => {
+    expect(formatTimecodeHTML(0)).toBe('00:00<span class="timecode-ms">.000</span>');
+    expect(formatTimecodeHTML(5.4)).toBe('00:05<span class="timecode-ms">.400</span>');
+    expect(formatTimecodeHTML(3665)).toBe('01:01:05<span class="timecode-ms">.000</span>');
+  });
+
+  it('updateCompanionTimeDisplay updates both textContent and innerHTML', () => {
+    const el = registerMockEl('test-timecode', 'SPAN') as any;
+    updateCompanionTimeDisplay(el, 12.345);
+    expect(el.textContent).toBe('00:12.345');
+    expect(el.innerHTML).toBe('00:12<span class="timecode-ms">.345</span>');
+  });
+
+  it('updateCompanionMetadataUI updates single-row metadata strip, tooltip, and type icons', () => {
+    const fileNameEl = registerMockEl('companion-meta-filename');
+    const typeIconEl = registerMockEl('companion-meta-type-icon');
+    const formatEl = registerMockEl('companion-meta-format');
+    const resEl = registerMockEl('companion-meta-resolution');
+    const aspectEl = registerMockEl('companion-meta-aspect');
+
+    // Test Video info
+    updateCompanionMetadataUI({
+      filePath: '/media/movies/interview.mp4',
+      fileName: 'interview.mp4',
+      streamUrl: 'http://localhost:54321/stream/1',
+      durationSec: 120,
+      width: 1920,
+      height: 1080,
+      aspectRatio: '16:9',
+      isVideo: true
+    });
+
+    expect(fileNameEl.textContent).toBe('interview.mp4');
+    expect(fileNameEl.title).toBe('/media/movies/interview.mp4');
+    expect(typeIconEl.innerHTML).toContain('<polygon');
+    expect(formatEl.textContent).toBe('Video');
+    expect(resEl.textContent).toBe('1920×1080');
+    expect(aspectEl.textContent).toBe('16:9');
+
+    // Test Audio info
+    updateCompanionMetadataUI({
+      filePath: '/media/audio/voice-memo.mp3',
+      fileName: 'voice-memo.mp3',
+      streamUrl: 'http://localhost:54321/stream/2',
+      durationSec: 45,
+      isVideo: false
+    });
+
+    expect(fileNameEl.textContent).toBe('voice-memo.mp3');
+    expect(fileNameEl.title).toBe('/media/audio/voice-memo.mp3');
+    expect(typeIconEl.innerHTML).toContain('<circle');
+    expect(formatEl.textContent).toBe('Audio');
+    expect(resEl.textContent).toBe('Audio Only');
+    expect(aspectEl.textContent).toBe('Stereo');
+  });
+
   it('initializes companion player DOM listeners and controls safely', () => {
     registerMockEl('transcribe-left-panel');
     registerMockEl('transcribe-setup-view');
@@ -731,11 +810,201 @@ describe('Companion Media Player & DOM Controls', () => {
     const setupDeck = registerMockEl('transcribe-unified-deck');
     const mediaDeck = registerMockEl('transcribe-media-deck');
     const setupTabs = registerMockEl('setup-deck-mode-tabs');
+    const fileNameEl = registerMockEl('companion-meta-filename');
+    const formatEl = registerMockEl('companion-meta-format');
+    const resEl = registerMockEl('companion-meta-resolution');
+    const aspectEl = registerMockEl('companion-meta-aspect');
+    const typeIcon = registerMockEl('companion-meta-type-icon');
+    fileNameEl.textContent = 'active.mp4';
+    formatEl.textContent = 'Video';
+    resEl.textContent = '1920×1080';
+    aspectEl.textContent = '16:9';
 
     unloadCompanionPlayer();
     expect(setupDeck.style.display).toBe('flex');
     expect(mediaDeck.style.display).toBe('none');
     expect(setupTabs.style.display).toBe('none');
+    expect(fileNameEl.textContent).toBe('—');
+    expect(formatEl.textContent).toBe('—');
+    expect(resEl.textContent).toBe('—');
+    expect(aspectEl.textContent).toBe('—');
+    expect(typeIcon.innerHTML).toContain('<polygon');
+  });
+
+  it('toggles companion player console fullscreen correctly and syncs UI icon', async () => {
+    const consoleEl = registerMockEl('companion-player-console') as any;
+    const fullscreenBtn = registerMockEl('btn-companion-fullscreen', 'BUTTON') as any;
+    let requestFullscreenCalled = false;
+    consoleEl.requestFullscreen = async () => {
+      requestFullscreenCalled = true;
+    };
+
+    await toggleCompanionFullscreen();
+    expect(requestFullscreenCalled).toBe(true);
+
+    // When already in fullscreen, exit fullscreen is called and UI reflects Minimize icon
+    let exitFullscreenCalled = false;
+    (document as any).fullscreenElement = consoleEl;
+    (document as any).exitFullscreen = async () => {
+      exitFullscreenCalled = true;
+    };
+
+    updateFullscreenUI();
+    expect(fullscreenBtn.innerHTML).toContain('M8 3v3');
+    expect(fullscreenBtn.title).toBe('Exit Fullscreen');
+
+    await toggleCompanionFullscreen();
+    expect(exitFullscreenCalled).toBe(true);
+
+    delete (document as any).fullscreenElement;
+    delete (document as any).exitFullscreen;
+    updateFullscreenUI();
+    expect(fullscreenBtn.innerHTML).toContain('M8 3H5');
+    expect(fullscreenBtn.title).toBe('Fullscreen');
+  });
+
+  it('updates slider track custom CSS property clamped between 0 and 100', () => {
+    const slider = registerMockEl('test-slider', 'INPUT') as any;
+    updateSliderTrackProgress(slider, 45.6, '--seek-pct');
+    expect(slider.style['--seek-pct']).toBe('45.6%');
+
+    // Clamps below 0
+    updateSliderTrackProgress(slider, -10, '--seek-pct');
+    expect(slider.style['--seek-pct']).toBe('0%');
+
+    // Clamps above 100
+    updateSliderTrackProgress(slider, 150, '--seek-pct');
+    expect(slider.style['--seek-pct']).toBe('100%');
+
+    // Handles NaN gracefully
+    updateSliderTrackProgress(slider, NaN, '--vol-pct');
+    expect(slider.style['--vol-pct']).toBe('0%');
+
+    // Safe when null passed
+    expect(() => updateSliderTrackProgress(null, 50, '--seek-pct')).not.toThrow();
+  });
+
+  it('cycles playback rate smoothly forward on left-click and backward on right-click', () => {
+    const videoEl = registerMockEl('companion-media-element', 'VIDEO') as any;
+    const speedLabel = registerMockEl('companion-speed-label', 'SPAN') as any;
+    const speedBtn = registerMockEl('btn-companion-speed', 'BUTTON') as any;
+
+    expect(COMPANION_SPEEDS).toEqual([0.75, 1.0, 1.25, 1.5, 2.0]);
+
+    // Initial cycle from 1.0 -> 1.25 (forward)
+    cycleCompanionPlaybackRate(false);
+    expect(videoEl.playbackRate).toBe(1.25);
+    expect(speedLabel.textContent).toBe('1.25x');
+    expect(speedBtn.title).toContain('1.25x');
+
+    // 1.25 -> 1.5 (forward)
+    cycleCompanionPlaybackRate(false);
+    expect(videoEl.playbackRate).toBe(1.5);
+    expect(speedLabel.textContent).toBe('1.5x');
+
+    // Backward cycle (Right-click): 1.5 -> 1.25
+    cycleCompanionPlaybackRate(true);
+    expect(videoEl.playbackRate).toBe(1.25);
+    expect(speedLabel.textContent).toBe('1.25x');
+
+    // Backward cycle: 1.25 -> 1.0
+    cycleCompanionPlaybackRate(true);
+    expect(videoEl.playbackRate).toBe(1.0);
+    expect(speedLabel.textContent).toBe('1.0x');
+
+    // Backward cycle: 1.0 -> 0.75
+    cycleCompanionPlaybackRate(true);
+    expect(videoEl.playbackRate).toBe(0.75);
+    expect(speedLabel.textContent).toBe('0.75x');
+
+    // Backward wrap: 0.75 -> 2.0
+    cycleCompanionPlaybackRate(true);
+    expect(videoEl.playbackRate).toBe(2.0);
+    expect(speedLabel.textContent).toBe('2.0x');
+
+    // Forward wrap: 2.0 -> 0.75
+    cycleCompanionPlaybackRate(false);
+    expect(videoEl.playbackRate).toBe(0.75);
+    expect(speedLabel.textContent).toBe('0.75x');
+
+    // 0.75 -> 1.0
+    cycleCompanionPlaybackRate(false);
+    expect(videoEl.playbackRate).toBe(1.0);
+    expect(speedLabel.textContent).toBe('1.0x');
+  });
+
+  it('does not overwrite seek slider or track progress with stale currentTime while video is seeking backwards', () => {
+    const videoEl = registerMockEl('companion-media-element', 'VIDEO') as any;
+    videoEl.duration = 100;
+    videoEl.currentTime = 80;
+    const seekSlider = registerMockEl('companion-seek-slider', 'INPUT') as any;
+    seekSlider.value = '80';
+    updateSliderTrackProgress(seekSlider, 80, '--seek-pct');
+    registerMockEl('companion-time-current');
+
+    initCompanionPlayerDOM();
+
+    // User seeks backwards to 20% (second 20)
+    seekSlider.value = '20';
+    const inputListeners = seekSlider._listeners.get('input') || [];
+    inputListeners.forEach((fn: any) => fn());
+    expect(seekSlider.style['--seek-pct']).toBe('20%');
+
+    const changeListeners = seekSlider._listeners.get('change') || [];
+    changeListeners.forEach((fn: any) => fn());
+
+    // Video currentTime is requested to be 20, but browser video decoder is still seeking
+    videoEl.seeking = true;
+    videoEl.currentTime = 80;
+
+    // timeupdate fires during seek
+    const timeupdateListeners = videoEl._listeners.get('timeupdate') || [];
+    timeupdateListeners.forEach((fn: any) => fn());
+
+    // Slider must NOT be overwritten with stale 80%, must stay at 20%
+    expect(seekSlider.value).toBe('20');
+    expect(seekSlider.style['--seek-pct']).toBe('20%');
+
+    // Once seeked event fires and decoder completes
+    videoEl.seeking = false;
+    videoEl.currentTime = 20;
+    const seekedListeners = videoEl._listeners.get('seeked') || [];
+    seekedListeners.forEach((fn: any) => fn());
+
+    expect(seekSlider.value).toBe('20');
+    expect(seekSlider.style['--seek-pct']).toBe('20%');
+  });
+
+  it('resets isSeeking on commitSeek to prevent duplicate seek on consecutive pointerup and change events', () => {
+    const videoEl = registerMockEl('companion-media-element', 'VIDEO') as any;
+    videoEl.duration = 100;
+    const seekSlider = registerMockEl('companion-seek-slider', 'INPUT') as any;
+    seekSlider.value = '50';
+    registerMockEl('companion-time-current');
+
+    initCompanionPlayerDOM();
+
+    // User starts seeking
+    const pointerdownListeners = seekSlider._listeners.get('pointerdown') || [];
+    pointerdownListeners.forEach((fn: any) => fn());
+
+    let seekCount = 0;
+    Object.defineProperty(videoEl, 'currentTime', {
+      get() { return 50; },
+      set() { seekCount++; },
+      configurable: true
+    });
+
+    // Pointerup fires commitSeek
+    const pointerupListeners = seekSlider._listeners.get('pointerup') || [];
+    pointerupListeners.forEach((fn: any) => fn());
+    expect(seekCount).toBe(1);
+
+    // Browser immediately follows with native change event
+    const changeListeners = seekSlider._listeners.get('change') || [];
+    changeListeners.forEach((fn: any) => fn());
+    // Must remain 1, not duplicate-seek to 2
+    expect(seekCount).toBe(1);
   });
 
   it('safely exits early during silence without querySelectorAll thrashing', () => {
@@ -755,7 +1024,6 @@ describe('Companion Media Player & DOM Controls', () => {
     videoEl.load = () => {};
     const resEl = registerMockEl('companion-meta-resolution');
     const aspectEl = registerMockEl('companion-meta-aspect');
-    const pipBtn = registerMockEl('btn-companion-pip', 'BUTTON') as any;
     const fullscreenBtn = registerMockEl('btn-companion-fullscreen', 'BUTTON') as any;
     registerMockEl('companion-audio-fallback');
     registerMockEl('companion-audio-name');
@@ -766,7 +1034,6 @@ describe('Companion Media Player & DOM Controls', () => {
     expect(aspectEl.textContent).not.toBe('16:9');
     expect(aspectEl.textContent).toBe('Stereo');
     expect(resEl.textContent).toBe('Audio Only');
-    expect(pipBtn.disabled).toBe(true);
     expect(fullscreenBtn.disabled).toBe(true);
   });
 
@@ -840,8 +1107,7 @@ describe('Companion Media Player & DOM Controls', () => {
   it('retains user-chosen playbackRate and volume slider levels when loading new media', async () => {
     const videoEl = registerMockEl('companion-media-element', 'VIDEO') as any;
     videoEl.load = () => {};
-    const speedSelect = registerMockEl('companion-speed-select', 'SELECT') as any;
-    speedSelect.value = '1.5';
+    changeCompanionPlaybackRate('1.5');
     const volSlider = registerMockEl('companion-volume-slider', 'INPUT') as any;
     volSlider.value = '0.75';
 

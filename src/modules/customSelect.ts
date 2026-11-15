@@ -53,6 +53,16 @@ export class CustomSelect {
 
   public init(): void {
     if (typeof document === 'undefined') return;
+    const existingKey = this.select.id || this.select;
+    if (customSelectsMap.has(existingKey)) {
+      const existing = customSelectsMap.get(existingKey);
+      if (existing && existing !== this) {
+        existing.destroy();
+      }
+    }
+    if (this.select.dataset) {
+      this.select.dataset.customSelectInitialized = 'true';
+    }
 
     this.select.style.display = 'none';
 
@@ -667,23 +677,34 @@ export class CustomSelect {
     this.optionsContainer.style.zIndex = '999999';
 
     const triggerWidth = Math.round(normalizedRect.width);
-    const isReasoning = this.select && this.select.classList.contains('model-reasoning-select');
-    const isPaginationSize = this.select && this.select.classList.contains('pagination-size-select');
-    const minDropdownWidth = isReasoning ? triggerWidth : (isPaginationSize ? 70 : 118);
+    const isReasoning = Boolean(this.select && this.select.classList.contains('model-reasoning-select'));
+    const isPaginationSize = Boolean(this.select && this.select.classList.contains('pagination-size-select'));
+
+    let minDropdownWidth = 118;
+    if (isReasoning) {
+      minDropdownWidth = triggerWidth;
+    } else if (isPaginationSize) {
+      minDropdownWidth = 70;
+    }
+
     const targetWidth = Math.max(triggerWidth, minDropdownWidth);
-    this.optionsContainer.style.width = isReasoning ? `${triggerWidth}px` : 'auto';
+    this.optionsContainer.style.width = isReasoning ? `${targetWidth}px` : 'auto';
     this.optionsContainer.style.minWidth = `${targetWidth}px`;
-    this.optionsContainer.style.maxWidth = isReasoning ? `${triggerWidth}px` : `${Math.max(targetWidth, 280)}px`;
+    this.optionsContainer.style.maxWidth = isReasoning ? `${targetWidth}px` : `${Math.max(targetWidth, 280)}px`;
 
     const measuredWidth = (this.optionsContainer.getBoundingClientRect().width / cssZoom) || targetWidth;
     const effectiveWidth = Math.max(targetWidth, Math.round(measuredWidth));
-    const isRtl = (typeof isRtlLanguage === 'function' && isRtlLanguage(getLanguage())) ||
-                  document.documentElement.dir === 'rtl' ||
-                  document.body.dir === 'rtl';
+    const isDocRtl = (typeof isRtlLanguage === 'function' && isRtlLanguage(getLanguage())) ||
+                     document.documentElement.dir === 'rtl' ||
+                     document.body.dir === 'rtl';
 
-    const leftPos = isReasoning
+    // Check if the trigger or an ancestor explicitly specifies direction (e.g. dir="ltr" in media controls)
+    const triggerDir = this.trigger.closest('[dir]')?.getAttribute('dir');
+    const isEffectiveRtl = triggerDir ? triggerDir === 'rtl' : isDocRtl;
+
+    const leftPos = (isReasoning || !isEffectiveRtl)
       ? Math.round(normalizedRect.left)
-      : (isRtl ? Math.round(normalizedRect.right - effectiveWidth) : Math.round(normalizedRect.left));
+      : Math.round(normalizedRect.right - effectiveWidth);
     const maxLeft = Math.max(8, viewportWidth - effectiveWidth - 8);
     this.optionsContainer.style.left = `${Math.max(8, Math.min(leftPos, maxLeft))}px`;
     this.optionsContainer.style.right = 'auto';
@@ -857,6 +878,12 @@ export class CustomSelect {
     }
     if (this.observer) {
       this.observer.disconnect();
+    }
+    if (this.select?.dataset?.customSelectInitialized) {
+      delete this.select.dataset.customSelectInitialized;
+    }
+    if (this.select) {
+      this.select.style.display = '';
     }
     customSelectsMap.delete(this.select.id || this.select);
     if (typeof window !== 'undefined' && (window as any).customSelectsMap) {

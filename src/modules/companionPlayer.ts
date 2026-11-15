@@ -28,9 +28,20 @@ let activeMediaInfo: CompanionMediaInfo | null = null;
 let activeStreamUrl: string | null = null;
 let activeLoadSequence = 0;
 let isSeeking = false;
+let isVideoSeeking = false;
+let seekWatchdogTimer: ReturnType<typeof setTimeout> | null = null;
 let currentHighlightedLineId: number | null = null;
 let pendingSeekTargetSec: number | null = null;
 let hasMetadataSeekListener = false;
+
+function armSeekWatchdog(): void {
+  if (seekWatchdogTimer) clearTimeout(seekWatchdogTimer);
+  seekWatchdogTimer = setTimeout(() => {
+    seekWatchdogTimer = null;
+    isSeeking = false;
+    isVideoSeeking = false;
+  }, 1000);
+}
 
 export function formatTimecodeDisplay(seconds: number): string {
   if (isNaN(seconds) || seconds < 0 || !isFinite(seconds)) seconds = 0;
@@ -47,6 +58,66 @@ export function formatTimecodeDisplay(seconds: number): string {
   const sStr = sec.toString().padStart(2, '0');
   const msStr = ms.toString().padStart(3, '0');
   return `${hStr}${mStr}:${sStr}.${msStr}`;
+}
+
+export function formatTimecodeHTML(seconds: number): string {
+  const formatted = formatTimecodeDisplay(seconds);
+  const dotIdx = formatted.lastIndexOf('.');
+  if (dotIdx === -1) return formatted;
+  const main = formatted.substring(0, dotIdx);
+  const ms = formatted.substring(dotIdx);
+  return `${main}<span class="timecode-ms">${ms}</span>`;
+}
+
+export function updateCompanionTimeDisplay(el: HTMLElement | null, seconds: number): void {
+  if (!el) return;
+  const formatted = formatTimecodeDisplay(seconds);
+  const dotIdx = formatted.lastIndexOf('.');
+  if (dotIdx !== -1) {
+    const main = formatted.substring(0, dotIdx);
+    const ms = formatted.substring(dotIdx);
+    el.innerHTML = `${main}<span class="timecode-ms">${ms}</span>`;
+  } else {
+    el.textContent = formatted;
+  }
+}
+
+export function updateSliderTrackProgress(slider: HTMLInputElement | null, pct: number, varName: string): void {
+  if (!slider) return;
+  const clamped = Math.max(0, Math.min(100, isNaN(pct) ? 0 : pct));
+  const val = `${clamped}%`;
+  if (slider.style) {
+    if (typeof slider.style.setProperty === 'function') {
+      slider.style.setProperty(varName, val);
+    } else {
+      (slider.style as any)[varName] = val;
+    }
+    slider.style.background = `linear-gradient(to right, var(--color-royal-blue, #3b82f6) 0%, var(--color-royal-blue, #3b82f6) ${val}, rgba(255, 255, 255, 0.14) ${val}, rgba(255, 255, 255, 0.14) 100%)`;
+  }
+}
+
+export const COMPANION_SPEEDS = [0.75, 1.0, 1.25, 1.5, 2.0];
+let currentCompanionSpeed = 1.0;
+
+export function formatSpeedLabel(rate: number): string {
+  if (rate === 1 || rate === 2) {
+    return `${rate.toFixed(1)}x`;
+  }
+  return `${rate}x`;
+}
+
+export function cycleCompanionPlaybackRate(reverse = false): void {
+  const idx = COMPANION_SPEEDS.indexOf(currentCompanionSpeed);
+  let nextIdx: number;
+  if (idx === -1) {
+    nextIdx = 1;
+  } else if (reverse) {
+    nextIdx = (idx - 1 + COMPANION_SPEEDS.length) % COMPANION_SPEEDS.length;
+  } else {
+    nextIdx = (idx + 1) % COMPANION_SPEEDS.length;
+  }
+  currentCompanionSpeed = COMPANION_SPEEDS[nextIdx];
+  changeCompanionPlaybackRate(String(currentCompanionSpeed));
 }
 
 export function getActiveMediaInfo(): CompanionMediaInfo | null {
@@ -240,14 +311,8 @@ export async function loadMediaIntoCompanionPlayer(filePath: string, autoSwitchD
   // Update UI Metadata Card
   updateCompanionMetadataUI(activeMediaInfo);
 
-  // Update PiP and Fullscreen button availability based on audio vs video
-  const pipBtn = document.getElementById('btn-companion-pip') as HTMLButtonElement | null;
+  // Update Fullscreen button availability based on audio vs video
   const fullscreenBtn = document.getElementById('btn-companion-fullscreen') as HTMLButtonElement | null;
-  if (pipBtn) {
-    pipBtn.disabled = isAudioOnly;
-    pipBtn.style.opacity = isAudioOnly ? '0.35' : '1';
-    pipBtn.style.cursor = isAudioOnly ? 'not-allowed' : 'pointer';
-  }
   if (fullscreenBtn) {
     fullscreenBtn.disabled = isAudioOnly;
     fullscreenBtn.style.opacity = isAudioOnly ? '0.35' : '1';
@@ -259,16 +324,15 @@ export async function loadMediaIntoCompanionPlayer(filePath: string, autoSwitchD
   videoEl.load();
 
   const seekSlider = document.getElementById('companion-seek-slider') as HTMLInputElement | null;
-  if (seekSlider) seekSlider.value = '0';
+  if (seekSlider) {
+    seekSlider.value = '0';
+    updateSliderTrackProgress(seekSlider, 0, '--seek-pct');
+  }
   const timeCurrent = document.getElementById('companion-time-current');
-  if (timeCurrent) timeCurrent.textContent = formatTimecodeDisplay(0);
+  if (timeCurrent) updateCompanionTimeDisplay(timeCurrent, 0);
 
   // Synchronize user-chosen playback rate and volume on the newly loaded media
-  const speedSelect = document.getElementById('companion-speed-select') as HTMLSelectElement | null;
-  if (speedSelect) {
-    const rate = parseFloat(speedSelect.value) || 1.0;
-    videoEl.playbackRate = rate;
-  }
+  changeCompanionPlaybackRate(String(currentCompanionSpeed));
   const volSlider = document.getElementById('companion-volume-slider') as HTMLInputElement | null;
   if (volSlider) {
     const vol = parseFloat(volSlider.value);
@@ -276,6 +340,7 @@ export async function loadMediaIntoCompanionPlayer(filePath: string, autoSwitchD
       videoEl.volume = Math.max(0, Math.min(1, vol));
       videoEl.muted = vol === 0;
       updateVolumeIcons(videoEl.muted || videoEl.volume === 0);
+      updateSliderTrackProgress(volSlider, videoEl.muted ? 0 : videoEl.volume * 100, '--vol-pct');
     }
   }
 
@@ -298,10 +363,24 @@ export function updateCompanionMetadataUI(info: CompanionMediaInfo): void {
   const aspectEl = document.getElementById('companion-meta-aspect');
   const formatEl = document.getElementById('companion-meta-format');
   const timeTotalEl = document.getElementById('companion-time-total');
+  const typeIcon = document.getElementById('companion-meta-type-icon');
 
-  if (fileNameEl) fileNameEl.textContent = info.fileName;
-  if (durationEl) durationEl.textContent = formatTimecodeDisplay(info.durationSec);
-  if (timeTotalEl) timeTotalEl.textContent = formatTimecodeDisplay(info.durationSec);
+  if (fileNameEl) {
+    fileNameEl.textContent = info.fileName;
+    if (info.filePath) {
+      fileNameEl.title = info.filePath;
+    }
+  }
+  if (durationEl) updateCompanionTimeDisplay(durationEl, info.durationSec);
+  if (timeTotalEl) updateCompanionTimeDisplay(timeTotalEl, info.durationSec);
+
+  if (typeIcon) {
+    if (info.isVideo) {
+      typeIcon.innerHTML = `<polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>`;
+    } else {
+      typeIcon.innerHTML = `<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>`;
+    }
+  }
 
   if (resEl) {
     resEl.textContent = (info.width && info.height)
@@ -324,6 +403,9 @@ export function toggleCompanionPlayback(): void {
   const videoEl = document.getElementById('companion-media-element') as HTMLVideoElement | null;
   if (!videoEl) return;
   if (videoEl.paused) {
+    if (videoEl.ended) {
+      videoEl.currentTime = 0;
+    }
     videoEl.play().catch(e => console.warn('Video play error:', e));
   } else {
     videoEl.pause();
@@ -333,8 +415,20 @@ export function toggleCompanionPlayback(): void {
 export function jumpCompanionPlayback(seconds: number): void {
   const videoEl = document.getElementById('companion-media-element') as HTMLVideoElement | null;
   if (!videoEl) return;
-  const targetTime = Math.max(0, Math.min(videoEl.duration || 999999, videoEl.currentTime + seconds));
+  const dur = videoEl.duration || activeMediaInfo?.durationSec || 0;
+  const targetTime = Math.max(0, Math.min(dur || 999999, videoEl.currentTime + seconds));
+  isSeeking = true;
+  isVideoSeeking = true;
   videoEl.currentTime = targetTime;
+  const seekSlider = document.getElementById('companion-seek-slider') as HTMLInputElement | null;
+  if (dur > 0 && seekSlider) {
+    const pct = (targetTime / dur) * 100;
+    seekSlider.value = String(pct);
+    updateSliderTrackProgress(seekSlider, pct, '--seek-pct');
+  }
+  const timeCurrent = document.getElementById('companion-time-current');
+  if (timeCurrent) updateCompanionTimeDisplay(timeCurrent, targetTime);
+  armSeekWatchdog();
 }
 
 export function seekCompanionPlayer(targetMs: number, autoPlay?: boolean): void {
@@ -342,6 +436,19 @@ export function seekCompanionPlayer(targetMs: number, autoPlay?: boolean): void 
   if (!videoEl) return;
   const targetSec = Math.max(0, targetMs / 1000);
   const shouldPlay = typeof autoPlay === 'boolean' ? autoPlay : !videoEl.paused;
+  const dur = videoEl.duration || activeMediaInfo?.durationSec || 0;
+  const seekSlider = document.getElementById('companion-seek-slider') as HTMLInputElement | null;
+  if (dur > 0 && seekSlider) {
+    const pct = (targetSec / dur) * 100;
+    seekSlider.value = String(pct);
+    updateSliderTrackProgress(seekSlider, pct, '--seek-pct');
+  }
+  const timeCurrent = document.getElementById('companion-time-current');
+  if (timeCurrent) updateCompanionTimeDisplay(timeCurrent, targetSec);
+
+  isSeeking = true;
+  isVideoSeeking = true;
+  armSeekWatchdog();
 
   if (videoEl.readyState >= 1) {
     videoEl.currentTime = targetSec;
@@ -384,6 +491,12 @@ export function unloadCompanionPlayer(): void {
   activeLoadSequence++;
   activeMediaInfo = null;
   pauseCompanionPlayer();
+  if (seekWatchdogTimer) {
+    clearTimeout(seekWatchdogTimer);
+    seekWatchdogTimer = null;
+  }
+  isSeeking = false;
+  isVideoSeeking = false;
   pendingSeekTargetSec = null;
   hasMetadataSeekListener = false;
   currentHighlightedLineId = null;
@@ -393,11 +506,35 @@ export function unloadCompanionPlayer(): void {
     });
   }
   const seekSlider = document.getElementById('companion-seek-slider') as HTMLInputElement | null;
-  if (seekSlider) seekSlider.value = '0';
+  if (seekSlider) {
+    seekSlider.value = '0';
+    updateSliderTrackProgress(seekSlider, 0, '--seek-pct');
+  }
   const timeCurrent = document.getElementById('companion-time-current');
-  if (timeCurrent) timeCurrent.textContent = formatTimecodeDisplay(0);
+  if (timeCurrent) updateCompanionTimeDisplay(timeCurrent, 0);
   const timeTotal = document.getElementById('companion-time-total');
-  if (timeTotal) timeTotal.textContent = formatTimecodeDisplay(0);
+  if (timeTotal) updateCompanionTimeDisplay(timeTotal, 0);
+
+  // Reset companion metadata strip elements
+  const fileNameEl = document.getElementById('companion-meta-filename');
+  const resEl = document.getElementById('companion-meta-resolution');
+  const aspectEl = document.getElementById('companion-meta-aspect');
+  const formatEl = document.getElementById('companion-meta-format');
+  const durationEl = document.getElementById('companion-meta-duration');
+  const typeIcon = document.getElementById('companion-meta-type-icon');
+
+  if (fileNameEl) {
+    fileNameEl.textContent = '—';
+    fileNameEl.title = t('transcribe.noMediaOrTranscribe') || 'No media file selected or transcribed yet.';
+  }
+  if (resEl) resEl.textContent = '—';
+  if (aspectEl) aspectEl.textContent = '—';
+  if (formatEl) formatEl.textContent = '—';
+  if (durationEl) updateCompanionTimeDisplay(durationEl, 0);
+  if (typeIcon) {
+    typeIcon.innerHTML = `<polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>`;
+  }
+
   const invoke = getTauriInvoke();
   if (activeStreamUrl && invoke) {
     invoke('revoke_media_stream', { streamUrl: activeStreamUrl }).catch(() => {});
@@ -411,13 +548,7 @@ export function unloadCompanionPlayer(): void {
   }
   const audioFallback = document.getElementById('companion-audio-fallback');
   if (audioFallback) audioFallback.style.display = 'none';
-  const pipBtn = document.getElementById('btn-companion-pip') as HTMLButtonElement | null;
   const fullscreenBtn = document.getElementById('btn-companion-fullscreen') as HTMLButtonElement | null;
-  if (pipBtn) {
-    pipBtn.disabled = false;
-    pipBtn.style.opacity = '1';
-    pipBtn.style.cursor = 'pointer';
-  }
   if (fullscreenBtn) {
     fullscreenBtn.disabled = false;
     fullscreenBtn.style.opacity = '1';
@@ -432,9 +563,23 @@ export function unloadCompanionPlayer(): void {
 
 export function changeCompanionPlaybackRate(rateStr: string): void {
   const videoEl = document.getElementById('companion-media-element') as HTMLVideoElement | null;
-  if (!videoEl) return;
   const rate = parseFloat(rateStr) || 1.0;
-  videoEl.playbackRate = rate;
+  currentCompanionSpeed = rate;
+  if (videoEl) {
+    videoEl.playbackRate = rate;
+  }
+  const formattedSpeed = formatSpeedLabel(rate);
+  const speedLabel = document.getElementById('companion-speed-label');
+  if (speedLabel) {
+    speedLabel.textContent = formattedSpeed;
+  }
+  const speedBtn = document.getElementById('btn-companion-speed') as HTMLButtonElement | null;
+  if (speedBtn) {
+    const speedAria = t('transcribe.companionSpeedAria') || 'Playback speed';
+    const cycleHint = t('transcribe.companionSpeedCycleHint') || 'Left-click: next, Right-click: prev';
+    speedBtn.title = `${speedAria}: ${formattedSpeed} (${cycleHint})`;
+    speedBtn.setAttribute('aria-label', `${speedAria}: ${formattedSpeed}`);
+  }
 }
 
 let lastNonZeroVolume = 1.0;
@@ -450,6 +595,8 @@ export function changeCompanionVolume(volStr: string): void {
     lastNonZeroVolume = vol;
   }
   updateVolumeIcons(videoEl.muted || vol === 0);
+  const volSlider = document.getElementById('companion-volume-slider') as HTMLInputElement | null;
+  updateSliderTrackProgress(volSlider, videoEl.muted ? 0 : vol * 100, '--vol-pct');
 }
 
 export function toggleCompanionMute(): void {
@@ -466,6 +613,7 @@ export function toggleCompanionMute(): void {
     if (volSlider) volSlider.value = String(videoEl.volume);
   }
   updateVolumeIcons(videoEl.muted || videoEl.volume === 0);
+  updateSliderTrackProgress(volSlider, videoEl.muted ? 0 : videoEl.volume * 100, '--vol-pct');
 }
 
 function updateVolumeIcons(isMuted: boolean): void {
@@ -473,6 +621,10 @@ function updateVolumeIcons(isMuted: boolean): void {
   const muteIcon = document.getElementById('icon-vol-muted');
   if (highIcon) highIcon.style.display = isMuted ? 'none' : 'block';
   if (muteIcon) muteIcon.style.display = isMuted ? 'block' : 'none';
+  const muteBtn = document.getElementById('btn-companion-mute');
+  if (muteBtn) {
+    muteBtn.setAttribute('aria-pressed', isMuted ? 'true' : 'false');
+  }
 }
 
 export async function toggleCompanionPiP(): Promise<void> {
@@ -489,17 +641,40 @@ export async function toggleCompanionPiP(): Promise<void> {
   }
 }
 
+export function updateFullscreenUI(): void {
+  if (typeof document === 'undefined') return;
+  const btn = document.getElementById('btn-companion-fullscreen') as HTMLButtonElement | null;
+  if (!btn) return;
+  const isFullscreen = Boolean(document.fullscreenElement);
+  const title = isFullscreen
+    ? (t('transcribe.companionExitFullscreen') || 'Exit Fullscreen')
+    : (t('transcribe.companionFullscreen') || 'Fullscreen');
+  btn.title = title;
+  btn.setAttribute('aria-label', title);
+  if (isFullscreen) {
+    btn.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>`;
+  } else {
+    btn.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>`;
+  }
+}
+
 export async function toggleCompanionFullscreen(): Promise<void> {
+  const consoleEl = document.getElementById('companion-player-console');
   const stage = document.getElementById('companion-player-stage');
-  if (!stage) return;
+  const targetEl = consoleEl || stage;
+  if (!targetEl) return;
   try {
     if (document.fullscreenElement) {
       await document.exitFullscreen();
-    } else if (stage.requestFullscreen) {
+    } else if (targetEl.requestFullscreen) {
+      await targetEl.requestFullscreen();
+    } else if (stage && stage.requestFullscreen) {
       await stage.requestFullscreen();
     }
   } catch (err) {
     console.warn('Fullscreen error:', err);
+  } finally {
+    updateFullscreenUI();
   }
 }
 
@@ -610,6 +785,7 @@ export function highlightActiveTranscriptSegment(currentSec: number): void {
 
 export function initCompanionPlayerDOM(): void {
   if (typeof document === 'undefined') return;
+
   const videoEl = document.getElementById('companion-media-element') as HTMLVideoElement | null;
   if (!videoEl || (videoEl as any)._hasCompanionListeners) return;
   (videoEl as any)._hasCompanionListeners = true;
@@ -630,19 +806,44 @@ export function initCompanionPlayerDOM(): void {
     if (pauseIcon) pauseIcon.style.display = 'none';
   });
 
-  videoEl.addEventListener('timeupdate', () => {
+  videoEl.addEventListener('seeking', () => {
+    isVideoSeeking = true;
+  });
+
+  videoEl.addEventListener('seeked', () => {
+    if (seekWatchdogTimer) {
+      clearTimeout(seekWatchdogTimer);
+      seekWatchdogTimer = null;
+    }
+    isSeeking = false;
+    isVideoSeeking = false;
     const cur = videoEl.currentTime || 0;
     const dur = videoEl.duration || activeMediaInfo?.durationSec || 0;
-    if (timeCurrentEl) timeCurrentEl.textContent = formatTimecodeDisplay(cur);
-    if (!isSeeking && seekSlider && dur > 0) {
-      seekSlider.value = String((cur / dur) * 100);
+    if (dur > 0 && seekSlider) {
+      const pct = (cur / dur) * 100;
+      seekSlider.value = String(pct);
+      updateSliderTrackProgress(seekSlider, pct, '--seek-pct');
+    }
+    if (timeCurrentEl) updateCompanionTimeDisplay(timeCurrentEl, cur);
+    highlightActiveTranscriptSegment(cur);
+  });
+
+  videoEl.addEventListener('timeupdate', () => {
+    if (isSeeking || isVideoSeeking || videoEl.seeking) return;
+    const cur = videoEl.currentTime || 0;
+    const dur = videoEl.duration || activeMediaInfo?.durationSec || 0;
+    if (timeCurrentEl) updateCompanionTimeDisplay(timeCurrentEl, cur);
+    if (dur > 0 && seekSlider) {
+      const pct = (cur / dur) * 100;
+      seekSlider.value = String(pct);
+      updateSliderTrackProgress(seekSlider, pct, '--seek-pct');
     }
     highlightActiveTranscriptSegment(cur);
   });
 
   videoEl.addEventListener('loadedmetadata', () => {
     const dur = videoEl.duration || activeMediaInfo?.durationSec || 0;
-    if (timeTotalEl) timeTotalEl.textContent = formatTimecodeDisplay(dur);
+    if (timeTotalEl) updateCompanionTimeDisplay(timeTotalEl, dur);
     if (activeMediaInfo) {
       if (dur > 0) activeMediaInfo.durationSec = dur;
       if (videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
@@ -683,20 +884,61 @@ export function initCompanionPlayerDOM(): void {
   });
 
   if (seekSlider) {
+    seekSlider.addEventListener('pointerdown', () => {
+      isSeeking = true;
+    });
+
     seekSlider.addEventListener('input', () => {
       isSeeking = true;
       const dur = videoEl.duration || activeMediaInfo?.durationSec || 0;
       const pct = parseFloat(seekSlider.value) || 0;
+      updateSliderTrackProgress(seekSlider, pct, '--seek-pct');
       const targetSec = (pct / 100) * dur;
-      if (timeCurrentEl) timeCurrentEl.textContent = formatTimecodeDisplay(targetSec);
+      if (timeCurrentEl) updateCompanionTimeDisplay(timeCurrentEl, targetSec);
     });
 
-    seekSlider.addEventListener('change', () => {
+    const commitSeek = () => {
+      if (!isSeeking) return;
+      isSeeking = false;
       const dur = videoEl.duration || activeMediaInfo?.durationSec || 0;
       const pct = parseFloat(seekSlider.value) || 0;
-      videoEl.currentTime = (pct / 100) * dur;
+      updateSliderTrackProgress(seekSlider, pct, '--seek-pct');
+      const targetSec = (pct / 100) * dur;
+      if (timeCurrentEl) updateCompanionTimeDisplay(timeCurrentEl, targetSec);
+      isVideoSeeking = true;
+      videoEl.currentTime = targetSec;
+      armSeekWatchdog();
+    };
+
+    seekSlider.addEventListener('change', commitSeek);
+    seekSlider.addEventListener('pointerup', commitSeek);
+    seekSlider.addEventListener('pointercancel', () => {
       isSeeking = false;
     });
+  }
+
+  const volSlider = document.getElementById('companion-volume-slider') as HTMLInputElement | null;
+  if (volSlider) {
+    const initVol = parseFloat(volSlider.value);
+    const volVal = isNaN(initVol) ? 1.0 : initVol;
+    updateSliderTrackProgress(volSlider, volVal * 100, '--vol-pct');
+  }
+
+  const speedBtn = document.getElementById('btn-companion-speed');
+  if (speedBtn && !(speedBtn as any)._hasSpeedListeners) {
+    (speedBtn as any)._hasSpeedListeners = true;
+    speedBtn.addEventListener('click', (e: MouseEvent) => {
+      e.preventDefault();
+      cycleCompanionPlaybackRate(false);
+    });
+    speedBtn.addEventListener('contextmenu', (e: MouseEvent) => {
+      e.preventDefault();
+      cycleCompanionPlaybackRate(true);
+    });
+  }
+
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('fullscreenchange', updateFullscreenUI);
   }
 
   // Keyboard shortcut listener for spacebar play/pause
@@ -748,6 +990,8 @@ export function initCompanionPlayerDOM(): void {
       if (activeMediaInfo) {
         updateCompanionMetadataUI(activeMediaInfo);
       }
+      updateFullscreenUI();
+      changeCompanionPlaybackRate(String(currentCompanionSpeed));
     });
   }
 }
@@ -763,8 +1007,15 @@ win.seekCompanionPlayer = seekCompanionPlayer;
 win.pauseCompanionPlayer = pauseCompanionPlayer;
 win.unloadCompanionPlayer = unloadCompanionPlayer;
 win.changeCompanionPlaybackRate = changeCompanionPlaybackRate;
+win.cycleCompanionPlaybackRate = cycleCompanionPlaybackRate;
+win.updateSliderTrackProgress = updateSliderTrackProgress;
+win.COMPANION_SPEEDS = COMPANION_SPEEDS;
 win.changeCompanionVolume = changeCompanionVolume;
 win.toggleCompanionMute = toggleCompanionMute;
 win.toggleCompanionPiP = toggleCompanionPiP;
 win.toggleCompanionFullscreen = toggleCompanionFullscreen;
+win.updateFullscreenUI = updateFullscreenUI;
 win.initCompanionPlayerDOM = initCompanionPlayerDOM;
+win.formatTimecodeDisplay = formatTimecodeDisplay;
+win.formatTimecodeHTML = formatTimecodeHTML;
+win.updateCompanionTimeDisplay = updateCompanionTimeDisplay;

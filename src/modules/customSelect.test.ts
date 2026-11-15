@@ -377,6 +377,14 @@ describe('CustomSelect Module', () => {
       cs.destroy();
       expect(customSelectsMap.has('my-select')).toBe(false);
       expect(mockBody.contains(cs.optionsContainer as any)).toBe(false);
+      expect(selectEl.dataset.customSelectInitialized).toBeUndefined();
+      expect(selectEl.style.display).toBe('');
+
+      // Can be re-initialized after destroy
+      const cs2 = new CustomSelect(selectEl);
+      expect(customSelectsMap.has('my-select')).toBe(true);
+      expect(selectEl.dataset.customSelectInitialized).toBe('true');
+      cs2.destroy();
     });
   });
 
@@ -547,6 +555,50 @@ describe('CustomSelect Module', () => {
       cs.syncDisabledState();
       expect(cs.container?.classList.contains('disabled')).toBe(false);
       expect(cs.trigger?.hasAttribute('aria-disabled')).toBe(false);
+    });
+
+    it('aligns custom select to left in RTL document when ancestor has dir="ltr"', () => {
+      mockDoc.documentElement.dir = 'rtl';
+      const container = new MockDOMNode('DIV');
+      container.setAttribute('dir', 'ltr');
+      mockBody.appendChild(container as any);
+
+      const selectEl = createTestSelect('ltr-container-select');
+      container.appendChild(selectEl as any);
+
+      const cs = new CustomSelect(selectEl);
+      if (cs.trigger) {
+        cs.trigger.getBoundingClientRect = () => ({
+          top: 100, bottom: 126, left: 200, right: 320, width: 120, height: 26
+        } as any);
+      }
+      if (cs.optionsContainer) {
+        cs.optionsContainer.getBoundingClientRect = () => ({
+          top: 130, bottom: 230, left: 200, right: 320, width: 120, height: 100
+        } as any);
+      }
+      cs.open();
+      // In LTR context, leftPos should align with normalizedRect.left (200px)
+      expect(cs.optionsContainer?.style.left).toBe('200px');
+    });
+
+    it('aligns custom select to right edge in RTL document when dir="rtl"', () => {
+      mockDoc.documentElement.dir = 'rtl';
+      const selectEl = createTestSelect('rtl-select');
+      const cs = new CustomSelect(selectEl);
+      if (cs.trigger) {
+        cs.trigger.getBoundingClientRect = () => ({
+          top: 100, bottom: 126, left: 200, right: 320, width: 120, height: 26
+        } as any);
+      }
+      if (cs.optionsContainer) {
+        cs.optionsContainer.getBoundingClientRect = () => ({
+          top: 130, bottom: 230, left: 200, right: 320, width: 120, height: 100
+        } as any);
+      }
+      cs.open();
+      // In RTL context, right edge 320 - effectiveWidth 120 = 200px
+      expect(cs.optionsContainer?.style.left).toBe('200px');
     });
   });
 
