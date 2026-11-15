@@ -291,11 +291,10 @@
                   <div class="companion-controls-bar">
                     <div class="companion-controls-left">
                       <button type="button" class="btn-player-btn" id="btn-companion-jump-back" title="Rewind 5s (Left Arrow)" data-i18n-title="transcribe.companionRewind5s" onclick="jumpCompanionPlayback(-5)">
-                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                           <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
                           <path d="M3 3v5h5"/>
                         </svg>
-                        <span class="jump-badge">-5s</span>
                       </button>
                       <button type="button" class="btn-player-play-main" id="btn-companion-play-toggle" title="Play / Pause (Space)" data-i18n-title="transcribe.companionPlayPause" onclick="toggleCompanionPlayback()">
                         <svg id="icon-companion-play" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
@@ -306,11 +305,10 @@
                         </svg>
                       </button>
                       <button type="button" class="btn-player-btn" id="btn-companion-jump-fwd" title="Forward 5s (Right Arrow)" data-i18n-title="transcribe.companionForward5s" onclick="jumpCompanionPlayback(5)">
-                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                           <path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
                           <path d="M21 3v5h-5"/>
                         </svg>
-                        <span class="jump-badge">+5s</span>
                       </button>
                     </div>
 
@@ -380,13 +378,18 @@
                   </div>
 
                   <!-- Quick Keyboard Shortcuts Cheat Sheet -->
-                  <div class="companion-shortcuts-card">
-                    <div class="shortcuts-header">
-                      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M8 16h8"/>
+                  <details class="companion-shortcuts-card" id="companion-shortcuts-details">
+                    <summary class="shortcuts-header">
+                      <div class="shortcuts-header-left">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                          <rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M8 16h8"/>
+                        </svg>
+                        <span data-i18n="transcribe.companionShortcutsTitle">Keyboard Shortcuts</span>
+                      </div>
+                      <svg class="shortcuts-chevron" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="6 9 12 15 18 9"></polyline>
                       </svg>
-                      <span data-i18n="transcribe.companionShortcutsTitle">Keyboard Shortcuts</span>
-                    </div>
+                    </summary>
                     <div class="shortcuts-list">
                       <div class="shortcut-item">
                         <kbd>Space</kbd>
@@ -417,7 +420,7 @@
                         <span data-i18n="transcribe.companionShortcutRedo">Redo edit</span>
                       </div>
                     </div>
-                  </div>
+                  </details>
 
                   <!-- Return to Setup / Transcribe New File -->
                   <div class="companion-footer-actions">

@@ -63,6 +63,7 @@ export function showTranscribeSetupDeck(): void {
   const setupTabSetup = document.getElementById('btn-setup-tab-setup');
   const setupTabPlayer = document.getElementById('btn-setup-tab-player');
   const setupDeckTabs = document.getElementById('setup-deck-mode-tabs');
+  const manageSettingsBtn = document.getElementById('btn-transcribe-manage-settings');
 
   if (setupDeck) setupDeck.style.display = 'flex';
   if (mediaDeck) mediaDeck.style.display = 'none';
@@ -70,8 +71,11 @@ export function showTranscribeSetupDeck(): void {
   if (tabPlayer) tabPlayer.classList.remove('active');
   if (setupTabSetup) setupTabSetup.classList.add('active');
   if (setupTabPlayer) setupTabPlayer.classList.remove('active');
-  if (setupDeckTabs && activeMediaInfo) {
-    setupDeckTabs.style.display = 'inline-flex';
+  if (setupDeckTabs) {
+    setupDeckTabs.style.display = activeMediaInfo ? 'inline-flex' : 'none';
+  }
+  if (manageSettingsBtn) {
+    manageSettingsBtn.style.display = activeMediaInfo ? 'none' : 'inline-flex';
   }
 }
 
@@ -109,6 +113,8 @@ export async function loadMediaIntoCompanionPlayer(filePath: string, autoSwitchD
     } else {
       const setupDeckTabs = document.getElementById('setup-deck-mode-tabs');
       if (setupDeckTabs) setupDeckTabs.style.display = 'inline-flex';
+      const manageSettingsBtn = document.getElementById('btn-transcribe-manage-settings');
+      if (manageSettingsBtn) manageSettingsBtn.style.display = 'none';
     }
     return true;
   }
@@ -278,6 +284,8 @@ export async function loadMediaIntoCompanionPlayer(filePath: string, autoSwitchD
   } else {
     const setupDeckTabs = document.getElementById('setup-deck-mode-tabs');
     if (setupDeckTabs) setupDeckTabs.style.display = 'inline-flex';
+    const manageSettingsBtn = document.getElementById('btn-transcribe-manage-settings');
+    if (manageSettingsBtn) manageSettingsBtn.style.display = 'none';
   }
   return true;
 }
@@ -418,6 +426,8 @@ export function unloadCompanionPlayer(): void {
   showTranscribeSetupDeck();
   const setupDeckTabs = document.getElementById('setup-deck-mode-tabs');
   if (setupDeckTabs) setupDeckTabs.style.display = 'none';
+  const manageSettingsBtn = document.getElementById('btn-transcribe-manage-settings');
+  if (manageSettingsBtn) manageSettingsBtn.style.display = 'inline-flex';
 }
 
 export function changeCompanionPlaybackRate(rateStr: string): void {

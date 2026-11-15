@@ -364,6 +364,7 @@
   display: flex;
   align-items: center;
   min-width: 0;
+  flex: 1;
 }
 
 .transcribe-deck-title {
@@ -1890,8 +1891,8 @@ html[dir="rtl"] #options-for-batch-sort-select .custom-select-option.selected {
 
 /* Keyframe animation for pane transitions */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 
@@ -1917,14 +1918,20 @@ html[dir="rtl"] #transcript-search::placeholder,
 .transcribe-media-deck {
   display: flex;
   flex-direction: column;
+  min-height: 100%;
+  height: auto;
+  flex-shrink: 0;
   gap: 12px;
-  padding: 16px;
-  background: var(--bg-surface, #121215);
-  border: 1px solid var(--border-subtle, #27272a);
-  border-radius: var(--radius-lg, 12px);
+  padding: 18px 20px;
+  border-radius: 12px;
+  background: var(--bg-glass-card, rgba(20, 24, 39, 0.65));
+  border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.08));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
   min-width: 0;
   width: 100%;
-  animation: fadeIn 0.2s ease-out;
+  box-sizing: border-box;
 }
 
 .deck-mode-tabs {
@@ -1946,13 +1953,13 @@ html[dir="rtl"] #transcript-search::placeholder,
   font-weight: 500;
   color: var(--color-text-dim, #71717a);
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
   border-radius: 4px;
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.btn-deck-tab:hover {
+.btn-deck-tab:hover:not(.active) {
   color: var(--color-text, #fafafa);
   background: rgba(255, 255, 255, 0.06);
 }
@@ -1960,7 +1967,7 @@ html[dir="rtl"] #transcript-search::placeholder,
 .btn-deck-tab.active {
   color: #fff;
   background: rgba(var(--color-royal-blue-rgb, 59, 130, 246), 0.25);
-  border: 1px solid rgba(var(--color-royal-blue-rgb, 59, 130, 246), 0.4);
+  border-color: rgba(var(--color-royal-blue-rgb, 59, 130, 246), 0.4);
 }
 
 /* Companion Player Stage */
@@ -1969,7 +1976,7 @@ html[dir="rtl"] #transcript-search::placeholder,
   background: #000;
   border-radius: var(--radius-md, 8px);
   overflow: hidden;
-  border: 1px solid var(--border-subtle, #27272a);
+  border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.08));
   display: flex;
   justify-content: center;
   align-items: center;
@@ -1982,24 +1989,25 @@ html[dir="rtl"] #transcript-search::placeholder,
   justify-content: center;
   align-items: center;
   background: #050507;
-  min-height: 200px;
-  max-height: 280px;
+  min-height: 160px;
+  max-height: 220px;
+  overflow: hidden;
 }
 
 .companion-video-container video {
   width: 100%;
-  max-height: 280px;
+  max-height: 220px;
   object-fit: contain;
   display: block;
   outline: none;
 }
 
 .companion-video-container.aspect-vertical {
-  max-height: 340px;
+  max-height: 260px;
 }
 
 .companion-video-container.aspect-vertical video {
-  max-height: 340px;
+  max-height: 260px;
   object-fit: contain;
 }
 
@@ -2077,9 +2085,9 @@ html[dir="rtl"] #transcript-search::placeholder,
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 6px 8px;
+  padding: 6px 10px;
   background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border-subtle, #27272a);
+  border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.08));
   border-radius: var(--radius-md, 8px);
 }
 
@@ -2094,8 +2102,8 @@ html[dir="rtl"] #transcript-search::placeholder,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   background: var(--bg-elevated, #18181b);
   border: 1px solid var(--border-subtle, #27272a);
   border-radius: var(--radius-sm, 6px);
@@ -2110,12 +2118,9 @@ html[dir="rtl"] #transcript-search::placeholder,
   border-color: var(--border-focus, #3f3f46);
 }
 
-.btn-player-btn .jump-badge {
-  font-size: 0.55rem;
-  font-weight: 700;
-  position: absolute;
-  bottom: 1px;
-  font-family: var(--font-mono, monospace);
+.btn-player-btn:focus-visible {
+  outline: 2px solid var(--accent-primary, #3b82f6);
+  outline-offset: 1px;
 }
 
 .btn-player-play-main {
@@ -2183,15 +2188,25 @@ html[dir="rtl"] #transcript-search::placeholder,
 }
 
 /* Metadata & Shortcuts Cards */
-.companion-meta-card,
-.companion-shortcuts-card {
-  padding: 10px 12px;
+.companion-meta-card {
+  padding: 8px 12px;
   background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border-subtle, #27272a);
+  border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-md, 8px);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.companion-shortcuts-card {
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.08));
   border-radius: var(--radius-md, 8px);
   display: flex;
   flex-direction: column;
   gap: 8px;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .meta-row.meta-filename-row {
@@ -2219,9 +2234,9 @@ html[dir="rtl"] #transcript-search::placeholder,
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 8px;
-  background: rgba(255, 255, 255, 0.025);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  padding: 3px 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 4px;
   font-size: 0.7rem;
 }
@@ -2239,12 +2254,40 @@ html[dir="rtl"] #transcript-search::placeholder,
 .shortcuts-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+}
+
+.shortcuts-header:focus-visible {
+  outline: 2px solid var(--accent-primary, #3b82f6);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm, 6px);
+}
+
+.shortcuts-header::-webkit-details-marker {
+  display: none;
+}
+
+.shortcuts-header-left {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   font-weight: 600;
   color: var(--color-text-dim, #71717a);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.shortcuts-chevron {
+  color: var(--color-text-dim, #71717a);
+  transition: transform 0.2s ease;
+}
+
+details.companion-shortcuts-card[open] .shortcuts-chevron {
+  transform: rotate(180deg);
 }
 
 .shortcuts-list {
