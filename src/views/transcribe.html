@@ -355,6 +355,13 @@
                             <span id="companion-speed-label">1.0x</span>
                           </button>
 
+                          <button type="button" class="btn-player-btn" id="btn-companion-shortcuts" onclick="openShortcutsModal()" title="Keyboard Shortcuts (?)" data-i18n-title="transcribe.companionShortcutsTitle" aria-label="Keyboard Shortcuts" data-i18n-aria="transcribe.companionShortcutsTitle">
+                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                              <rect width="20" height="16" x="2" y="4" rx="2"/>
+                              <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M8 16h8"/>
+                            </svg>
+                          </button>
+
                           <button type="button" class="btn-player-btn" id="btn-companion-fullscreen" onclick="toggleCompanionFullscreen()" title="Fullscreen" data-i18n-title="transcribe.companionFullscreen" aria-label="Fullscreen">
                             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                               <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
@@ -364,55 +371,6 @@
                       </div>
                     </div>
                   </div>
-
-                  <!-- Quick Keyboard Shortcuts Cheat Sheet -->
-                  <details class="companion-shortcuts-card" id="companion-shortcuts-details">
-                    <summary class="shortcuts-header">
-                      <div class="shortcuts-header-left">
-                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
-                          <rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M8 16h8"/>
-                        </svg>
-                        <span data-i18n="transcribe.companionShortcutsTitle">Keyboard Shortcuts</span>
-                      </div>
-                      <svg class="shortcuts-chevron" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="6 9 12 15 18 9"></polyline>
-                      </svg>
-                    </summary>
-                    <div class="shortcuts-list">
-                      <div class="shortcut-item">
-                        <kbd>Space</kbd>
-                        <span data-i18n="transcribe.companionShortcutSpace">Play / Pause</span>
-                      </div>
-                      <div class="shortcut-item">
-                        <kbd>← / →</kbd>
-                        <span data-i18n="transcribe.companionShortcutSeek5s">Rewind / Forward 5s</span>
-                      </div>
-                      <div class="shortcut-item">
-                        <kbd>Enter</kbd>
-                        <span data-i18n="transcribe.companionShortcutEnter">Split segment at cursor</span>
-                      </div>
-                      <div class="shortcut-item">
-                        <kbd>Backspace</kbd>
-                        <span data-i18n="transcribe.companionShortcutBackspace">Merge with previous</span>
-                      </div>
-                      <div class="shortcut-item">
-                        <kbd>Tab</kbd>
-                        <span data-i18n="transcribe.companionShortcutTab">Next segment</span>
-                      </div>
-                      <div class="shortcut-item">
-                        <kbd>Click</kbd>
-                        <span data-i18n="transcribe.companionShortcutClick">Seek to segment or word</span>
-                      </div>
-                      <div class="shortcut-item">
-                        <kbd>Ctrl + Z</kbd>
-                        <span data-i18n="transcribe.companionShortcutUndo">Undo edit</span>
-                      </div>
-                      <div class="shortcut-item">
-                        <kbd>Ctrl + Shift + Z</kbd>
-                        <span data-i18n="transcribe.companionShortcutRedo">Redo edit</span>
-                      </div>
-                    </div>
-                  </details>
                 </div>
               </div>
 
@@ -515,6 +473,17 @@
                             <span data-i18n="transcribe.sendToHardsub">Send to Hardsub Studio</span>
                           </button>
                         </div>
+                      </div>
+
+                      <div class="toolbar-divider" aria-hidden="true"></div>
+
+                      <div class="toolbar-btn-group">
+                        <button class="btn-secondary btn-icon-only btn-toolbar-shortcuts" id="btn-transcribe-shortcuts" type="button" onclick="openShortcutsModal()" data-i18n-title="transcribe.companionShortcutsTitle" title="Keyboard Shortcuts (?)" aria-label="Keyboard Shortcuts" data-i18n-aria="transcribe.companionShortcutsTitle">
+                          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect width="20" height="16" x="2" y="4" rx="2"/>
+                            <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M8 16h8"/>
+                          </svg>
+                        </button>
                       </div>
                     </div>
                   </div>

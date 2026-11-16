@@ -14,7 +14,8 @@ import {
   fetchLatestRelease,
   renderUpdateCheckerUI,
   getUpdateCheckerState,
-  resetUpdateCheckerState
+  resetUpdateCheckerState,
+  _handleShortcutsModalKeydown
 } from './appModal';
 
 // Resilient headless DOM mock for Node Vitest runner
@@ -662,6 +663,47 @@ describe('appModal & Feedback Module', () => {
     });
   });
 
+  describe('shortcuts modal dialog controller', () => {
+    it('opens and closes shortcuts modal smoothly and handles Escape and question mark keys', () => {
+      const overlay = document.createElement('div');
+      overlay.id = 'shortcuts-modal-overlay';
+      overlay.style.display = 'none';
+
+      const card = document.createElement('div');
+      card.className = 'shortcuts-modal-card';
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'btn-shortcuts-close';
+      card.appendChild(closeBtn);
+      overlay.appendChild(card);
+      document.body.appendChild(overlay);
+
+      expect(typeof (window as any).openShortcutsModal).toBe('function');
+      expect(typeof (window as any).closeShortcutsModal).toBe('function');
+      expect(typeof appModal.openShortcuts).toBe('function');
+      expect(typeof appModal.closeShortcuts).toBe('function');
+
+      (window as any).openShortcutsModal();
+      expect(overlay.style.display).toBe('flex');
+      expect(overlay.classList.contains('show')).toBe(true);
+
+      // Trigger Escape key via event handler
+      const escEvent = { key: 'Escape', preventDefault: vi.fn(), stopPropagation: vi.fn() } as any;
+      _handleShortcutsModalKeydown(escEvent);
+      expect(escEvent.preventDefault).toHaveBeenCalled();
+      expect(overlay.classList.contains('show')).toBe(false);
+
+      // Test Persian question mark key "؟"
+      (window as any).openShortcutsModal();
+      expect(overlay.classList.contains('show')).toBe(true);
+      const faEvent = { key: '؟', preventDefault: vi.fn(), stopPropagation: vi.fn() } as any;
+      _handleShortcutsModalKeydown(faEvent);
+      expect(faEvent.preventDefault).toHaveBeenCalled();
+      expect(overlay.classList.contains('show')).toBe(false);
+
+      overlay.remove();
+    });
+  });
+
   describe('appModal controller namespace export', () => {
     it('exposes all expected functions and window bindings', () => {
       expect(typeof appModal.notify).toBe('function');
@@ -669,10 +711,14 @@ describe('appModal & Feedback Module', () => {
       expect(typeof appModal.close).toBe('function');
       expect(typeof appModal.confirm).toBe('function');
       expect(typeof appModal.compareSemver).toBe('function');
+      expect(typeof appModal.openShortcuts).toBe('function');
+      expect(typeof appModal.closeShortcuts).toBe('function');
       expect(typeof (window as any).showNotification).toBe('function');
       expect(typeof (window as any).showAppModal).toBe('function');
       expect(typeof (window as any).showConfirmModal).toBe('function');
       expect(typeof (window as any).showBatchErrorDialog).toBe('function');
+      expect(typeof (window as any).openShortcutsModal).toBe('function');
+      expect(typeof (window as any).closeShortcutsModal).toBe('function');
     });
   });
 });

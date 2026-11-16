@@ -287,6 +287,25 @@ export function setupSearchShortcuts(): void {
   document.addEventListener('keydown', (e: KeyboardEvent) => {
     const target = e.target as HTMLElement | null;
     const isEditing = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+
+    if ((e.key === '?' || e.key === '؟') && !isEditing && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const shortcutsOverlay = document.getElementById('shortcuts-modal-overlay');
+      if (shortcutsOverlay && (shortcutsOverlay.classList.contains('show') || shortcutsOverlay.style.display === 'flex')) {
+        if (typeof (window as any).closeShortcutsModal === 'function') {
+          e.preventDefault();
+          (window as any).closeShortcutsModal();
+          return;
+        }
+      } else {
+        const isOtherModalOpen = Boolean(document.querySelector('.modal-overlay.show'));
+        if (!isOtherModalOpen && typeof (window as any).openShortcutsModal === 'function') {
+          e.preventDefault();
+          (window as any).openShortcutsModal();
+          return;
+        }
+      }
+    }
+
     if ((e.key === '/' && !isEditing) || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f')) {
       if (activeView === 'settings') {
         const input = document.getElementById('settings-search-input') as HTMLInputElement | null;

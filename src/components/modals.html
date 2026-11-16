@@ -770,3 +770,118 @@
         </div>
       </div>
     </div>
+
+    <!-- Quick Keyboard Shortcuts Modal Overlay -->
+    <div class="modal-overlay" id="shortcuts-modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="shortcuts-modal-title">
+      <div class="shortcuts-modal-card" tabindex="-1">
+        <!-- Close Button -->
+        <button type="button" class="about-modal-close-btn" onclick="closeShortcutsModal()" aria-label="Close" data-i18n-aria="common.close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+
+        <!-- Header -->
+        <div class="shortcuts-modal-header">
+          <div class="shortcuts-modal-title-row">
+            <div class="shortcuts-modal-icon-badge" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect width="20" height="16" x="2" y="4" rx="2"/>
+                <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M8 16h8"/>
+              </svg>
+            </div>
+            <div class="shortcuts-modal-heading-text">
+              <h3 class="shortcuts-modal-title" id="shortcuts-modal-title" data-i18n="transcribe.companionShortcutsTitle">Keyboard Shortcuts</h3>
+              <span class="shortcuts-modal-subtitle" data-i18n="transcribe.liveViewerTitle">Live Transcript Viewer</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Categorized Grid Body -->
+        <div class="shortcuts-modal-body">
+          <!-- Section 1: Media Player & Playback -->
+          <div class="shortcuts-modal-section">
+            <div class="shortcuts-section-heading">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polygon points="6 3 20 12 6 21 6 3"/>
+              </svg>
+              <span data-i18n="transcribe.companionPlayerTitle">Companion Player</span>
+            </div>
+            <div class="shortcuts-modal-items">
+              <div class="shortcut-modal-item">
+                <span class="shortcut-modal-desc" data-i18n="transcribe.companionShortcutSpace">Play / Pause</span>
+                <kbd class="shortcut-kbd">Space</kbd>
+              </div>
+              <div class="shortcut-modal-item">
+                <span class="shortcut-modal-desc" data-i18n="transcribe.companionShortcutSeek5s">Rewind / Forward 5s</span>
+                <div class="shortcut-kbd-group" dir="ltr">
+                  <kbd class="shortcut-kbd">←</kbd>
+                  <span class="shortcut-kbd-sep">/</span>
+                  <kbd class="shortcut-kbd">→</kbd>
+                </div>
+              </div>
+              <div class="shortcut-modal-item">
+                <span class="shortcut-modal-desc" data-i18n="transcribe.companionShortcutClick">Seek to segment or word</span>
+                <kbd class="shortcut-kbd">Click</kbd>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 2: Transcript & Subtitle Editor -->
+          <div class="shortcuts-modal-section">
+            <div class="shortcuts-section-heading">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+              </svg>
+              <span data-i18n="transcribe.liveViewerTitle">Live Transcript Viewer</span>
+            </div>
+            <div class="shortcuts-modal-items">
+              <div class="shortcut-modal-item">
+                <span class="shortcut-modal-desc" data-i18n="transcribe.companionShortcutEnter">Split segment at cursor</span>
+                <kbd class="shortcut-kbd">Enter</kbd>
+              </div>
+              <div class="shortcut-modal-item">
+                <span class="shortcut-modal-desc" data-i18n="transcribe.companionShortcutBackspace">Merge with previous</span>
+                <kbd class="shortcut-kbd">Backspace</kbd>
+              </div>
+              <div class="shortcut-modal-item">
+                <span class="shortcut-modal-desc" data-i18n="transcribe.companionShortcutTab">Next segment</span>
+                <kbd class="shortcut-kbd">Tab</kbd>
+              </div>
+              <div class="shortcut-modal-item">
+                <span class="shortcut-modal-desc" data-i18n="transcribe.companionShortcutUndo">Undo edit</span>
+                <div class="shortcut-kbd-group" dir="ltr">
+                  <kbd class="shortcut-kbd">Ctrl</kbd>
+                  <span class="shortcut-kbd-sep">+</span>
+                  <kbd class="shortcut-kbd">Z</kbd>
+                </div>
+              </div>
+              <div class="shortcut-modal-item">
+                <span class="shortcut-modal-desc" data-i18n="transcribe.companionShortcutRedo">Redo edit</span>
+                <div class="shortcut-kbd-group" dir="ltr">
+                  <kbd class="shortcut-kbd">Ctrl</kbd>
+                  <span class="shortcut-kbd-sep">+</span>
+                  <kbd class="shortcut-kbd">Shift</kbd>
+                  <span class="shortcut-kbd-sep">+</span>
+                  <kbd class="shortcut-kbd">Z</kbd>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="shortcuts-modal-footer">
+          <div class="shortcuts-footer-hint" dir="ltr">
+            <kbd class="shortcut-kbd-sm">?</kbd>
+            <span class="shortcut-kbd-sep">/</span>
+            <kbd class="shortcut-kbd-sm">Esc</kbd>
+          </div>
+          <button type="button" class="btn-primary btn-shortcuts-close" onclick="closeShortcutsModal()" data-i18n="modals.ok">OK</button>
+        </div>
+      </div>
+    </div>

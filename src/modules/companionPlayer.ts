@@ -954,6 +954,8 @@ export function initCompanionPlayerDOM(): void {
       // Do not intercept keyboard shortcuts if an application modal dialog is currently open
       const modalOverlay = document.getElementById('app-modal-overlay');
       if (modalOverlay && modalOverlay.style.display !== 'none') return;
+      const shortcutsOverlay = document.getElementById('shortcuts-modal-overlay');
+      if (shortcutsOverlay && (shortcutsOverlay.classList.contains('show') || shortcutsOverlay.style.display !== 'none')) return;
 
       const transcribePanel = document.getElementById('panel-transcribe');
       if (!transcribePanel || !transcribePanel.classList.contains('active')) return;

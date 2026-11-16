@@ -2502,86 +2502,21 @@ html[dir="rtl"] #transcript-search::placeholder,
   box-shadow: 0 0 6px rgba(var(--color-royal-blue-rgb, 59, 130, 246), 0.8);
 }
 
-/* Shortcuts Details (Collapsible without layout bugs or dead space) */
-.companion-shortcuts-card {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.08));
-  border-radius: var(--radius-md, 8px);
-  overflow: hidden;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
-}
-
-.shortcuts-header {
-  padding: 9px 14px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  cursor: pointer;
-  user-select: none;
-  list-style: none;
-  transition: background-color 0.15s ease;
-}
-
-.shortcuts-header:hover {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.shortcuts-header:focus-visible {
-  outline: 2px solid var(--accent-primary, #3b82f6);
-  outline-offset: -1px;
-}
-
-.shortcuts-header::-webkit-details-marker {
-  display: none;
-}
-
-.shortcuts-header-left {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.76rem;
-  font-weight: 500;
-  color: var(--color-text-muted, #a1a1aa);
-}
-
-.shortcuts-chevron {
+/* Shortcuts Toolbar Trigger */
+.btn-toolbar-shortcuts {
   color: var(--color-text-dim, #71717a);
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
 }
 
-details.companion-shortcuts-card[open] .shortcuts-chevron {
-  transform: rotate(180deg);
-}
-
-details.companion-shortcuts-card[open] .shortcuts-header {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.shortcuts-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 10px 14px 12px 14px;
-}
-
-.shortcut-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 0.74rem;
-  color: var(--color-text-muted, #a1a1aa);
-}
-
-.shortcut-item kbd {
-  font-family: var(--font-mono, monospace);
-  font-size: 0.68rem;
-  font-weight: 600;
+.btn-toolbar-shortcuts:hover {
   color: var(--color-text, #fafafa);
-  background: var(--bg-elevated, #18181b);
-  border: 1px solid var(--border-subtle, #27272a);
-  padding: 1px 6px;
-  border-radius: 3px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--border-focus, #3f3f46);
+}
+
+.btn-toolbar-shortcuts:focus-visible {
+  outline: 2px solid var(--accent-primary, #3b82f6);
+  outline-offset: 1px;
 }
 
 /* Card Actions (Play, Split, Merge) */

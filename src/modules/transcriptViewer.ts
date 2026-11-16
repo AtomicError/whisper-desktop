@@ -1839,6 +1839,8 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
     // Do not intercept if an application modal overlay is open
     const modalOverlay = document.getElementById('app-modal-overlay');
     if (modalOverlay && modalOverlay.style.display !== 'none') return;
+    const shortcutsOverlay = document.getElementById('shortcuts-modal-overlay');
+    if (shortcutsOverlay && (shortcutsOverlay.classList.contains('show') || shortcutsOverlay.style.display !== 'none')) return;
 
     // Only active when transcribe panel is active
     const transcribePanel = document.getElementById('panel-transcribe');

@@ -336,6 +336,8 @@
 .about-modal-close-btn {
   position: absolute;
   top: 16px;
+  inset-inline-end: 16px;
+  inset-inline-start: auto;
   right: 16px;
   left: auto;
   width: 32px;
@@ -385,6 +387,11 @@
 .about-modal-close-btn svg {
   width: 15px;
   height: 15px;
+}
+
+html[dir="rtl"] .about-modal-close-btn {
+  right: auto;
+  left: 16px;
 }
 
 /* Modal Body */
@@ -803,5 +810,205 @@
   color: var(--color-text-dim);
   margin-top: 2px;
   line-height: 1.4;
+}
+
+/* ==========================================================================
+   Keyboard Shortcuts Modal (Linear / macOS Native Aesthetic)
+   ========================================================================== */
+.shortcuts-modal-card {
+  max-width: 580px;
+  width: 92%;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  border-radius: var(--radius-lg, 16px);
+  padding: 24px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  background-color: var(--bg-surface, #121215);
+  background-image: linear-gradient(180deg, var(--bg-surface, #121215) 0%, var(--bg-app, #09090b) 100%);
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.1));
+  border-top-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 
+    0 28px 70px rgba(0, 0, 0, 0.94),
+    0 0 0 1px rgba(255, 255, 255, 0.05),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+  transform: scale(0.96);
+  opacity: 0;
+  outline: none;
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s ease;
+}
+
+.modal-overlay.show .shortcuts-modal-card {
+  transform: scale(1);
+  opacity: 1;
+}
+
+.shortcuts-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  padding-inline-end: 36px;
+  border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+}
+
+.shortcuts-modal-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.shortcuts-modal-icon-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md, 8px);
+  background: rgba(var(--color-royal-blue-rgb, 59, 130, 246), 0.1);
+  border: 1px solid rgba(var(--color-royal-blue-rgb, 59, 130, 246), 0.25);
+  color: var(--color-royal-blue, #3b82f6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.shortcuts-modal-heading-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.shortcuts-modal-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-primary, #fafafa);
+  margin: 0;
+  line-height: 1.3;
+}
+
+.shortcuts-modal-subtitle {
+  font-size: 0.76rem;
+  color: var(--text-secondary, #a1a1aa);
+  font-weight: 400;
+}
+
+.shortcuts-modal-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+@media (max-width: 540px) {
+  .shortcuts-modal-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.shortcuts-modal-section {
+  background: var(--bg-elevated, #18181b);
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-md, 8px);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.shortcuts-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-royal-blue, #3b82f6);
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.shortcuts-modal-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.shortcut-modal-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 24px;
+}
+
+.shortcut-modal-desc {
+  font-size: 0.76rem;
+  color: var(--text-secondary, #a1a1aa);
+  line-height: 1.3;
+}
+
+.shortcut-kbd-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.shortcut-kbd-sep {
+  font-size: 0.7rem;
+  color: var(--text-muted, #71717a);
+  font-weight: 500;
+}
+
+.shortcut-kbd {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-primary, #fafafa);
+  background: var(--bg-app, #09090b);
+  border: 1px solid var(--border-focus, #3f3f46);
+  padding: 2px 7px;
+  border-radius: var(--radius-sm, 4px);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.shortcuts-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+}
+
+.shortcuts-footer-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.shortcut-kbd-sm {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text-secondary, #a1a1aa);
+  background: var(--bg-app, #09090b);
+  border: 1px solid var(--border-subtle, #27272a);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.btn-shortcuts-close {
+  padding: 6px 20px;
+  font-size: 0.82rem;
+  height: 32px;
+  min-height: 32px;
 }
 

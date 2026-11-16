@@ -20,6 +20,8 @@ declare global {
     resolveBatchError?: (choice: string) => void;
     openAboutModal: () => void;
     closeAboutModal: () => void;
+    openShortcutsModal: () => void;
+    closeShortcutsModal: () => void;
     checkForAppUpdates: () => Promise<void>;
     renderUpdateCheckerUI: () => void;
     syncAppVersionUI: () => void;
@@ -877,21 +879,130 @@ export function closeAboutModal(): void {
 }
 
 let _isAboutOverlayMouseDown = false;
+let _isShortcutsOverlayMouseDown = false;
+let _shortcutsModalTimer: ReturnType<typeof setTimeout> | null = null;
+let _shortcutsModalLastFocus: HTMLElement | null = null;
+
+export function _handleShortcutsModalKeydown(e: KeyboardEvent): void {
+  if (typeof document === 'undefined') return;
+
+  const overlay = document.getElementById('shortcuts-modal-overlay');
+  if (!overlay || !overlay.classList.contains('show')) return;
+
+  if (e.key === 'Escape' || ((e.key === '?' || e.key === '؟') && !e.ctrlKey && !e.metaKey && !e.altKey)) {
+    e.preventDefault();
+    e.stopPropagation();
+    closeShortcutsModal();
+    return;
+  }
+
+  if (e.key === 'Tab') {
+    const focusable = overlay.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    );
+    if (!focusable.length) return;
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const card = overlay.querySelector('.shortcuts-modal-card');
+
+    if (e.shiftKey) {
+      const isFirst = document.activeElement === first;
+      const isCard = document.activeElement === card;
+      const isOutside = !overlay.contains(document.activeElement);
+      if (isFirst || isCard || isOutside) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else {
+      const isLast = document.activeElement === last;
+      const isOutside = !overlay.contains(document.activeElement);
+      if (isLast || isOutside) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  }
+}
+
+export function openShortcutsModal(): void {
+  if (typeof document === 'undefined') return;
+
+  const overlay = document.getElementById('shortcuts-modal-overlay');
+  if (overlay) {
+    if (_shortcutsModalTimer) {
+      clearTimeout(_shortcutsModalTimer);
+      _shortcutsModalTimer = null;
+    }
+    if (!overlay.classList.contains('show')) {
+      _shortcutsModalLastFocus = (document.activeElement as HTMLElement) || null;
+    }
+
+    overlay.style.display = 'flex';
+    void overlay.offsetWidth;
+    overlay.classList.add('show');
+
+    document.addEventListener('keydown', _handleShortcutsModalKeydown);
+
+    safeRaf(() => {
+      if (typeof document === 'undefined') return;
+      const card = overlay.querySelector('.shortcuts-modal-card') as HTMLElement | null;
+      if (card) {
+        card.focus({ preventScroll: true });
+      } else {
+        const closeBtn = overlay.querySelector('.btn-shortcuts-close, .about-modal-close-btn') as HTMLElement | null;
+        if (closeBtn) closeBtn.focus({ preventScroll: true });
+      }
+    });
+  }
+}
+
+export function closeShortcutsModal(): void {
+  if (typeof document === 'undefined') return;
+
+  const overlay = document.getElementById('shortcuts-modal-overlay');
+  if (overlay) {
+    if (_shortcutsModalTimer) {
+      clearTimeout(_shortcutsModalTimer);
+    }
+    overlay.classList.remove('show');
+    document.removeEventListener('keydown', _handleShortcutsModalKeydown);
+
+    _shortcutsModalTimer = setTimeout(() => {
+      overlay.style.display = 'none';
+      _shortcutsModalTimer = null;
+    }, 220);
+
+    if (_shortcutsModalLastFocus && typeof _shortcutsModalLastFocus.focus === 'function') {
+      try {
+        _shortcutsModalLastFocus.focus();
+      } catch (_) {}
+      _shortcutsModalLastFocus = null;
+    }
+  }
+}
 
 export function setupAboutModalEvents(): void {
   if (typeof document === 'undefined') return;
 
   document.addEventListener('mousedown', (e) => {
-    const overlay = document.getElementById('about-modal-overlay');
-    _isAboutOverlayMouseDown = Boolean(overlay && e.target === overlay);
+    const aboutOverlay = document.getElementById('about-modal-overlay');
+    _isAboutOverlayMouseDown = Boolean(aboutOverlay && e.target === aboutOverlay);
+    const shortcutsOverlay = document.getElementById('shortcuts-modal-overlay');
+    _isShortcutsOverlayMouseDown = Boolean(shortcutsOverlay && e.target === shortcutsOverlay);
   });
 
   document.addEventListener('click', (e) => {
-    const overlay = document.getElementById('about-modal-overlay');
-    if (overlay && e.target === overlay && _isAboutOverlayMouseDown) {
+    const aboutOverlay = document.getElementById('about-modal-overlay');
+    if (aboutOverlay && e.target === aboutOverlay && _isAboutOverlayMouseDown) {
       closeAboutModal();
     }
+    const shortcutsOverlay = document.getElementById('shortcuts-modal-overlay');
+    if (shortcutsOverlay && e.target === shortcutsOverlay && _isShortcutsOverlayMouseDown) {
+      closeShortcutsModal();
+    }
     _isAboutOverlayMouseDown = false;
+    _isShortcutsOverlayMouseDown = false;
   });
 }
 
@@ -961,6 +1072,8 @@ export function syncAppModalWindowBindings(): void {
   win.showBatchErrorDialog = showBatchErrorDialog;
   win.openAboutModal = openAboutModal;
   win.closeAboutModal = closeAboutModal;
+  win.openShortcutsModal = openShortcutsModal;
+  win.closeShortcutsModal = closeShortcutsModal;
   win.checkForAppUpdates = checkForAppUpdates;
   win.renderUpdateCheckerUI = renderUpdateCheckerUI;
   win.syncAppVersionUI = syncAppVersionUI;
@@ -987,6 +1100,8 @@ export const appModal = {
   syncVersionUI: syncAppVersionUI,
   openAbout: openAboutModal,
   closeAbout: closeAboutModal,
+  openShortcuts: openShortcutsModal,
+  closeShortcuts: closeShortcutsModal,
   getUpdateState: getUpdateCheckerState,
   resetUpdateState: resetUpdateCheckerState,
   syncWindowBindings: syncAppModalWindowBindings
