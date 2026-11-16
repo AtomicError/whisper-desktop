@@ -251,6 +251,8 @@ export const es: Translations = {
     highlightConfidence: 'Confianza',
     companionSetupTab: 'Ajustes',
     companionPlayerTab: 'Reproductor',
+    resizerTooltip: 'Arrastre para redimensionar el panel (doble clic para restablecer)',
+    resizerAria: 'Redimensionar paneles',
     companionMetaDuration: 'Duración:',
     companionMetaResolution: 'Resolución:',
     companionMetaAspect: 'Relación:',

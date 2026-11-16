@@ -251,6 +251,8 @@ export const ar: Translations = {
     highlightConfidence: 'نسبة الثقة',
     companionSetupTab: 'الإعدادات',
     companionPlayerTab: 'المشغل',
+    resizerTooltip: 'اسحب لتغيير حجم اللوحة (انقر نقرًا مزدوجًا لإعادة الضبط)',
+    resizerAria: 'تغيير حجم الألواح',
     companionMetaDuration: 'المدة:',
     companionMetaResolution: 'الدقة:',
     companionMetaAspect: 'النسبة:',

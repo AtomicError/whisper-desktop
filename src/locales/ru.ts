@@ -251,6 +251,8 @@ export const ru: Translations = {
     highlightConfidence: 'Уверенность',
     companionSetupTab: 'Настройки',
     companionPlayerTab: 'Плеер',
+    resizerTooltip: 'Потяните для изменения размера (двойной клик для сброса)',
+    resizerAria: 'Изменение размера панелей',
     companionMetaDuration: 'Длительность:',
     companionMetaResolution: 'Разрешение:',
     companionMetaAspect: 'Соотношение:',

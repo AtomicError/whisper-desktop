@@ -1,12 +1,114 @@
 /* 4. Transcribe File View */
 .transcribe-layout {
+  --transcribe-default-left-width: 420px;
+  --transcribe-min-left-width: 420px;
   display: grid;
-  grid-template-columns: minmax(380px, 440px) 1fr;
-  gap: 16px;
+  grid-template-columns: var(--transcribe-left-panel-width, var(--transcribe-default-left-width)) 12px minmax(0, 1fr);
+  gap: 4px;
   flex-grow: 1;
   min-height: 0;
   height: 100%;
   width: 100%;
+  position: relative;
+}
+
+.transcribe-layout.is-animating {
+  transition: grid-template-columns 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.transcribe-layout-resizer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 100%;
+  cursor: col-resize;
+  position: relative;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  z-index: 15;
+  outline: none;
+  border-radius: var(--radius-sm, 6px);
+}
+
+.transcribe-layout-resizer:focus-visible {
+  outline: 2px solid var(--accent-primary, #3b82f6);
+  outline-offset: -1px;
+}
+
+.transcribe-resizer-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background-color: var(--border-subtle, rgba(255, 255, 255, 0.08));
+  border-radius: 1px;
+  transition: background-color 0.18s ease, box-shadow 0.18s ease, width 0.18s ease;
+  pointer-events: none;
+}
+
+.transcribe-resizer-handle {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 8px;
+  height: 36px;
+  border-radius: 4px;
+  background: var(--bg-elevated, #18181b);
+  border: 1px solid var(--border-subtle, #27272a);
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+  pointer-events: none;
+}
+
+.transcribe-resizer-handle .resizer-pip {
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: var(--text-muted, #71717a);
+  transition: background-color 0.15s ease;
+}
+
+.transcribe-layout-resizer:hover .transcribe-resizer-line,
+body.is-resizing-transcribe .transcribe-layout-resizer .transcribe-resizer-line {
+  background-color: var(--accent-primary, #3b82f6);
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
+}
+
+.transcribe-layout-resizer:hover .transcribe-resizer-handle,
+body.is-resizing-transcribe .transcribe-layout-resizer .transcribe-resizer-handle {
+  background: var(--bg-hover, #27272a);
+  border-color: var(--accent-primary, #3b82f6);
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.25);
+  transform: scale(1.1);
+}
+
+.transcribe-layout-resizer:hover .resizer-pip,
+body.is-resizing-transcribe .transcribe-layout-resizer .resizer-pip {
+  background: var(--accent-primary, #3b82f6);
+}
+
+.transcribe-layout-resizer.is-snapped .transcribe-resizer-handle {
+  border-color: rgba(59, 130, 246, 0.5);
+  box-shadow: 0 0 6px rgba(59, 130, 246, 0.2);
+}
+
+body.is-resizing-transcribe {
+  cursor: col-resize !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+body.is-resizing-transcribe * {
+  cursor: col-resize !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
 }
 
 .transcribe-left-panel {
@@ -944,6 +1046,8 @@
 
 /* Live Transcript Viewer */
 .transcript-viewer-card {
+  container-type: inline-size;
+  container-name: transcript-card;
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -962,14 +1066,17 @@
   border-bottom: 1px solid var(--border-glass);
   padding-bottom: 10px;
   flex-shrink: 0;
-  gap: 12px;
+  gap: 8px;
+  min-width: 0;
 }
 
 .transcript-viewer-title-group {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-shrink: 0;
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
   white-space: nowrap;
 }
 
@@ -984,6 +1091,10 @@
   margin: 0;
   color: var(--color-text);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  transition: opacity 0.2s ease, max-width 0.2s ease;
 }
 
 .transcript-viewer-actions {
@@ -991,6 +1102,107 @@
   align-items: center;
   gap: 6px;
   flex-wrap: nowrap;
+  flex-shrink: 0;
+}
+
+/* -------------------------------------------------------------
+   Adaptive Progressive Disclosure (Container Queries + Classes)
+   ------------------------------------------------------------- */
+@container transcript-card (max-width: 860px) {
+  .transcript-viewer-actions .btn-icon-text:not(.btn-toolbar-workflow) span,
+  .transcript-viewer-actions .btn-copy-transcript span {
+    display: none !important;
+  }
+
+  .transcript-viewer-actions .btn-icon-text:not(.btn-toolbar-workflow) svg,
+  .transcript-viewer-actions .btn-copy-transcript svg {
+    margin: 0 !important;
+  }
+
+  .transcript-viewer-actions #chevron-open-output-file {
+    display: none !important;
+  }
+
+  .transcript-viewer-actions .btn-icon-text:not(.btn-toolbar-workflow),
+  .transcript-viewer-actions .btn-copy-transcript {
+    width: 28px !important;
+    min-width: 28px !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    padding: 0 !important;
+    justify-content: center !important;
+  }
+
+  .toolbar-divider {
+    margin: 0 1px;
+  }
+
+  .transcript-viewer-actions {
+    gap: 4px;
+  }
+}
+
+@container transcript-card (max-width: 640px) {
+  .transcript-viewer-actions .btn-toolbar-workflow span {
+    display: none !important;
+  }
+
+  .transcript-viewer-actions .btn-toolbar-workflow svg:first-child {
+    margin: 0 !important;
+  }
+
+  .transcript-viewer-actions .btn-toolbar-workflow {
+    padding: 0 6px !important;
+    gap: 3px;
+    min-width: 36px;
+  }
+}
+
+/* Fallback class-based responsive mirroring (for 100% deterministic cross-engine guarantee) */
+.transcript-viewer-card.is-compact .transcript-viewer-actions .btn-icon-text:not(.btn-toolbar-workflow) span,
+.transcript-viewer-card.is-compact .transcript-viewer-actions .btn-copy-transcript span {
+  display: none !important;
+}
+
+.transcript-viewer-card.is-compact .transcript-viewer-actions .btn-icon-text:not(.btn-toolbar-workflow) svg,
+.transcript-viewer-card.is-compact .transcript-viewer-actions .btn-copy-transcript svg {
+  margin: 0 !important;
+}
+
+.transcript-viewer-card.is-compact .transcript-viewer-actions #chevron-open-output-file {
+  display: none !important;
+}
+
+.transcript-viewer-card.is-compact .transcript-viewer-actions .btn-icon-text:not(.btn-toolbar-workflow),
+.transcript-viewer-card.is-compact .transcript-viewer-actions .btn-copy-transcript {
+  width: 28px !important;
+  min-width: 28px !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  padding: 0 !important;
+  justify-content: center !important;
+}
+
+.transcript-viewer-card.is-compact .toolbar-divider {
+  margin: 0 1px;
+}
+
+.transcript-viewer-card.is-compact .transcript-viewer-actions {
+  gap: 4px;
+}
+
+.transcript-viewer-card.is-ultra-compact .transcript-viewer-actions .btn-toolbar-workflow span {
+  display: none !important;
+}
+
+.transcript-viewer-card.is-ultra-compact .transcript-viewer-actions .btn-toolbar-workflow svg:first-child {
+  margin: 0 !important;
+}
+
+.transcript-viewer-card.is-ultra-compact .transcript-viewer-actions .btn-toolbar-workflow {
+  padding: 0 6px !important;
+  gap: 3px;
+  min-width: 36px;
 }
 
 .toolbar-btn-group {
@@ -2061,25 +2273,27 @@ html[dir="rtl"] #transcript-search::placeholder,
   align-items: center;
   background: radial-gradient(circle at center, rgba(30, 41, 59, 0.45) 0%, rgba(5, 7, 13, 0.95) 75%);
   min-height: 160px;
-  max-height: 220px;
+  max-height: max(220px, min(500px, calc(100vh - 380px)));
   overflow: hidden;
   position: relative;
+  transition: max-height 0.2s ease;
 }
 
 .companion-video-container video {
   width: 100%;
-  max-height: 220px;
+  height: 100%;
+  max-height: max(220px, min(500px, calc(100vh - 380px)));
   object-fit: contain;
   display: block;
   outline: none;
 }
 
 .companion-video-container.aspect-vertical {
-  max-height: 260px;
+  max-height: max(260px, min(620px, calc(100vh - 340px)));
 }
 
 .companion-video-container.aspect-vertical video {
-  max-height: 260px;
+  max-height: max(260px, min(620px, calc(100vh - 340px)));
   object-fit: contain;
 }
 

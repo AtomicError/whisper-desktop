@@ -251,6 +251,8 @@ export const tr: Translations = {
     highlightConfidence: 'Güvenilirlik',
     companionSetupTab: 'Kurulum',
     companionPlayerTab: 'Oynatıcı',
+    resizerTooltip: 'Paneli yeniden boyutlandırmak için sürükleyin (sıfırlamak için çift tıklayın)',
+    resizerAria: 'Panelleri yeniden boyutlandır',
     companionMetaDuration: 'Süre:',
     companionMetaResolution: 'Çözünürlük:',
     companionMetaAspect: 'Oran:',

@@ -251,6 +251,8 @@ export const zh: Translations = {
     highlightConfidence: '置信度',
     companionSetupTab: '设置',
     companionPlayerTab: '播放器',
+    resizerTooltip: '拖动以调整面板大小（双击重置）',
+    resizerAria: '调整面板大小',
     companionMetaDuration: '时长:',
     companionMetaResolution: '分辨率:',
     companionMetaAspect: '宽高比:',

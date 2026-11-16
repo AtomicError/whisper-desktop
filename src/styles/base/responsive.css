@@ -326,6 +326,9 @@
     height: auto;
     overflow-y: auto;
   }
+  .transcribe-layout-resizer {
+    display: none !important;
+  }
   .translate-left-panel,
   .transcribe-left-panel {
     height: auto;

@@ -251,6 +251,8 @@ export const de: Translations = {
     highlightConfidence: 'Konfidenz',
     companionSetupTab: 'Setup',
     companionPlayerTab: 'Player',
+    resizerTooltip: 'Ziehen zum Ändern der Größe (Doppelklick zum Zurücksetzen)',
+    resizerAria: 'Bereiche anpassen',
     companionMetaDuration: 'Dauer:',
     companionMetaResolution: 'Auflösung:',
     companionMetaAspect: 'Format:',

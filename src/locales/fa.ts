@@ -251,6 +251,8 @@ export const fa: Translations = {
     highlightConfidence: 'ضریب اطمینان',
     companionSetupTab: 'تنظیمات',
     companionPlayerTab: 'پخش‌کننده',
+    resizerTooltip: 'برای تغییر اندازه بکشید (دوبار کلیک برای بازنشانی)',
+    resizerAria: 'تغییر اندازه ستون‌ها',
     companionMetaDuration: 'مدت‌زمان:',
     companionMetaResolution: 'وضوح تصویر:',
     companionMetaAspect: 'نسبت ابعاد:',

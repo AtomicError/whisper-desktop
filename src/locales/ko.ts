@@ -251,6 +251,8 @@ export const ko: Translations = {
     highlightConfidence: '신뢰도',
     companionSetupTab: '설정',
     companionPlayerTab: '플레이어',
+    resizerTooltip: '패널 크기를 조절하려면 드래그하세요 (더블 클릭하여 재설정)',
+    resizerAria: '패널 크기 조절',
     companionMetaDuration: '재생 시간:',
     companionMetaResolution: '해상도:',
     companionMetaAspect: '화면비:',

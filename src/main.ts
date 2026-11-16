@@ -9,6 +9,7 @@ import { themeManager } from './modules/themeManager';
 import { modelHub } from './modules/modelHub';
 import { transcriptViewer } from './modules/transcriptViewer';
 import { initCompanionPlayerDOM } from './modules/companionPlayer';
+import { initTranscribeLayoutResizer } from './modules/transcribeLayoutResizer';
 import { initializeCustomSelects, syncCustomSelects } from './modules/customSelect';
 import {
   batchProcessor,
@@ -286,6 +287,7 @@ export async function initApp(): Promise<void> {
   setupTranscribeDragAndDrop();
   transcriptViewer.setupDirection();
   initCompanionPlayerDOM();
+  initTranscribeLayoutResizer();
   setupQuickConfigDeckEventListeners();
   setupResponsiveMenuFadeIn();
   setupHorizontalTabScroll();

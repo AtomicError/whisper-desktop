@@ -251,6 +251,8 @@ export const ja: Translations = {
     highlightConfidence: '信頼度',
     companionSetupTab: '設定',
     companionPlayerTab: 'プレーヤー',
+    resizerTooltip: 'ドラッグしてパネルのサイズを変更（ダブルクリックでリセット）',
+    resizerAria: 'パネルサイズの変更',
     companionMetaDuration: '再生時間:',
     companionMetaResolution: '解像度:',
     companionMetaAspect: 'アスペクト比:',

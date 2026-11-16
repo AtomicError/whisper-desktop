@@ -249,6 +249,8 @@ export const en = {
     highlightConfidence: 'Confidence',
     companionSetupTab: 'Setup',
     companionPlayerTab: 'Player',
+    resizerTooltip: 'Drag to resize panel (Double-click to reset)',
+    resizerAria: 'Resize panels',
     companionMetaDuration: 'Duration:',
     companionMetaResolution: 'Resolution:',
     companionMetaAspect: 'Aspect:',

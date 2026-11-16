@@ -251,6 +251,8 @@ export const it: Translations = {
     highlightConfidence: 'Confidenza',
     companionSetupTab: 'Impostazioni',
     companionPlayerTab: 'Riproduttore',
+    resizerTooltip: 'Trascina per ridimensionare il pannello (doppio clic per ripristinare)',
+    resizerAria: 'Ridimensiona i pannelli',
     companionMetaDuration: 'Durata:',
     companionMetaResolution: 'Risoluzione:',
     companionMetaAspect: 'Proporzioni:',

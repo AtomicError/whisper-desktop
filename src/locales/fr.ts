@@ -251,6 +251,8 @@ export const fr: Translations = {
     highlightConfidence: 'Confiance',
     companionSetupTab: 'Configuration',
     companionPlayerTab: 'Lecteur',
+    resizerTooltip: 'Faites glisser pour redimensionner (double-clic pour réinitialiser)',
+    resizerAria: 'Redimensionner les panneaux',
     companionMetaDuration: 'Durée :',
     companionMetaResolution: 'Résolution :',
     companionMetaAspect: 'Proportions :',

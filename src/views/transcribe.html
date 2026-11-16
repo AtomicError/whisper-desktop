@@ -1,8 +1,8 @@
           <!-- 4. TRANSCRIBE FILE PANEL -->
           <div class="view-panel fixed-layout-panel active" id="panel-transcribe" role="tabpanel" aria-labelledby="nav-tab-transcribe" tabindex="0">
-            <div class="transcribe-layout">
+            <div class="transcribe-layout" id="transcribe-layout">
               
-              <div class="transcribe-left-panel">
+              <div class="transcribe-left-panel" id="transcribe-left-panel">
                 <div class="glass-card transcribe-unified-deck" id="transcribe-unified-deck">
                   <!-- Header: Studio Title & Settings Shortcut -->
                   <div class="transcribe-deck-header">
@@ -374,8 +374,18 @@
                 </div>
               </div>
 
+              <!-- Interactive Resizable Layout Splitter -->
+              <div class="transcribe-layout-resizer" id="transcribe-layout-resizer" role="separator" aria-orientation="vertical" tabindex="0" data-i18n-title="transcribe.resizerTooltip" title="Drag to resize panel (Double-click to reset)" data-i18n-aria="transcribe.resizerAria" aria-label="Resize panels" aria-valuenow="420" aria-valuemin="420">
+                <div class="transcribe-resizer-line" aria-hidden="true"></div>
+                <div class="transcribe-resizer-handle" aria-hidden="true">
+                  <span class="resizer-pip"></span>
+                  <span class="resizer-pip"></span>
+                  <span class="resizer-pip"></span>
+                </div>
+              </div>
+
               <!-- Dedicated Transcript Viewer Workspace (Right Panel) -->
-              <div class="transcribe-right-panel">
+              <div class="transcribe-right-panel" id="transcribe-right-panel">
                 <div class="glass-card transcript-viewer-card" id="transcribe-viewer-card">
                   <div class="transcript-viewer-header">
                     <div class="transcript-viewer-title-group">
