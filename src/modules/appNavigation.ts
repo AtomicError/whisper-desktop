@@ -284,6 +284,36 @@ export function setupSearchShortcuts(): void {
     });
   }
 
+  const hardsubSearchInput = document.getElementById('hardsub-search-input') as (HTMLInputElement & { _hasSearchEscListener?: boolean }) | null;
+  if (hardsubSearchInput && !hardsubSearchInput._hasSearchEscListener) {
+    hardsubSearchInput._hasSearchEscListener = true;
+    hardsubSearchInput.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (hardsubSearchInput.value) {
+          e.preventDefault();
+          hardsubSearchInput.value = '';
+          hardsubSearchInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        hardsubSearchInput.blur();
+      }
+    });
+  }
+
+  const logSearchInput = document.getElementById('log-search') as (HTMLInputElement & { _hasSearchEscListener?: boolean }) | null;
+  if (logSearchInput && !logSearchInput._hasSearchEscListener) {
+    logSearchInput._hasSearchEscListener = true;
+    logSearchInput.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (logSearchInput.value) {
+          e.preventDefault();
+          logSearchInput.value = '';
+          logSearchInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        logSearchInput.blur();
+      }
+    });
+  }
+
   document.addEventListener('keydown', (e: KeyboardEvent) => {
     const target = e.target as HTMLElement | null;
     const isEditing = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
@@ -323,6 +353,20 @@ export function setupSearchShortcuts(): void {
         }
       } else if (activeView === 'transcribe') {
         const input = document.getElementById('transcript-search') as HTMLInputElement | null;
+        if (input && input.offsetParent !== null) {
+          e.preventDefault();
+          input.focus();
+          input.select();
+        }
+      } else if (activeView === 'hardsub') {
+        const input = document.getElementById('hardsub-search-input') as HTMLInputElement | null;
+        if (input && input.offsetParent !== null) {
+          e.preventDefault();
+          input.focus();
+          input.select();
+        }
+      } else if (activeView === 'logs') {
+        const input = document.getElementById('log-search') as HTMLInputElement | null;
         if (input && input.offsetParent !== null) {
           e.preventDefault();
           input.focus();

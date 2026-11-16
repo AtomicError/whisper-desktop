@@ -1129,7 +1129,19 @@ export const de: Translations = {
     previewNotTranslated: 'nicht übersetzt',
     confirmResetEngineTitle: 'Transkriptionseinstellungen zurücksetzen',
     confirmResetEngineDesc: 'Möchten Sie wirklich alle Transkriptionsparameter auf die Standardwerte zurücksetzen?\n(Allgemeine App-Einstellungen, Modelle und KI-Übersetzung bleiben erhalten.)',
-    confirmResetEngineBtn: 'Auf Standard zurücksetzen'
+    confirmResetEngineBtn: 'Auf Standard zurücksetzen',
+    shortcutsModalTitle: 'Tastaturkurzbefehle',
+    shortcutsModalSubtitle: 'Schnellübersicht über globale Tastenkombinationen und Studios',
+    shortcutsGlobalSection: 'Global & Allgemein',
+    shortcutsSearch: 'In aktiver Ansicht suchen',
+    shortcutsZoom: 'Oberfläche zoomen (vergrößern / verkleinern / zurücksetzen)',
+    shortcutsToggle: 'Diesen Kurzbefehl-Helfer anzeigen',
+    shortcutsDismiss: 'Dialoge schließen oder Suche abbrechen',
+    shortcutsSeek10s: '10 Sek. zurück / vor',
+    shortcutsVolume: 'Lautstärke anpassen (5%)',
+    shortcutsSeekCue: 'Video zu Untertitelzeit springen',
+    shortcutsExitFullscreen: 'Vollbildmodus beenden',
+    shortcutsOr: 'oder'
   },
   toasts: {
     testCancelled: 'Verbindungstest abgebrochen.',

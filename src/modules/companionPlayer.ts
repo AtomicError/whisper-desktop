@@ -588,7 +588,7 @@ export function changeCompanionVolume(volStr: string): void {
   const videoEl = document.getElementById('companion-media-element') as HTMLVideoElement | null;
   if (!videoEl) return;
   const parsed = parseFloat(volStr);
-  const vol = Math.max(0, Math.min(1, isNaN(parsed) ? 1.0 : parsed));
+  const vol = Math.max(0, Math.min(1, isNaN(parsed) ? 1.0 : Math.round(parsed * 100) / 100));
   videoEl.volume = vol;
   videoEl.muted = vol === 0;
   if (vol > 0) {
@@ -596,7 +596,18 @@ export function changeCompanionVolume(volStr: string): void {
   }
   updateVolumeIcons(videoEl.muted || vol === 0);
   const volSlider = document.getElementById('companion-volume-slider') as HTMLInputElement | null;
+  if (volSlider && volSlider.value !== String(vol)) {
+    volSlider.value = String(vol);
+  }
   updateSliderTrackProgress(volSlider, videoEl.muted ? 0 : vol * 100, '--vol-pct');
+}
+
+export function adjustCompanionVolume(delta: number): void {
+  const videoEl = document.getElementById('companion-media-element') as HTMLVideoElement | null;
+  if (!videoEl) return;
+  const currentVol = videoEl.muted ? 0 : videoEl.volume;
+  const newVol = Math.max(0, Math.min(1, Math.round((currentVol + delta) * 100) / 100));
+  changeCompanionVolume(String(newVol));
 }
 
 export function toggleCompanionMute(): void {
@@ -973,17 +984,29 @@ export function initCompanionPlayerDOM(): void {
           e.preventDefault();
           toggleCompanionPlayback();
         }
-      } else if (e.code === 'ArrowLeft') {
+      } else if (e.code === 'ArrowLeft' || e.key === 'ArrowLeft') {
         const mediaDeck = document.getElementById('transcribe-media-deck');
         if (mediaDeck && mediaDeck.style.display !== 'none') {
           e.preventDefault();
           jumpCompanionPlayback(-5);
         }
-      } else if (e.code === 'ArrowRight') {
+      } else if (e.code === 'ArrowRight' || e.key === 'ArrowRight') {
         const mediaDeck = document.getElementById('transcribe-media-deck');
         if (mediaDeck && mediaDeck.style.display !== 'none') {
           e.preventDefault();
           jumpCompanionPlayback(5);
+        }
+      } else if (e.code === 'ArrowUp' || e.key === 'ArrowUp') {
+        const mediaDeck = document.getElementById('transcribe-media-deck');
+        if (mediaDeck && mediaDeck.style.display !== 'none') {
+          e.preventDefault();
+          adjustCompanionVolume(0.05);
+        }
+      } else if (e.code === 'ArrowDown' || e.key === 'ArrowDown') {
+        const mediaDeck = document.getElementById('transcribe-media-deck');
+        if (mediaDeck && mediaDeck.style.display !== 'none') {
+          e.preventDefault();
+          adjustCompanionVolume(-0.05);
         }
       }
     });
@@ -1013,6 +1036,7 @@ win.cycleCompanionPlaybackRate = cycleCompanionPlaybackRate;
 win.updateSliderTrackProgress = updateSliderTrackProgress;
 win.COMPANION_SPEEDS = COMPANION_SPEEDS;
 win.changeCompanionVolume = changeCompanionVolume;
+win.adjustCompanionVolume = adjustCompanionVolume;
 win.toggleCompanionMute = toggleCompanionMute;
 win.toggleCompanionPiP = toggleCompanionPiP;
 win.toggleCompanionFullscreen = toggleCompanionFullscreen;

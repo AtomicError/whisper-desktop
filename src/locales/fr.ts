@@ -1124,7 +1124,19 @@ export const fr: Translations = {
     previewNotTranslated: 'non traduit',
     confirmResetEngineTitle: 'Réinitialiser les paramètres de transcription',
     confirmResetEngineDesc: 'Voulez-vous vraiment restaurer tous les paramètres de transcription aux valeurs par défaut ?\n(Les préférences générales de l\'application, les modèles et la traduction IA seront conservés.)',
-    confirmResetEngineBtn: 'Rétablir les valeurs par défaut'
+    confirmResetEngineBtn: 'Rétablir les valeurs par défaut',
+    shortcutsModalTitle: 'Raccourcis clavier',
+    shortcutsModalSubtitle: 'Guide rapide des raccourcis globaux et des studios',
+    shortcutsGlobalSection: 'Global et général',
+    shortcutsSearch: 'Rechercher dans la vue active',
+    shortcutsZoom: 'Zoom de l\'interface (agrandir / réduire / réinitialiser)',
+    shortcutsToggle: 'Afficher ce guide des raccourcis',
+    shortcutsDismiss: 'Fermer les boîtes de dialogue ou annuler la recherche',
+    shortcutsSeek10s: 'Reculer / Avancer de 10s',
+    shortcutsVolume: 'Ajuster le volume (5%)',
+    shortcutsSeekCue: 'Avancer la vidéo au sous-titre',
+    shortcutsExitFullscreen: 'Quitter le mode plein écran',
+    shortcutsOr: 'ou'
   },
   toasts: {
     testCancelled: 'Test de connexion annulé.',

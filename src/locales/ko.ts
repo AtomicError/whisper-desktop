@@ -1131,7 +1131,19 @@ export const ko: Translations = {
     previewNotTranslated: '번역되지 않음',
     confirmResetEngineTitle: '전사 설정 초기화',
     confirmResetEngineDesc: '모든 전사 매개변수를 기본값으로 복원하시겠습니까?\n(일반 앱 설정, 모델 및 AI 번역 설정은 유지됩니다.)',
-    confirmResetEngineBtn: '기본값으로 초기화'
+    confirmResetEngineBtn: '기본값으로 초기화',
+    shortcutsModalTitle: '키보드 단축키',
+    shortcutsModalSubtitle: '전역 및 스튜디오 단축키 빠른 안내',
+    shortcutsGlobalSection: '전역 및 기본 기능',
+    shortcutsSearch: '현재 화면에서 검색',
+    shortcutsZoom: '화면 확대/축소 (확대 / 축소 / 초기화)',
+    shortcutsToggle: '이 단축키 안내 표시',
+    shortcutsDismiss: '창 닫기 및 검색 취소',
+    shortcutsSeek10s: '10초 뒤로 / 앞으로 탐색',
+    shortcutsVolume: '음량 조절 (5%)',
+    shortcutsSeekCue: '자막 시간으로 비디오 탐색',
+    shortcutsExitFullscreen: '전체 화면 종료',
+    shortcutsOr: '또는'
   },
   toasts: {
     testCancelled: '연결 테스트가 취소되었습니다.',

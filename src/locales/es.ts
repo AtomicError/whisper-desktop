@@ -1124,7 +1124,19 @@ export const es: Translations = {
     previewNotTranslated: 'no traducido',
     confirmResetEngineTitle: 'Restablecer ajustes de transcripción',
     confirmResetEngineDesc: '¿Está seguro de que desea restablecer todos los parámetros de transcripción a los valores predeterminados?\n(Las preferencias generales de la aplicación, modelos y traducción IA se mantendrán.)',
-    confirmResetEngineBtn: 'Restablecer a valores por defecto'
+    confirmResetEngineBtn: 'Restablecer a valores por defecto',
+    shortcutsModalTitle: 'Atajos de teclado',
+    shortcutsModalSubtitle: 'Referencia rápida de atajos globales y de estudio',
+    shortcutsGlobalSection: 'Global y navegación',
+    shortcutsSearch: 'Buscar en la vista activa',
+    shortcutsZoom: 'Zoom de interfaz (acercar / alejar / restablecer)',
+    shortcutsToggle: 'Mostrar esta guía de atajos',
+    shortcutsDismiss: 'Cerrar ventanas o cancelar búsqueda',
+    shortcutsSeek10s: 'Retroceder / Avanzar 10s',
+    shortcutsVolume: 'Ajustar volumen (5%)',
+    shortcutsSeekCue: 'Saltar video al tiempo del subtítulo',
+    shortcutsExitFullscreen: 'Salir de pantalla completa',
+    shortcutsOr: 'o'
   },
   toasts: {
     testCancelled: 'Prueba de conexión cancelada.',

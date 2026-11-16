@@ -1124,7 +1124,19 @@ export const zh: Translations = {
     previewNotTranslated: '未翻译',
     confirmResetEngineTitle: '重置转录设置',
     confirmResetEngineDesc: '确定要将所有转录参数恢复为默认值吗？\n（常规应用程序偏好、模型和 AI 翻译设置将保持不变。）',
-    confirmResetEngineBtn: '恢复默认值'
+    confirmResetEngineBtn: '恢复默认值',
+    shortcutsModalTitle: '键盘快捷键',
+    shortcutsModalSubtitle: '全局与工作区快捷键快速参考',
+    shortcutsGlobalSection: '全局与导航',
+    shortcutsSearch: '在当前视图中搜索',
+    shortcutsZoom: '界面缩放（放大 / 缩小 / 重置）',
+    shortcutsToggle: '显示此快捷键指南',
+    shortcutsDismiss: '关闭窗口或清除搜索',
+    shortcutsSeek10s: '快退 / 快进 10 秒',
+    shortcutsVolume: '调节音量 (5%)',
+    shortcutsSeekCue: '跳转视频至字幕对应时间',
+    shortcutsExitFullscreen: '退出全屏播放',
+    shortcutsOr: '或'
   },
   toasts: {
     testCancelled: '已取消连接测试。',

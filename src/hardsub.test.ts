@@ -22,6 +22,7 @@ class ClassList {
 }
 
 class Control extends EventTarget {
+  id = '';
   value = '0';
   disabled = false;
   textContent = '';
@@ -519,6 +520,36 @@ describe('real hardsub seek interaction', () => {
     expect(key('ArrowRight').defaultPrevented).toBe(true);
     video.settle();
     expect(video.currentTime).toBe(10);
+  });
+
+  it('allows keyboard shortcuts when non-input controls like play button are active', async () => {
+    const { video, load } = fixture();
+    await load();
+    const playButton = new Control();
+    (playButton as any).tagName = 'BUTTON';
+    playButton.id = 'hardsub-btn-play';
+    doc.activeElement = playButton;
+
+    // ArrowRight seeks 10s
+    expect(key('ArrowRight').defaultPrevented).toBe(true);
+    video.settle();
+    expect(video.currentTime).toBe(10);
+
+    // ArrowLeft seeks -10s
+    expect(key('ArrowLeft').defaultPrevented).toBe(true);
+    video.settle();
+    expect(video.currentTime).toBe(0);
+
+    // ArrowUp adjusts volume
+    video.volume = 0.5;
+    expect(key('ArrowUp').defaultPrevented).toBe(true);
+    expect(video.volume).toBeCloseTo(0.55);
+
+    // Space toggles playback
+    expect(key(' ').defaultPrevented).toBe(true);
+    expect(video.play).toHaveBeenCalled();
+
+    doc.activeElement = null;
   });
 
   it('disposal removes source and DOM listeners and rejects late readiness', async () => {

@@ -1129,7 +1129,19 @@ export const ar: Translations = {
     previewNotTranslated: 'غير مترجم',
     confirmResetEngineTitle: 'إعادة ضبط إعدادات النسخ',
     confirmResetEngineDesc: 'هل أنت متأكد من رغبتك في استعادة كافة معلمات النسخ إلى الإعدادات الافتراضية؟\n(ستبقى تفضيلات التطبيق العامة ومسارات النماذج وموفرو الترجمة الذكية محفوظة.)',
-    confirmResetEngineBtn: 'استعادة الافتراضيات'
+    confirmResetEngineBtn: 'استعادة الافتراضيات',
+    shortcutsModalTitle: 'اختصارات لوحة المفاتيح',
+    shortcutsModalSubtitle: 'دليل شامل لاختصارات التطبيق العامة والاستوديوهات',
+    shortcutsGlobalSection: 'عام وشامل',
+    shortcutsSearch: 'البحث في الصفحة النشطة',
+    shortcutsZoom: 'تكبير وتصغير الواجهة',
+    shortcutsToggle: 'فتح دليل الاختصارات هذا',
+    shortcutsDismiss: 'إغلاق النوافذ أو إلغاء البحث',
+    shortcutsSeek10s: 'تقديم / ترجيع ١٠ ثوانٍ',
+    shortcutsVolume: 'ضبط مستوى الصوت (٥٪)',
+    shortcutsSeekCue: 'الانتقال بالفيديو لزمن المقطع',
+    shortcutsExitFullscreen: 'الخروج من ملء الشاشة',
+    shortcutsOr: 'أو'
   },
   toasts: {
     testCancelled: 'تم إلغاء اختبار الاتصال.',

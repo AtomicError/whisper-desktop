@@ -3058,7 +3058,33 @@ export class HardsubController {
 
     // Global Keyboard Shortcuts for player
     this.on(document, 'keydown', (e) => {
-      if (!this.canInteractWithVideo() || !this.videoElement || e.defaultPrevented || e.isComposing || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || this.isInteractiveTarget(e.target) || this.isInteractiveTarget(document.activeElement)) return;
+      if (!this.canInteractWithVideo() || !this.videoElement || e.defaultPrevented || e.isComposing) return;
+      if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
+
+      // Do not intercept if an application modal overlay is open
+      const isModalOpen = typeof document.querySelector === 'function' && Boolean(document.querySelector('.modal-overlay.show, #app-modal-overlay:not([style*="display: none"]), #shortcuts-modal-overlay.show'));
+      if (isModalOpen) return;
+
+      const target = e.target as HTMLElement | null;
+      const activeEl = document.activeElement as HTMLElement | null;
+
+      // Do not intercept if user is editing inside a textarea, text input, or contenteditable
+      const isEditing = (el: any) => {
+        if (!el) return false;
+        if (el.isContentEditable) return true;
+        const tag = el.tagName;
+        if (tag === 'TEXTAREA' || tag === 'SELECT') return true;
+        if (tag === 'INPUT') {
+          return el.type !== 'button' && el.type !== 'submit' && el.type !== 'reset';
+        }
+        if (typeof el.closest === 'function') {
+          return Boolean(el.closest('textarea, input:not([type="button"]):not([type="submit"]):not([type="reset"]), select, [contenteditable]:not([contenteditable="false"])'));
+        }
+        return false;
+      };
+
+      if (isEditing(target) || isEditing(activeEl)) return;
+
       if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         if (!this.canSeek()) return;
         e.preventDefault();
@@ -3070,7 +3096,12 @@ export class HardsubController {
         this.videoElement.muted = volume === 0;
         this.updateVolumeIcons(volume, this.videoElement.muted);
         this.showVolumeHUD(volume, this.videoElement.muted);
-      } else if (e.key === ' ' || e.key === 'Spacebar') {
+      } else if (e.code === 'Space' || e.key === ' ' || e.key === 'Spacebar') {
+        // If a non-play button is focused, allow native button activation via Space
+        const isNonPlayButton = (el: HTMLElement | null) => el?.tagName === 'BUTTON' && el.id !== 'hardsub-btn-play';
+        if (isNonPlayButton(target) || isNonPlayButton(activeEl)) {
+          return;
+        }
         e.preventDefault();
         this.togglePlayback();
       }

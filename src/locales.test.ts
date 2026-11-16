@@ -224,6 +224,29 @@ describe('locale consistency for speed presets', () => {
       expect(translate.deckTitle.length).toBeGreaterThan(0);
     });
 
+    it(`locale ${code} has all required shortcuts modal keys defined`, () => {
+      const modals = (dict as any).modals;
+      expect(modals).toBeDefined();
+      const shortcutKeys = [
+        'shortcutsModalTitle',
+        'shortcutsModalSubtitle',
+        'shortcutsGlobalSection',
+        'shortcutsSearch',
+        'shortcutsZoom',
+        'shortcutsToggle',
+        'shortcutsDismiss',
+        'shortcutsSeek10s',
+        'shortcutsVolume',
+        'shortcutsSeekCue',
+        'shortcutsExitFullscreen',
+        'shortcutsOr'
+      ];
+      for (const k of shortcutKeys) {
+        expect(typeof modals[k]).toBe('string');
+        expect(modals[k].length).toBeGreaterThan(0);
+      }
+    });
+
     it(`locale ${code} uses clean transcription terminology without generic Whisper branding`, () => {
       const models = (dict as any).models;
       const transcribe = (dict as any).transcribe;

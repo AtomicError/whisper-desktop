@@ -39,6 +39,7 @@ import {
   seekCompanionPlayer,
   highlightActiveTranscriptSegment,
   changeCompanionVolume,
+  adjustCompanionVolume,
   toggleCompanionMute,
   pauseCompanionPlayer,
   showTranscribeSetupDeck,
@@ -780,6 +781,47 @@ describe('Companion Media Player & DOM Controls', () => {
     expect(videoEl.muted).toBe(false);
     expect(videoEl.volume).toBe(0.75);
     expect(volSlider.value).toBe('0.75');
+  });
+
+  it('adjusts companion volume in 5% increments and un-mutes automatically', () => {
+    const videoEl = registerMockEl('companion-media-element', 'VIDEO') as any;
+    videoEl.volume = 0.5;
+    videoEl.muted = false;
+    const volSlider = registerMockEl('companion-volume-slider', 'INPUT') as any;
+    volSlider.value = '0.5';
+    registerMockEl('icon-vol-high');
+    registerMockEl('icon-vol-muted');
+
+    // Increase volume by +0.05
+    adjustCompanionVolume(0.05);
+    expect(videoEl.volume).toBe(0.55);
+    expect(volSlider.value).toBe('0.55');
+    expect(videoEl.muted).toBe(false);
+
+    // Decrease volume by -0.05
+    adjustCompanionVolume(-0.05);
+    expect(videoEl.volume).toBe(0.5);
+    expect(volSlider.value).toBe('0.5');
+
+    // Muted state should un-mute when volume is raised
+    videoEl.muted = true;
+    adjustCompanionVolume(0.05);
+    expect(videoEl.volume).toBe(0.05);
+    expect(videoEl.muted).toBe(false);
+    expect(volSlider.value).toBe('0.05');
+
+    // Clamping at ceiling 1.0
+    videoEl.volume = 0.98;
+    adjustCompanionVolume(0.05);
+    expect(videoEl.volume).toBe(1.0);
+    expect(volSlider.value).toBe('1');
+
+    // Clamping at floor 0.0 and auto-mute
+    videoEl.volume = 0.03;
+    adjustCompanionVolume(-0.05);
+    expect(videoEl.volume).toBe(0);
+    expect(videoEl.muted).toBe(true);
+    expect(volSlider.value).toBe('0');
   });
 
   it('supports comma-formatted SRT timestamps when tracking active segment', () => {

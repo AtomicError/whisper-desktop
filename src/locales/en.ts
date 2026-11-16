@@ -1129,7 +1129,19 @@ export const en = {
     previewNotTranslated: 'not translated',
     confirmResetEngineTitle: 'Reset Transcription Settings',
     confirmResetEngineDesc: 'Are you sure you want to reset transcription settings to defaults?\n(General app preferences, models, and AI translation will be preserved.)',
-    confirmResetEngineBtn: 'Reset to Defaults'
+    confirmResetEngineBtn: 'Reset to Defaults',
+    shortcutsModalTitle: 'Keyboard Shortcuts',
+    shortcutsModalSubtitle: 'Global and studio shortcuts quick reference',
+    shortcutsGlobalSection: 'Global Application',
+    shortcutsSearch: 'Search in active view',
+    shortcutsZoom: 'Zoom interface (in / out / reset)',
+    shortcutsToggle: 'Toggle keyboard shortcuts helper',
+    shortcutsDismiss: 'Close dialogs or clear search',
+    shortcutsSeek10s: 'Rewind / Forward 10s',
+    shortcutsVolume: 'Adjust volume (5%)',
+    shortcutsSeekCue: 'Seek video to subtitle cue',
+    shortcutsExitFullscreen: 'Exit fullscreen video',
+    shortcutsOr: 'or'
   },
   toasts: {
     testCancelled: 'Connection test cancelled.',

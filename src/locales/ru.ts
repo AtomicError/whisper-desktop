@@ -1129,7 +1129,19 @@ export const ru: Translations = {
     previewNotTranslated: 'не переведено',
     confirmResetEngineTitle: 'Сбросить настройки транскрипции',
     confirmResetEngineDesc: 'Вы уверены, что хотите сбросить все параметры транскрипции до значений по умолчанию?\n(Общие настройки приложения, модели и ИИ-перевод останутся без изменений.)',
-    confirmResetEngineBtn: 'Сбросить к значениям по умолчанию'
+    confirmResetEngineBtn: 'Сбросить к значениям по умолчанию',
+    shortcutsModalTitle: 'Горячие клавиши',
+    shortcutsModalSubtitle: 'Быстрая справка по глобальным и студийным комбинациям',
+    shortcutsGlobalSection: 'Глобальные и общие',
+    shortcutsSearch: 'Поиск на активной странице',
+    shortcutsZoom: 'Масштаб интерфейса (увеличить / уменьшить / сброс)',
+    shortcutsToggle: 'Открыть эту справку по клавишам',
+    shortcutsDismiss: 'Закрыть диалог или очистить поиск',
+    shortcutsSeek10s: 'Перемотка на 10 сек назад / вперед',
+    shortcutsVolume: 'Регулировка громкости (5%)',
+    shortcutsSeekCue: 'Перейти к времени субтитра',
+    shortcutsExitFullscreen: 'Выйти из полноэкранного режима',
+    shortcutsOr: 'или'
   },
   toasts: {
     testCancelled: 'Проверка подключения отменена.',

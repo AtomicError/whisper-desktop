@@ -1131,7 +1131,19 @@ export const tr: Translations = {
     previewNotTranslated: 'çevrilmedi',
     confirmResetEngineTitle: 'Transkripsiyon Ayarlarını Sıfırla',
     confirmResetEngineDesc: 'Tüm transkripsiyon parametrelerini varsayılan değerlere sıfırlamak istediğinizden emin misiniz?\n(Genel uygulama tercihleri, modeller ve yapay zeka çevirisi korunacaktır.)',
-    confirmResetEngineBtn: 'Varsayılanlara Sıfırla'
+    confirmResetEngineBtn: 'Varsayılanlara Sıfırla',
+    shortcutsModalTitle: 'Klavye Kısayolları',
+    shortcutsModalSubtitle: 'Genel ve stüdyo kısayolları hızlı rehberi',
+    shortcutsGlobalSection: 'Genel ve Gezinme',
+    shortcutsSearch: 'Etkin görünümde ara',
+    shortcutsZoom: 'Arayüzü yakınlaştır (büyüt / küçült / sıfırla)',
+    shortcutsToggle: 'Bu kısayol kılavuzunu göster',
+    shortcutsDismiss: 'Pencereleri kapat veya aramayı iptal et',
+    shortcutsSeek10s: '10 sn geri / ileri sar',
+    shortcutsVolume: 'Ses düzeyini ayarla (%5)',
+    shortcutsSeekCue: 'Videoyu altyazı zamanına sar',
+    shortcutsExitFullscreen: 'Tam ekrandan çık',
+    shortcutsOr: 'veya'
   },
   toasts: {
     testCancelled: 'Bağlantı testi iptal edildi.',

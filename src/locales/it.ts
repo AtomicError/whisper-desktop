@@ -1131,7 +1131,19 @@ export const it: Translations = {
     previewNotTranslated: 'non tradotto',
     confirmResetEngineTitle: 'Ripristina impostazioni trascrizione',
     confirmResetEngineDesc: 'Sei sicuro di voler ripristinare tutti i parametri di trascrizione ai valori predefiniti?\n(Le preferenze generali dell\'app, i modelli e la traduzione IA rimarranno invariati.)',
-    confirmResetEngineBtn: 'Ripristina ai valori predefiniti'
+    confirmResetEngineBtn: 'Ripristina ai valori predefiniti',
+    shortcutsModalTitle: 'Scorciatoie da tastiera',
+    shortcutsModalSubtitle: 'Guida rapida alle scorciatoie globali e degli studi',
+    shortcutsGlobalSection: 'Globale e navigazione',
+    shortcutsSearch: 'Cerca nella vista attiva',
+    shortcutsZoom: 'Zoom interfaccia (ingrandisci / rimpicciolisci / ripristina)',
+    shortcutsToggle: 'Mostra questa guida alle scorciatoie',
+    shortcutsDismiss: 'Chiudi finestre o annulla ricerca',
+    shortcutsSeek10s: 'Indietro / Avanti di 10s',
+    shortcutsVolume: 'Regola volume (5%)',
+    shortcutsSeekCue: 'Salta video al tempo del sottotitolo',
+    shortcutsExitFullscreen: 'Esci da schermo intero',
+    shortcutsOr: 'o'
   },
   toasts: {
     testCancelled: 'Test di connessione annullato.',

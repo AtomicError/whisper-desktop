@@ -1131,7 +1131,19 @@ export const fa: Translations = {
     previewNotTranslated: 'ترجمه‌نشده',
     confirmResetEngineTitle: 'بازنشانی تنظیمات رونویسی',
     confirmResetEngineDesc: 'آیا از بازنشانی تنظیمات رونویسی به مقادیر پیش‌فرض اطمینان دارید؟\n(تنظیمات عمومی برنامه، مدل‌ها و هوش مصنوعی حفظ خواهند شد.)',
-    confirmResetEngineBtn: 'بازنشانی به پیش‌فرض'
+    confirmResetEngineBtn: 'بازنشانی به پیش‌فرض',
+    shortcutsModalTitle: 'کلیدهای میان‌بر نرم‌افزار',
+    shortcutsModalSubtitle: 'راهنمای جامع کلیدهای میان‌بر سراسری و استودیوها',
+    shortcutsGlobalSection: 'عمومی و سراسری',
+    shortcutsSearch: 'جستجو در صفحه فعال',
+    shortcutsZoom: 'بزرگ‌نمایی رابط کاربری (افزایش / کاهش / بازنشانی)',
+    shortcutsToggle: 'نمایش همین راهنمای میان‌برها',
+    shortcutsDismiss: 'بستن پنجره‌ها و لغو جستجو',
+    shortcutsSeek10s: '۱۰ ثانیه به عقب / جلو',
+    shortcutsVolume: 'تنظیم بلندی صدا (۵٪)',
+    shortcutsSeekCue: 'پرش ویدیو به زمان سگمنت',
+    shortcutsExitFullscreen: 'خروج از نمای تمام‌صفحه',
+    shortcutsOr: 'یا'
   },
   toasts: {
     testCancelled: 'آزمون اتصال لغو شد.',

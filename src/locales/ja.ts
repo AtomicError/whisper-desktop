@@ -1129,7 +1129,19 @@ export const ja: Translations = {
     previewNotTranslated: '未翻訳',
     confirmResetEngineTitle: '文字起こし設定をリセット',
     confirmResetEngineDesc: 'すべての文字起こしパラメータをデフォルト値に戻しますか？\n（アプリの基本設定、モデル、AI翻訳設定は保持されます。）',
-    confirmResetEngineBtn: 'デフォルトに戻す'
+    confirmResetEngineBtn: 'デフォルトに戻す',
+    shortcutsModalTitle: 'キーボードショートカット',
+    shortcutsModalSubtitle: '全体およびスタジオ用ショートカット一覧',
+    shortcutsGlobalSection: '全般・グローバル',
+    shortcutsSearch: 'アクティブ画面で検索',
+    shortcutsZoom: '画面ズーム（拡大 / 縮小 / リセット）',
+    shortcutsToggle: 'このショートカットガイドを表示',
+    shortcutsDismiss: 'ダイアログを閉じる・検索解除',
+    shortcutsSeek10s: '10秒巻き戻し / 早送り',
+    shortcutsVolume: '音量調整 (5%)',
+    shortcutsSeekCue: '字幕タイミングに動画をシーク',
+    shortcutsExitFullscreen: '全画面表示を終了',
+    shortcutsOr: 'または'
   },
   toasts: {
     testCancelled: '接続テストがキャンセルされました。',
