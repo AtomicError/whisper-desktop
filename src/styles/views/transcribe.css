@@ -1975,6 +1975,7 @@ html[dir="rtl"] #options-for-batch-sort-select .custom-select-option.selected {
   border-bottom: 1px solid rgba(255, 255, 255, 0.035);
   padding-bottom: 6px;
   user-select: none;
+  cursor: pointer;
 }
 
 .transcript-card-badge-wrap {
@@ -2286,6 +2287,13 @@ html[dir="rtl"] #transcript-search::placeholder,
   object-fit: contain;
   display: block;
   outline: none;
+}
+
+.companion-subtitle-canvas {
+  position: absolute;
+  pointer-events: none;
+  display: none;
+  z-index: 5;
 }
 
 .companion-video-container.aspect-vertical {

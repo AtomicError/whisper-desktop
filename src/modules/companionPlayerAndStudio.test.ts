@@ -51,6 +51,10 @@ import {
   updateFullscreenUI,
   cycleCompanionPlaybackRate,
   updateSliderTrackProgress,
+  updateCompanionSubtitleBounds,
+  renderCompanionSubtitle,
+  hasArabicOrPersianScript,
+  cleanSubtitleDisplayText,
   COMPANION_SPEEDS
 } from './companionPlayer';
 import { clearBatchQueue, removeFileFromBatch, selectBatchItemTranscript, batchProcessor } from './batchProcessor';
@@ -101,6 +105,38 @@ class MockElement {
   style: Record<string, string> = {};
   dataset: Record<string, string> = {};
   _listeners = new Map<string, Array<(e: any) => void>>();
+  width = 0;
+  height = 0;
+  clientWidth = 0;
+  clientHeight = 0;
+  offsetLeft = 0;
+  offsetTop = 0;
+  videoWidth = 0;
+  videoHeight = 0;
+
+  getContext(type: string) {
+    if (type === '2d') {
+      return {
+        clearRect: () => {},
+        measureText: (t: string) => ({ width: t.length * 8 }),
+        fillText: () => {},
+        strokeText: () => {},
+        font: '',
+        textAlign: '',
+        textBaseline: '',
+        direction: '',
+        strokeStyle: '',
+        fillStyle: '',
+        lineWidth: 1,
+        lineJoin: '',
+        miterLimit: 2,
+        save: () => {},
+        restore: () => {},
+        setTransform: () => {},
+      };
+    }
+    return null;
+  }
 
   constructor(tag = 'DIV') {
     this.tagName = tag.toUpperCase();
@@ -2486,5 +2522,103 @@ describe('Studio Refinements, Isolation & Keyboard Accessibility', () => {
     const splitResult = splitTranscriptSegment(0);
     expect(splitResult).toBe(false);
     expect(transcriptViewer.lines.length).toBe(1);
+  });
+
+  it('accurately resolves exact boundary timestamps to the newly starting segment (resolves bug where clicking segment 2 kept segment 1)', () => {
+    transcriptViewer.lines = [
+      { id: 0, timeRange: '[00:00:00.070 --> 00:00:02.230]', text: 'When you cut off the root of an onion,', startMs: 70, endMs: 2230 },
+      { id: 1, timeRange: '[00:00:02.230 --> 00:00:04.710]', text: 'it releases chemicals that hit your eyes', startMs: 2230, endMs: 4710 }
+    ];
+    renderTranscriptLines(transcriptViewer.lines);
+
+    const card0 = document.querySelector('.transcript-card[data-id="0"]')!;
+    const card1 = document.querySelector('.transcript-card[data-id="1"]')!;
+
+    // 1. Initial position at segment 0
+    highlightActiveTranscriptSegment(1.0);
+    expect(card0.classList.contains('active-playback')).toBe(true);
+    expect(card1.classList.contains('active-playback')).toBe(false);
+
+    // 2. Seeking exactly to 2.230 (the boundary between segment 0 and 1)
+    // MUST select segment 1 because segment 1 starts at 2.230!
+    highlightActiveTranscriptSegment(2.230);
+    expect(card0.classList.contains('active-playback')).toBe(false);
+    expect(card1.classList.contains('active-playback')).toBe(true);
+
+    // 3. Right before the boundary (2.229) selects segment 0
+    highlightActiveTranscriptSegment(2.229);
+    expect(card0.classList.contains('active-playback')).toBe(true);
+    expect(card1.classList.contains('active-playback')).toBe(false);
+  });
+
+  it('supports explicit targetLineId in seekCompanionPlayer for instant segment activation', () => {
+    transcriptViewer.lines = [
+      { id: 0, timeRange: '[00:00:00.070 --> 00:00:02.230]', text: 'Segment 0', startMs: 70, endMs: 2230 },
+      { id: 1, timeRange: '[00:00:02.230 --> 00:00:04.710]', text: 'Segment 1', startMs: 2230, endMs: 4710 }
+    ];
+    renderTranscriptLines(transcriptViewer.lines);
+
+    const card1 = document.querySelector('.transcript-card[data-id="1"]')!;
+    seekCompanionPlayer(2230, false, 1);
+    expect(card1.classList.contains('active-playback')).toBe(true);
+  });
+
+  it('detects Persian and Arabic scripts accurately for RTL canvas subtitle rendering', () => {
+    expect(hasArabicOrPersianScript('it releases chemicals that hit your eyes')).toBe(false);
+    expect(hasArabicOrPersianScript('مواد شیمیایی آزاد می‌کند که به چشم شما برخورد می‌کند')).toBe(true);
+    expect(hasArabicOrPersianScript('Onion پیاز')).toBe(true);
+  });
+
+  it('updates companion subtitle bounds and renders subtitles on canvas without throwing', () => {
+    registerMockEl('companion-subtitle-canvas', 'CANVAS');
+    const container = registerMockEl('companion-video-container', 'DIV');
+    container.clientWidth = 400;
+    container.clientHeight = 300;
+    const video = registerMockEl('companion-media-element', 'VIDEO') as any;
+    video.videoWidth = 1920;
+    video.videoHeight = 1080;
+    video.clientWidth = 400;
+    video.clientHeight = 225;
+
+    expect(() => updateCompanionSubtitleBounds(true)).not.toThrow();
+    expect(() => renderCompanionSubtitle(true)).not.toThrow();
+  });
+
+  it('cleans subtitle text by removing ASS tags, HTML tags, and normalizing newlines', () => {
+    expect(cleanSubtitleDisplayText('{\\an8}Hello {\\b1}World{\\b0}')).toBe('Hello World');
+    expect(cleanSubtitleDisplayText('<i>مورب</i> و <b>برجسته</b>')).toBe('مورب و برجسته');
+    expect(cleanSubtitleDisplayText('Line 1\\NLine 2\\nLine 3')).toBe('Line 1\nLine 2\nLine 3');
+    expect(cleanSubtitleDisplayText('')).toBe('');
+  });
+
+  it('automatically triggers subtitle redraw when canvas dimensions change even if forceRedraw is false', () => {
+    const canvas = registerMockEl('companion-subtitle-canvas', 'CANVAS') as any;
+    const container = registerMockEl('companion-video-container', 'DIV');
+    container.clientWidth = 600;
+    container.clientHeight = 400;
+    const video = registerMockEl('companion-media-element', 'VIDEO') as any;
+    video.videoWidth = 1920;
+    video.videoHeight = 1080;
+    video.clientWidth = 600;
+    video.clientHeight = 338;
+
+    transcriptViewer.lines = [
+      { id: 0, timeRange: '[00:00:00.000 --> 00:00:03.000]', text: 'Resized subtitle', startMs: 0, endMs: 3000 }
+    ];
+    renderTranscriptLines(transcriptViewer.lines);
+
+    // Initial sizing
+    updateCompanionSubtitleBounds(true);
+    const initialW = canvas.width;
+    expect(initialW).toBeGreaterThan(0);
+
+    // Change container size (simulating pane resize)
+    container.clientWidth = 800;
+    video.clientWidth = 800;
+    video.clientHeight = 450;
+
+    // updateCompanionSubtitleBounds with forceRedraw = false should detect dimsChanged and redraw without error
+    expect(() => updateCompanionSubtitleBounds(false)).not.toThrow();
+    expect(canvas.width).not.toBe(initialW);
   });
 });

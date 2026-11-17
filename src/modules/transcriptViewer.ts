@@ -184,7 +184,7 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
     e.stopPropagation();
     const win = getGlobal();
     if (typeof win.seekCompanionPlayer === 'function') {
-      win.seekCompanionPlayer(startMs, true);
+      win.seekCompanionPlayer(startMs, true, lineObj.id);
     }
   };
   actionsWrap.appendChild(playBtn);
@@ -248,10 +248,11 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
 
   headerEl.appendChild(actionsWrap);
 
-  headerEl.onclick = () => {
+  headerEl.onclick = (e: MouseEvent) => {
+    if ((e.target as HTMLElement)?.closest('.btn-card-action')) return;
     const win = getGlobal();
     if (typeof win.seekCompanionPlayer === 'function') {
-      win.seekCompanionPlayer(startMs);
+      win.seekCompanionPlayer(startMs, undefined, lineObj.id);
     }
   };
 
@@ -267,6 +268,10 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
   applyTextDirection(textarea);
   textarea.onfocus = () => {
     sessionSnapshotTaken = false;
+    const win = getGlobal();
+    if (typeof win.highlightActiveTranscriptSegment === 'function') {
+      win.highlightActiveTranscriptSegment(startMs / 1000, lineObj.id);
+    }
   };
   textarea.oninput = () => {
     if (!sessionSnapshotTaken) {
@@ -331,7 +336,7 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
         e.stopPropagation();
         const win = getGlobal();
         if (typeof win.seekCompanionPlayer === 'function') {
-          win.seekCompanionPlayer(w.startMs);
+          win.seekCompanionPlayer(w.startMs, undefined, lineObj.id);
         }
         if (textarea) {
           const cleanWord = w.text.trim();
@@ -390,6 +395,23 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
     bodyEl.appendChild(wordsBar);
   }
 
+  cardEl.onclick = (e: MouseEvent) => {
+    const target = e.target as HTMLElement | null;
+    const isAction = typeof target?.closest === 'function' && target.closest('.btn-card-action');
+    const isWordsBar = typeof target?.closest === 'function' && target.closest('.transcript-words-bar');
+    const isTextarea = (typeof HTMLTextAreaElement !== 'undefined' && target instanceof HTMLTextAreaElement) ||
+      target?.tagName === 'TEXTAREA' ||
+      target?.classList?.contains('transcript-text-input');
+    const isHeader = typeof target?.closest === 'function' && target.closest('.transcript-card-header');
+    if (isAction || isWordsBar || isTextarea || isHeader) {
+      return;
+    }
+    const win = getGlobal();
+    if (typeof win.seekCompanionPlayer === 'function') {
+      win.seekCompanionPlayer(startMs, undefined, lineObj.id);
+    }
+  };
+
   cardEl.ondblclick = (e: MouseEvent) => {
     const target = e.target as HTMLElement | null;
     const isAction = typeof target?.closest === 'function' && target.closest('.btn-card-action');
@@ -402,7 +424,7 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
     }
     const win = getGlobal();
     if (typeof win.seekCompanionPlayer === 'function') {
-      win.seekCompanionPlayer(startMs);
+      win.seekCompanionPlayer(startMs, undefined, lineObj.id);
     }
   };
 
@@ -455,6 +477,11 @@ export function renderTranscriptLines(lines: TranscriptLine[]): void {
   const searchInput = document.getElementById('transcript-search') as HTMLInputElement | null;
   if (searchInput && searchInput.value.trim() !== '') {
     filterTranscriptLines();
+  }
+
+  const win = getGlobal();
+  if (typeof win.renderCompanionSubtitle === 'function') {
+    win.renderCompanionSubtitle(true);
   }
 }
 
@@ -781,6 +808,9 @@ export function updateTranscriptLineText(id: number, value: string): void {
     }
     transcriptDirty = true;
     scheduleTranscriptDiskSync();
+    if (typeof win.renderCompanionSubtitle === 'function') {
+      win.renderCompanionSubtitle(true);
+    }
   }
 }
 

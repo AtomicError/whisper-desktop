@@ -1,5 +1,5 @@
 // Companion Player & Media Console Controller for Whisper Desktop
-import { t } from '../i18n/index';
+import { t, firstStrongDirection } from '../i18n/index';
 import { formatMsToTimestamp, parseTimestampStringToMs, getTranscriptLines } from './transcriptViewer';
 
 const getGlobal = (): any => (typeof window !== 'undefined' ? window : globalThis);
@@ -33,6 +33,11 @@ let seekWatchdogTimer: ReturnType<typeof setTimeout> | null = null;
 let currentHighlightedLineId: number | null = null;
 let pendingSeekTargetSec: number | null = null;
 let hasMetadataSeekListener = false;
+let companionSubtitleCanvas: HTMLCanvasElement | null = null;
+let companionCanvasCtx: CanvasRenderingContext2D | null = null;
+let companionResizeObserver: ResizeObserver | null = null;
+let lastRenderedSubtitleText = '';
+let explicitTargetLineId: number | null = null;
 
 function armSeekWatchdog(): void {
   if (seekWatchdogTimer) clearTimeout(seekWatchdogTimer);
@@ -169,6 +174,9 @@ export function showTranscribeMediaDeck(): void {
   if (setupDeckTabs) {
     setupDeckTabs.style.display = 'none';
   }
+  setTimeout(() => {
+    updateCompanionSubtitleBounds(true);
+  }, 30);
 }
 
 export async function loadMediaIntoCompanionPlayer(filePath: string, autoSwitchDeck = true): Promise<boolean> {
@@ -431,7 +439,7 @@ export function jumpCompanionPlayback(seconds: number): void {
   armSeekWatchdog();
 }
 
-export function seekCompanionPlayer(targetMs: number, autoPlay?: boolean): void {
+export function seekCompanionPlayer(targetMs: number, autoPlay?: boolean, targetLineId?: number): void {
   const videoEl = document.getElementById('companion-media-element') as HTMLVideoElement | null;
   if (!videoEl) return;
   const targetSec = Math.max(0, targetMs / 1000);
@@ -445,6 +453,13 @@ export function seekCompanionPlayer(targetMs: number, autoPlay?: boolean): void 
   }
   const timeCurrent = document.getElementById('companion-time-current');
   if (timeCurrent) updateCompanionTimeDisplay(timeCurrent, targetSec);
+
+  if (typeof targetLineId === 'number') {
+    explicitTargetLineId = targetLineId;
+    highlightActiveTranscriptSegment(targetSec, targetLineId);
+  } else {
+    explicitTargetLineId = null;
+  }
 
   isSeeking = true;
   isVideoSeeking = true;
@@ -500,6 +515,20 @@ export function unloadCompanionPlayer(): void {
   pendingSeekTargetSec = null;
   hasMetadataSeekListener = false;
   currentHighlightedLineId = null;
+  explicitTargetLineId = null;
+  lastRenderedSubtitleText = '';
+  if (companionSubtitleCanvas) {
+    if (companionCanvasCtx) {
+      companionCanvasCtx.clearRect(0, 0, companionSubtitleCanvas.width, companionSubtitleCanvas.height);
+    }
+    companionSubtitleCanvas.style.display = 'none';
+  }
+  companionSubtitleCanvas = null;
+  companionCanvasCtx = null;
+  if (companionResizeObserver) {
+    companionResizeObserver.disconnect();
+    companionResizeObserver = null;
+  }
   if (typeof document !== 'undefined' && typeof document.querySelectorAll === 'function') {
     document.querySelectorAll('.transcript-card.active-playback').forEach(el => {
       el.classList.remove('active-playback');
@@ -689,83 +718,299 @@ export async function toggleCompanionFullscreen(): Promise<void> {
   }
 }
 
-export function highlightActiveTranscriptSegment(currentSec: number): void {
+export function hasArabicOrPersianScript(text: string): boolean {
+  return /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(text);
+}
+
+export function cleanSubtitleDisplayText(rawText: string): string {
+  if (!rawText) return '';
+  return rawText
+    .replace(/\\n/gi, '\n')
+    .replace(/\{[^}]*\}/g, '')
+    .replace(/<[^>]*>/g, '')
+    .trim();
+}
+
+export function protectRtlPunctuation(text: string, isRtl: boolean): string {
+  if (!isRtl || !text) return text;
+  let res = text;
+  if (/[\p{P}\p{S}]$/u.test(res)) {
+    res = res + '\u200F';
+  }
+  if (/^[\p{P}\p{S}]/u.test(res)) {
+    res = '\u200F' + res;
+  }
+  return res;
+}
+
+export function updateCompanionSubtitleBounds(forceRedraw = true): void {
   if (typeof document === 'undefined') return;
-  const currentMs = currentSec * 1000;
+  const canvas = (document.getElementById('companion-subtitle-canvas') as HTMLCanvasElement | null) || companionSubtitleCanvas;
+  const videoEl = document.getElementById('companion-media-element') as HTMLVideoElement | null;
+  const container = document.getElementById('companion-video-container') as HTMLElement | null;
+  if (!canvas || !videoEl || !container) return;
+
+  companionSubtitleCanvas = canvas;
+  companionCanvasCtx = canvas.getContext('2d');
+
+  if (activeMediaInfo && !activeMediaInfo.isVideo) {
+    canvas.style.display = 'none';
+    return;
+  }
+
+  const containerW = container.clientWidth;
+  const containerH = container.clientHeight;
+  const videoW = videoEl.videoWidth || activeMediaInfo?.width || 0;
+  const videoH = videoEl.videoHeight || activeMediaInfo?.height || 0;
+  const videoElW = videoEl.clientWidth;
+  const videoElH = videoEl.clientHeight;
+
+  if (!videoW || !videoH || containerW === 0 || containerH === 0 || videoElW === 0 || videoElH === 0) {
+    canvas.style.display = 'none';
+    return;
+  }
+
+  const videoElAspect = videoElW / videoElH;
+  const videoAspect = videoW / videoH;
+
+  let displayWidth: number;
+  let displayHeight: number;
+
+  if (videoAspect > videoElAspect) {
+    displayWidth = videoElW;
+    displayHeight = videoElW / videoAspect;
+  } else {
+    displayHeight = videoElH;
+    displayWidth = videoElH * videoAspect;
+  }
+
+  const left = videoEl.offsetLeft + (videoElW - displayWidth) / 2;
+  const top = videoEl.offsetTop + (videoElH - displayHeight) / 2;
+
+  const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
+  const roundedW = Math.max(1, Math.round(displayWidth));
+  const roundedH = Math.max(1, Math.round(displayHeight));
+
+  canvas.style.width = `${roundedW}px`;
+  canvas.style.height = `${roundedH}px`;
+  canvas.style.left = `${Math.round(left)}px`;
+  canvas.style.top = `${Math.round(top)}px`;
+  canvas.style.display = 'block';
+
+  const bufferW = Math.round(roundedW * dpr);
+  const bufferH = Math.round(roundedH * dpr);
+
+  const dimsChanged = canvas.width !== bufferW || canvas.height !== bufferH;
+  if (dimsChanged) {
+    canvas.width = bufferW;
+    canvas.height = bufferH;
+    lastRenderedSubtitleText = '';
+  }
+
+  if (forceRedraw || dimsChanged) {
+    renderCompanionSubtitle(true);
+  }
+}
+
+export function renderCompanionSubtitle(force = false): void {
+  if (typeof document === 'undefined') return;
+  const canvas = (document.getElementById('companion-subtitle-canvas') as HTMLCanvasElement | null) || companionSubtitleCanvas;
+  if (!canvas) return;
+  const ctx = companionCanvasCtx || canvas.getContext('2d');
+  if (!ctx) return;
+
+  const videoEl = document.getElementById('companion-media-element') as HTMLVideoElement | null;
+  if (!videoEl || (activeMediaInfo && !activeMediaInfo.isVideo)) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    return;
+  }
+
+  const curMs = Math.round((videoEl.currentTime || 0) * 1000);
   const lines = getTranscriptLines();
-  if (!lines || lines.length === 0) return;
+  let activeText = '';
 
-  let matchingLineId: number | null = null;
-
-  // Fast path for continuous forward/current playback: check current or next segment first
-  if (currentHighlightedLineId !== null && currentHighlightedLineId >= 0 && currentHighlightedLineId < lines.length) {
-    const curLine = lines[currentHighlightedLineId];
-    let curStart = curLine.startMs;
-    let curEnd = curLine.endMs;
-    if (curStart === undefined || curEnd === undefined) {
-      const match = curLine.timeRange.match(/\[([\d:.,]+)\s*(?:-->|→)\s*([\d:.,]+)\]/);
-      if (match) {
-        curStart = parseTimestampStringToMs(match[1]) ?? 0;
-        curEnd = parseTimestampStringToMs(match[2]) ?? (curStart + 3000);
-      }
-      if (curStart !== undefined && curEnd !== undefined) {
-        curLine.startMs = curStart;
-        curLine.endMs = curEnd;
+  if (lines && lines.length > 0) {
+    const targetId = explicitTargetLineId !== null ? explicitTargetLineId : currentHighlightedLineId;
+    if (targetId !== null) {
+      const targetLine = lines.find(l => l.id === targetId);
+      if (targetLine) {
+        activeText = targetLine.text.trim();
       }
     }
-    if (curStart !== undefined && curEnd !== undefined && currentMs >= curStart && currentMs <= curEnd) {
-      matchingLineId = curLine.id;
-    } else if (currentHighlightedLineId + 1 < lines.length) {
-      const nextLine = lines[currentHighlightedLineId + 1];
-      let nextStart = nextLine.startMs;
-      let nextEnd = nextLine.endMs;
-      if (nextStart === undefined || nextEnd === undefined) {
-        const match = nextLine.timeRange.match(/\[([\d:.,]+)\s*(?:-->|→)\s*([\d:.,]+)\]/);
-        if (match) {
-          nextStart = parseTimestampStringToMs(match[1]) ?? 0;
-          nextEnd = parseTimestampStringToMs(match[2]) ?? (nextStart + 3000);
+
+    if (!activeText) {
+      const candidates = lines.filter(l => {
+        const s = l.startMs ?? 0;
+        const e = l.endMs ?? (s + 3000);
+        return curMs >= s && curMs <= e;
+      });
+
+      if (candidates.length === 1) {
+        activeText = candidates[0].text.trim();
+      } else if (candidates.length > 1) {
+        const startingAtNow = candidates.find(l => (l.startMs ?? 0) === curMs);
+        if (startingAtNow) {
+          activeText = startingAtNow.text.trim();
+        } else {
+          candidates.sort((a, b) => (b.startMs ?? 0) - (a.startMs ?? 0));
+          activeText = candidates[0].text.trim();
         }
-        if (nextStart !== undefined && nextEnd !== undefined) {
-          nextLine.startMs = nextStart;
-          nextLine.endMs = nextEnd;
-        }
-      }
-      if (nextStart !== undefined && nextEnd !== undefined && currentMs >= nextStart && currentMs <= nextEnd) {
-        matchingLineId = nextLine.id;
       }
     }
   }
 
-  // Fallback: binary search if seek jumped or fast path did not match
-  if (matchingLineId === null) {
-    let low = 0;
-    let high = lines.length - 1;
-    while (low <= high) {
-      const mid = (low + high) >> 1;
-      const midLine = lines[mid];
-      let sMs = midLine.startMs;
-      let eMs = midLine.endMs;
-      if (sMs === undefined || eMs === undefined) {
-        const match = midLine.timeRange.match(/\[([\d:.,]+)\s*(?:-->|→)\s*([\d:.,]+)\]/);
-        if (match) {
-          sMs = parseTimestampStringToMs(match[1]) ?? 0;
-          eMs = parseTimestampStringToMs(match[2]) ?? (sMs + 3000);
-        } else {
-          sMs = mid * 2000;
-          eMs = sMs + 2000;
-        }
-        if (sMs !== undefined && eMs !== undefined) {
-          midLine.startMs = sMs;
-          midLine.endMs = eMs;
-        }
-      }
-      if (currentMs >= sMs && currentMs <= eMs) {
-        matchingLineId = midLine.id;
-        break;
-      } else if (currentMs < sMs) {
-        high = mid - 1;
+  if (!force && activeText === lastRenderedSubtitleText) {
+    return;
+  }
+  lastRenderedSubtitleText = activeText;
+
+  const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
+  const canvasW = canvas.width / dpr;
+  const canvasH = canvas.height / dpr;
+  if (canvasW <= 0 || canvasH <= 0) return;
+
+  if (typeof ctx.save === 'function') {
+    ctx.save();
+  }
+  if (typeof ctx.setTransform === 'function') {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  ctx.clearRect(0, 0, canvasW, canvasH);
+
+  const cleanedText = cleanSubtitleDisplayText(activeText);
+  if (!cleanedText) {
+    if (typeof ctx.restore === 'function') {
+      ctx.restore();
+    }
+    return;
+  }
+
+  const fontSize = Math.max(13, Math.min(34, Math.round(canvasH * 0.055)));
+  ctx.font = `600 ${fontSize}px 'Vazirmatn', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`;
+
+  const strongDir = firstStrongDirection(cleanedText);
+  const isRtl = strongDir ? strongDir === 'rtl' : hasArabicOrPersianScript(cleanedText);
+  ctx.direction = isRtl ? 'rtl' : 'ltr';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+
+  const maxLineWidth = canvasW * 0.88;
+  const rawLines = cleanedText.split('\n');
+  const wrappedLines: string[] = [];
+
+  for (const rawLine of rawLines) {
+    const trimmed = rawLine.trim();
+    if (!trimmed) continue;
+    if (ctx.measureText(trimmed).width <= maxLineWidth) {
+      wrappedLines.push(trimmed);
+      continue;
+    }
+    const words = trimmed.split(/\s+/);
+    let currentLine = '';
+    for (const w of words) {
+      const candidate = currentLine ? `${currentLine} ${w}` : w;
+      if (ctx.measureText(candidate).width > maxLineWidth && currentLine) {
+        wrappedLines.push(currentLine);
+        currentLine = w;
       } else {
-        low = mid + 1;
+        currentLine = candidate;
+      }
+    }
+    if (currentLine) {
+      wrappedLines.push(currentLine);
+    }
+  }
+
+  if (wrappedLines.length === 0) {
+    if (typeof ctx.restore === 'function') {
+      ctx.restore();
+    }
+    return;
+  }
+
+  const lineHeight = Math.round(fontSize * 1.35);
+  const bottomMargin = Math.max(12, Math.round(canvasH * 0.075));
+  const startBottomY = canvasH - bottomMargin;
+  const strokeWidth = Math.max(2.5, Math.round(fontSize * 0.16));
+
+  wrappedLines.forEach((textLine, idx) => {
+    const lineY = startBottomY - (wrappedLines.length - 1 - idx) * lineHeight;
+    const formattedLine = protectRtlPunctuation(textLine, isRtl);
+
+    if (typeof ctx.save === 'function') {
+      ctx.save();
+    }
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
+    ctx.shadowBlur = Math.max(3, Math.round(fontSize * 0.2));
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 1;
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
+    ctx.lineWidth = strokeWidth;
+    ctx.lineJoin = 'round';
+    ctx.miterLimit = 2;
+    ctx.strokeText(formattedLine, canvasW / 2, lineY);
+    if (typeof ctx.restore === 'function') {
+      ctx.restore();
+    }
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(formattedLine, canvasW / 2, lineY);
+  });
+
+  if (typeof ctx.restore === 'function') {
+    ctx.restore();
+  }
+}
+
+export function highlightActiveTranscriptSegment(currentSec: number, forcedLineId?: number): void {
+  if (typeof document === 'undefined') return;
+  const currentMs = Math.round(currentSec * 1000);
+  const lines = getTranscriptLines();
+  if (!lines || lines.length === 0) {
+    renderCompanionSubtitle();
+    return;
+  }
+
+  // Ensure timestamps are parsed and cached on line objects
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    if (l.startMs === undefined || l.endMs === undefined) {
+      const match = l.timeRange.match(/\[([\d:.,]+)\s*(?:-->|→)\s*([\d:.,]+)\]/);
+      if (match) {
+        l.startMs = parseTimestampStringToMs(match[1]) ?? 0;
+        l.endMs = parseTimestampStringToMs(match[2]) ?? (l.startMs + 3000);
+      } else {
+        l.startMs = i * 2000;
+        l.endMs = l.startMs + 2000;
+      }
+    }
+  }
+
+  let matchingLineId: number | null = null;
+
+  if (typeof forcedLineId === 'number') {
+    const forcedExists = lines.some(l => l.id === forcedLineId);
+    if (forcedExists) {
+      matchingLineId = forcedLineId;
+    }
+  }
+
+  if (matchingLineId === null) {
+    const candidates = lines.filter(l => {
+      const s = l.startMs ?? 0;
+      const e = l.endMs ?? (s + 3000);
+      return currentMs >= s && currentMs <= e;
+    });
+
+    if (candidates.length === 1) {
+      matchingLineId = candidates[0].id;
+    } else if (candidates.length > 1) {
+      const startingAtNow = candidates.find(l => (l.startMs ?? 0) === currentMs);
+      if (startingAtNow) {
+        matchingLineId = startingAtNow.id;
+      } else {
+        candidates.sort((a, b) => (b.startMs ?? 0) - (a.startMs ?? 0));
+        matchingLineId = candidates[0].id;
       }
     }
   }
@@ -774,7 +1019,10 @@ export function highlightActiveTranscriptSegment(currentSec: number): void {
   const isAlreadyActiveOnDOM = currentActiveEl && currentActiveEl.dataset.id === String(matchingLineId);
 
   const isAlreadyIdle = matchingLineId === null && currentHighlightedLineId === null && !currentActiveEl;
-  if ((matchingLineId === currentHighlightedLineId && isAlreadyActiveOnDOM) || isAlreadyIdle) return;
+  if ((matchingLineId === currentHighlightedLineId && isAlreadyActiveOnDOM) || isAlreadyIdle) {
+    renderCompanionSubtitle();
+    return;
+  }
   currentHighlightedLineId = matchingLineId;
 
   document.querySelectorAll('.transcript-card.active-playback').forEach(el => {
@@ -792,6 +1040,8 @@ export function highlightActiveTranscriptSegment(currentSec: number): void {
       }
     }
   }
+
+  renderCompanionSubtitle();
 }
 
 export function initCompanionPlayerDOM(): void {
@@ -819,6 +1069,7 @@ export function initCompanionPlayerDOM(): void {
 
   videoEl.addEventListener('seeking', () => {
     isVideoSeeking = true;
+    renderCompanionSubtitle();
   });
 
   videoEl.addEventListener('seeked', () => {
@@ -836,7 +1087,10 @@ export function initCompanionPlayerDOM(): void {
       updateSliderTrackProgress(seekSlider, pct, '--seek-pct');
     }
     if (timeCurrentEl) updateCompanionTimeDisplay(timeCurrentEl, cur);
-    highlightActiveTranscriptSegment(cur);
+    const forcedId = explicitTargetLineId !== null ? explicitTargetLineId : undefined;
+    explicitTargetLineId = null;
+    highlightActiveTranscriptSegment(cur, forcedId);
+    updateCompanionSubtitleBounds(false);
   });
 
   videoEl.addEventListener('timeupdate', () => {
@@ -874,6 +1128,7 @@ export function initCompanionPlayerDOM(): void {
         }
       }
       updateCompanionMetadataUI(activeMediaInfo);
+      updateCompanionSubtitleBounds(true);
     }
   });
 
@@ -1018,6 +1273,26 @@ export function initCompanionPlayerDOM(): void {
       updateFullscreenUI();
       changeCompanionPlaybackRate(String(currentCompanionSpeed));
     });
+
+    const videoContainer = document.getElementById('companion-video-container');
+    if (videoContainer && typeof ResizeObserver !== 'undefined' && !companionResizeObserver) {
+      companionResizeObserver = new ResizeObserver(() => {
+        updateCompanionSubtitleBounds(false);
+      });
+      companionResizeObserver.observe(videoContainer);
+    }
+
+    window.addEventListener('resize', () => {
+      updateCompanionSubtitleBounds(false);
+    });
+
+    if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+      document.addEventListener('fullscreenchange', () => {
+        setTimeout(() => {
+          updateCompanionSubtitleBounds(true);
+        }, 60);
+      });
+    }
   }
 }
 
@@ -1045,3 +1320,6 @@ win.initCompanionPlayerDOM = initCompanionPlayerDOM;
 win.formatTimecodeDisplay = formatTimecodeDisplay;
 win.formatTimecodeHTML = formatTimecodeHTML;
 win.updateCompanionTimeDisplay = updateCompanionTimeDisplay;
+win.updateCompanionSubtitleBounds = updateCompanionSubtitleBounds;
+win.renderCompanionSubtitle = renderCompanionSubtitle;
+win.highlightActiveTranscriptSegment = highlightActiveTranscriptSegment;
