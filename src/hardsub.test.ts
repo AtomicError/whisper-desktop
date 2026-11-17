@@ -41,8 +41,9 @@ class Control extends EventTarget {
   matches(_selector: string): boolean { return false; }
   removeAttribute(name: string) { this.attributes.delete(name); }
   appendChild(child: Control) { this.children.push(child); return child; }
-  get innerHTML() { return ''; }
-  set innerHTML(_v: string) { this.children = []; }
+  private _html = '';
+  get innerHTML() { return this._html; }
+  set innerHTML(v: string) { this._html = v; this.children = []; }
   get options() { return this.children; }
   querySelector(selector: string): Control | null {
     if (selector === 'span') {
@@ -68,9 +69,10 @@ class Media extends Control {
   readyState = 0;
   volume = 1;
   muted = false;
+  playbackRate = 1.0;
   error: { code: number } | null = null;
   canPlayType() { return 'probably'; }
-  private time = 0;
+  time = 0;
   seeks: Array<{ time: number; fast: boolean }> = [];
   frames = new Map<number, () => void>();
   private frameId = 0;
@@ -135,6 +137,23 @@ function fixture() {
   const italicBtn = new Control();
   doc.elements.set('hardsub-btn-bold', boldBtn);
   doc.elements.set('hardsub-btn-italic', italicBtn);
+
+  const jumpBackBtn = new Control();
+  const jumpFwdBtn = new Control();
+  const speedBtn = new Control();
+  const speedLabel = new Control();
+  const timeCurrent = new Control();
+  const timeTotal = new Control();
+  const prevCueBtn = new Control();
+  const nextCueBtn = new Control();
+  doc.elements.set('hardsub-btn-jump-back', jumpBackBtn);
+  doc.elements.set('hardsub-btn-jump-fwd', jumpFwdBtn);
+  doc.elements.set('hardsub-btn-speed', speedBtn);
+  doc.elements.set('hardsub-speed-label', speedLabel);
+  doc.elements.set('hardsub-time-current', timeCurrent);
+  doc.elements.set('hardsub-time-total', timeTotal);
+  doc.elements.set('hardsub-btn-prev-cue', prevCueBtn);
+  doc.elements.set('hardsub-btn-next-cue', nextCueBtn);
 
   const controller = new Controller();
   controllers.push(controller);
@@ -238,6 +257,7 @@ function fixture() {
   doc.elements.set('hardsub-font', fontSelect);
   Object.assign(internal, { hwSelect, codecSelect, fontSelect, boldToggle: boldBtn, italicToggle: italicBtn });
   Object.assign(internal, { previewCancelBtn: cancel, previewRetryBtn: retry });
+  Object.assign(internal, { btnJumpBack: jumpBackBtn, btnJumpFwd: jumpFwdBtn, btnSpeed: speedBtn, speedLabel, timeCurrentEl: timeCurrent, timeTotalEl: timeTotal, prevCueBtn, nextCueBtn });
   internal.setupVideoPlayerEvents();
   (internal as any).setupEventListeners();
   const load = async (active = true) => {
@@ -247,7 +267,7 @@ function fixture() {
     if (active) controller.setPageActive(true);
     video.pause.mockClear();
   };
-  return { controller, video, slider, play, iconPlay, iconPause, label, badge, time, container, internal, load, cancel, retry, outputDirText, btnBrowseDir, btnResetDir, btnOpenFolder, btnPlayVideo, telemetryBox, volumeWrapper, volumeBtn, volumeSlider, btnClearVideo, btnClearSub, btnResetAll, fullscreenBtn, iconFsEnter, iconFsExit, fontSelect, boldBtn, italicBtn, startBtn };
+  return { controller, video, slider, play, iconPlay, iconPause, label, badge, time, container, internal, load, cancel, retry, outputDirText, btnBrowseDir, btnResetDir, btnOpenFolder, btnPlayVideo, telemetryBox, volumeWrapper, volumeBtn, volumeSlider, btnClearVideo, btnClearSub, btnResetAll, fullscreenBtn, iconFsEnter, iconFsExit, fontSelect, boldBtn, italicBtn, startBtn, jumpBackBtn, jumpFwdBtn, speedBtn, speedLabel, timeCurrent, timeTotal, prevCueBtn, nextCueBtn };
 }
 
 beforeAll(async () => {
@@ -401,8 +421,8 @@ describe('real hardsub seek interaction', () => {
     video.ready();
     key('ArrowRight');
     video.settle();
-    expect(video.currentTime).toBe(10);
-    expect(time.textContent).toContain('00:10');
+    expect(video.currentTime).toBe(5);
+    expect(time.textContent).toContain('00:05');
   });
 
   it('settles a same-time gesture without waiting for seeked or duplicating release', async () => {
@@ -421,7 +441,7 @@ describe('real hardsub seek interaction', () => {
     expect(badge.textContent).toBe(status);
     key('ArrowRight');
     video.settle();
-    expect(video.currentTime).toBe(10);
+    expect(video.currentTime).toBe(5);
   });
 
   it.each(['pointercancel', 'lostpointercapture'])('does not resume a cancelled slider gesture: %s', async event => {
@@ -460,7 +480,7 @@ describe('real hardsub seek interaction', () => {
     video.ready();
     key('ArrowRight');
     video.settle();
-    expect(video.currentTime).toBe(10);
+    expect(video.currentTime).toBe(5);
     expect(slider.disabled).toBe(false);
   });
 
@@ -519,7 +539,7 @@ describe('real hardsub seek interaction', () => {
     expect(video.seeks).toEqual([]);
     expect(key('ArrowRight').defaultPrevented).toBe(true);
     video.settle();
-    expect(video.currentTime).toBe(10);
+    expect(video.currentTime).toBe(5);
   });
 
   it('allows keyboard shortcuts when non-input controls like play button are active', async () => {
@@ -530,12 +550,12 @@ describe('real hardsub seek interaction', () => {
     playButton.id = 'hardsub-btn-play';
     doc.activeElement = playButton;
 
-    // ArrowRight seeks 10s
+    // ArrowRight seeks 5s
     expect(key('ArrowRight').defaultPrevented).toBe(true);
     video.settle();
-    expect(video.currentTime).toBe(10);
+    expect(video.currentTime).toBe(5);
 
-    // ArrowLeft seeks -10s
+    // ArrowLeft seeks -5s
     expect(key('ArrowLeft').defaultPrevented).toBe(true);
     video.settle();
     expect(video.currentTime).toBe(0);
@@ -1307,12 +1327,20 @@ describe('hardsub output directory management', () => {
     });
 
     it('clearVideoState resets phase to idle, disables controls, and releases preview backend resources', async () => {
-      const { controller, load, internal, play, slider, badge } = fixture();
+      const { controller, load, internal, play, slider, badge, jumpBackBtn, jumpFwdBtn, speedBtn, volumeBtn, volumeSlider, fullscreenBtn, prevCueBtn, nextCueBtn } = fixture();
       await load();
 
       expect(internal.phase).toBe('ready');
       expect((play as any).disabled).toBe(false);
       expect((slider as any).disabled).toBe(false);
+      expect((jumpBackBtn as any).disabled).toBe(false);
+      expect((jumpFwdBtn as any).disabled).toBe(false);
+      expect((speedBtn as any).disabled).toBe(false);
+      expect((volumeBtn as any).disabled).toBe(false);
+      expect((volumeSlider as any).disabled).toBe(false);
+      expect((fullscreenBtn as any).disabled).toBe(false);
+      expect((prevCueBtn as any).disabled).toBe(false);
+      expect((nextCueBtn as any).disabled).toBe(false);
 
       controller.clearVideoState();
       await flush();
@@ -1320,6 +1348,14 @@ describe('hardsub output directory management', () => {
       expect(internal.phase).toBe('idle');
       expect((play as any).disabled).toBe(true);
       expect((slider as any).disabled).toBe(true);
+      expect((jumpBackBtn as any).disabled).toBe(true);
+      expect((jumpFwdBtn as any).disabled).toBe(true);
+      expect((speedBtn as any).disabled).toBe(true);
+      expect((volumeBtn as any).disabled).toBe(true);
+      expect((volumeSlider as any).disabled).toBe(true);
+      expect((fullscreenBtn as any).disabled).toBe(true);
+      expect((prevCueBtn as any).disabled).toBe(true);
+      expect((nextCueBtn as any).disabled).toBe(true);
       expect(badge.textContent).toBe('No Video Loaded');
       expect(invoke).toHaveBeenCalledWith('release_hardsub_preview', expect.anything());
     });
@@ -1791,6 +1827,92 @@ describe('hardsub output directory management', () => {
       const tempAssWrite = writes.find(w => w.filePath === '/media/video.temp.ass');
       expect(tempAssWrite).toBeDefined();
       expect((internal as any).isSubtitlesModified).toBe(false);
+    });
+  });
+
+  describe('modern player controls & speed integration', () => {
+    it('jumps 5s back and forward safely when jump buttons are clicked', async () => {
+      const { video, load, jumpBackBtn, jumpFwdBtn } = fixture();
+      await load();
+      video.time = 20;
+      video.settle();
+
+      jumpBackBtn.dispatchEvent(new Event('click'));
+      video.settle();
+      expect(video.currentTime).toBe(15);
+
+      jumpFwdBtn.dispatchEvent(new Event('click'));
+      video.settle();
+      expect(video.currentTime).toBe(20);
+    });
+
+    it('cycles playback speed smoothly on click and right-click and updates label and video element', async () => {
+      const { video, load, speedBtn, speedLabel } = fixture();
+      await load();
+
+      expect(speedLabel.textContent).toBe('1.0x');
+
+      // Left-click cycles forward: 1.0 -> 1.25 -> 1.5 -> 2.0 -> 0.75 -> 1.0
+      speedBtn.dispatchEvent(new Event('click'));
+      expect(video.playbackRate).toBe(1.25);
+      expect(speedLabel.textContent).toBe('1.25x');
+
+      speedBtn.dispatchEvent(new Event('click'));
+      expect(video.playbackRate).toBe(1.5);
+      expect(speedLabel.textContent).toBe('1.5x');
+
+      // Right-click (contextmenu) cycles backward: 1.5 -> 1.25
+      const rightClickEvent = new Event('contextmenu', { cancelable: true });
+      speedBtn.dispatchEvent(rightClickEvent);
+      expect(rightClickEvent.defaultPrevented).toBe(true);
+      expect(video.playbackRate).toBe(1.25);
+      expect(speedLabel.textContent).toBe('1.25x');
+    });
+
+    it('renders timecode with millisecond precision in timeCurrent and timeTotal elements', async () => {
+      const { video, load, timeCurrent, timeTotal, time, internal } = fixture();
+      await load();
+      video.duration = 65.432;
+      video.currentTime = 12.345;
+
+      (internal as any).updatePlaybackTime();
+
+      expect(timeCurrent.innerHTML).toContain('00:12');
+      expect(timeCurrent.innerHTML).toContain('<span class="timecode-ms">.345</span>');
+      expect(timeTotal.innerHTML).toContain('01:05');
+      expect(timeTotal.innerHTML).toContain('<span class="timecode-ms">.432</span>');
+      // Backward compatibility element
+      expect(time.textContent).toBe('00:12 / 01:05');
+    });
+
+    it('disables all media-dependent player controls when no video is loaded and enables them when ready', async () => {
+      const { internal, load, play, slider, jumpBackBtn, jumpFwdBtn, prevCueBtn, nextCueBtn, speedBtn, volumeBtn, volumeSlider, fullscreenBtn } = fixture();
+
+      // Before video is loaded (idle phase)
+      (internal as any).renderPlayerPhase();
+      expect(play.disabled).toBe(true);
+      expect(slider.disabled).toBe(true);
+      expect(jumpBackBtn.disabled).toBe(true);
+      expect(jumpFwdBtn.disabled).toBe(true);
+      expect(prevCueBtn.disabled).toBe(true);
+      expect(nextCueBtn.disabled).toBe(true);
+      expect(speedBtn.disabled).toBe(true);
+      expect(volumeBtn.disabled).toBe(true);
+      expect(volumeSlider.disabled).toBe(true);
+      expect(fullscreenBtn.disabled).toBe(true);
+
+      // After video loads and enters ready phase
+      await load();
+      expect(play.disabled).toBe(false);
+      expect(slider.disabled).toBe(false);
+      expect(jumpBackBtn.disabled).toBe(false);
+      expect(jumpFwdBtn.disabled).toBe(false);
+      expect(prevCueBtn.disabled).toBe(false);
+      expect(nextCueBtn.disabled).toBe(false);
+      expect(speedBtn.disabled).toBe(false);
+      expect(volumeBtn.disabled).toBe(false);
+      expect(volumeSlider.disabled).toBe(false);
+      expect(fullscreenBtn.disabled).toBe(false);
     });
   });
 });

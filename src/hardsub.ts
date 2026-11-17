@@ -1,5 +1,6 @@
 import { t, getLanguage, isRtlLanguage, firstStrongDirection, applyTextDirection, applyContentDirection, clearContentDirection, isolateDirection, isolateLtr } from './i18n/index';
 import { spanOrigins, assRunOrder, protectRtlPunctuation, calculateSubtitleBoxGeometry, hasArabicScript, isArabicScriptFont, resolveEffectiveFont, toAssFontName } from './hardsubLayout';
+import { formatTimecodeHTML, formatSpeedLabel } from './modules/companionPlayer';
 
 const invoke = async <T>(cmd: string, args: Record<string, any> = {}): Promise<T> => {
   const tauri = (window as any).__TAURI__;
@@ -735,6 +736,14 @@ export class HardsubController {
   private videoIconPause: HTMLElement | null = null;
   private videoSeekSlider: HTMLInputElement | null = null;
   private videoTimeDisplay: HTMLElement | null = null;
+  private timeCurrentEl: HTMLElement | null = null;
+  private timeTotalEl: HTMLElement | null = null;
+  private btnJumpBack: HTMLButtonElement | null = null;
+  private btnJumpFwd: HTMLButtonElement | null = null;
+  private btnSpeed: HTMLButtonElement | null = null;
+  private speedLabel: HTMLElement | null = null;
+  private currentPlaybackSpeed: number = 1.0;
+  private static readonly HARDSUB_SPEEDS = [0.75, 1.0, 1.25, 1.5, 2.0];
   private prevCueBtn: HTMLButtonElement | null = null;
   private nextCueBtn: HTMLButtonElement | null = null;
 
@@ -1017,6 +1026,8 @@ export class HardsubController {
     }
     if (this.videoSeekSlider) this.videoSeekSlider.value = '0';
     this.updateSeekSliderProgress(0);
+    if (this.timeCurrentEl) this.timeCurrentEl.innerHTML = '00:00<span class="timecode-ms">.000</span>';
+    if (this.timeTotalEl) this.timeTotalEl.innerHTML = '00:00<span class="timecode-ms">.000</span>';
     if (this.videoTimeDisplay) this.videoTimeDisplay.textContent = '00:00 / 00:00';
     this.activeCueId = null;
     document.querySelectorAll('.subtitle-cue-card.active').forEach(card => card.classList.remove('active'));
@@ -1262,6 +1273,12 @@ export class HardsubController {
     this.videoIconPause = document.getElementById('hardsub-icon-pause');
     this.videoSeekSlider = document.getElementById('hardsub-video-seek') as HTMLInputElement;
     this.videoTimeDisplay = document.getElementById('hardsub-video-time');
+    this.timeCurrentEl = document.getElementById('hardsub-time-current');
+    this.timeTotalEl = document.getElementById('hardsub-time-total');
+    this.btnJumpBack = document.getElementById('hardsub-btn-jump-back') as HTMLButtonElement | null;
+    this.btnJumpFwd = document.getElementById('hardsub-btn-jump-fwd') as HTMLButtonElement | null;
+    this.btnSpeed = document.getElementById('hardsub-btn-speed') as HTMLButtonElement | null;
+    this.speedLabel = document.getElementById('hardsub-speed-label');
     this.prevCueBtn = document.getElementById('hardsub-btn-prev-cue') as HTMLButtonElement;
     this.nextCueBtn = document.getElementById('hardsub-btn-next-cue') as HTMLButtonElement;
 
@@ -2348,6 +2365,7 @@ export class HardsubController {
     const vol = this.videoElement ? (this.videoVolumeSlider ? parseFloat(this.videoVolumeSlider.value) : this.videoElement.volume) : 1;
     const isMuted = this.videoElement ? (this.videoElement.muted || vol === 0) : false;
     this.updateVolumeIcons(vol, isMuted);
+    this.setPlaybackSpeed(this.currentPlaybackSpeed);
     this.renderPlayerPhase();
     this.updateOutputDirUI();
     if (this.progressStatusText && this.lastStatusPayload) {
@@ -2612,7 +2630,18 @@ export class HardsubController {
     const busy = this.phase === 'loading' || this.phase === 'preparing';
     const recovery = this.phase === 'error' || this.phase === 'cancelled';
     const actionsVisible = !this.isFullscreen();
-    for (const control of [this.videoPlayBtn, this.videoSeekSlider, this.prevCueBtn, this.nextCueBtn]) {
+    for (const control of [
+      this.videoPlayBtn,
+      this.btnJumpBack,
+      this.btnJumpFwd,
+      this.prevCueBtn,
+      this.nextCueBtn,
+      this.videoSeekSlider,
+      this.videoVolumeBtn,
+      this.videoVolumeSlider,
+      this.btnSpeed,
+      this.videoFullscreenBtn,
+    ]) {
       if (control) control.disabled = !ready;
     }
     const playing = ready && !!this.videoElement && (this.playIntent || !this.videoElement.paused) && !this.videoElement.ended;
@@ -2727,6 +2756,9 @@ export class HardsubController {
         this.directSourceGeometry = { width: video.videoWidth, height: video.videoHeight };
       }
       this.phase = 'ready';
+      if (this.currentPlaybackSpeed !== 1.0) {
+        video.playbackRate = this.currentPlaybackSpeed;
+      }
       const isMuted = video.muted || (this.videoVolumeSlider ? parseFloat(this.videoVolumeSlider.value) === 0 : false);
       const targetVolume = isMuted ? 0 : (this.videoVolumeSlider ? parseFloat(this.videoVolumeSlider.value) : (this.lastVolume > 0 ? this.lastVolume : 1));
       video.volume = Math.max(0, Math.min(1, targetVolume));
@@ -2797,6 +2829,8 @@ export class HardsubController {
     const pct = duration ? video.currentTime / duration * 100 : 0;
     if (this.videoSeekSlider) this.videoSeekSlider.value = String(pct);
     this.updateSeekSliderProgress(pct);
+    if (this.timeCurrentEl) this.timeCurrentEl.innerHTML = formatTimecodeHTML(video.currentTime);
+    if (this.timeTotalEl) this.timeTotalEl.innerHTML = formatTimecodeHTML(duration);
     if (this.videoTimeDisplay) this.videoTimeDisplay.textContent = `${formatSecondsToDisplay(video.currentTime)} / ${formatSecondsToDisplay(duration)}`;
     this.syncActiveSubtitleWithTime(video.currentTime * 1000);
   }
@@ -2830,6 +2864,8 @@ export class HardsubController {
         this.updateSeekSliderProgress(pct);
         const targetTime = (this.videoElement.duration || 0) * (pct / 100);
         
+        if (this.timeCurrentEl) this.timeCurrentEl.innerHTML = formatTimecodeHTML(targetTime);
+        if (this.timeTotalEl) this.timeTotalEl.innerHTML = formatTimecodeHTML(this.videoElement.duration || 0);
         if (this.videoTimeDisplay) {
           this.videoTimeDisplay.textContent = `${formatSecondsToDisplay(targetTime)} / ${formatSecondsToDisplay(this.videoElement.duration || 0)}`;
         }
@@ -2862,9 +2898,39 @@ export class HardsubController {
     this.on(this.videoSeekSlider, 'pointercancel', cancelGesture);
     this.on(this.videoSeekSlider, 'lostpointercapture', cancelGesture);
 
+    // Jump 5s Back / Forward
+    if (this.btnJumpBack) {
+      this.on(this.btnJumpBack, 'click', () => {
+        if (!this.canSeek() || !this.videoElement) return;
+        this.performSafeSeek(this.videoElement.currentTime - 5);
+      });
+    }
+
+    if (this.btnJumpFwd) {
+      this.on(this.btnJumpFwd, 'click', () => {
+        if (!this.canSeek() || !this.videoElement) return;
+        this.performSafeSeek(this.videoElement.currentTime + 5);
+      });
+    }
+
+    // Playback Speed Toggle
+    if (this.btnSpeed) {
+      this.on(this.btnSpeed, 'click', (e: MouseEvent) => {
+        if (!this.canInteractWithVideo()) return;
+        e.preventDefault();
+        this.cyclePlaybackSpeed(false);
+      });
+      this.on(this.btnSpeed, 'contextmenu', (e: MouseEvent) => {
+        if (!this.canInteractWithVideo()) return;
+        e.preventDefault();
+        this.cyclePlaybackSpeed(true);
+      });
+      this.setPlaybackSpeed(this.currentPlaybackSpeed);
+    }
+
     // Jump to Prev / Next Cue
     this.on(this.prevCueBtn, 'click', () => {
-      if (!this.videoElement || this.subtitleCues.length === 0) return;
+      if (!this.canSeek() || !this.videoElement || this.subtitleCues.length === 0) return;
       const curMs = this.videoElement.currentTime * 1000;
       const prev = [...this.subtitleCues].reverse().find((c) => c.startMs < curMs - 300);
       if (prev) {
@@ -2873,7 +2939,7 @@ export class HardsubController {
     });
 
     this.on(this.nextCueBtn, 'click', () => {
-      if (!this.videoElement || this.subtitleCues.length === 0) return;
+      if (!this.canSeek() || !this.videoElement || this.subtitleCues.length === 0) return;
       const curMs = this.videoElement.currentTime * 1000;
       const next = this.subtitleCues.find((c) => c.startMs > curMs + 100);
       if (next) {
@@ -2889,37 +2955,35 @@ export class HardsubController {
     });
 
     this.on(this.videoVolumeSlider, 'input', () => {
-      if (this.videoElement && this.videoVolumeSlider) {
-        const val = parseFloat(this.videoVolumeSlider.value);
-        this.videoElement.volume = val;
-        this.videoElement.muted = (val === 0);
-        this.updateVolumeIcons(val, this.videoElement.muted);
-        if (val > 0) {
-          this.lastVolume = val;
-        }
+      if (!this.canInteractWithVideo() || !this.videoElement || !this.videoVolumeSlider) return;
+      const val = parseFloat(this.videoVolumeSlider.value);
+      this.videoElement.volume = val;
+      this.videoElement.muted = (val === 0);
+      this.updateVolumeIcons(val, this.videoElement.muted);
+      if (val > 0) {
+        this.lastVolume = val;
       }
     });
 
     this.on(this.videoVolumeBtn, 'click', () => {
-      if (this.videoElement) {
-        const isMuted = !this.videoElement.muted;
-        this.videoElement.muted = isMuted;
-        
-        let volumeToSet = parseFloat(this.videoVolumeSlider?.value || '1');
-        if (isMuted) {
-          const currentSliderVal = parseFloat(this.videoVolumeSlider?.value || '1');
-          if (currentSliderVal > 0) {
-            this.lastVolume = currentSliderVal;
-          }
-          volumeToSet = 0;
-        } else {
-          volumeToSet = this.lastVolume > 0 ? this.lastVolume : 0.8;
-          this.videoElement.volume = volumeToSet;
+      if (!this.canInteractWithVideo() || !this.videoElement) return;
+      const isMuted = !this.videoElement.muted;
+      this.videoElement.muted = isMuted;
+      
+      let volumeToSet = parseFloat(this.videoVolumeSlider?.value || '1');
+      if (isMuted) {
+        const currentSliderVal = parseFloat(this.videoVolumeSlider?.value || '1');
+        if (currentSliderVal > 0) {
+          this.lastVolume = currentSliderVal;
         }
-        
-        this.updateVolumeIcons(volumeToSet, isMuted);
-        this.videoVolumeBtn?.blur();
+        volumeToSet = 0;
+      } else {
+        volumeToSet = this.lastVolume > 0 ? this.lastVolume : 0.8;
+        this.videoElement.volume = volumeToSet;
       }
+      
+      this.updateVolumeIcons(volumeToSet, isMuted);
+      this.videoVolumeBtn?.blur();
     });
 
     // Fullscreen Toggle
@@ -3012,6 +3076,12 @@ export class HardsubController {
           }
     
           // 2. Instantly update time display
+          if (this.timeCurrentEl) {
+            this.timeCurrentEl.innerHTML = formatTimecodeHTML(this.virtualCurrentTime);
+          }
+          if (this.timeTotalEl) {
+            this.timeTotalEl.innerHTML = formatTimecodeHTML(duration);
+          }
           if (this.videoTimeDisplay) {
             this.videoTimeDisplay.textContent = `${formatSecondsToDisplay(this.virtualCurrentTime)} / ${formatSecondsToDisplay(duration)}`;
           }
@@ -3088,7 +3158,7 @@ export class HardsubController {
       if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         if (!this.canSeek()) return;
         e.preventDefault();
-        this.performSafeSeek(this.videoElement.currentTime + (e.key === 'ArrowLeft' ? -10 : 10));
+        this.performSafeSeek(this.videoElement.currentTime + (e.key === 'ArrowLeft' ? -5 : 5));
       } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         e.preventDefault();
         const volume = Math.max(0, Math.min(1, this.videoElement.volume + (e.key === 'ArrowUp' ? 0.05 : -0.05)));
@@ -3412,8 +3482,13 @@ export class HardsubController {
   }
 
   private updateSeekSliderProgress(pct: number) {
-    if (this.videoSeekSlider) {
+    if (this.videoSeekSlider && this.videoSeekSlider.style) {
       const val = Math.max(0, Math.min(100, pct));
+      if (typeof this.videoSeekSlider.style.setProperty === 'function') {
+        this.videoSeekSlider.style.setProperty('--seek-pct', `${val}%`);
+      } else {
+        (this.videoSeekSlider.style as any)['--seek-pct'] = `${val}%`;
+      }
       this.videoSeekSlider.style.background = `linear-gradient(to right, var(--color-royal-blue) 0%, var(--color-royal-blue) ${val}%, rgba(255, 255, 255, 0.1) ${val}%, rgba(255, 255, 255, 0.1) 100%)`;
     }
   }
@@ -3423,16 +3498,26 @@ export class HardsubController {
     if (isMuted) {
       if (this.videoIconVolUp) this.videoIconVolUp.style.display = 'none';
       if (this.videoIconVolMute) this.videoIconVolMute.style.display = 'block';
-      if (this.videoVolumeSlider) {
+      if (this.videoVolumeSlider && this.videoVolumeSlider.style) {
         this.videoVolumeSlider.value = '0';
+        if (typeof this.videoVolumeSlider.style.setProperty === 'function') {
+          this.videoVolumeSlider.style.setProperty('--vol-pct', '0%');
+        } else {
+          (this.videoVolumeSlider.style as any)['--vol-pct'] = '0%';
+        }
         this.videoVolumeSlider.style.background = `linear-gradient(to right, var(--color-royal-blue) 0%, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.1) 100%)`;
       }
     } else {
       if (this.videoIconVolUp) this.videoIconVolUp.style.display = 'block';
       if (this.videoIconVolMute) this.videoIconVolMute.style.display = 'none';
-      if (this.videoVolumeSlider) {
+      if (this.videoVolumeSlider && this.videoVolumeSlider.style) {
         this.videoVolumeSlider.value = String(volume);
         const pct = volume * 100;
+        if (typeof this.videoVolumeSlider.style.setProperty === 'function') {
+          this.videoVolumeSlider.style.setProperty('--vol-pct', `${pct}%`);
+        } else {
+          (this.videoVolumeSlider.style as any)['--vol-pct'] = `${pct}%`;
+        }
         this.videoVolumeSlider.style.background = `linear-gradient(to right, var(--color-royal-blue) 0%, var(--color-royal-blue) ${pct}%, rgba(255, 255, 255, 0.1) ${pct}%, rgba(255, 255, 255, 0.1) 100%)`;
       }
     }
@@ -3443,6 +3528,37 @@ export class HardsubController {
       this.videoVolumeBtn.setAttribute?.('aria-label', volTitle);
       this.videoVolumeBtn.setAttribute?.('data-i18n-title', volKey);
       this.videoVolumeBtn.setAttribute?.('data-i18n-aria', volKey);
+    }
+  }
+
+  public cyclePlaybackSpeed(reverse = false): void {
+    const speeds = HardsubController.HARDSUB_SPEEDS;
+    const idx = speeds.indexOf(this.currentPlaybackSpeed);
+    let nextIdx: number;
+    if (idx === -1) {
+      nextIdx = 1;
+    } else if (reverse) {
+      nextIdx = (idx - 1 + speeds.length) % speeds.length;
+    } else {
+      nextIdx = (idx + 1) % speeds.length;
+    }
+    this.setPlaybackSpeed(speeds[nextIdx]);
+  }
+
+  public setPlaybackSpeed(rate: number): void {
+    this.currentPlaybackSpeed = rate;
+    if (this.videoElement) {
+      this.videoElement.playbackRate = rate;
+    }
+    const formatted = formatSpeedLabel(rate);
+    if (this.speedLabel) {
+      this.speedLabel.textContent = formatted;
+    }
+    if (this.btnSpeed) {
+      const speedAria = t('transcribe.companionSpeedAria') || 'Playback speed';
+      const cycleHint = t('transcribe.companionSpeedCycleHint') || 'Left-click: next, Right-click: prev';
+      this.btnSpeed.title = `${speedAria}: ${formatted} (${cycleHint})`;
+      this.btnSpeed.setAttribute('aria-label', `${speedAria}: ${formatted}`);
     }
   }
 

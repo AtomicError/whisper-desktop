@@ -2585,17 +2585,13 @@ html[dir="rtl"] #transcript-search::placeholder,
   background: transparent !important;
   border: none !important;
   border-radius: var(--radius-sm, 6px);
-  color: var(--text-secondary, #a1a1aa);
+  color: rgba(255, 255, 255, 0.8) !important;
   cursor: pointer;
   position: relative;
   box-shadow: none !important;
   padding: 0;
   transition: color 0.15s ease, background-color 0.15s ease;
   user-select: none;
-}
-
-.btn-player-play-main {
-  color: var(--text-primary, #ffffff) !important;
 }
 
 .btn-player-btn:hover:not(:disabled),
@@ -2627,7 +2623,7 @@ html[dir="rtl"] #transcript-search::placeholder,
   font-family: var(--font-mono, monospace);
   font-size: 0.74rem;
   font-weight: 600;
-  color: var(--text-secondary, #a1a1aa);
+  color: rgba(255, 255, 255, 0.8) !important;
   min-width: 34px;
   height: 28px;
   padding: 0 4px;
