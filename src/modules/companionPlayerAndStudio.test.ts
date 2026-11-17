@@ -114,26 +114,31 @@ class MockElement {
   videoWidth = 0;
   videoHeight = 0;
 
+  _context2d: any = null;
+
   getContext(type: string) {
     if (type === '2d') {
-      return {
-        clearRect: () => {},
-        measureText: (t: string) => ({ width: t.length * 8 }),
-        fillText: () => {},
-        strokeText: () => {},
-        font: '',
-        textAlign: '',
-        textBaseline: '',
-        direction: '',
-        strokeStyle: '',
-        fillStyle: '',
-        lineWidth: 1,
-        lineJoin: '',
-        miterLimit: 2,
-        save: () => {},
-        restore: () => {},
-        setTransform: () => {},
-      };
+      if (!this._context2d) {
+        this._context2d = {
+          clearRect: () => {},
+          measureText: (t: string) => ({ width: t.length * 8 }),
+          fillText: () => {},
+          strokeText: () => {},
+          font: '',
+          textAlign: '',
+          textBaseline: '',
+          direction: '',
+          strokeStyle: '',
+          fillStyle: '',
+          lineWidth: 1,
+          lineJoin: '',
+          miterLimit: 2,
+          save: () => {},
+          restore: () => {},
+          setTransform: () => {},
+        };
+      }
+      return this._context2d;
     }
     return null;
   }
@@ -2620,5 +2625,61 @@ describe('Studio Refinements, Isolation & Keyboard Accessibility', () => {
     // updateCompanionSubtitleBounds with forceRedraw = false should detect dimsChanged and redraw without error
     expect(() => updateCompanionSubtitleBounds(false)).not.toThrow();
     expect(canvas.width).not.toBe(initialW);
+  });
+
+  it('dynamically prioritizes Inter for English subtitles and Vazirmatn for Persian subtitles', () => {
+    const canvas = registerMockEl('companion-subtitle-canvas', 'CANVAS') as any;
+    const ctx = canvas.getContext('2d');
+    const container = registerMockEl('companion-video-container', 'DIV');
+    container.clientWidth = 600;
+    container.clientHeight = 400;
+    const video = registerMockEl('companion-media-element', 'VIDEO') as any;
+    video.videoWidth = 1920;
+    video.videoHeight = 1080;
+    video.clientWidth = 600;
+    video.clientHeight = 338;
+    updateCompanionSubtitleBounds(true);
+
+    // 1. English subtitle -> Inter prioritized
+    transcriptViewer.lines = [
+      { id: 0, timeRange: '[00:00:00.000 --> 00:00:03.000]', text: 'When you cut off the root of an onion', startMs: 0, endMs: 3000 }
+    ];
+    renderTranscriptLines(transcriptViewer.lines);
+    renderCompanionSubtitle(true);
+    expect(ctx.font).toContain("'Inter', 'Vazirmatn'");
+
+    // 2. Persian subtitle -> Vazirmatn prioritized
+    transcriptViewer.lines = [
+      { id: 1, timeRange: '[00:00:00.000 --> 00:00:03.000]', text: 'مواد شیمیایی آزاد می‌کند که به چشم شما برخورد می‌کند', startMs: 0, endMs: 3000 }
+    ];
+    renderTranscriptLines(transcriptViewer.lines);
+    renderCompanionSubtitle(true);
+    expect(ctx.font).toContain("'Vazirmatn', 'Inter'");
+  });
+
+  it('adaptively scales font size in 9:16 vertical videos to prevent taking up half the screen', () => {
+    const canvas = registerMockEl('companion-subtitle-canvas', 'CANVAS') as any;
+    const ctx = canvas.getContext('2d');
+    const container = registerMockEl('companion-video-container', 'DIV');
+    container.clientWidth = 320;
+    container.clientHeight = 570;
+    const video = registerMockEl('companion-media-element', 'VIDEO') as any;
+    // 9:16 vertical video (e.g. 1080x1920)
+    video.videoWidth = 1080;
+    video.videoHeight = 1920;
+    video.clientWidth = 320;
+    video.clientHeight = 569;
+    updateCompanionSubtitleBounds(true);
+
+    transcriptViewer.lines = [
+      { id: 0, timeRange: '[00:00:00.000 --> 00:00:03.000]', text: 'Shorts vertical caption', startMs: 0, endMs: 3000 }
+    ];
+    renderTranscriptLines(transcriptViewer.lines);
+    renderCompanionSubtitle(true);
+
+    // In a 320x569 vertical video:
+    // Without adaptive scaling, font size would be 569 * 0.055 = 31px (massive).
+    // With adaptive scaling, font size is Math.round(320 * 0.058) = 19px.
+    expect(ctx.font).toMatch(/600 1[789]px/);
   });
 });

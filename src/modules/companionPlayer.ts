@@ -753,6 +753,13 @@ export function updateCompanionSubtitleBounds(forceRedraw = true): void {
   companionSubtitleCanvas = canvas;
   companionCanvasCtx = canvas.getContext('2d');
 
+  if (!companionResizeObserver && typeof ResizeObserver !== 'undefined') {
+    companionResizeObserver = new ResizeObserver(() => {
+      updateCompanionSubtitleBounds(false);
+    });
+    companionResizeObserver.observe(container);
+  }
+
   if (activeMediaInfo && !activeMediaInfo.isVideo) {
     canvas.style.display = 'none';
     return;
@@ -867,7 +874,7 @@ export function renderCompanionSubtitle(force = false): void {
   const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
   const canvasW = canvas.width / dpr;
   const canvasH = canvas.height / dpr;
-  if (canvasW <= 0 || canvasH <= 0) return;
+  if (!(canvasW > 0 && canvasH > 0)) return;
 
   if (typeof ctx.save === 'function') {
     ctx.save();
@@ -885,14 +892,22 @@ export function renderCompanionSubtitle(force = false): void {
     return;
   }
 
-  const fontSize = Math.max(13, Math.min(34, Math.round(canvasH * 0.055)));
-  ctx.font = `600 ${fontSize}px 'Vazirmatn', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`;
-
   const strongDir = firstStrongDirection(cleanedText);
   const isRtl = strongDir ? strongDir === 'rtl' : hasArabicOrPersianScript(cleanedText);
   ctx.direction = isRtl ? 'rtl' : 'ltr';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
+
+  const aspect = canvasW / canvasH;
+  const baseSize = aspect >= 1.0
+    ? canvasH * 0.055
+    : Math.min(canvasH * 0.055, canvasW * 0.058);
+  const fontSize = Math.max(12, Math.min(32, Math.round(baseSize)));
+
+  const fontFamily = isRtl
+    ? "'Vazirmatn', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+    : "'Inter', 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  ctx.font = `600 ${fontSize}px ${fontFamily}`;
 
   const maxLineWidth = canvasW * 0.88;
   const rawLines = cleanedText.split('\n');
@@ -929,9 +944,11 @@ export function renderCompanionSubtitle(force = false): void {
   }
 
   const lineHeight = Math.round(fontSize * 1.35);
-  const bottomMargin = Math.max(12, Math.round(canvasH * 0.075));
+  const bottomMargin = aspect >= 1.0
+    ? Math.max(12, Math.round(canvasH * 0.075))
+    : Math.max(10, Math.round(canvasH * 0.045));
   const startBottomY = canvasH - bottomMargin;
-  const strokeWidth = Math.max(2.5, Math.round(fontSize * 0.16));
+  const strokeWidth = Math.max(2.2, Math.round(fontSize * 0.16));
 
   wrappedLines.forEach((textLine, idx) => {
     const lineY = startBottomY - (wrappedLines.length - 1 - idx) * lineHeight;
