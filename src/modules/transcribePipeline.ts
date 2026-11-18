@@ -17,7 +17,7 @@ import {
   compiledBackends,
   localScannedTransModels
 } from './settingsManager';
-import { batchProcessor, addBatchFiles, formatDuration } from './batchProcessor';
+import { batchProcessor, addBatchFiles } from './batchProcessor';
 import { escapeHTML, logsController } from './logsController';
 import { loadTranscriptFromFile, loadTranscriptFromJsonData, transcriptViewer, clearTranscriptLines, flushPendingTranscriptEdits } from './transcriptViewer';
 import { loadMediaIntoCompanionPlayer } from './companionPlayer';
@@ -867,7 +867,7 @@ export async function runWhisperTranscription(): Promise<void> {
 
     // Mark Step 3 as completed and notify user immediately when transcription succeeds
     setWizardStepCompleted(3, true);
-    showNotification(t('toasts.transcriptionComplete', { time: formatDuration(elapsedVal) }), "success");
+    showNotification(t('toasts.transcriptionComplete', { time: formatLocalizedTimeDuration(elapsedVal) }), "success");
 
     setTranscribeStatusBadge('complete', 'transcribe.statusComplete');
     if (metricsEl) metricsEl.style.display = 'inline-flex';

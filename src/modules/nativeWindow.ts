@@ -1,5 +1,6 @@
 // Native OS Controls, Titlebar Management, Taskbar Progress, Clipboard, and File Helpers
-import { t, applyContentDirection, clearContentDirection } from '../i18n/index';
+import { t, getLanguage, applyContentDirection, clearContentDirection } from '../i18n/index';
+import { formatLocalizedNumber } from '../i18n/formatters';
 import { showNotification, showConfirmModal } from './appModal';
 import type { SettingsState } from './settingsManager';
 
@@ -14,7 +15,7 @@ declare global {
     splitFileNameAndExt: (filename: string) => { base: string; ext: string };
     formatFileNameMiddleTruncate: (filename: string, maxLength?: number) => string;
     updateMediaCardName: (path: string | null) => void;
-    formatLocalizedTimeDuration: (secondsVal: any) => string;
+    formatLocalizedTimeDuration: (secondsVal: number | string | null | undefined) => string;
     setTranscribeStatusBadge: (statusClass: string, text: string) => void;
     copyToClipboard: (text: any) => Promise<void>;
     openFileInEditor: (filePath: string) => Promise<void>;
@@ -115,17 +116,52 @@ export function updateMediaCardName(path: string | null): void {
 }
 
 // ----------------- Time Duration & Transcribe Status Badge -----------------
-export function formatLocalizedTimeDuration(secondsVal: any): string {
-  if (secondsVal === undefined || secondsVal === null || isNaN(secondsVal)) return '';
+export function formatLocalizedTimeDuration(secondsVal: number | string | null | undefined): string {
+  if (secondsVal === undefined || secondsVal === null || secondsVal === '') return '';
   const num = typeof secondsVal === 'number' ? secondsVal : parseFloat(secondsVal);
-  if (isNaN(num)) return '';
-  if (num < 60) {
-    const secStr = num.toFixed(1);
-    return t('transcribe.durationSeconds', { seconds: secStr }) || t('common.durationSeconds', { seconds: secStr }) || `${secStr}s`;
+  if (!Number.isFinite(num) || num < 0) return '';
+
+  const lang = getLanguage();
+
+  if (num >= 59.95) {
+    const totalSec = Math.round(num);
+    const hours = Math.floor(totalSec / 3600);
+    const minutes = Math.floor((totalSec % 3600) / 60);
+    const seconds = totalSec % 60;
+
+    if (hours > 0) {
+      const hStr = formatLocalizedNumber(hours, lang, 0);
+      const mStr = formatLocalizedNumber(minutes, lang, 0);
+      if (minutes > 0 && seconds > 0) {
+        const sStr = formatLocalizedNumber(seconds, lang, 0);
+        return t('transcribe.durationHoursMinutesSeconds', { hours: hStr, minutes: mStr, seconds: sStr });
+      } else if (minutes > 0) {
+        return t('transcribe.durationHoursMinutes', { hours: hStr, minutes: mStr });
+      }
+      return t('transcribe.durationHours', { hours: hStr });
+    }
+
+    if (minutes > 0) {
+      const mStr = formatLocalizedNumber(minutes, lang, 0);
+      if (seconds > 0) {
+        const sStr = formatLocalizedNumber(seconds, lang, 0);
+        return t('transcribe.durationMinutesSeconds', { minutes: mStr, seconds: sStr });
+      }
+      return t('transcribe.durationMinutes', { minutes: mStr });
+    }
   }
-  const mins = Math.floor(num / 60);
-  const remSec = (num % 60).toFixed(0);
-  return t('transcribe.durationMinutesSeconds', { minutes: mins, seconds: remSec }) || t('common.durationMinutesSeconds', { minutes: mins, seconds: remSec }) || `${mins}m ${remSec}s`;
+
+  // Under 60 seconds: whole numbers format without decimal; fractions format with 1 decimal
+  const hasFraction = Math.abs(num - Math.round(num)) >= 0.05;
+  const secStr = hasFraction
+    ? formatLocalizedNumber(num, lang, 1)
+    : formatLocalizedNumber(Math.round(num), lang, 0);
+
+  return (
+    t('transcribe.durationSeconds', { seconds: secStr }) ||
+    t('common.durationSeconds', { seconds: secStr }) ||
+    `${secStr}s`
+  );
 }
 
 export function setTranscribeStatusBadge(statusClass: string, i18nKey?: string, fallbackText?: string): void {

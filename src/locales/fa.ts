@@ -1167,7 +1167,7 @@ export const fa: Translations = {
     modelDownloadPaused: 'دانلود مدل {name} متوقف شد.',
     modelDeleted: 'مدل {name} از دیسک حذف شد.',
     transcriptionStart: 'رونویسی برای فایل {name} آغاز شد.',
-    transcriptionComplete: 'رونویسی در مدت زمان {time} با موفقیت پایان یافت!',
+    transcriptionComplete: 'رونویسی در مدت‌زمان {time} با موفقیت پایان یافت!',
     transcriptionError: 'رونویسی با خطا مواجه شد:\n{error}',
     transcriptionCancelled: 'عملیات رونویسی لغو شد.',
     fileCopied: 'متن رونویسی با موفقیت در کلیپ‌بورد کپی شد!',

@@ -1,4 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
+import { setLanguage } from '../i18n/index';
 import {
   nativeWindow,
   getBasename,
@@ -73,9 +74,13 @@ describe('nativeWindow & OS Module', () => {
     elementsMap = new Map();
 
     (globalThis as any).document = {
+      documentElement: new MockElement('HTML'),
       createElement: (tag: string) => new MockElement(tag),
-      getElementById: (id: string) => elementsMap.get(id) || null
+      getElementById: (id: string) => elementsMap.get(id) || null,
+      querySelectorAll: () => [],
+      querySelector: () => null
     };
+    (globalThis as any).window.dispatchEvent = vi.fn();
 
     setIsTranscriptionRunning(false);
     setIsTranslationRunning(false);
@@ -127,9 +132,19 @@ describe('nativeWindow & OS Module', () => {
   });
 
   describe('formatLocalizedTimeDuration helper', () => {
-    it('formats seconds below 60 to single-decimal seconds', () => {
+    it('formats seconds below 60 to single-decimal seconds when fractional', () => {
       const res = formatLocalizedTimeDuration(12.4);
       expect(res).toContain('12.4');
+    });
+
+    it('formats whole seconds cleanly without decimal points', () => {
+      const res = formatLocalizedTimeDuration(7);
+      expect(res).toBe('7 sec');
+    });
+
+    it('formats 0 seconds cleanly as 0 sec', () => {
+      const res = formatLocalizedTimeDuration(0);
+      expect(res).toBe('0 sec');
     });
 
     it('formats seconds above 60 into minutes and seconds', () => {
@@ -138,10 +153,46 @@ describe('nativeWindow & OS Module', () => {
       expect(res).toContain('5');
     });
 
-    it('returns empty string for invalid or missing inputs', () => {
+    it('handles minute boundary overflow correctly without producing 60 sec', () => {
+      // 119.8s rounds to 120s which should be cleanly "2 min" and NOT "1 min 60 sec"
+      const res1 = formatLocalizedTimeDuration(119.8);
+      expect(res1).toBe('2 min');
+
+      // 59.96s rounds to 60s which should be "1 min"
+      const res2 = formatLocalizedTimeDuration(59.96);
+      expect(res2).toBe('1 min');
+    });
+
+    it('formats durations over an hour with hours, minutes, and seconds', () => {
+      const res = formatLocalizedTimeDuration(3665);
+      expect(res).toContain('1');
+      expect(res).toContain('5');
+    });
+
+    it('handles hour boundary overflow correctly without producing 60 min or 60 sec', () => {
+      // 3599.8s rounds to 3600s which should be "1 hr"
+      const res = formatLocalizedTimeDuration(3599.8);
+      expect(res).toBe('1 hr');
+    });
+
+    it('localizes time duration in Persian cleanly with Persian digits', () => {
+      try {
+        setLanguage('fa', false);
+        const res = formatLocalizedTimeDuration(7);
+        expect(res).toBe('۷ ثانیه');
+      } finally {
+        setLanguage('en', false);
+      }
+    });
+
+    it('returns empty string for invalid, negative, infinite, or missing inputs', () => {
       expect(formatLocalizedTimeDuration(null)).toBe('');
       expect(formatLocalizedTimeDuration(undefined)).toBe('');
       expect(formatLocalizedTimeDuration(NaN)).toBe('');
+      expect(formatLocalizedTimeDuration(Infinity)).toBe('');
+      expect(formatLocalizedTimeDuration(-Infinity)).toBe('');
+      expect(formatLocalizedTimeDuration(-5)).toBe('');
+      expect(formatLocalizedTimeDuration('')).toBe('');
     });
   });
 
