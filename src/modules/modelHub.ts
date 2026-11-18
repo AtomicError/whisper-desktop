@@ -673,7 +673,6 @@ export async function downloadModelClick(name: string): Promise<void> {
   if (!modelsDir || _modelActionsInProgress.has(name) || !invoke) return;
   _modelActionsInProgress.add(name);
   try {
-    if (showNotification) showNotification(t('toasts.modelDownloadStarted', { name: `ggml-${name}.bin` }), "info");
     _cachedModelStatuses = null;
 
     const card = document.querySelector(`[data-model="${name}"]`);
@@ -726,7 +725,6 @@ export async function pauseModelClick(name: string): Promise<void> {
   _modelActionsInProgress.add(name);
   try {
     await invoke('pause_download_model', { modelName: name });
-    if (showNotification) showNotification(t('toasts.modelDownloadPaused', { name: `ggml-${name}.bin` }), "info");
     _cachedModelStatuses = null;
     await loadModelStatusesGrid(false, true);
   } catch (err: any) {

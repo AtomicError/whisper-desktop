@@ -309,9 +309,12 @@ function isElementVisible(el: HTMLElement): boolean {
   }
 }
 
-function translateNonTextI18n(root: Document | Element = document): void {
+function translateNonTextI18n(root?: Document | Element): void {
+  const doc = root || (typeof document !== 'undefined' ? document : null);
+  if (!doc) return;
+
   // Translate rich HTML content with defensive sanitization
-  const htmlElements = root.querySelectorAll<HTMLElement>('[data-i18n-html]');
+  const htmlElements = doc.querySelectorAll<HTMLElement>('[data-i18n-html]');
   for (const el of htmlElements) {
     const key = el.getAttribute('data-i18n-html');
     if (key) {
@@ -324,7 +327,7 @@ function translateNonTextI18n(root: Document | Element = document): void {
   }
 
   // Translate specific helper attributes
-  const placeholderEls = root.querySelectorAll<HTMLElement>('[data-i18n-placeholder]');
+  const placeholderEls = doc.querySelectorAll<HTMLElement>('[data-i18n-placeholder]');
   for (const el of placeholderEls) {
     const key = el.getAttribute('data-i18n-placeholder');
     if (key) {
@@ -332,7 +335,7 @@ function translateNonTextI18n(root: Document | Element = document): void {
     }
   }
 
-  const titleEls = root.querySelectorAll<HTMLElement>('[data-i18n-title]');
+  const titleEls = doc.querySelectorAll<HTMLElement>('[data-i18n-title]');
   for (const el of titleEls) {
     const key = el.getAttribute('data-i18n-title');
     if (key) {
@@ -340,7 +343,7 @@ function translateNonTextI18n(root: Document | Element = document): void {
     }
   }
 
-  const ariaEls = root.querySelectorAll<HTMLElement>('[data-i18n-aria]');
+  const ariaEls = doc.querySelectorAll<HTMLElement>('[data-i18n-aria]');
   for (const el of ariaEls) {
     const key = el.getAttribute('data-i18n-aria');
     if (key) {
@@ -349,7 +352,7 @@ function translateNonTextI18n(root: Document | Element = document): void {
   }
 
   // Translate compound attributes (format: "title:key,placeholder:key2")
-  const attrElements = root.querySelectorAll<HTMLElement>('[data-i18n-attr]');
+  const attrElements = doc.querySelectorAll<HTMLElement>('[data-i18n-attr]');
   for (const el of attrElements) {
     const rawAttr = el.getAttribute('data-i18n-attr');
     if (!rawAttr) continue;
@@ -363,9 +366,12 @@ function translateNonTextI18n(root: Document | Element = document): void {
   }
 }
 
-export function translateDOM(root: Document | Element = document): void {
+export function translateDOM(root?: Document | Element): void {
+  const doc = root || (typeof document !== 'undefined' ? document : null);
+  if (!doc) return;
+
   // Translate text content
-  const textElements = root.querySelectorAll<HTMLElement>('[data-i18n]');
+  const textElements = doc.querySelectorAll<HTMLElement>('[data-i18n]');
   for (const el of textElements) {
     const key = el.getAttribute('data-i18n');
     if (key) {
@@ -373,12 +379,11 @@ export function translateDOM(root: Document | Element = document): void {
     }
   }
 
-  translateNonTextI18n(root);
+  translateNonTextI18n(doc);
 }
 
 export function setLanguage(
   lang: SupportedLanguage,
-  notify: boolean = true,
   animated: boolean = true
 ): void {
   if (!SUPPORTED_LANGUAGES.includes(lang)) {
@@ -410,8 +415,9 @@ export function setLanguage(
     document.title = APP_NAME;
   }
 
+  const isSplash = typeof document !== 'undefined' && Boolean(document.getElementById('splash-curtain'));
   const isTestEnv = typeof (globalThis as any).process !== 'undefined' && (globalThis as any).process?.env?.NODE_ENV === 'test';
-  const shouldAnimate = animated && !isTestEnv &&
+  const shouldAnimate = animated && !isSplash && !isTestEnv &&
     typeof window !== 'undefined' &&
     typeof window.matchMedia === 'function' &&
     !window.matchMedia('(prefers-reduced-motion: reduce)').matches &&
@@ -489,11 +495,6 @@ export function setLanguage(
   // Dispatch global event for components that listen to language change
   if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
     window.dispatchEvent(new CustomEvent('whisper:languageChanged', { detail: { language: lang, isRtl } }));
-  }
-
-  // Notify user if changed manually
-  if (notify && typeof window !== 'undefined' && typeof (window as any).showNotification === 'function') {
-    (window as any).showNotification(t('toasts.langChanged'), 'info', 3000);
   }
 }
 

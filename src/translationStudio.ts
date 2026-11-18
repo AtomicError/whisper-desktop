@@ -1705,10 +1705,6 @@ export class TranslationStudioController {
     if (typeof win.switchView === 'function') {
       win.switchView('hardsub');
     }
-
-    if (videoToLoad) {
-      this.notify(t('translate.sendToHardsubDesc'), 'info');
-    }
   }
 
   public refreshLocalization() {

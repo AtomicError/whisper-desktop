@@ -827,16 +827,12 @@ describe('batchProcessor module', () => {
       expect(batchProcessor.getActiveViewerIndex()).toBe(-1);
     });
 
-    it('notifies when attempting to select a pending item', async () => {
-      const showNotificationMock = vi.fn();
-      (window as any).showNotification = showNotificationMock;
-
+    it('guards against attempting to select a pending item', async () => {
       batchProcessor.setItems([{ path: '/pending.mp4', name: 'pending.mp4', status: 'pending' }]);
       batchProcessor.setActiveViewerIndex(-1);
 
       await selectBatchItemTranscript(0);
       expect(batchProcessor.getActiveViewerIndex()).toBe(-1);
-      expect(showNotificationMock).toHaveBeenCalled();
     });
 
     it('selects completed item and updates active viewer index, window output paths, and resets viewport scroll', async () => {

@@ -450,7 +450,6 @@ export async function sendTranscribeToTranslationStudio(): Promise<void> {
   if (typeof win.switchView === 'function') {
     win.switchView('translate');
   }
-  showNotification(t('transcribe.sendToTranslationDesc') || 'Generated subtitle loaded into Translation Studio.', 'info');
 }
 
 export function sendTranscribeToHardsubStudio(): Promise<void> | void {
@@ -476,7 +475,6 @@ export function sendTranscribeToHardsubStudio(): Promise<void> | void {
     if (typeof win.switchView === 'function') {
       win.switchView('hardsub');
     }
-    showNotification(t('transcribe.sendToHardsubDesc') || t('translate.sendToHardsubDesc') || 'Loaded into Hardsub Studio', 'info');
   };
 
   if (hasPendingTranscriptEdits()) {

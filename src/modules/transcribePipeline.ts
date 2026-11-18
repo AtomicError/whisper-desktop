@@ -1306,7 +1306,6 @@ export async function handleDroppedFiles(rawFiles: string[]): Promise<void> {
   if (typeof win.switchView === 'function') {
     win.switchView('transcribe');
   }
-  showNotification(t('toasts.filesLoaded', { count: files.length }), "success");
 }
 
 export const transcribePipeline = {

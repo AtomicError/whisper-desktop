@@ -1,5 +1,4 @@
 // Multi-Theme & UI Scaling Engine for Whisper Desktop
-import { t } from '../i18n/index';
 
 export interface ThemeConfig {
   id: string;
@@ -514,22 +513,6 @@ export function switchTheme(themeName: string, animated = true): void {
         (window as any).saveCurrentSettings(false);
       }
     }
-
-    const themeKey = (config.id === 'royal-blue')
-      ? 'royal'
-      : (config.id === 'fire-orange' || config.id === 'fire')
-      ? 'fire'
-      : (config.id === 'ruby-red' || config.id === 'ruby' || config.id === 'carbon')
-      ? 'ruby'
-      : config.id;
-    const localizedThemeName = (typeof t === 'function' && t(`theme.${themeKey}`) !== `theme.${themeKey}`)
-      ? t(`theme.${themeKey}`)
-      : (config.toastName || config.label);
-    
-    const showNotification = (window as any).showNotification;
-    if (showNotification) {
-      showNotification(t('toasts.themeSwitched', { theme: localizedThemeName }), 'info');
-    }
   };
 
   // Synchronize settingsState immediately so the active state is consistent across the app
@@ -561,6 +544,11 @@ const getNativeTauriInvoke = (): any => {
   return null;
 };
 
+/**
+ * Applies UI zoom scale across native Tauri webview and fallback CSS zoom.
+ * Note: `showToast` parameter is preserved for signature compatibility with boot routines
+ * and is checked to distinguish splash boot hydration (!persist && !showToast) from user actions.
+ */
 export async function applyUiZoom(scale: number | string, persist = true, showToast = false): Promise<void> {
   let numScale = typeof scale === 'number' ? scale : parseFloat(scale);
   if (isNaN(numScale) || numScale <= 0) {
@@ -623,11 +611,6 @@ export async function applyUiZoom(scale: number | string, persist = true, showTo
     if ((window as any).syncCustomSelects) {
       (window as any).syncCustomSelects();
     }
-  }
-
-  const showNotification = (window as any).showNotification;
-  if (showToast && typeof showNotification === 'function') {
-    showNotification(t('toasts.uiScaleToast', { scale: Math.round(numScale * 100) }), "info");
   }
 
   if (persist && (window as any).settingsState) {

@@ -1890,8 +1890,6 @@ export function setupQuickConfigDeckEventListeners(): void {
         if (cfgBackendSelect) {
           cfgBackendSelect.value = backend;
         }
-        const backendLabel = backend === 'Standard' ? ((typeof t === 'function' && t('transcribe.backendCpu')) || 'CPU') : backend + ' GPU';
-        showNotification(t('toasts.backendSwitched', { backend: backendLabel }), "success");
       }
     });
   }
@@ -1930,17 +1928,12 @@ export function toggleQuickVad(forceVal?: boolean): void {
     }
   }
 
-  const vadModelName = current.vadModel ? getBasename(current.vadModel) : 'Silero VAD';
-  const notifyMsg = current.vad ? t('toasts.vadEnabled', { model: vadModelName }) : t('toasts.vadDisabled');
-
   if (typeof setTimeout === 'function') {
     setTimeout(() => {
       saveCurrentSettings();
-      showNotification(notifyMsg, "info");
     }, 240);
   } else {
     saveCurrentSettings();
-    showNotification(notifyMsg, "info");
   }
 }
 

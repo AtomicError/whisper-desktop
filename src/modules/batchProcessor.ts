@@ -400,10 +400,6 @@ export function clearBatchQueue(): void {
     currentSettings.inputFile = "";
     saveCurrentSettings();
   }
-
-  if (typeof win.showNotification === 'function') {
-    win.showNotification(t('toasts.queueCleared'), "info");
-  }
 }
 
 function resetBatchSortSelect(): void {
@@ -528,9 +524,6 @@ export function sortBatchQueue(criteria: string): void {
   }
 
   renderBatchQueueTable();
-  if (typeof win.showNotification === 'function') {
-    win.showNotification(t('toasts.queueSorted'), "success");
-  }
 }
 
 export async function selectBatchItemTranscript(index: number): Promise<void> {
@@ -545,9 +538,6 @@ export async function selectBatchItemTranscript(index: number): Promise<void> {
   const isCompleted = item.status === 'completed';
 
   if (!isCompleted && !isActive) {
-    if (item.status === 'pending' && typeof win.showNotification === 'function') {
-      win.showNotification(t('transcribe.statusPending') || "Pending...", "info");
-    }
     return;
   }
 
@@ -1603,9 +1593,6 @@ export async function addBatchFiles(files: string[]): Promise<boolean> {
       })();
     }
 
-    if (typeof win.showNotification === 'function') {
-      win.showNotification(t('toasts.filesLoaded', { count: newFiles.length }), "success");
-    }
     return true;
   }
 

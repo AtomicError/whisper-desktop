@@ -5,6 +5,11 @@ import {
   cancelActiveScramble,
   CYBER_HACKER_GLYPHS
 } from './textScramble';
+import {
+  setLanguage,
+  getLanguage,
+  initI18n
+} from './index';
 
 class MockElement {
   public textContent = '';
@@ -161,6 +166,59 @@ describe('textScramble Engine', () => {
       let done = false;
       scrambleBatch([], { onComplete: () => { done = true; } });
       expect(done).toBe(true);
+    });
+  });
+
+  describe('setLanguage lifecycle & animation guards', () => {
+    let prevDoc: any;
+    let prevWin: any;
+    let splashExists = false;
+
+    beforeEach(() => {
+      prevDoc = (globalThis as any).document;
+      prevWin = (globalThis as any).window;
+      splashExists = false;
+
+      (globalThis as any).document = {
+        documentElement: {
+          setAttribute: vi.fn(),
+          classList: { add: vi.fn(), remove: vi.fn() }
+        },
+        querySelectorAll: () => [],
+        getElementById: (id: string) => {
+          if (id === 'splash-curtain' && splashExists) {
+            return { id: 'splash-curtain' };
+          }
+          return null;
+        },
+        querySelector: () => null,
+        title: ''
+      };
+      (globalThis as any).window = {
+        dispatchEvent: vi.fn(),
+        matchMedia: () => ({ matches: false }),
+        requestAnimationFrame: vi.fn()
+      };
+    });
+
+    afterEach(() => {
+      (globalThis as any).document = prevDoc;
+      (globalThis as any).window = prevWin;
+    });
+
+    it('translates DOM immediately without animation when animated is false', () => {
+      setLanguage('en', false);
+      expect(getLanguage()).toBe('en');
+    });
+
+    it('bypasses animation when splash curtain is present in DOM even if animated is true', () => {
+      splashExists = true;
+      setLanguage('fa', true);
+      expect(getLanguage()).toBe('fa');
+    });
+
+    it('initializes cleanly via initI18n with instant translation', () => {
+      expect(() => initI18n()).not.toThrow();
     });
   });
 });
