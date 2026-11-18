@@ -16,6 +16,7 @@ export interface SettingsState {
   modelsDir?: string;
   modelPath?: string;
   selectedBackend?: string;
+  whisperSource?: string;
   ffmpegSource?: string;
   ffmpegCustomPath?: string;
   outputDirType?: string;
@@ -1036,7 +1037,7 @@ export function bindSettingsToDOM(): void {
           }
 
           current[key] = val;
-          saveCurrentSettings(true);
+          const savePromise = saveCurrentSettings(true);
 
           if (key === 'language' || key === 'modelPath' || key === 'threads') {
             updateTranscribeUIConfigs();
@@ -1046,6 +1047,12 @@ export function bindSettingsToDOM(): void {
           }
           if (key === 'ffmpegSource') {
             refreshFFmpegStatus(val, true);
+          }
+          if (key === 'whisperSource') {
+            refreshWhisperStatus(val, true);
+            void savePromise.then(() => {
+              refreshBuildStatuses();
+            });
           }
           if (key === 'translateAiProvider' && typeof win.onProviderChanged === 'function') {
             win.onProviderChanged();
@@ -1069,6 +1076,7 @@ export function bindSettingsToDOM(): void {
     !document.documentElement?.classList?.contains('app-ready');
   if (!isSplashActive) {
     refreshFFmpegStatus(current.ffmpegSource, false);
+    refreshWhisperStatus(current.whisperSource, false);
   }
   toggleOutputDirCustomField();
 
@@ -1149,6 +1157,59 @@ export async function refreshFFmpegStatus(sourceOverride?: string, userInitiated
     }
   } catch (err) {
     console.warn("Failed to check FFmpeg status:", err);
+    if (badgeEl) {
+      badgeEl.className = 'setting-status-pill error';
+      badgeEl.innerHTML = `<span class="ffmpeg-status-dot yellow"></span> Status Error`;
+    }
+  }
+}
+
+// ----------------- Whisper Status & Version Formatting -----------------
+export function formatWhisperVersion(versionStr?: string | null): string {
+  if (!versionStr || versionStr === 'Unknown version' || versionStr === 'N/A') {
+    return 'Ready';
+  }
+  const match = versionStr.match(/version:\s*([^\s]+)/i) || versionStr.match(/version\s+([^\s]+)/i);
+  const raw = match ? match[1] : versionStr.trim();
+  if (raw.startsWith('v') || raw.startsWith('V')) {
+    return raw;
+  }
+  const semverMatch = raw.match(/^(\d+(\.\d+)+)/);
+  if (semverMatch) {
+    return `v${raw}`;
+  }
+  return raw.length > 0 ? raw : 'Ready';
+}
+
+export async function refreshWhisperStatus(sourceOverride?: string, userInitiated = false): Promise<void> {
+  if (typeof document === 'undefined') return;
+  const badgeEl = document.getElementById('whisper-status-badge');
+  if (!badgeEl) return;
+
+  const current = getSettingsState();
+  const currentSource = sourceOverride || (current ? current.whisperSource : 'bundled');
+
+  try {
+    const info = await invoke('get_whisper_status', { source: currentSource });
+    if (info.isAvailable) {
+      const verFormatted = formatWhisperVersion(info.version);
+      const safeVer = verFormatted.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      badgeEl.className = 'setting-status-pill ready';
+      badgeEl.innerHTML = `<span class="ffmpeg-status-dot blue"></span> ${safeVer}`;
+      const backendsStr = info.availableBackends && info.availableBackends.length > 0
+        ? `\nBackends: ${info.availableBackends.join(', ')}`
+        : '';
+      badgeEl.title = `Source: ${info.configuredSource}\nPath: ${isolateLtr(info.resolvedPath)}\n${info.version}${backendsStr}`;
+    } else {
+      badgeEl.className = 'setting-status-pill missing';
+      badgeEl.innerHTML = `<span class="ffmpeg-status-dot red"></span> Not Found`;
+      badgeEl.title = info.errorMessage || 'System whisper-cli binary was not found';
+      if (currentSource === 'system' && userInitiated) {
+        showNotification(t('toasts.whisperNotFound'), "warning");
+      }
+    }
+  } catch (err) {
+    console.warn("Failed to check Whisper status:", err);
     if (badgeEl) {
       badgeEl.className = 'setting-status-pill error';
       badgeEl.innerHTML = `<span class="ffmpeg-status-dot yellow"></span> Status Error`;
@@ -2033,6 +2094,8 @@ export const settingsManager = {
   syncJsonConfidenceDependency,
   formatFFmpegVersion,
   refreshFFmpegStatus,
+  formatWhisperVersion,
+  refreshWhisperStatus,
   INT_SETTING_KEYS,
   FLOAT_SETTING_KEYS,
   sanitizeSettingsPayload,

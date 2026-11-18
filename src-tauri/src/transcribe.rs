@@ -559,89 +559,100 @@ pub async fn run_transcription(
     let backend_name = settings.selected_backend.to_lowercase();
     let exe_ext = std::env::consts::EXE_SUFFIX;
     let bin_name = format!("whisper-cli-{}{}", backend_name, exe_ext);
+    let is_system_source = settings.whisper_source.eq_ignore_ascii_case("system");
 
     use tauri::Manager;
-    let mut resolved_bin: Option<std::path::PathBuf> = None;
-    let candidates = compute_bin_candidate_rel_paths(&settings.selected_backend, exe_ext);
+    let bin_path = if is_system_source {
+        crate::whisper_resolver::resolve_whisper_binary_for_execution(Some(&app), &settings.selected_backend)?
+    } else {
+        let mut resolved_bin: Option<std::path::PathBuf> = None;
+        let candidates = compute_bin_candidate_rel_paths(&settings.selected_backend, exe_ext);
 
-    for candidate in &candidates {
-        let cand_str = candidate.to_string_lossy();
-        // 1. Tauri BaseDirectory::Resource
-        if let Ok(p) = app.path().resolve(format!("resources/{}", cand_str), tauri::path::BaseDirectory::Resource) {
-            if p.exists() {
-                resolved_bin = Some(p);
-                break;
+        for candidate in &candidates {
+            let cand_str = candidate.to_string_lossy();
+            // 1. Tauri BaseDirectory::Resource
+            if let Ok(p) = app.path().resolve(format!("resources/{}", cand_str), tauri::path::BaseDirectory::Resource) {
+                if p.exists() {
+                    resolved_bin = Some(p);
+                    break;
+                }
             }
-        }
-        if let Ok(p) = app.path().resolve(&*cand_str, tauri::path::BaseDirectory::Resource) {
-            if p.exists() {
-                resolved_bin = Some(p);
-                break;
+            if let Ok(p) = app.path().resolve(&*cand_str, tauri::path::BaseDirectory::Resource) {
+                if p.exists() {
+                    resolved_bin = Some(p);
+                    break;
+                }
             }
-        }
 
-        // 2. Next to running executable (Portable / Standalone mode)
-        if let Ok(exe_path) = std::env::current_exe() {
-            if let Some(parent) = exe_path.parent() {
-                let res_sub = parent.join("resources").join(candidate);
-                if res_sub.exists() {
-                    resolved_bin = Some(res_sub);
+            // 2. Next to running executable (Portable / Standalone mode)
+            if let Ok(exe_path) = std::env::current_exe() {
+                if let Some(parent) = exe_path.parent() {
+                    let res_sub = parent.join("resources").join(candidate);
+                    if res_sub.exists() {
+                        resolved_bin = Some(res_sub);
+                        break;
+                    } else {
+                        let next_to_exe = parent.join(candidate);
+                        if next_to_exe.exists() {
+                            resolved_bin = Some(next_to_exe);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // 3. Dev environment paths
+            if let Ok(cwd) = std::env::current_dir() {
+                let dev_sub = cwd.join("src-tauri").join("resources").join(candidate);
+                if dev_sub.exists() {
+                    resolved_bin = Some(dev_sub);
                     break;
                 } else {
-                    let next_to_exe = parent.join(candidate);
-                    if next_to_exe.exists() {
-                        resolved_bin = Some(next_to_exe);
+                    let dev_direct = cwd.join("resources").join(candidate);
+                    if dev_direct.exists() {
+                        resolved_bin = Some(dev_direct);
                         break;
                     }
                 }
             }
         }
 
-        // 3. Dev environment paths
-        if let Ok(cwd) = std::env::current_dir() {
-            let dev_sub = cwd.join("src-tauri").join("resources").join(candidate);
-            if dev_sub.exists() {
-                resolved_bin = Some(dev_sub);
-                break;
-            } else {
-                let dev_direct = cwd.join("resources").join(candidate);
-                if dev_direct.exists() {
-                    resolved_bin = Some(dev_direct);
-                    break;
-                }
+        let p = match resolved_bin {
+            Some(path) => path,
+            None => {
+                return Err(format!(
+                    "Whisper CLI binary ('{}') not found. Please ensure the compiled binary is placed into 'resources/' or 'src-tauri/resources/'.",
+                    bin_name
+                ));
+            }
+        };
+
+        // Check if the binary is a placeholder text file instead of a real compiled binary
+        if let Ok(meta) = fs::metadata(&p) {
+            if meta.len() < 100_000 {
+                return Err(format!(
+                    "Whisper binary for backend '{}' ({}) is a placeholder file (size: {} bytes). Please place a real compiled binary executable in src-tauri/resources/.",
+                    settings.selected_backend, bin_name, meta.len()
+                ));
             }
         }
-    }
 
-    let bin_path = match resolved_bin {
-        Some(path) => path,
-        None => {
-            return Err(format!(
-                "Whisper CLI binary ('{}') not found. Please ensure the compiled binary is placed into 'resources/' or 'src-tauri/resources/'.",
-                bin_name
-            ));
-        }
+        p
     };
-
-    // Check if the binary is a placeholder text file instead of a real compiled binary
-    if let Ok(meta) = fs::metadata(&bin_path) {
-        if meta.len() < 100_000 {
-            return Err(format!(
-                "Whisper binary for backend '{}' ({}) is a placeholder file (size: {} bytes). Please place a real compiled binary executable in src-tauri/resources/.",
-                settings.selected_backend, bin_name, meta.len()
-            ));
-        }
-    }
 
     // Ensure executable permissions on Unix platforms.
     // If the binary is inside a read-only filesystem (like an AppImage mount) or execution is restricted,
     // we copy the binary and any companion shared libraries to the user's writable cache directory first.
     #[cfg(unix)]
-    let orig_bin_dir = bin_path.parent().map(|p| p.to_path_buf());
+    let orig_bin_dir = if !is_system_source {
+        bin_path.parent().map(|p| p.to_path_buf())
+    } else {
+        None
+    };
     #[cfg(unix)]
     let mut bin_path = bin_path;
     #[cfg(unix)]
-    {
+    if !is_system_source {
         use std::os::unix::fs::PermissionsExt;
         
         let mut needs_copy = std::env::var("APPIMAGE").is_ok() || std::env::var("APPDIR").is_ok();
@@ -855,6 +866,10 @@ pub async fn run_transcription(
     let mut cmd = Command::new(&bin_path);
     #[cfg(target_os = "windows")]
     cmd.creation_flags(0x08000000);
+    #[cfg(target_os = "linux")]
+    if is_system_source {
+        crate::sanitize_host_command(cmd.as_std_mut());
+    }
     cmd.args(&args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())

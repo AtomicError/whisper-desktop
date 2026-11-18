@@ -45,6 +45,7 @@ allow = [
   "release_hardsub_preview",
   "probe_hardsub_source",
   "get_ffmpeg_status",
+  "get_whisper_status",
   "copy_to_clipboard",
   "open_file_in_editor",
   "show_in_folder",

@@ -101,6 +101,8 @@ pub struct WhisperSettings {
     pub translate_ai_custom_prompt: String,
     pub translate_ai_polish: bool,
     pub ffmpeg_source: String, // "bundled" or "system"
+    #[serde(default = "default_whisper_source")]
+    pub whisper_source: String, // "bundled" or "system"
     #[serde(default = "default_output_dir_mode")]
     pub output_dir_mode: String, // "input_dir" or "custom"
     #[serde(default)]
@@ -175,6 +177,10 @@ fn default_theme() -> String {
 
 fn default_ui_scale() -> f64 {
     1.0
+}
+
+fn default_whisper_source() -> String {
+    "bundled".to_string()
 }
 
 fn default_output_dir_mode() -> String {
@@ -252,6 +258,7 @@ impl WhisperSettings {
             translate_ai_custom_prompt: "".to_string(),
             translate_ai_polish: false,
             ffmpeg_source: "bundled".to_string(),
+            whisper_source: "bundled".to_string(),
             output_dir_mode: "input_dir".to_string(),
             output_dir_path: "".to_string(),
             ui_scale: 1.0,
@@ -403,6 +410,11 @@ impl WhisperSettings {
         // FFmpeg source fallback
         if self.ffmpeg_source != "bundled" && self.ffmpeg_source != "system" {
             self.ffmpeg_source = "bundled".to_string();
+        }
+
+        // Whisper source fallback
+        if self.whisper_source != "bundled" && self.whisper_source != "system" {
+            self.whisper_source = "bundled".to_string();
         }
 
         self.recent_spoken_languages = sanitize_recent_list(&self.recent_spoken_languages, true);
@@ -912,6 +924,7 @@ mod tests {
         s.offset_t = -100;
         s.device_id = -1;
         s.ffmpeg_source = "hack".to_string();
+        s.whisper_source = "hack".to_string();
 
         save_settings_to_path(&temp_path, &s).unwrap();
 
@@ -930,6 +943,7 @@ mod tests {
         assert_eq!(loaded.offset_t, 0);
         assert_eq!(loaded.device_id, 0);
         assert_eq!(loaded.ffmpeg_source, "bundled");
+        assert_eq!(loaded.whisper_source, "bundled");
 
         let _ = fs::remove_file(&temp_path);
     }

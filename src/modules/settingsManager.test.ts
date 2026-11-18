@@ -8,6 +8,8 @@ vi.mock('./appModal', () => ({
 import {
   settingsManager,
   formatFFmpegVersion,
+  formatWhisperVersion,
+  refreshWhisperStatus,
   getStepperBounds,
   clampNumberSetting,
   sanitizeSettingsPayload,
@@ -275,6 +277,71 @@ describe('settingsManager module', () => {
       expect(formatFFmpegVersion(undefined)).toBe('Ready');
       expect(formatFFmpegVersion('Unknown version')).toBe('Ready');
       expect(formatFFmpegVersion('N/A')).toBe('Ready');
+    });
+  });
+
+  describe('formatWhisperVersion', () => {
+    it('correctly extracts whisper.cpp version string', () => {
+      expect(formatWhisperVersion('whisper.cpp version: 1.9.5-dev')).toBe('v1.9.5-dev');
+      expect(formatWhisperVersion('whisper.cpp version: v2.0.0')).toBe('v2.0.0');
+      expect(formatWhisperVersion('whisper.cpp version: 1.8.2')).toBe('v1.8.2');
+    });
+
+    it('handles direct semantic version strings', () => {
+      expect(formatWhisperVersion('1.9.5')).toBe('v1.9.5');
+      expect(formatWhisperVersion('v1.9.5')).toBe('v1.9.5');
+    });
+
+    it('falls back to Ready for missing or invalid version strings', () => {
+      expect(formatWhisperVersion('')).toBe('Ready');
+      expect(formatWhisperVersion(null)).toBe('Ready');
+      expect(formatWhisperVersion(undefined)).toBe('Ready');
+      expect(formatWhisperVersion('Unknown version')).toBe('Ready');
+      expect(formatWhisperVersion('N/A')).toBe('Ready');
+    });
+  });
+
+  describe('refreshWhisperStatus', () => {
+    it('updates badge to ready when whisper status is available', async () => {
+      const badge = new MockElement('span');
+      badge.id = 'whisper-status-badge';
+      (document.getElementById as any).mockReturnValue(badge);
+
+      (window as any).__TAURI__.core.invoke = vi.fn().mockResolvedValue({
+        isAvailable: true,
+        configuredSource: 'system',
+        resolvedPath: '/usr/bin/whisper-cli',
+        version: 'whisper.cpp version: 1.9.5-dev',
+        availableBackends: ['Standard', 'Vulkan', 'OpenVINO'],
+        errorMessage: null
+      });
+
+      await refreshWhisperStatus('system');
+
+      expect(badge.className).toBe('setting-status-pill ready');
+      expect(badge.innerHTML).toContain('v1.9.5-dev');
+      expect(badge.title).toContain('/usr/bin/whisper-cli');
+      expect(badge.title).toContain('Vulkan, OpenVINO');
+    });
+
+    it('updates badge to missing when whisper-cli is not found', async () => {
+      const badge = new MockElement('span');
+      badge.id = 'whisper-status-badge';
+      (document.getElementById as any).mockReturnValue(badge);
+
+      (window as any).__TAURI__.core.invoke = vi.fn().mockResolvedValue({
+        isAvailable: false,
+        configuredSource: 'system',
+        resolvedPath: 'Not Found',
+        version: 'N/A',
+        availableBackends: [],
+        errorMessage: 'System whisper-cli not found'
+      });
+
+      await refreshWhisperStatus('system', false);
+
+      expect(badge.className).toBe('setting-status-pill missing');
+      expect(badge.innerHTML).toContain('Not Found');
     });
   });
 

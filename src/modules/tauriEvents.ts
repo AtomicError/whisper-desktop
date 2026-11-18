@@ -207,6 +207,18 @@ export const invoke = async function(cmd: string, args: any = {}): Promise<any> 
     };
   }
 
+  if (cmd === 'get_whisper_status') {
+    const src = (args && args.source) || 'bundled';
+    return {
+      configuredSource: src,
+      resolvedPath: '/usr/bin/whisper-cli',
+      isAvailable: true,
+      version: 'whisper.cpp version: 1.9.5-dev',
+      availableBackends: ['Standard', 'Vulkan', 'OpenVINO'],
+      errorMessage: null
+    };
+  }
+
   return null;
 };
 

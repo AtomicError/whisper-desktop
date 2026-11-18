@@ -38,6 +38,7 @@ import {
   refreshSettings,
   refreshBuildStatuses,
   refreshFFmpegStatus,
+  refreshWhisperStatus,
   scanAndPopulateModels,
   setupNumberInputControls,
   updateTranscribeUIConfigs,
@@ -358,6 +359,7 @@ export async function initApp(): Promise<void> {
   logsController.redraw();
   await refreshBuildStatuses();
   void refreshFFmpegStatus();
+  void refreshWhisperStatus();
   void hardsubController.loadFontsAndHardware();
 
   // Unfreeze theme transitions

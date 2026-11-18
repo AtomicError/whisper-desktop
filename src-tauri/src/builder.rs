@@ -85,6 +85,11 @@ pub fn is_valid_executable(path: &Path) -> bool {
 }
 
 pub fn check_build_exists(app: &AppHandle, backend: &str) -> bool {
+    let settings = crate::settings::load_settings_file();
+    if settings.whisper_source.eq_ignore_ascii_case("system") {
+        return crate::whisper_resolver::is_system_backend_available(backend);
+    }
+
     let exe_ext = std::env::consts::EXE_SUFFIX;
     let candidates = compute_bin_candidate_rel_paths(backend, exe_ext);
 

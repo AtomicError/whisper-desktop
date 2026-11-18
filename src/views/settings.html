@@ -319,6 +319,28 @@
                       </select>
                     </div>
                   </div>
+
+                  <!-- Whisper Engine Card -->
+                  <div class="setting-card">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.whisperSourceTitle">Whisper Engine</span>
+                        <span id="whisper-status-badge" class="setting-status-pill checking"><span class="ffmpeg-status-dot blue"></span> Checking...</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.whisperSourceDesc">Speech recognition binary execution source for transcription inference.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.whisperSourcePoints">
+                          <span class="setting-desc-point"><strong>Internal:</strong> Standalone bundled binary (recommended, zero-config)</span>
+                          <span class="setting-desc-point"><strong>System:</strong> Uses OS-installed whisper-cli and ggml backends</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control">
+                      <select class="select-control" id="opt-whisperSource" aria-label="Whisper Engine Execution Source">
+                        <option value="bundled" data-i18n="settings.whisperInternal">Internal</option>
+                        <option value="system" data-i18n="settings.whisperSystem">System</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
 
                 <!-- Group: Core Transcription -->

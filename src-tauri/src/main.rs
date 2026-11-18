@@ -12,6 +12,7 @@ mod hardsub;
 mod video_server;
 mod media_preview;
 pub mod ffmpeg_resolver;
+pub mod whisper_resolver;
 
 use std::sync::{Arc, Mutex};
 use std::path::Path;
@@ -71,6 +72,7 @@ async fn load_settings() -> WhisperSettings {
 fn save_settings(settings: WhisperSettings) -> Result<(), String> {
     save_settings_file(&settings)?;
     crate::ffmpeg_resolver::invalidate_ffmpeg_cache();
+    crate::whisper_resolver::invalidate_whisper_cache();
     Ok(())
 }
 
@@ -716,6 +718,15 @@ async fn get_ffmpeg_status(app: AppHandle, source: Option<String>) -> crate::ffm
     })
     .await
     .unwrap_or_else(|_| crate::ffmpeg_resolver::get_current_ffmpeg_status(None, None))
+}
+
+#[tauri::command]
+async fn get_whisper_status(app: AppHandle, source: Option<String>) -> crate::whisper_resolver::WhisperStatus {
+    tokio::task::spawn_blocking(move || {
+        crate::whisper_resolver::get_current_whisper_status(Some(&app), source)
+    })
+    .await
+    .unwrap_or_else(|_| crate::whisper_resolver::get_current_whisper_status(None, None))
 }
 
 #[tauri::command]
@@ -1556,6 +1567,7 @@ fn main() {
             get_font_render_scale,
             start_hardsub_task,
             get_ffmpeg_status,
+            get_whisper_status,
             copy_to_clipboard,
             open_file_in_editor,
             show_in_folder,
