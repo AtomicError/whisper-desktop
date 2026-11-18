@@ -879,7 +879,7 @@ export async function refreshSettings(): Promise<void> {
     const isMonochrome = (loaded && typeof loaded.monochromeCanvas === 'boolean')
       ? loaded.monochromeCanvas
       : (typeof localStorage !== 'undefined' && localStorage.getItem('whisper_monochrome_canvas') === 'true');
-    applyMonochromeCanvas(Boolean(isMonochrome), true);
+    applyMonochromeCanvas(Boolean(isMonochrome), true, false);
 
     const currentTheme = (loaded && loaded.theme) ? loaded.theme : 'royal-blue';
     applyTheme(currentTheme);

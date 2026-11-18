@@ -125,47 +125,85 @@ export function isMonochromeCanvasActive(): boolean {
   return document.documentElement.getAttribute('data-canvas') === 'monochrome';
 }
 
-export function applyMonochromeCanvas(isMonochrome: boolean, persist = true): void {
+export function applyMonochromeCanvas(isMonochrome: boolean, persist = true, animated = true): void {
   if (typeof document === 'undefined') return;
   const root = document.documentElement;
-  if (isMonochrome) {
-    root.setAttribute('data-canvas', 'monochrome');
-  } else {
-    root.removeAttribute('data-canvas');
+  const currentActive = isMonochromeCanvasActive();
+
+  const applyDomChanges = () => {
+    if (isMonochrome) {
+      root.setAttribute('data-canvas', 'monochrome');
+    } else {
+      root.removeAttribute('data-canvas');
+    }
+
+    if (persist) {
+      try {
+        localStorage.setItem('whisper_monochrome_canvas', isMonochrome ? 'true' : 'false');
+      } catch (_) {}
+    }
+
+    const monoCheck = document.getElementById('opt-monochromeCanvas') as HTMLInputElement | null;
+    if (monoCheck && monoCheck.checked !== !!isMonochrome) {
+      monoCheck.checked = !!isMonochrome;
+    }
+
+    const currentThemeId = ((window as any).settingsState && (window as any).settingsState.theme)
+      ? (window as any).settingsState.theme
+      : (localStorage.getItem('whisper_theme_cache') || 'royal-blue');
+    const config = resolveThemeConfig(currentThemeId);
+
+    if (isMonochrome) {
+      const monoBg = MONOCHROME_META_COLORS[config.id] || NEUTRAL_CANVAS_COLOR;
+      root.style.setProperty('--bg-space', monoBg);
+      const metaTheme = document.querySelector('meta[name="theme-color"]');
+      if (metaTheme) metaTheme.setAttribute('content', monoBg);
+    } else {
+      if (config.id === 'royal-blue') {
+        root.style.removeProperty('--bg-space');
+      } else if (config.metaColor) {
+        root.style.setProperty('--bg-space', config.metaColor);
+      }
+      const metaTheme = document.querySelector('meta[name="theme-color"]');
+      if (metaTheme && config.metaColor) {
+        metaTheme.setAttribute('content', config.metaColor);
+      }
+    }
+
+    if ((window as any).settingsState) {
+      (window as any).settingsState.monochromeCanvas = isMonochrome;
+    }
+  };
+
+  if (currentActive === isMonochrome) {
+    applyDomChanges();
+    return;
   }
 
-  if (persist) {
-    try {
-      localStorage.setItem('whisper_monochrome_canvas', isMonochrome ? 'true' : 'false');
-    } catch (_) {}
-  }
+  const isTestEnv = typeof (globalThis as any).process !== 'undefined' && (globalThis as any).process?.env?.NODE_ENV === 'test';
+  const shouldAnimate = animated && !isTestEnv &&
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    !window.matchMedia('(prefers-reduced-motion: reduce)').matches &&
+    typeof requestAnimationFrame === 'function';
 
-  const monoCheck = document.getElementById('opt-monochromeCanvas') as HTMLInputElement | null;
-  if (monoCheck && monoCheck.checked !== !!isMonochrome) {
-    monoCheck.checked = !!isMonochrome;
+  const appContainer = document.getElementById('app-container');
+  if (!shouldAnimate || !appContainer) {
+    applyDomChanges();
+    return;
   }
 
   const currentThemeId = ((window as any).settingsState && (window as any).settingsState.theme)
     ? (window as any).settingsState.theme
     : (localStorage.getItem('whisper_theme_cache') || 'royal-blue');
   const config = resolveThemeConfig(currentThemeId);
+  const oldCanvasAttr = currentActive ? 'monochrome' : null;
 
-  if (isMonochrome) {
-    const monoBg = MONOCHROME_META_COLORS[config.id] || NEUTRAL_CANVAS_COLOR;
-    root.style.setProperty('--bg-space', monoBg);
-    const metaTheme = document.querySelector('meta[name="theme-color"]');
-    if (metaTheme) metaTheme.setAttribute('content', monoBg);
-  } else {
-    if (config.id === 'royal-blue') {
-      root.style.removeProperty('--bg-space');
-    } else if (config.metaColor) {
-      root.style.setProperty('--bg-space', config.metaColor);
-    }
-    const metaTheme = document.querySelector('meta[name="theme-color"]');
-    if (metaTheme && config.metaColor) {
-      metaTheme.setAttribute('content', config.metaColor);
-    }
-  }
+  runThemeWipe(
+    config.id,
+    oldCanvasAttr,
+    applyDomChanges
+  );
 }
 
 export function applyTheme(themeName: string): void {
@@ -246,45 +284,273 @@ export function handleThemeSegmentClick(targetTheme: string): void {
   switchTheme(targetTheme);
 }
 
-export function switchTheme(themeName: string, animated = true): void {
-  const config = resolveThemeConfig(themeName);
+let activeThemeWipeCancel: (() => void) | null = null;
 
+export function cancelActiveThemeWipe(): void {
+  if (activeThemeWipeCancel) {
+    activeThemeWipeCancel();
+    activeThemeWipeCancel = null;
+  }
+}
+
+export function runThemeWipe(
+  oldThemeId: string,
+  oldCanvasAttr: string | null,
+  onApplyNewState: () => void,
+  onComplete?: () => void
+): void {
+  if (typeof document === 'undefined') {
+    onApplyNewState();
+    onComplete?.();
+    return;
+  }
+
+  cancelActiveThemeWipe();
+
+  const appContainer = document.getElementById('app-container');
+  if (!appContainer) {
+    onApplyNewState();
+    onComplete?.();
+    return;
+  }
+
+  const isRtl = document.documentElement.getAttribute('dir') === 'rtl' ||
+    document.documentElement.classList.contains('rtl-layout');
+
+  const titlebar = document.querySelector('.titlebar');
+
+  // 1. Create overlay containing the cloned app in the OLD theme and canvas state
+  const overlay = document.createElement('div');
+  overlay.id = 'theme-wipe-overlay';
+  overlay.setAttribute('data-theme', oldThemeId);
+  if (oldCanvasAttr) {
+    overlay.setAttribute('data-canvas', oldCanvasAttr);
+  }
+
+  const cloneWrap = document.createElement('div');
+  cloneWrap.className = 'theme-wipe-clone-content';
+
+  if (titlebar) {
+    cloneWrap.appendChild(titlebar.cloneNode(true));
+  }
+  cloneWrap.appendChild(appContainer.cloneNode(true));
+  overlay.appendChild(cloneWrap);
+
+  // Synchronize scroll positions of view scroll containers
+  const origScrolls = document.querySelectorAll('.settings-scroll-container, .main-view, .transcribe-panel');
+  const cloneScrolls = cloneWrap.querySelectorAll('.settings-scroll-container, .main-view, .transcribe-panel');
+  origScrolls.forEach((orig, idx) => {
+    if (cloneScrolls[idx]) {
+      (cloneScrolls[idx] as HTMLElement).scrollTop = (orig as HTMLElement).scrollTop;
+      (cloneScrolls[idx] as HTMLElement).scrollLeft = (orig as HTMLElement).scrollLeft;
+    }
+  });
+
+  // Synchronize canvas pixel buffers so graphic surfaces / subtitle overlays are preserved in the clone
+  const origCanvases = document.querySelectorAll<HTMLCanvasElement>('canvas');
+  const cloneCanvases = cloneWrap.querySelectorAll<HTMLCanvasElement>('canvas');
+  origCanvases.forEach((orig, idx) => {
+    const clone = cloneCanvases[idx];
+    if (clone && orig.width > 0 && orig.height > 0) {
+      clone.width = orig.width;
+      clone.height = orig.height;
+      const ctx = clone.getContext('2d');
+      if (ctx) {
+        try {
+          ctx.drawImage(orig, 0, 0);
+        } catch (_) {}
+      }
+    }
+  });
+
+  // Neutralize media elements in visual clone to prevent double-buffering or GStreamer hardware conflicts
+  cloneWrap.querySelectorAll('video, audio').forEach((media) => {
+    try {
+      (media as HTMLMediaElement).pause();
+      (media as HTMLMediaElement).muted = true;
+      (media as HTMLMediaElement).removeAttribute('autoplay');
+    } catch (_) {}
+  });
+
+  // Strip duplicate IDs and Tauri drag regions from visual clone to prevent DOM / webview hit-test collisions
+  cloneWrap.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
+  cloneWrap.querySelectorAll('[data-tauri-drag-region]').forEach((el) => el.removeAttribute('data-tauri-drag-region'));
+
+  // 2. Create the SVG Laser Blade Layer (luminous white line cutting across the seam)
+  const svgLayer = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svgLayer.setAttribute('class', 'theme-wipe-svg-layer');
+
+  const bladeLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  bladeLine.setAttribute('class', 'theme-wipe-blade-line');
+  svgLayer.appendChild(bladeLine);
+
+  document.body.appendChild(overlay);
+  document.body.appendChild(svgLayer);
+
+  // 3. Immediately switch the real underlying app to the NEW state!
+  onApplyNewState();
+
+  // 4. Smooth 1000ms cinematic diagonal wipe loop
+  let rafId: number | null = null;
+  let isDone = false;
+  const duration = 1000;
+  const startTime = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+
+  const cleanup = () => {
+    if (isDone) return;
+    isDone = true;
+    if (rafId !== null && typeof cancelAnimationFrame === 'function') {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+    overlay.remove();
+    svgLayer.remove();
+    if (activeThemeWipeCancel === cancelHandler) {
+      activeThemeWipeCancel = null;
+    }
+  };
+
+  const cancelHandler = () => {
+    cleanup();
+  };
+  activeThemeWipeCancel = cancelHandler;
+
+  const tick = (now: number) => {
+    if (isDone) return;
+
+    const elapsed = now - startTime;
+    const progress = Math.min(1.0, elapsed / duration);
+
+    // Smooth, cinematic sine-based ease-in-out for steady, tangible momentum
+    const eased = -(Math.cos(Math.PI * progress) - 1) / 2;
+
+    const W = window.innerWidth || document.documentElement.clientWidth || 1024;
+    const H = window.innerHeight || document.documentElement.clientHeight || 768;
+
+    const T = eased * 2.2;
+
+    let x1 = 0;
+    let y1 = 0;
+    let x2 = 0;
+    let y2 = 0;
+
+    if (T <= 1.0) {
+      x1 = T * W;
+      y1 = 0;
+      x2 = 0;
+      y2 = T * H;
+    } else {
+      x1 = W;
+      y1 = (T - 1.0) * H;
+      x2 = (T - 1.0) * W;
+      y2 = H;
+    }
+
+    if (!isRtl) {
+      // LTR: Top-Left to Bottom-Right
+      bladeLine.setAttribute('x1', x1.toFixed(1));
+      bladeLine.setAttribute('y1', y1.toFixed(1));
+      bladeLine.setAttribute('x2', x2.toFixed(1));
+      bladeLine.setAttribute('y2', y2.toFixed(1));
+
+      if (T <= 1.0) {
+        overlay.style.clipPath = `polygon(${x1.toFixed(1)}px 0px, ${W}px 0px, ${W}px ${H}px, 0px ${H}px, 0px ${y2.toFixed(1)}px)`;
+      } else if (T < 2.0) {
+        overlay.style.clipPath = `polygon(${W}px ${y1.toFixed(1)}px, ${W}px ${H}px, ${x2.toFixed(1)}px ${H}px)`;
+      } else {
+        overlay.style.clipPath = 'polygon(0 0, 0 0, 0 0)';
+      }
+    } else {
+      // RTL: Top-Right to Bottom-Left
+      const rx1 = W - x1;
+      const rx2 = W - x2;
+
+      bladeLine.setAttribute('x1', rx1.toFixed(1));
+      bladeLine.setAttribute('y1', y1.toFixed(1));
+      bladeLine.setAttribute('x2', rx2.toFixed(1));
+      bladeLine.setAttribute('y2', y2.toFixed(1));
+
+      if (T <= 1.0) {
+        overlay.style.clipPath = `polygon(${rx1.toFixed(1)}px 0px, 0px 0px, 0px ${H}px, ${W}px ${H}px, ${W}px ${y2.toFixed(1)}px)`;
+      } else if (T < 2.0) {
+        overlay.style.clipPath = `polygon(0px ${y1.toFixed(1)}px, 0px ${H}px, ${rx2.toFixed(1)}px ${H}px)`;
+      } else {
+        overlay.style.clipPath = 'polygon(0 0, 0 0, 0 0)';
+      }
+    }
+
+    if (progress < 1.0) {
+      rafId = requestAnimationFrame(tick);
+    } else {
+      cleanup();
+      onComplete?.();
+    }
+  };
+
+  rafId = requestAnimationFrame(tick);
+}
+
+export function switchTheme(themeName: string, animated = true): void {
+  if (typeof document === 'undefined') return;
+
+  cancelActiveThemeWipe();
+
+  const config = resolveThemeConfig(themeName);
+  const currentThemeAttr = document.documentElement.getAttribute('data-theme') || 'royal-blue';
+  const oldThemeId = resolveThemeConfig(currentThemeAttr).id;
+  const currentCanvasAttr = document.documentElement.getAttribute('data-canvas');
+
+  const isTestEnv = typeof (globalThis as any).process !== 'undefined' && (globalThis as any).process?.env?.NODE_ENV === 'test';
+  const shouldAnimate = animated && !isTestEnv &&
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    !window.matchMedia('(prefers-reduced-motion: reduce)').matches &&
+    typeof requestAnimationFrame === 'function';
+
+  const finalizeThemeSwitch = () => {
+    if ((window as any).settingsState) {
+      (window as any).settingsState.theme = config.id;
+      if (typeof (window as any).saveCurrentSettings === 'function') {
+        (window as any).saveCurrentSettings(false);
+      }
+    }
+
+    const themeKey = (config.id === 'royal-blue')
+      ? 'royal'
+      : (config.id === 'fire-orange' || config.id === 'fire')
+      ? 'fire'
+      : (config.id === 'ruby-red' || config.id === 'ruby' || config.id === 'carbon')
+      ? 'ruby'
+      : config.id;
+    const localizedThemeName = (typeof t === 'function' && t(`theme.${themeKey}`) !== `theme.${themeKey}`)
+      ? t(`theme.${themeKey}`)
+      : (config.toastName || config.label);
+    
+    const showNotification = (window as any).showNotification;
+    if (showNotification) {
+      showNotification(t('toasts.themeSwitched', { theme: localizedThemeName }), 'info');
+    }
+  };
+
+  // Synchronize settingsState immediately so the active state is consistent across the app
   if ((window as any).settingsState) {
     (window as any).settingsState.theme = config.id;
-    if (typeof (window as any).saveCurrentSettings === 'function') {
-      (window as any).saveCurrentSettings();
-    }
   }
 
-  const shouldAnimate = animated &&
-    !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const appContainer = document.getElementById('app-container');
 
-  if (shouldAnimate) {
-    const root = document.documentElement;
-    root.classList.add('theme-transitioning');
+  if (!shouldAnimate || !appContainer || oldThemeId === config.id) {
     applyTheme(config.id);
-    setTimeout(() => {
-      root.classList.remove('theme-transitioning');
-    }, 280);
-  } else {
-    applyTheme(config.id);
+    finalizeThemeSwitch();
+    return;
   }
 
-  const themeKey = (config.id === 'royal-blue')
-    ? 'royal'
-    : (config.id === 'fire-orange' || config.id === 'fire')
-    ? 'fire'
-    : (config.id === 'ruby-red' || config.id === 'ruby' || config.id === 'carbon')
-    ? 'ruby'
-    : config.id;
-  const localizedThemeName = (typeof t === 'function' && t(`theme.${themeKey}`) !== `theme.${themeKey}`)
-    ? t(`theme.${themeKey}`)
-    : (config.toastName || config.label);
-  
-  const showNotification = (window as any).showNotification;
-  if (showNotification) {
-    showNotification(t('toasts.themeSwitched', { theme: localizedThemeName }), 'info');
-  }
+  runThemeWipe(
+    oldThemeId,
+    currentCanvasAttr,
+    () => applyTheme(config.id),
+    finalizeThemeSwitch
+  );
 }
 
 const getNativeTauriInvoke = (): any => {
@@ -438,6 +704,7 @@ if (typeof window !== 'undefined') {
   (window as any).toggleTheme = toggleTheme;
   (window as any).handleThemeSegmentClick = handleThemeSegmentClick;
   (window as any).switchTheme = switchTheme;
+  (window as any).runThemeWipe = runThemeWipe;
   (window as any).applyUiZoom = applyUiZoom;
   (window as any).adjustUiZoom = adjustUiZoom;
   (window as any).setUiZoom = setUiZoom;
@@ -447,6 +714,7 @@ export const themeManager = {
   applyTheme,
   toggleTheme,
   switchTheme,
+  runThemeWipe,
   applyMonochromeCanvas,
   isMonochromeCanvasActive,
   applyUiZoom,

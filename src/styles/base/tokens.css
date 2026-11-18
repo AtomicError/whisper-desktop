@@ -162,7 +162,9 @@ html {
 
 :root,
 :root[data-theme="royal-blue"],
-:root[data-theme="cyber-blue"] {
+:root[data-theme="cyber-blue"],
+[data-theme="royal-blue"],
+[data-theme="cyber-blue"] {
   --bg-space: #070913;
   --bg-deep: #0b0e1b;
   --bg-card: rgba(15, 20, 38, 0.55);
@@ -271,7 +273,9 @@ html {
 }
 
 :root[data-theme="fire-orange"],
-:root[data-theme="fire"] {
+:root[data-theme="fire"],
+[data-theme="fire-orange"],
+[data-theme="fire"] {
   --bg-space: #100803;
   --bg-deep: #160c07;
   --bg-card: rgba(28, 15, 8, 0.55);
@@ -343,7 +347,10 @@ html {
 
 :root[data-theme="ruby-red"],
 :root[data-theme="ruby"],
-:root[data-theme="carbon"] {
+:root[data-theme="carbon"],
+[data-theme="ruby-red"],
+[data-theme="ruby"],
+[data-theme="carbon"] {
   /* Surfaces & Canvas (Dark ruby noir tint mirroring Royal Blue's dark navy blueprint) */
   --bg-space: #120707;                      /* Main application canvas (deep muted ruby noir, mirroring #070913) */
   --bg-deep: #190909;                       /* Sidebar and deep containers (mirroring #0b0e1b) */
@@ -434,7 +441,8 @@ html {
   --nav-active-hover-shadow: 0 6px 20px rgba(244, 63, 94, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2), inset 0 0 16px rgba(244, 63, 94, 0.15);
 }
 
-:root[data-theme="emerald"] {
+:root[data-theme="emerald"],
+[data-theme="emerald"] {
   --bg-space: #060e0a;
   --bg-deep: #09150f;
   --bg-card: rgba(12, 28, 20, 0.60);
@@ -566,7 +574,9 @@ html {
 }
 
 :root[data-canvas="monochrome"],
-:root[data-canvas="monochrome"][data-theme] {
+:root[data-canvas="monochrome"][data-theme],
+[data-canvas="monochrome"],
+#theme-wipe-overlay[data-canvas="monochrome"] {
   --bg-space: var(--canvas-neutral-bg);
   --bg-app: var(--canvas-neutral-bg);
   --bg-titlebar: var(--canvas-neutral-titlebar);
@@ -590,61 +600,177 @@ html {
 }
 
 /* ==========================================================================
-   SMOOTH DESKTOP THEME TRANSITIONS (GPU ACCELERATED VIEW TRANSITIONS)
+   SMOOTH DESKTOP THEME TRANSITION: REAL DUAL-THEME DIAGONAL WIPE + LASER BLADE
    ========================================================================== */
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation-duration: 260ms;
-  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+#theme-wipe-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 99998;
+  pointer-events: none;
+  overflow: hidden;
+  background-color: var(--bg-space);
+  contain: strict;
+  will-change: clip-path;
 }
 
-::view-transition-old(root) {
-  animation-name: theme-crossfade-out;
+.theme-wipe-clone-content {
+  position: absolute;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
-::view-transition-new(root) {
-  animation-name: theme-crossfade-in;
+.theme-wipe-svg-layer {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 99999;
+  pointer-events: none;
+  overflow: visible;
 }
 
-@keyframes theme-crossfade-out {
-  from { opacity: 1; }
-  to { opacity: 0; }
+.theme-wipe-blade-line {
+  stroke: #ffffff;
+  stroke-width: 3.5px;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 6px #ffffff) drop-shadow(0 0 16px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 30px rgba(255, 255, 255, 0.7));
 }
 
-@keyframes theme-crossfade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+/* Ensure brand icon inside the cloned overlay retains the old theme's palette during the wipe */
+#theme-wipe-overlay[data-theme="royal-blue"] .brand-icon,
+#theme-wipe-overlay[data-theme="cyber-blue"] .brand-icon {
+  --brand-icon-f1: #00389a;
+  --brand-icon-f2: #0040af;
+  --brand-icon-f3: #0045be;
+  --brand-icon-f4: #0041b3;
+  --brand-icon-f5: #004fc7;
+  --brand-icon-f6: #0043b8;
+  --brand-icon-f7: #004cc3;
+  --brand-icon-f8: #0048bc;
+  --brand-icon-f9: #0056d6;
+  --brand-icon-f10: #0057d9;
+  --brand-icon-f11: #075dde;
+  --brand-icon-f12: #0f62e4;
+  --brand-icon-f13: #297bfb;
+  --brand-icon-f14: #1d99ed;
+  --brand-icon-f15: #1b6dee;
+  --brand-icon-f16: #2475f5;
+  --brand-icon-f17: #2c7efe;
+  --brand-icon-f18: #1c9aed;
+  --brand-icon-f19: #13a7e2;
+  --brand-icon-f20: #33bbf1;
+  --brand-icon-f21: #5bd4ff;
+  --brand-icon-f22: #f3f4f6;
+  filter: drop-shadow(0 0 8px rgba(45, 127, 255, 0.5));
 }
 
-/* Fallback for environments without View Transitions API */
-html.theme-transitioning,
-html.theme-transitioning body,
-html.theme-transitioning .titlebar,
-html.theme-transitioning sidebar,
-html.theme-transitioning header,
-html.theme-transitioning .main-view,
-html.theme-transitioning .nav-item,
-html.theme-transitioning .theme-picker-card,
-html.theme-transitioning .backend-card,
-html.theme-transitioning .setting-card,
-html.theme-transitioning .wizard-step,
-html.theme-transitioning .btn-primary,
-html.theme-transitioning .btn-secondary,
-html.theme-transitioning .analytics-box,
-html.theme-transitioning .telemetry-hud,
-html.theme-transitioning .batch-queue-panel {
-  transition: background-color 260ms cubic-bezier(0.2, 0, 0, 1),
-              border-color 260ms cubic-bezier(0.2, 0, 0, 1),
-              box-shadow 260ms cubic-bezier(0.2, 0, 0, 1),
-              color 260ms cubic-bezier(0.2, 0, 0, 1) !important;
-  transition-delay: 0s !important;
+#theme-wipe-overlay[data-theme="fire-orange"] .brand-icon,
+#theme-wipe-overlay[data-theme="fire"] .brand-icon {
+  --brand-icon-f1: #71270c;
+  --brand-icon-f2: #8e2c04;
+  --brand-icon-f3: #9e3000;
+  --brand-icon-f4: #8f2c04;
+  --brand-icon-f5: #b13800;
+  --brand-icon-f6: #992e00;
+  --brand-icon-f7: #aa3500;
+  --brand-icon-f8: #a23200;
+  --brand-icon-f9: #c23f00;
+  --brand-icon-f10: #ab3500;
+  --brand-icon-f11: #b33900;
+  --brand-icon-f12: #bb3c00;
+  --brand-icon-f13: #dc4a00;
+  --brand-icon-f14: #f05d00;
+  --brand-icon-f15: #c94200;
+  --brand-icon-f16: #d54600;
+  --brand-icon-f17: #e04e00;
+  --brand-icon-f18: #f05e00;
+  --brand-icon-f19: #f96500;
+  --brand-icon-f20: #fd832c;
+  --brand-icon-f21: #fcac31;
+  --brand-icon-f22: #f3f4f6;
+  filter: drop-shadow(0 0 8px rgba(255, 107, 0, 0.5));
+}
+
+#theme-wipe-overlay[data-theme="ruby-red"] .brand-icon,
+#theme-wipe-overlay[data-theme="ruby"] .brand-icon,
+#theme-wipe-overlay[data-theme="carbon"] .brand-icon {
+  --brand-icon-f1: #761e1e;
+  --brand-icon-f2: #94201f;
+  --brand-icon-f3: #a42121;
+  --brand-icon-f4: #952020;
+  --brand-icon-f5: #ba2423;
+  --brand-icon-f6: #9f2121;
+  --brand-icon-f7: #b32323;
+  --brand-icon-f8: #a92222;
+  --brand-icon-f9: #ce2525;
+  --brand-icon-f10: #b42323;
+  --brand-icon-f11: #bd2424;
+  --brand-icon-f12: #c52424;
+  --brand-icon-f13: #e53635;
+  --brand-icon-f14: #f54d63;
+  --brand-icon-f15: #d62626;
+  --brand-icon-f16: #e02d2d;
+  --brand-icon-f17: #e93b3b;
+  --brand-icon-f18: #f54e63;
+  --brand-icon-f19: #f7606a;
+  --brand-icon-f20: #fb7c8d;
+  --brand-icon-f21: #f7a4ad;
+  --brand-icon-f22: #f4f4f5;
+  filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.5));
+}
+
+#theme-wipe-overlay[data-theme="emerald"] .brand-icon {
+  --brand-icon-f1: #0c4f3a;
+  --brand-icon-f2: #066147;
+  --brand-icon-f3: #066b4e;
+  --brand-icon-f4: #066248;
+  --brand-icon-f5: #067957;
+  --brand-icon-f6: #06684c;
+  --brand-icon-f7: #067554;
+  --brand-icon-f8: #066f50;
+  --brand-icon-f9: #06875f;
+  --brand-icon-f10: #067654;
+  --brand-icon-f11: #067b58;
+  --brand-icon-f12: #06815c;
+  --brand-icon-f13: #069a6b;
+  --brand-icon-f14: #0cad78;
+  --brand-icon-f15: #068c62;
+  --brand-icon-f16: #059468;
+  --brand-icon-f17: #079d6e;
+  --brand-icon-f18: #0cad79;
+  --brand-icon-f19: #0fb57e;
+  --brand-icon-f20: #25c892;
+  --brand-icon-f21: #5bebbd;
+  --brand-icon-f22: #f3f4f6;
+  filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.5));
+}
+
+/* ==========================================================================
+   TERMINAL BLOCK CURSOR / REWRITING DECIPHER STYLING
+   ========================================================================== */
+.text-scrambling {
+  color: var(--text-primary, #fafafa) !important;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.28);
+  font-feature-settings: "tnum" 1;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  ::view-transition-group(*),
-  ::view-transition-old(*),
-  ::view-transition-new(*) {
-    animation: none !important;
+  #theme-wipe-overlay,
+  .theme-wipe-svg-layer {
+    display: none !important;
+  }
+  .text-scrambling {
+    color: inherit !important;
+    text-shadow: none !important;
   }
 }
 

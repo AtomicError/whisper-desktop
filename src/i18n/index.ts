@@ -11,6 +11,7 @@ import { pt } from '../locales/pt';
 import { it } from '../locales/it';
 import { tr } from '../locales/tr';
 import { ko } from '../locales/ko';
+import { scrambleBatch } from './textScramble';
 
 export type SupportedLanguage =
   | 'en'
@@ -294,16 +295,21 @@ export function getLanguage(): SupportedLanguage {
   return currentLang;
 }
 
-export function translateDOM(root: Document | Element = document): void {
-  // Translate text content
-  const textElements = root.querySelectorAll<HTMLElement>('[data-i18n]');
-  for (const el of textElements) {
-    const key = el.getAttribute('data-i18n');
-    if (key) {
-      el.textContent = t(key);
-    }
+function isElementVisible(el: HTMLElement): boolean {
+  if (typeof el.closest !== 'function') return true;
+  try {
+    if (!el.isConnected) return false;
+    // Native select options are non-rendered DOM elements replaced by custom selects
+    if (el.tagName === 'OPTION') return false;
+    if (el.closest('.titlebar, header, sidebar, .sidebar-nav, .brand')) return true;
+    if (el.closest('.view-panel.active, .fixed-layout-panel.active')) return true;
+    return el.offsetParent !== null;
+  } catch (_) {
+    return true;
   }
+}
 
+function translateNonTextI18n(root: Document | Element = document): void {
   // Translate rich HTML content with defensive sanitization
   const htmlElements = root.querySelectorAll<HTMLElement>('[data-i18n-html]');
   for (const el of htmlElements) {
@@ -357,7 +363,24 @@ export function translateDOM(root: Document | Element = document): void {
   }
 }
 
-export function setLanguage(lang: SupportedLanguage, notify: boolean = true): void {
+export function translateDOM(root: Document | Element = document): void {
+  // Translate text content
+  const textElements = root.querySelectorAll<HTMLElement>('[data-i18n]');
+  for (const el of textElements) {
+    const key = el.getAttribute('data-i18n');
+    if (key) {
+      el.textContent = t(key);
+    }
+  }
+
+  translateNonTextI18n(root);
+}
+
+export function setLanguage(
+  lang: SupportedLanguage,
+  notify: boolean = true,
+  animated: boolean = true
+): void {
   if (!SUPPORTED_LANGUAGES.includes(lang)) {
     lang = 'en';
   }
@@ -368,57 +391,108 @@ export function setLanguage(lang: SupportedLanguage, notify: boolean = true): vo
   } catch (_) {}
 
   const isRtl = isRtlLanguage(lang);
-  document.documentElement.setAttribute('lang', lang);
-  document.documentElement.setAttribute('dir', isRtl ? 'rtl' : 'ltr');
-  if (isRtl) {
-    document.documentElement.classList.add('rtl-layout');
-  } else {
-    document.documentElement.classList.remove('rtl-layout');
+  if (typeof document !== 'undefined' && document.documentElement) {
+    document.documentElement.setAttribute('lang', lang);
+    document.documentElement.setAttribute('dir', isRtl ? 'rtl' : 'ltr');
+    if (isRtl) {
+      document.documentElement.classList.add('rtl-layout');
+    } else {
+      document.documentElement.classList.remove('rtl-layout');
+    }
   }
 
   // Sync select dropdown in UI if present
-  const selectEl = document.getElementById('opt-uiLanguage') as HTMLSelectElement | null;
-  if (selectEl && selectEl.value !== lang) {
-    selectEl.value = lang;
-  }
-
-  // Update DOM translations
-  translateDOM();
-
-  // Synchronize custom selects and refresh localized option placeholders if initialized
-  if (typeof (window as any).syncCustomSelects === 'function') {
-    (window as any).syncCustomSelects(true);
-  }
-
-  // Synchronize current view title
-  const activeNav = document.querySelector<HTMLElement>('.nav-item.active');
-  const viewTitle = document.getElementById('current-view-title');
-  if (activeNav && activeNav.dataset.view) {
-    const locTitle = t(`nav.${activeNav.dataset.view}`);
-    if (viewTitle && locTitle) viewTitle.textContent = locTitle;
-  }
-
-  // Synchronize window/document title
   if (typeof document !== 'undefined') {
+    const selectEl = document.getElementById('opt-uiLanguage') as HTMLSelectElement | null;
+    if (selectEl && selectEl.value !== lang) {
+      selectEl.value = lang;
+    }
     document.title = APP_NAME;
   }
 
-  // Synchronize with settingsState and save to backend if available
+  const isTestEnv = typeof (globalThis as any).process !== 'undefined' && (globalThis as any).process?.env?.NODE_ENV === 'test';
+  const shouldAnimate = animated && !isTestEnv &&
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    !window.matchMedia('(prefers-reduced-motion: reduce)').matches &&
+    typeof requestAnimationFrame === 'function' &&
+    typeof document !== 'undefined' &&
+    typeof document.querySelectorAll === 'function';
+
+  if (shouldAnimate) {
+    const allTextEls = document.querySelectorAll<HTMLElement>('[data-i18n]');
+    const scrambleItems: Array<{ el: HTMLElement; targetText: string }> = [];
+
+    for (const el of allTextEls) {
+      const key = el.getAttribute('data-i18n');
+      if (!key) continue;
+      const target = t(key);
+
+      if (isElementVisible(el)) {
+        scrambleItems.push({ el, targetText: target });
+      } else {
+        el.textContent = target;
+      }
+    }
+
+    const activeNav = document.querySelector<HTMLElement>('.nav-item.active');
+    const viewTitle = document.getElementById('current-view-title');
+    if (activeNav && activeNav.dataset.view && viewTitle) {
+      const locTitle = t(`nav.${activeNav.dataset.view}`);
+      if (locTitle) {
+        scrambleItems.push({ el: viewTitle, targetText: locTitle });
+      }
+    }
+
+    translateNonTextI18n();
+
+    if (typeof (window as any).syncCustomSelects === 'function') {
+      (window as any).syncCustomSelects(true);
+    }
+
+    scrambleBatch(scrambleItems, {
+      duration: 1000,
+      onComplete: () => {
+        if (typeof (window as any).syncCustomSelects === 'function') {
+          (window as any).syncCustomSelects(true);
+        }
+      }
+    });
+  } else {
+    translateDOM();
+
+    if (typeof (window as any).syncCustomSelects === 'function') {
+      (window as any).syncCustomSelects(true);
+    }
+
+    if (typeof document !== 'undefined') {
+      const activeNav = document.querySelector<HTMLElement>('.nav-item.active');
+      const viewTitle = document.getElementById('current-view-title');
+      if (activeNav && activeNav.dataset.view) {
+        const locTitle = t(`nav.${activeNav.dataset.view}`);
+        if (viewTitle && locTitle) viewTitle.textContent = locTitle;
+      }
+    }
+  }
+
+  // Synchronize with settingsState and save to backend if available (non-blocking!)
   if (typeof window !== 'undefined') {
     const win = window as any;
     if (win.settingsState && win.settingsState.uiLanguage !== lang) {
       win.settingsState.uiLanguage = lang;
       if (typeof win.saveCurrentSettings === 'function') {
-        win.saveCurrentSettings(true);
+        win.saveCurrentSettings(false);
       }
     }
   }
 
   // Dispatch global event for components that listen to language change
-  window.dispatchEvent(new CustomEvent('whisper:languageChanged', { detail: { language: lang, isRtl } }));
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    window.dispatchEvent(new CustomEvent('whisper:languageChanged', { detail: { language: lang, isRtl } }));
+  }
 
   // Notify user if changed manually
-  if (notify && typeof (window as any).showNotification === 'function') {
+  if (notify && typeof window !== 'undefined' && typeof (window as any).showNotification === 'function') {
     (window as any).showNotification(t('toasts.langChanged'), 'info', 3000);
   }
 }
