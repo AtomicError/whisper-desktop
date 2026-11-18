@@ -433,11 +433,16 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
   return cardEl;
 }
 
-export function renderTranscriptLines(lines: TranscriptLine[]): void {
+export function renderTranscriptLines(lines: TranscriptLine[], preserveScroll = true): void {
   if (typeof document === 'undefined') return;
   const viewport = document.getElementById('transcript-viewport');
   if (!viewport) return;
-  const prevScrollTop = viewport.scrollTop;
+  const vp = viewport as any;
+  if (!preserveScroll && vp._scrollDebounce) {
+    clearTimeout(vp._scrollDebounce);
+    delete vp._scrollDebounce;
+  }
+  const prevScrollTop = preserveScroll ? viewport.scrollTop : 0;
   viewport.innerHTML = '';
 
   const placeholder = document.getElementById('transcript-placeholder');
@@ -1497,7 +1502,7 @@ export function aggregateTokensIntoWords(
   return words;
 }
 
-export function parseAndApplyTranscriptContent(text: string, ext: string, shouldRender = true): TranscriptLine[] {
+export function parseAndApplyTranscriptContent(text: string, ext: string, shouldRender = true, preserveScroll = false): TranscriptLine[] {
   try {
     const parsedLines: TranscriptLine[] = [];
 
@@ -1510,7 +1515,7 @@ export function parseAndApplyTranscriptContent(text: string, ext: string, should
       transcriptDirty = false;
       transcriptLines = lines;
       clearTranscriptHistory();
-      renderTranscriptLines(transcriptLines);
+      renderTranscriptLines(transcriptLines, preserveScroll);
     }
     return lines;
   };
@@ -1715,7 +1720,14 @@ export async function loadTranscriptFromFile(fullPath: string, shouldRender = tr
     if (!invoke) return [];
     const text: string = await invoke('read_text_file_content', { filePath: fullPath });
     const ext = (fullPath.split('.').pop() || '').toLowerCase();
-    return parseAndApplyTranscriptContent(text, ext, shouldRender);
+    const lines = parseAndApplyTranscriptContent(text, ext, shouldRender, false);
+    if (shouldRender && typeof document !== 'undefined') {
+      const viewport = document.getElementById('transcript-viewport');
+      if (viewport) {
+        viewport.scrollTop = 0;
+      }
+    }
+    return lines;
   } catch (err) {
     console.error("Failed to load transcript file:", err);
     return [];
@@ -1853,7 +1865,14 @@ export function clearTranscriptLines(): void {
 
 export async function loadTranscriptFromJsonData(jsonData: string, shouldRender = true): Promise<TranscriptLine[]> {
   try {
-    return parseAndApplyTranscriptContent(jsonData, 'json', shouldRender);
+    const lines = parseAndApplyTranscriptContent(jsonData, 'json', shouldRender, false);
+    if (shouldRender && typeof document !== 'undefined') {
+      const viewport = document.getElementById('transcript-viewport');
+      if (viewport) {
+        viewport.scrollTop = 0;
+      }
+    }
+    return lines;
   } catch (err) {
     console.error("Failed to load transcript from json data:", err);
     return [];

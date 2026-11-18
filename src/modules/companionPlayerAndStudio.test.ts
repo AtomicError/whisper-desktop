@@ -44,6 +44,8 @@ import {
   pauseCompanionPlayer,
   showTranscribeSetupDeck,
   showTranscribeMediaDeck,
+  wakeCompanionPlayerSurface,
+  onTranscribeViewActivated,
   unloadCompanionPlayer,
   updateCompanionMetadataUI,
   loadMediaIntoCompanionPlayer,
@@ -2361,9 +2363,14 @@ describe('Studio Refinements, Isolation & Keyboard Accessibility', () => {
     (keydownHandler as any)({ code: 'ArrowRight', shiftKey: true, preventDefault: () => { defaultPrevented = true; } });
     expect(defaultPrevented).toBe(false);
 
+    // Event with defaultPrevented = true should be ignored
+    defaultPrevented = false;
+    (keydownHandler as any)({ code: 'Space', defaultPrevented: true, preventDefault: () => { defaultPrevented = true; } });
+    expect(defaultPrevented).toBe(false);
+
     // Plain Space without modifiers should be intercepted
     defaultPrevented = false;
-    (keydownHandler as any)({ code: 'Space', preventDefault: () => { defaultPrevented = true; } });
+    (keydownHandler as any)({ code: 'Space', defaultPrevented: false, preventDefault: () => { defaultPrevented = true; } });
     expect(defaultPrevented).toBe(true);
   });
 
@@ -2681,5 +2688,114 @@ describe('Studio Refinements, Isolation & Keyboard Accessibility', () => {
     // Without adaptive scaling, font size would be 569 * 0.055 = 31px (massive).
     // With adaptive scaling, font size is Math.round(320 * 0.058) = 19px.
     expect(ctx.font).toMatch(/600 1[789]px/);
+  });
+
+  it('toggles non-destructive deck-hidden class when switching between setup deck and media deck', () => {
+    const setupDeck = registerMockEl('transcribe-unified-deck', 'DIV');
+    const mediaDeck = registerMockEl('transcribe-media-deck', 'DIV');
+    const tabSetup = registerMockEl('btn-tab-to-setup', 'BUTTON');
+    const tabPlayer = registerMockEl('btn-tab-to-player', 'BUTTON');
+    const setupTabSetup = registerMockEl('btn-setup-tab-setup', 'BUTTON');
+    const setupTabPlayer = registerMockEl('btn-setup-tab-player', 'BUTTON');
+
+    // 1. Show Media Deck
+    showTranscribeMediaDeck();
+    expect(setupDeck.classList.contains('deck-hidden')).toBe(true);
+    expect(setupDeck.style.display).toBe('none');
+    expect(mediaDeck.classList.contains('deck-hidden')).toBe(false);
+    expect(mediaDeck.style.display).toBe('flex');
+    expect(tabPlayer.classList.contains('active')).toBe(true);
+
+    // 2. Show Setup Deck
+    showTranscribeSetupDeck();
+    expect(setupDeck.classList.contains('deck-hidden')).toBe(false);
+    expect(setupDeck.style.display).toBe('flex');
+    expect(mediaDeck.classList.contains('deck-hidden')).toBe(true);
+    expect(mediaDeck.style.display).toBe('none');
+    expect(tabSetup.classList.contains('active')).toBe(true);
+  });
+
+  it('onTranscribeViewActivated safely wakes player surface when media deck is active', () => {
+    const mediaDeck = registerMockEl('transcribe-media-deck', 'DIV');
+    mediaDeck.style.display = 'flex';
+    mediaDeck.classList.remove('deck-hidden');
+
+    const video = registerMockEl('companion-media-element', 'VIDEO') as any;
+    video.src = 'http://127.0.0.1:54321/media/stream.mp4';
+    video.currentTime = 14.5;
+    video.readyState = 2;
+
+    const canvas = registerMockEl('companion-subtitle-canvas', 'CANVAS') as any;
+    const container = registerMockEl('companion-video-container', 'DIV');
+    container.clientWidth = 400;
+    container.clientHeight = 300;
+    video.clientWidth = 400;
+    video.clientHeight = 300;
+    video.videoWidth = 640;
+    video.videoHeight = 480;
+
+    onTranscribeViewActivated();
+    expect(video.currentTime).toBe(14.5);
+    expect(canvas.style.display).toBe('block');
+  });
+
+  it('loadTranscriptFromFile and parseAndApplyTranscriptContent reset viewport scroll to top for fresh transcripts', async () => {
+    const viewport = registerMockEl('transcript-viewport', 'DIV');
+    viewport.scrollTop = 1500; // Scrolled to bottom during transcription
+
+    const { loadTranscriptFromFile } = await import('./transcriptViewer');
+    globalThis.__TAURI__ = {
+      core: {
+        invoke: async (cmd: string) => {
+          if (cmd === 'read_text_file_content') {
+            return '1\n00:00:00,000 --> 00:00:02,000\nHello World\n';
+          }
+          return null;
+        }
+      }
+    };
+
+    await loadTranscriptFromFile('/output/sub.srt', true);
+    expect(viewport.scrollTop).toBe(0);
+  });
+
+  it('wakeCompanionPlayerSurface does not rewind currentTime if playback resumes before rAF', () => {
+    const video = registerMockEl('companion-media-element', 'VIDEO') as any;
+    video.src = 'http://127.0.0.1:54321/media/stream.mp4';
+    video.currentTime = 20.0;
+    video.readyState = 2;
+    video.paused = true;
+    video.seeking = false;
+
+    // Simulate active media info for companion player
+    (window as any).activeMediaInfo = { isVideo: true };
+
+    let rafCallback: (() => void) | null = null;
+    const origRaf = (window as any).requestAnimationFrame;
+    (window as any).requestAnimationFrame = (cb: () => void) => {
+      rafCallback = cb;
+      return 1;
+    };
+
+    wakeCompanionPlayerSurface();
+    // After micro-nudge, currentTime is 20.0 - 0.0005 = 19.9995
+    expect(video.currentTime).toBeCloseTo(19.9995, 4);
+
+    // Now video starts playing (paused becomes false) before rAF executes
+    video.paused = false;
+    video.currentTime = 21.5;
+
+    if (rafCallback) {
+      (rafCallback as () => void)();
+    }
+
+    // Should NOT have reverted to 20.0 because video was no longer paused!
+    expect(video.currentTime).toBe(21.5);
+
+    if (origRaf) {
+      (window as any).requestAnimationFrame = origRaf;
+    } else {
+      delete (window as any).requestAnimationFrame;
+    }
   });
 });

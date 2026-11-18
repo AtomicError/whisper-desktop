@@ -891,5 +891,36 @@ describe('transcribePipeline module', () => {
       await openOutputFolder();
       expect(mockInvoke).toHaveBeenCalledWith('show_in_folder', { filePath: '/custom/output_folder' });
     });
+
+    it('browseMediaFile unloads companion player and resets previous session when a new file is selected', async () => {
+      let unloaded = false;
+      (globalThis as any).window.unloadCompanionPlayer = () => { unloaded = true; };
+
+      (globalThis as any).window.invoke = vi.fn((cmd: string) => {
+        if (cmd === 'select_files') return Promise.resolve(['/new/video2.mp4']);
+        if (cmd === 'probe_media_file') return Promise.resolve({ exists: true, durationSec: 30, format: 'Video' });
+        return Promise.resolve(null);
+      });
+
+      await browseMediaFile();
+      expect(unloaded).toBe(true);
+    });
+
+    it('handleDroppedFiles unloads companion player when files are dropped', async () => {
+      let unloadedCount = 0;
+      (globalThis as any).window.unloadCompanionPlayer = () => { unloadedCount++; };
+      (globalThis as any).window.invoke = vi.fn((cmd: string) => {
+        if (cmd === 'probe_media_file') return Promise.resolve({ exists: true, durationSec: 45, format: 'Video' });
+        return Promise.resolve(null);
+      });
+
+      // Single file drop
+      await handleDroppedFiles(['/dropped/single.mp4']);
+      expect(unloadedCount).toBe(1);
+
+      // Multi file drop
+      await handleDroppedFiles(['/dropped/multi1.mp4', '/dropped/multi2.mp4']);
+      expect(unloadedCount).toBe(2);
+    });
   });
 });

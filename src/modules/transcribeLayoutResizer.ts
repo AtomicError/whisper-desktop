@@ -241,14 +241,17 @@ function handleKeyDown(e: KeyboardEvent): void {
 
   if (e.key === 'ArrowRight') {
     e.preventDefault();
+    if (typeof e.stopPropagation === 'function') e.stopPropagation();
     const dirStep = isRtl ? -step : step;
     setTranscribeLeftPanelWidth(currentWidth + dirStep, true, false);
   } else if (e.key === 'ArrowLeft') {
     e.preventDefault();
+    if (typeof e.stopPropagation === 'function') e.stopPropagation();
     const dirStep = isRtl ? step : -step;
     setTranscribeLeftPanelWidth(currentWidth + dirStep, true, false);
   } else if (e.key === 'Home' || e.key === 'Enter' || e.key === ' ') {
     e.preventDefault();
+    if (typeof e.stopPropagation === 'function') e.stopPropagation();
     resetTranscribeLayoutWidth();
   }
 }

@@ -2147,6 +2147,33 @@ html[dir="rtl"] #transcript-search::placeholder,
   box-sizing: border-box;
 }
 
+/* Non-destructive Deck Switching to Preserve Video Render Surface in WebKitGTK */
+.transcribe-unified-deck.deck-hidden {
+  display: none !important;
+}
+
+.transcribe-media-deck.deck-hidden {
+  display: flex !important;
+  position: absolute !important;
+  top: -9999px !important;
+  inset-inline-start: -9999px !important;
+  width: 0 !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  border: none !important;
+  box-shadow: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+  transform: scale(0.001);
+  transform-origin: top left;
+  z-index: -10 !important;
+}
+
 .deck-mode-tabs {
   display: inline-flex;
   align-items: center;

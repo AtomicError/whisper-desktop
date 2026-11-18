@@ -654,7 +654,7 @@ header {
   transition: opacity 0.1s ease;
 }
 
-/* Base Panel Views with Clean Instant Switching & Proper Stacking Context */
+/* Base Panel Views with Clean Instant Switching & Hardware Surface Preservation */
 .view-panel {
   position: absolute;
   top: 0;
@@ -663,27 +663,38 @@ header {
   bottom: 0;
   padding: 32px;
   overflow-y: auto;
-  display: none;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
   z-index: 1;
 }
 
 .view-panel.active {
   display: block;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
   z-index: 2;
 }
 
 /* Fixed Layout Panel Utility (No outer scrollbar, uses internal scrolling) */
 .view-panel.fixed-layout-panel {
   overflow: hidden;
-  display: none;
+  display: flex;
   flex-direction: column;
   height: 100%;
   box-sizing: border-box;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
   z-index: 1;
 }
 
 .view-panel.fixed-layout-panel.active {
   display: flex;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
   z-index: 2;
 }
 

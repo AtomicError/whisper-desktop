@@ -355,25 +355,29 @@ describe('Transcription Studio Layout Resizer Module', () => {
     const onKeyDown = registeredListeners['keydown'][0];
 
     // ArrowRight in LTR increases width by 20px
-    const rightEvt = { key: 'ArrowRight', shiftKey: false, preventDefault: vi.fn() };
+    const rightEvt = { key: 'ArrowRight', shiftKey: false, preventDefault: vi.fn(), stopPropagation: vi.fn() };
     onKeyDown(rightEvt);
     expect(getTranscribeLeftPanelWidth()).toBe(440);
     expect(rightEvt.preventDefault).toHaveBeenCalled();
+    expect(rightEvt.stopPropagation).toHaveBeenCalled();
 
     // Shift + ArrowRight increases width by 48px
-    const shiftRightEvt = { key: 'ArrowRight', shiftKey: true, preventDefault: vi.fn() };
+    const shiftRightEvt = { key: 'ArrowRight', shiftKey: true, preventDefault: vi.fn(), stopPropagation: vi.fn() };
     onKeyDown(shiftRightEvt);
     expect(getTranscribeLeftPanelWidth()).toBe(488);
+    expect(shiftRightEvt.stopPropagation).toHaveBeenCalled();
 
     // ArrowLeft decreases width
-    const leftEvt = { key: 'ArrowLeft', shiftKey: false, preventDefault: vi.fn() };
+    const leftEvt = { key: 'ArrowLeft', shiftKey: false, preventDefault: vi.fn(), stopPropagation: vi.fn() };
     onKeyDown(leftEvt);
     expect(getTranscribeLeftPanelWidth()).toBe(468);
+    expect(leftEvt.stopPropagation).toHaveBeenCalled();
 
     // Home resets to default 420px
-    const homeEvt = { key: 'Home', shiftKey: false, preventDefault: vi.fn() };
+    const homeEvt = { key: 'Home', shiftKey: false, preventDefault: vi.fn(), stopPropagation: vi.fn() };
     onKeyDown(homeEvt);
     expect(getTranscribeLeftPanelWidth()).toBe(DEFAULT_LEFT_PANEL_WIDTH);
+    expect(homeEvt.stopPropagation).toHaveBeenCalled();
   });
 
   it('updates transcript viewer card responsive classes based on card width', () => {

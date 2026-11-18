@@ -447,6 +447,13 @@ export async function browseMediaFile(): Promise<void> {
 
     if (files.length === 1) {
       batchProcessor.setIsBatchMode(false);
+
+      // Unload companion player and reset previous session completely (acts like Clear)
+      const win = getGlobal();
+      if (typeof win.unloadCompanionPlayer === 'function') {
+        win.unloadCompanionPlayer();
+      }
+
       setSelectedMediaFile(files[0]);
 
       applySingleFileSelectedUI(files[0]);
@@ -470,6 +477,10 @@ export async function browseMediaFile(): Promise<void> {
       setWizardStepCompleted(1, true);
       await probeSelectedFile();
     } else {
+      const win = getGlobal();
+      if (typeof win.unloadCompanionPlayer === 'function') {
+        win.unloadCompanionPlayer();
+      }
       await addBatchFiles(files);
     }
   }
@@ -824,6 +835,20 @@ export async function runWhisperTranscription(): Promise<void> {
         } catch (playerErr) {
           console.warn('Could not load media into companion player:', playerErr);
         }
+      }
+
+      // Scroll transcript viewer to top and highlight initial segment for synchronized UX
+      const viewport = document.getElementById('transcript-viewport') as any;
+      if (viewport) {
+        if (viewport._scrollDebounce) {
+          clearTimeout(viewport._scrollDebounce);
+          delete viewport._scrollDebounce;
+        }
+        viewport.scrollTop = 0;
+      }
+      if (typeof win.highlightActiveTranscriptSegment === 'function') {
+        const firstLine = transcriptViewer.lines && transcriptViewer.lines.length > 0 ? transcriptViewer.lines[0] : null;
+        win.highlightActiveTranscriptSegment(0, firstLine?.id);
       }
     }
 
@@ -1243,6 +1268,12 @@ export async function handleDroppedFiles(rawFiles: string[]): Promise<void> {
 
   if (files.length === 1) {
     batchProcessor.setIsBatchMode(false);
+
+    // Unload companion player and reset previous session completely (acts like Clear)
+    if (typeof win.unloadCompanionPlayer === 'function') {
+      win.unloadCompanionPlayer();
+    }
+
     setSelectedMediaFile(files[0]);
 
     applySingleFileSelectedUI(files[0]);

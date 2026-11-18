@@ -618,7 +618,13 @@ export async function selectBatchItemTranscript(index: number): Promise<void> {
       transcriptLines = item.transcriptLines.map((l: any) => ({ ...l }));
       transcriptViewer.lines = item.transcriptLines.map((l: any) => ({ ...l }));
       if (win) win.transcriptLines = transcriptLines;
-      transcriptViewer.render(transcriptLines);
+      transcriptViewer.render(transcriptLines, false);
+      if (typeof document !== 'undefined') {
+        const viewport = document.getElementById('transcript-viewport');
+        if (viewport) {
+          viewport.scrollTop = 0;
+        }
+      }
     } else {
       if (item.internalJsonPath) {
         const invoke = getTauriInvoke();
@@ -1606,6 +1612,9 @@ export async function addBatchFiles(files: string[]): Promise<boolean> {
   // Case 2: Entering Batch Mode (either initial multi-selection or replacing single file)
   isBatchMode = true;
   win.selectedMediaFile = null;
+  if (typeof win.unloadCompanionPlayer === 'function') {
+    win.unloadCompanionPlayer();
+  }
 
   if (typeof document !== 'undefined') {
     const dropZone = document.getElementById('transcribe-drop-zone');

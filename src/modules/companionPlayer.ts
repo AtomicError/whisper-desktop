@@ -129,6 +129,62 @@ export function getActiveMediaInfo(): CompanionMediaInfo | null {
   return activeMediaInfo;
 }
 
+let companionWakeTimer: ReturnType<typeof setTimeout> | null = null;
+
+export function wakeCompanionPlayerSurface(): void {
+  if (typeof document === 'undefined') return;
+  const videoEl = document.getElementById('companion-media-element') as HTMLVideoElement | null;
+  if (videoEl && activeMediaInfo && activeMediaInfo.isVideo && videoEl.src) {
+    if (videoEl.readyState >= 1) {
+      try {
+        const cur = videoEl.currentTime;
+        if (videoEl.paused && !videoEl.seeking) {
+          // In WebKitGTK, setting currentTime to the identical timestamp is an early-return no-op.
+          // By applying a sub-millisecond micro-nudge (0.0005s) and restoring it on the next frame,
+          // we force the GStreamer pipeline to decode and present the paused video frame onto the surface.
+          const delta = cur > 0.005 ? -0.0005 : 0.0005;
+          videoEl.currentTime = cur + delta;
+          if (typeof requestAnimationFrame !== 'undefined') {
+            requestAnimationFrame(() => {
+              try {
+                if (videoEl.paused) {
+                  videoEl.currentTime = cur;
+                }
+              } catch (_) {}
+            });
+          }
+        }
+      } catch (_) {}
+    }
+  }
+  updateCompanionSubtitleBounds(true);
+  if (typeof requestAnimationFrame !== 'undefined') {
+    requestAnimationFrame(() => {
+      updateCompanionSubtitleBounds(false);
+    });
+  }
+  if (companionWakeTimer) clearTimeout(companionWakeTimer);
+  companionWakeTimer = setTimeout(() => {
+    companionWakeTimer = null;
+    updateCompanionSubtitleBounds(true);
+  }, 220);
+}
+
+export function onTranscribeViewActivated(): void {
+  if (typeof document === 'undefined') return;
+  const mediaDeck = document.getElementById('transcribe-media-deck');
+  if (mediaDeck && !mediaDeck.classList.contains('deck-hidden')) {
+    wakeCompanionPlayerSurface();
+    setTimeout(() => {
+      const transcribePanel = document.getElementById('panel-transcribe');
+      const isTranscribeActive = transcribePanel?.classList.contains('active');
+      if (isTranscribeActive && mediaDeck && !mediaDeck.classList.contains('deck-hidden')) {
+        wakeCompanionPlayerSurface();
+      }
+    }, 60);
+  }
+}
+
 export function showTranscribeSetupDeck(): void {
   if (typeof document === 'undefined') return;
   pauseCompanionPlayer();
@@ -141,8 +197,14 @@ export function showTranscribeSetupDeck(): void {
   const setupDeckTabs = document.getElementById('setup-deck-mode-tabs');
   const manageSettingsBtn = document.getElementById('btn-transcribe-manage-settings');
 
-  if (setupDeck) setupDeck.style.display = 'flex';
-  if (mediaDeck) mediaDeck.style.display = 'none';
+  if (setupDeck) {
+    setupDeck.classList.remove('deck-hidden');
+    setupDeck.style.display = 'flex';
+  }
+  if (mediaDeck) {
+    mediaDeck.classList.add('deck-hidden');
+    mediaDeck.style.display = 'none';
+  }
   if (tabSetup) tabSetup.classList.add('active');
   if (tabPlayer) tabPlayer.classList.remove('active');
   if (setupTabSetup) setupTabSetup.classList.add('active');
@@ -165,8 +227,14 @@ export function showTranscribeMediaDeck(): void {
   const setupTabPlayer = document.getElementById('btn-setup-tab-player');
   const setupDeckTabs = document.getElementById('setup-deck-mode-tabs');
 
-  if (setupDeck) setupDeck.style.display = 'none';
-  if (mediaDeck) mediaDeck.style.display = 'flex';
+  if (setupDeck) {
+    setupDeck.classList.add('deck-hidden');
+    setupDeck.style.display = 'none';
+  }
+  if (mediaDeck) {
+    mediaDeck.classList.remove('deck-hidden');
+    mediaDeck.style.display = 'flex';
+  }
   if (tabSetup) tabSetup.classList.remove('active');
   if (tabPlayer) tabPlayer.classList.add('active');
   if (setupTabSetup) setupTabSetup.classList.remove('active');
@@ -174,9 +242,7 @@ export function showTranscribeMediaDeck(): void {
   if (setupDeckTabs) {
     setupDeckTabs.style.display = 'none';
   }
-  setTimeout(() => {
-    updateCompanionSubtitleBounds(true);
-  }, 30);
+  wakeCompanionPlayerSurface();
 }
 
 export async function loadMediaIntoCompanionPlayer(filePath: string, autoSwitchDeck = true): Promise<boolean> {
@@ -509,6 +575,10 @@ export function unloadCompanionPlayer(): void {
   if (seekWatchdogTimer) {
     clearTimeout(seekWatchdogTimer);
     seekWatchdogTimer = null;
+  }
+  if (companionWakeTimer) {
+    clearTimeout(companionWakeTimer);
+    companionWakeTimer = null;
   }
   isSeeking = false;
   isVideoSeeking = false;
@@ -1243,40 +1313,40 @@ export function initCompanionPlayerDOM(): void {
       const transcribePanel = document.getElementById('panel-transcribe');
       if (!transcribePanel || !transcribePanel.classList.contains('active')) return;
 
-      // Do not intercept hotkeys if modifier keys (Ctrl, Alt, Meta, Shift) are held
-      if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
+      // Do not intercept hotkeys if default was prevented or modifier keys (Ctrl, Alt, Meta, Shift) are held
+      if (e.defaultPrevented || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
+
+      const isMediaDeckActive = () => {
+        const mediaDeck = document.getElementById('transcribe-media-deck');
+        return Boolean(mediaDeck && !mediaDeck.classList.contains('deck-hidden') && mediaDeck.style.display !== 'none');
+      };
 
       if (e.code === 'Space') {
         // If a non-play button is focused, allow native button activation via Space
         if (target?.tagName === 'BUTTON' && target.id !== 'btn-companion-play-toggle') {
           return;
         }
-        const mediaDeck = document.getElementById('transcribe-media-deck');
-        if (mediaDeck && mediaDeck.style.display !== 'none') {
+        if (isMediaDeckActive()) {
           e.preventDefault();
           toggleCompanionPlayback();
         }
       } else if (e.code === 'ArrowLeft' || e.key === 'ArrowLeft') {
-        const mediaDeck = document.getElementById('transcribe-media-deck');
-        if (mediaDeck && mediaDeck.style.display !== 'none') {
+        if (isMediaDeckActive()) {
           e.preventDefault();
           jumpCompanionPlayback(-5);
         }
       } else if (e.code === 'ArrowRight' || e.key === 'ArrowRight') {
-        const mediaDeck = document.getElementById('transcribe-media-deck');
-        if (mediaDeck && mediaDeck.style.display !== 'none') {
+        if (isMediaDeckActive()) {
           e.preventDefault();
           jumpCompanionPlayback(5);
         }
       } else if (e.code === 'ArrowUp' || e.key === 'ArrowUp') {
-        const mediaDeck = document.getElementById('transcribe-media-deck');
-        if (mediaDeck && mediaDeck.style.display !== 'none') {
+        if (isMediaDeckActive()) {
           e.preventDefault();
           adjustCompanionVolume(0.05);
         }
       } else if (e.code === 'ArrowDown' || e.key === 'ArrowDown') {
-        const mediaDeck = document.getElementById('transcribe-media-deck');
-        if (mediaDeck && mediaDeck.style.display !== 'none') {
+        if (isMediaDeckActive()) {
           e.preventDefault();
           adjustCompanionVolume(-0.05);
         }
@@ -1340,3 +1410,6 @@ win.updateCompanionTimeDisplay = updateCompanionTimeDisplay;
 win.updateCompanionSubtitleBounds = updateCompanionSubtitleBounds;
 win.renderCompanionSubtitle = renderCompanionSubtitle;
 win.highlightActiveTranscriptSegment = highlightActiveTranscriptSegment;
+win.wakeCompanionPlayerSurface = wakeCompanionPlayerSurface;
+win.onTranscribeViewActivated = onTranscribeViewActivated;
+win.getActiveMediaInfo = getActiveMediaInfo;

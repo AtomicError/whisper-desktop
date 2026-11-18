@@ -1,4 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
+import { transcriptViewer } from './transcriptViewer';
 import {
   batchProcessor,
   formatDuration,
@@ -838,7 +839,8 @@ describe('batchProcessor module', () => {
       expect(showNotificationMock).toHaveBeenCalled();
     });
 
-    it('selects completed item and updates active viewer index and window output paths', async () => {
+    it('selects completed item and updates active viewer index, window output paths, and resets viewport scroll', async () => {
+      const renderSpy = vi.spyOn(transcriptViewer, 'render').mockImplementation(() => {});
       batchProcessor.setItems([
         {
           path: '/media/video.mp4',
@@ -855,6 +857,8 @@ describe('batchProcessor module', () => {
       expect(batchProcessor.getActiveViewerIndex()).toBe(0);
       expect((window as any).lastTranscribedVideoPath).toBe('/media/video.mp4');
       expect((window as any).lastTranscribedSubtitlePath).toBe('/media/video.srt');
+      expect(renderSpy).toHaveBeenCalledWith(expect.any(Array), false);
+      renderSpy.mockRestore();
     });
   });
 

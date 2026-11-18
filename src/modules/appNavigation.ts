@@ -12,6 +12,11 @@ declare global {
     hardsubController?: any;
     translationStudioController?: any;
     getCurrentSourceMediaFile?: () => string | null;
+    onTranscribeViewActivated?: () => void;
+    wakeCompanionPlayerSurface?: () => void;
+    unloadCompanionPlayer?: () => void;
+    getActiveMediaInfo?: () => unknown;
+    highlightActiveTranscriptSegment?: (currentSec: number, forcedLineId?: number) => void;
   }
 }
 
@@ -106,6 +111,12 @@ export function switchView(viewName: string): void {
           viewport.querySelectorAll('.transcript-text-input').forEach(el => {
             transcriptViewer.autoResize(el as HTMLElement);
           });
+        }
+        const win = typeof window !== 'undefined' ? (window as any) : null;
+        if (win && typeof win.onTranscribeViewActivated === 'function') {
+          try {
+            win.onTranscribeViewActivated();
+          } catch (_) {}
         }
       });
     } else if (viewName === 'logs') {
