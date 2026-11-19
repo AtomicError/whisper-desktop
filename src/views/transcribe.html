@@ -127,7 +127,7 @@
                     <!-- 3. Spoken Language Selector -->
                     <div class="transcribe-field-group">
                       <label for="quick-opt-language">
-                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-royal-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-royal-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                           <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
                         </svg>
                         <span data-i18n="transcribe.spokenLang">Spoken Language</span>
@@ -135,10 +135,10 @@
                       <select class="select-control" id="quick-opt-language" data-searchable data-language-select="spoken" data-i18n-aria="transcribe.spokenLang" aria-label="Spoken Language"></select>
                     </div>
 
-                    <!-- 4. Hardware Engine / Backend Selector -->
+                    <!-- 4. Engine Selector -->
                     <div class="transcribe-field-group">
                       <label for="quick-opt-selectedBackend">
-                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                           <rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>
                         </svg>
                         <span data-i18n="transcribe.engine">Engine</span>
@@ -148,12 +148,40 @@
                       </select>
                     </div>
 
-                    <!-- 5. Silero VAD Switch Row -->
+                    <!-- 5. Output Formats Multi-Toggle Pills -->
+                    <div class="transcribe-field-group" id="quick-output-formats-group">
+                      <label id="lbl-quick-formats">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                          <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>
+                        </svg>
+                        <span data-i18n="transcribe.outputFormats">Output Formats</span>
+                      </label>
+                      <div class="transcribe-format-pills" id="quick-output-formats" role="group" aria-labelledby="lbl-quick-formats">
+                        <button type="button" class="transcribe-format-pill active" id="quick-fmt-srt" data-format-key="outputSrt" aria-pressed="true" onclick="toggleQuickOutputFormat('outputSrt')">
+                          <span class="transcribe-format-dot" aria-hidden="true"></span>
+                          <span>SRT</span>
+                        </button>
+                        <button type="button" class="transcribe-format-pill" id="quick-fmt-vtt" data-format-key="outputVtt" aria-pressed="false" onclick="toggleQuickOutputFormat('outputVtt')">
+                          <span class="transcribe-format-dot" aria-hidden="true"></span>
+                          <span>VTT</span>
+                        </button>
+                        <button type="button" class="transcribe-format-pill" id="quick-fmt-txt" data-format-key="outputTxt" aria-pressed="false" onclick="toggleQuickOutputFormat('outputTxt')">
+                          <span class="transcribe-format-dot" aria-hidden="true"></span>
+                          <span>TXT</span>
+                        </button>
+                        <button type="button" class="transcribe-format-pill" id="quick-fmt-lrc" data-format-key="outputLrc" aria-pressed="false" onclick="toggleQuickOutputFormat('outputLrc')">
+                          <span class="transcribe-format-dot" aria-hidden="true"></span>
+                          <span>LRC</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- 6. Silero VAD Switch Row -->
                     <div class="transcribe-field-group">
                       <div class="transcribe-switch-row">
                         <div class="transcribe-switch-info">
                           <span class="transcribe-switch-title">
-                            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                               <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" x2="12" y1="19" y2="22"/>
                             </svg>
                             <span data-i18n="transcribe.sileroVad">Silero VAD</span>
@@ -167,10 +195,112 @@
                       </div>
                     </div>
 
-                    <!-- 6. Output Folder Row (Matching Translation Studio) -->
+                    <!-- 7. Time Range Selector (Single File & Batch Global Slice — Always Visible, Checkbox-Controlled) -->
+                    <div class="transcribe-field-group" id="quick-range-group">
+                      <div class="transcribe-field-header-row">
+                        <label id="lbl-quick-range">
+                          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-royal-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                          </svg>
+                          <span data-i18n="transcribe.timeRange">Time Range</span>
+                        </label>
+                        <label class="checkbox-container transcribe-inline-checkbox" for="quick-range-enabled">
+                          <input type="checkbox" id="quick-range-enabled" onchange="setQuickRangeMode(this.checked ? 'custom' : 'full')" />
+                          <span class="custom-checkmark"></span>
+                          <span data-i18n="transcribe.rangeCustomSlice">Custom Slice</span>
+                        </label>
+                      </div>
+                      <div class="transcribe-range-slice-panel is-inactive" id="quick-range-inputs" role="group" aria-labelledby="lbl-quick-range">
+                        <!-- Dual-Handle Interactive Timeline Scrubber -->
+                        <div class="transcribe-trim-bar is-disabled" id="quick-range-slider-wrap" dir="ltr">
+                          <div class="transcribe-trim-track">
+                            <div class="transcribe-trim-fill" id="quick-range-fill"></div>
+                          </div>
+                          <input type="range" id="quick-range-slider-start" class="transcribe-trim-slider transcribe-trim-slider--start" min="0" max="100" step="1" value="0" disabled data-i18n-aria="transcribe.rangeStart" aria-label="Start" />
+                          <input type="range" id="quick-range-slider-end" class="transcribe-trim-slider transcribe-trim-slider--end" min="0" max="100" step="1" value="100" disabled data-i18n-aria="transcribe.rangeEnd" aria-label="End" />
+                        </div>
+
+                        <div class="transcribe-range-inputs">
+                          <div class="transcribe-range-field">
+                            <label for="quick-range-start" data-i18n="transcribe.rangeStart">Start</label>
+                            <div class="transcribe-range-input-wrap">
+                              <input type="text" id="quick-range-start" class="transcribe-time-input" value="00:00" placeholder="00:00" inputmode="numeric" autocomplete="off" dir="ltr" aria-describedby="quick-range-hint" />
+                              <button type="button" class="btn-range-capture" id="btn-range-start-player" onclick="capturePlayerTimeForRange('start')" data-i18n-title="transcribe.usePlayerPosition" data-i18n-aria="transcribe.usePlayerPosition" title="Use Player position" aria-label="Use Player position">
+                                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                  <circle cx="12" cy="12" r="10"/><line x1="22" x2="18" y1="12" y2="12"/><line x1="6" x2="2" y1="12" y2="12"/><line x1="12" x2="12" y1="6" y2="2"/><line x1="12" x2="12" y1="22" y2="18"/>
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+                          <div class="transcribe-range-field">
+                            <label for="quick-range-end" data-i18n="transcribe.rangeEnd">End</label>
+                            <div class="transcribe-range-input-wrap">
+                              <input type="text" id="quick-range-end" class="transcribe-time-input" value="" placeholder="--:--" inputmode="numeric" autocomplete="off" dir="ltr" aria-describedby="quick-range-hint" />
+                              <button type="button" class="btn-range-capture" id="btn-range-end-player" onclick="capturePlayerTimeForRange('end')" data-i18n-title="transcribe.usePlayerPosition" data-i18n-aria="transcribe.usePlayerPosition" title="Use Player position" aria-label="Use Player position">
+                                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                  <circle cx="12" cy="12" r="10"/><line x1="22" x2="18" y1="12" y2="12"/><line x1="6" x2="2" y1="12" y2="12"/><line x1="12" x2="12" y1="6" y2="2"/><line x1="12" x2="12" y1="22" y2="18"/>
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="transcribe-range-hint" id="quick-range-hint" aria-live="polite" data-i18n="transcribe.rangeFullMedia">Full File</div>
+                      </div>
+                    </div>
+
+                    <!-- 8. Subtitle Line Formatting -->
+                    <div class="transcribe-field-group" id="quick-line-length-group">
+                      <div class="transcribe-field-header-row">
+                        <label id="lbl-quick-maxlen">
+                          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <line x1="21" x2="3" y1="6" y2="6"/><line x1="15" x2="3" y1="12" y2="12"/><line x1="17" x2="3" y1="18" y2="18"/>
+                          </svg>
+                          <span data-i18n="transcribe.lineLength">Line Length (Chars)</span>
+                        </label>
+                        <label class="checkbox-container transcribe-inline-checkbox" for="quick-adv-splitWord">
+                          <input type="checkbox" id="quick-adv-splitWord" />
+                          <span class="custom-checkmark"></span>
+                          <span data-i18n="transcribe.splitWordShort">Whole words only</span>
+                        </label>
+                      </div>
+                      <div class="transcribe-maxlen-presets" role="group" aria-labelledby="lbl-quick-maxlen">
+                        <button type="button" class="transcribe-preset-pill active" id="quick-maxlen-auto" data-maxlen="0" aria-pressed="true" onclick="setQuickMaxLen(0)" data-i18n="transcribe.lineLenAuto" data-i18n-title="transcribe.lineLenAuto" title="Auto">Auto</button>
+                        <button type="button" class="transcribe-preset-pill" id="quick-maxlen-28" data-maxlen="28" aria-pressed="false" onclick="setQuickMaxLen(28)" data-i18n="transcribe.lineLenShort" data-i18n-title="transcribe.lineLenShort" title="28 (Short)">28 (Short)</button>
+                        <button type="button" class="transcribe-preset-pill" id="quick-maxlen-42" data-maxlen="42" aria-pressed="false" onclick="setQuickMaxLen(42)" data-i18n="transcribe.lineLenStandard" data-i18n-title="transcribe.lineLenStandard" title="42 (Std)">42 (Std)</button>
+                        <button type="button" class="transcribe-preset-pill" id="quick-maxlen-custom" data-maxlen="custom" aria-pressed="false" onclick="activateCustomMaxLen()" data-i18n="transcribe.lineLenCustom" data-i18n-title="transcribe.lineLenCustom" title="Custom">Custom</button>
+                      </div>
+                      <div class="transcribe-maxlen-custom-row" id="quick-maxlen-custom-row" style="display:none;">
+                        <span class="transcribe-maxlen-custom-label" data-i18n="transcribe.lineLength">Line Length (Chars)</span>
+                        <div class="number-input-control transcribe-number-control" data-custom-stepper="true">
+                          <button type="button" id="btn-quick-maxlen-dec" onclick="stepQuickMaxLen(-1)" data-i18n-aria="transcribe.lineLenDecrease" aria-label="Decrease Line Length">-</button>
+                          <input type="text" id="quick-adv-maxLen" value="40" inputmode="numeric" autocomplete="off" dir="ltr" data-i18n-aria="transcribe.lineLength" aria-label="Custom max characters per line" />
+                          <button type="button" id="btn-quick-maxlen-inc" onclick="stepQuickMaxLen(1)" data-i18n-aria="transcribe.lineLenIncrease" aria-label="Increase Line Length">+</button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- 9. Initial Prompt -->
+                    <div class="transcribe-field-group" id="quick-prompt-group">
+                      <div class="transcribe-field-header-row">
+                        <label for="quick-adv-prompt">
+                          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-royal-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                          </svg>
+                          <span data-i18n="settings.initialPromptTitle">Initial Prompt</span>
+                        </label>
+                        <label class="checkbox-container transcribe-inline-checkbox" for="quick-adv-carryPrompt">
+                          <input type="checkbox" id="quick-adv-carryPrompt" />
+                          <span class="custom-checkmark"></span>
+                          <span data-i18n="transcribe.carryPromptShort">Keep across chunks</span>
+                        </label>
+                      </div>
+                      <textarea id="quick-adv-prompt" class="transcribe-adv-textarea" rows="2" dir="auto" spellcheck="false" data-i18n-placeholder="transcribe.promptPlaceholder" placeholder="Optional context, prompt or vocabulary list..."></textarea>
+                    </div>
+
+                    <!-- 10. Output Folder Row -->
                     <div class="transcribe-field-group">
                       <label>
-                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                         </svg>
                         <span data-i18n="transcribe.outputFolder">Output Folder</span>
@@ -184,9 +314,10 @@
 
                     <!-- Hidden legacy fallback button for backwards compatibility -->
                     <button id="btn-next-step-2" style="display:none;" type="button"></button>
+                  </div>
 
-                    <!-- 6. Action & Execution Section -->
-                    <div class="transcribe-actions-section">
+                  <!-- Docked Action & Execution Footer (Always Visible) -->
+                  <div class="transcribe-actions-section">
                       <!-- Single-file actions -->
                       <div class="transcribe-actions-bar" id="single-transcribe-actions">
                         <button class="btn-primary btn-start-transcription" id="btn-run-transcribe" type="button" disabled data-i18n-title="toasts.noFileSelected" title="Please select an audio or video file first." onclick="runWhisperTranscription()">
@@ -240,7 +371,6 @@
                       </div>
                     </div>
                   </div>
-                </div>
 
                 <!-- Companion Player & Media Console Deck (Left Deck) -->
                 <div class="glass-card transcribe-media-deck deck-hidden" id="transcribe-media-deck">
@@ -274,7 +404,7 @@
                           <polygon points="23 7 16 12 23 17 23 7"/>
                           <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
                         </svg>
-                        <span class="companion-meta-filename" id="companion-meta-filename" dir="auto" title="No media loaded" data-i18n-title="transcribe.noMediaOrTranscribe">—</span>
+                        <span class="companion-meta-filename" id="companion-meta-filename" dir="auto" title="No media loaded" data-i18n-title="toasts.noMediaOrTranscribe">—</span>
                       </div>
                       <div class="companion-meta-specs" id="companion-meta-specs" dir="ltr">
                         <span class="companion-meta-chip" id="companion-meta-format">—</span>

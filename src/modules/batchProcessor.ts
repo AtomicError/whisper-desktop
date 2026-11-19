@@ -1,13 +1,20 @@
 // Batch Processing Engine & Queue Controller for Whisper Desktop
-import { t, applyContentDirection, isolateLtr, isolateDirection } from '../i18n/index';
-import { escapeHTML } from './logsController';
+import { t, getLanguage, applyContentDirection, isolateLtr, isolateDirection } from '../i18n/index';
+import { formatLocalizedNumber } from '../i18n/formatters';
+import { escapeHTML, logsController } from './logsController';
 import { transcriptViewer, loadTranscriptFromFile, loadTranscriptFromJsonData } from './transcriptViewer';
 import { customSelectsMap } from './customSelect';
+import { formatMsToTimecode } from './transcribeConfigHelpers';
 import {
   getSettingsState,
   saveCurrentSettings,
   compiledBackends,
   localScannedTransModels,
+  resetTranscribeTimeRange,
+  updateTranscribeRangeVisibility,
+  syncQuickTimeRangeUI,
+  validateAndApplyQuickTimeRange,
+  updateDeckScrollCue,
   SettingsState
 } from './settingsManager';
 import type { ProbedMediaMetadata } from './transcribePipeline';
@@ -76,7 +83,7 @@ export interface BatchItem {
   name: string;
   size?: string;
   durationSec?: number | null;
-  status: 'pending' | 'converting' | 'transcribing' | 'translating' | 'completed' | 'failed' | 'aborted';
+  status: 'pending' | 'converting' | 'transcribing' | 'translating' | 'completed' | 'failed' | 'aborted' | 'skipped';
   timeSec?: number;
   speedFactor?: number;
   outputs?: string[];
@@ -97,6 +104,7 @@ let isBatchExtracting = false;
 let batchCancelActive = false;
 let activeBatchViewerIndex = -1;
 let activeBatchSelectSeq = 0;
+let batchQueueEpoch = 0;
 let batchProcessingIndex = -1;
 let userExplicitlySelectedBatchItem = false;
 let transcriptLines: any[] = [];
@@ -232,6 +240,8 @@ export function removeFileFromBatch(index: number): void {
 
     renderBatchQueueTable();
     updateBatchSpecs();
+    syncQuickTimeRangeUI();
+    updateDeckScrollCue();
     if (typeof window.updateTranscribeActionButtons === 'function') {
       window.updateTranscribeActionButtons(false);
     }
@@ -243,6 +253,7 @@ export function clearBatchQueue(): void {
   if (transcriptViewer.hasPendingEdits()) {
     void transcriptViewer.flushEdits();
   }
+  batchQueueEpoch++;
   batchItems = [];
   selectedMediaFiles = [];
   isBatchMode = false;
@@ -255,6 +266,9 @@ export function clearBatchQueue(): void {
     win.unloadCompanionPlayer();
   }
   win.selectedMediaFile = null;
+  win.probedMetadata = null;
+  resetTranscribeTimeRange(false);
+  updateTranscribeRangeVisibility(false);
   window.lastTranscribedSubtitlePath = null;
   window.lastTranscribedVideoPath = null;
   window.lastTranscribedOutputDir = null;
@@ -330,7 +344,6 @@ export function clearBatchQueue(): void {
       durEl.textContent = '-';
     }
     if (durEl) durEl.removeAttribute('title');
-    win.probedMetadata = null;
 
     const fillBar = document.getElementById('progress-linear-fill');
     if (fillBar) fillBar.style.width = '0%';
@@ -343,6 +356,7 @@ export function clearBatchQueue(): void {
     if (msgEl) {
       delete msgEl.dataset.batchSummarySuccess;
       delete msgEl.dataset.batchSummaryTotal;
+      delete msgEl.dataset.batchSummarySkipped;
       msgEl.setAttribute('data-i18n', 'transcribe.standingBy');
       msgEl.textContent = t('transcribe.standingBy');
     }
@@ -668,7 +682,17 @@ export async function selectBatchItemTranscript(index: number): Promise<void> {
     if (currentSeq !== activeBatchSelectSeq) return;
     if (item.path && typeof win.loadMediaIntoCompanionPlayer === 'function') {
       try {
-        void win.loadMediaIntoCompanionPlayer(item.path, false);
+        const firstLine = transcriptLines.length > 0 ? transcriptLines[0] : null;
+        const firstStartMs =
+          typeof firstLine?.startMs === 'number' && firstLine.startMs > 0 ? firstLine.startMs : 0;
+        const loadResult = win.loadMediaIntoCompanionPlayer(item.path, false, item.durationSec ?? undefined);
+        if (firstStartMs > 0 && typeof win.seekCompanionPlayer === 'function') {
+          void Promise.resolve(loadResult).then((loaded: any) => {
+            if (loaded !== false && currentSeq === activeBatchSelectSeq) {
+              win.seekCompanionPlayer(firstStartMs, false, firstLine?.id, false);
+            }
+          });
+        }
       } catch (_) {}
     }
     if (typeof document !== 'undefined') {
@@ -803,6 +827,9 @@ function renderBatchQueueTable(): void {
     } else if (item.status === 'aborted') {
       badge.className = 'batch-status-badge badge-failed';
       badge.textContent = t('transcribe.statusAborted');
+    } else if (item.status === 'skipped') {
+      badge.className = 'batch-status-badge badge-skipped';
+      badge.textContent = t('transcribe.statusSkipped') || 'Skipped';
     }
     statusWrapper.appendChild(badge);
 
@@ -975,11 +1002,21 @@ export async function runBatchExtraction(): Promise<void> {
   }
   if (!isBatchMode || batchItems.length === 0) return;
 
+  if (!validateAndApplyQuickTimeRange(true)) {
+    if (typeof win.showNotification === 'function') {
+      win.showNotification(
+        t('transcribe.rangeErrorInvalidAction') || 'Please fix the custom time range before transcribing.',
+        'error'
+      );
+    }
+    return;
+  }
+
   const invoke = getTauriInvoke();
   if (!invoke) return;
 
-  const settings = getSettingsState() || {};
-  const backend = settings.selectedBackend || 'Standard';
+  const runSettings: SettingsState = { ...(getSettingsState() || {}) };
+  const backend = runSettings.selectedBackend || 'Standard';
   const isCompiled = backend === 'Standard' || Boolean(compiledBackends[backend]);
   if (!isCompiled) {
     if (typeof win.showNotification === 'function') {
@@ -990,7 +1027,7 @@ export async function runBatchExtraction(): Promise<void> {
   }
 
   const scannedModels = localScannedTransModels.length > 0 ? localScannedTransModels : (win.localScannedTransModels || []);
-  const modelExists = scannedModels.includes(settings.modelPath);
+  const modelExists = scannedModels.includes(runSettings.modelPath);
   if (!modelExists) {
     if (typeof win.showNotification === 'function') {
       win.showNotification(t('toasts.noModelFound'), "error");
@@ -1056,6 +1093,7 @@ export async function runBatchExtraction(): Promise<void> {
     activeBatchViewerIndex = 0; // Follow first item initially
 
     batchItems.forEach(item => {
+      item.status = 'pending';
       item.transcriptLines = [];
       item.outputs = [];
       item.outputFiles = [];
@@ -1087,7 +1125,9 @@ export async function runBatchExtraction(): Promise<void> {
     const msgEl = document.getElementById('lbl-radial-msg') as HTMLElement | null;
 
     let successCount = 0;
+    let skippedCount = 0;
     const totalCount = batchItems.length;
+    const batchOffsetMs = Math.max(0, Number(runSettings.offsetT || 0));
 
     for (let i = 0; i < totalCount; i++) {
     batchProcessingIndex = i;
@@ -1096,12 +1136,54 @@ export async function runBatchExtraction(): Promise<void> {
       continue;
     }
 
+    const item = batchItems[i];
+    item.transcriptLines = [];
+
+    if (batchOffsetMs > 0 && !(typeof item.durationSec === 'number' && item.durationSec > 0)) {
+      try {
+        const meta = await invoke('probe_media_file', { filePath: item.path });
+        if (meta && meta.exists && typeof meta.durationSec === 'number' && meta.durationSec > 0) {
+          item.size = meta.size || item.size;
+          item.durationSec = meta.durationSec;
+        }
+      } catch (_) {}
+      if (batchCancelActive) {
+        item.status = 'aborted';
+        renderBatchQueueTable();
+        continue;
+      }
+    }
+
+    if (
+      batchOffsetMs > 0 &&
+      typeof item.durationSec === 'number' &&
+      item.durationSec > 0 &&
+      batchOffsetMs >= Math.max(1, Math.round(item.durationSec * 1000))
+    ) {
+      item.status = 'skipped';
+      skippedCount++;
+      renderBatchQueueTable();
+      const offsetStr = formatMsToTimecode(batchOffsetMs, true);
+      const skipMsg =
+        t('toasts.batchItemSkippedShort', {
+          name: item.name,
+          start: isolateLtr(offsetStr)
+        }) || `Skipped '${item.name}': shorter than start time (${offsetStr}).`;
+      logsController.push({
+        category: 'Batch',
+        message: skipMsg,
+        timestamp: new Date().toLocaleTimeString()
+      });
+      const skipPct = (((i + 1) / totalCount) * 100).toFixed(0);
+      if (fillBar) fillBar.style.width = `${skipPct}%`;
+      if (pctEl) pctEl.textContent = `${skipPct}%`;
+      continue;
+    }
+
     if (!userExplicitlySelectedBatchItem) {
       activeBatchViewerIndex = i;
     }
 
-    const item = batchItems[i];
-    item.transcriptLines = [];
     item.status = 'converting';
     renderBatchQueueTable();
 
@@ -1111,8 +1193,7 @@ export async function runBatchExtraction(): Promise<void> {
     if (msgEl) msgEl.textContent = t('transcribe.batchConvertingProgress', { current: i + 1, total: totalCount, name: item.name });
 
     let currentWavPath: string | null = null;
-    const originalInputFile = settings.inputFile;
-    settings.inputFile = item.path;
+    const itemSettings: SettingsState = { ...runSettings, inputFile: item.path };
 
     try {
       currentWavPath = await invoke('convert_media_file', { filePath: item.path });
@@ -1150,7 +1231,7 @@ export async function runBatchExtraction(): Promise<void> {
       }
 
       const result = await invoke('start_transcription_task', {
-        settings,
+        settings: itemSettings,
         wavPath: currentWavPath,
         durationSec: item.durationSec || 60.0
       });
@@ -1202,7 +1283,7 @@ export async function runBatchExtraction(): Promise<void> {
         item.transcriptLines = [];
       }
 
-      const rawItemOutputDir = (settings && settings.outputDirMode === 'custom' && settings.outputDirPath) ? settings.outputDirPath : (result.outputDir || getParentDir(item.path));
+      const rawItemOutputDir = (runSettings.outputDirMode === 'custom' && runSettings.outputDirPath) ? runSettings.outputDirPath : (result.outputDir || getParentDir(item.path));
       const itemOutputDir = (rawItemOutputDir && (rawItemOutputDir.endsWith('/') || rawItemOutputDir.endsWith('\\'))) ? rawItemOutputDir.slice(0, -1) : rawItemOutputDir;
       const sep = itemOutputDir && itemOutputDir.includes('\\') && !itemOutputDir.includes('/') ? '\\' : '/';
       item.outputDir = itemOutputDir;
@@ -1259,8 +1340,6 @@ export async function runBatchExtraction(): Promise<void> {
           win.showNotification(t('toasts.batchItemError', { name: item.name, error: String(err) }), "error");
         }
       }
-    } finally {
-      settings.inputFile = originalInputFile;
     }
   }
 
@@ -1274,6 +1353,7 @@ export async function runBatchExtraction(): Promise<void> {
       if (msgEl) {
         delete (msgEl.dataset as any).batchSummarySuccess;
         delete (msgEl.dataset as any).batchSummaryTotal;
+        delete (msgEl.dataset as any).batchSummarySkipped;
         delete (msgEl.dataset as any).statusCompleted;
         msgEl.setAttribute('data-i18n', 'transcribe.standingBy');
         msgEl.textContent = t('transcribe.standingBy');
@@ -1290,17 +1370,44 @@ export async function runBatchExtraction(): Promise<void> {
         pctEl.removeAttribute('data-i18n');
         pctEl.textContent = '100%';
       }
+      const lang = getLanguage();
+      const successStr = formatLocalizedNumber(successCount, lang, 0);
+      const totalStr = formatLocalizedNumber(totalCount, lang, 0);
+      const skippedStr = formatLocalizedNumber(skippedCount, lang, 0);
       if (msgEl) {
         msgEl.removeAttribute('data-i18n');
-        msgEl.textContent = t('transcribe.batchCompletedSummary', { success: successCount, total: totalCount });
         msgEl.dataset.batchSummarySuccess = String(successCount);
         msgEl.dataset.batchSummaryTotal = String(totalCount);
+        if (skippedCount > 0) {
+          msgEl.dataset.batchSummarySkipped = String(skippedCount);
+          msgEl.textContent = t('transcribe.batchCompletedSummaryWithSkipped', {
+            success: successStr,
+            total: totalStr,
+            skipped: skippedStr
+          });
+        } else {
+          delete (msgEl.dataset as any).batchSummarySkipped;
+          msgEl.textContent = t('transcribe.batchCompletedSummary', { success: successStr, total: totalStr });
+        }
       }
       if (typeof win.showNotification === 'function') {
-        win.showNotification(t('toasts.batchComplete', { success: successCount, total: totalCount }), "success");
+        if (skippedCount > 0) {
+          win.showNotification(
+            t('toasts.batchCompleteWithSkipped', { success: successStr, total: totalStr, skipped: skippedStr }),
+            successCount > 0 ? "info" : "warning"
+          );
+        } else {
+          win.showNotification(t('toasts.batchComplete', { success: successStr, total: totalStr }), "success");
+        }
       }
       if (typeof win.setTranscribeStatusBadge === 'function') {
-        win.setTranscribeStatusBadge('complete', 'transcribe.statusComplete');
+        if (successCount > 0) {
+          win.setTranscribeStatusBadge('complete', 'transcribe.statusComplete');
+        } else if (skippedCount > 0) {
+          win.setTranscribeStatusBadge('warning', 'transcribe.statusSkipped');
+        } else {
+          win.setTranscribeStatusBadge('cancelled', 'transcribe.statusFailed');
+        }
       }
     }
 
@@ -1357,8 +1464,14 @@ export async function runBatchExtraction(): Promise<void> {
 
     renderBatchQueueTable();
 
-    const autoTransferEnabled = Boolean(settings?.autoTransferToTranslate ?? settings?.translateAiEnabled);
-    if (!wasCancelled && successCount > 0 && autoTransferEnabled && window.lastTranscribedSubtitlePath) {
+    const autoTransferEnabled = Boolean(runSettings.autoTransferToTranslate ?? runSettings.translateAiEnabled);
+    const hasTranslatable = Boolean(
+      window.lastTranscribedSubtitlePath ||
+      (window.lastTranscribedOutputFiles || []).some((f: any) =>
+        f?.type === 'text' || String(f?.name || '').toLowerCase().endsWith('.txt')
+      )
+    );
+    if (!wasCancelled && successCount > 0 && autoTransferEnabled && hasTranslatable) {
       if (typeof window.sendTranscribeToTranslationStudio === 'function') {
         await window.sendTranscribeToTranslationStudio();
       }
@@ -1402,6 +1515,7 @@ export async function runBatchExtraction(): Promise<void> {
         if (msgEl) {
           delete (msgEl.dataset as any).batchSummarySuccess;
           delete (msgEl.dataset as any).batchSummaryTotal;
+          delete (msgEl.dataset as any).batchSummarySkipped;
           delete (msgEl.dataset as any).statusCompleted;
           if (typeof msgEl.setAttribute === 'function') {
             msgEl.setAttribute('data-i18n', 'transcribe.standingBy');
@@ -1424,6 +1538,7 @@ export async function runBatchExtraction(): Promise<void> {
         if (msgEl) {
           delete (msgEl.dataset as any).batchSummarySuccess;
           delete (msgEl.dataset as any).batchSummaryTotal;
+          delete (msgEl.dataset as any).batchSummarySkipped;
           delete (msgEl.dataset as any).statusCompleted;
           if (typeof msgEl.setAttribute === 'function') {
             msgEl.setAttribute('data-i18n', 'transcribe.taskFailed');
@@ -1573,14 +1688,23 @@ export async function addBatchFiles(files: string[]): Promise<boolean> {
 
     renderBatchQueueTable();
     updateBatchSpecs();
+    syncQuickTimeRangeUI();
+    updateDeckScrollCue();
+    if (typeof window.updateTranscribeActionButtons === 'function') {
+      window.updateTranscribeActionButtons(false);
+    }
 
     const invoke = getTauriInvoke();
     if (invoke) {
+      const probeEpoch = batchQueueEpoch;
       (async () => {
         for (const item of newItems) {
+          if (probeEpoch !== batchQueueEpoch) return;
+          if (!batchItems.includes(item)) continue;
           try {
             const meta = await invoke('probe_media_file', { filePath: item.path });
-            if (meta && meta.exists) {
+            if (probeEpoch !== batchQueueEpoch) return;
+            if (meta && meta.exists && batchItems.includes(item)) {
               item.size = meta.size;
               item.durationSec = meta.durationSec;
             }
@@ -1588,8 +1712,11 @@ export async function addBatchFiles(files: string[]): Promise<boolean> {
             console.error("Failed to probe file in batch:", err);
           }
         }
+        if (probeEpoch !== batchQueueEpoch) return;
         renderBatchQueueTable();
         updateBatchSpecs();
+        syncQuickTimeRangeUI();
+        updateDeckScrollCue();
       })();
     }
 
@@ -1597,11 +1724,32 @@ export async function addBatchFiles(files: string[]): Promise<boolean> {
   }
 
   // Case 2: Entering Batch Mode (either initial multi-selection or replacing single file)
+  const hadPriorSingle = Boolean(win.selectedMediaFile);
+  batchQueueEpoch++;
   isBatchMode = true;
   win.selectedMediaFile = null;
+  win.probedMetadata = null;
+  activeBatchViewerIndex = -1;
+  batchItems = uniqueFiles.map(filePath => ({
+    path: filePath,
+    name: getBasename(filePath),
+    size: (t('transcribe.statusPending') || 'Pending') + '...',
+    durationSec: null,
+    status: 'pending',
+    timeSec: 0,
+    speedFactor: 0.0,
+    outputs: []
+  }));
+  selectedMediaFiles = batchItems.map(item => item.path);
+  resetBatchSortSelect();
+
   if (typeof win.unloadCompanionPlayer === 'function') {
     win.unloadCompanionPlayer();
   }
+  if (hadPriorSingle) {
+    resetTranscribeTimeRange(true);
+  }
+  updateTranscribeRangeVisibility(true);
 
   if (typeof document !== 'undefined') {
     const dropZone = document.getElementById('transcribe-drop-zone');
@@ -1644,10 +1792,6 @@ export async function addBatchFiles(files: string[]): Promise<boolean> {
     if (runBatchBtn) runBatchBtn.style.display = 'inline-flex';
     const cancelBatchBtn = document.getElementById('btn-cancel-batch');
     if (cancelBatchBtn) cancelBatchBtn.style.display = 'none';
-
-    if (typeof window.updateTranscribeActionButtons === 'function') {
-      window.updateTranscribeActionButtons(false);
-    }
   }
 
   if (typeof win.setWizardStepCompleted === 'function') {
@@ -1655,43 +1799,56 @@ export async function addBatchFiles(files: string[]): Promise<boolean> {
     win.setWizardStepCompleted(2, true);
   }
 
-  activeBatchViewerIndex = -1;
-  batchItems = uniqueFiles.map(filePath => ({
-    path: filePath,
-    name: getBasename(filePath),
-    size: (t('transcribe.statusPending') || 'Pending') + '...',
-    durationSec: null,
-    status: 'pending',
-    timeSec: 0,
-    speedFactor: 0.0,
-    outputs: []
-  }));
-  selectedMediaFiles = batchItems.map(item => item.path);
-  resetBatchSortSelect();
-
   renderBatchQueueTable();
   updateBatchSpecs();
+  syncQuickTimeRangeUI();
+  updateDeckScrollCue();
+  if (typeof window.updateTranscribeActionButtons === 'function') {
+    window.updateTranscribeActionButtons(false);
+  }
 
   const invoke = getTauriInvoke();
   if (invoke) {
+    const probeEpoch = batchQueueEpoch;
+    const createdItems = [...batchItems];
     (async () => {
-      for (let idx = 0; idx < uniqueFiles.length; idx++) {
+      for (const item of createdItems) {
+        if (probeEpoch !== batchQueueEpoch) return;
+        if (!batchItems.includes(item)) continue;
         try {
-          const meta = await invoke('probe_media_file', { filePath: uniqueFiles[idx] });
-          if (meta && meta.exists && batchItems[idx]) {
-            batchItems[idx].size = meta.size;
-            batchItems[idx].durationSec = meta.durationSec;
+          const meta = await invoke('probe_media_file', { filePath: item.path });
+          if (probeEpoch !== batchQueueEpoch) return;
+          if (meta && meta.exists && batchItems.includes(item)) {
+            item.size = meta.size;
+            item.durationSec = meta.durationSec;
           }
         } catch (err) {
           console.error("Failed to probe file in batch:", err);
         }
       }
+      if (probeEpoch !== batchQueueEpoch) return;
       renderBatchQueueTable();
       updateBatchSpecs();
+      syncQuickTimeRangeUI();
+      const currentSettings = getSettingsState();
+      if (currentSettings && (Number(currentSettings.offsetT || 0) > 0 || Number(currentSettings.duration || 0) > 0)) {
+        validateAndApplyQuickTimeRange(true);
+      }
+      updateDeckScrollCue();
     })();
   }
 
   return true;
+}
+
+export function resetBatchQueueState(): void {
+  batchQueueEpoch++;
+  batchItems = [];
+  selectedMediaFiles = [];
+  isBatchMode = false;
+  activeBatchViewerIndex = -1;
+  batchProcessingIndex = -1;
+  userExplicitlySelectedBatchItem = false;
 }
 
 export const batchProcessor = {
@@ -1705,6 +1862,7 @@ export const batchProcessor = {
   },
   getIsBatchMode: () => isBatchMode,
   setIsBatchMode: (val: boolean) => { isBatchMode = Boolean(val); },
+  resetQueueState: resetBatchQueueState,
   getIsExtracting: () => isBatchExtracting,
   setIsExtracting: (val: boolean) => {
     isBatchExtracting = Boolean(val);

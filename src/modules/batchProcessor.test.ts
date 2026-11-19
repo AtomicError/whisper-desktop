@@ -1,5 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { transcriptViewer } from './transcriptViewer';
+import { logsController } from './logsController';
+import { updateTranscribeActionButtons } from './workflowBridge';
 import {
   batchProcessor,
   formatDuration,
@@ -894,6 +896,436 @@ describe('batchProcessor module', () => {
 
       (window as any).selectedMediaFiles = ['/a.mp4', '/b.mp4'];
       expect(batchProcessor.getSelectedFiles()).toEqual(['/a.mp4', '/b.mp4']);
+    });
+
+    it('pre-skips batch items shorter than settings.offsetT without calling FFmpeg or Whisper', async () => {
+      batchProcessor.setIsBatchMode(true);
+      batchProcessor.setItems([
+        { path: '/short.mp4', name: 'short.mp4', durationSec: 25, status: 'pending' },
+        { path: '/long.mp4', name: 'long.mp4', durationSec: 120, status: 'pending' }
+      ]);
+      (window as any).settingsState = {
+        selectedBackend: 'Standard',
+        modelPath: '/model.bin',
+        offsetT: 60_000,
+        duration: 0
+      };
+      (window as any).localScannedTransModels = ['/model.bin'];
+      const notifyMock = vi.fn();
+      (window as any).showNotification = notifyMock;
+
+      const convertedPaths: string[] = [];
+      (window as any).invoke = vi.fn((cmd: string, args: any) => {
+        if (cmd === 'convert_media_file') {
+          convertedPaths.push(args.filePath);
+          return Promise.resolve('/tmp/long.wav');
+        }
+        if (cmd === 'start_transcription_task') {
+          return Promise.resolve({
+            outputDir: '/out',
+            generatedFiles: ['long.srt'],
+            durationMs: 1000,
+            speedFactor: 2.0
+          });
+        }
+        return Promise.resolve('ok');
+      });
+
+      const msgEl = { textContent: '', removeAttribute: vi.fn(), setAttribute: vi.fn(), dataset: {} as Record<string, string> };
+      const fillBar = { style: { width: '0%' }, classList: { remove: vi.fn() } };
+      const pctEl = { textContent: '0%', removeAttribute: vi.fn() };
+      const prevDoc = (globalThis as any).document;
+      (globalThis as any).document = {
+        getElementById: vi.fn().mockImplementation((id: string) => {
+          if (id === 'lbl-radial-msg') return msgEl;
+          if (id === 'progress-linear-fill') return fillBar;
+          if (id === 'lbl-radial-pct') return pctEl;
+          return null;
+        })
+      };
+
+      const pushLogSpy = vi.spyOn(logsController, 'push');
+      try {
+        await runBatchExtraction();
+
+        expect(convertedPaths).toEqual(['/long.mp4']);
+        expect(batchProcessor.getItems()[0].status).toBe('skipped');
+        expect(batchProcessor.getItems()[1].status).toBe('completed');
+        expect(msgEl.dataset.batchSummarySkipped).toBe('1');
+        expect(notifyMock).toHaveBeenCalledWith(expect.any(String), 'info');
+        const skipLogCall = pushLogSpy.mock.calls.find(
+          ([entry]) => entry?.category === 'Batch' && String(entry.message).includes('short.mp4')
+        );
+        expect(skipLogCall).toBeDefined();
+        expect(skipLogCall?.[0].message).toContain('01:00');
+        expect(skipLogCall?.[0].message).not.toContain('{start}');
+      } finally {
+        pushLogSpy.mockRestore();
+        (globalThis as any).document = prevDoc;
+      }
+    });
+
+    it('snapshots settings at batch start so mid-run mutations do not alter queued items or mutate global inputFile', async () => {
+      batchProcessor.setIsBatchMode(true);
+      batchProcessor.setItems([
+        { path: '/first.mp4', name: 'first.mp4', durationSec: 120, status: 'pending' },
+        { path: '/second.mp4', name: 'second.mp4', durationSec: 120, status: 'pending' }
+      ]);
+      const liveSettings: any = {
+        selectedBackend: 'Standard',
+        modelPath: '/model.bin',
+        inputFile: '/original.mp4',
+        offsetT: 10_000,
+        duration: 20_000,
+        outputSrt: true,
+        outputTxt: false
+      };
+      (window as any).settingsState = liveSettings;
+      (window as any).localScannedTransModels = ['/model.bin'];
+      (window as any).showNotification = vi.fn();
+
+      const capturedTaskSettings: any[] = [];
+      (window as any).invoke = vi.fn((cmd: string, args: any) => {
+        if (cmd === 'convert_media_file') {
+          return Promise.resolve(`/tmp/${args.filePath.replace('/', '')}.wav`);
+        }
+        if (cmd === 'start_transcription_task') {
+          capturedTaskSettings.push({ ...args.settings });
+          // Simulate user toggling quick settings while the first batch file is running
+          if (capturedTaskSettings.length === 1) {
+            liveSettings.offsetT = 90_000;
+            liveSettings.outputTxt = true;
+          }
+          return Promise.resolve({
+            outputDir: '/out',
+            generatedFiles: ['out.srt'],
+            durationMs: 500,
+            speedFactor: 4.0
+          });
+        }
+        return Promise.resolve('ok');
+      });
+
+      const prevDoc = (globalThis as any).document;
+      (globalThis as any).document = { getElementById: vi.fn().mockReturnValue(null) };
+
+      try {
+        await runBatchExtraction();
+
+        expect(capturedTaskSettings).toHaveLength(2);
+        expect(capturedTaskSettings[0].inputFile).toBe('/first.mp4');
+        expect(capturedTaskSettings[1].inputFile).toBe('/second.mp4');
+        expect(capturedTaskSettings[1].offsetT).toBe(10_000);
+        expect(capturedTaskSettings[1].outputTxt).toBe(false);
+        expect(liveSettings.inputFile).toBe('/original.mp4');
+      } finally {
+        (globalThis as any).document = prevDoc;
+      }
+    });
+
+    it('assigns async probed durations by item reference even if queue is sorted mid-probe and aborts on clear', async () => {
+      const resolvers: Record<string, (val: any) => void> = {};
+      (window as any).invoke = vi.fn((cmd: string, args: any) => {
+        if (cmd === 'probe_media_file') {
+          return new Promise(resolve => {
+            resolvers[args.filePath] = resolve;
+          });
+        }
+        return Promise.resolve('ok');
+      });
+
+      const prevDoc = (globalThis as any).document;
+      (globalThis as any).document = { getElementById: vi.fn().mockReturnValue(null) };
+
+      try {
+        await addBatchFiles(['/z_short.mp4', '/a_long.mp4']);
+
+        // Sort alphabetically while first probe is still in flight: order becomes [a_long, z_short]
+        sortBatchQueue('name-asc');
+        expect(batchProcessor.getItems().map(i => i.path)).toEqual(['/a_long.mp4', '/z_short.mp4']);
+
+        // Resolve first probe (/z_short.mp4 -> 15s), then second (/a_long.mp4 -> 300s)
+        resolvers['/z_short.mp4']({ exists: true, size: '1 MB', durationSec: 15 });
+        await Promise.resolve();
+        await Promise.resolve();
+        resolvers['/a_long.mp4']({ exists: true, size: '20 MB', durationSec: 300 });
+        await Promise.resolve();
+        await Promise.resolve();
+
+        const items = batchProcessor.getItems();
+        expect(items.find(i => i.path === '/z_short.mp4')?.durationSec).toBe(15);
+        expect(items.find(i => i.path === '/a_long.mp4')?.durationSec).toBe(300);
+
+        // Now start a new batch probe and immediately clear queue before it resolves
+        await addBatchFiles(['/x.mp4', '/y.mp4']);
+        clearBatchQueue();
+        resolvers['/x.mp4']?.({ exists: true, size: '2 MB', durationSec: 50 });
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(batchProcessor.getIsBatchMode()).toBe(false);
+        expect(batchProcessor.getItems()).toHaveLength(0);
+      } finally {
+        (globalThis as any).document = prevDoc;
+      }
+    });
+
+    it('probes unknown duration on-demand during runBatchExtraction when offsetT > 0 and skips short files', async () => {
+      batchProcessor.setIsBatchMode(true);
+      batchProcessor.setItems([
+        { path: '/unprobed_short.mp4', name: 'unprobed_short.mp4', durationSec: null, status: 'pending' },
+        { path: '/unprobed_long.mp4', name: 'unprobed_long.mp4', durationSec: null, status: 'pending' }
+      ]);
+      (window as any).settingsState = {
+        selectedBackend: 'Standard',
+        modelPath: '/model.bin',
+        offsetT: 60_000,
+        duration: 0,
+        outputSrt: true
+      };
+      (window as any).localScannedTransModels = ['/model.bin'];
+      (window as any).showNotification = vi.fn();
+
+      const convertedPaths: string[] = [];
+      (window as any).invoke = vi.fn((cmd: string, args: any) => {
+        if (cmd === 'probe_media_file') {
+          if (args.filePath === '/unprobed_short.mp4') {
+            return Promise.resolve({ exists: true, size: '1 MB', durationSec: 20 });
+          }
+          return Promise.resolve({ exists: true, size: '10 MB', durationSec: 180 });
+        }
+        if (cmd === 'convert_media_file') {
+          convertedPaths.push(args.filePath);
+          return Promise.resolve('/tmp/long.wav');
+        }
+        if (cmd === 'start_transcription_task') {
+          return Promise.resolve({
+            outputDir: '/out',
+            generatedFiles: ['unprobed_long.srt'],
+            durationMs: 1000,
+            speedFactor: 2.0
+          });
+        }
+        return Promise.resolve('ok');
+      });
+
+      const prevDoc = (globalThis as any).document;
+      (globalThis as any).document = { getElementById: vi.fn().mockReturnValue(null) };
+
+      try {
+        await runBatchExtraction();
+        expect(convertedPaths).toEqual(['/unprobed_long.mp4']);
+        expect(batchProcessor.getItems()[0].status).toBe('skipped');
+        expect(batchProcessor.getItems()[0].durationSec).toBe(20);
+        expect(batchProcessor.getItems()[1].status).toBe('completed');
+        expect(batchProcessor.getItems()[1].durationSec).toBe(180);
+      } finally {
+        (globalThis as any).document = prevDoc;
+      }
+    });
+
+    it('resets stale item statuses on re-run and uses warning status badge when all batch items are skipped', async () => {
+      batchProcessor.setIsBatchMode(true);
+      batchProcessor.setItems([
+        { path: '/short_a.mp4', name: 'short_a.mp4', durationSec: null, status: 'completed' },
+        { path: '/short_b.mp4', name: 'short_b.mp4', durationSec: null, status: 'failed' }
+      ]);
+      (window as any).settingsState = {
+        selectedBackend: 'Standard',
+        modelPath: '/model.bin',
+        offsetT: 60_000,
+        duration: 0,
+        outputSrt: true
+      };
+      (window as any).localScannedTransModels = ['/model.bin'];
+      (window as any).showNotification = vi.fn();
+      const badgeMock = vi.fn();
+      const prevBadge = (window as any).setTranscribeStatusBadge;
+      (window as any).setTranscribeStatusBadge = badgeMock;
+
+      let observedSecondItemStatusDuringFirstProbe: string | undefined;
+      (window as any).invoke = vi.fn((cmd: string, args: any) => {
+        if (cmd === 'probe_media_file') {
+          if (args.filePath === '/short_a.mp4') {
+            observedSecondItemStatusDuringFirstProbe = batchProcessor.getItems()[1].status;
+          }
+          return Promise.resolve({ exists: true, size: '1 MB', durationSec: 15 });
+        }
+        return Promise.resolve('ok');
+      });
+
+      const prevDoc = (globalThis as any).document;
+      (globalThis as any).document = { getElementById: vi.fn().mockReturnValue(null) };
+
+      try {
+        await runBatchExtraction();
+        // Stale 'failed' badge must be cleared to 'pending' before processing starts
+        expect(observedSecondItemStatusDuringFirstProbe).toBe('pending');
+        expect(batchProcessor.getItems().map(i => i.status)).toEqual(['skipped', 'skipped']);
+        // All-skipped batch must display warning badge instead of green 'complete'
+        expect(badgeMock).toHaveBeenLastCalledWith('warning', 'transcribe.statusSkipped');
+      } finally {
+        (window as any).setTranscribeStatusBadge = prevBadge;
+        (globalThis as any).document = prevDoc;
+      }
+    });
+
+    it('enables #btn-run-batch and updates its tooltip immediately when entering batch mode with 2+ files', async () => {
+      const attrs: Record<string, string> = { 'data-i18n-title': 'toasts.noFileSelected' };
+      const btnBatchSpan = {
+        textContent: '',
+        setAttribute: vi.fn()
+      };
+      const btnBatch: any = {
+        disabled: true,
+        title: 'Please select an audio or video file first.',
+        style: { display: 'none' },
+        querySelector: vi.fn().mockReturnValue(btnBatchSpan),
+        setAttribute: vi.fn((k: string, v: string) => { attrs[k] = v; }),
+        getAttribute: vi.fn((k: string) => attrs[k] ?? null)
+      };
+      const batchControlsBox = { style: { display: 'none' } };
+      const singleActions = { style: { display: 'flex' } };
+
+      const prevDoc = (globalThis as any).document;
+      const prevUpdateActionBtns = (window as any).updateTranscribeActionButtons;
+      (globalThis as any).document = {
+        getElementById: vi.fn().mockImplementation((id: string) => {
+          if (id === 'btn-run-batch') return btnBatch;
+          if (id === 'batch-controls-box') return batchControlsBox;
+          if (id === 'single-transcribe-actions') return singleActions;
+          return null;
+        })
+      };
+      (window as any).updateTranscribeActionButtons = updateTranscribeActionButtons;
+      (window as any).invoke = vi.fn().mockResolvedValue({ exists: true, size: '5 MB', durationSec: 90 });
+
+      try {
+        await addBatchFiles(['/clip1.mp4', '/clip2.mp4']);
+
+        expect(batchProcessor.getIsBatchMode()).toBe(true);
+        expect(batchProcessor.getItems()).toHaveLength(2);
+        expect(btnBatch.style.display).toBe('inline-flex');
+        expect(btnBatch.disabled).toBe(false);
+        expect(attrs['data-i18n-title']).toBe('transcribe.startBatchAiExtraction');
+        expect(btnBatch.title).not.toContain('select an audio or video file');
+      } finally {
+        clearBatchQueue();
+        (window as any).updateTranscribeActionButtons = prevUpdateActionBtns;
+        (globalThis as any).document = prevDoc;
+      }
+    });
+
+    it('clears stale single-file probedMetadata on Single -> Batch -> Clear so empty deck trim slider stays disabled', async () => {
+      const prevDoc = (globalThis as any).document;
+      const prevProbed = (window as any).probedMetadata;
+      const prevSelected = (window as any).selectedMediaFile;
+      const prevInvoke = (window as any).invoke;
+
+      const makeEl = (tag: string, id: string) => {
+        const classes = new Set<string>();
+        const el: any = {
+          tagName: tag,
+          id,
+          style: {},
+          value: '',
+          placeholder: '',
+          max: '100',
+          disabled: true,
+          checked: false,
+          textContent: '',
+          dataset: {},
+          classList: {
+            add: (...c: string[]) => c.forEach(x => classes.add(x)),
+            remove: (...c: string[]) => c.forEach(x => classes.delete(x)),
+            toggle: (c: string, force?: boolean) => (force ?? !classes.has(c) ? classes.add(c) : classes.delete(c)),
+            contains: (c: string) => classes.has(c)
+          },
+          setAttribute: vi.fn(),
+          removeAttribute: vi.fn(),
+          closest: () => null
+        };
+        return el;
+      };
+
+      const sliderWrap = makeEl('DIV', 'quick-range-slider-wrap');
+      const startSlider = makeEl('INPUT', 'quick-range-slider-start');
+      const endSlider = makeEl('INPUT', 'quick-range-slider-end');
+      const endInput = makeEl('INPUT', 'quick-range-end');
+      const fillEl = makeEl('DIV', 'quick-range-fill');
+      const els: Record<string, any> = {
+        'quick-range-slider-wrap': sliderWrap,
+        'quick-range-slider-start': startSlider,
+        'quick-range-slider-end': endSlider,
+        'quick-range-end': endInput,
+        'quick-range-fill': fillEl
+      };
+
+      (globalThis as any).document = {
+        getElementById: (id: string) => els[id] || null,
+        querySelector: () => null,
+        querySelectorAll: () => []
+      };
+      (window as any).invoke = vi.fn().mockResolvedValue({ exists: true, durationSec: 30, size: '1 MB' });
+
+      try {
+        // Simulate prior single file with 120s probedMetadata
+        (window as any).selectedMediaFile = '/media/prior_single.mp4';
+        (window as any).probedMetadata = { exists: true, durationSec: 120 };
+
+        // Enter Batch Mode -> must clear stale single-file probedMetadata immediately
+        await addBatchFiles(['/media/b1.mp4', '/media/b2.mp4']);
+        expect((window as any).probedMetadata).toBeNull();
+
+        // Clear Batch Queue -> empty deck must keep trim slider disabled and End placeholder '--:--'
+        clearBatchQueue();
+        expect((window as any).probedMetadata).toBeNull();
+        expect(sliderWrap.classList.contains('is-disabled')).toBe(true);
+        expect(startSlider.disabled).toBe(true);
+        expect(endSlider.disabled).toBe(true);
+        expect(endInput.placeholder).toBe('--:--');
+      } finally {
+        (window as any).probedMetadata = prevProbed;
+        (window as any).selectedMediaFile = prevSelected;
+        (window as any).invoke = prevInvoke;
+        (globalThis as any).document = prevDoc;
+      }
+    });
+
+    it('seeks companion player to first sliced segment startMs when selecting a completed batch item', async () => {
+      const prevLoad = (window as any).loadMediaIntoCompanionPlayer;
+      const prevSeek = (window as any).seekCompanionPlayer;
+      const loadMock = vi.fn().mockResolvedValue(true);
+      const seekMock = vi.fn();
+      (window as any).loadMediaIntoCompanionPlayer = loadMock;
+      (window as any).seekCompanionPlayer = seekMock;
+
+      try {
+        batchProcessor.setIsBatchMode(true);
+        batchProcessor.setItems([
+          {
+            path: '/media/sliced_batch.mp4',
+            name: 'sliced_batch.mp4',
+            durationSec: 180,
+            status: 'completed',
+            subtitlePath: '/media/sliced_batch.srt',
+            outputDir: '/media',
+            outputFiles: [{ path: '/media/sliced_batch.srt', name: 'sliced_batch.srt', type: 'subtitle' }],
+            transcriptLines: [
+              { id: 1, startMs: 45_000, endMs: 50_000, text: 'Batch sliced line' }
+            ]
+          }
+        ]);
+
+        await selectBatchItemTranscript(0);
+        await Promise.resolve();
+
+        expect(loadMock).toHaveBeenCalledWith('/media/sliced_batch.mp4', false, 180);
+        expect(seekMock).toHaveBeenCalledWith(45_000, false, 1, false);
+      } finally {
+        clearBatchQueue();
+        (window as any).loadMediaIntoCompanionPlayer = prevLoad;
+        (window as any).seekCompanionPlayer = prevSeek;
+      }
     });
   });
 });

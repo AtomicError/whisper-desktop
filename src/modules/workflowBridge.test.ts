@@ -618,5 +618,45 @@ describe('workflowBridge module', () => {
       const vttContent = serializeTranscriptLinesForFile(transcriptViewer.getLines(), '/output/edited.vtt');
       expect(vttContent).toBe('WEBVTT\n\n1\n00:00:01.000 --> 00:00:03.500\nCorrected subtitle text\n');
     });
+
+    it('enables Translation Studio while keeping Hardsub Studio disabled for TXT-only transcription outputs', async () => {
+      const btnOpenFolder = new MockElement('BUTTON');
+      btnOpenFolder.id = 'btn-open-output-folder';
+      const btnOpenFile = new MockElement('BUTTON');
+      btnOpenFile.id = 'btn-open-output-file';
+      const btnSendTranslate = new MockElement('BUTTON');
+      btnSendTranslate.id = 'btn-send-to-translation';
+      const btnSendHardsub = new MockElement('BUTTON');
+      btnSendHardsub.id = 'btn-transcribe-send-to-hardsub';
+      const btnSendStudio = new MockElement('BUTTON');
+      btnSendStudio.id = 'btn-send-to-studio';
+
+      domMap.set(btnOpenFolder.id, btnOpenFolder);
+      domMap.set(btnOpenFile.id, btnOpenFile);
+      domMap.set(btnSendTranslate.id, btnSendTranslate);
+      domMap.set(btnSendHardsub.id, btnSendHardsub);
+      domMap.set(btnSendStudio.id, btnSendStudio);
+
+      setLastTranscribedSubtitlePath(null);
+      setLastTranscribedOutputDir('/output');
+      setLastTranscribedOutputFiles([{ name: 'lecture.txt', path: '/output/lecture.txt', type: 'text' }]);
+
+      updateTranscribeWorkflowButtons();
+
+      expect(btnSendStudio.disabled).toBe(false);
+      expect(btnSendTranslate.disabled).toBe(false);
+      expect(btnSendHardsub.disabled).toBe(true);
+      expect(btnSendHardsub.getAttribute('data-i18n-title')).toBe('transcribe.hardsubRequiresTimedSub');
+
+      const mockLoadSub = vi.fn().mockResolvedValue(undefined);
+      const mockSwitchView = vi.fn();
+      (globalThis as any).window.translationStudioController = { loadSubtitleFile: mockLoadSub };
+      (globalThis as any).window.switchView = mockSwitchView;
+
+      await sendTranscribeToTranslationStudio();
+
+      expect(mockLoadSub).toHaveBeenCalledWith('/output/lecture.txt');
+      expect(mockSwitchView).toHaveBeenCalledWith('translate');
+    });
   });
 });

@@ -764,9 +764,12 @@ pub async fn run_transcription(
         args.push(settings.prompt.clone());
     }
     
+    let ensure_srt = settings.output_srt
+        || (!settings.output_txt && !settings.output_vtt && !settings.output_lrc);
+
     if settings.output_txt { args.push("-otxt".to_string()); }
     if settings.output_vtt { args.push("-ovtt".to_string()); }
-    if settings.output_srt { args.push("-osrt".to_string()); }
+    if ensure_srt { args.push("-osrt".to_string()); }
     if settings.output_lrc { args.push("-olrc".to_string()); }
     
     // Always generate full detailed JSON with word-level confidence behind the scenes for UI/studio companion
@@ -1016,8 +1019,12 @@ pub async fn run_transcription(
                                 let s = s_str.as_str().parse::<f64>().unwrap_or(0.0);
                                 
                                 let curr_time_secs = h * 3600.0 + m * 60.0 + s;
-                                if duration_sec > 0.0 {
-                                    let progress = (curr_time_secs / duration_sec).clamp(0.0, 1.0);
+                                if let Some(progress) = compute_slice_progress(
+                                    curr_time_secs,
+                                    duration_sec,
+                                    settings.offset_t,
+                                    settings.duration,
+                                ) {
                                     let _ = app.emit("transcribe-status", TranscribeProgress {
                                         progress,
                                         message: format!("Transcribing: {:.0}%", progress * 100.0),
@@ -1077,8 +1084,13 @@ pub async fn run_transcription(
     }
     
     let elapsed = start_time.elapsed().as_millis() as u64;
-    let speed_factor = if elapsed > 0 {
-        (duration_sec * 1000.0) / elapsed as f64
+    let effective_span_sec = compute_effective_span_sec(
+        duration_sec,
+        settings.offset_t,
+        settings.duration,
+    );
+    let speed_factor = if elapsed > 0 && effective_span_sec > 0.0 {
+        (effective_span_sec * 1000.0) / elapsed as f64
     } else {
         0.0
     };
@@ -1112,7 +1124,7 @@ pub async fn run_transcription(
     let out_basename = Path::new(&out_name_str).file_name().unwrap_or_default().to_string_lossy().to_string();
     let formats = [
         (".txt", settings.output_txt),
-        (".srt", settings.output_srt),
+        (".srt", ensure_srt),
         (".vtt", settings.output_vtt),
         (".lrc", settings.output_lrc),
     ];
@@ -1172,6 +1184,34 @@ pub fn read_text_file(file_path: String) -> Result<String, String> {
         return Err("File does not exist".to_string());
     }
     crate::translation::translator::read_subtitle_string(path)
+}
+
+pub(crate) fn compute_effective_span_sec(full_duration_sec: f64, offset_t_ms: i32, duration_ms: i32) -> f64 {
+    let offset_sec = (offset_t_ms.max(0) as f64) / 1000.0;
+    let requested_dur_sec = (duration_ms.max(0) as f64) / 1000.0;
+    if full_duration_sec <= 0.0 {
+        return requested_dur_sec;
+    }
+    let remaining_sec = (full_duration_sec - offset_sec).max(0.0);
+    if requested_dur_sec > 0.0 {
+        remaining_sec.min(requested_dur_sec)
+    } else {
+        remaining_sec
+    }
+}
+
+pub(crate) fn compute_slice_progress(
+    curr_time_secs: f64,
+    full_duration_sec: f64,
+    offset_t_ms: i32,
+    duration_ms: i32,
+) -> Option<f64> {
+    let span_sec = compute_effective_span_sec(full_duration_sec, offset_t_ms, duration_ms);
+    if span_sec <= 0.0 {
+        return None;
+    }
+    let offset_sec = (offset_t_ms.max(0) as f64) / 1000.0;
+    Some(((curr_time_secs - offset_sec) / span_sec).clamp(0.0, 1.0))
 }
 
 fn dtw_token_for_model(model_path: &str) -> Option<&'static str> {
@@ -1679,6 +1719,36 @@ mod tests {
         assert_eq!(std::fs::read_to_string(&dest).unwrap(), "1\n00:00:00,000 --> 00:00:01,000\nHello");
 
         let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_compute_effective_span_and_slice_progress() {
+        // Full file (offset = 0, duration = 0)
+        assert_eq!(compute_effective_span_sec(120.0, 0, 0), 120.0);
+        assert_eq!(compute_slice_progress(60.0, 120.0, 0, 0), Some(0.5));
+
+        // Offset only (skip first 30s of 120s file -> 90s span)
+        assert_eq!(compute_effective_span_sec(120.0, 30_000, 0), 90.0);
+        assert_eq!(compute_slice_progress(30.0, 120.0, 30_000, 0), Some(0.0));
+        assert_eq!(compute_slice_progress(75.0, 120.0, 30_000, 0), Some(0.5));
+        assert_eq!(compute_slice_progress(120.0, 120.0, 30_000, 0), Some(1.0));
+
+        // Sliced range: 30s offset, 20s duration inside 120s file
+        assert_eq!(compute_effective_span_sec(120.0, 30_000, 20_000), 20.0);
+        assert_eq!(compute_slice_progress(40.0, 120.0, 30_000, 20_000), Some(0.5));
+        assert_eq!(compute_slice_progress(50.0, 120.0, 30_000, 20_000), Some(1.0));
+
+        // Duration exceeds EOF -> clamps to remaining audio
+        assert_eq!(compute_effective_span_sec(120.0, 100_000, 60_000), 20.0);
+        assert_eq!(compute_slice_progress(110.0, 120.0, 100_000, 60_000), Some(0.5));
+
+        // Offset beyond EOF -> 0 span, None progress (no divide by zero)
+        assert_eq!(compute_effective_span_sec(120.0, 130_000, 20_000), 0.0);
+        assert_eq!(compute_slice_progress(130.0, 120.0, 130_000, 20_000), None);
+
+        // Unknown full duration with explicit slice duration
+        assert_eq!(compute_effective_span_sec(0.0, 10_000, 40_000), 40.0);
+        assert_eq!(compute_slice_progress(30.0, 0.0, 10_000, 40_000), Some(0.5));
     }
 }
 

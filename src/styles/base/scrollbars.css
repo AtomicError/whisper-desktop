@@ -261,6 +261,27 @@
   background: transparent !important;
 }
 
+/* Transcribe Setup Deck Body & Companion Media Deck: Clean Invisible Scrollbar (Zero Width Shift, Matches Settings) */
+.transcribe-deck-body,
+.transcribe-media-deck {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.transcribe-deck-body::-webkit-scrollbar,
+.transcribe-media-deck::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
+.transcribe-deck-body::-webkit-scrollbar-thumb,
+.transcribe-media-deck::-webkit-scrollbar-thumb {
+  display: none !important;
+  background: transparent !important;
+}
+
 html, body {
   border-radius: 12px;
   overflow: hidden;

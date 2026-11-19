@@ -1,6 +1,7 @@
 // Companion Player & Media Console Controller for Whisper Desktop
 import { t, firstStrongDirection } from '../i18n/index';
 import { formatMsToTimestamp, parseTimestampStringToMs, getTranscriptLines } from './transcriptViewer';
+import { updateDeckScrollCue } from './transcribeQuickDeck';
 
 const getGlobal = (): any => (typeof window !== 'undefined' ? window : globalThis);
 
@@ -129,6 +130,15 @@ export function getActiveMediaInfo(): CompanionMediaInfo | null {
   return activeMediaInfo;
 }
 
+export function getCompanionCurrentTimeSec(): number {
+  if (typeof document === 'undefined' || !activeMediaInfo) return 0;
+  const videoEl = document.getElementById('companion-media-element') as HTMLVideoElement | null;
+  if (!videoEl || typeof videoEl.currentTime !== 'number' || Number.isNaN(videoEl.currentTime)) {
+    return 0;
+  }
+  return Math.max(0, videoEl.currentTime);
+}
+
 let companionWakeTimer: ReturnType<typeof setTimeout> | null = null;
 
 export function wakeCompanionPlayerSurface(): void {
@@ -215,6 +225,7 @@ export function showTranscribeSetupDeck(): void {
   if (manageSettingsBtn) {
     manageSettingsBtn.style.display = activeMediaInfo ? 'none' : 'inline-flex';
   }
+  updateDeckScrollCue();
 }
 
 export function showTranscribeMediaDeck(): void {
@@ -245,7 +256,11 @@ export function showTranscribeMediaDeck(): void {
   wakeCompanionPlayerSurface();
 }
 
-export async function loadMediaIntoCompanionPlayer(filePath: string, autoSwitchDeck = true): Promise<boolean> {
+export async function loadMediaIntoCompanionPlayer(
+  filePath: string,
+  autoSwitchDeck = true,
+  knownDurationSec?: number
+): Promise<boolean> {
   if (typeof document === 'undefined' || !filePath) return false;
   const invoke = getTauriInvoke();
   const videoEl = document.getElementById('companion-media-element') as HTMLVideoElement | null;
@@ -318,19 +333,21 @@ export async function loadMediaIntoCompanionPlayer(filePath: string, autoSwitchD
     if (audioFallback) audioFallback.style.display = 'none';
   }
 
-  // Probe media metadata
-  let durationSec = 0;
+  // Probe media metadata (reuse caller's probed duration when available to avoid duplicate ffprobe)
+  let durationSec = typeof knownDurationSec === 'number' && knownDurationSec > 0 ? knownDurationSec : 0;
   let width = 0;
   let height = 0;
   let aspectStr: string | undefined = isAudioOnly ? undefined : '16:9';
 
   if (invoke) {
-    try {
-      const meta = await invoke('probe_media_file', { filePath });
-      if (meta && meta.durationSec) {
-        durationSec = meta.durationSec;
-      }
-    } catch (_) {}
+    if (durationSec <= 0) {
+      try {
+        const meta = await invoke('probe_media_file', { filePath });
+        if (meta && meta.durationSec) {
+          durationSec = meta.durationSec;
+        }
+      } catch (_) {}
+    }
 
     if (!isAudioOnly) {
       try {
@@ -505,7 +522,12 @@ export function jumpCompanionPlayback(seconds: number): void {
   armSeekWatchdog();
 }
 
-export function seekCompanionPlayer(targetMs: number, autoPlay?: boolean, targetLineId?: number): void {
+export function seekCompanionPlayer(
+  targetMs: number,
+  autoPlay?: boolean,
+  targetLineId?: number,
+  switchToMediaDeck = true
+): void {
   const videoEl = document.getElementById('companion-media-element') as HTMLVideoElement | null;
   if (!videoEl) return;
   const targetSec = Math.max(0, targetMs / 1000);
@@ -556,12 +578,13 @@ export function seekCompanionPlayer(targetMs: number, autoPlay?: boolean, target
       }, { once: true });
     }
   }
-  if (activeMediaInfo) {
+  if (switchToMediaDeck && activeMediaInfo) {
     showTranscribeMediaDeck();
   }
 }
 
 export function pauseCompanionPlayer(): void {
+  if (typeof document === 'undefined') return;
   const videoEl = document.getElementById('companion-media-element') as HTMLVideoElement | null;
   if (videoEl && !videoEl.paused) {
     videoEl.pause();
@@ -599,7 +622,15 @@ export function unloadCompanionPlayer(): void {
     companionResizeObserver.disconnect();
     companionResizeObserver = null;
   }
-  if (typeof document !== 'undefined' && typeof document.querySelectorAll === 'function') {
+  const invoke = getTauriInvoke();
+  if (activeStreamUrl && invoke) {
+    invoke('revoke_media_stream', { streamUrl: activeStreamUrl }).catch(() => {});
+    activeStreamUrl = null;
+  }
+
+  if (typeof document === 'undefined') return;
+
+  if (typeof document.querySelectorAll === 'function') {
     document.querySelectorAll('.transcript-card.active-playback').forEach(el => {
       el.classList.remove('active-playback');
     });
@@ -624,7 +655,7 @@ export function unloadCompanionPlayer(): void {
 
   if (fileNameEl) {
     fileNameEl.textContent = '—';
-    fileNameEl.title = t('transcribe.noMediaOrTranscribe') || 'No media file selected or transcribed yet.';
+    fileNameEl.title = t('toasts.noMediaOrTranscribe') || 'No media file selected or transcribed yet.';
   }
   if (resEl) resEl.textContent = '—';
   if (aspectEl) aspectEl.textContent = '—';
@@ -634,11 +665,6 @@ export function unloadCompanionPlayer(): void {
     typeIcon.innerHTML = `<polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>`;
   }
 
-  const invoke = getTauriInvoke();
-  if (activeStreamUrl && invoke) {
-    invoke('revoke_media_stream', { streamUrl: activeStreamUrl }).catch(() => {});
-    activeStreamUrl = null;
-  }
   const videoEl = document.getElementById('companion-media-element') as HTMLVideoElement | null;
   if (videoEl) {
     videoEl.removeAttribute('src');
@@ -1216,6 +1242,13 @@ export function initCompanionPlayerDOM(): void {
       }
       updateCompanionMetadataUI(activeMediaInfo);
       updateCompanionSubtitleBounds(true);
+      const winRef = getGlobal();
+      if (dur > 0 && winRef?.probedMetadata && !(Number(winRef.probedMetadata.durationSec) > 0)) {
+        winRef.probedMetadata = { ...winRef.probedMetadata, durationSec: dur };
+      }
+      if (typeof winRef?.syncQuickTimeRangeUI === 'function') {
+        winRef.syncQuickTimeRangeUI();
+      }
     }
   });
 
@@ -1413,3 +1446,4 @@ win.highlightActiveTranscriptSegment = highlightActiveTranscriptSegment;
 win.wakeCompanionPlayerSurface = wakeCompanionPlayerSurface;
 win.onTranscribeViewActivated = onTranscribeViewActivated;
 win.getActiveMediaInfo = getActiveMediaInfo;
+win.getCompanionCurrentTimeSec = getCompanionCurrentTimeSec;

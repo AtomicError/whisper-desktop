@@ -228,8 +228,8 @@ html {
   --text-primary: #fafafa;
   --text-secondary: #a1a1aa;
   --text-muted: #71717a;
-  --accent-primary: #3b82f6;
-  --accent-hover: #2563eb;
+  --accent-primary: var(--color-accent);
+  --accent-hover: var(--color-accent-dark);
   --danger: #ef4444;
 
   /* Model Family Palette Accents */
@@ -310,6 +310,8 @@ html {
   --color-red: #ef4444;
   --color-red-rgb: 239, 68, 68;
   --color-hot: #f43f5e;
+  --accent-primary: var(--color-accent);
+  --accent-hover: var(--color-accent-dark);
 
   /* Model Family Palette Accents (Option 1: Natural Thermal Spectrum) */
   --color-model-large: #ef4444;
@@ -509,8 +511,8 @@ html {
   --text-primary: #fafafa;
   --text-secondary: #a1a1aa;
   --text-muted: #71717a;
-  --accent-primary: #3b82f6;
-  --accent-hover: #2563eb;
+  --accent-primary: var(--color-accent);
+  --accent-hover: var(--color-accent-dark);
   --danger: #ef4444;
 
   /* Model Family Palette Accents */

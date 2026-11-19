@@ -212,6 +212,24 @@ export function renderOutputFilesDropdown(): void {
 }
 
 // ----------------- Transcribe Workflow Buttons State -----------------
+export function getTranslatableOutputPath(): string | null {
+  const subtitlePath = getLastTranscribedSubtitlePath();
+  if (subtitlePath) return subtitlePath;
+
+  const files = getLastTranscribedOutputFiles();
+  const timedFile = files.find(f => {
+    const lower = (f.name || f.path || '').toLowerCase();
+    return lower.endsWith('.srt') || lower.endsWith('.vtt') || lower.endsWith('.lrc');
+  });
+  if (timedFile?.path) return timedFile.path;
+
+  const txtFile = files.find(f => {
+    const lower = (f.name || f.path || '').toLowerCase();
+    return f.type === 'text' || lower.endsWith('.txt');
+  });
+  return txtFile?.path || null;
+}
+
 export function updateTranscribeWorkflowButtons(): void {
   if (typeof document === 'undefined') return;
   const btnOpenFolder = document.getElementById('btn-open-output-folder') as HTMLButtonElement | null;
@@ -226,13 +244,15 @@ export function updateTranscribeWorkflowButtons(): void {
 
   const explicitOutputDir = getLastTranscribedOutputDir();
   const subtitlePath = getLastTranscribedSubtitlePath();
+  const translatablePath = getTranslatableOutputPath();
   const outputFiles = getLastTranscribedOutputFiles();
   const effectiveOutputDir = explicitOutputDir || (subtitlePath ? getParentDir(subtitlePath) : (outputFiles[0]?.path ? getParentDir(outputFiles[0].path) : null));
   const hasOutputDir = !isRunning && Boolean(effectiveOutputDir);
   const hasSubtitle = !isRunning && Boolean(subtitlePath);
-  const hasFiles = !isRunning && (outputFiles.length > 0 || Boolean(subtitlePath));
+  const hasTranslatable = !isRunning && Boolean(translatablePath);
+  const hasFiles = !isRunning && (outputFiles.length > 0 || Boolean(subtitlePath) || Boolean(translatablePath));
   const transcriptLines = win?.transcriptLines || [];
-  const hasTranscript = !isRunning && Boolean((Array.isArray(transcriptLines) && transcriptLines.length > 0) || Boolean(subtitlePath));
+  const hasTranscript = !isRunning && Boolean((Array.isArray(transcriptLines) && transcriptLines.length > 0) || Boolean(subtitlePath) || Boolean(translatablePath));
 
   if (btnCopy) {
     btnCopy.disabled = !hasTranscript;
@@ -249,7 +269,8 @@ export function updateTranscribeWorkflowButtons(): void {
       btnOpenFile.removeAttribute('data-i18n-title');
     } else if (hasFiles) {
       if (chevronOpenFile) chevronOpenFile.style.display = 'none';
-      const singleName = outputFiles.length === 1 ? outputFiles[0].name : (subtitlePath ? getBasename(subtitlePath) : '');
+      const fallbackPath = subtitlePath || translatablePath;
+      const singleName = outputFiles.length === 1 ? outputFiles[0].name : (fallbackPath ? getBasename(fallbackPath) : '');
       btnOpenFile.title = singleName ? `${t('transcribe.openFile')}: ${singleName}` : t('transcribe.openFile');
       btnOpenFile.removeAttribute('data-i18n-title');
     } else {
@@ -271,8 +292,8 @@ export function updateTranscribeWorkflowButtons(): void {
   }
 
   if (btnSendTranslate) {
-    btnSendTranslate.disabled = !hasSubtitle;
-    if (hasSubtitle) {
+    btnSendTranslate.disabled = !hasTranslatable;
+    if (hasTranslatable) {
       btnSendTranslate.removeAttribute('title');
       btnSendTranslate.removeAttribute('data-i18n-title');
     } else {
@@ -286,6 +307,12 @@ export function updateTranscribeWorkflowButtons(): void {
     if (hasSubtitle) {
       btnSendHardsub.removeAttribute('title');
       btnSendHardsub.removeAttribute('data-i18n-title');
+    } else if (hasTranslatable) {
+      btnSendHardsub.setAttribute(
+        'title',
+        t('transcribe.hardsubRequiresTimedSub') || 'Hardsub Studio requires timed subtitles (.srt, .vtt, .lrc)'
+      );
+      btnSendHardsub.setAttribute('data-i18n-title', 'transcribe.hardsubRequiresTimedSub');
     } else {
       btnSendHardsub.setAttribute('title', t('transcribe.noSubGeneratedYet') || 'No generated subtitle yet');
       btnSendHardsub.setAttribute('data-i18n-title', 'transcribe.noSubGeneratedYet');
@@ -294,11 +321,11 @@ export function updateTranscribeWorkflowButtons(): void {
 
   const btnSendStudio = document.getElementById('btn-send-to-studio') as HTMLButtonElement | null;
   if (btnSendStudio) {
-    btnSendStudio.disabled = !hasSubtitle;
-    if (!hasSubtitle) {
+    btnSendStudio.disabled = !hasTranslatable;
+    if (!hasTranslatable) {
       btnSendStudio.setAttribute('aria-expanded', 'false');
     }
-    if (hasSubtitle) {
+    if (hasTranslatable) {
       btnSendStudio.removeAttribute('title');
       btnSendStudio.removeAttribute('data-i18n-title');
     } else {
@@ -425,7 +452,7 @@ export function isSupportedVideoFile(filePath: string | null | undefined): boole
 
 export async function sendTranscribeToTranslationStudio(): Promise<void> {
   toggleWorkflowDropdown(true);
-  const subToLoad = getLastTranscribedSubtitlePath();
+  const subToLoad = getTranslatableOutputPath();
   if (!subToLoad) {
     showNotification(t('transcribe.noSubGeneratedYet') || 'No generated subtitle yet', 'error');
     return;
@@ -556,6 +583,7 @@ if (typeof window !== 'undefined') {
 export const workflowBridge = {
   getLastTranscribedSubtitlePath,
   setLastTranscribedSubtitlePath,
+  getTranslatableOutputPath,
   getLastTranscribedVideoPath,
   setLastTranscribedVideoPath,
   getLastTranscribedOutputDir,

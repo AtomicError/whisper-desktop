@@ -3,76 +3,86 @@ import { t, getLanguage, setLanguage, isolateLtr, applyTextDirection } from '../
 import { showNotification, showConfirmModal } from './appModal';
 import { getBasename, openFileInEditor } from './nativeWindow';
 import { applyMonochromeCanvas, applyTheme, switchTheme, applyUiZoom } from './themeManager';
-import { initLanguageSelects, renderLanguageSelect } from '../languageSelect';
+import { initLanguageSelects } from '../languageSelect';
 import { invalidateModelStatusesCache } from './modelHub';
 import type { ProviderConfig } from './translationProviders';
 import type { ProbedMediaMetadata } from './transcribePipeline';
+import {
+  OUTPUT_FORMAT_KEYS,
+  type OutputFormatKey,
+  MAX_I32,
+  canToggleOutputFormatOff,
+  ensureAtLeastOneOutputFormat,
+  getRecommendedThreadCount,
+  normalizeDigitsToAscii,
+  clampIntSettingValue,
+  formatMsToTimecode,
+  evaluateCustomTimeRange,
+  evaluateBatchTimeRange,
+  computeTrimSliderState
+} from './transcribeConfigHelpers';
+import {
+  registerTranscribeDeckHost,
+  type SettingsState
+} from './transcribeDeckHost';
+import {
+  resetQuickDeckState,
+  resetQuickRangeModeIfZero,
+  clearQuickRangeValidationError,
+  collapseCustomMaxLenIfPreset,
+  updateDeckScrollCue,
+  syncQuickOutputFormatsUI,
+  toggleQuickOutputFormat,
+  updateTranscribeRangeVisibility,
+  syncQuickTimeRangeUI,
+  setQuickRangeMode,
+  resetTranscribeTimeRange,
+  validateAndApplyQuickTimeRange,
+  capturePlayerTimeForRange,
+  setQuickMaxLen,
+  activateCustomMaxLen,
+  stepQuickMaxLen,
+  syncQuickAdvancedUI,
+  applyRecommendedThreads,
+  openTranscriptionSettings,
+  toggleQuickVad,
+  updateTranscribeUIConfigs,
+  setupQuickConfigDeckEventListeners
+} from './transcribeQuickDeck';
+
+export {
+  type SettingsState,
+  OUTPUT_FORMAT_KEYS,
+  type OutputFormatKey,
+  canToggleOutputFormatOff,
+  ensureAtLeastOneOutputFormat,
+  getRecommendedThreadCount,
+  formatMsToTimecode,
+  evaluateCustomTimeRange,
+  evaluateBatchTimeRange,
+  computeTrimSliderState,
+  updateDeckScrollCue,
+  syncQuickOutputFormatsUI,
+  toggleQuickOutputFormat,
+  updateTranscribeRangeVisibility,
+  syncQuickTimeRangeUI,
+  setQuickRangeMode,
+  resetTranscribeTimeRange,
+  validateAndApplyQuickTimeRange,
+  capturePlayerTimeForRange,
+  setQuickMaxLen,
+  activateCustomMaxLen,
+  stepQuickMaxLen,
+  syncQuickAdvancedUI,
+  applyRecommendedThreads,
+  openTranscriptionSettings,
+  toggleQuickVad,
+  updateTranscribeUIConfigs,
+  setupQuickConfigDeckEventListeners
+};
 
 if (typeof window === 'undefined') {
   (globalThis as any).window = globalThis;
-}
-
-export interface SettingsState {
-  modelsDir?: string;
-  modelPath?: string;
-  selectedBackend?: string;
-  whisperSource?: string;
-  ffmpegSource?: string;
-  ffmpegCustomPath?: string;
-  outputDirType?: string;
-  outputDirCustom?: string;
-  inputFile?: string;
-  threads?: number;
-  processors?: number;
-  offsetT?: number;
-  duration?: number;
-  maxContext?: number;
-  maxLen?: number;
-  bestOf?: number;
-  beamSize?: number;
-  audioCtx?: number;
-  deviceId?: number;
-  flashAttn?: boolean;
-  gpuDevice?: number;
-  language?: string;
-  translate?: boolean;
-  diarize?: boolean;
-  tinydiarize?: boolean;
-  noTimestamps?: boolean;
-  splitOnWord?: boolean;
-  wordTimestamps?: boolean;
-  printColors?: boolean;
-  suppressBlank?: boolean;
-  suppressNonSpeech?: boolean;
-  initialPrompt?: string;
-  prompt?: string;
-  carryOverPrompt?: boolean;
-  wordThold?: number;
-  entropyThold?: number;
-  logprobThold?: number;
-  noSpeechThold?: number;
-  temperature?: number;
-  temperatureInc?: number;
-  vad?: boolean;
-  vadModelPath?: string;
-  vadThold?: number;
-  vadMinSpeech?: number;
-  vadMaxSpeech?: number;
-  vadMinSil?: number;
-  vadSpeechPad?: number;
-  vadOverlap?: number;
-  outputTxt?: boolean;
-  outputVtt?: boolean;
-  outputSrt?: boolean;
-  outputLrc?: boolean;
-  uiLanguage?: string;
-  theme?: string;
-  uiScale?: number;
-  monochromeCanvas?: boolean;
-  autoTransferToTranslate?: boolean;
-  translateAiEnabled?: boolean;
-  translateAiPolish?: boolean;
-  [key: string]: any;
 }
 
 declare global {
@@ -101,6 +111,17 @@ declare global {
     updateTranscribeUIConfigs: () => void;
     openTranscriptionSettings: () => void;
     toggleQuickVad: (forceVal?: boolean) => void;
+    toggleQuickOutputFormat: (key: OutputFormatKey) => void;
+    applyRecommendedThreads: () => Promise<void>;
+    setQuickRangeMode: (mode: 'full' | 'custom') => void;
+    resetTranscribeTimeRange: (save?: boolean) => void;
+    updateTranscribeRangeVisibility: (isBatch: boolean) => void;
+    validateAndApplyQuickTimeRange: (commit?: boolean) => boolean;
+    capturePlayerTimeForRange: (target: 'start' | 'end') => void;
+    setQuickMaxLen: (val: number, keepCustomOpen?: boolean) => void;
+    activateCustomMaxLen: () => void;
+    stepQuickMaxLen: (delta: number) => void;
+    syncQuickTimeRangeUI: (current?: SettingsState | null) => void;
     syncCustomSelects?: () => void;
     saveCurrentSettings: (immediate?: boolean) => any;
     refreshSettings: () => Promise<void>;
@@ -961,6 +982,18 @@ export function bindSettingsToDOM(): void {
         const chk = el as HTMLInputElement;
         chk.checked = Boolean(current[key]);
         chk.onchange = () => {
+          if (OUTPUT_FORMAT_KEYS.includes(key as OutputFormatKey) && !chk.checked) {
+            if (!canToggleOutputFormatOff(current, key as OutputFormatKey)) {
+              chk.checked = true;
+              current[key] = true;
+              showNotification(
+                t('toasts.atLeastOneOutputFormat') || 'At least one output format must stay enabled.',
+                'warning'
+              );
+              return;
+            }
+          }
+
           current[key] = chk.checked;
           if (key === 'autoTransferToTranslate' || key === 'translateAiEnabled') {
             current.autoTransferToTranslate = chk.checked;
@@ -970,6 +1003,9 @@ export function bindSettingsToDOM(): void {
             const quickVadInput = document.getElementById('quick-toggle-vad') as HTMLInputElement | null;
             if (quickVadInput) quickVadInput.checked = chk.checked;
           }
+          if (OUTPUT_FORMAT_KEYS.includes(key as OutputFormatKey)) {
+            syncQuickOutputFormatsUI(current);
+          }
 
           // Defer heavy side-effects so the 220ms toggle CSS transition completes at pure 60fps
           setTimeout(() => {
@@ -977,7 +1013,12 @@ export function bindSettingsToDOM(): void {
               applyMonochromeCanvas(chk.checked, true);
             }
             saveCurrentSettings();
-            if (key === 'vad') {
+            if (
+              key === 'vad' ||
+              key === 'carryPrompt' ||
+              key === 'splitWord' ||
+              OUTPUT_FORMAT_KEYS.includes(key as OutputFormatKey)
+            ) {
               updateTranscribeUIConfigs();
             }
             if (key === 'translateAiPolish' && win.translationStudioController?.syncFromGlobalSettings) {
@@ -993,24 +1034,28 @@ export function bindSettingsToDOM(): void {
             (el as any)._hasDynamicDirListener = true;
             el.addEventListener('input', () => safeApplyDynamicDirection(el as HTMLElement));
           }
-          if (key === 'prompt' || el.id === 'opt-prompt') {
+          if ((key === 'prompt' || el.id === 'opt-prompt') && !(el as any)._hasPromptSyncListener) {
+            (el as any)._hasPromptSyncListener = true;
             el.addEventListener('input', () => {
-              current.prompt = el.value;
+              const live = getSettingsState();
+              if (!live) return;
+              live.prompt = el.value;
+              syncQuickAdvancedUI(live);
               saveCurrentSettings(false);
             });
           }
         }
         el.onchange = () => {
+          const stepperCtrl = el.closest?.('.number-input-control') as (HTMLElement & { _stepperInitialized?: boolean }) | null;
+          if (stepperCtrl?._stepperInitialized && !stepperCtrl.hasAttribute('data-custom-stepper') && el.id !== 'quick-adv-maxLen') {
+            return;
+          }
           let val: any = el.value;
           if (INT_SETTING_KEYS.has(key)) {
-            val = parseInt(el.value);
-            if (isNaN(val)) val = (key === 'maxContext') ? -1 : 0;
-            if (key === 'bestOf' || key === 'beamSize') {
-              val = Math.max(1, Math.min(8, val));
-              el.value = String(val);
-            }
+            val = clampIntSettingValue(key, el.value);
+            el.value = String(val);
           } else if (FLOAT_SETTING_KEYS.has(key)) {
-            val = parseFloat(el.value);
+            val = parseFloat(normalizeDigitsToAscii(String(el.value ?? '')));
             if (isNaN(val)) {
               val = (key === 'vadMaxSpeech') ? 30.0 : 0.0;
             } else if (key === 'vadMaxSpeech') {
@@ -1037,9 +1082,24 @@ export function bindSettingsToDOM(): void {
           }
 
           current[key] = val;
+          if (key === 'offsetT' || key === 'duration') {
+            clearQuickRangeValidationError();
+            resetQuickRangeModeIfZero();
+          }
+          if (key === 'maxLen') {
+            collapseCustomMaxLenIfPreset(Number(val) || 0);
+          }
           const savePromise = saveCurrentSettings(true);
 
-          if (key === 'language' || key === 'modelPath' || key === 'threads') {
+          if (
+            key === 'language' ||
+            key === 'modelPath' ||
+            key === 'threads' ||
+            key === 'offsetT' ||
+            key === 'duration' ||
+            key === 'maxLen' ||
+            key === 'prompt'
+          ) {
             updateTranscribeUIConfigs();
           }
           if (key === 'selectedBackend') {
@@ -1238,13 +1298,13 @@ export function sanitizeSettingsPayload(state: any): any {
   }
   for (const key of Object.keys(clean)) {
     if (INT_SETTING_KEYS.has(key)) {
-      const parsed = parseInt(clean[key]);
-      clean[key] = isNaN(parsed) ? (key === 'maxContext' ? -1 : 0) : parsed;
+      clean[key] = clampIntSettingValue(key, clean[key]);
     } else if (FLOAT_SETTING_KEYS.has(key)) {
-      const parsed = parseFloat(clean[key]);
+      const parsed = parseFloat(normalizeDigitsToAscii(String(clean[key] ?? '')));
       clean[key] = isNaN(parsed) ? (key === 'vadMaxSpeech' ? 30.0 : 0.0) : parsed;
     }
   }
+  ensureAtLeastOneOutputFormat(clean);
   return clean;
 }
 
@@ -1258,10 +1318,9 @@ export async function saveCurrentSettings(immediate = false): Promise<void> {
 
   for (const key of Object.keys(current)) {
     if (INT_SETTING_KEYS.has(key) && typeof current[key] === 'string') {
-      const parsed = parseInt(current[key]);
-      current[key] = isNaN(parsed) ? (key === 'maxContext' ? -1 : 0) : parsed;
+      current[key] = clampIntSettingValue(key, current[key]);
     } else if (FLOAT_SETTING_KEYS.has(key) && typeof current[key] === 'string') {
-      const parsed = parseFloat(current[key]);
+      const parsed = parseFloat(normalizeDigitsToAscii(current[key]));
       current[key] = isNaN(parsed) ? (key === 'vadMaxSpeech' ? 30.0 : 0.0) : parsed;
     }
   }
@@ -1318,6 +1377,7 @@ export async function confirmResetWhisperEngine(): Promise<void> {
     if (updated) {
       setSettingsState(updated);
     }
+    resetQuickDeckState();
     bindSettingsToDOM();
     updateTranscribeUIConfigs();
     if (typeof refreshBuildStatuses === 'function') {
@@ -1351,6 +1411,9 @@ export function getStepperBounds(inputId: string): { min: number; max: number } 
     min = 1;
   } else if (inputId === 'opt-deviceId' || inputId === 'opt-maxLen') {
     min = 0;
+  } else if (inputId === 'quick-adv-maxLen') {
+    min = 1;
+    max = 500;
   } else if (inputId === 'opt-maxContext') {
     min = -1;
   } else if (inputId === 'opt-bestOf' || inputId === 'opt-beamSize') {
@@ -1369,7 +1432,7 @@ export function updateStepperButtonStates(inputOrId: string | HTMLInputElement):
 
   const decBtn = ctrl.querySelector('button:first-child') as HTMLButtonElement | null;
   const incBtn = ctrl.querySelector('button:last-child') as HTMLButtonElement | null;
-  const val = parseInt(input.value);
+  const val = parseInt(normalizeDigitsToAscii(input.value), 10);
   const { min, max } = getStepperBounds(input.id);
 
   if (decBtn) {
@@ -1388,12 +1451,14 @@ export function updateAllStepperButtons(): void {
 }
 
 export function clampNumberSetting(inputId: string, val: any): number {
-  let num = parseInt(val);
+  let num = parseInt(normalizeDigitsToAscii(String(val ?? '')), 10);
   if (isNaN(num)) num = (inputId === 'opt-maxContext' ? -1 : 0);
 
   const { min, max } = getStepperBounds(inputId);
-  if (num < min) num = min;
-  if (num > max) num = max;
+  const safeMin = Math.max(min, -MAX_I32 - 1);
+  const safeMax = Math.min(max, MAX_I32);
+  if (num < safeMin) num = safeMin;
+  if (num > safeMax) num = safeMax;
   return num;
 }
 
@@ -1401,7 +1466,7 @@ export function incrementNumber(inputId: string, step = 1, immediate = false): v
   if (typeof document === 'undefined') return;
   const el = document.getElementById(inputId) as HTMLInputElement | null;
   if (el) {
-    let currentVal = parseInt(el.value);
+    let currentVal = parseInt(normalizeDigitsToAscii(el.value), 10);
     if (isNaN(currentVal)) currentVal = (inputId === 'opt-maxContext' ? -1 : 0);
     const nextVal = clampNumberSetting(inputId, currentVal + step);
     el.value = String(nextVal);
@@ -1412,6 +1477,16 @@ export function incrementNumber(inputId: string, step = 1, immediate = false): v
     if (current && key in current) {
       current[key] = nextVal;
       saveCurrentSettings(immediate);
+      if (key === 'maxLen' || key === 'threads' || key === 'offsetT' || key === 'duration') {
+        if (key === 'offsetT' || key === 'duration') {
+          clearQuickRangeValidationError();
+          resetQuickRangeModeIfZero();
+        }
+        if (key === 'maxLen') {
+          collapseCustomMaxLenIfPreset(nextVal);
+        }
+        updateTranscribeUIConfigs();
+      }
     }
   }
 }
@@ -1420,7 +1495,7 @@ export function decrementNumber(inputId: string, step = 1, immediate = false): v
   if (typeof document === 'undefined') return;
   const el = document.getElementById(inputId) as HTMLInputElement | null;
   if (el) {
-    let currentVal = parseInt(el.value);
+    let currentVal = parseInt(normalizeDigitsToAscii(el.value), 10);
     if (isNaN(currentVal)) currentVal = (inputId === 'opt-maxContext' ? -1 : 0);
     const nextVal = clampNumberSetting(inputId, currentVal - step);
     el.value = String(nextVal);
@@ -1431,6 +1506,16 @@ export function decrementNumber(inputId: string, step = 1, immediate = false): v
     if (current && key in current) {
       current[key] = nextVal;
       saveCurrentSettings(immediate);
+      if (key === 'maxLen' || key === 'threads' || key === 'offsetT' || key === 'duration') {
+        if (key === 'offsetT' || key === 'duration') {
+          clearQuickRangeValidationError();
+          resetQuickRangeModeIfZero();
+        }
+        if (key === 'maxLen') {
+          collapseCustomMaxLenIfPreset(nextVal);
+        }
+        updateTranscribeUIConfigs();
+      }
     }
   }
 }
@@ -1439,8 +1524,11 @@ export function setupNumberInputControls(): void {
   if (typeof document === 'undefined') return;
   document.querySelectorAll('.number-input-control').forEach(ctrl => {
     const input = ctrl.querySelector('input') as HTMLInputElement | null;
-    if (!input || (ctrl as any)._stepperInitialized) {
-      if (input) updateStepperButtonStates(input);
+    if (!input || ctrl.hasAttribute('data-custom-stepper') || input.id === 'quick-adv-maxLen') {
+      return;
+    }
+    if ((ctrl as any)._stepperInitialized) {
+      updateStepperButtonStates(input);
       return;
     }
     (ctrl as any)._stepperInitialized = true;
@@ -1452,15 +1540,39 @@ export function setupNumberInputControls(): void {
       if (match) step = parseFloat(match[1]) || 1;
     }
 
+    let hasUncommittedInput = false;
+
     const commitValue = (immediate = true) => {
-      const clamped = clampNumberSetting(input.id, input.value);
-      input.value = String(clamped);
-      updateStepperButtonStates(input);
+      const rawVal = input.value;
+      const clamped = clampNumberSetting(input.id, rawVal);
       const key = input.id.replace('opt-', '');
       const current = getSettingsState();
+      const alreadySynced =
+        !hasUncommittedInput &&
+        rawVal === String(clamped) &&
+        Boolean(current && key in current && current[key] === clamped);
+
+      if (alreadySynced) {
+        updateStepperButtonStates(input);
+        return;
+      }
+
+      hasUncommittedInput = false;
+      input.value = String(clamped);
+      updateStepperButtonStates(input);
       if (current && key in current) {
         current[key] = clamped;
+        if (key === 'offsetT' || key === 'duration') {
+          clearQuickRangeValidationError();
+          resetQuickRangeModeIfZero();
+        }
+        if (key === 'maxLen') {
+          collapseCustomMaxLenIfPreset(clamped);
+        }
         saveCurrentSettings(immediate);
+        if (key === 'threads' || key === 'offsetT' || key === 'duration' || key === 'maxLen') {
+          updateTranscribeUIConfigs();
+        }
       }
     };
 
@@ -1482,6 +1594,7 @@ export function setupNumberInputControls(): void {
         commitValue(true);
         input.blur();
       } else if (e.key === 'Escape') {
+        hasUncommittedInput = false;
         const key = input.id.replace('opt-', '');
         const current = getSettingsState();
         if (current && key in current) {
@@ -1497,7 +1610,8 @@ export function setupNumberInputControls(): void {
     });
 
     input.addEventListener('input', () => {
-      let cleaned = input.value.replace(/[^0-9\-]/g, '');
+      hasUncommittedInput = true;
+      let cleaned = input.value.replace(/[^0-9\u06F0-\u06F9\u0660-\u0669\-]/g, '');
       if (cleaned.lastIndexOf('-') > 0) {
         cleaned = cleaned.charAt(0) === '-' ? '-' + cleaned.replace(/\-/g, '') : cleaned.replace(/\-/g, '');
       }
@@ -1505,8 +1619,9 @@ export function setupNumberInputControls(): void {
       updateStepperButtonStates(input);
       const key = input.id.replace('opt-', '');
       const current = getSettingsState();
-      if (cleaned !== '' && cleaned !== '-' && current && key in current) {
-        const num = clampNumberSetting(input.id, cleaned);
+      const asciiCleaned = normalizeDigitsToAscii(cleaned);
+      if (asciiCleaned !== '' && asciiCleaned !== '-' && current && key in current) {
+        const num = clampNumberSetting(input.id, asciiCleaned);
         current[key] = num;
         saveCurrentSettings(false);
       }
@@ -1561,6 +1676,10 @@ export function toggleOutputDirCustomField(): void {
   }
   if (typeof updateTranscribeOutputDirUI === 'function') {
     updateTranscribeOutputDirUI();
+  }
+  const win = getGlobal();
+  if (typeof win.syncCustomSelects === 'function') {
+    win.syncCustomSelects();
   }
 }
 
@@ -1672,7 +1791,7 @@ export async function browseTranscribeOutputDir(): Promise<void> {
         }
         await saveCurrentSettings();
       }
-      updateTranscribeOutputDirUI();
+      toggleOutputDirCustomField();
     }
   } catch (err) {
     console.error('Failed to select transcribe output directory:', err);
@@ -1688,10 +1807,10 @@ export async function resetTranscribeOutputDir(): Promise<void> {
   try {
     const current = getSettingsState();
     if (current) {
-      current.outputDirMode = 'source';
+      current.outputDirMode = 'input_dir';
       current.outputDirPath = '';
       const optMode = document.getElementById('opt-outputDirMode') as HTMLSelectElement | null;
-      if (optMode) optMode.value = 'source';
+      if (optMode) optMode.value = 'input_dir';
       const optPath = document.getElementById('opt-outputDirPath') as HTMLInputElement | null;
       if (optPath) {
         optPath.value = '';
@@ -1699,7 +1818,7 @@ export async function resetTranscribeOutputDir(): Promise<void> {
       }
       await saveCurrentSettings();
     }
-    updateTranscribeOutputDirUI();
+    toggleOutputDirCustomField();
   } finally {
     if (resetBtn) resetBtn.disabled = false;
   }
@@ -1723,217 +1842,6 @@ export function updateTranscribeOutputDirUI(): void {
     dirTextEl.removeAttribute('title');
     dirTextEl.classList.remove('has-custom-path');
     resetBtn.style.display = 'none';
-  }
-}
-
-// ----------------- Transcribe Quick Configuration Deck & UI Configs -----------------
-export function updateTranscribeUIConfigs(): void {
-  if (typeof document === 'undefined') return;
-  const current = getSettingsState();
-  if (!current) return;
-
-  const backend = current.selectedBackend || 'Standard';
-
-  const win = getGlobal();
-  const probed = win.probedMetadata;
-  if (probed && probed.exists && typeof win.renderMediaMetadata === 'function') {
-    win.renderMediaMetadata(probed);
-  }
-
-  // 1. Sync Quick Engine / Backend Select
-  const quickBackendSelect = document.getElementById('quick-opt-selectedBackend') as HTMLSelectElement | null;
-  if (quickBackendSelect) {
-    const backendDefs = [
-      { key: 'Standard', label: t('transcribe.backendCpu') },
-      { key: 'Vulkan', label: t('transcribe.backendVulkan') },
-      { key: 'CUDA', label: t('transcribe.backendCuda') },
-      { key: 'OpenVINO', label: t('transcribe.backendOpenvino') }
-    ];
-
-    const availableBackends = backendDefs.filter(b => b.key === 'Standard' || Boolean(compiledBackends[b.key]));
-    const currentKeys = Array.from(quickBackendSelect.options || []).map(o => o.value).join(',');
-    const targetKeys = availableBackends.map(b => b.key).join(',');
-    if (currentKeys !== targetKeys) {
-      quickBackendSelect.innerHTML = '';
-      availableBackends.forEach(b => {
-        const opt = document.createElement('option');
-        opt.value = b.key;
-        opt.textContent = b.label;
-        if (b.key === backend) {
-          opt.selected = true;
-        }
-        quickBackendSelect.appendChild(opt);
-      });
-    } else {
-      Array.from(quickBackendSelect.options || []).forEach(opt => {
-        const match = availableBackends.find(b => b.key === opt.value);
-        if (match && opt.textContent !== match.label) {
-          opt.textContent = match.label;
-        }
-      });
-    }
-    quickBackendSelect.value = backend;
-  }
-
-  // 2. Sync Quick Model Select
-  const quickModelSelect = document.getElementById('quick-opt-model') as HTMLSelectElement | null;
-  if (quickModelSelect && current.modelPath) {
-    quickModelSelect.value = current.modelPath;
-  }
-
-  // 3. Sync Quick Language Select
-  const quickLangSelect = document.getElementById('quick-opt-language') as HTMLSelectElement | null;
-  if (quickLangSelect) {
-    const targetLang = (current.language || 'auto').trim();
-    if (!quickLangSelect.options || quickLangSelect.options.length === 0) {
-      renderLanguageSelect(quickLangSelect, 'spoken', targetLang);
-    } else if (quickLangSelect.value !== targetLang) {
-      quickLangSelect.value = targetLang;
-    }
-  }
-
-  // 4. Sync Quick VAD Button State & Tooltip
-  const hasVadModel = Boolean(localScannedVadModels && localScannedVadModels.length > 0 && current.vadModel);
-  const vadActive = Boolean(current.vad && hasVadModel);
-  const vadModelName = current.vadModel ? getBasename(current.vadModel) : 'Default';
-
-  const quickVadBtn = document.getElementById('quick-toggle-vad') as HTMLInputElement | null;
-  if (quickVadBtn) {
-    if ('checked' in quickVadBtn && quickVadBtn.checked !== vadActive) {
-      quickVadBtn.checked = vadActive;
-    }
-    if (vadActive) {
-      quickVadBtn.classList.add('active');
-      quickVadBtn.title = `${t('transcribe.vadActive')} (${vadModelName}) - ${t('transcribe.vadDisableHint') || 'Click to disable'}`;
-    } else {
-      quickVadBtn.classList.remove('active');
-      if (hasVadModel) {
-        quickVadBtn.title = `${t('transcribe.vadDisabled')} (${vadModelName}) - ${t('transcribe.vadEnableHint') || 'Click to enable'}`;
-      } else {
-        quickVadBtn.title = t('toasts.noVadFound') || 'No Silero VAD model found on system';
-      }
-    }
-  }
-
-  updateTranscribeOutputDirUI();
-
-  if (typeof win.updateTranscribeWorkflowButtons === 'function') {
-    win.updateTranscribeWorkflowButtons();
-  }
-
-  if (typeof win.syncCustomSelects === 'function') {
-    win.syncCustomSelects();
-  }
-}
-
-export function openTranscriptionSettings(): void {
-  const win = getGlobal();
-  if (typeof win.switchView === 'function') {
-    win.switchView('settings');
-    switchSettingsCategory('transcription');
-  }
-}
-
-export function setupQuickConfigDeckEventListeners(): void {
-  if (typeof document === 'undefined') return;
-
-  const quickModelSelect = document.getElementById('quick-opt-model') as HTMLSelectElement | null;
-  if (quickModelSelect) {
-    quickModelSelect.addEventListener('change', () => {
-      const current = getSettingsState();
-      if (current && quickModelSelect.value) {
-        current.modelPath = quickModelSelect.value;
-        const cfgModelSelect = document.getElementById('opt-modelPath') as HTMLSelectElement | null;
-        if (cfgModelSelect) {
-          cfgModelSelect.value = quickModelSelect.value;
-        }
-        saveCurrentSettings();
-        updateTranscribeUIConfigs();
-      }
-    });
-  }
-
-  const quickLangSelect = document.getElementById('quick-opt-language') as HTMLSelectElement | null;
-  if (quickLangSelect) {
-    quickLangSelect.addEventListener('change', () => {
-      const current = getSettingsState();
-      if (current) {
-        current.language = quickLangSelect.value;
-        const cfgLangInput = document.getElementById('opt-language') as HTMLInputElement | null;
-        if (cfgLangInput) {
-          cfgLangInput.value = quickLangSelect.value;
-        }
-        saveCurrentSettings();
-        updateTranscribeUIConfigs();
-      }
-    });
-  }
-
-  const quickBackendSelect = document.getElementById('quick-opt-selectedBackend') as HTMLSelectElement | null;
-  if (quickBackendSelect) {
-    quickBackendSelect.addEventListener('change', async () => {
-      const backend = quickBackendSelect.value;
-      const isCompiled = backend === 'Standard' || Boolean(compiledBackends[backend]);
-      const current = getSettingsState();
-      if (!isCompiled) {
-        showNotification(t('toasts.backendNotFound', { backend: backend === 'Standard' ? 'CPU' : backend }), "error");
-        if (current) {
-          quickBackendSelect.value = current.selectedBackend;
-          const win = getGlobal();
-          if (typeof win.syncCustomSelects === 'function') win.syncCustomSelects();
-        }
-        return;
-      }
-      if (current) {
-        selectBackend(backend, false);
-        const cfgBackendSelect = document.getElementById('opt-selectedBackend') as HTMLSelectElement | null;
-        if (cfgBackendSelect) {
-          cfgBackendSelect.value = backend;
-        }
-      }
-    });
-  }
-}
-
-export function toggleQuickVad(forceVal?: boolean): void {
-  const current = getSettingsState();
-  if (!current) return;
-
-  const willEnable = (typeof forceVal === 'boolean') ? forceVal : !current.vad;
-  if (willEnable) {
-    const hasVadModel = Boolean(localScannedVadModels && localScannedVadModels.length > 0 && current.vadModel);
-    if (!hasVadModel) {
-      showNotification(t('toasts.noVadFound'), "warning");
-      const quickVadInput = document.getElementById('quick-toggle-vad') as HTMLInputElement | null;
-      if (quickVadInput) quickVadInput.checked = false;
-      return;
-    }
-  }
-
-  current.vad = willEnable;
-  const cfgVadCheckbox = document.getElementById('opt-vad') as HTMLInputElement | null;
-  if (cfgVadCheckbox) {
-    cfgVadCheckbox.checked = current.vad;
-  }
-  const quickVadInput = document.getElementById('quick-toggle-vad') as HTMLInputElement | null;
-  if (quickVadInput) {
-    quickVadInput.checked = current.vad;
-    const vadModelName = current.vadModel ? getBasename(current.vadModel) : 'Default';
-    if (current.vad) {
-      quickVadInput.classList.add('active');
-      quickVadInput.title = `${t('transcribe.vadActive')} (${vadModelName}) - ${t('transcribe.vadDisableHint') || 'Click to disable'}`;
-    } else {
-      quickVadInput.classList.remove('active');
-      quickVadInput.title = `${t('transcribe.vadDisabled')} (${vadModelName}) - ${t('transcribe.vadEnableHint') || 'Click to enable'}`;
-    }
-  }
-
-  if (typeof setTimeout === 'function') {
-    setTimeout(() => {
-      saveCurrentSettings();
-    }, 240);
-  } else {
-    saveCurrentSettings();
   }
 }
 
@@ -1992,6 +1900,18 @@ export function syncSettingsManagerWindowBindings(): void {
   win.updateTranscribeUIConfigs = updateTranscribeUIConfigs;
   win.openTranscriptionSettings = openTranscriptionSettings;
   win.toggleQuickVad = toggleQuickVad;
+  win.toggleQuickOutputFormat = toggleQuickOutputFormat;
+  win.applyRecommendedThreads = applyRecommendedThreads;
+  win.setQuickRangeMode = setQuickRangeMode;
+  win.resetTranscribeTimeRange = resetTranscribeTimeRange;
+  win.updateTranscribeRangeVisibility = updateTranscribeRangeVisibility;
+  win.validateAndApplyQuickTimeRange = validateAndApplyQuickTimeRange;
+  win.capturePlayerTimeForRange = capturePlayerTimeForRange;
+  win.setQuickMaxLen = setQuickMaxLen;
+  win.activateCustomMaxLen = activateCustomMaxLen;
+  win.stepQuickMaxLen = stepQuickMaxLen;
+  win.syncQuickTimeRangeUI = syncQuickTimeRangeUI;
+  win.updateDeckScrollCue = updateDeckScrollCue;
   win.saveCurrentSettings = saveCurrentSettings;
   win.refreshSettings = refreshSettings;
   win.refreshBuildStatuses = refreshBuildStatuses;
@@ -2057,6 +1977,19 @@ export function syncSettingsManagerWindowBindings(): void {
   }
 }
 
+registerTranscribeDeckHost({
+  getSettingsState,
+  getCompiledBackends,
+  getLocalScannedVadModels,
+  saveCurrentSettings,
+  selectBackend,
+  switchSettingsCategory,
+  updateTranscribeOutputDirUI,
+  safeApplyDynamicDirection,
+  updateStepperButtonStates,
+  notifyDeckScrollCue: updateDeckScrollCue
+});
+
 if (typeof window !== 'undefined') {
   syncSettingsManagerWindowBindings();
 }
@@ -2111,6 +2044,19 @@ export const settingsManager = {
   openTranscriptionSettings,
   setupQuickConfigDeckEventListeners,
   toggleQuickVad,
+  toggleQuickOutputFormat,
+  applyRecommendedThreads,
+  setQuickRangeMode,
+  resetTranscribeTimeRange,
+  updateTranscribeRangeVisibility,
+  validateAndApplyQuickTimeRange,
+  capturePlayerTimeForRange,
+  setQuickMaxLen,
+  activateCustomMaxLen,
+  stepQuickMaxLen,
+  syncQuickOutputFormatsUI,
+  syncQuickTimeRangeUI,
+  syncQuickAdvancedUI,
   safeApplyDynamicDirection
 };
 

@@ -646,3 +646,18 @@ html[dir="rtl"] #hardsub-subtitle-list {
   padding: 4px 10px 10px 10px;
 }
 
+/* 14. Transcribe Setup Quick Deck Extensions in RTL */
+html[dir="rtl"] .transcribe-time-input,
+html[dir="rtl"] .transcribe-trim-bar {
+  direction: ltr !important;
+  unicode-bidi: isolate;
+}
+
+html[dir="rtl"] .transcribe-time-input {
+  text-align: end;
+}
+
+html[dir="rtl"] .transcribe-range-field label {
+  text-align: start;
+}
+

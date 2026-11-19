@@ -15,7 +15,12 @@ import {
   getSettingsState,
   saveCurrentSettings,
   compiledBackends,
-  localScannedTransModels
+  localScannedTransModels,
+  resetTranscribeTimeRange,
+  updateTranscribeRangeVisibility,
+  validateAndApplyQuickTimeRange,
+  syncQuickTimeRangeUI,
+  updateDeckScrollCue
 } from './settingsManager';
 import { batchProcessor, addBatchFiles } from './batchProcessor';
 import { escapeHTML, logsController } from './logsController';
@@ -232,10 +237,9 @@ export function clearSingleMediaFile(): void {
   }
   void (transcriptViewer.flushEdits ? transcriptViewer.flushEdits() : flushPendingTranscriptEdits());
   setSelectedMediaFile(null);
-  batchProcessor.setSelectedFiles([]);
+  batchProcessor.resetQueueState();
   setWavPathForTranscription(null);
   setProbedMetadata(null);
-  batchProcessor.setIsBatchMode(false);
 
   const win = getGlobal();
   if (typeof win.unloadCompanionPlayer === 'function') {
@@ -300,6 +304,10 @@ export function clearSingleMediaFile(): void {
   }
   if (durEl) durEl.removeAttribute('title');
 
+  resetTranscribeTimeRange(false);
+  updateTranscribeRangeVisibility(false);
+  updateDeckScrollCue();
+
   const currentSettings = getSettingsState();
   if (currentSettings) {
     currentSettings.inputFile = '';
@@ -350,6 +358,7 @@ export function resetTelemetryHud(): void {
   if (msgEl) {
     delete (msgEl.dataset as any).batchSummarySuccess;
     delete (msgEl.dataset as any).batchSummaryTotal;
+    delete (msgEl.dataset as any).batchSummarySkipped;
     delete (msgEl.dataset as any).statusCompleted;
     msgEl.setAttribute('data-i18n', 'transcribe.standingBy');
     msgEl.textContent = t('transcribe.standingBy');
@@ -421,6 +430,52 @@ export function applySingleFileSelectedUI(filePath: string): void {
   if (runBtn) runBtn.style.display = 'inline-flex';
   const cancelBtn = document.getElementById('btn-cancel-transcribe');
   if (cancelBtn) cancelBtn.style.display = 'none';
+  updateDeckScrollCue();
+}
+
+async function selectSingleMediaFile(filePath: string, hadPriorMedia: boolean): Promise<void> {
+  // Invalidate any in-flight batch probes and clear stale batch items before entering single-file mode
+  batchProcessor.resetQueueState();
+  batchProcessor.setSelectedFiles([filePath]);
+
+  // Unload companion player and reset previous session state before loading new file
+  const win = getGlobal();
+  if (typeof win.unloadCompanionPlayer === 'function') {
+    win.unloadCompanionPlayer();
+  }
+
+  setSelectedMediaFile(filePath);
+  applySingleFileSelectedUI(filePath);
+
+  setWavPathForTranscription(null);
+  setProbedMetadata(null);
+  setLastTranscribedSubtitlePath(null);
+  setLastTranscribedVideoPath(null);
+  setLastTranscribedOutputDir(null);
+  setLastTranscribedOutputFiles([]);
+  resetTranscriptViewport();
+  resetTelemetryHud();
+  if (hadPriorMedia) {
+    resetTranscribeTimeRange(false);
+  } else {
+    syncQuickTimeRangeUI();
+  }
+  updateTranscribeRangeVisibility(false);
+  updateTranscribeWorkflowButtons();
+  updateTranscribeActionButtons(false);
+
+  const currentSettings = getSettingsState();
+  if (currentSettings) {
+    currentSettings.inputFile = filePath;
+    saveCurrentSettings();
+  }
+
+  setWizardStepCompleted(1, true);
+  await probeSelectedFile();
+  const probed = getProbedMetadata();
+  if (probed?.exists && getSelectedMediaFile() === filePath) {
+    void loadMediaIntoCompanionPlayer(filePath, false, probed.durationSec);
+  }
 }
 
 export async function browseMediaFile(): Promise<void> {
@@ -443,39 +498,13 @@ export async function browseMediaFile(): Promise<void> {
       return;
     }
 
+    const hadPriorMedia = Boolean(
+      getSelectedMediaFile() || batchProcessor.getIsBatchMode() || batchProcessor.getItems().length > 0
+    );
     batchProcessor.setSelectedFiles(files);
 
     if (files.length === 1) {
-      batchProcessor.setIsBatchMode(false);
-
-      // Unload companion player and reset previous session completely (acts like Clear)
-      const win = getGlobal();
-      if (typeof win.unloadCompanionPlayer === 'function') {
-        win.unloadCompanionPlayer();
-      }
-
-      setSelectedMediaFile(files[0]);
-
-      applySingleFileSelectedUI(files[0]);
-
-      setWavPathForTranscription(null);
-      setLastTranscribedSubtitlePath(null);
-      setLastTranscribedVideoPath(null);
-      setLastTranscribedOutputDir(null);
-      setLastTranscribedOutputFiles([]);
-      resetTranscriptViewport();
-      resetTelemetryHud();
-      updateTranscribeWorkflowButtons();
-      updateTranscribeActionButtons(false);
-
-      const currentSettings = getSettingsState();
-      if (currentSettings) {
-        currentSettings.inputFile = files[0];
-        saveCurrentSettings();
-      }
-
-      setWizardStepCompleted(1, true);
-      await probeSelectedFile();
+      await selectSingleMediaFile(files[0], hadPriorMedia);
     } else {
       const win = getGlobal();
       if (typeof win.unloadCompanionPlayer === 'function') {
@@ -570,6 +599,7 @@ export async function probeSelectedFile(): Promise<void> {
 
   try {
     const meta = await invoke('probe_media_file', { filePath: currentMedia });
+    if (getSelectedMediaFile() !== currentMedia) return;
     setProbedMetadata(meta);
 
     if (meta.exists) {
@@ -580,6 +610,11 @@ export async function probeSelectedFile(): Promise<void> {
 
         setWizardStepCompleted(2, true);
         openWizardStep(2);
+        syncQuickTimeRangeUI();
+        const currentSettings = getSettingsState();
+        if (currentSettings && (Number(currentSettings.offsetT || 0) > 0 || Number(currentSettings.duration || 0) > 0)) {
+          validateAndApplyQuickTimeRange(true);
+        }
 
         const fillBar = document.getElementById('progress-linear-fill');
         if (fillBar) fillBar.style.width = '0%';
@@ -592,17 +627,20 @@ export async function probeSelectedFile(): Promise<void> {
         if (msgEl) {
           delete (msgEl.dataset as any).batchSummarySuccess;
           delete (msgEl.dataset as any).batchSummaryTotal;
+          delete (msgEl.dataset as any).batchSummarySkipped;
           msgEl.setAttribute('data-i18n', 'transcribe.readyForTranscription');
           msgEl.textContent = t('transcribe.readyForTranscription');
         }
 
         setWizardStepCompleted(3, false);
+        updateDeckScrollCue();
       }
     } else {
       showNotification(t('toasts.fileNotFoundOrInvalid'), "error");
       clearSingleMediaFile();
     }
   } catch (e) {
+    if (getSelectedMediaFile() !== currentMedia) return;
     console.error("Probing failed:", e);
     showNotification(t('toasts.metaReadError'), "error");
     clearSingleMediaFile();
@@ -645,7 +683,16 @@ export async function runWhisperTranscription(): Promise<void> {
     return;
   }
 
-  const currentSettings = getSettingsState();
+  if (!validateAndApplyQuickTimeRange(true)) {
+    showNotification(
+      t('transcribe.rangeErrorInvalidAction') || 'Please fix the custom time range before transcribing.',
+      'error'
+    );
+    return;
+  }
+
+  const liveSettings = getSettingsState();
+  const currentSettings = liveSettings ? { ...liveSettings } : null;
   const backend = currentSettings?.selectedBackend || 'Standard';
   const isCompiled = backend === 'Standard' || Boolean(compiledBackends[backend]);
   if (!isCompiled) {
@@ -831,13 +878,13 @@ export async function runWhisperTranscription(): Promise<void> {
       const mediaToPlay = currentMedia || (currentSettings ? currentSettings.inputFile : null);
       if (mediaToPlay) {
         try {
-          await loadMediaIntoCompanionPlayer(mediaToPlay);
+          await loadMediaIntoCompanionPlayer(mediaToPlay, true, currentProbed?.durationSec);
         } catch (playerErr) {
           console.warn('Could not load media into companion player:', playerErr);
         }
       }
 
-      // Scroll transcript viewer to top and highlight initial segment for synchronized UX
+      // Scroll transcript viewer to top and synchronize companion player/highlight with first segment
       const viewport = document.getElementById('transcript-viewport') as any;
       if (viewport) {
         if (viewport._scrollDebounce) {
@@ -846,8 +893,14 @@ export async function runWhisperTranscription(): Promise<void> {
         }
         viewport.scrollTop = 0;
       }
-      if (typeof win.highlightActiveTranscriptSegment === 'function') {
-        const firstLine = transcriptViewer.lines && transcriptViewer.lines.length > 0 ? transcriptViewer.lines[0] : null;
+      const firstLine = transcriptViewer.lines && transcriptViewer.lines.length > 0 ? transcriptViewer.lines[0] : null;
+      const firstStartMs =
+        typeof firstLine?.startMs === 'number' && firstLine.startMs >= 0
+          ? firstLine.startMs
+          : Math.max(0, Number(currentSettings?.offsetT || 0));
+      if (typeof win.seekCompanionPlayer === 'function') {
+        win.seekCompanionPlayer(firstStartMs, false, firstLine?.id);
+      } else if (typeof win.highlightActiveTranscriptSegment === 'function') {
         win.highlightActiveTranscriptSegment(0, firstLine?.id);
       }
     }
@@ -875,6 +928,7 @@ export async function runWhisperTranscription(): Promise<void> {
     if (msgEl) {
       delete (msgEl.dataset as any).batchSummarySuccess;
       delete (msgEl.dataset as any).batchSummaryTotal;
+      delete (msgEl.dataset as any).batchSummarySkipped;
       (msgEl.dataset as any).statusCompleted = 'true';
       msgEl.setAttribute('data-i18n', 'transcribe.progressComplete');
       msgEl.textContent = t('transcribe.progressComplete');
@@ -893,7 +947,8 @@ export async function runWhisperTranscription(): Promise<void> {
 
     // Auto-Transfer to Translation Studio if enabled
     const autoTransferEnabled = Boolean(currentSettings?.autoTransferToTranslate ?? currentSettings?.translateAiEnabled);
-    if (autoTransferEnabled && workflowBridge.getLastTranscribedSubtitlePath()) {
+    const transferTarget = workflowBridge.getTranslatableOutputPath?.() || workflowBridge.getLastTranscribedSubtitlePath();
+    if (autoTransferEnabled && transferTarget) {
       await sendTranscribeToTranslationStudio();
     }
   } catch (e: any) {
@@ -915,6 +970,7 @@ export async function runWhisperTranscription(): Promise<void> {
       if (msgEl) {
         delete (msgEl.dataset as any).batchSummarySuccess;
         delete (msgEl.dataset as any).batchSummaryTotal;
+        delete (msgEl.dataset as any).batchSummarySkipped;
         delete (msgEl.dataset as any).statusCompleted;
         msgEl.setAttribute('data-i18n', 'transcribe.standingBy');
         msgEl.textContent = t('transcribe.standingBy');
@@ -930,6 +986,7 @@ export async function runWhisperTranscription(): Promise<void> {
       if (msgEl) {
         delete (msgEl.dataset as any).batchSummarySuccess;
         delete (msgEl.dataset as any).batchSummaryTotal;
+        delete (msgEl.dataset as any).batchSummarySkipped;
         delete (msgEl.dataset as any).statusCompleted;
         msgEl.setAttribute('data-i18n', 'transcribe.taskFailed');
         msgEl.textContent = t('transcribe.taskFailed');
@@ -1264,38 +1321,13 @@ export async function handleDroppedFiles(rawFiles: string[]): Promise<void> {
     return;
   }
 
+  const hadPriorMedia = Boolean(
+    getSelectedMediaFile() || batchProcessor.getIsBatchMode() || batchProcessor.getItems().length > 0
+  );
   batchProcessor.setSelectedFiles(files);
 
   if (files.length === 1) {
-    batchProcessor.setIsBatchMode(false);
-
-    // Unload companion player and reset previous session completely (acts like Clear)
-    if (typeof win.unloadCompanionPlayer === 'function') {
-      win.unloadCompanionPlayer();
-    }
-
-    setSelectedMediaFile(files[0]);
-
-    applySingleFileSelectedUI(files[0]);
-
-    setWavPathForTranscription(null);
-    setLastTranscribedSubtitlePath(null);
-    setLastTranscribedVideoPath(null);
-    setLastTranscribedOutputDir(null);
-    setLastTranscribedOutputFiles([]);
-    resetTranscriptViewport();
-    resetTelemetryHud();
-    updateTranscribeWorkflowButtons();
-    updateTranscribeActionButtons(false);
-
-    const currentSettings = getSettingsState();
-    if (currentSettings) {
-      currentSettings.inputFile = files[0];
-      saveCurrentSettings();
-    }
-
-    setWizardStepCompleted(1, true);
-    await probeSelectedFile();
+    await selectSingleMediaFile(files[0], hadPriorMedia);
   } else {
     await addBatchFiles(files);
     setTimeout(() => {

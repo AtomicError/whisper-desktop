@@ -499,7 +499,8 @@
                         </div>
                       </div>
                     </div>
-                    <div class="setting-control">
+                    <div class="setting-control setting-control--inline">
+                      <button type="button" class="btn-secondary btn-sm setting-auto-btn" id="btn-auto-threads" onclick="applyRecommendedThreads()" data-i18n="settings.autoDetectThreads" data-i18n-title="settings.autoDetectThreadsDesc" title="Auto-detect optimal CPU threads">Auto</button>
                       <div class="number-input-control">
                         <button onclick="decrementNumber('opt-threads', 1)" type="button" aria-label="Decrease Threads">-</button>
                         <input type="text" id="opt-threads" value="4" inputmode="numeric" autocomplete="off" aria-label="Threads Count" />

@@ -7,6 +7,7 @@ vi.mock('./appModal', () => ({
 
 import {
   settingsManager,
+  bindSettingsToDOM,
   formatFFmpegVersion,
   formatWhisperVersion,
   refreshWhisperStatus,
@@ -36,13 +37,32 @@ import {
   executeFilterSettings,
   refreshBuildStatuses,
   toggleQuickVad,
+  toggleQuickOutputFormat,
+  applyRecommendedThreads,
+  setQuickRangeMode,
+  resetTranscribeTimeRange,
+  updateTranscribeRangeVisibility,
+  validateAndApplyQuickTimeRange,
+  capturePlayerTimeForRange,
+  syncQuickTimeRangeUI,
+  setQuickMaxLen,
+  activateCustomMaxLen,
+  stepQuickMaxLen,
+  syncQuickAdvancedUI,
+  updateTranscribeUIConfigs,
+  setupNumberInputControls,
+  setupQuickConfigDeckEventListeners,
+  resetTranscribeOutputDir,
   syncSettingsManagerWindowBindings
 } from './settingsManager';
+import { resetQuickDeckState } from './transcribeQuickDeck';
+import { setLanguage } from '../i18n/index';
 
 // Headless DOM mock for Node runner
 class MockElement {
   public tagName: string;
   public id = '';
+  public type = '';
   public className = '';
   public value = '';
   public textContent = '';
@@ -163,6 +183,7 @@ class MockElement {
   }
 
   querySelector(selector: string): MockElement | null {
+    if (selector === 'input') return this.children.find(c => c.tagName === 'INPUT') || null;
     if (selector === 'button:first-child') return this.children[0] || null;
     if (selector === 'button:last-child') return this.children[this.children.length - 1] || null;
     if (selector === '.cat-match-badge') {
@@ -201,6 +222,14 @@ class MockElement {
   addEventListener(type: string, cb: (e: any) => void) {
     if (!this.listeners[type]) this.listeners[type] = [];
     this.listeners[type].push(cb);
+  }
+
+  dispatchEvent(event: { type: string; [key: string]: any }) {
+    const list = this.listeners[event.type] || [];
+    for (const cb of list) {
+      cb(event);
+    }
+    return true;
   }
 }
 
@@ -408,6 +437,16 @@ describe('settingsManager module', () => {
       const payload2 = { translateAiEnabled: false };
       const cleaned2 = sanitizeSettingsPayload(payload2);
       expect(cleaned2.autoTransferToTranslate).toBe(false);
+    });
+
+    it('enforces at least outputSrt=true when all four output formats are false', () => {
+      const cleaned = sanitizeSettingsPayload({
+        outputSrt: false,
+        outputVtt: false,
+        outputTxt: false,
+        outputLrc: false
+      });
+      expect(cleaned.outputSrt).toBe(true);
     });
 
     it('handles null/undefined gracefully', () => {
@@ -726,6 +765,1020 @@ describe('settingsManager module', () => {
 
       setActiveSettingsCat('advanced');
       expect(win.activeSettingsCat).toBe('advanced');
+    });
+  });
+
+  describe('Transcribe Studio Quick Config & Settings Synergy', () => {
+    it('prevents disabling all output formats via toggleQuickOutputFormat and syncs pills & Settings', () => {
+      const srtPill = new MockElement('BUTTON');
+      srtPill.id = 'quick-fmt-srt';
+      const vttPill = new MockElement('BUTTON');
+      vttPill.id = 'quick-fmt-vtt';
+      const optSrt = new MockElement('INPUT');
+      optSrt.id = 'opt-outputSrt';
+      optSrt.type = 'checkbox';
+      const optVtt = new MockElement('INPUT');
+      optVtt.id = 'opt-outputVtt';
+      optVtt.type = 'checkbox';
+
+      elementRegistry.set('quick-fmt-srt', srtPill);
+      elementRegistry.set('quick-fmt-vtt', vttPill);
+      elementRegistry.set('opt-outputSrt', optSrt);
+      elementRegistry.set('opt-outputVtt', optVtt);
+
+      setSettingsState({ outputSrt: true, outputVtt: false, outputTxt: false, outputLrc: false });
+
+      // Cannot disable last active format (SRT)
+      toggleQuickOutputFormat('outputSrt');
+      expect(getSettingsState()?.outputSrt).toBe(true);
+      expect(srtPill.getAttribute('aria-pressed')).toBe('true');
+
+      // Enabling VTT succeeds and allows turning SRT off afterwards
+      toggleQuickOutputFormat('outputVtt');
+      expect(getSettingsState()?.outputVtt).toBe(true);
+      expect(optVtt.checked).toBe(true);
+      expect(vttPill.getAttribute('aria-pressed')).toBe('true');
+
+      toggleQuickOutputFormat('outputSrt');
+      expect(getSettingsState()?.outputSrt).toBe(false);
+      expect(optSrt.checked).toBe(false);
+    });
+
+    it('detects and applies recommended thread count from systemSpecs.cpu_cores', async () => {
+      const threadsInput = new MockElement('INPUT');
+      threadsInput.id = 'opt-threads';
+      threadsInput.value = '4';
+      elementRegistry.set('opt-threads', threadsInput);
+
+      (globalThis as any).window.systemSpecs = { cpu_cores: 16, total_ram_gb: 32, gpu_type: 'nvidia' };
+      setSettingsState({ threads: 4 });
+
+      await applyRecommendedThreads();
+
+      expect(getSettingsState()?.threads).toBe(8);
+      expect(threadsInput.value).toBe('8');
+    });
+
+    it('manages checkbox-controlled always-visible time range panel, trim slider sync, validation, and full reset safely', () => {
+      const rangeCheckbox = new MockElement('INPUT');
+      rangeCheckbox.id = 'quick-range-enabled';
+      rangeCheckbox.type = 'checkbox';
+      const inputsRow = new MockElement('DIV');
+      inputsRow.id = 'quick-range-inputs';
+      const sliderWrap = new MockElement('DIV');
+      sliderWrap.id = 'quick-range-slider-wrap';
+      const sliderStart = new MockElement('INPUT');
+      sliderStart.id = 'quick-range-slider-start';
+      const sliderEnd = new MockElement('INPUT');
+      sliderEnd.id = 'quick-range-slider-end';
+      const fillBar = new MockElement('DIV');
+      fillBar.id = 'quick-range-fill';
+      const startInput = new MockElement('INPUT');
+      startInput.id = 'quick-range-start';
+      const endInput = new MockElement('INPUT');
+      endInput.id = 'quick-range-end';
+      const hintEl = new MockElement('DIV');
+      hintEl.id = 'quick-range-hint';
+
+      elementRegistry.set(rangeCheckbox.id, rangeCheckbox);
+      elementRegistry.set(inputsRow.id, inputsRow);
+      elementRegistry.set(sliderWrap.id, sliderWrap);
+      elementRegistry.set(sliderStart.id, sliderStart);
+      elementRegistry.set(sliderEnd.id, sliderEnd);
+      elementRegistry.set(fillBar.id, fillBar);
+      elementRegistry.set(startInput.id, startInput);
+      elementRegistry.set(endInput.id, endInput);
+      elementRegistry.set(hintEl.id, hintEl);
+
+      (globalThis as any).window.probedMetadata = null;
+      setSettingsState({ offsetT: 0, duration: 0 });
+
+      // Remains visible (disabled state) before a file is probed so slider is always discoverable
+      setQuickRangeMode('custom');
+      expect(rangeCheckbox.checked).toBe(true);
+      expect(inputsRow.style.display).toBe('flex');
+      expect(inputsRow.classList.contains('is-inactive')).toBe(false);
+      expect(sliderWrap.style.display).toBe('flex');
+      expect(sliderWrap.classList.contains('is-disabled')).toBe(true);
+      expect(sliderStart.disabled).toBe(true);
+
+      // Once media duration is available, slider activates cleanly with exact bounds
+      (globalThis as any).window.probedMetadata = { exists: true, durationSec: 120 };
+      setQuickRangeMode('custom');
+      expect(sliderWrap.classList.contains('is-disabled')).toBe(false);
+      expect(sliderStart.disabled).toBe(false);
+
+      // Apply valid slice 00:30 -> 01:30 (60s duration on 120s media -> 25% start, 50% width)
+      startInput.value = '00:30';
+      endInput.value = '01:30';
+      expect(validateAndApplyQuickTimeRange(true)).toBe(true);
+      expect(getSettingsState()?.offsetT).toBe(30_000);
+      expect(getSettingsState()?.duration).toBe(60_000);
+      expect(fillBar.style['--trim-start-pct']).toBe('25.00%');
+      expect(fillBar.style['--trim-width-pct']).toBe('50.00%');
+      expect(sliderStart.value).toBe('30');
+      expect(sliderEnd.value).toBe('90');
+
+      // Invalid order blocks commit and sets error state in-place without hiding hintEl
+      startInput.value = '01:00';
+      endInput.value = '00:20';
+      expect(validateAndApplyQuickTimeRange(true)).toBe(false);
+      expect(hintEl.classList.contains('is-error')).toBe(true);
+
+      // Reset clears offsetT/duration, keeps panel visible in dimmed inactive Full File state
+      resetTranscribeTimeRange(false);
+      expect(getSettingsState()?.offsetT).toBe(0);
+      expect(getSettingsState()?.duration).toBe(0);
+      expect(rangeCheckbox.checked).toBe(false);
+      expect(inputsRow.style.display).toBe('flex');
+      expect(inputsRow.classList.contains('is-inactive')).toBe(true);
+    });
+
+    it('updates maxLen 4-option presets, reveals custom stepper only in Custom mode, and syncs prompt/splitWord', () => {
+      const pAuto = new MockElement('BUTTON');
+      pAuto.id = 'quick-maxlen-auto';
+      const p42 = new MockElement('BUTTON');
+      p42.id = 'quick-maxlen-42';
+      const p28 = new MockElement('BUTTON');
+      p28.id = 'quick-maxlen-28';
+      const pCustom = new MockElement('BUTTON');
+      pCustom.id = 'quick-maxlen-custom';
+      const customRow = new MockElement('DIV');
+      customRow.id = 'quick-maxlen-custom-row';
+      const maxLenInput = new MockElement('INPUT');
+      maxLenInput.id = 'quick-adv-maxLen';
+      const promptInput = new MockElement('TEXTAREA');
+      promptInput.id = 'quick-adv-prompt';
+      const splitChk = new MockElement('INPUT');
+      splitChk.id = 'quick-adv-splitWord';
+      splitChk.type = 'checkbox';
+
+      elementRegistry.set(pAuto.id, pAuto);
+      elementRegistry.set(p42.id, p42);
+      elementRegistry.set(p28.id, p28);
+      elementRegistry.set(pCustom.id, pCustom);
+      elementRegistry.set(customRow.id, customRow);
+      elementRegistry.set(maxLenInput.id, maxLenInput);
+      elementRegistry.set(promptInput.id, promptInput);
+      elementRegistry.set(splitChk.id, splitChk);
+
+      setSettingsState({
+        prompt: 'Domain term',
+        splitWord: true,
+        maxLen: 0
+      });
+
+      // Selecting preset hides custom stepper row
+      setQuickMaxLen(42);
+      expect(getSettingsState()?.maxLen).toBe(42);
+      expect(p42.getAttribute('aria-pressed')).toBe('true');
+      expect(pAuto.getAttribute('aria-pressed')).toBe('false');
+      expect(pCustom.getAttribute('aria-pressed')).toBe('false');
+      expect(customRow.style.display).toBe('none');
+
+      // Activating Custom reveals stepper row and stepping adjusts value cleanly
+      setQuickMaxLen(0);
+      expect(customRow.style.display).toBe('none');
+      activateCustomMaxLen();
+      expect(pCustom.getAttribute('aria-pressed')).toBe('true');
+      expect(customRow.style.display).toBe('flex');
+      expect(getSettingsState()?.maxLen).toBe(40);
+
+      stepQuickMaxLen(5);
+      expect(getSettingsState()?.maxLen).toBe(45);
+      expect(maxLenInput.value).toBe('45');
+
+      syncQuickAdvancedUI();
+      expect(promptInput.value).toBe('Domain term');
+      expect(splitChk.checked).toBe(true);
+    });
+
+    it('isolates #quick-adv-maxLen from setupNumberInputControls so ArrowUp/Down and Persian digits update settingsState.maxLen', () => {
+      const wrapper = new MockElement('DIV');
+      wrapper.className = 'number-input-control transcribe-number-control';
+      wrapper.setAttribute('data-custom-stepper', 'true');
+      const decBtn = new MockElement('BUTTON');
+      const maxLenInput = new MockElement('INPUT');
+      maxLenInput.id = 'quick-adv-maxLen';
+      maxLenInput.value = '40';
+      const incBtn = new MockElement('BUTTON');
+      wrapper.appendChild(decBtn);
+      wrapper.appendChild(maxLenInput);
+      wrapper.appendChild(incBtn);
+
+      const optMaxLen = new MockElement('INPUT');
+      optMaxLen.id = 'opt-maxLen';
+      optMaxLen.value = '40';
+
+      elementRegistry.set('quick-adv-maxLen', maxLenInput);
+      elementRegistry.set('opt-maxLen', optMaxLen);
+
+      const origQsa = document.querySelectorAll;
+      (document as any).querySelectorAll = (sel: string) => {
+        if (sel === '.number-input-control') return [wrapper];
+        return origQsa.call(document, sel);
+      };
+
+      try {
+        setSettingsState({ maxLen: 40 });
+        setupNumberInputControls();
+        setupQuickConfigDeckEventListeners();
+
+        // setupNumberInputControls must skip data-custom-stepper
+        expect((wrapper as any)._stepperInitialized).toBeUndefined();
+
+        // ArrowUp updates settingsState.maxLen and #opt-maxLen directly
+        maxLenInput.dispatchEvent({ type: 'keydown', key: 'ArrowUp', preventDefault: vi.fn() });
+        expect(getSettingsState()?.maxLen).toBe(41);
+        expect(optMaxLen.value).toBe('41');
+
+        // Typing Persian digits preserves input and updates maxLen
+        maxLenInput.value = '۴۸';
+        maxLenInput.dispatchEvent({ type: 'input' });
+        expect(maxLenInput.value).toBe('۴۸');
+        expect(getSettingsState()?.maxLen).toBe(48);
+        expect(optMaxLen.value).toBe('48');
+      } finally {
+        (document as any).querySelectorAll = origQsa;
+      }
+    });
+
+    it('supports global time range slicing in Batch Mode with slider hidden, short-file warning, and all-short rejection', () => {
+      const rangeGroup = new MockElement('DIV');
+      rangeGroup.id = 'quick-range-group';
+      const rangeCheckbox = new MockElement('INPUT');
+      rangeCheckbox.id = 'quick-range-enabled';
+      rangeCheckbox.type = 'checkbox';
+      const inputsRow = new MockElement('DIV');
+      inputsRow.id = 'quick-range-inputs';
+      const sliderWrap = new MockElement('DIV');
+      sliderWrap.id = 'quick-range-slider-wrap';
+      const btnStartPlayer = new MockElement('BUTTON');
+      btnStartPlayer.id = 'btn-range-start-player';
+      const btnEndPlayer = new MockElement('BUTTON');
+      btnEndPlayer.id = 'btn-range-end-player';
+      const startInput = new MockElement('INPUT');
+      startInput.id = 'quick-range-start';
+      const endInput = new MockElement('INPUT');
+      endInput.id = 'quick-range-end';
+      const hintEl = new MockElement('DIV');
+      hintEl.id = 'quick-range-hint';
+      hintEl.setAttribute('data-i18n', 'transcribe.rangeFullMedia');
+
+      elementRegistry.set(rangeGroup.id, rangeGroup);
+      elementRegistry.set(rangeCheckbox.id, rangeCheckbox);
+      elementRegistry.set(inputsRow.id, inputsRow);
+      elementRegistry.set(sliderWrap.id, sliderWrap);
+      elementRegistry.set(btnStartPlayer.id, btnStartPlayer);
+      elementRegistry.set(btnEndPlayer.id, btnEndPlayer);
+      elementRegistry.set(startInput.id, startInput);
+      elementRegistry.set(endInput.id, endInput);
+      elementRegistry.set(hintEl.id, hintEl);
+
+      const win = globalThis as any;
+      win.window.isBatchMode = true;
+      win.window.batchItems = [{ durationSec: 40 }, { durationSec: 180 }];
+      setSettingsState({ offsetT: 0, duration: 0 });
+
+      updateTranscribeRangeVisibility(true);
+      expect(rangeGroup.style.display).toBe('flex');
+      expect(inputsRow.classList.contains('is-batch-mode')).toBe(true);
+      expect(sliderWrap.style.display).toBe('none');
+      expect(btnStartPlayer.style.display).toBe('none');
+      expect(btnEndPlayer.style.display).toBe('none');
+      expect(hintEl.getAttribute('data-i18n')).toBe('transcribe.rangeFullMedia');
+
+      // Custom slice 01:00 -> End warns about the 40s file while staying valid for the 180s file
+      setQuickRangeMode('custom');
+      startInput.value = '01:00';
+      endInput.value = '';
+      expect(validateAndApplyQuickTimeRange(true)).toBe(true);
+      expect(getSettingsState()?.offsetT).toBe(60_000);
+      expect(hintEl.classList.contains('is-warning')).toBe(true);
+      expect(hintEl.getAttribute('data-i18n')).toBeNull();
+
+      // Start 05:00 exceeds all batch durations -> rejected with error
+      startInput.value = '05:00';
+      expect(validateAndApplyQuickTimeRange(true)).toBe(false);
+      expect(hintEl.classList.contains('is-error')).toBe(true);
+
+      // Resetting restores data-i18n="transcribe.rangeFullMedia"
+      resetTranscribeTimeRange(false);
+      expect(hintEl.getAttribute('data-i18n')).toBe('transcribe.rangeFullMedia');
+      win.window.isBatchMode = false;
+      win.window.batchItems = [];
+    });
+
+    it('resets transcribe outputDirMode to input_dir matching Settings options', async () => {
+      const optMode = new MockElement('SELECT');
+      optMode.id = 'opt-outputDirMode';
+      optMode.value = 'custom';
+      elementRegistry.set('opt-outputDirMode', optMode);
+      setSettingsState({ outputDirMode: 'custom', outputDirPath: '/tmp/out' });
+
+      await resetTranscribeOutputDir();
+      expect(getSettingsState()?.outputDirMode).toBe('input_dir');
+      expect(optMode.value).toBe('input_dir');
+    });
+
+    it('preserves invalid Time Range draft inputs and error state across updateTranscribeUIConfigs calls', () => {
+      resetQuickDeckState();
+      const startInput = new MockElement('INPUT');
+      startInput.id = 'quick-range-start';
+      const endInput = new MockElement('INPUT');
+      endInput.id = 'quick-range-end';
+      const hintEl = new MockElement('DIV');
+      hintEl.id = 'quick-range-hint';
+      elementRegistry.set(startInput.id, startInput);
+      elementRegistry.set(endInput.id, endInput);
+      elementRegistry.set(hintEl.id, hintEl);
+
+      const win = globalThis as any;
+      win.window.probedMetadata = { exists: true, durationSec: 90 };
+      setSettingsState({ offsetT: 10_000, duration: 20_000 });
+
+      setQuickRangeMode('custom');
+      startInput.value = '02:30';
+      endInput.value = '00:45';
+      expect(validateAndApplyQuickTimeRange(true)).toBe(false);
+      expect(hintEl.classList.contains('is-error')).toBe(true);
+
+      // Re-syncing UI (e.g. toggling another setting or language change) must not clobber invalid inputs
+      updateTranscribeUIConfigs();
+      expect(startInput.value).toBe('02:30');
+      expect(endInput.value).toBe('00:45');
+      expect(hintEl.classList.contains('is-error')).toBe(true);
+
+      resetQuickDeckState();
+      win.window.probedMetadata = null;
+    });
+
+    it('collapses Quick Deck custom Line Length when preset value is entered in Settings and displays maxLen > 500 accurately', () => {
+      resetQuickDeckState();
+      const origQsa = (document as any).querySelectorAll;
+      const optMaxLen = new MockElement('INPUT');
+      optMaxLen.id = 'opt-maxLen';
+      optMaxLen.value = '35';
+      const wrap = new MockElement('DIV');
+      wrap.className = 'number-input-control';
+      (wrap as any).querySelector = (sel: string) => (sel === 'input' ? optMaxLen : null);
+
+      const autoBtn = new MockElement('BUTTON');
+      autoBtn.id = 'quick-maxlen-auto';
+      const p28Btn = new MockElement('BUTTON');
+      p28Btn.id = 'quick-maxlen-28';
+      const p42Btn = new MockElement('BUTTON');
+      p42Btn.id = 'quick-maxlen-42';
+      const customBtn = new MockElement('BUTTON');
+      customBtn.id = 'quick-maxlen-custom';
+      const customRow = new MockElement('DIV');
+      customRow.id = 'quick-maxlen-custom-row';
+      const quickMaxLenInput = new MockElement('INPUT');
+      quickMaxLenInput.id = 'quick-adv-maxLen';
+
+      [optMaxLen, autoBtn, p28Btn, p42Btn, customBtn, customRow, quickMaxLenInput].forEach(el =>
+        elementRegistry.set(el.id, el)
+      );
+
+      (document as any).querySelectorAll = (sel: string) =>
+        sel === '.number-input-control' ? [wrap] : [];
+
+      try {
+        setSettingsState({ maxLen: 0 });
+        setupNumberInputControls();
+        activateCustomMaxLen();
+        expect(customBtn.classList.contains('active')).toBe(true);
+
+        // Entering preset '42' in Settings #opt-maxLen collapses Custom row back to the 42 pill
+        optMaxLen.value = '42';
+        optMaxLen.dispatchEvent({ type: 'blur' });
+        expect(getSettingsState()?.maxLen).toBe(42);
+        expect(customBtn.classList.contains('active')).toBe(false);
+        expect(p42Btn.classList.contains('active')).toBe(true);
+        expect(customRow.style.display).toBe('none');
+
+        // Entering maxLen > 500 in Settings displays truthfully in Quick Deck
+        optMaxLen.value = '600';
+        optMaxLen.dispatchEvent({ type: 'blur' });
+        expect(getSettingsState()?.maxLen).toBe(600);
+        expect(customBtn.classList.contains('active')).toBe(true);
+        expect(quickMaxLenInput.value).toBe('600');
+      } finally {
+        (document as any).querySelectorAll = origQsa;
+        resetQuickDeckState();
+      }
+    });
+
+    it('clamps near-EOF start capture and clears earlier End value when capturing player start position', () => {
+      resetQuickDeckState();
+      const startInput = new MockElement('INPUT');
+      startInput.id = 'quick-range-start';
+      const endInput = new MockElement('INPUT');
+      endInput.id = 'quick-range-end';
+      const hintEl = new MockElement('DIV');
+      hintEl.id = 'quick-range-hint';
+      elementRegistry.set(startInput.id, startInput);
+      elementRegistry.set(endInput.id, endInput);
+      elementRegistry.set(hintEl.id, hintEl);
+
+      const win = globalThis as any;
+      win.window.selectedMediaFile = '/media/clip.mp4';
+      win.window.probedMetadata = { exists: true, durationSec: 100 };
+      setSettingsState({ offsetT: 0, duration: 20_000 });
+      endInput.value = '00:20';
+
+      // Player near EOF at 100s -> clamps start to 01:39 (99s) and clears 00:20 end instead of erroring
+      win.window.getCompanionCurrentTimeSec = () => 100;
+      capturePlayerTimeForRange('start');
+
+      expect(startInput.value).toBe('01:39');
+      expect(endInput.value).toBe('');
+      expect(getSettingsState()?.offsetT).toBe(99_000);
+      expect(getSettingsState()?.duration).toBe(0);
+      expect(hintEl.classList.contains('is-error')).toBe(false);
+
+      win.window.selectedMediaFile = null;
+      win.window.probedMetadata = null;
+      delete win.window.getCompanionCurrentTimeSec;
+      resetQuickDeckState();
+    });
+
+    it('formats batch custom range summary with RTL directional arrow and LRI isolation when End is open', async () => {
+      resetQuickDeckState();
+      const hintEl = new MockElement('DIV');
+      hintEl.id = 'quick-range-hint';
+      elementRegistry.set(hintEl.id, hintEl);
+
+      const win = globalThis as any;
+      win.window.isBatchMode = true;
+      win.window.batchItems = [{ durationSec: 120 }, { durationSec: 180 }];
+      setSettingsState({ offsetT: 15_000, duration: 0 });
+
+      try {
+        await setLanguage('fa');
+        syncQuickTimeRangeUI();
+        expect(hintEl.textContent).toContain('\u206600:15\u2069 \u2190');
+        expect(hintEl.getAttribute('dir')).toBeNull();
+      } finally {
+        await setLanguage('en');
+        win.window.isBatchMode = false;
+        win.window.batchItems = [];
+        resetQuickDeckState();
+      }
+    });
+
+    it('keeps trim slider disabled for sub-second media clips so integer-second dragging cannot exceed EOF', () => {
+      resetQuickDeckState();
+      const sliderWrap = new MockElement('DIV');
+      sliderWrap.id = 'quick-range-slider-wrap';
+      const startSlider = new MockElement('INPUT');
+      startSlider.id = 'quick-range-slider-start';
+      const endSlider = new MockElement('INPUT');
+      endSlider.id = 'quick-range-slider-end';
+      const fillEl = new MockElement('DIV');
+      fillEl.id = 'quick-range-fill';
+      elementRegistry.set(sliderWrap.id, sliderWrap);
+      elementRegistry.set(startSlider.id, startSlider);
+      elementRegistry.set(endSlider.id, endSlider);
+      elementRegistry.set(fillEl.id, fillEl);
+
+      const win = globalThis as any;
+      win.window.isBatchMode = false;
+      win.window.probedMetadata = { exists: true, durationSec: 0.6 };
+      setSettingsState({ offsetT: 0, duration: 0 });
+
+      try {
+        syncQuickTimeRangeUI();
+        expect(sliderWrap.classList.contains('is-disabled')).toBe(true);
+        expect(startSlider.disabled).toBe(true);
+        expect(endSlider.disabled).toBe(true);
+
+        // Short 1.2s clip (rounds to maxSec=1) must also keep integer-second slider disabled
+        // so dragging endSlider to 0 cannot emit 00:00 -> 00:00 (endBeforeStart).
+        win.window.probedMetadata = { exists: true, durationSec: 1.2 };
+        syncQuickTimeRangeUI();
+        expect(sliderWrap.classList.contains('is-disabled')).toBe(true);
+        expect(startSlider.disabled).toBe(true);
+        expect(endSlider.disabled).toBe(true);
+
+        // 2.0s clip enables the integer-second trim slider cleanly
+        win.window.probedMetadata = { exists: true, durationSec: 2.0 };
+        syncQuickTimeRangeUI();
+        expect(sliderWrap.classList.contains('is-disabled')).toBe(false);
+        expect(startSlider.disabled).toBe(false);
+        expect(endSlider.disabled).toBe(false);
+      } finally {
+        win.window.probedMetadata = null;
+        resetQuickDeckState();
+      }
+    });
+
+    it('preserves sub-second time ranges without false endBeforeStart rejection or precision loss', () => {
+      resetQuickDeckState();
+      const rangeCheckbox = new MockElement('INPUT');
+      rangeCheckbox.id = 'quick-range-enabled';
+      const startInput = new MockElement('INPUT');
+      startInput.id = 'quick-range-start';
+      const endInput = new MockElement('INPUT');
+      endInput.id = 'quick-range-end';
+      const hintEl = new MockElement('DIV');
+      hintEl.id = 'quick-range-hint';
+      [rangeCheckbox, startInput, endInput, hintEl].forEach(el => elementRegistry.set(el.id, el));
+
+      const win = globalThis as any;
+      win.window.isBatchMode = false;
+      win.window.probedMetadata = { exists: true, durationSec: 60 };
+
+      try {
+        // Sub-second range within the same integer second (1.5s -> 1.9s)
+        setSettingsState({ offsetT: 1_500, duration: 400 });
+        syncQuickTimeRangeUI();
+        expect(startInput.value).toBe('00:01.5');
+        expect(endInput.value).toBe('00:01.9');
+        expect(validateAndApplyQuickTimeRange(true)).toBe(true);
+        expect(getSettingsState()?.offsetT).toBe(1_500);
+        expect(getSettingsState()?.duration).toBe(400);
+        expect(hintEl.classList.contains('is-error')).toBe(false);
+
+        // Millisecond Settings values (1.5s offset, 5.5s duration -> 7.0s end) stay exact on Start
+        setSettingsState({ offsetT: 1_500, duration: 5_500 });
+        syncQuickTimeRangeUI();
+        expect(startInput.value).toBe('00:01.5');
+        expect(endInput.value).toBe('00:07');
+        expect(validateAndApplyQuickTimeRange(true)).toBe(true);
+        expect(getSettingsState()?.offsetT).toBe(1_500);
+        expect(getSettingsState()?.duration).toBe(5_500);
+      } finally {
+        win.window.probedMetadata = null;
+        resetQuickDeckState();
+      }
+    });
+
+    it('clears stale Quick Deck range validation error when Settings authoritatively updates offsetT or duration', () => {
+      resetQuickDeckState();
+      const optOffset = new MockElement('INPUT');
+      optOffset.id = 'opt-offsetT';
+      optOffset.type = 'number';
+      const optDuration = new MockElement('INPUT');
+      optDuration.id = 'opt-duration';
+      optDuration.type = 'number';
+      const rangeCheckbox = new MockElement('INPUT');
+      rangeCheckbox.id = 'quick-range-enabled';
+      const startInput = new MockElement('INPUT');
+      startInput.id = 'quick-range-start';
+      const endInput = new MockElement('INPUT');
+      endInput.id = 'quick-range-end';
+      const hintEl = new MockElement('DIV');
+      hintEl.id = 'quick-range-hint';
+      [optOffset, optDuration, rangeCheckbox, startInput, endInput, hintEl].forEach(el =>
+        elementRegistry.set(el.id, el)
+      );
+
+      const win = globalThis as any;
+      win.window.isBatchMode = false;
+      win.window.probedMetadata = { exists: true, durationSec: 120 };
+
+      try {
+        setSettingsState({ offsetT: 0, duration: 0 });
+        bindSettingsToDOM();
+        setQuickRangeMode('custom');
+
+        // Enter invalid draft in Quick Deck -> locks validation error
+        startInput.value = '99:99';
+        endInput.value = '';
+        expect(validateAndApplyQuickTimeRange(true)).toBe(false);
+        expect(hintEl.classList.contains('is-error')).toBe(true);
+
+        // User fixes range via Settings #opt-offsetT -> stale error clears & Quick Deck updates
+        optOffset.value = '10000';
+        (optOffset as any).onchange?.();
+
+        expect(getSettingsState()?.offsetT).toBe(10_000);
+        expect(startInput.value).toBe('00:10');
+        expect(hintEl.classList.contains('is-error')).toBe(false);
+        expect(validateAndApplyQuickTimeRange(true)).toBe(true);
+      } finally {
+        win.window.probedMetadata = null;
+        resetQuickDeckState();
+      }
+    });
+
+    it('isolates {max} timecode with LRI/PDI in RTL range error messages', async () => {
+      resetQuickDeckState();
+      const startInput = new MockElement('INPUT');
+      startInput.id = 'quick-range-start';
+      const endInput = new MockElement('INPUT');
+      endInput.id = 'quick-range-end';
+      const hintEl = new MockElement('DIV');
+      hintEl.id = 'quick-range-hint';
+      [startInput, endInput, hintEl].forEach(el => elementRegistry.set(el.id, el));
+
+      const win = globalThis as any;
+      win.window.isBatchMode = false;
+      win.window.probedMetadata = { exists: true, durationSec: 120 };
+
+      try {
+        await setLanguage('fa');
+        setSettingsState({ offsetT: 0, duration: 0 });
+        setQuickRangeMode('custom');
+        startInput.value = '05:00';
+        endInput.value = '';
+        expect(validateAndApplyQuickTimeRange(true)).toBe(false);
+        expect(hintEl.textContent).toContain('\u206602:00\u2069');
+      } finally {
+        await setLanguage('en');
+        win.window.probedMetadata = null;
+        resetQuickDeckState();
+      }
+    });
+
+    it('syncs trim slider thumb values on reset even when the slider still holds document.activeElement (WebKit)', () => {
+      resetQuickDeckState();
+      const sliderWrap = new MockElement('DIV');
+      sliderWrap.id = 'quick-range-slider-wrap';
+      const startSlider = new MockElement('INPUT');
+      startSlider.id = 'quick-range-slider-start';
+      const endSlider = new MockElement('INPUT');
+      endSlider.id = 'quick-range-slider-end';
+      const fillEl = new MockElement('DIV');
+      fillEl.id = 'quick-range-fill';
+      [sliderWrap, startSlider, endSlider, fillEl].forEach(el => elementRegistry.set(el.id, el));
+
+      const win = globalThis as any;
+      win.window.isBatchMode = false;
+      win.window.probedMetadata = { exists: true, durationSec: 120 };
+      const prevActive = (document as any).activeElement;
+
+      try {
+        setSettingsState({ offsetT: 40_000, duration: 50_000 });
+        syncQuickTimeRangeUI();
+        expect(startSlider.value).toBe('40');
+        expect(endSlider.value).toBe('90');
+
+        // Simulate WebKit keeping activeElement on startSlider when user clicks a reset button
+        (document as any).activeElement = startSlider;
+        resetTranscribeTimeRange(false);
+
+        expect(startSlider.value).toBe('0');
+        expect(endSlider.value).toBe('120');
+        expect(fillEl.style['--trim-start-pct']).toBe('0.00%');
+        expect(fillEl.style['--trim-width-pct']).toBe('100.00%');
+      } finally {
+        (document as any).activeElement = prevActive;
+        win.window.probedMetadata = null;
+        resetQuickDeckState();
+      }
+    });
+
+    it('preserves sub-seconds in capturePlayerTimeForRange("end") when whole-second flooring would collide with Start', () => {
+      resetQuickDeckState();
+      const startInput = new MockElement('INPUT');
+      startInput.id = 'quick-range-start';
+      const endInput = new MockElement('INPUT');
+      endInput.id = 'quick-range-end';
+      const hintEl = new MockElement('DIV');
+      hintEl.id = 'quick-range-hint';
+      [startInput, endInput, hintEl].forEach(el => elementRegistry.set(el.id, el));
+
+      const win = globalThis as any;
+      win.window.isBatchMode = false;
+      win.window.selectedMediaFile = '/media/clip.mp4';
+      win.window.probedMetadata = { exists: true, durationSec: 60 };
+      setSettingsState({ offsetT: 5_000, duration: 0 });
+      setQuickRangeMode('custom');
+      startInput.value = '00:05';
+      endInput.value = '';
+
+      try {
+        // Player at 5.8s: flooring to 00:05 would trigger endBeforeStart; preserving .8 succeeds
+        win.window.getCompanionCurrentTimeSec = () => 5.8;
+        capturePlayerTimeForRange('end');
+
+        expect(endInput.value).toBe('00:05.8');
+        expect(getSettingsState()?.offsetT).toBe(5_000);
+        expect(getSettingsState()?.duration).toBe(800);
+        expect(hintEl.classList.contains('is-error')).toBe(false);
+      } finally {
+        win.window.selectedMediaFile = null;
+        win.window.probedMetadata = null;
+        delete win.window.getCompanionCurrentTimeSec;
+        resetQuickDeckState();
+      }
+    });
+
+    it('syncs Settings #output-dir-custom-card visibility and Custom Select trigger when resetting output folder from Quick Deck', async () => {
+      const optMode = new MockElement('SELECT');
+      optMode.id = 'opt-outputDirMode';
+      optMode.value = 'custom';
+      const customCard = new MockElement('DIV');
+      customCard.id = 'output-dir-custom-card';
+      customCard.style.display = 'flex';
+      elementRegistry.set(optMode.id, optMode);
+      elementRegistry.set(customCard.id, customCard);
+
+      const syncSelectsMock = vi.fn();
+      const prevSync = (globalThis as any).window.syncCustomSelects;
+      (globalThis as any).window.syncCustomSelects = syncSelectsMock;
+
+      try {
+        setSettingsState({ outputDirMode: 'custom', outputDirPath: '/tmp/out' });
+        await resetTranscribeOutputDir();
+
+        expect(optMode.value).toBe('input_dir');
+        expect(customCard.style.display).toBe('none');
+        expect(syncSelectsMock).toHaveBeenCalled();
+      } finally {
+        (globalThis as any).window.syncCustomSelects = prevSync;
+      }
+    });
+
+    it('accepts Persian and Arabic digits in Settings number steppers and preserves untouched maxLen > 500 on Quick Deck blur', () => {
+      resetQuickDeckState();
+      const origQsa = (document as any).querySelectorAll;
+      const optThreads = new MockElement('INPUT');
+      optThreads.id = 'opt-threads';
+      optThreads.value = '4';
+      const wrap = new MockElement('DIV');
+      wrap.className = 'number-input-control';
+      (wrap as any).querySelector = (sel: string) => (sel === 'input' ? optThreads : null);
+      (optThreads as any).closest = (sel: string) => (sel === '.number-input-control' ? wrap : null);
+
+      const quickMaxLen = new MockElement('INPUT');
+      quickMaxLen.id = 'quick-adv-maxLen';
+      quickMaxLen.value = '600';
+      const customRow = new MockElement('DIV');
+      customRow.id = 'quick-maxlen-custom-row';
+      const customBtn = new MockElement('BUTTON');
+      customBtn.id = 'quick-maxlen-custom';
+      [optThreads, quickMaxLen, customRow, customBtn].forEach(el => elementRegistry.set(el.id, el));
+
+      (document as any).querySelectorAll = (sel: string) =>
+        sel === '.number-input-control' ? [wrap] : [];
+
+      try {
+        setSettingsState({ threads: 4, maxLen: 600 });
+        setupNumberInputControls();
+        setupQuickConfigDeckEventListeners();
+
+        // Persian digits in Settings #opt-threads must not be stripped
+        optThreads.value = '۱۲';
+        optThreads.dispatchEvent({ type: 'input' });
+        expect(optThreads.value).toBe('۱۲');
+        expect(getSettingsState()?.threads).toBe(12);
+
+        // Arabic-Indic digits also normalize cleanly on blur
+        optThreads.value = '٨';
+        optThreads.dispatchEvent({ type: 'blur' });
+        expect(optThreads.value).toBe('8');
+        expect(getSettingsState()?.threads).toBe(8);
+
+        // Activating Custom or blurring untouched Quick Deck input with maxLen = 600 must NOT clobber to 500
+        activateCustomMaxLen();
+        expect(getSettingsState()?.maxLen).toBe(600);
+        expect(quickMaxLen.value).toBe('600');
+        quickMaxLen.dispatchEvent({ type: 'blur' });
+        expect(getSettingsState()?.maxLen).toBe(600);
+      } finally {
+        (document as any).querySelectorAll = origQsa;
+        resetQuickDeckState();
+      }
+    });
+
+    it('replaces stale red error sentence with clean neutral readout when editing an invalid range live', () => {
+      resetQuickDeckState();
+      const startInput = new MockElement('INPUT');
+      startInput.id = 'quick-range-start';
+      const endInput = new MockElement('INPUT');
+      endInput.id = 'quick-range-end';
+      const hintEl = new MockElement('DIV');
+      hintEl.id = 'quick-range-hint';
+      [startInput, endInput, hintEl].forEach(el => elementRegistry.set(el.id, el));
+
+      const win = globalThis as any;
+      win.window.isBatchMode = false;
+      win.window.probedMetadata = { exists: true, durationSec: 120 };
+      setSettingsState({ offsetT: 10_000, duration: 20_000 });
+      setupQuickConfigDeckEventListeners();
+      setQuickRangeMode('custom');
+
+      try {
+        // Trigger validation error on blur
+        startInput.value = '00:50';
+        endInput.value = '00:10';
+        endInput.dispatchEvent({ type: 'blur' });
+        expect(hintEl.classList.contains('is-error')).toBe(true);
+        const errorText = hintEl.textContent;
+
+        // While user types a still-incomplete value, error styling clears AND stale error sentence is replaced
+        endInput.value = '00:';
+        endInput.dispatchEvent({ type: 'input' });
+        expect(hintEl.classList.contains('is-error')).toBe(false);
+        expect(hintEl.textContent).not.toBe(errorText);
+        expect(hintEl.textContent).toContain('00:10');
+      } finally {
+        win.window.probedMetadata = null;
+        resetQuickDeckState();
+      }
+    });
+
+    it('sets accurate noVadFound tooltip when disabling VAD with no VAD model installed', () => {
+      const quickVad = new MockElement('INPUT');
+      quickVad.id = 'quick-toggle-vad';
+      quickVad.type = 'checkbox';
+      quickVad.checked = true;
+      elementRegistry.set(quickVad.id, quickVad);
+
+      setLocalScannedVadModels([]);
+      setSettingsState({ vad: true, vadModel: '' });
+
+      toggleQuickVad(false);
+      expect(getSettingsState()?.vad).toBe(false);
+      expect(quickVad.title).toContain('Silero VAD');
+      expect(quickVad.title).not.toContain('Click to enable');
+    });
+
+    it('keeps #opt-prompt input listener bound to live settingsState after setSettingsState replacement', () => {
+      // Arrange
+      const optPrompt = new MockElement('TEXTAREA');
+      optPrompt.id = 'opt-prompt';
+      const quickPrompt = new MockElement('TEXTAREA');
+      quickPrompt.id = 'quick-adv-prompt';
+      const quickCarry = new MockElement('INPUT');
+      quickCarry.id = 'quick-adv-carryPrompt';
+      quickCarry.type = 'checkbox';
+      [optPrompt, quickPrompt, quickCarry].forEach(el => elementRegistry.set(el.id, el));
+
+      const oldState = { prompt: 'stale', carryPrompt: true, maxLen: 42 };
+      setSettingsState(oldState);
+      bindSettingsToDOM();
+
+      // Simulate engine reset replacing settingsState with a fresh object
+      const freshState = { prompt: '', carryPrompt: false, maxLen: 0 };
+      setSettingsState(freshState);
+      bindSettingsToDOM();
+
+      // Act
+      optPrompt.value = 'Fresh technical glossary';
+      optPrompt.dispatchEvent({ type: 'input' });
+
+      // Assert: live state updates, old state is untouched, Quick Deck is NOT clobbered with stale values
+      expect(getSettingsState()?.prompt).toBe('Fresh technical glossary');
+      expect(oldState.prompt).toBe('stale');
+      expect(quickPrompt.value).toBe('Fresh technical glossary');
+      expect(quickCarry.checked).toBe(false);
+    });
+
+    it('clamps Settings #opt-offsetT/#opt-duration to Rust i32 bounds and parses Persian digits on change', () => {
+      // Arrange
+      const optOffset = new MockElement('INPUT');
+      optOffset.id = 'opt-offsetT';
+      optOffset.type = 'number';
+      const optDuration = new MockElement('INPUT');
+      optDuration.id = 'opt-duration';
+      optDuration.type = 'number';
+      [optOffset, optDuration].forEach(el => elementRegistry.set(el.id, el));
+
+      setSettingsState({ offsetT: 0, duration: 0 });
+      bindSettingsToDOM();
+
+      // Act: exceed i32::MAX on offsetT and enter Persian digits on duration
+      optOffset.value = '3000000000';
+      (optOffset as any).onchange?.();
+      optDuration.value = '۴۵۰۰۰';
+      (optDuration as any).onchange?.();
+
+      // Assert
+      expect(getSettingsState()?.offsetT).toBe(2_147_483_000);
+      expect(optOffset.value).toBe('2147483000');
+      expect(getSettingsState()?.duration).toBe(45_000);
+      expect(optDuration.value).toBe('45000');
+
+      const sanitized = sanitizeSettingsPayload({ offsetT: '3500000000', threads: '۸' });
+      expect(sanitized.offsetT).toBe(2_147_483_000);
+      expect(sanitized.threads).toBe(8);
+    });
+
+    it('avoids redundant save_settings IPC calls when change is immediately followed by blur on steppers and quick maxLen', () => {
+      // Arrange
+      const origQsa = (document as any).querySelectorAll;
+      const wrap = new MockElement('DIV');
+      wrap.className = 'number-input-control';
+      const optThreads = new MockElement('INPUT');
+      optThreads.id = 'opt-threads';
+      optThreads.type = 'text';
+      optThreads.value = '4';
+      wrap.appendChild(optThreads);
+      (optThreads as any).closest = (sel: string) => (sel === '.number-input-control' ? wrap : null);
+
+      const quickMaxLen = new MockElement('INPUT');
+      quickMaxLen.id = 'quick-adv-maxLen';
+      quickMaxLen.type = 'text';
+      quickMaxLen.value = '40';
+      [optThreads, quickMaxLen].forEach(el => elementRegistry.set(el.id, el));
+
+      (document as any).querySelectorAll = (sel: string) => (sel === '.number-input-control' ? [wrap] : []);
+
+      try {
+        const saveSpy = vi.fn().mockResolvedValue(undefined);
+        (globalThis as any).window.__TAURI__.core.invoke = saveSpy;
+        setSettingsState({ threads: 4, maxLen: 40 });
+        setupNumberInputControls();
+        bindSettingsToDOM();
+        setupQuickConfigDeckEventListeners();
+        saveSpy.mockClear();
+
+        // Act: edit stepper via input, then fire both change + blur (standard browser order)
+        optThreads.value = '8';
+        optThreads.dispatchEvent({ type: 'input' });
+        optThreads.dispatchEvent({ type: 'change' });
+        (optThreads as any).onchange?.();
+        optThreads.dispatchEvent({ type: 'blur' });
+
+        // Assert: only a single immediate save_settings call occurred
+        const saveCalls = saveSpy.mock.calls.filter(c => c[0] === 'save_settings');
+        expect(saveCalls).toHaveLength(1);
+        expect(getSettingsState()?.threads).toBe(8);
+
+        // Act: edit quick-adv-maxLen via input, then fire change + blur
+        saveSpy.mockClear();
+        vi.useFakeTimers();
+        quickMaxLen.value = '55';
+        quickMaxLen.dispatchEvent({ type: 'input' });
+        quickMaxLen.dispatchEvent({ type: 'change' });
+        quickMaxLen.dispatchEvent({ type: 'blur' });
+        vi.advanceTimersByTime(300);
+        vi.useRealTimers();
+
+        const maxLenSaves = saveSpy.mock.calls.filter(c => c[0] === 'save_settings');
+        expect(maxLenSaves).toHaveLength(1);
+        expect(getSettingsState()?.maxLen).toBe(55);
+      } finally {
+        vi.useRealTimers();
+        (document as any).querySelectorAll = origQsa;
+        resetQuickDeckState();
+      }
+    });
+
+    it('flags out-of-range Settings offsetT/duration immediately in Quick Deck when single-file duration is known', () => {
+      // Arrange
+      const optOffset = new MockElement('INPUT');
+      optOffset.id = 'opt-offsetT';
+      optOffset.type = 'number';
+      const optDuration = new MockElement('INPUT');
+      optDuration.id = 'opt-duration';
+      optDuration.type = 'number';
+      const rangeCheckbox = new MockElement('INPUT');
+      rangeCheckbox.id = 'quick-range-enabled';
+      rangeCheckbox.type = 'checkbox';
+      const inputsRow = new MockElement('DIV');
+      inputsRow.id = 'quick-range-inputs';
+      const startWrap = new MockElement('DIV');
+      startWrap.className = 'transcribe-range-input-wrap';
+      const startInput = new MockElement('INPUT');
+      startInput.id = 'quick-range-start';
+      (startInput as any).closest = (sel: string) => (sel === '.transcribe-range-input-wrap' ? startWrap : null);
+      const endWrap = new MockElement('DIV');
+      endWrap.className = 'transcribe-range-input-wrap';
+      const endInput = new MockElement('INPUT');
+      endInput.id = 'quick-range-end';
+      (endInput as any).closest = (sel: string) => (sel === '.transcribe-range-input-wrap' ? endWrap : null);
+      const hintEl = new MockElement('DIV');
+      hintEl.id = 'quick-range-hint';
+
+      [optOffset, optDuration, rangeCheckbox, inputsRow, startInput, endInput, hintEl].forEach(el =>
+        elementRegistry.set(el.id, el)
+      );
+
+      const prevProbed = (globalThis as any).window.probedMetadata;
+      const prevBatch = (globalThis as any).window.isBatchMode;
+      try {
+        (globalThis as any).window.isBatchMode = false;
+        (globalThis as any).window.probedMetadata = { exists: true, durationSec: 60 };
+        setSettingsState({ offsetT: 0, duration: 0 });
+        bindSettingsToDOM();
+
+        // Act: set offsetT = 90_000ms (90s) from Settings while a 60s file is loaded
+        optOffset.value = '90000';
+        (optOffset as any).onchange?.();
+
+        // Assert: Quick Deck must immediately surface error styling rather than neutral "01:30 -> 01:00"
+        expect(hintEl.classList.contains('is-error')).toBe(true);
+        expect(startWrap.classList.contains('is-invalid')).toBe(true);
+        expect(endWrap.classList.contains('is-invalid')).toBe(true);
+
+        // Act: fix offsetT back inside bounds (20s)
+        optOffset.value = '20000';
+        (optOffset as any).onchange?.();
+
+        // Assert: error clears and neutral summary restores
+        expect(hintEl.classList.contains('is-error')).toBe(false);
+        expect(startWrap.classList.contains('is-invalid')).toBe(false);
+        expect(hintEl.textContent).toContain('00:20');
+      } finally {
+        (globalThis as any).window.probedMetadata = prevProbed;
+        (globalThis as any).window.isBatchMode = prevBatch;
+        resetQuickDeckState();
+      }
     });
   });
 });

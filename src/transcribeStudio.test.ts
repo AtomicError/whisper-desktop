@@ -1486,5 +1486,122 @@ it releases chemicals that hit your eyes
   });
 });
 
+describe('Enhanced Transcribe Studio Controls & Locale Coverage', () => {
+  const languageCodes = ['en', 'fa', 'ar', 'de', 'es', 'fr', 'it', 'ja', 'ko', 'pt', 'ru', 'tr', 'zh'] as const;
+  const html = loadResolvedHtml(resolve(__dirname, 'index.html'));
+
+  it('includes direct flat setup controls, checkbox-controlled always-visible trim slider, custom stepper, docked actions footer, and excludes removed duplicate/dual-row elements', () => {
+    expect(html).toContain('id="quick-output-formats"');
+    expect(html).toContain('id="quick-fmt-srt"');
+    expect(html).toContain('id="quick-fmt-vtt"');
+    expect(html).toContain('id="quick-fmt-txt"');
+    expect(html).toContain('id="quick-fmt-lrc"');
+
+    // Full-width stacked Language and Engine (no cramped dual-row)
+    expect(html).not.toContain('transcribe-dual-row');
+
+    // Time Range: custom checkbox + always-visible trim panel
+    expect(html).toContain('id="quick-range-group"');
+    expect(html).toContain('id="quick-range-enabled"');
+    expect(html).toContain('id="quick-range-slider-wrap"');
+    expect(html).toContain('id="quick-range-slider-start"');
+    expect(html).toContain('id="quick-range-slider-end"');
+    expect(html).toContain('id="quick-range-fill"');
+    expect(html).toContain('id="quick-range-start"');
+    expect(html).toContain('id="quick-range-end"');
+    expect(html).toContain('id="btn-range-start-player"');
+    expect(html).toContain('id="btn-range-end-player"');
+
+    // Line Length: 4-option presets + custom app stepper (.number-input-control)
+    expect(html).toContain('id="quick-maxlen-auto"');
+    expect(html).toContain('id="quick-maxlen-28"');
+    expect(html).toContain('id="quick-maxlen-42"');
+    expect(html).toContain('id="quick-maxlen-custom"');
+    expect(html).toContain('id="quick-maxlen-custom-row"');
+    expect(html).toContain('id="quick-adv-maxLen"');
+    expect(html).toContain('data-custom-stepper="true"');
+    expect(html).toContain('transcribe-number-control');
+    expect(html).toContain('id="quick-adv-splitWord"');
+    expect(html).toContain('id="quick-adv-prompt"');
+    expect(html).toContain('id="quick-adv-carryPrompt"');
+    expect(html).toContain('transcribe-inline-checkbox');
+
+    // Removed duplicate All Whisper Settings link, More Options disclosure, DTW, and Whisper direct translate (-tr)
+    expect(html).not.toContain('id="btn-adv-open-settings"');
+    expect(html).not.toContain('id="quick-advanced-details"');
+    expect(html).not.toContain('id="quick-adv-dtwEnabled"');
+    expect(html).not.toContain('id="quick-adv-translate"');
+
+    // Actions footer is docked outside the scrollable deck body inside unified deck
+    const deckStart = html.indexOf('id="transcribe-unified-deck"');
+    const bodyEnd = html.indexOf('id="btn-next-step-2"');
+    const actionsIdx = html.indexOf('class="transcribe-actions-section"');
+    const mediaDeckIdx = html.indexOf('id="transcribe-media-deck"');
+    expect(bodyEnd).toBeGreaterThan(deckStart);
+    expect(actionsIdx).toBeGreaterThan(bodyEnd);
+    expect(mediaDeckIdx).toBeGreaterThan(actionsIdx);
+
+    // Settings hardware thread auto-detection control
+    expect(html).toContain('id="btn-auto-threads"');
+  });
+
+  it('defines all new Transcribe Studio, Settings, and Toast localization keys across all 13 languages', () => {
+    const newTranscribeKeys = [
+      'outputFormats',
+      'timeRange',
+      'rangeFullMedia',
+      'rangeCustomSlice',
+      'rangeStart',
+      'rangeEnd',
+      'rangeToEnd',
+      'usePlayerPosition',
+      'rangeErrorFormat',
+      'rangeErrorOrder',
+      'rangeErrorDuration',
+      'rangeErrorInvalidAction',
+      'rangeBatchApplies',
+      'rangeBatchWarningShort',
+      'rangeErrorBatchAllShort',
+      'carryPromptShort',
+      'lineLength',
+      'splitWordShort',
+      'lineLenAuto',
+      'lineLenStandard',
+      'lineLenShort',
+      'lineLenCustom',
+      'hardsubRequiresTimedSub',
+      'statusSkipped',
+      'batchCompletedSummaryWithSkipped'
+    ] as const;
+
+    for (const code of languageCodes) {
+      const dict = locales[code];
+      for (const key of newTranscribeKeys) {
+        expect(dict.transcribe[key], `${code}.transcribe.${key} must exist`).toBeTruthy();
+      }
+      expect(dict.settings.autoDetectThreads, `${code}.settings.autoDetectThreads must exist`).toBeTruthy();
+      expect(dict.settings.autoDetectThreadsDesc, `${code}.settings.autoDetectThreadsDesc must exist`).toBeTruthy();
+      expect(dict.toasts.atLeastOneOutputFormat, `${code}.toasts.atLeastOneOutputFormat must exist`).toBeTruthy();
+      expect(dict.toasts.threadsAutoDetected, `${code}.toasts.threadsAutoDetected must exist`).toBeTruthy();
+      expect(dict.toasts.batchCompleteWithSkipped, `${code}.toasts.batchCompleteWithSkipped must exist`).toBeTruthy();
+      expect(dict.toasts.batchItemSkippedShort, `${code}.toasts.batchItemSkippedShort must exist`).toBeTruthy();
+    }
+
+    // RTL LRM protection for .srt/.vtt/.lrc tokens in Persian & Arabic strings
+    expect(locales.fa.transcribe.hardsubRequiresTimedSub).toContain('\u200E.srt');
+    expect(locales.ar.transcribe.hardsubRequiresTimedSub).toContain('\u200E.srt');
+
+    // No redundant data-i18n-aria overriding aria-labelledby on #quick-output-formats
+    const html = readFileSync(resolve(process.cwd(), 'src/views/transcribe.html'), 'utf8');
+    expect(html).not.toMatch(/id="quick-output-formats"[^>]*data-i18n-aria/);
+
+    // Token & badge CSS integrity
+    const tokensCss = readFileSync(resolve(process.cwd(), 'src/styles/base/tokens.css'), 'utf8');
+    expect(tokensCss).not.toContain('--accent-primary: #3b82f6;');
+    const transcribeCss = readFileSync(resolve(process.cwd(), 'src/styles/views/transcribe.css'), 'utf8');
+    expect(transcribeCss).toContain('.badge-skipped');
+  });
+});
+
 
 

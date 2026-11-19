@@ -333,12 +333,14 @@ export function setupTauriListeners(): void {
         if (i18nKey) {
           delete msgEl.dataset.batchSummarySuccess;
           delete msgEl.dataset.batchSummaryTotal;
+          delete msgEl.dataset.batchSummarySkipped;
           delete msgEl.dataset.statusCompleted;
           msgEl.setAttribute('data-i18n', i18nKey);
           msgEl.textContent = t(i18nKey);
         } else if (payload.message) {
           delete msgEl.dataset.batchSummarySuccess;
           delete msgEl.dataset.batchSummaryTotal;
+          delete msgEl.dataset.batchSummarySkipped;
           delete msgEl.dataset.statusCompleted;
           msgEl.removeAttribute('data-i18n');
           msgEl.textContent = isolateDirection(payload.message);
@@ -375,6 +377,7 @@ export function setupTauriListeners(): void {
       const msg = payload.message;
       delete msgEl.dataset.batchSummarySuccess;
       delete msgEl.dataset.batchSummaryTotal;
+      delete msgEl.dataset.batchSummarySkipped;
       if (msg.includes('Translating with AI') || msg.includes('Translating AI:')) {
         msgEl.setAttribute('data-i18n', 'transcribe.aiTranslating');
         msgEl.textContent = t('transcribe.aiTranslating');

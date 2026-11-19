@@ -74,6 +74,7 @@ import {
   getCurrentSourceMediaFile
 } from './modules/appNavigation';
 import { initI18n, t, getLanguage, isRtlLanguage } from './i18n/index';
+import { formatLocalizedNumber } from './i18n/formatters';
 import type { SystemSpecs } from './modelRecommender';
 
 // Global error catcher integrated with application logger and toast system
@@ -135,10 +136,22 @@ window.addEventListener('whisper:languageChanged', () => {
   const msgEl = document.getElementById('lbl-radial-msg');
   if (msgEl) {
     if (msgEl.dataset.batchSummaryTotal) {
-      msgEl.textContent = t('transcribe.batchCompletedSummary', {
-        success: Number(msgEl.dataset.batchSummarySuccess || 0),
-        total: Number(msgEl.dataset.batchSummaryTotal || 0)
-      });
+      const lang = getLanguage();
+      const successStr = formatLocalizedNumber(Number(msgEl.dataset.batchSummarySuccess || 0), lang, 0);
+      const totalStr = formatLocalizedNumber(Number(msgEl.dataset.batchSummaryTotal || 0), lang, 0);
+      const skipped = Number(msgEl.dataset.batchSummarySkipped || 0);
+      if (skipped > 0) {
+        msgEl.textContent = t('transcribe.batchCompletedSummaryWithSkipped', {
+          success: successStr,
+          total: totalStr,
+          skipped: formatLocalizedNumber(skipped, lang, 0)
+        });
+      } else {
+        msgEl.textContent = t('transcribe.batchCompletedSummary', {
+          success: successStr,
+          total: totalStr
+        });
+      }
     } else if (msgEl.dataset.statusCompleted === 'true') {
       msgEl.textContent = t('transcribe.progressComplete');
     }

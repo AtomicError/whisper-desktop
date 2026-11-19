@@ -217,6 +217,7 @@
 
 /* Custom Checkbox Design */
 .checkbox-container {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 12px;

@@ -2798,4 +2798,49 @@ describe('Studio Refinements, Isolation & Keyboard Accessibility', () => {
       delete (window as any).requestAnimationFrame;
     }
   });
+
+  it('respects switchToMediaDeck=false in seekCompanionPlayer so background batch seeks do not hijack Setup Deck', async () => {
+    // Arrange
+    const setupDeck = registerMockEl('transcribe-unified-deck', 'DIV');
+    const mediaDeck = registerMockEl('transcribe-media-deck', 'DIV');
+    const video = registerMockEl('companion-media-element', 'VIDEO') as any;
+    video.readyState = 2;
+    video.duration = 120;
+    video.paused = true;
+
+    (window as any).__TAURI__ = {
+      core: {
+        invoke: async (cmd: string) => {
+          if (cmd === 'stream_media_file') return 'http://127.0.0.1:54321/media/batch.mp4';
+          if (cmd === 'probe_media_file') return { exists: true, durationSec: 120 };
+          return null;
+        }
+      }
+    };
+
+    await loadMediaIntoCompanionPlayer('/media/batch.mp4', false, 120);
+    setupDeck.classList.remove('deck-hidden');
+    setupDeck.style.display = 'flex';
+    mediaDeck.classList.add('deck-hidden');
+    mediaDeck.style.display = 'none';
+
+    transcriptViewer.lines = [
+      { id: 0, timeRange: '[00:00:15.000 --> 00:00:20.000]', text: 'Batch line', startMs: 15_000, endMs: 20_000 }
+    ];
+    renderTranscriptLines(transcriptViewer.lines);
+
+    // Act: silent background seek (e.g. clicking a batch queue row)
+    seekCompanionPlayer(15_000, false, 0, false);
+
+    // Assert: player seeks & highlights segment, but Setup Deck stays visible
+    expect(video.currentTime).toBe(15);
+    expect(setupDeck.classList.contains('deck-hidden')).toBe(false);
+    expect(setupDeck.style.display).toBe('flex');
+    expect(mediaDeck.classList.contains('deck-hidden')).toBe(true);
+
+    // Act: explicit default seek switches to Media Deck as expected
+    seekCompanionPlayer(15_000, false, 0);
+    expect(setupDeck.classList.contains('deck-hidden')).toBe(true);
+    expect(mediaDeck.classList.contains('deck-hidden')).toBe(false);
+  });
 });

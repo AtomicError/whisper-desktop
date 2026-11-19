@@ -14,6 +14,7 @@ import {
   setWizardStepCompleted,
   clearSingleMediaFile,
   browseMediaFile,
+  probeSelectedFile,
   handleDroppedFiles,
   renderMediaMetadata,
   toggleTelemetryHudCollapse,
@@ -29,6 +30,8 @@ import {
 import { batchProcessor } from './batchProcessor';
 import { transcriptViewer } from './transcriptViewer';
 import { workflowBridge } from './workflowBridge';
+import { getSettingsState, setSettingsState } from './settingsManager';
+import { resetQuickDeckState } from './transcribeQuickDeck';
 
 class MockElement {
   public tagName: string;
@@ -921,6 +924,300 @@ describe('transcribePipeline module', () => {
       // Multi file drop
       await handleDroppedFiles(['/dropped/multi1.mp4', '/dropped/multi2.mp4']);
       expect(unloadedCount).toBe(2);
+    });
+
+    it('preserves Settings Time Range on first file load from empty state, and resets it when replacing prior media', async () => {
+      resetQuickDeckState();
+      setSelectedMediaFile(null);
+      batchProcessor.setIsBatchMode(false);
+      batchProcessor.setItems([]);
+      setSettingsState({ offsetT: 15_000, duration: 30_000 });
+
+      (globalThis as any).window.invoke = vi.fn((cmd: string) => {
+        if (cmd === 'select_files') return Promise.resolve(['/first/video.mp4']);
+        if (cmd === 'probe_media_file') return Promise.resolve({ exists: true, durationSec: 120, format: 'Video' });
+        return Promise.resolve(null);
+      });
+
+      // Act 1: First file load from empty state preserves pre-configured Settings offset/duration
+      await browseMediaFile();
+      expect(getSelectedMediaFile()).toBe('/first/video.mp4');
+      expect(getSettingsState()?.offsetT).toBe(15_000);
+      expect(getSettingsState()?.duration).toBe(30_000);
+
+      // Act 2: Replacing an already-loaded file resets Time Range to Full File
+      (globalThis as any).window.invoke = vi.fn((cmd: string) => {
+        if (cmd === 'select_files') return Promise.resolve(['/second/video.mp4']);
+        if (cmd === 'probe_media_file') return Promise.resolve({ exists: true, durationSec: 120, format: 'Video' });
+        return Promise.resolve(null);
+      });
+      await browseMediaFile();
+      expect(getSelectedMediaFile()).toBe('/second/video.mp4');
+      expect(getSettingsState()?.offsetT).toBe(0);
+      expect(getSettingsState()?.duration).toBe(0);
+    });
+
+    it('ignores stale probeSelectedFile results when a newer media file was selected before probing resolved', async () => {
+      let resolveFirstProbe!: (val: any) => void;
+      const firstProbePromise = new Promise(resolve => {
+        resolveFirstProbe = resolve;
+      });
+
+      setSelectedMediaFile('/first/slow.mp4');
+      setProbedMetadata(null);
+
+      (globalThis as any).window.invoke = vi.fn((cmd: string, args: any) => {
+        if (cmd === 'probe_media_file' && args?.filePath === '/first/slow.mp4') {
+          return firstProbePromise;
+        }
+        if (cmd === 'probe_media_file' && args?.filePath === '/second/fast.mp4') {
+          return Promise.resolve({ exists: true, durationSec: 45, format: 'Video' });
+        }
+        return Promise.resolve(null);
+      });
+
+      const slowProbeTask = probeSelectedFile();
+      setSelectedMediaFile('/second/fast.mp4');
+      await probeSelectedFile();
+      expect(getProbedMetadata()?.durationSec).toBe(45);
+
+      // Now resolve the stale earlier probe; it must NOT overwrite the newer file's metadata
+      resolveFirstProbe({ exists: true, durationSec: 300, format: 'Video' });
+      await slowProbeTask;
+      expect(getProbedMetadata()?.durationSec).toBe(45);
+    });
+
+    it('snapshots settings before WAV conversion and seeks companion player to sliced offset on completion', async () => {
+      resetQuickDeckState();
+      setSelectedMediaFile('/media/sliced.mp4');
+      setWavPathForTranscription(null);
+      setProbedMetadata({ exists: true, durationSec: 300, format: 'Video' });
+      (globalThis as any).window.localScannedTransModels = ['ggml-base.bin'];
+      setSettingsState({
+        selectedBackend: 'Standard',
+        modelPath: 'ggml-base.bin',
+        inputFile: '/media/sliced.mp4',
+        outputSrt: true,
+        outputDirMode: 'input_dir',
+        offsetT: 120_000,
+        duration: 30_000
+      });
+
+      let resolveConvert!: (wav: string) => void;
+      const convertPromise = new Promise<string>(resolve => {
+        resolveConvert = resolve;
+      });
+      let capturedTaskSettings: any = null;
+      const seekMock = vi.fn();
+      const highlightMock = vi.fn();
+      const prevSeek = (globalThis as any).window.seekCompanionPlayer;
+      const prevHighlight = (globalThis as any).window.highlightActiveTranscriptSegment;
+      (globalThis as any).window.seekCompanionPlayer = seekMock;
+      (globalThis as any).window.highlightActiveTranscriptSegment = highlightMock;
+
+      (globalThis as any).window.invoke = vi.fn((cmd: string, args: any) => {
+        if (cmd === 'convert_media_file') return convertPromise;
+        if (cmd === 'start_transcription_task') {
+          capturedTaskSettings = { ...args?.settings };
+          return Promise.resolve({
+            outputDir: '/media',
+            generatedFiles: ['sliced.srt'],
+            durationMs: 1200,
+            speedFactor: 25.0,
+            internalJsonPath: null
+          });
+        }
+        if (cmd === 'get_transcript_session_data') {
+          return Promise.resolve(
+            JSON.stringify({
+              transcription: [
+                {
+                  timestamps: { from: '00:02:00,000', to: '00:02:05,000' },
+                  offsets: { from: 120_000, to: 125_000 },
+                  text: 'Sliced caption'
+                }
+              ]
+            })
+          );
+        }
+        return Promise.resolve(null);
+      });
+
+      try {
+        const runTask = runWhisperTranscription();
+        await Promise.resolve();
+        await Promise.resolve();
+
+        // Mutate live settings while WAV conversion is still in flight
+        const liveSettings = getSettingsState();
+        if (liveSettings) {
+          liveSettings.offsetT = 0;
+          liveSettings.outputSrt = false;
+          liveSettings.outputTxt = true;
+        }
+
+        resolveConvert('/tmp/sliced.wav');
+        await runTask;
+
+        // Task must receive the immutable run snapshot captured at start
+        expect(capturedTaskSettings?.offsetT).toBe(120_000);
+        expect(capturedTaskSettings?.outputSrt).toBe(true);
+        // Companion player must seek to the sliced start instead of highlighting on frame 00:00
+        expect(seekMock).toHaveBeenCalledWith(120_000, false, expect.any(Number));
+        expect(highlightMock).not.toHaveBeenCalled();
+      } finally {
+        (globalThis as any).window.seekCompanionPlayer = prevSeek;
+        (globalThis as any).window.highlightActiveTranscriptSegment = prevHighlight;
+        resetQuickDeckState();
+      }
+    });
+
+    it('clears stale probedMetadata immediately when replacing a single file and ignores stale probe rejections', async () => {
+      resetQuickDeckState();
+      setSelectedMediaFile('/media/first.mp4');
+      setProbedMetadata({ exists: true, durationSec: 180, format: 'Video' });
+
+      let rejectSecondProbe!: (err: Error) => void;
+      const secondProbePromise = new Promise<any>((_, reject) => {
+        rejectSecondProbe = reject;
+      });
+      let probedDuringTransition: any = 'not-checked';
+
+      (globalThis as any).window.invoke = vi.fn((cmd: string, args: any) => {
+        if (cmd === 'probe_media_file' && args?.filePath === '/media/second.mp4') {
+          // By the time probe_media_file is invoked for the replacement file, prior metadata must already be null
+          probedDuringTransition = getProbedMetadata();
+          return secondProbePromise;
+        }
+        if (cmd === 'probe_media_file' && args?.filePath === '/media/third.mp4') {
+          return Promise.resolve({ exists: true, durationSec: 42, format: 'Video' });
+        }
+        return Promise.resolve(null);
+      });
+
+      const secondDropTask = handleDroppedFiles(['/media/second.mp4']);
+      expect(probedDuringTransition).toBeNull();
+
+      // Switch to third file before second file's probe fails
+      await handleDroppedFiles(['/media/third.mp4']);
+      expect(getSelectedMediaFile()).toBe('/media/third.mp4');
+      expect(getProbedMetadata()?.durationSec).toBe(42);
+
+      // Now reject the stale second probe: it must NOT clear the newly selected third file
+      rejectSecondProbe(new Error('stale probe failure'));
+      await secondDropTask;
+
+      expect(getSelectedMediaFile()).toBe('/media/third.mp4');
+      expect(getProbedMetadata()?.durationSec).toBe(42);
+      resetQuickDeckState();
+    });
+
+    it('clears stale batchItems and invalidates in-flight batch probes on resetQueueState and single-file transitions', async () => {
+      // Arrange
+      resetQuickDeckState();
+      let resolveBatchProbe!: (val: any) => void;
+      const batchProbePromise = new Promise(resolve => {
+        resolveBatchProbe = resolve;
+      });
+
+      (globalThis as any).window.invoke = vi.fn((cmd: string, args: any) => {
+        if (cmd === 'probe_media_file' && args?.filePath === '/batch/a.mp4') {
+          return batchProbePromise;
+        }
+        if (cmd === 'probe_media_file' && args?.filePath === '/single/only.mp4') {
+          return Promise.resolve({ exists: true, durationSec: 95, format: 'Video' });
+        }
+        return Promise.resolve({ exists: true, durationSec: 30, format: 'Video' });
+      });
+
+      // Enter batch mode with 2 files while probing /batch/a.mp4 stays in-flight
+      await handleDroppedFiles(['/batch/a.mp4', '/batch/b.mp4']);
+      expect(batchProcessor.getIsBatchMode()).toBe(true);
+      expect(batchProcessor.getItems()).toHaveLength(2);
+
+      // Act: exit batch mode via clearSingleMediaFile (or stale isBatchMode=false before dropping single file)
+      batchProcessor.setIsBatchMode(false);
+      await handleDroppedFiles(['/single/only.mp4']);
+
+      // Assert: stale batch items are wiped and epoch invalidated
+      expect(batchProcessor.getIsBatchMode()).toBe(false);
+      expect(batchProcessor.getItems()).toHaveLength(0);
+      expect(getSelectedMediaFile()).toBe('/single/only.mp4');
+      expect(getProbedMetadata()?.durationSec).toBe(95);
+
+      // Resolve stale batch probe and verify it does NOT mutate state or revive batch items
+      resolveBatchProbe({ exists: true, durationSec: 12, size: '1 MB' });
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(batchProcessor.getIsBatchMode()).toBe(false);
+      expect(batchProcessor.getItems()).toHaveLength(0);
+      expect(getSelectedMediaFile()).toBe('/single/only.mp4');
+
+      // Clearing single media file also leaves batch state completely empty
+      clearSingleMediaFile();
+      expect(batchProcessor.getItems()).toHaveLength(0);
+      expect(batchProcessor.getSelectedFiles()).toHaveLength(0);
+      resetQuickDeckState();
+    });
+
+    it('synchronizes preloaded companion player back to 00:00 when full-file transcription finishes with firstStartMs === 0', async () => {
+      // Arrange
+      resetQuickDeckState();
+      setSelectedMediaFile('/media/full_clip.mp4');
+      setWavPathForTranscription('/tmp/full_clip.wav');
+      setProbedMetadata({ exists: true, durationSec: 120, format: 'Video' });
+      (globalThis as any).window.localScannedTransModels = ['ggml-base.bin'];
+      setSettingsState({
+        selectedBackend: 'Standard',
+        modelPath: 'ggml-base.bin',
+        inputFile: '/media/full_clip.mp4',
+        outputSrt: true,
+        outputDirMode: 'input_dir',
+        offsetT: 0,
+        duration: 0
+      });
+
+      const seekMock = vi.fn();
+      const prevSeek = (globalThis as any).window.seekCompanionPlayer;
+      (globalThis as any).window.seekCompanionPlayer = seekMock;
+
+      (globalThis as any).window.invoke = vi.fn((cmd: string) => {
+        if (cmd === 'start_transcription_task') {
+          return Promise.resolve({
+            outputDir: '/media',
+            generatedFiles: ['full_clip.srt'],
+            durationMs: 800,
+            speedFactor: 15.0,
+            internalJsonPath: null
+          });
+        }
+        if (cmd === 'get_transcript_session_data') {
+          return Promise.resolve(
+            JSON.stringify({
+              transcription: [
+                {
+                  timestamps: { from: '00:00:00,000', to: '00:00:04,000' },
+                  offsets: { from: 0, to: 4_000 },
+                  text: 'Starts right at zero'
+                }
+              ]
+            })
+          );
+        }
+        return Promise.resolve(null);
+      });
+
+      try {
+        // Act
+        await runWhisperTranscription();
+
+        // Assert: seeks preloaded player cleanly to 0ms so prior scrub position cannot stay desynced
+        expect(seekMock).toHaveBeenCalledWith(0, false, 0);
+      } finally {
+        (globalThis as any).window.seekCompanionPlayer = prevSeek;
+        resetQuickDeckState();
+      }
     });
   });
 });

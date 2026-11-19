@@ -242,6 +242,16 @@
     overflow: visible !important;
     flex: none !important;
   }
+  .transcribe-unified-deck,
+  .transcribe-media-deck {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  .transcribe-deck-body {
+    flex: none !important;
+    overflow: visible !important;
+  }
   .transcribe-right-panel {
     height: auto !important;
     min-height: min-content !important;
@@ -332,6 +342,16 @@
   .translate-left-panel,
   .transcribe-left-panel {
     height: auto;
+    overflow: visible;
+  }
+  .transcribe-unified-deck,
+  .transcribe-media-deck {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+  .transcribe-deck-body {
+    flex: none;
     overflow: visible;
   }
   .translate-right-panel,

@@ -419,6 +419,11 @@ impl WhisperSettings {
 
         self.recent_spoken_languages = sanitize_recent_list(&self.recent_spoken_languages, true);
         self.recent_translation_targets = sanitize_recent_list(&self.recent_translation_targets, false);
+
+        // Guarantee at least one user-facing output format remains enabled
+        if !self.output_txt && !self.output_srt && !self.output_vtt && !self.output_lrc {
+            self.output_srt = true;
+        }
     }
 }
 
@@ -1250,6 +1255,29 @@ mod tests {
         assert_eq!(settings.translate_ai_providers, "[{\"name\":\"custom-ai\",\"apiKey\":\"secret\"}]");
         assert_eq!(settings.translate_ai_provider, "custom-ai");
         assert_eq!(settings.model_path, "ggml-medium.bin");
+    }
+
+    #[test]
+    fn test_sanitize_enforces_at_least_one_output_format() {
+        let mut settings = WhisperSettings::default_settings();
+        settings.output_txt = false;
+        settings.output_srt = false;
+        settings.output_vtt = false;
+        settings.output_lrc = false;
+
+        settings.sanitize_and_validate();
+
+        assert!(settings.output_srt, "SRT must be re-enabled when all output formats are disabled");
+        assert!(!settings.output_txt);
+        assert!(!settings.output_vtt);
+        assert!(!settings.output_lrc);
+
+        // Preserve valid non-SRT selection (e.g., VTT only)
+        settings.output_srt = false;
+        settings.output_vtt = true;
+        settings.sanitize_and_validate();
+        assert!(!settings.output_srt);
+        assert!(settings.output_vtt);
     }
 }
 
