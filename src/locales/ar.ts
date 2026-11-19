@@ -250,6 +250,7 @@ export const ar: Translations = {
     toggleConfidenceTooltip: 'تمييز الكلمات ذات الثقة المنخفضة (< 60%)',
     highlightConfidence: 'نسبة الثقة',
     companionSetupTab: 'الإعدادات',
+    companionFilesTab: 'الملفات',
     companionPlayerTab: 'المشغل',
     resizerTooltip: 'اسحب لتغيير حجم اللوحة (انقر نقرًا مزدوجًا لإعادة الضبط)',
     resizerAria: 'تغيير حجم الألواح',

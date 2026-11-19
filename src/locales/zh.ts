@@ -250,6 +250,7 @@ export const zh: Translations = {
     toggleConfidenceTooltip: '高亮低置信度词语 (< 60%)',
     highlightConfidence: '置信度',
     companionSetupTab: '设置',
+    companionFilesTab: '文件',
     companionPlayerTab: '播放器',
     resizerTooltip: '拖动以调整面板大小（双击重置）',
     resizerAria: '调整面板大小',

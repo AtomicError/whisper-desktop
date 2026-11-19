@@ -250,6 +250,7 @@ export const ja: Translations = {
     toggleConfidenceTooltip: '信頼度の低い単語を強調表示 (< 60%)',
     highlightConfidence: '信頼度',
     companionSetupTab: '設定',
+    companionFilesTab: 'ファイル',
     companionPlayerTab: 'プレーヤー',
     resizerTooltip: 'ドラッグしてパネルのサイズを変更（ダブルクリックでリセット）',
     resizerAria: 'パネルサイズの変更',

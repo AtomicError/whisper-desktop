@@ -102,13 +102,26 @@ function syncSettingsInputElement(id: string, value: string | boolean): void {
 }
 
 /**
- * Updates the subtle footer elevation cue when `.transcribe-deck-body` has scrolled overflow below.
+ * Updates the subtle footer elevation cue when `.transcribe-deck-body` or the active `Files` queue list has scrolled overflow below.
  */
 export function updateDeckScrollCue(): void {
   if (typeof document === 'undefined') return;
   const deck = document.getElementById('transcribe-unified-deck');
-  const body = deck?.querySelector('.transcribe-deck-body') as HTMLElement | null;
-  if (!deck || !body) return;
+  if (!deck) return;
+
+  const batchQueue = document.getElementById('batch-queue-container');
+  const isFilesTabVisible = Boolean(
+    batchQueue && batchQueue.style && batchQueue.style.display && batchQueue.style.display !== 'none'
+  );
+  const body = isFilesTabVisible
+    ? ((typeof batchQueue?.querySelector === 'function'
+        ? batchQueue.querySelector('.batch-table-wrapper')
+        : null) as HTMLElement | null) || batchQueue
+    : (typeof deck.querySelector === 'function'
+        ? (deck.querySelector('.transcribe-deck-body') as HTMLElement | null)
+        : null);
+
+  if (!body) return;
   if (typeof body.scrollHeight !== 'number' || typeof body.clientHeight !== 'number') return;
 
   const hasOverflowBelow = body.scrollHeight - body.clientHeight - (body.scrollTop || 0) > 6;
@@ -623,10 +636,16 @@ function bindDeckScrollCueObserver(): void {
   if (!deckBody || (deckBody as any)._scrollCueBound) return;
   (deckBody as any)._scrollCueBound = true;
   deckBody.addEventListener('scroll', updateDeckScrollCue, { passive: true });
+  const batchTableWrapper = document.querySelector('#batch-queue-container .batch-table-wrapper') as HTMLElement | null;
+  if (batchTableWrapper && !(batchTableWrapper as any)._scrollCueBound) {
+    (batchTableWrapper as any)._scrollCueBound = true;
+    batchTableWrapper.addEventListener('scroll', updateDeckScrollCue, { passive: true });
+  }
   if (typeof ResizeObserver !== 'undefined') {
     const ro = new ResizeObserver(updateDeckScrollCue);
     ro.observe(deckBody);
-    ['transcribe-drop-zone', 'batch-queue-container', 'quick-range-inputs', 'quick-maxlen-custom-row', 'quick-adv-prompt'].forEach(childId => {
+    if (batchTableWrapper) ro.observe(batchTableWrapper);
+    ['transcribe-drop-zone', 'batch-queue-container', 'batch-queue-body', 'quick-range-inputs', 'quick-maxlen-custom-row', 'quick-adv-prompt'].forEach(childId => {
       const child = document.getElementById(childId);
       if (child) ro.observe(child);
     });

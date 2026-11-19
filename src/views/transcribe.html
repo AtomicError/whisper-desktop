@@ -10,11 +10,17 @@
                       <span class="transcribe-deck-title" data-i18n="transcribe.deckTitle">Transcription Setup</span>
                     </div>
                     <div class="deck-mode-tabs" id="setup-deck-mode-tabs" style="display: none;">
-                      <button type="button" class="btn-deck-tab active" id="btn-setup-tab-setup" title="Transcription Setup" data-i18n-title="transcribe.deckTitle">
+                      <button type="button" class="btn-deck-tab active" id="btn-setup-tab-setup" title="Transcription Setup" data-i18n-title="transcribe.deckTitle" onclick="showTranscribeSetupDeck()">
                         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
                           <path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
                         </svg>
                         <span data-i18n="transcribe.companionSetupTab">Setup</span>
+                      </button>
+                      <button type="button" class="btn-deck-tab" id="btn-setup-tab-files" title="Queue Files" data-i18n-title="transcribe.queueFilesHeader" onclick="showTranscribeFilesDeck()" style="display: none;">
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+                        </svg>
+                        <span data-i18n="transcribe.companionFilesTab">Files</span>
                       </button>
                       <button type="button" class="btn-deck-tab" id="btn-setup-tab-player" title="Return to Media Player" data-i18n-title="transcribe.companionPlayerTitle" onclick="showTranscribeMediaDeck()">
                         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
@@ -62,7 +68,7 @@
                             <div class="transcribe-meta-badges-row batch-specs-box" id="batch-specs-box" style="display:none;">
                               <span class="transcribe-meta-badge"><strong id="batch-files-count">0</strong>&nbsp;<span data-i18n="transcribe.batchFilesUnit">Files</span></span>
                               <span class="transcribe-meta-bullet" aria-hidden="true">•</span>
-                              <span class="transcribe-meta-badge"><span data-i18n="transcribe.batchTotalDuration">Total Duration:</span>&nbsp;<strong id="batch-total-duration">--:--:--</strong></span>
+                              <span class="transcribe-meta-badge" data-i18n-title="transcribe.duration" title="Duration"><strong id="batch-total-duration">--:--:--</strong></span>
                             </div>
                           </div>
                         </div>
@@ -70,46 +76,6 @@
                           <button class="btn-secondary btn-media-browse" id="btn-browse-media" onclick="browseMediaFile()" data-i18n="transcribe.browseSystem" type="button">Browse</button>
                           <button class="btn-secondary btn-clear-media" id="btn-clear-media" onclick="clearSingleMediaFile()" data-i18n="transcribe.clearMedia" type="button" style="display:none;">Clear</button>
                         </div>
-                      </div>
-                    </div>
-
-                    <!-- Batch Queue Container -->
-                    <div id="batch-queue-container" class="batch-queue-panel" style="display:none;">
-                      <div class="batch-queue-header">
-                        <div class="batch-queue-title">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <line x1="8" y1="6" x2="21" y2="6"></line>
-                            <line x1="8" y1="12" x2="21" y2="12"></line>
-                            <line x1="8" y1="18" x2="21" y2="18"></line>
-                            <line x1="3" y1="6" x2="3.01" y2="6"></line>
-                            <line x1="3" y1="12" x2="3.01" y2="12"></line>
-                            <line x1="3" y1="18" x2="3.01" y2="18"></line>
-                          </svg>
-                          <span class="batch-title-text" data-i18n="transcribe.queueFilesHeader">Queue Files</span>
-                          <span class="batch-count-chip" id="lbl-batch-count">0</span>
-                        </div>
-                        <div class="batch-queue-actions">
-                          <div class="batch-sort-wrapper">
-                            <select id="batch-sort-select" class="select-control batch-sort-control" data-no-tooltip aria-label="Sort queue" data-i18n-aria="transcribe.sortQueue" onchange="sortBatchQueue(this.value)">
-                              <option value="" disabled selected hidden data-i18n="transcribe.sortQueue">Sort...</option>
-                              <option value="name-asc" data-i18n="transcribe.sortNameAsc">Alphabetical (A-Z)</option>
-                              <option value="name-desc" data-i18n="transcribe.sortNameDesc">Alphabetical (Z-A)</option>
-                              <option value="duration-asc" data-i18n="transcribe.sortDurationAsc">Duration (Shortest first)</option>
-                              <option value="duration-desc" data-i18n="transcribe.sortDurationDesc">Duration (Longest first)</option>
-                            </select>
-                          </div>
-                          <button class="btn-secondary btn-clear-queue" id="btn-clear-batch" onclick="clearBatchQueue()" type="button" data-i18n-title="transcribe.clearQueue" title="Clear Queue">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                              <polyline points="3 6 5 6 21 6"></polyline>
-                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                            </svg>
-                            <span data-i18n="transcribe.clearQueue">Clear</span>
-                          </button>
-                        </div>
-                      </div>
-
-                      <div class="batch-table-wrapper batch-queue-list-wrapper">
-                        <div class="batch-queue-list" id="batch-queue-body"></div>
                       </div>
                     </div>
 
@@ -316,6 +282,46 @@
                     <button id="btn-next-step-2" style="display:none;" type="button"></button>
                   </div>
 
+                  <!-- Batch Queue Container (Dedicated Files Tab Body inside Unified Deck) -->
+                  <div id="batch-queue-container" class="batch-queue-panel" style="display:none;">
+                    <div class="batch-queue-header">
+                      <div class="batch-queue-title">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <line x1="8" y1="6" x2="21" y2="6"></line>
+                          <line x1="8" y1="12" x2="21" y2="12"></line>
+                          <line x1="8" y1="18" x2="21" y2="18"></line>
+                          <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                          <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                          <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                        </svg>
+                        <span class="batch-title-text" data-i18n="transcribe.queueFilesHeader">Queue Files</span>
+                        <span class="batch-count-chip" id="lbl-batch-count">0</span>
+                      </div>
+                      <div class="batch-queue-actions">
+                        <div class="batch-sort-wrapper">
+                          <select id="batch-sort-select" class="select-control batch-sort-control" data-no-tooltip aria-label="Sort queue" data-i18n-aria="transcribe.sortQueue" onchange="sortBatchQueue(this.value)">
+                            <option value="" disabled selected hidden data-i18n="transcribe.sortQueue">Sort...</option>
+                            <option value="name-asc" data-i18n="transcribe.sortNameAsc">Alphabetical (A-Z)</option>
+                            <option value="name-desc" data-i18n="transcribe.sortNameDesc">Alphabetical (Z-A)</option>
+                            <option value="duration-asc" data-i18n="transcribe.sortDurationAsc">Duration (Shortest first)</option>
+                            <option value="duration-desc" data-i18n="transcribe.sortDurationDesc">Duration (Longest first)</option>
+                          </select>
+                        </div>
+                        <button class="btn-secondary btn-clear-queue" id="btn-clear-batch" onclick="clearBatchQueue()" type="button" data-i18n-title="transcribe.clearQueue" title="Clear Queue">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                          </svg>
+                          <span data-i18n="transcribe.clearQueue">Clear</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="batch-table-wrapper batch-queue-list-wrapper">
+                      <div class="batch-queue-list" id="batch-queue-body"></div>
+                    </div>
+                  </div>
+
                   <!-- Docked Action & Execution Footer (Always Visible) -->
                   <div class="transcribe-actions-section">
                       <!-- Single-file actions -->
@@ -386,7 +392,13 @@
                         </svg>
                         <span data-i18n="transcribe.companionSetupTab">Setup</span>
                       </button>
-                      <button type="button" class="btn-deck-tab active" id="btn-tab-to-player" title="Media Companion Player" data-i18n-title="transcribe.companionPlayerTitle">
+                      <button type="button" class="btn-deck-tab" id="btn-tab-to-files" title="Queue Files" data-i18n-title="transcribe.queueFilesHeader" onclick="showTranscribeFilesDeck()" style="display: none;">
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+                        </svg>
+                        <span data-i18n="transcribe.companionFilesTab">Files</span>
+                      </button>
+                      <button type="button" class="btn-deck-tab active" id="btn-tab-to-player" title="Media Companion Player" data-i18n-title="transcribe.companionPlayerTitle" onclick="showTranscribeMediaDeck()">
                         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
                           <polygon points="5 3 19 12 5 21 5 3"/>
                         </svg>

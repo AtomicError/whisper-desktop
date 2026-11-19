@@ -40,6 +40,115 @@ let companionResizeObserver: ResizeObserver | null = null;
 let lastRenderedSubtitleText = '';
 let explicitTargetLineId: number | null = null;
 
+export type TranscribeDeckTab = 'setup' | 'files' | 'player';
+let activeTranscribeDeckTab: TranscribeDeckTab = 'setup';
+
+declare global {
+  interface Window {
+    loadMediaIntoCompanionPlayer?: (filePath: string, autoSwitchDeck?: boolean, knownDurationSec?: number) => Promise<boolean>;
+    showTranscribeSetupDeck?: () => void;
+    showTranscribeFilesDeck?: () => void;
+    showTranscribeMediaDeck?: () => void;
+    syncTranscribeDeckTabsUI?: () => void;
+    getActiveTranscribeDeckTab?: () => TranscribeDeckTab;
+    toggleCompanionPlayback?: () => void;
+    jumpCompanionPlayback?: (seconds: number) => void;
+    seekCompanionPlayer?: (targetMs: number, autoPlay?: boolean, targetLineId?: number, switchToMediaDeck?: boolean) => void;
+    pauseCompanionPlayer?: () => void;
+    unloadCompanionPlayer?: () => void;
+    getCompanionCurrentTimeSec?: () => number;
+  }
+}
+
+export function getActiveTranscribeDeckTab(): TranscribeDeckTab {
+  return activeTranscribeDeckTab;
+}
+
+function isBatchModeActive(): boolean {
+  const win = getGlobal();
+  if (!win) return false;
+  if (win.batchProcessor && typeof win.batchProcessor.getIsBatchMode === 'function') {
+    return Boolean(win.batchProcessor.getIsBatchMode());
+  }
+  return Boolean(win.isBatchMode);
+}
+
+function getSetupDeckBody(setupDeck: HTMLElement | null): HTMLElement | null {
+  if (setupDeck && typeof setupDeck.querySelector === 'function') {
+    const found = setupDeck.querySelector('.transcribe-deck-body') as HTMLElement | null;
+    if (found) return found;
+  }
+  if (typeof document !== 'undefined' && typeof document.querySelector === 'function') {
+    return document.querySelector('#transcribe-unified-deck .transcribe-deck-body') as HTMLElement | null;
+  }
+  return null;
+}
+
+export function syncTranscribeDeckTabsUI(): void {
+  if (typeof document === 'undefined') return;
+  const isBatch = isBatchModeActive();
+  if (!isBatch && activeTranscribeDeckTab === 'files') {
+    activeTranscribeDeckTab = 'setup';
+  }
+  const hasPlayer = Boolean(activeMediaInfo);
+  const showHeaderTabs = isBatch || hasPlayer;
+
+  const setupDeckTabs = document.getElementById('setup-deck-mode-tabs');
+  const manageSettingsBtn = document.getElementById('btn-transcribe-manage-settings');
+
+  const setupTabSetup = document.getElementById('btn-setup-tab-setup');
+  const setupTabFiles = document.getElementById('btn-setup-tab-files');
+  const setupTabPlayer = document.getElementById('btn-setup-tab-player');
+
+  const mediaTabSetup = document.getElementById('btn-tab-to-setup');
+  const mediaTabFiles = document.getElementById('btn-tab-to-files');
+  const mediaTabPlayer = document.getElementById('btn-tab-to-player');
+
+  if (setupDeckTabs) {
+    setupDeckTabs.style.display =
+      activeTranscribeDeckTab === 'player' ? 'none' : showHeaderTabs ? 'inline-flex' : 'none';
+  }
+  if (manageSettingsBtn) {
+    manageSettingsBtn.style.display = showHeaderTabs ? 'none' : 'inline-flex';
+  }
+
+  if (setupTabFiles) {
+    setupTabFiles.style.display = isBatch ? 'inline-flex' : 'none';
+  }
+  if (mediaTabFiles) {
+    mediaTabFiles.style.display = isBatch ? 'inline-flex' : 'none';
+  }
+
+  const showPlayerTab = hasPlayer || activeTranscribeDeckTab === 'player';
+  if (setupTabPlayer) {
+    setupTabPlayer.style.display = showPlayerTab ? 'inline-flex' : 'none';
+  }
+  if (mediaTabPlayer) {
+    mediaTabPlayer.style.display = showPlayerTab ? 'inline-flex' : 'none';
+  }
+
+  const isSetupActive = activeTranscribeDeckTab === 'setup';
+  const isFilesActive = activeTranscribeDeckTab === 'files';
+  const isPlayerActive = activeTranscribeDeckTab === 'player';
+
+  const setTabButtonState = (btn: HTMLElement | null, active: boolean): void => {
+    if (!btn) return;
+    btn.classList.toggle('active', active);
+    if (typeof btn.setAttribute === 'function') {
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    }
+  };
+
+  setTabButtonState(setupTabSetup, isSetupActive);
+  setTabButtonState(mediaTabSetup, isSetupActive);
+
+  setTabButtonState(setupTabFiles, isFilesActive);
+  setTabButtonState(mediaTabFiles, isFilesActive);
+
+  setTabButtonState(setupTabPlayer, isPlayerActive);
+  setTabButtonState(mediaTabPlayer, isPlayerActive);
+}
+
 function armSeekWatchdog(): void {
   if (seekWatchdogTimer) clearTimeout(seekWatchdogTimer);
   seekWatchdogTimer = setTimeout(() => {
@@ -197,15 +306,12 @@ export function onTranscribeViewActivated(): void {
 
 export function showTranscribeSetupDeck(): void {
   if (typeof document === 'undefined') return;
+  activeTranscribeDeckTab = 'setup';
   pauseCompanionPlayer();
   const setupDeck = document.getElementById('transcribe-unified-deck');
   const mediaDeck = document.getElementById('transcribe-media-deck');
-  const tabSetup = document.getElementById('btn-tab-to-setup');
-  const tabPlayer = document.getElementById('btn-tab-to-player');
-  const setupTabSetup = document.getElementById('btn-setup-tab-setup');
-  const setupTabPlayer = document.getElementById('btn-setup-tab-player');
-  const setupDeckTabs = document.getElementById('setup-deck-mode-tabs');
-  const manageSettingsBtn = document.getElementById('btn-transcribe-manage-settings');
+  const deckBody = getSetupDeckBody(setupDeck);
+  const batchQueueContainer = document.getElementById('batch-queue-container');
 
   if (setupDeck) {
     setupDeck.classList.remove('deck-hidden');
@@ -215,28 +321,52 @@ export function showTranscribeSetupDeck(): void {
     mediaDeck.classList.add('deck-hidden');
     mediaDeck.style.display = 'none';
   }
-  if (tabSetup) tabSetup.classList.add('active');
-  if (tabPlayer) tabPlayer.classList.remove('active');
-  if (setupTabSetup) setupTabSetup.classList.add('active');
-  if (setupTabPlayer) setupTabPlayer.classList.remove('active');
-  if (setupDeckTabs) {
-    setupDeckTabs.style.display = activeMediaInfo ? 'inline-flex' : 'none';
+  if (deckBody) {
+    deckBody.style.display = 'flex';
   }
-  if (manageSettingsBtn) {
-    manageSettingsBtn.style.display = activeMediaInfo ? 'none' : 'inline-flex';
+  if (batchQueueContainer) {
+    batchQueueContainer.style.display = 'none';
   }
+  syncTranscribeDeckTabsUI();
+  updateDeckScrollCue();
+}
+
+export function showTranscribeFilesDeck(): void {
+  if (typeof document === 'undefined') return;
+  if (!isBatchModeActive()) {
+    showTranscribeSetupDeck();
+    return;
+  }
+  activeTranscribeDeckTab = 'files';
+  pauseCompanionPlayer();
+  const setupDeck = document.getElementById('transcribe-unified-deck');
+  const mediaDeck = document.getElementById('transcribe-media-deck');
+  const deckBody = getSetupDeckBody(setupDeck);
+  const batchQueueContainer = document.getElementById('batch-queue-container');
+
+  if (setupDeck) {
+    setupDeck.classList.remove('deck-hidden');
+    setupDeck.style.display = 'flex';
+  }
+  if (mediaDeck) {
+    mediaDeck.classList.add('deck-hidden');
+    mediaDeck.style.display = 'none';
+  }
+  if (deckBody) {
+    deckBody.style.display = 'none';
+  }
+  if (batchQueueContainer) {
+    batchQueueContainer.style.display = 'flex';
+  }
+  syncTranscribeDeckTabsUI();
   updateDeckScrollCue();
 }
 
 export function showTranscribeMediaDeck(): void {
   if (typeof document === 'undefined') return;
+  activeTranscribeDeckTab = 'player';
   const setupDeck = document.getElementById('transcribe-unified-deck');
   const mediaDeck = document.getElementById('transcribe-media-deck');
-  const tabSetup = document.getElementById('btn-tab-to-setup');
-  const tabPlayer = document.getElementById('btn-tab-to-player');
-  const setupTabSetup = document.getElementById('btn-setup-tab-setup');
-  const setupTabPlayer = document.getElementById('btn-setup-tab-player');
-  const setupDeckTabs = document.getElementById('setup-deck-mode-tabs');
 
   if (setupDeck) {
     setupDeck.classList.add('deck-hidden');
@@ -246,13 +376,7 @@ export function showTranscribeMediaDeck(): void {
     mediaDeck.classList.remove('deck-hidden');
     mediaDeck.style.display = 'flex';
   }
-  if (tabSetup) tabSetup.classList.remove('active');
-  if (tabPlayer) tabPlayer.classList.add('active');
-  if (setupTabSetup) setupTabSetup.classList.remove('active');
-  if (setupTabPlayer) setupTabPlayer.classList.add('active');
-  if (setupDeckTabs) {
-    setupDeckTabs.style.display = 'none';
-  }
+  syncTranscribeDeckTabsUI();
   wakeCompanionPlayerSurface();
 }
 
@@ -271,10 +395,7 @@ export async function loadMediaIntoCompanionPlayer(
     if (autoSwitchDeck) {
       showTranscribeMediaDeck();
     } else {
-      const setupDeckTabs = document.getElementById('setup-deck-mode-tabs');
-      if (setupDeckTabs) setupDeckTabs.style.display = 'inline-flex';
-      const manageSettingsBtn = document.getElementById('btn-transcribe-manage-settings');
-      if (manageSettingsBtn) manageSettingsBtn.style.display = 'none';
+      syncTranscribeDeckTabsUI();
     }
     return true;
   }
@@ -438,10 +559,7 @@ export async function loadMediaIntoCompanionPlayer(
   if (autoSwitchDeck) {
     showTranscribeMediaDeck();
   } else {
-    const setupDeckTabs = document.getElementById('setup-deck-mode-tabs');
-    if (setupDeckTabs) setupDeckTabs.style.display = 'inline-flex';
-    const manageSettingsBtn = document.getElementById('btn-transcribe-manage-settings');
-    if (manageSettingsBtn) manageSettingsBtn.style.display = 'none';
+    syncTranscribeDeckTabsUI();
   }
   return true;
 }
@@ -679,11 +797,11 @@ export function unloadCompanionPlayer(): void {
     fullscreenBtn.style.opacity = '1';
     fullscreenBtn.style.cursor = 'pointer';
   }
-  showTranscribeSetupDeck();
-  const setupDeckTabs = document.getElementById('setup-deck-mode-tabs');
-  if (setupDeckTabs) setupDeckTabs.style.display = 'none';
-  const manageSettingsBtn = document.getElementById('btn-transcribe-manage-settings');
-  if (manageSettingsBtn) manageSettingsBtn.style.display = 'inline-flex';
+  if (isBatchModeActive() && activeTranscribeDeckTab === 'files') {
+    showTranscribeFilesDeck();
+  } else {
+    showTranscribeSetupDeck();
+  }
 }
 
 export function changeCompanionPlaybackRate(rateStr: string): void {
@@ -1420,7 +1538,10 @@ export function initCompanionPlayerDOM(): void {
 const win = getGlobal();
 win.loadMediaIntoCompanionPlayer = loadMediaIntoCompanionPlayer;
 win.showTranscribeSetupDeck = showTranscribeSetupDeck;
+win.showTranscribeFilesDeck = showTranscribeFilesDeck;
 win.showTranscribeMediaDeck = showTranscribeMediaDeck;
+win.syncTranscribeDeckTabsUI = syncTranscribeDeckTabsUI;
+win.getActiveTranscribeDeckTab = getActiveTranscribeDeckTab;
 win.toggleCompanionPlayback = toggleCompanionPlayback;
 win.jumpCompanionPlayback = jumpCompanionPlayback;
 win.seekCompanionPlayer = seekCompanionPlayer;

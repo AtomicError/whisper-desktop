@@ -250,6 +250,7 @@ export const fr: Translations = {
     toggleConfidenceTooltip: 'Mettre en évidence les mots à faible confiance (< 60%)',
     highlightConfidence: 'Confiance',
     companionSetupTab: 'Configuration',
+    companionFilesTab: 'Fichiers',
     companionPlayerTab: 'Lecteur',
     resizerTooltip: 'Faites glisser pour redimensionner (double-clic pour réinitialiser)',
     resizerAria: 'Redimensionner les panneaux',

@@ -250,6 +250,7 @@ export const fa: Translations = {
     toggleConfidenceTooltip: 'نمایش کلمات با ضریب اطمینان پایین (کمتر از ۶۰٪)',
     highlightConfidence: 'ضریب اطمینان',
     companionSetupTab: 'تنظیمات',
+    companionFilesTab: 'فایل‌ها',
     companionPlayerTab: 'پخش‌کننده',
     resizerTooltip: 'برای تغییر اندازه بکشید (دوبار کلیک برای بازنشانی)',
     resizerAria: 'تغییر اندازه ستون‌ها',

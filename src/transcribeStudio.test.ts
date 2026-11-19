@@ -1571,7 +1571,8 @@ describe('Enhanced Transcribe Studio Controls & Locale Coverage', () => {
       'lineLenCustom',
       'hardsubRequiresTimedSub',
       'statusSkipped',
-      'batchCompletedSummaryWithSkipped'
+      'batchCompletedSummaryWithSkipped',
+      'companionFilesTab'
     ] as const;
 
     for (const code of languageCodes) {
@@ -1600,6 +1601,23 @@ describe('Enhanced Transcribe Studio Controls & Locale Coverage', () => {
     expect(tokensCss).not.toContain('--accent-primary: #3b82f6;');
     const transcribeCss = readFileSync(resolve(process.cwd(), 'src/styles/views/transcribe.css'), 'utf8');
     expect(transcribeCss).toContain('.badge-skipped');
+
+    // Dedicated Batch Files tab buttons and sibling placement inside unified deck
+    expect(html).toContain('id="btn-setup-tab-files"');
+    expect(html).toContain('id="btn-tab-to-files"');
+    expect(html).toContain('data-i18n="transcribe.companionFilesTab"');
+    expect(html).toContain('onclick="showTranscribeFilesDeck()"');
+    const bodyEndIdx = html.indexOf('id="btn-next-step-2"');
+    const batchQueueIdx = html.indexOf('id="batch-queue-container"');
+    const actionsSectionIdx = html.indexOf('class="transcribe-actions-section"');
+    expect(batchQueueIdx).toBeGreaterThan(bodyEndIdx);
+    expect(actionsSectionIdx).toBeGreaterThan(batchQueueIdx);
+
+    // Compact single-line batch summary metadata in dropzone without wrapping inline 'Total Duration:' prefix
+    const batchSpecsMatch = html.match(/<div[^>]*id="batch-specs-box"[^>]*>([\s\S]*?)<\/div>/);
+    expect(batchSpecsMatch).not.toBeNull();
+    expect(batchSpecsMatch?.[1]).not.toContain('data-i18n="transcribe.batchTotalDuration"');
+    expect(transcribeCss).toMatch(/#transcribe-drop-zone\.transcribe-dropzone-card\s*\{[\s\S]*?flex-shrink:\s*0;/);
   });
 });
 

@@ -43,7 +43,11 @@ import {
   toggleCompanionMute,
   pauseCompanionPlayer,
   showTranscribeSetupDeck,
+  showTranscribeFilesDeck,
   showTranscribeMediaDeck,
+  syncTranscribeDeckTabsUI,
+  getActiveTranscribeDeckTab,
+  getActiveMediaInfo,
   wakeCompanionPlayerSurface,
   onTranscribeViewActivated,
   unloadCompanionPlayer,
@@ -59,7 +63,14 @@ import {
   cleanSubtitleDisplayText,
   COMPANION_SPEEDS
 } from './companionPlayer';
-import { clearBatchQueue, removeFileFromBatch, selectBatchItemTranscript, batchProcessor } from './batchProcessor';
+import {
+  clearBatchQueue,
+  removeFileFromBatch,
+  selectBatchItemTranscript,
+  addBatchFiles,
+  runBatchExtraction,
+  batchProcessor
+} from './batchProcessor';
 
 // Minimal mock DOM for headless testing
 class MockElement {
@@ -343,6 +354,9 @@ const mockDocument = {
     return results;
   },
   createElement(tag: string) {
+    return new MockElement(tag);
+  },
+  createElementNS(_ns: string, tag: string) {
     return new MockElement(tag);
   },
   createDocumentFragment() {
@@ -1505,18 +1519,24 @@ describe('Studio Refinements, Isolation & Keyboard Accessibility', () => {
   it('unloads companion player when clearBatchQueue is called', () => {
     const win = typeof window !== 'undefined' ? (window as any) : (globalThis as any);
     let unloaded = false;
+    const prevUnload = win.unloadCompanionPlayer;
     win.unloadCompanionPlayer = () => { unloaded = true; };
     win.showNotification = () => {};
     win.isBatchMode = true;
     batchProcessor.setItems([{ path: '/test.mp4', status: 'completed' }] as any);
 
-    clearBatchQueue();
-    expect(unloaded).toBe(true);
+    try {
+      clearBatchQueue();
+      expect(unloaded).toBe(true);
+    } finally {
+      win.unloadCompanionPlayer = prevUnload;
+    }
   });
 
   it('unloads companion player when removeFileFromBatch deletes the active completed item without remaining completed items', () => {
     const win = typeof window !== 'undefined' ? (window as any) : (globalThis as any);
     let unloaded = false;
+    const prevUnload = win.unloadCompanionPlayer;
     win.unloadCompanionPlayer = () => { unloaded = true; };
     win.showNotification = () => {};
     win.isBatchMode = true;
@@ -1526,8 +1546,12 @@ describe('Studio Refinements, Isolation & Keyboard Accessibility', () => {
       { path: '/test2.mp4', status: 'pending' }
     ] as any);
 
-    removeFileFromBatch(0);
-    expect(unloaded).toBe(true);
+    try {
+      removeFileFromBatch(0);
+      expect(unloaded).toBe(true);
+    } finally {
+      win.unloadCompanionPlayer = prevUnload;
+    }
   });
 
   it('recognizes extended audio formats (e.g. .wma, .aiff, .alac) as audio only in companion player', async () => {
@@ -2266,15 +2290,20 @@ describe('Studio Refinements, Isolation & Keyboard Accessibility', () => {
 
   it('unloads companion player immediately when selecting an active in-progress batch item', async () => {
     let unloaded = false;
+    const prevUnload = (window as any).unloadCompanionPlayer;
     (window as any).unloadCompanionPlayer = () => { unloaded = true; };
 
-    (window as any).batchItems = [
-      { id: 0, status: 'completed', path: '/audio/completed.mp3', transcriptLines: [] },
-      { id: 1, status: 'transcribing', path: '/audio/transcribing.mp3', transcriptLines: [] }
-    ];
+    try {
+      (window as any).batchItems = [
+        { id: 0, status: 'completed', path: '/audio/completed.mp3', transcriptLines: [] },
+        { id: 1, status: 'transcribing', path: '/audio/transcribing.mp3', transcriptLines: [] }
+      ];
 
-    await selectBatchItemTranscript(1);
-    expect(unloaded).toBe(true);
+      await selectBatchItemTranscript(1);
+      expect(unloaded).toBe(true);
+    } finally {
+      (window as any).unloadCompanionPlayer = prevUnload;
+    }
   });
 
   it('flushes pending edits when removing an item or clearing the batch queue', () => {
@@ -2842,5 +2871,209 @@ describe('Studio Refinements, Isolation & Keyboard Accessibility', () => {
     seekCompanionPlayer(15_000, false, 0);
     expect(setupDeck.classList.contains('deck-hidden')).toBe(true);
     expect(mediaDeck.classList.contains('deck-hidden')).toBe(false);
+  });
+
+  it('manages the 3-tab lifecycle (Setup | Files | Player) cleanly across Batch Mode selection, execution, and unload', async () => {
+    // Arrange
+    const setupDeck = registerMockEl('transcribe-unified-deck', 'DIV');
+    const deckBody = registerMockEl('transcribe-setup-body', 'DIV', 'transcribe-deck-body');
+    setupDeck.appendChild(deckBody);
+    const dropZone = registerMockEl('transcribe-drop-zone', 'DIV');
+    const fileNameEl = registerMockEl('lbl-file-name', 'P');
+    const clearMediaBtn = registerMockEl('btn-clear-media', 'BUTTON');
+    const batchQueueContainer = registerMockEl('batch-queue-container', 'DIV');
+    registerMockEl('batch-queue-body', 'DIV');
+    const mediaDeck = registerMockEl('transcribe-media-deck', 'DIV');
+
+    const setupDeckTabs = registerMockEl('setup-deck-mode-tabs', 'DIV');
+    const manageSettingsBtn = registerMockEl('btn-transcribe-manage-settings', 'BUTTON');
+
+    const setupTabSetup = registerMockEl('btn-setup-tab-setup', 'BUTTON');
+    const setupTabFiles = registerMockEl('btn-setup-tab-files', 'BUTTON');
+    const setupTabPlayer = registerMockEl('btn-setup-tab-player', 'BUTTON');
+
+    const mediaTabSetup = registerMockEl('btn-tab-to-setup', 'BUTTON');
+    const mediaTabFiles = registerMockEl('btn-tab-to-files', 'BUTTON');
+    const mediaTabPlayer = registerMockEl('btn-tab-to-player', 'BUTTON');
+
+    const video = registerMockEl('companion-media-element', 'VIDEO') as any;
+    video.readyState = 2;
+    video.duration = 90;
+    video.paused = true;
+
+    (window as any).__TAURI__ = {
+      core: {
+        invoke: async (cmd: string) => {
+          if (cmd === 'probe_media_file') return { exists: true, durationSec: 90, size: '12 MB' };
+          if (cmd === 'stream_media_file') return 'http://127.0.0.1:54321/media/item1.mp4';
+          if (cmd === 'convert_media_file') return '/tmp/item.wav';
+          if (cmd === 'start_transcription_task') {
+            return {
+              generatedFiles: ['item.srt'],
+              outputDir: '/media',
+              durationMs: 1200,
+              speedFactor: 4.5
+            };
+          }
+          return null;
+        }
+      }
+    };
+
+    // 1. Entering Batch Mode via addBatchFiles keeps Setup active while revealing [Setup | Files] tabs
+    unloadCompanionPlayer();
+    clearBatchQueue();
+    await addBatchFiles(['/media/item1.mp4', '/media/item2.mp4']);
+
+    expect(batchProcessor.getIsBatchMode()).toBe(true);
+    expect(getActiveTranscribeDeckTab()).toBe('setup');
+    expect(setupDeckTabs.style.display).toBe('inline-flex');
+    expect(manageSettingsBtn.style.display).toBe('none');
+    expect(setupTabSetup.classList.contains('active')).toBe(true);
+    expect(setupTabSetup.getAttribute('aria-pressed')).toBe('true');
+    expect(setupTabFiles.style.display).toBe('inline-flex');
+    expect(setupTabFiles.classList.contains('active')).toBe(false);
+    expect(setupTabFiles.getAttribute('aria-pressed')).toBe('false');
+    expect(setupTabPlayer.style.display).toBe('none');
+    expect(deckBody.style.display).toBe('flex');
+    expect(batchQueueContainer.style.display).toBe('none');
+    expect(clearMediaBtn.style.display).toBe('inline-flex');
+    expect(dropZone.classList.contains('is-batch-summary')).toBe(true);
+    expect(dropZone.getAttribute('data-i18n-title')).toBe('transcribe.queueFilesHeader');
+    expect(fileNameEl.getAttribute('data-i18n')).toBe('transcribe.batchModeActive');
+
+    // 2. Switching to Files tab displays #batch-queue-container and hides .transcribe-deck-body
+    showTranscribeFilesDeck();
+    expect(getActiveTranscribeDeckTab()).toBe('files');
+    expect(deckBody.style.display).toBe('none');
+    expect(batchQueueContainer.style.display).toBe('flex');
+    expect(setupTabFiles.classList.contains('active')).toBe(true);
+    expect(setupTabSetup.classList.contains('active')).toBe(false);
+
+    // 3. Loading a completed item into Companion Player (autoSwitchDeck=false) reveals the 3rd Player tab without leaving Files tab
+    await loadMediaIntoCompanionPlayer('/media/item1.mp4', false, 90);
+    expect(getActiveTranscribeDeckTab()).toBe('files');
+    expect(setupTabPlayer.style.display).toBe('inline-flex');
+    expect(mediaTabFiles.style.display).toBe('inline-flex');
+    expect(mediaTabPlayer.style.display).toBe('inline-flex');
+
+    // 4. Unloading Companion Player while on Files tab in Batch Mode preserves Files tab and hides only Player tab
+    unloadCompanionPlayer();
+    expect(getActiveTranscribeDeckTab()).toBe('files');
+    expect(batchQueueContainer.style.display).toBe('flex');
+    expect(deckBody.style.display).toBe('none');
+    expect(setupDeckTabs.style.display).toBe('inline-flex');
+    expect(setupTabFiles.classList.contains('active')).toBe(true);
+    expect(setupTabPlayer.style.display).toBe('none');
+
+    // 5. Starting runBatchExtraction from Setup automatically switches to Files tab
+    showTranscribeSetupDeck();
+    expect(getActiveTranscribeDeckTab()).toBe('setup');
+    (window as any).settingsState = {
+      selectedBackend: 'Standard',
+      modelPath: '/models/ggml-base.bin',
+      outputSrt: true
+    };
+    (window as any).localScannedTransModels = ['/models/ggml-base.bin'];
+
+    await runBatchExtraction();
+    expect(getActiveTranscribeDeckTab()).toBe('files');
+    expect(batchQueueContainer.style.display).toBe('flex');
+    expect(deckBody.style.display).toBe('none');
+    expect(getActiveMediaInfo()?.filePath).toBe('/media/item2.mp4');
+    expect(setupTabPlayer.style.display).toBe('inline-flex');
+    expect(mediaTabPlayer.style.display).toBe('inline-flex');
+
+    // 6. Clearing batch queue exits Batch Mode, hides Files tab, and returns to Setup
+    clearBatchQueue();
+    expect(batchProcessor.getIsBatchMode()).toBe(false);
+    expect(getActiveTranscribeDeckTab()).toBe('setup');
+    expect(setupDeckTabs.style.display).toBe('none');
+    expect(setupTabFiles.style.display).toBe('none');
+    expect(deckBody.style.display).toBe('flex');
+    expect(batchQueueContainer.style.display).toBe('none');
+    expect(clearMediaBtn.style.display).toBe('none');
+    expect(dropZone.classList.contains('is-batch-summary')).toBe(false);
+    expect(dropZone.getAttribute('data-i18n-title')).toBe('transcribe.selectFilePrompt');
+    expect(fileNameEl.getAttribute('data-i18n')).toBe('transcribe.noFileLoaded');
+  });
+
+  it('preserves user active tab and does not re-seek or pause already-loaded item when batch completes in background', async () => {
+    // Arrange
+    const setupDeck = registerMockEl('transcribe-unified-deck', 'DIV');
+    const deckBody = registerMockEl('transcribe-setup-body', 'DIV', 'transcribe-deck-body');
+    setupDeck.appendChild(deckBody);
+    registerMockEl('batch-queue-container', 'DIV');
+    registerMockEl('batch-queue-body', 'DIV');
+    registerMockEl('transcribe-media-deck', 'DIV');
+    registerMockEl('setup-deck-mode-tabs', 'DIV');
+    registerMockEl('btn-transcribe-manage-settings', 'BUTTON');
+    registerMockEl('btn-setup-tab-setup', 'BUTTON');
+    registerMockEl('btn-setup-tab-files', 'BUTTON');
+    registerMockEl('btn-setup-tab-player', 'BUTTON');
+    registerMockEl('btn-tab-to-setup', 'BUTTON');
+    registerMockEl('btn-tab-to-files', 'BUTTON');
+    registerMockEl('btn-tab-to-player', 'BUTTON');
+
+    const video = registerMockEl('companion-media-element', 'VIDEO') as any;
+    video.readyState = 2;
+    video.duration = 120;
+    video.paused = true;
+
+    let itemIndex = 0;
+    (window as any).__TAURI__ = {
+      core: {
+        invoke: async (cmd: string, args?: any) => {
+          if (cmd === 'probe_media_file') return { exists: true, durationSec: 120, size: '15 MB' };
+          if (cmd === 'stream_media_file') return `http://127.0.0.1:54321/media/${args?.filePath || 'item.mp4'}`;
+          if (cmd === 'convert_media_file') return '/tmp/item.wav';
+          if (cmd === 'get_transcript_session_data') {
+            return JSON.stringify({
+              transcription: [
+                { timestamps: { from: '00:00:02,000', to: '00:00:05,000' }, offsets: { from: 2000, to: 5000 }, text: 'First cue' }
+              ]
+            });
+          }
+          if (cmd === 'start_transcription_task') {
+            itemIndex++;
+            if (itemIndex === 2) {
+              // Simulate user selecting Completed Item 0, playing it at 45s, and switching to Setup tab while Item 1 is running
+              await selectBatchItemTranscript(0);
+              video.currentTime = 45;
+              video.paused = false;
+              showTranscribeSetupDeck();
+            }
+            return {
+              generatedFiles: ['item.srt'],
+              outputDir: '/media',
+              internalJsonPath: '/tmp/session.json',
+              durationMs: 1000,
+              speedFactor: 4.0
+            };
+          }
+          return null;
+        }
+      }
+    };
+
+    unloadCompanionPlayer();
+    clearBatchQueue();
+    await addBatchFiles(['/media/first.mp4', '/media/second.mp4']);
+    (window as any).settingsState = {
+      selectedBackend: 'Standard',
+      modelPath: '/models/ggml-base.bin',
+      outputSrt: true
+    };
+    (window as any).localScannedTransModels = ['/models/ggml-base.bin'];
+
+    // Act
+    await runBatchExtraction();
+
+    // Assert: User's deliberate switch to Setup tab is respected, and active playback of first.mp4 at 45s was not reset back to 2s
+    expect(getActiveTranscribeDeckTab()).toBe('setup');
+    expect(getActiveMediaInfo()?.filePath).toBe('/media/first.mp4');
+    expect(video.currentTime).toBe(45);
+
+    clearBatchQueue();
   });
 });

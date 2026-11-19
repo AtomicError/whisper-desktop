@@ -250,6 +250,7 @@ export const ru: Translations = {
     toggleConfidenceTooltip: 'Выделить слова с низкой уверенностью (< 60%)',
     highlightConfidence: 'Уверенность',
     companionSetupTab: 'Настройки',
+    companionFilesTab: 'Файлы',
     companionPlayerTab: 'Плеер',
     resizerTooltip: 'Потяните для изменения размера (двойной клик для сброса)',
     resizerAria: 'Изменение размера панелей',

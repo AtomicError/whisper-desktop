@@ -247,10 +247,18 @@ export function clearSingleMediaFile(): void {
   }
 
   const dropZone = document.getElementById('transcribe-drop-zone');
-  if (dropZone) dropZone.classList.remove('has-file');
+  if (dropZone) {
+    dropZone.classList.remove('has-file');
+    dropZone.classList.remove('is-batch-summary');
+    dropZone.title = t('transcribe.selectFilePrompt');
+    if (typeof dropZone.setAttribute === 'function') {
+      dropZone.setAttribute('data-i18n-title', 'transcribe.selectFilePrompt');
+    }
+  }
 
   const fileNameEl = document.getElementById('lbl-file-name');
   if (fileNameEl) {
+    fileNameEl.style.display = 'block';
     updateMediaCardName(null);
   }
   const filePathEl = document.getElementById('lbl-file-path');
@@ -271,6 +279,29 @@ export function clearSingleMediaFile(): void {
 
   const batchQueueContainer = document.getElementById('batch-queue-container');
   if (batchQueueContainer) batchQueueContainer.style.display = 'none';
+  if (typeof batchProcessor.renderTable === 'function') {
+    batchProcessor.renderTable();
+  }
+  const sortSelect = document.getElementById('batch-sort-select') as HTMLSelectElement | null;
+  if (sortSelect) {
+    sortSelect.value = '';
+    if (win && win.customSelectsMap && typeof win.customSelectsMap.get === 'function' && win.customSelectsMap.get('batch-sort-select')) {
+      win.customSelectsMap.get('batch-sort-select').syncSelectedValue();
+    }
+  }
+  const setupDeckBody =
+    typeof document.querySelector === 'function'
+      ? (document.querySelector('#transcribe-unified-deck .transcribe-deck-body') as HTMLElement | null)
+      : null;
+  if (setupDeckBody) setupDeckBody.style.display = 'flex';
+  if (win && typeof win.showTranscribeSetupDeck === 'function') {
+    win.showTranscribeSetupDeck();
+  } else if (win && typeof win.syncTranscribeDeckTabsUI === 'function') {
+    win.syncTranscribeDeckTabsUI();
+  }
+
+  const nextStepBtn = document.getElementById('btn-next-step-2');
+  if (nextStepBtn) nextStepBtn.textContent = t('transcribe.continueToTranscription');
 
   const batchControlsBox = document.getElementById('batch-controls-box');
   if (batchControlsBox) batchControlsBox.style.display = 'none';
@@ -282,6 +313,10 @@ export function clearSingleMediaFile(): void {
   if (btnRun) btnRun.style.display = 'inline-flex';
   const btnCancel = document.getElementById('btn-cancel-transcribe');
   if (btnCancel) btnCancel.style.display = 'none';
+
+  setWizardStepCompleted(1, false);
+  setWizardStepCompleted(2, false);
+  setWizardStepCompleted(3, false);
 
   const mediaIcon = document.getElementById('transcribe-media-icon');
   if (mediaIcon) {
@@ -395,7 +430,14 @@ export function resetTranscriptViewport(): void {
 export function applySingleFileSelectedUI(filePath: string): void {
   if (typeof document === 'undefined') return;
   const dropZone = document.getElementById('transcribe-drop-zone');
-  if (dropZone) dropZone.classList.add('has-file');
+  if (dropZone) {
+    dropZone.classList.add('has-file');
+    dropZone.classList.remove('is-batch-summary');
+    dropZone.title = t('transcribe.selectFilePrompt');
+    if (typeof dropZone.setAttribute === 'function') {
+      dropZone.setAttribute('data-i18n-title', 'transcribe.selectFilePrompt');
+    }
+  }
 
   // Update UI for Single-file Mode
   const fileNameEl = document.getElementById('lbl-file-name');
@@ -413,6 +455,17 @@ export function applySingleFileSelectedUI(filePath: string): void {
 
   const batchQueueContainer = document.getElementById('batch-queue-container');
   if (batchQueueContainer) batchQueueContainer.style.display = 'none';
+  const setupDeckBody =
+    typeof document.querySelector === 'function'
+      ? (document.querySelector('#transcribe-unified-deck .transcribe-deck-body') as HTMLElement | null)
+      : null;
+  if (setupDeckBody) setupDeckBody.style.display = 'flex';
+  const win = getGlobal();
+  if (win && typeof win.showTranscribeSetupDeck === 'function') {
+    win.showTranscribeSetupDeck();
+  } else if (win && typeof win.syncTranscribeDeckTabsUI === 'function') {
+    win.syncTranscribeDeckTabsUI();
+  }
 
   const metaBox = document.getElementById('media-meta-box');
   if (metaBox) metaBox.style.display = 'flex';
@@ -1218,10 +1271,18 @@ export function setupTranscribeDragAndDrop(): void {
   if (typeof document === 'undefined') return;
   const transZone = document.getElementById('transcribe-drop-zone');
   if (!transZone) return;
+  const batchZone = document.getElementById('batch-queue-container');
 
   transZone.addEventListener('click', (e: any) => {
-    if (getSelectedMediaFile() || (batchProcessor.getIsBatchMode() && batchProcessor.getItems().length > 0)) return;
     if (e.target && e.target.closest && e.target.closest('button')) return;
+    if (batchProcessor.getIsBatchMode() && batchProcessor.getItems().length > 0) {
+      const win = getGlobal();
+      if (win && typeof win.showTranscribeFilesDeck === 'function') {
+        win.showTranscribeFilesDeck();
+      }
+      return;
+    }
+    if (getSelectedMediaFile()) return;
     browseMediaFile();
   });
 
@@ -1235,6 +1296,9 @@ export function setupTranscribeDragAndDrop(): void {
   transZone.addEventListener('dragleave', (e: any) => {
     e.preventDefault();
     e.stopPropagation();
+    if (e && e.relatedTarget && typeof transZone.contains === 'function' && transZone.contains(e.relatedTarget)) {
+      return;
+    }
     transZone.classList.remove('drag-over');
   });
 
@@ -1248,6 +1312,41 @@ export function setupTranscribeDragAndDrop(): void {
       await handleDroppedFiles(files);
     }
   });
+
+  if (batchZone) {
+    batchZone.addEventListener('dragover', (e: any) => {
+      e.preventDefault();
+      e.stopPropagation();
+      batchZone.classList.add('drag-over');
+    });
+
+    batchZone.addEventListener('dragleave', (e: any) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e && e.relatedTarget && typeof batchZone.contains === 'function' && batchZone.contains(e.relatedTarget)) {
+        return;
+      }
+      batchZone.classList.remove('drag-over');
+    });
+
+    batchZone.addEventListener('drop', async (e: any) => {
+      e.preventDefault();
+      e.stopPropagation();
+      batchZone.classList.remove('drag-over');
+
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        const files = Array.from(e.dataTransfer.files).map((f: any) => f.path || f.name);
+        await handleDroppedFiles(files);
+      }
+    });
+  }
+
+  const isPointInRect = (el: HTMLElement | null, x: number, y: number): boolean => {
+    if (!el || typeof el.getBoundingClientRect !== 'function') return false;
+    const rect = el.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return false;
+    return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+  };
 
   // Native Tauri drag-drop events
   const win = getGlobal();
@@ -1263,27 +1362,35 @@ export function setupTranscribeDragAndDrop(): void {
         const x = event.payload.position.x / ratio;
         const y = event.payload.position.y / ratio;
 
-        const rect = transZone.getBoundingClientRect();
-        if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+        if (isPointInRect(transZone, x, y)) {
           transZone.classList.add('drag-over');
         } else {
           transZone.classList.remove('drag-over');
+        }
+
+        if (batchZone) {
+          if (isPointInRect(batchZone, x, y)) {
+            batchZone.classList.add('drag-over');
+          } else {
+            batchZone.classList.remove('drag-over');
+          }
         }
       });
 
       listen('tauri://drag-leave', () => {
         transZone.classList.remove('drag-over');
+        if (batchZone) batchZone.classList.remove('drag-over');
       });
 
       listen('tauri://drag-drop', async (event: any) => {
         transZone.classList.remove('drag-over');
+        if (batchZone) batchZone.classList.remove('drag-over');
 
         const ratio = win.devicePixelRatio || 1;
         const x = event.payload.position.x / ratio;
         const y = event.payload.position.y / ratio;
 
-        const rect = transZone.getBoundingClientRect();
-        if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+        if (isPointInRect(transZone, x, y) || isPointInRect(batchZone, x, y)) {
           const files = event.payload.paths;
           if (files && files.length > 0) {
             await handleDroppedFiles(files);
@@ -1330,9 +1437,6 @@ export async function handleDroppedFiles(rawFiles: string[]): Promise<void> {
     await selectSingleMediaFile(files[0], hadPriorMedia);
   } else {
     await addBatchFiles(files);
-    setTimeout(() => {
-      openWizardStep(2);
-    }, 500);
   }
 
   if (typeof win.switchView === 'function') {

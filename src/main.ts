@@ -73,7 +73,7 @@ import {
   applyDynamicDirection,
   getCurrentSourceMediaFile
 } from './modules/appNavigation';
-import { initI18n, t, getLanguage, isRtlLanguage } from './i18n/index';
+import { initI18n, t, getLanguage, isRtlLanguage, clearContentDirection } from './i18n/index';
 import { formatLocalizedNumber } from './i18n/formatters';
 import type { SystemSpecs } from './modelRecommender';
 
@@ -180,8 +180,14 @@ window.addEventListener('whisper:languageChanged', () => {
       updateMediaCardName(null);
       filePathEl.textContent = t('transcribe.selectFilePrompt');
     } else if (batchProcessor.getIsBatchMode() && batchProcessor.getItems().length > 0) {
-      fileNameEl.textContent = `${batchProcessor.getItems().length} ${t('transcribe.queueFiles')}`;
-      fileNameEl.removeAttribute('title');
+      if (typeof fileNameEl.setAttribute === 'function') {
+        fileNameEl.setAttribute('data-i18n', 'transcribe.batchModeActive');
+      }
+      fileNameEl.textContent = t('transcribe.batchModeActive');
+      if (typeof fileNameEl.removeAttribute === 'function') {
+        fileNameEl.removeAttribute('title');
+      }
+      clearContentDirection(fileNameEl);
     }
   }
 

@@ -496,6 +496,7 @@ body.is-resizing-transcribe * {
   flex-direction: column;
   gap: 8px;
   min-width: 0;
+  flex-shrink: 0;
 }
 
 .transcribe-field-group label {
@@ -531,11 +532,12 @@ body.is-resizing-transcribe * {
 #transcribe-drop-zone.transcribe-dropzone-card {
   border: 1.5px dashed rgba(255, 255, 255, 0.16);
   border-radius: var(--radius-lg, 12px);
-  padding: 14px 16px;
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  min-height: 68px;
+  min-height: 64px;
+  flex-shrink: 0;
   background: rgba(0, 0, 0, 0.2);
   text-align: start;
   cursor: pointer;
@@ -558,22 +560,23 @@ body.is-resizing-transcribe * {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: 12px;
   width: 100%;
+  min-width: 0;
 }
 
 .transcribe-dropzone-identity {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   flex: 1;
   min-width: 0;
 }
 
 .transcribe-dropzone-card .transcribe-media-icon {
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
   color: var(--color-royal-blue, #2d7fff);
   flex-shrink: 0;
   stroke-width: 1.8;
@@ -584,12 +587,12 @@ body.is-resizing-transcribe * {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 4px;
+  gap: 3px;
   flex: 1;
   min-width: 0;
 }
 .transcribe-dropzone-card .transcribe-media-name {
-  font-size: 0.92rem;
+  font-size: 0.88rem;
   font-weight: 600;
   color: var(--text-primary, #fafafa);
   margin: 0;
@@ -600,7 +603,7 @@ body.is-resizing-transcribe * {
 }
 
 .transcribe-dropzone-card .transcribe-media-prompt {
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   color: var(--text-muted, #71717a);
   margin: 0;
   white-space: nowrap;
@@ -611,28 +614,28 @@ body.is-resizing-transcribe * {
 
 .transcribe-dropzone-card .transcribe-dropzone-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
   flex-shrink: 0;
 }
 
 .transcribe-dropzone-card .btn-media-browse {
-  padding: 0 12px;
-  font-size: 0.78rem;
+  padding: 0 10px;
+  font-size: 0.75rem;
   font-weight: 500;
   border-radius: var(--radius-sm, 6px);
-  height: 30px;
+  height: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
 .transcribe-dropzone-card .btn-clear-media {
-  padding: 0 12px;
-  font-size: 0.78rem;
+  padding: 0 10px;
+  font-size: 0.75rem;
   font-weight: 500;
   border-radius: var(--radius-sm, 6px);
-  height: 30px;
+  height: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -653,6 +656,10 @@ body.is-resizing-transcribe * {
   cursor: default;
 }
 
+#transcribe-drop-zone.transcribe-dropzone-card.has-file.is-batch-summary {
+  cursor: pointer;
+}
+
 #transcribe-drop-zone.transcribe-dropzone-card.has-file:hover {
   border-color: rgba(var(--color-royal-blue-rgb), 0.55);
   background: rgba(var(--color-royal-blue-rgb), 0.12);
@@ -667,8 +674,8 @@ body.is-resizing-transcribe * {
 }
 
 #transcribe-drop-zone.transcribe-dropzone-card.has-file .btn-media-browse {
-  height: 30px;
-  padding: 0 12px;
+  height: 28px;
+  padding: 0 10px;
 }
 
 /* Embedded metadata row (Clean inline text under filename) */
@@ -676,8 +683,10 @@ body.is-resizing-transcribe * {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-wrap: wrap;
-  width: auto;
+  flex-wrap: nowrap;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
   padding: 0;
   margin: 0;
   border: none;
@@ -687,7 +696,7 @@ body.is-resizing-transcribe * {
 .transcribe-meta-badge {
   display: inline-flex;
   align-items: center;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 500;
   color: var(--text-secondary, #a1a1aa);
   background: none;
@@ -698,7 +707,8 @@ body.is-resizing-transcribe * {
   unicode-bidi: isolate;
   font-variant-numeric: tabular-nums;
   user-select: none;
-  cursor: default;
+  cursor: inherit;
+  min-width: 0;
 }
 
 .transcribe-meta-bullet {
@@ -706,20 +716,31 @@ body.is-resizing-transcribe * {
   color: var(--text-muted, #71717a);
   user-select: none;
   line-height: 1;
+  flex-shrink: 0;
 }
 
 .transcribe-meta-badge strong {
-  font-weight: 600;
-  color: var(--text-primary, #fafafa);
+  font-weight: 500;
+  color: inherit;
+}
+
+#batch-total-duration {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.74rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Batch Specs Row */
 .transcribe-dropzone-card .batch-specs-box {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 6px;
-  width: auto;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
   padding: 0;
   margin: 0;
   background: transparent;
@@ -1503,9 +1524,14 @@ body.is-resizing-transcribe * {
   box-shadow: var(--shadow-glass);
 }
 
-/* Premium Unified Batch Queue Panel Styling */
+/* Premium Unified Batch Queue Panel Styling (Dedicated Files Tab inside Unified Deck) */
 .batch-queue-panel {
-  width: 100%;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: auto;
+  margin-inline: 18px;
   margin-top: 0;
   background: var(--bg-surface, #121215);
   border: 1px solid var(--border-subtle, #27272a);
@@ -1514,6 +1540,13 @@ body.is-resizing-transcribe * {
   position: relative;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
   transition: var(--transition-smooth);
+  box-sizing: border-box;
+}
+
+.batch-queue-panel.drag-over {
+  border-color: var(--color-cyan) !important;
+  background: rgba(var(--color-cyan-rgb), 0.05) !important;
+  box-shadow: 0 0 16px rgba(var(--color-cyan-rgb), 0.15) !important;
 }
 
 .batch-queue-header {
@@ -1529,6 +1562,7 @@ body.is-resizing-transcribe * {
   position: relative;
   z-index: 20;
   min-width: 0;
+  flex-shrink: 0;
 }
 
 .batch-queue-title {
@@ -1719,7 +1753,9 @@ html[dir="rtl"] #options-for-batch-sort-select .custom-select-option.selected {
 
 /* Card List Container */
 .batch-table-wrapper {
-  max-height: 220px;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
   overflow-y: auto;
   overflow-x: hidden;
   border: none;
@@ -2212,20 +2248,23 @@ html[dir="rtl"] #transcript-search::placeholder,
   border-radius: var(--radius-sm, 6px);
   border: 1px solid var(--border-subtle, #27272a);
   gap: 2px;
+  flex-shrink: 0;
 }
 
 .btn-deck-tab {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  font-size: 0.75rem;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 0.74rem;
   font-weight: 500;
   color: var(--color-text-dim, #71717a);
   background: transparent;
   border: 1px solid transparent;
   border-radius: 4px;
   cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
@@ -2238,6 +2277,14 @@ html[dir="rtl"] #transcript-search::placeholder,
   color: #fff;
   background: rgba(var(--color-royal-blue-rgb, 59, 130, 246), 0.25);
   border-color: rgba(var(--color-royal-blue-rgb, 59, 130, 246), 0.4);
+}
+
+.btn-deck-tab:focus-visible,
+.batch-queue-card.is-clickable:focus-visible,
+.btn-batch-action:focus-visible,
+.btn-clear-queue:focus-visible {
+  outline: 2px solid var(--accent-primary, #3b82f6);
+  outline-offset: 1px;
 }
 
 /* Unified Companion Player Console & Integrated Controls (Matching Hardsub Studio Engine) */

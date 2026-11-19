@@ -354,6 +354,9 @@
     flex: none;
     overflow: visible;
   }
+  .batch-table-wrapper {
+    max-height: 360px;
+  }
   .translate-right-panel,
   .transcribe-right-panel {
     height: auto;

@@ -107,9 +107,15 @@ export function updateMediaCardName(path: string | null): void {
   if (!nameEl) return;
   if (path) {
     const name = getBasename(path);
+    if (typeof nameEl.removeAttribute === 'function') {
+      nameEl.removeAttribute('data-i18n');
+    }
     nameEl.textContent = name;
     applyContentDirection(nameEl, name);
   } else {
+    if (typeof nameEl.setAttribute === 'function') {
+      nameEl.setAttribute('data-i18n', 'transcribe.noFileLoaded');
+    }
     nameEl.textContent = t('transcribe.noFileLoaded');
     clearContentDirection(nameEl);
   }

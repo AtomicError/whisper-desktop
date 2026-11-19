@@ -250,6 +250,7 @@ export const tr: Translations = {
     toggleConfidenceTooltip: 'Düşük güvenilirlikli kelimeleri vurgula (< %60)',
     highlightConfidence: 'Güvenilirlik',
     companionSetupTab: 'Kurulum',
+    companionFilesTab: 'Dosyalar',
     companionPlayerTab: 'Oynatıcı',
     resizerTooltip: 'Paneli yeniden boyutlandırmak için sürükleyin (sıfırlamak için çift tıklayın)',
     resizerAria: 'Panelleri yeniden boyutlandır',

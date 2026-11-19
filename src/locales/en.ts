@@ -248,6 +248,7 @@ export const en = {
     toggleConfidenceTooltip: 'Highlight low-confidence words (< 60%)',
     highlightConfidence: 'Confidence',
     companionSetupTab: 'Setup',
+    companionFilesTab: 'Files',
     companionPlayerTab: 'Player',
     resizerTooltip: 'Drag to resize panel (Double-click to reset)',
     resizerAria: 'Resize panels',

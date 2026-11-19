@@ -250,6 +250,7 @@ export const ko: Translations = {
     toggleConfidenceTooltip: '낮은 신뢰도 단어 강조 표시 (< 60%)',
     highlightConfidence: '신뢰도',
     companionSetupTab: '설정',
+    companionFilesTab: '파일',
     companionPlayerTab: '플레이어',
     resizerTooltip: '패널 크기를 조절하려면 드래그하세요 (더블 클릭하여 재설정)',
     resizerAria: '패널 크기 조절',

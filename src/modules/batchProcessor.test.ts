@@ -1327,5 +1327,73 @@ describe('batchProcessor module', () => {
         (window as any).seekCompanionPlayer = prevSeek;
       }
     });
+
+    it('clears #batch-queue-body DOM and aborts in-flight selectBatchItemTranscript loads when clearBatchQueue is called', async () => {
+      // Arrange
+      const prevDoc = (globalThis as any).document;
+      const prevInvoke = (window as any).invoke;
+      const prevLoad = (window as any).loadMediaIntoCompanionPlayer;
+      const loadMock = vi.fn().mockResolvedValue(true);
+      (window as any).loadMediaIntoCompanionPlayer = loadMock;
+
+      let resolveSessionJson!: (val: string) => void;
+      (window as any).invoke = vi.fn((cmd: string) => {
+        if (cmd === 'get_transcript_session_data') {
+          return new Promise<string>(resolve => {
+            resolveSessionJson = resolve;
+          });
+        }
+        return Promise.resolve(null);
+      });
+
+      const queueBody = { innerHTML: '<div class="batch-queue-card">Stale Card</div>' };
+      const countChip = { textContent: '2' };
+      (globalThis as any).document = {
+        getElementById: (id: string) => {
+          if (id === 'batch-queue-body') return queueBody;
+          if (id === 'lbl-batch-count') return countChip;
+          return null;
+        },
+        querySelector: () => null,
+        querySelectorAll: () => []
+      };
+
+      try {
+        batchProcessor.setIsBatchMode(true);
+        batchProcessor.setItems([
+          {
+            path: '/media/inflight.mp4',
+            name: 'inflight.mp4',
+            status: 'completed',
+            internalJsonPath: '/tmp/inflight_session.json'
+          }
+        ]);
+
+        // Act: start async transcript selection, then clear queue before IPC resolves
+        const selectTask = selectBatchItemTranscript(0);
+        clearBatchQueue();
+
+        expect(queueBody.innerHTML).toBe('');
+        expect(countChip.textContent).toBe('0');
+
+        resolveSessionJson(
+          JSON.stringify({
+            transcription: [
+              { timestamps: { from: '00:00:01,000', to: '00:00:03,000' }, offsets: { from: 1000, to: 3000 }, text: 'Stale cue' }
+            ]
+          })
+        );
+        await selectTask;
+
+        // Assert: stale in-flight load must not repopulate viewer or companion player after clear
+        expect(batchProcessor.getActiveViewerIndex()).toBe(-1);
+        expect(loadMock).not.toHaveBeenCalled();
+        expect((window as any).lastTranscribedVideoPath).toBeNull();
+      } finally {
+        (window as any).loadMediaIntoCompanionPlayer = prevLoad;
+        (window as any).invoke = prevInvoke;
+        (globalThis as any).document = prevDoc;
+      }
+    });
   });
 });
