@@ -4,6 +4,7 @@
 // persisted "recent languages" pinning.
 
 import { getLanguage, t } from './i18n/index';
+import { customSelectsMap, prefersReducedMotion, safeRaf } from './modules/customSelect';
 import {
   TRANSLATION_TARGET_LANGUAGES,
   WHISPER_SPOKEN_LANGUAGES,
@@ -29,17 +30,7 @@ const LANGUAGE_SELECT_IDS: Record<LanguageSelectKind, string[]> = {
 };
 
 const AUTO_LANGUAGE_VALUE = 'auto';
-
-const safeRaf = (cb: () => void) => {
-  const win = typeof window !== 'undefined' ? (window as any) : (globalThis as any);
-  if (typeof win.requestAnimationFrame === 'function') {
-    win.requestAnimationFrame(cb);
-  } else if (typeof requestAnimationFrame === 'function') {
-    requestAnimationFrame(cb);
-  } else {
-    setTimeout(cb, 0);
-  }
-};
+const pendingRefreshCancels = new Map<string, () => void>();
 
 function getSettingsState(): any {
   return (window as any).settingsState || null;
@@ -100,9 +91,13 @@ function makeGroupElement(label: string, entries: LanguageEntry[]): HTMLOptGroup
   return group;
 }
 
+function getSelectInstance(selectId: string): any {
+  const winMap = typeof window !== 'undefined' ? ((window as any).customSelectsMap as Map<string, any> | undefined) : undefined;
+  return customSelectsMap.get(selectId) || (winMap ? winMap.get(selectId) : null) || null;
+}
+
 function refreshCustomSelectInstance(select: HTMLSelectElement): void {
-  const map = (window as any).customSelectsMap as Map<string, any> | undefined;
-  const instance = map ? map.get(select.id) : null;
+  const instance = getSelectInstance(select.id);
   if (instance && typeof instance.updateOptions === 'function') {
     instance.updateOptions();
   }
@@ -110,8 +105,9 @@ function refreshCustomSelectInstance(select: HTMLSelectElement): void {
 
 /**
  * Rebuilds a language dropdown: pinned "auto" first (spoken only), then a
- * "Recent languages" group, then every language sorted per the active UI
- * locale. Unknown legacy values stay visible via a fallback option.
+ * "Recent languages" group (up to 3), then the remaining languages sorted per
+ * the active UI locale so no language appears twice. Unknown legacy values
+ * stay visible via a fallback option.
  */
 export function renderLanguageSelect(select: HTMLSelectElement, kind: LanguageSelectKind, currentValue?: string): void {
   if (!select) return;
@@ -121,6 +117,13 @@ export function renderLanguageSelect(select: HTMLSelectElement, kind: LanguageSe
   let targetValue = (currentValue === undefined ? getCurrentSettingsValue(kind) : currentValue).trim();
   if (!targetValue) {
     targetValue = kind === 'spoken' ? AUTO_LANGUAGE_VALUE : TRANSLATION_TARGET_LANGUAGES[0].value;
+  }
+
+  const matchedEntry = entries.find((entry) => entry.value.toLowerCase() === targetValue.toLowerCase());
+  if (matchedEntry) {
+    targetValue = matchedEntry.value;
+  } else if (kind === 'spoken' && targetValue.toLowerCase() === AUTO_LANGUAGE_VALUE) {
+    targetValue = AUTO_LANGUAGE_VALUE;
   }
 
   select.innerHTML = '';
@@ -142,12 +145,16 @@ export function renderLanguageSelect(select: HTMLSelectElement, kind: LanguageSe
     select.appendChild(makeGroupElement(t('languages.recent'), recentEntries));
   }
 
+  const recentValuesSet = new Set(recentEntries.map((entry) => entry.value.toLowerCase()));
   const compare = makeLanguageComparator(uiLang);
-  const sorted = [...entries].sort((a, b) => compare(a.label, b.label) || a.value.localeCompare(b.value));
-  select.appendChild(makeGroupElement(t('languages.all'), sorted));
+  const sorted = entries
+    .filter((entry) => !recentValuesSet.has(entry.value.toLowerCase()))
+    .sort((a, b) => compare(a.label, b.label) || a.value.localeCompare(b.value));
+  if (sorted.length > 0) {
+    select.appendChild(makeGroupElement(t('languages.all'), sorted));
+  }
 
-  const knownValue = entries.some((entry) => entry.value.toLowerCase() === targetValue.toLowerCase());
-  if (!knownValue && !(kind === 'spoken' && targetValue.toLowerCase() === AUTO_LANGUAGE_VALUE)) {
+  if (!matchedEntry && !(kind === 'spoken' && targetValue === AUTO_LANGUAGE_VALUE)) {
     select.appendChild(
       makeOptionElement({
         value: targetValue,
@@ -161,14 +168,73 @@ export function renderLanguageSelect(select: HTMLSelectElement, kind: LanguageSe
   refreshCustomSelectInstance(select);
 }
 
-function reRenderKind(kind: LanguageSelectKind, activeValue?: string): void {
+function reRenderKind(kind: LanguageSelectKind, activeValue?: string, excludeId?: string): void {
   const value = activeValue !== undefined ? activeValue : getCurrentSettingsValue(kind);
   LANGUAGE_SELECT_IDS[kind].forEach((id) => {
+    if (excludeId && id === excludeId) return;
+    const cancelPending = pendingRefreshCancels.get(id);
+    if (cancelPending) {
+      cancelPending();
+      pendingRefreshCancels.delete(id);
+    }
     const el = document.getElementById(id) as HTMLSelectElement | null;
     if (el) {
       renderLanguageSelect(el, kind, value || el.value);
     }
   });
+}
+
+function scheduleActiveSelectRefresh(select: HTMLSelectElement, kind: LanguageSelectKind, value: string): void {
+  const cancelPrevious = pendingRefreshCancels.get(select.id);
+  if (cancelPrevious) {
+    cancelPrevious();
+    pendingRefreshCancels.delete(select.id);
+  }
+
+  const instance = getSelectInstance(select.id);
+  const optionsEl = instance?.optionsContainer as HTMLElement | undefined;
+
+  if (!optionsEl || typeof optionsEl.addEventListener !== 'function' || (prefersReducedMotion() && !instance.isOpen)) {
+    safeRaf(() => {
+      if (select.isConnected === false) return;
+      renderLanguageSelect(select, kind, select.value || value);
+    });
+    return;
+  }
+
+  let finished = false;
+  let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+  const cancel = () => {
+    if (finished) return;
+    finished = true;
+    if (fallbackTimer !== null) clearTimeout(fallbackTimer);
+    optionsEl.removeEventListener('transitionend', onTransitionEnd);
+    if (pendingRefreshCancels.get(select.id) === cancel) {
+      pendingRefreshCancels.delete(select.id);
+    }
+  };
+  const finish = () => {
+    if (finished) return;
+    if (select.isConnected === false || getSelectInstance(select.id) !== instance) {
+      cancel();
+      return;
+    }
+    if (instance.isOpen) {
+      // User reopened before the close fade completed; wait for the next close transition
+      if (fallbackTimer !== null) clearTimeout(fallbackTimer);
+      fallbackTimer = setTimeout(finish, 220);
+      return;
+    }
+    cancel();
+    renderLanguageSelect(select, kind, select.value || value);
+  };
+  const onTransitionEnd = (e: TransitionEvent) => {
+    if (e.target === optionsEl && !instance.isOpen) finish();
+  };
+
+  pendingRefreshCancels.set(select.id, cancel);
+  optionsEl.addEventListener('transitionend', onTransitionEnd);
+  fallbackTimer = setTimeout(finish, 220);
 }
 
 function attachRecentsListener(select: HTMLSelectElement, kind: LanguageSelectKind): void {
@@ -182,10 +248,12 @@ function attachRecentsListener(select: HTMLSelectElement, kind: LanguageSelectKi
     } else {
       state.recentTranslationTargets = pushRecentLanguage(state.recentTranslationTargets, select.value);
     }
-    // Refresh both twin dropdowns asynchronously on next frame so the active dropdown closes with 0ms visual lag
+    const chosenValue = select.value;
+    // Update twin dropdowns on next frame, and defer the just-closed dropdown until its fade-out finishes
     safeRaf(() => {
-      reRenderKind(kind, select.value);
+      reRenderKind(kind, chosenValue, select.id);
     });
+    scheduleActiveSelectRefresh(select, kind, chosenValue);
   });
 }
 

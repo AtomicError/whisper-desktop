@@ -217,6 +217,8 @@ html {
   --space-3: 12px;
   --space-4: 16px;
   --space-6: 24px;
+  --z-dropdown: 50;
+  --z-portal-dropdown: 1000010; /* Above hardsub overlays (1000000), below toasts (9999999) */
 
   /* Surfaces & Typography Design Tokens */
   --bg-app: #09090b;

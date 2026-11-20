@@ -56,6 +56,7 @@
 .modal-details-box::-webkit-scrollbar,
 .about-modal-card::-webkit-scrollbar,
 .custom-select-options::-webkit-scrollbar,
+.custom-select-list::-webkit-scrollbar,
 [class*="options-for-"]::-webkit-scrollbar {
   width: 8px !important;
   height: 8px !important;
@@ -86,6 +87,7 @@
 .modal-details-box::-webkit-scrollbar-track,
 .about-modal-card::-webkit-scrollbar-track,
 .custom-select-options::-webkit-scrollbar-track,
+.custom-select-list::-webkit-scrollbar-track,
 [class*="options-for-"]::-webkit-scrollbar-track {
   background: transparent !important;
   background-color: transparent !important;
@@ -118,6 +120,7 @@
 .modal-details-box::-webkit-scrollbar-thumb,
 .about-modal-card::-webkit-scrollbar-thumb,
 .custom-select-options::-webkit-scrollbar-thumb,
+.custom-select-list::-webkit-scrollbar-thumb,
 [class*="options-for-"]::-webkit-scrollbar-thumb {
   background: var(--color-accent) !important;
   border-radius: 9999px !important;
@@ -175,6 +178,8 @@
 .about-modal-card:hover::-webkit-scrollbar-thumb,
 .custom-select-options.scrolling-active::-webkit-scrollbar-thumb,
 .custom-select-options:hover::-webkit-scrollbar-thumb,
+.custom-select-list.scrolling-active::-webkit-scrollbar-thumb,
+.custom-select-list:hover::-webkit-scrollbar-thumb,
 [class*="options-for-"]:hover::-webkit-scrollbar-thumb {
   background: var(--color-accent) !important;
   border-radius: 9999px !important;
@@ -230,6 +235,8 @@
 .about-modal-card::-webkit-scrollbar-thumb:active,
 .custom-select-options::-webkit-scrollbar-thumb:hover,
 .custom-select-options::-webkit-scrollbar-thumb:active,
+.custom-select-list::-webkit-scrollbar-thumb:hover,
+.custom-select-list::-webkit-scrollbar-thumb:active,
 [class*="options-for-"]::-webkit-scrollbar-thumb:hover,
 [class*="options-for-"]::-webkit-scrollbar-thumb:active {
   background: var(--color-accent) !important;

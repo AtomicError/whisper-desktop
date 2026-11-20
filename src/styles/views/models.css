@@ -990,44 +990,22 @@
 }
 
 /* Reasoning dropdown options list styling - ensure exact same width and clean display */
-.custom-select-options[class*="options-for-model-reasoning"],
-[class*="options-for-model-reasoning"] {
-  min-width: 110px !important;
-  width: 110px !important;
-  max-width: 110px !important;
-  max-height: 290px !important;
-  padding: 4px 0 !important;
-  box-sizing: border-box !important;
+.custom-select-options[class*="options-for-model-reasoning"] {
+  min-width: 110px;
+  width: 110px;
+  max-width: 110px;
+  padding: 4px 0;
+  box-sizing: border-box;
 }
 
-[class*="options-for-model-reasoning"] .custom-select-option {
-  padding: 6px 14px 6px 18px !important;
-  font-size: 0.82rem !important;
-  white-space: nowrap !important;
-  overflow: visible !important;
-  text-overflow: clip !important;
-}
-
-[class*="options-for-model-reasoning"] .custom-select-option.selected,
-[class*="options-for-model-reasoning"] .custom-select-option:hover {
-  padding-left: 20px !important;
-  padding-right: 14px !important;
-  overflow: visible !important;
-  text-overflow: clip !important;
-}
-
-[dir="rtl"] [class*="options-for-model-reasoning"] .custom-select-option {
-  padding: 6px 14px 6px 18px !important;
-  overflow: visible !important;
-  text-overflow: clip !important;
-}
-
-[dir="rtl"] [class*="options-for-model-reasoning"] .custom-select-option.selected,
-[dir="rtl"] [class*="options-for-model-reasoning"] .custom-select-option:hover {
-  padding-left: 20px !important;
-  padding-right: 14px !important;
-  overflow: visible !important;
-  text-overflow: clip !important;
+.custom-select-options[class*="options-for-model-reasoning"] .custom-select-option {
+  padding-block: 6px;
+  padding-inline: 18px 12px;
+  font-size: 0.82rem;
+  line-height: 18px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Pagination Controls */
@@ -1149,8 +1127,15 @@ select.pagination-size-select {
 }
 
 .custom-select-options[class*="options-for-models-page-size-select"] .custom-select-option {
-  padding: 5px 12px;
+  padding-block: 5px;
+  padding-inline: 12px;
   font-size: 0.78rem;
+  white-space: nowrap;
+  line-height: 18px;
+}
+
+.custom-select-options[class*="options-for-models-page-size-select"] .custom-select-option::before {
+  display: none;
 }
 
 .pagination-nav {
@@ -1369,6 +1354,7 @@ select.pagination-size-select {
 .custom-select-arrow {
   width: 14px;
   height: 14px;
+  flex-shrink: 0;
   color: var(--color-text-muted);
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -1379,6 +1365,7 @@ select.pagination-size-select {
 }
 
 .custom-select-options {
+  --cs-selected-grad-dir: 90deg;
   background: var(--bg-dropdown);
   border: 1px solid var(--border-glass-active);
   border-radius: 8px;
@@ -1389,23 +1376,46 @@ select.pagination-size-select {
   overflow-x: hidden;
   position: fixed;
   box-sizing: border-box;
-  z-index: 999999 !important;
-  
+  z-index: var(--z-portal-dropdown, 1000010);
+  transform-origin: top center;
+
   opacity: 0;
-  transform: translateY(-8px);
+  visibility: hidden;
+  transform: translateY(-6px) scale(0.985);
   pointer-events: none;
-  transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.17s ease, transform 0.17s cubic-bezier(0.16, 1, 0.3, 1), visibility 0s linear 0.17s;
+}
+
+.custom-select-options.starts-with-group {
+  padding-top: 0;
+}
+
+.custom-select-options[data-placement="top"]:not(.open) {
+  transform-origin: bottom center;
+  transform: translateY(6px) scale(0.985);
 }
 
 .custom-select-options.open {
   opacity: 1;
-  transform: translateY(0);
+  visibility: visible;
+  transform: none;
   pointer-events: auto;
+  transition: opacity 0.17s ease, transform 0.17s cubic-bezier(0.16, 1, 0.3, 1), visibility 0s linear 0s;
+}
+
+@property --cs-opt-bg-alpha {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
 }
 
 .custom-select-option {
+  --cs-opt-bg-alpha: 0;
   position: relative;
-  padding: 10px 14px 10px 20px;
+  padding-block: 10px;
+  padding-inline: 22px 14px;
+  line-height: 20px;
+  text-align: start;
   color: var(--color-text-muted);
   font-size: 0.85rem;
   cursor: pointer;
@@ -1413,46 +1423,59 @@ select.pagination-size-select {
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
-  transition: background-color 0.15s ease, color 0.15s ease, padding 0.15s ease;
+  background-image: linear-gradient(
+    var(--cs-selected-grad-dir),
+    rgba(var(--color-royal-blue-rgb), var(--cs-opt-bg-alpha)) 0%,
+    transparent 100%
+  );
+  transition: --cs-opt-bg-alpha 0.15s ease, color 0.15s ease;
   display: block;
 }
 
 .custom-select-option::before {
   content: "";
   position: absolute;
-  left: 8px;
-  top: 50%;
-  transform: translateY(-50%) scaleY(0);
+  inset-inline-start: 8px;
+  inset-block: 25%;
+  transform: scaleY(0);
+  transform-origin: center;
   width: 3px;
-  height: 50%;
   background-color: var(--color-royal-blue);
   border-radius: 4px;
   transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
   opacity: 0;
+  pointer-events: none;
 }
 
-.custom-select-option:hover,
+.custom-select-options:not(.keyboard-nav) .custom-select-option:hover,
 .custom-select-option.focused {
-  background: rgba(255, 255, 255, 0.04);
+  --cs-opt-bg-alpha: 0.1;
   color: #fff;
-  padding-left: 24px;
 }
 
-.custom-select-option:hover::before,
+.custom-select-options:not(.keyboard-nav) .custom-select-option:active {
+  --cs-opt-bg-alpha: 0.16;
+}
+
+.custom-select-options:not(.keyboard-nav) .custom-select-option:hover::before,
 .custom-select-option.focused::before {
-  transform: translateY(-50%) scaleY(0.7);
+  transform: scaleY(0.7);
   opacity: 0.7;
 }
 
 .custom-select-option.selected {
-  background: linear-gradient(90deg, rgba(var(--color-royal-blue-rgb), 0.12) 0%, transparent 100%);
+  --cs-opt-bg-alpha: 0.16;
   color: #fff;
   font-weight: 600;
-  padding-left: 24px;
+}
+
+.custom-select-options:not(.keyboard-nav) .custom-select-option.selected:hover,
+.custom-select-option.selected.focused {
+  --cs-opt-bg-alpha: 0.22;
 }
 
 .custom-select-option.selected::before {
-  transform: translateY(-50%) scaleY(1);
+  transform: scaleY(1);
   opacity: 1;
 }
 
@@ -1462,31 +1485,71 @@ select.pagination-size-select {
   pointer-events: none;
 }
 
-/* ---- Searchable custom select (language pickers) ---- */
+/* ---- Searchable custom select (language & model pickers) ---- */
 .custom-select-options.has-search {
+  display: flex;
+  flex-direction: column;
   max-height: 340px;
-  padding-top: 0 !important;
-  scroll-padding-top: 48px;
+  padding: 0;
+  overflow: hidden;
 }
 
 .custom-select-search-row {
-  position: sticky;
-  top: 0;
-  z-index: 10;
+  flex: 0 0 auto;
   width: 100%;
   box-sizing: border-box;
-  margin: 0 0 6px 0;
-  padding: 8px 8px;
+  margin: 0;
+  padding: 8px;
   background: var(--bg-dropdown);
   border-bottom: 1px solid var(--border-glass-active);
-  border-top-left-radius: 7px;
-  border-top-right-radius: 7px;
+}
+
+.custom-select-search-row[dir="rtl"] {
+  direction: rtl;
+  text-align: start;
+}
+
+.custom-select-search-row[dir="ltr"] {
+  direction: ltr;
+  text-align: start;
+}
+
+.custom-select-search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.custom-select-search-icon {
+  position: absolute;
+  inset-inline-start: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.45);
+  pointer-events: none;
+}
+
+.custom-select-list {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 0;
+  box-sizing: border-box;
+}
+
+.custom-select-list.starts-with-group {
+  padding-top: 0;
 }
 
 .custom-select-search {
   width: 100%;
   box-sizing: border-box;
-  padding: 6px 10px;
+  padding-block: 6px;
+  padding-inline: 32px;
   font-size: 0.85rem;
   font-family: inherit;
   color: #fff;
@@ -1499,33 +1562,16 @@ select.pagination-size-select {
   text-align: start;
 }
 
-html[dir="rtl"] .custom-select-search,
-.rtl-layout .custom-select-search,
-html[dir="rtl"] .custom-select-options .custom-select-search,
-.rtl-layout .custom-select-options .custom-select-search,
-html[dir="rtl"] .custom-select-options.custom-select-ltr .custom-select-search,
-.rtl-layout .custom-select-options.custom-select-ltr .custom-select-search {
-  direction: rtl !important;
-  text-align: right !important;
-  unicode-bidi: normal !important;
+.custom-select-search[data-no-strong-char] {
+  unicode-bidi: normal;
 }
 
-html[dir="rtl"] .custom-select-search::placeholder,
-.rtl-layout .custom-select-search::placeholder,
-html[dir="rtl"] .custom-select-options .custom-select-search::placeholder,
-.rtl-layout .custom-select-options .custom-select-search::placeholder,
-html[dir="rtl"] .custom-select-options.custom-select-ltr .custom-select-search::placeholder,
-.rtl-layout .custom-select-options.custom-select-ltr .custom-select-search::placeholder {
-  direction: rtl !important;
-  text-align: right !important;
+.custom-select-search[dir="ltr"] {
+  direction: ltr;
 }
 
-.custom-select-search[dir="ltr"],
-html[dir="rtl"] .custom-select-search[dir="ltr"],
-.rtl-layout .custom-select-search[dir="ltr"] {
-  direction: ltr !important;
-  text-align: left !important;
-  unicode-bidi: plaintext !important;
+.custom-select-search[dir="rtl"] {
+  direction: rtl;
 }
 
 .custom-select-search:focus {
@@ -1537,8 +1583,43 @@ html[dir="rtl"] .custom-select-search[dir="ltr"],
   color: rgba(255, 255, 255, 0.4);
 }
 
+.custom-select-search-clear {
+  position: absolute;
+  inset-inline-end: 4px;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.custom-select-search-clear:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.custom-select-search-clear:focus-visible {
+  outline: 2px solid var(--color-royal-blue);
+  outline-offset: 1px;
+}
+
+.custom-select-search-clear.hidden {
+  display: none;
+}
+
 .custom-select-group-label {
-  padding: 7px 14px 3px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg-dropdown);
+  padding: 8px 14px 4px;
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -1548,6 +1629,17 @@ html[dir="rtl"] .custom-select-search[dir="ltr"],
   user-select: none;
 }
 
+html[dir="rtl"] .custom-select-group-label,
+.rtl-layout .custom-select-group-label {
+  letter-spacing: 0;
+}
+
+.custom-select-option:not(.hidden) ~ .custom-select-group-label {
+  margin-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 9px;
+}
+
 .custom-select-option.hidden,
 .custom-select-group-label.hidden,
 .custom-select-no-results.hidden {
@@ -1555,12 +1647,32 @@ html[dir="rtl"] .custom-select-search[dir="ltr"],
 }
 
 .custom-select-no-results {
-  padding: 10px 14px;
+  padding: 12px 14px;
   font-size: 0.82rem;
   font-style: italic;
   color: rgba(255, 255, 255, 0.45);
   text-align: center;
   pointer-events: none;
+}
+
+.custom-select-no-results[dir="rtl"] {
+  direction: rtl;
+}
+
+.custom-select-no-results[dir="ltr"] {
+  direction: ltr;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .custom-select-trigger,
+  .custom-select-arrow,
+  .custom-select-options,
+  .custom-select-option,
+  .custom-select-option::before,
+  .custom-select-search,
+  .custom-select-search-clear {
+    transition: none !important;
+  }
 }
 
 /* Technical inputs: preserve LTR orientation */
@@ -1584,143 +1696,30 @@ html[dir="rtl"] .custom-select-search[dir="ltr"],
 }
 
 /* Technical English/Latin custom selects: force strict LTR presentation even in RTL app mode */
-html[dir="rtl"] .custom-select-container.custom-select-ltr .custom-select-trigger,
-.rtl-layout .custom-select-container.custom-select-ltr .custom-select-trigger,
-.custom-select-container.custom-select-ltr .custom-select-trigger {
-  direction: ltr !important;
-  text-align: left !important;
-  flex-direction: row !important;
-}
-
-html[dir="rtl"] .custom-select-container.custom-select-ltr .custom-select-value,
-.rtl-layout .custom-select-container.custom-select-ltr .custom-select-value,
-.custom-select-container.custom-select-ltr .custom-select-value {
-  direction: ltr !important;
-  text-align: left !important;
-}
-
-html[dir="rtl"] .custom-select-options.custom-select-ltr,
-.rtl-layout .custom-select-options.custom-select-ltr,
-.custom-select-options.custom-select-ltr {
-  direction: ltr !important;
-  text-align: left !important;
-}
-
-html[dir="rtl"] .custom-select-options.custom-select-ltr .custom-select-option,
-.rtl-layout .custom-select-options.custom-select-ltr .custom-select-option,
+.custom-select-container.custom-select-ltr .custom-select-trigger,
+.custom-select-container.custom-select-ltr .custom-select-value,
+.custom-select-options.custom-select-ltr,
 .custom-select-options.custom-select-ltr .custom-select-option {
-  direction: ltr !important;
-  text-align: left !important;
-  justify-content: flex-start !important;
-  padding-left: 20px !important;
-  padding-right: 14px !important;
+  direction: ltr;
+  text-align: left;
+  --cs-selected-grad-dir: 90deg;
 }
 
-html[dir="rtl"] .custom-select-options.custom-select-ltr .custom-select-option::before,
-.rtl-layout .custom-select-options.custom-select-ltr .custom-select-option::before,
-.custom-select-options.custom-select-ltr .custom-select-option::before {
-  left: 8px !important;
-  right: auto !important;
-}
-
-html[dir="rtl"] .custom-select-options.custom-select-ltr .custom-select-option:hover,
-html[dir="rtl"] .custom-select-options.custom-select-ltr .custom-select-option.focused,
-html[dir="rtl"] .custom-select-options.custom-select-ltr .custom-select-option.selected,
-.rtl-layout .custom-select-options.custom-select-ltr .custom-select-option:hover,
-.rtl-layout .custom-select-options.custom-select-ltr .custom-select-option.focused,
-.rtl-layout .custom-select-options.custom-select-ltr .custom-select-option.selected,
-.custom-select-options.custom-select-ltr .custom-select-option:hover,
-.custom-select-options.custom-select-ltr .custom-select-option.focused,
-.custom-select-options.custom-select-ltr .custom-select-option.selected {
-  padding-left: 24px !important;
-  padding-right: 14px !important;
-  background: linear-gradient(90deg, rgba(var(--color-royal-blue-rgb), 0.12) 0%, transparent 100%) !important;
+.custom-select-container.custom-select-ltr .custom-select-trigger {
+  flex-direction: row;
 }
 
 /* RTL Presentation for Arabic/Persian custom selects */
+html[dir="rtl"] .custom-select-options:not(.custom-select-ltr),
+.rtl-layout .custom-select-options:not(.custom-select-ltr) {
+  --cs-selected-grad-dir: 270deg;
+  direction: rtl;
+}
+
 html[dir="rtl"] .custom-select-options:not(.custom-select-ltr) .custom-select-option,
 .rtl-layout .custom-select-options:not(.custom-select-ltr) .custom-select-option {
-  direction: rtl !important;
-  text-align: right !important;
-  justify-content: flex-start !important;
-  padding-left: 14px !important;
-  padding-right: 20px !important;
-}
-
-html[dir="rtl"] .custom-select-options:not(.custom-select-ltr) .custom-select-option::before,
-.rtl-layout .custom-select-options:not(.custom-select-ltr) .custom-select-option::before {
-  right: 8px !important;
-  left: auto !important;
-}
-
-html[dir="rtl"] .custom-select-options:not(.custom-select-ltr) .custom-select-option:hover,
-html[dir="rtl"] .custom-select-options:not(.custom-select-ltr) .custom-select-option.focused,
-html[dir="rtl"] .custom-select-options:not(.custom-select-ltr) .custom-select-option.selected,
-.rtl-layout .custom-select-options:not(.custom-select-ltr) .custom-select-option:hover,
-.rtl-layout .custom-select-options:not(.custom-select-ltr) .custom-select-option.focused,
-.rtl-layout .custom-select-options:not(.custom-select-ltr) .custom-select-option.selected {
-  padding-left: 14px !important;
-  padding-right: 24px !important;
-  background: linear-gradient(270deg, rgba(var(--color-royal-blue-rgb), 0.12) 0%, transparent 100%) !important;
-}
-
-/* High-specificity override for reasoning dropdown in both LTR and RTL to match button width */
-html[dir="rtl"] .custom-select-options[class*="options-for-model-reasoning"],
-.rtl-layout .custom-select-options[class*="options-for-model-reasoning"],
-.custom-select-options[class*="options-for-model-reasoning"] {
-  min-width: 110px !important;
-  width: 110px !important;
-  max-width: 110px !important;
-}
-
-html[dir="rtl"] .custom-select-options[class*="options-for-model-reasoning"] .custom-select-option,
-html[dir="rtl"] .custom-select-options[class*="options-for-model-reasoning"].custom-select-ltr .custom-select-option,
-.rtl-layout .custom-select-options[class*="options-for-model-reasoning"] .custom-select-option,
-.rtl-layout .custom-select-options[class*="options-for-model-reasoning"].custom-select-ltr .custom-select-option,
-.custom-select-options[class*="options-for-model-reasoning"] .custom-select-option {
-  overflow: visible !important;
-  text-overflow: clip !important;
-  white-space: nowrap !important;
-  padding: 6px 14px 6px 18px !important;
-}
-
-html[dir="rtl"] .custom-select-options[class*="options-for-model-reasoning"] .custom-select-option.selected,
-html[dir="rtl"] .custom-select-options[class*="options-for-model-reasoning"] .custom-select-option:hover,
-html[dir="rtl"] .custom-select-options[class*="options-for-model-reasoning"].custom-select-ltr .custom-select-option.selected,
-html[dir="rtl"] .custom-select-options[class*="options-for-model-reasoning"].custom-select-ltr .custom-select-option:hover,
-.rtl-layout .custom-select-options[class*="options-for-model-reasoning"] .custom-select-option.selected,
-.rtl-layout .custom-select-options[class*="options-for-model-reasoning"] .custom-select-option:hover,
-.custom-select-options[class*="options-for-model-reasoning"] .custom-select-option.selected,
-.custom-select-options[class*="options-for-model-reasoning"] .custom-select-option:hover {
-  padding-left: 20px !important;
-  padding-right: 14px !important;
-  overflow: visible !important;
-  text-overflow: clip !important;
-}
-
-/* High-specificity overrides for pagination page size dropdown in both LTR and RTL */
-html[dir="rtl"] .custom-select-options[class*="options-for-models-page-size-select"],
-.rtl-layout .custom-select-options[class*="options-for-models-page-size-select"],
-.custom-select-options[class*="options-for-models-page-size-select"] {
-  min-width: 70px !important;
-  width: auto !important;
-}
-
-html[dir="rtl"] .custom-select-options[class*="options-for-models-page-size-select"] .custom-select-option,
-html[dir="rtl"] .custom-select-options[class*="options-for-models-page-size-select"].custom-select-ltr .custom-select-option,
-.rtl-layout .custom-select-options[class*="options-for-models-page-size-select"] .custom-select-option,
-.rtl-layout .custom-select-options[class*="options-for-models-page-size-select"].custom-select-ltr .custom-select-option,
-.custom-select-options[class*="options-for-models-page-size-select"] .custom-select-option {
-  padding: 5px 12px !important;
-  font-size: 0.78rem !important;
-  white-space: nowrap !important;
-  line-height: 1.4 !important;
-}
-
-html[dir="rtl"] .custom-select-options[class*="options-for-models-page-size-select"] .custom-select-option::before,
-.rtl-layout .custom-select-options[class*="options-for-models-page-size-select"] .custom-select-option::before,
-.custom-select-options[class*="options-for-models-page-size-select"] .custom-select-option::before {
-  display: none !important;
+  direction: rtl;
+  text-align: start;
 }
 
 /* Search Inputs RTL overrides (Settings & Models & All App Search Fields) */
