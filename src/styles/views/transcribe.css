@@ -1536,8 +1536,8 @@ body.is-resizing-transcribe * {
   width: auto;
   margin-inline: 18px;
   margin-block: 14px 12px;
-  background: var(--bg-surface, #121215);
-  border: 1px solid var(--border-subtle, #27272a);
+  background: var(--bg-table-body);
+  border: 1px solid var(--border-glass);
   border-radius: 12px;
   overflow: visible;
   position: relative;
@@ -1558,8 +1558,8 @@ body.is-resizing-transcribe * {
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  border-bottom: 1px solid var(--border-subtle, #27272a);
-  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid var(--border-glass);
+  background: var(--bg-table-head);
   border-top-left-radius: 12px;
   border-top-right-radius: 12px;
   position: relative;
@@ -1635,8 +1635,8 @@ body.is-resizing-transcribe * {
   font-weight: 500 !important;
   border-radius: 6px !important;
   background: rgba(255, 255, 255, 0.04) !important;
-  border: 1px solid var(--border-subtle, #27272a) !important;
-  color: var(--text-secondary, #a1a1aa) !important;
+  border: 1px solid var(--border-glass) !important;
+  color: var(--color-text-muted) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
@@ -1646,9 +1646,9 @@ body.is-resizing-transcribe * {
 }
 
 #custom-select-batch-sort-select .custom-select-trigger:hover {
-  background: var(--bg-hover, #27272a) !important;
-  border-color: var(--border-focus, #3f3f46) !important;
-  color: var(--text-primary, #fafafa) !important;
+  background: var(--bg-card-hover) !important;
+  border-color: var(--border-glass-active) !important;
+  color: var(--color-text) !important;
 }
 
 #custom-select-batch-sort-select .custom-select-trigger .custom-select-value {
