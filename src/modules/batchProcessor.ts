@@ -115,7 +115,6 @@ let activeBatchSelectSeq = 0;
 let batchQueueEpoch = 0;
 let batchProcessingIndex = -1;
 let userExplicitlySelectedBatchItem = false;
-let transcriptLines: any[] = [];
 
 const getGlobal = (): any => (typeof window !== 'undefined' ? window : globalThis);
 
@@ -209,7 +208,6 @@ export function removeFileFromBatch(index: number): void {
         if (typeof win.unloadCompanionPlayer === 'function') {
           win.unloadCompanionPlayer();
         }
-        transcriptLines = [];
         transcriptViewer.lines = [];
         if (win) win.transcriptLines = [];
 
@@ -286,7 +284,6 @@ export function clearBatchQueue(): void {
   window.lastTranscribedVideoPath = null;
   window.lastTranscribedOutputDir = null;
   window.lastTranscribedOutputFiles = [];
-  transcriptLines = [];
   transcriptViewer.lines = [];
   if (win) win.transcriptLines = [];
 
@@ -626,10 +623,9 @@ export async function selectBatchItemTranscript(index: number): Promise<void> {
       win.unloadCompanionPlayer();
     }
     if (item.transcriptLines && item.transcriptLines.length > 0) {
-      transcriptLines = item.transcriptLines.map((l: any) => ({ ...l }));
       transcriptViewer.lines = item.transcriptLines.map((l: any) => ({ ...l }));
-      if (win) win.transcriptLines = transcriptLines;
-      transcriptViewer.render(transcriptLines);
+      if (win && win.transcriptLines !== transcriptViewer.lines) win.transcriptLines = transcriptViewer.lines;
+      transcriptViewer.render(transcriptViewer.lines);
       if (typeof document !== 'undefined') {
         const viewport = document.getElementById('transcript-viewport');
         if (viewport) {
@@ -637,9 +633,8 @@ export async function selectBatchItemTranscript(index: number): Promise<void> {
         }
       }
     } else {
-      transcriptLines = [];
       transcriptViewer.lines = [];
-      if (win) win.transcriptLines = [];
+      if (win && win.transcriptLines !== transcriptViewer.lines) win.transcriptLines = [];
       if (typeof document !== 'undefined') {
         const viewport = document.getElementById('transcript-viewport');
         if (viewport) {
@@ -654,14 +649,13 @@ export async function selectBatchItemTranscript(index: number): Promise<void> {
     }
     if (typeof document !== 'undefined') {
       const btnCopy = document.getElementById('btn-copy-transcript') as HTMLButtonElement | null;
-      if (btnCopy) btnCopy.disabled = (transcriptLines.length === 0);
+      if (btnCopy) btnCopy.disabled = ((transcriptViewer.lines?.length ?? 0) === 0);
     }
   } else if (isCompleted) {
     if (Array.isArray(item.transcriptLines)) {
-      transcriptLines = item.transcriptLines.map((l: any) => ({ ...l }));
       transcriptViewer.lines = item.transcriptLines.map((l: any) => ({ ...l }));
-      if (win) win.transcriptLines = transcriptLines;
-      transcriptViewer.render(transcriptLines, false);
+      if (win && win.transcriptLines !== transcriptViewer.lines) win.transcriptLines = transcriptViewer.lines;
+      transcriptViewer.render(transcriptViewer.lines, false);
       if (typeof document !== 'undefined') {
         const viewport = document.getElementById('transcript-viewport');
         if (viewport) {
@@ -682,10 +676,10 @@ export async function selectBatchItemTranscript(index: number): Promise<void> {
               if (isStaleSelection()) return;
               if (loaded && loaded.length > 0) {
                 item.transcriptLines = loaded.map((l: any) => ({ ...l }));
-                transcriptLines = item.transcriptLines.map((l: any) => ({ ...l }));
-                transcriptViewer.lines = item.transcriptLines.map((l: any) => ({ ...l }));
-                if (win) win.transcriptLines = transcriptLines;
-                transcriptViewer.render(transcriptLines, false);
+                const loadedLines = item.transcriptLines.map((l: any) => ({ ...l }));
+                transcriptViewer.lines = loadedLines;
+                if (win && win.transcriptLines !== transcriptViewer.lines) win.transcriptLines = loadedLines;
+                transcriptViewer.render(loadedLines, false);
                 if (typeof document !== 'undefined') {
                   const viewport = document.getElementById('transcript-viewport');
                   if (viewport) {
@@ -720,10 +714,10 @@ export async function selectBatchItemTranscript(index: number): Promise<void> {
           item.transcriptLines = [];
         }
         if (isStaleSelection()) return;
-        transcriptLines = (item.transcriptLines || []).map((l: any) => ({ ...l }));
-        transcriptViewer.lines = (item.transcriptLines || []).map((l: any) => ({ ...l }));
-        if (win) win.transcriptLines = transcriptLines;
-        transcriptViewer.render(transcriptLines, false);
+        const fallbackLines = (item.transcriptLines || []).map((l: any) => ({ ...l }));
+        transcriptViewer.lines = fallbackLines;
+        if (win && win.transcriptLines !== transcriptViewer.lines) win.transcriptLines = fallbackLines;
+        transcriptViewer.render(fallbackLines, false);
         if (typeof document !== 'undefined') {
           const viewport = document.getElementById('transcript-viewport');
           if (viewport) {
@@ -735,7 +729,8 @@ export async function selectBatchItemTranscript(index: number): Promise<void> {
     if (isStaleSelection()) return;
     if (item.path && typeof win.loadMediaIntoCompanionPlayer === 'function') {
       try {
-        const firstLine = transcriptLines.length > 0 ? transcriptLines[0] : null;
+        const viewerLines = transcriptViewer.lines || [];
+        const firstLine = viewerLines.length > 0 ? viewerLines[0] : null;
         const firstStartMs =
           typeof firstLine?.startMs === 'number' && firstLine.startMs > 0 ? firstLine.startMs : 0;
         const loadResult = win.loadMediaIntoCompanionPlayer(item.path, false, item.durationSec ?? undefined);
@@ -750,7 +745,7 @@ export async function selectBatchItemTranscript(index: number): Promise<void> {
     }
     if (typeof document !== 'undefined') {
       const btnCopy = document.getElementById('btn-copy-transcript') as HTMLButtonElement | null;
-      if (btnCopy) btnCopy.disabled = (transcriptLines.length === 0);
+      if (btnCopy) btnCopy.disabled = ((transcriptViewer.lines?.length ?? 0) === 0);
     }
   }
 
@@ -1028,7 +1023,7 @@ function cleanupBatchExtractionState(
 
   try {
     const btnCopy = typeof document !== 'undefined' ? (document.getElementById('btn-copy-transcript') as HTMLButtonElement | null) : null;
-    if (btnCopy && transcriptLines.length === 0) {
+    if (btnCopy && (transcriptViewer.lines?.length ?? 0) === 0) {
       btnCopy.disabled = true;
     }
   } catch (_) {}
@@ -1157,7 +1152,6 @@ export async function runBatchExtraction(): Promise<void> {
     window.lastTranscribedOutputDir = null;
     window.lastTranscribedVideoPath = null;
     window.lastTranscribedOutputFiles = [];
-    transcriptLines = [];
     transcriptViewer.lines = [];
     if (win) win.transcriptLines = [];
     activeBatchViewerIndex = 0; // Follow first item initially
@@ -1280,7 +1274,6 @@ export async function runBatchExtraction(): Promise<void> {
       if (msgEl) msgEl.textContent = t('transcribe.batchExtractingProgress', { current: i + 1, total: totalCount, name: item.name });
 
       if (activeBatchViewerIndex === i) {
-        transcriptLines = [];
         transcriptViewer.lines = [];
         if (win) win.transcriptLines = [];
         window.lastTranscribedSubtitlePath = null;
@@ -1320,6 +1313,9 @@ export async function runBatchExtraction(): Promise<void> {
             const parsedLines = await loadTranscriptFromJsonData(sessionJson, shouldRender);
             if (parsedLines && parsedLines.length > 0) {
               item.transcriptLines = parsedLines.map((l: any) => ({ ...l }));
+              if (shouldRender && win && win.transcriptLines !== transcriptViewer.lines) {
+                win.transcriptLines = transcriptViewer.lines;
+              }
               loadedFromInternalJson = true;
             }
           }
@@ -1340,6 +1336,9 @@ export async function runBatchExtraction(): Promise<void> {
           const shouldRender = (activeBatchViewerIndex === i);
           const loaded = await loadTranscriptFromFile(subFullPath, shouldRender);
           item.transcriptLines = (loaded || []).map((l: any) => ({ ...l }));
+          if (shouldRender && win && win.transcriptLines !== transcriptViewer.lines) {
+            win.transcriptLines = transcriptViewer.lines;
+          }
         }
       }
 
@@ -1507,7 +1506,7 @@ export async function runBatchExtraction(): Promise<void> {
             const alreadyLoadedInPlayer =
               typeof win.getActiveMediaInfo === 'function' &&
               (win.getActiveMediaInfo() as any)?.filePath === viewedItem.path;
-            const lines = Array.isArray(viewedItem.transcriptLines) ? viewedItem.transcriptLines : transcriptLines;
+            const lines = Array.isArray(viewedItem.transcriptLines) ? viewedItem.transcriptLines : (transcriptViewer.lines || []);
             const firstLine = lines.length > 0 ? lines[0] : null;
             const firstStartMs =
               typeof firstLine?.startMs === 'number' && firstLine.startMs > 0 ? firstLine.startMs : 0;
@@ -1523,7 +1522,6 @@ export async function runBatchExtraction(): Promise<void> {
         }
       } else if (latestCompletedIdx === -1) {
         activeBatchViewerIndex = -1;
-        transcriptLines = [];
         transcriptViewer.lines = [];
         if (win) win.transcriptLines = [];
         if (typeof document !== 'undefined') {
@@ -1984,7 +1982,6 @@ export function resetBatchQueueState(): void {
   activeBatchViewerIndex = -1;
   batchProcessingIndex = -1;
   userExplicitlySelectedBatchItem = false;
-  transcriptLines = [];
 }
 
 export const batchProcessor = {

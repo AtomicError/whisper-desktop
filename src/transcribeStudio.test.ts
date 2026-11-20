@@ -1333,7 +1333,7 @@ it releases chemicals that hit your eyes
     expect(batchContent).toContain('batchProcessingIndex = i;');
     expect(batchContent).toContain('activeBatchViewerIndex = 0; // Follow first item initially');
     expect(batchContent).toContain('if (!userExplicitlySelectedBatchItem) {\n      activeBatchViewerIndex = i;\n    }');
-    expect(batchContent).toContain('if (activeBatchViewerIndex === i) {\n        transcriptLines = [];');
+    expect(batchContent).toContain('if (activeBatchViewerIndex === i) {\n        transcriptViewer.lines = [];');
 
     // 6. Verify end of batch respects currently viewed completed item and resets index on all-fail
     expect(batchContent).toContain('const isAlreadyViewingCompleted = activeBatchViewerIndex >= 0 &&\n    batchItems[activeBatchViewerIndex] &&\n    batchItems[activeBatchViewerIndex].status === \'completed\';');

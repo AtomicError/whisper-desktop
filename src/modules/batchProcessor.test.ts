@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { transcriptViewer } from './transcriptViewer';
 import { logsController } from './logsController';
-import { updateTranscribeActionButtons } from './workflowBridge';
+import { updateTranscribeActionButtons, updateTranscribeWorkflowButtons } from './workflowBridge';
 import {
   batchProcessor,
   formatDuration,
@@ -1391,6 +1391,185 @@ describe('batchProcessor module', () => {
         expect((window as any).lastTranscribedVideoPath).toBeNull();
       } finally {
         (window as any).loadMediaIntoCompanionPlayer = prevLoad;
+        (window as any).invoke = prevInvoke;
+        (globalThis as any).document = prevDoc;
+      }
+    });
+
+    it('keeps #btn-copy-transcript enabled after a 2-file batch completes without manual item switching', async () => {
+      // Arrange
+      const prevDoc = (globalThis as any).document;
+      const prevInvoke = (window as any).invoke;
+      const prevWorkflowBtns = (window as any).updateTranscribeWorkflowButtons;
+      const prevModels = (window as any).localScannedTransModels;
+      const prevSettings = (window as any).settingsState;
+
+      const btnCopy: any = { disabled: true };
+      const viewport: any = {
+        innerHTML: '',
+        scrollTop: 0,
+        scrollHeight: 0,
+        appendChild: vi.fn(),
+        querySelector: () => null,
+        querySelectorAll: () => []
+      };
+
+      (globalThis as any).document = {
+        getElementById: (id: string) => {
+          if (id === 'btn-copy-transcript') return btnCopy;
+          if (id === 'transcript-viewport') return viewport;
+          return null;
+        },
+        createElement: () => ({
+          className: '',
+          style: {},
+          dataset: {},
+          setAttribute: vi.fn(),
+          removeAttribute: vi.fn(),
+          addEventListener: vi.fn(),
+          appendChild: vi.fn(),
+          querySelector: () => null,
+          classList: { add: vi.fn(), remove: vi.fn(), toggle: vi.fn(), contains: () => false }
+        }),
+        createDocumentFragment: () => ({ appendChild: vi.fn() }),
+        querySelector: () => null,
+        querySelectorAll: () => []
+      };
+
+      (window as any).settingsState = {
+        selectedBackend: 'Standard',
+        modelPath: 'ggml-base.en.bin',
+        outputDirMode: 'source'
+      };
+      (window as any).localScannedTransModels = ['ggml-base.en.bin'];
+      (window as any).updateTranscribeWorkflowButtons = updateTranscribeWorkflowButtons;
+
+      (window as any).invoke = vi.fn((cmd: string, args?: any) => {
+        if (cmd === 'convert_media_file') {
+          return Promise.resolve(`${args.filePath}.wav`);
+        }
+        if (cmd === 'start_transcription_task') {
+          const isSecond = String(args?.wavPath || '').includes('second.mp4');
+          return Promise.resolve({
+            internalJsonPath: isSecond ? '/tmp/second.json' : '/tmp/first.json',
+            outputDir: '/media',
+            generatedFiles: [isSecond ? 'second.srt' : 'first.srt'],
+            durationMs: 1200,
+            speedFactor: 4.5
+          });
+        }
+        if (cmd === 'get_transcript_session_data') {
+          const isSecond = String(args?.sessionFile || '').includes('second.json');
+          return Promise.resolve(
+            JSON.stringify({
+              transcription: [
+                {
+                  timestamps: { from: '00:00:00,000', to: '00:00:02,000' },
+                  offsets: { from: 0, to: 2000 },
+                  text: isSecond ? 'Second file transcript line' : 'First file transcript line'
+                }
+              ]
+            })
+          );
+        }
+        return Promise.resolve(null);
+      });
+
+      try {
+        batchProcessor.setIsBatchMode(true);
+        batchProcessor.setItems([
+          { path: '/media/first.mp4', name: 'first.mp4', durationSec: 10, status: 'pending' },
+          { path: '/media/second.mp4', name: 'second.mp4', durationSec: 12, status: 'pending' }
+        ]);
+
+        // Act
+        await runBatchExtraction();
+
+        // Assert
+        expect(batchProcessor.getItems().map(i => i.status)).toEqual(['completed', 'completed']);
+        expect(batchProcessor.getActiveViewerIndex()).toBe(1);
+        expect(transcriptViewer.lines).toHaveLength(1);
+        expect(transcriptViewer.lines[0].text).toBe('Second file transcript line');
+        expect(btnCopy.disabled).toBe(false);
+      } finally {
+        clearBatchQueue();
+        (window as any).updateTranscribeWorkflowButtons = prevWorkflowBtns;
+        (window as any).localScannedTransModels = prevModels;
+        (window as any).settingsState = prevSettings;
+        (window as any).invoke = prevInvoke;
+        (globalThis as any).document = prevDoc;
+      }
+    });
+
+    it('disables #btn-copy-transcript after batch completion when the viewed item produces zero segments', async () => {
+      // Arrange
+      const prevDoc = (globalThis as any).document;
+      const prevInvoke = (window as any).invoke;
+      const prevWorkflowBtns = (window as any).updateTranscribeWorkflowButtons;
+      const prevModels = (window as any).localScannedTransModels;
+      const prevSettings = (window as any).settingsState;
+
+      const btnCopy: any = { disabled: false };
+      const viewport: any = {
+        innerHTML: '',
+        scrollTop: 0,
+        scrollHeight: 0,
+        appendChild: vi.fn(),
+        querySelector: () => null,
+        querySelectorAll: () => []
+      };
+
+      (globalThis as any).document = {
+        getElementById: (id: string) => {
+          if (id === 'btn-copy-transcript') return btnCopy;
+          if (id === 'transcript-viewport') return viewport;
+          return null;
+        },
+        querySelector: () => null,
+        querySelectorAll: () => []
+      };
+
+      (window as any).settingsState = {
+        selectedBackend: 'Standard',
+        modelPath: 'ggml-base.en.bin',
+        outputDirMode: 'source'
+      };
+      (window as any).localScannedTransModels = ['ggml-base.en.bin'];
+      (window as any).updateTranscribeWorkflowButtons = updateTranscribeWorkflowButtons;
+
+      (window as any).invoke = vi.fn((cmd: string) => {
+        if (cmd === 'convert_media_file') return Promise.resolve('/media/silent.mp4.wav');
+        if (cmd === 'start_transcription_task') {
+          return Promise.resolve({
+            internalJsonPath: null,
+            outputDir: '/media',
+            generatedFiles: ['silent.srt'],
+            durationMs: 500,
+            speedFactor: 10.0
+          });
+        }
+        if (cmd === 'read_text_file_content') return Promise.resolve('');
+        return Promise.resolve(null);
+      });
+
+      try {
+        batchProcessor.setIsBatchMode(true);
+        batchProcessor.setItems([
+          { path: '/media/silent.mp4', name: 'silent.mp4', durationSec: 5, status: 'pending' }
+        ]);
+
+        // Act
+        await runBatchExtraction();
+
+        // Assert
+        expect(batchProcessor.getItems()[0].status).toBe('completed');
+        expect(transcriptViewer.lines).toHaveLength(0);
+        expect(btnCopy.disabled).toBe(true);
+      } finally {
+        clearBatchQueue();
+        (window as any).updateTranscribeWorkflowButtons = prevWorkflowBtns;
+        (window as any).localScannedTransModels = prevModels;
+        (window as any).settingsState = prevSettings;
         (window as any).invoke = prevInvoke;
         (globalThis as any).document = prevDoc;
       }
