@@ -479,6 +479,10 @@ body.is-resizing-transcribe * {
   text-overflow: ellipsis;
 }
 
+.transcribe-unified-deck .transcribe-deck-header {
+  margin-bottom: 0;
+}
+
 .transcribe-deck-body {
   display: flex;
   flex-direction: column;
@@ -488,7 +492,7 @@ body.is-resizing-transcribe * {
   overflow-y: auto;
   overflow-x: hidden;
   padding-inline: 18px;
-  padding-bottom: 6px;
+  padding-block: 14px;
 }
 
 .transcribe-field-group {
@@ -875,14 +879,13 @@ body.is-resizing-transcribe * {
   gap: 10px;
   flex-shrink: 0;
   margin-inline: 18px;
-  margin-top: 12px;
+  margin-top: 0;
   padding-top: 12px;
   border-top: 1px solid var(--border-glass, rgba(255, 255, 255, 0.08));
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .transcribe-unified-deck.has-scroll-below .transcribe-actions-section {
-  border-top-color: rgba(var(--color-royal-blue-rgb, 59, 130, 246), 0.26);
   box-shadow: 0 -10px 18px -10px rgba(0, 0, 0, 0.55);
 }
 
@@ -1532,7 +1535,7 @@ body.is-resizing-transcribe * {
   min-height: 0;
   width: auto;
   margin-inline: 18px;
-  margin-top: 0;
+  margin-block: 14px 12px;
   background: var(--bg-surface, #121215);
   border: 1px solid var(--border-subtle, #27272a);
   border-radius: 12px;
