@@ -23,7 +23,9 @@ import {
 } from './transcribeConfigHelpers';
 import {
   clampConfidenceThreshold,
-  CONFIDENCE_THRESHOLD_DEFAULT
+  CONFIDENCE_THRESHOLD_DEFAULT,
+  CONFIDENCE_THRESHOLD_MIN,
+  CONFIDENCE_THRESHOLD_MAX
 } from './confidenceHelpers';
 import {
   registerTranscribeDeckHost,
@@ -1184,6 +1186,14 @@ export function syncConfidenceThresholdSettingsUI(percent: number, notifyViewer 
     if (badge) {
       badge.textContent = `${clamped}%`;
     }
+    const decBtn = document.getElementById('btn-confidence-threshold-dec') as HTMLButtonElement | null;
+    if (decBtn) {
+      decBtn.disabled = clamped <= CONFIDENCE_THRESHOLD_MIN;
+    }
+    const incBtn = document.getElementById('btn-confidence-threshold-inc') as HTMLButtonElement | null;
+    if (incBtn) {
+      incBtn.disabled = clamped >= CONFIDENCE_THRESHOLD_MAX;
+    }
   }
   if (notifyViewer && typeof win.setConfidenceThreshold === 'function') {
     const alreadyMatches =
@@ -1215,7 +1225,12 @@ export function setConfidenceThresholdPreference(val: number, save = true): numb
 export function adjustConfidenceThresholdPreference(delta: number): number {
   const current = getSettingsState();
   const base = clampConfidenceThreshold(current?.confidenceThreshold ?? CONFIDENCE_THRESHOLD_DEFAULT);
-  return setConfidenceThresholdPreference(base + delta, true);
+  const next = clampConfidenceThreshold(base + delta);
+  if (next === base) {
+    syncConfidenceThresholdSettingsUI(base, false);
+    return base;
+  }
+  return setConfidenceThresholdPreference(next, true);
 }
 
 // ----------------- FFmpeg Status & Version Formatting -----------------

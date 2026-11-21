@@ -310,7 +310,8 @@ export function reconcileWordsAfterEdit(
   }
 
   const reconciled: WordTokenLike[] = new Array(n);
-  for (let k = 0; k < n; k++) {
+  let k = 0;
+  while (k < n) {
     const oldIdx = matchedOldIndex[k];
     if (oldIdx !== -1) {
       const orig = previousWords[oldIdx];
@@ -321,31 +322,32 @@ export function reconcileWordsAfterEdit(
         prob: orig.prob,
         ...(orig.reviewed ? { reviewed: true } : {})
       };
-    } else {
-      // Interpolate timestamp from nearest matched neighbors
-      let leftMs = baseStart;
-      for (let l = k - 1; l >= 0; l--) {
-        if (matchedOldIndex[l] !== -1) {
-          leftMs = previousWords[matchedOldIndex[l]].endMs;
-          break;
-        }
-      }
-      let rightMs = baseEnd;
-      for (let r = k + 1; r < n; r++) {
-        if (matchedOldIndex[r] !== -1) {
-          rightMs = previousWords[matchedOldIndex[r]].startMs;
-          break;
-        }
-      }
-      const safeStart = Math.max(0, Math.min(leftMs, rightMs));
-      const safeEnd = Math.max(safeStart, Math.max(leftMs, rightMs));
-      reconciled[k] = {
-        text: newTokens[k],
-        startMs: safeStart,
-        endMs: safeEnd,
-        prob: 1.0,
-        reviewed: true
-      };
+      k++;
+      continue;
+    }
+
+    // Group contiguous unmatched tokens and distribute [leftMs, rightMs] proportionally
+    const runStart = k;
+    while (k < n && matchedOldIndex[k] === -1) {
+      k++;
+    }
+    const runEnd = k - 1;
+
+    const leftMs = runStart > 0
+      ? previousWords[matchedOldIndex[runStart - 1]].endMs
+      : baseStart;
+    const rightMs = k < n
+      ? previousWords[matchedOldIndex[k]].startMs
+      : baseEnd;
+    const safeStart = Math.max(0, Math.min(leftMs, rightMs));
+    const safeEnd = Math.max(safeStart, Math.max(leftMs, rightMs));
+    const runWords = buildProportionalReviewedWords(
+      newTokens.slice(runStart, runEnd + 1),
+      safeStart,
+      safeEnd
+    );
+    for (let offset = 0; offset < runWords.length; offset++) {
+      reconciled[runStart + offset] = runWords[offset];
     }
   }
 

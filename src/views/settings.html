@@ -263,7 +263,7 @@
                       </div>
                     </div>
                     <div class="setting-control ui-scale-control-group">
-                      <button class="btn-secondary ui-scale-btn ui-scale-btn-icon" type="button" onclick="adjustConfidenceThresholdPreference(-5)" data-i18n-title="settings.confidenceThresholdDecrease" title="Decrease threshold (-5%)" data-i18n-aria="settings.confidenceThresholdDecrease" aria-label="Decrease threshold (-5%)">−</button>
+                      <button class="btn-secondary ui-scale-btn ui-scale-btn-icon" id="btn-confidence-threshold-dec" type="button" onclick="adjustConfidenceThresholdPreference(-5)" data-i18n-title="settings.confidenceThresholdDecrease" title="Decrease threshold (-5%)" data-i18n-aria="settings.confidenceThresholdDecrease" aria-label="Decrease threshold (-5%)">−</button>
                       <select class="select-control" id="opt-confidenceThreshold" style="min-width:120px; width:120px;" data-i18n-aria="settings.confidenceThresholdTitle" aria-label="Confidence Highlight Threshold">
                         <option value="40">40%</option>
                         <option value="45">45%</option>
@@ -278,7 +278,7 @@
                         <option value="90">90%</option>
                         <option value="95">95%</option>
                       </select>
-                      <button class="btn-secondary ui-scale-btn ui-scale-btn-icon" type="button" onclick="adjustConfidenceThresholdPreference(5)" data-i18n-title="settings.confidenceThresholdIncrease" title="Increase threshold (+5%)" data-i18n-aria="settings.confidenceThresholdIncrease" aria-label="Increase threshold (+5%)">+</button>
+                      <button class="btn-secondary ui-scale-btn ui-scale-btn-icon" id="btn-confidence-threshold-inc" type="button" onclick="adjustConfidenceThresholdPreference(5)" data-i18n-title="settings.confidenceThresholdIncrease" title="Increase threshold (+5%)" data-i18n-aria="settings.confidenceThresholdIncrease" aria-label="Increase threshold (+5%)">+</button>
                       <button class="btn-secondary ui-scale-btn ui-scale-btn-text" type="button" onclick="setConfidenceThresholdPreference(70, true)" data-i18n-title="settings.confidenceThresholdResetTooltip" title="Reset to 70%" data-i18n-aria="settings.confidenceThresholdResetTooltip" aria-label="Reset to 70%" data-i18n="settings.uiScaleReset">Reset</button>
                     </div>
                   </div>

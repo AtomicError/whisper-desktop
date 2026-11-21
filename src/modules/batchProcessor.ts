@@ -2,7 +2,7 @@
 import { t, getLanguage, applyContentDirection, clearContentDirection, isolateLtr, isolateDirection } from '../i18n/index';
 import { formatLocalizedNumber } from '../i18n/formatters';
 import { escapeHTML, logsController } from './logsController';
-import { transcriptViewer, loadTranscriptFromFile, loadTranscriptFromJsonData } from './transcriptViewer';
+import { transcriptViewer, loadTranscriptFromFile, loadTranscriptFromJsonData, cloneTranscriptLine } from './transcriptViewer';
 import { customSelectsMap } from './customSelect';
 import { formatMsToTimecode } from './transcribeConfigHelpers';
 import {
@@ -618,10 +618,7 @@ export async function selectBatchItemTranscript(index: number): Promise<void> {
     transcriptViewer.setHistory(item.history || { undoStack: [], redoStack: [] });
   }
 
-  const cloneBatchLine = (l: any): any => ({
-    ...l,
-    words: Array.isArray(l?.words) ? l.words.map((w: any) => ({ ...w })) : undefined
-  });
+  const cloneBatchLine = cloneTranscriptLine;
 
   if (isActive) {
     if (typeof win.unloadCompanionPlayer === 'function') {
@@ -1322,10 +1319,7 @@ export async function runBatchExtraction(): Promise<void> {
             const shouldRender = (activeBatchViewerIndex === i);
             const parsedLines = await loadTranscriptFromJsonData(sessionJson, shouldRender);
             if (parsedLines && parsedLines.length > 0) {
-              item.transcriptLines = parsedLines.map((l: any) => ({
-                ...l,
-                words: Array.isArray(l?.words) ? l.words.map((w: any) => ({ ...w })) : undefined
-              }));
+              item.transcriptLines = parsedLines.map(cloneTranscriptLine);
               if (shouldRender && win && win.transcriptLines !== transcriptViewer.lines) {
                 win.transcriptLines = transcriptViewer.lines;
               }
@@ -1348,7 +1342,7 @@ export async function runBatchExtraction(): Promise<void> {
           const subFullPath = `${outputDir}${sep}${subFile}`;
           const shouldRender = (activeBatchViewerIndex === i);
           const loaded = await loadTranscriptFromFile(subFullPath, shouldRender);
-          item.transcriptLines = (loaded || []).map((l: any) => ({ ...l }));
+          item.transcriptLines = (loaded || []).map(cloneTranscriptLine);
           if (shouldRender && win && win.transcriptLines !== transcriptViewer.lines) {
             win.transcriptLines = transcriptViewer.lines;
           }

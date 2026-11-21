@@ -346,7 +346,6 @@ export function updateTranscribeWorkflowButtons(): void {
     const windowLinesHaveWords =
       Array.isArray(transcriptLines) &&
       transcriptLines.some((l: any) => Array.isArray(l?.words) && l.words.length > 0);
-    const hasConfidence = !isRunning && (hasTranscriptConfidenceData() || windowLinesHaveWords);
     const hideConfidenceBadge = () => {
       const btnBadge = document.getElementById('confidence-btn-badge');
       if (btnBadge) {
@@ -363,17 +362,17 @@ export function updateTranscribeWorkflowButtons(): void {
       hideConfidenceBadge();
     } else if (hasTranscriptConfidenceData()) {
       syncConfidenceButtonAndReviewBar();
+    } else if (windowLinesHaveWords) {
+      syncConfidenceButtonAndReviewBar(transcriptLines);
     } else {
-      if (!hasConfidence && isConfidenceHighlightingActive()) {
+      if (isConfidenceHighlightingActive()) {
         toggleConfidenceHighlighting(false);
       }
-      btnConfidence.disabled = !hasConfidence;
-      if (!hasConfidence) {
-        hideConfidenceBadge();
-        btnConfidence.title =
-          t('transcribe.confidenceUnavailableTooltip') ||
-          'Word-level confidence data is unavailable for this transcript';
-      }
+      btnConfidence.disabled = true;
+      hideConfidenceBadge();
+      btnConfidence.title =
+        t('transcribe.confidenceUnavailableTooltip') ||
+        'Word-level confidence data is unavailable for this transcript';
     }
   }
 }

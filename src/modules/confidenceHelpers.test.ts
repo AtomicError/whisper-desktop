@@ -181,6 +181,22 @@ describe('reconcileWordsAfterEdit & summary evaluation', () => {
     expect(markWordAsReviewed(original, 5)).toBeUndefined();
   });
 
+  it('distributes proportional monotonic timestamps across consecutive edited words between matched neighbors', () => {
+    const original = [
+      { text: 'Good', startMs: 1000, endMs: 1500, prob: 0.96 },
+      { text: 'helo', startMs: 1500, endMs: 2500, prob: 0.42 },
+      { text: 'wrld', startMs: 2500, endMs: 3500, prob: 0.38 },
+      { text: 'today', startMs: 3500, endMs: 4000, prob: 0.95 }
+    ];
+    const updated = reconcileWordsAfterEdit(original, 'Good hello world today', 1000, 4000);
+    expect(updated).toBeDefined();
+    expect(updated?.map(w => w.text)).toEqual(['Good', 'hello', 'world', 'today']);
+    expect(updated?.[0]).toMatchObject({ startMs: 1000, endMs: 1500, prob: 0.96 });
+    expect(updated?.[1]).toMatchObject({ startMs: 1500, endMs: 2500, prob: 1.0, reviewed: true });
+    expect(updated?.[2]).toMatchObject({ startMs: 2500, endMs: 3500, prob: 1.0, reviewed: true });
+    expect(updated?.[3]).toMatchObject({ startMs: 3500, endMs: 4000, prob: 0.95 });
+  });
+
   it('computes accurate multi-segment summary and skips reviewed words', () => {
     const lines = [
       {

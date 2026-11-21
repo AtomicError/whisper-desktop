@@ -418,12 +418,25 @@ describe('workflowBridge module', () => {
       expect(btnCopy.disabled).toBe(false);
       expect(btnOpenFile.title).toContain('movie.srt');
 
-      // Once word-level confidence tokens are present, confidence button activates
+      // Once word-level confidence tokens are present on window fallback, button, badge, and tooltip all sync
+      const btnBadge = new MockElement('SPAN');
+      btnBadge.id = 'confidence-btn-badge';
+      domMap.set(btnBadge.id, btnBadge);
       (globalThis as any).window.transcriptLines = [
-        { id: 0, text: 'Hello', words: [{ text: 'Hello', startMs: 0, endMs: 500, prob: 0.92 }] }
+        {
+          id: 0,
+          text: 'Hello maybe',
+          words: [
+            { text: 'Hello', startMs: 0, endMs: 500, prob: 0.92 },
+            { text: 'maybe', startMs: 500, endMs: 1000, prob: 0.48 }
+          ]
+        }
       ];
       updateTranscribeWorkflowButtons();
       expect(btnConfidence.disabled).toBe(false);
+      expect(btnBadge.textContent).toBe('1');
+      expect(btnBadge.style.display).toBe('');
+      expect(btnConfidence.title).not.toContain('unavailable');
       (globalThis as any).window.transcriptLines = [];
     });
 

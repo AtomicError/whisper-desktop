@@ -1780,5 +1780,43 @@ describe('settingsManager module', () => {
         resetQuickDeckState();
       }
     });
+
+    it('disables confidence threshold stepper buttons at min/max bounds and avoids redundant saves', () => {
+      const decBtn = new MockElement('BUTTON');
+      decBtn.id = 'btn-confidence-threshold-dec';
+      const incBtn = new MockElement('BUTTON');
+      incBtn.id = 'btn-confidence-threshold-inc';
+      const badge = new MockElement('SPAN');
+      badge.id = 'confidence-threshold-badge';
+      const sel = new MockElement('SELECT');
+      sel.id = 'opt-confidenceThreshold';
+      [decBtn, incBtn, badge, sel].forEach(el => elementRegistry.set(el.id, el));
+
+      const invokeSpy = vi.fn().mockResolvedValue(undefined);
+      const prevTauri = (globalThis as any).window.__TAURI__;
+      (globalThis as any).window.__TAURI__ = { core: { invoke: invokeSpy } };
+
+      try {
+        setSettingsState({ confidenceThreshold: 40 });
+        settingsManager.syncConfidenceThresholdSettingsUI(40, false);
+        expect(decBtn.disabled).toBe(true);
+        expect(incBtn.disabled).toBe(false);
+        expect(badge.textContent).toBe('40%');
+
+        // Adjusting below min (40 -> 35) must be a no-op with zero invoke save calls
+        expect(settingsManager.adjustConfidenceThresholdPreference(-5)).toBe(40);
+        expect(invokeSpy).not.toHaveBeenCalled();
+
+        // Adjusting up to 95 disables the increment button
+        setSettingsState({ confidenceThreshold: 95 });
+        settingsManager.syncConfidenceThresholdSettingsUI(95, false);
+        expect(decBtn.disabled).toBe(false);
+        expect(incBtn.disabled).toBe(true);
+        expect(settingsManager.adjustConfidenceThresholdPreference(5)).toBe(95);
+        expect(invokeSpy).not.toHaveBeenCalled();
+      } finally {
+        (globalThis as any).window.__TAURI__ = prevTauri;
+      }
+    });
   });
 });

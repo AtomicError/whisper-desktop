@@ -255,13 +255,15 @@ class MockElement {
       return res;
     }
     const res: MockElement[] = [];
-    const idMatch = sel.match(/\[data-id="([^"]+)"\]/);
+    const dataAttrMatch = sel.match(/\[data-([a-z-]+)="([^"]+)"\]/);
     const check = (node: MockElement) => {
-      if (idMatch) {
-        let matches = node.dataset.id === idMatch[1];
+      if (dataAttrMatch) {
+        const camelKey = dataAttrMatch[1].replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+        let matches = node.dataset[camelKey] === dataAttrMatch[2];
         if (matches && sel.startsWith('.')) {
-          const className = sel.split('[')[0].slice(1);
-          if (className && !node.classList.contains(className)) {
+          const classPart = sel.split('[')[0];
+          const classes = classPart.split('.').filter(Boolean);
+          if (!classes.every(c => node.classList.contains(c))) {
             matches = false;
           }
         }
@@ -3731,5 +3733,339 @@ describe('Modern Confidence Proofreading Workflow (Threshold, Review Bar, Filter
     expect(transcriptViewer.lines[1].words?.map(w => w.text)).toEqual(['He']);
     expect(transcriptViewer.lines[2].text).toBe('llo world');
     expect(transcriptViewer.lines[2].words?.map(w => w.text)).toEqual(['llo', 'world']);
+  });
+
+  it('reconciles mid-word splits on the last word and single-word segments without dropping confidence metadata', () => {
+    registerMockEl('transcript-viewport');
+    registerMockEl('btn-toggle-confidence', 'BUTTON');
+    registerMockEl('btn-copy-transcript', 'BUTTON');
+    registerMockEl('btn-undo-transcript', 'BUTTON');
+    registerMockEl('btn-redo-transcript', 'BUTTON');
+
+    const lines: TranscriptLine[] = [
+      {
+        id: 0,
+        timeRange: '[00:00:01.000 --> 00:00:04.000]',
+        text: 'Hello world',
+        startMs: 1000,
+        endMs: 4000,
+        words: [
+          { text: 'Hello', startMs: 1000, endMs: 2000, prob: 0.95 },
+          { text: 'world', startMs: 2000, endMs: 4000, prob: 0.45 }
+        ]
+      },
+      {
+        id: 1,
+        timeRange: '[00:00:04.000 --> 00:00:06.000]',
+        text: 'Helloworld',
+        startMs: 4000,
+        endMs: 6000,
+        words: [
+          { text: 'Helloworld', startMs: 4000, endMs: 6000, prob: 0.40 }
+        ]
+      }
+    ];
+
+    transcriptViewer.lines = lines;
+    renderTranscriptLines(lines, false);
+    toggleConfidenceHighlighting(true);
+
+    // Split inside the LAST word of card #0: "Hello wo|rld" (cursorPosition = 8)
+    expect(splitTranscriptSegment(0, 8)).toBe(true);
+    expect(transcriptViewer.lines[0].text).toBe('Hello wo');
+    expect(transcriptViewer.lines[0].words?.map(w => w.text)).toEqual(['Hello', 'wo']);
+    expect(transcriptViewer.lines[0].words?.[0].prob).toBe(0.95);
+    expect(transcriptViewer.lines[0].words?.[1].reviewed).toBe(true);
+    expect(transcriptViewer.lines[1].text).toBe('rld');
+    expect(transcriptViewer.lines[1].words?.map(w => w.text)).toEqual(['rld']);
+    expect(transcriptViewer.lines[1].words?.[0].reviewed).toBe(true);
+    expect(transcriptViewer.lines[0].endMs).toBe(transcriptViewer.lines[1].startMs);
+    expect(transcriptViewer.lines[0].endMs).toBe(2800);
+    expect(transcriptViewer.lines[0].words?.[1]).toMatchObject({ startMs: 2000, endMs: 2800 });
+    expect(transcriptViewer.lines[1].words?.[0]).toMatchObject({ startMs: 2800, endMs: 4000 });
+
+    // Split inside a SINGLE-word segment (now id 2): "Hello|world" (cursorPosition = 5)
+    expect(splitTranscriptSegment(2, 5)).toBe(true);
+    expect(transcriptViewer.lines[2].text).toBe('Hello');
+    expect(transcriptViewer.lines[2].words?.map(w => w.text)).toEqual(['Hello']);
+    expect(transcriptViewer.lines[3].text).toBe('world');
+    expect(transcriptViewer.lines[3].words?.map(w => w.text)).toEqual(['world']);
+    expect(transcriptViewer.lines[2].endMs).toBe(5000);
+    expect(transcriptViewer.lines[3].startMs).toBe(5000);
+    expect(transcriptViewer.lines[2].words?.[0]).toMatchObject({ startMs: 4000, endMs: 5000 });
+    expect(transcriptViewer.lines[3].words?.[0]).toMatchObject({ startMs: 5000, endMs: 6000 });
+  });
+
+  it('does not leave filtered-out split cards stuck in is-editing-text under Uncertain-only mode', async () => {
+    vi.useFakeTimers();
+    try {
+      const viewport = registerMockEl('transcript-viewport');
+      registerMockEl('btn-toggle-confidence', 'BUTTON');
+      registerMockEl('btn-copy-transcript', 'BUTTON');
+      registerMockEl('btn-undo-transcript', 'BUTTON');
+      registerMockEl('btn-redo-transcript', 'BUTTON');
+
+      const lines: TranscriptLine[] = [
+        {
+          id: 0,
+          timeRange: '[00:00:01.000 --> 00:00:04.000]',
+          text: 'helo good morning',
+          startMs: 1000,
+          endMs: 4000,
+          words: [
+            { text: 'helo', startMs: 1000, endMs: 1800, prob: 0.35 },
+            { text: 'good', startMs: 1800, endMs: 2800, prob: 0.98 },
+            { text: 'morning', startMs: 2800, endMs: 4000, prob: 0.99 }
+          ]
+        }
+      ];
+
+      transcriptViewer.lines = lines;
+      renderTranscriptLines(lines, false);
+      toggleConfidenceHighlighting(true);
+      toggleConfidenceLowOnlyFilter(true);
+
+      // Split after "helo" -> card #1 ("good morning") is all high-confidence and filtered out
+      expect(splitTranscriptSegment(0, 4)).toBe(true);
+      vi.advanceTimersByTime(50);
+
+      const cards = viewport.querySelectorAll('.transcript-card');
+      expect(cards.length).toBe(2);
+      expect(cards[0].style.display).toBe('flex');
+      expect(cards[1].style.display).toBe('none');
+      expect(cards[1].classList.contains('is-editing-text')).toBe(false);
+    } finally {
+      toggleConfidenceLowOnlyFilter(false);
+      vi.useRealTimers();
+    }
+  });
+
+  it('preserves drag text selection on click, limits tabindex=0 to flagged words, and respects reduced motion on jump scroll', () => {
+    const viewport = registerMockEl('transcript-viewport');
+    registerMockEl('btn-toggle-confidence', 'BUTTON');
+    registerMockEl('btn-copy-transcript', 'BUTTON');
+
+    const lines: TranscriptLine[] = [
+      {
+        id: 0,
+        timeRange: '[00:00:01.000 --> 00:00:03.000]',
+        text: 'Clear maybe word',
+        startMs: 1000,
+        endMs: 3000,
+        words: [
+          { text: 'Clear', startMs: 1000, endMs: 1500, prob: 0.96 },
+          { text: 'maybe', startMs: 1500, endMs: 2200, prob: 0.50 },
+          { text: 'word', startMs: 2200, endMs: 3000, prob: 0.95 }
+        ]
+      }
+    ];
+
+    transcriptViewer.lines = lines;
+    renderTranscriptLines(lines, false);
+    toggleConfidenceHighlighting(true);
+
+    const wordEls = viewport.querySelectorAll('.transcript-word');
+    expect(wordEls[0].getAttribute('tabindex')).toBe('-1');
+    expect(wordEls[1].getAttribute('tabindex')).toBe('0');
+    expect(wordEls[2].getAttribute('tabindex')).toBe('-1');
+
+    // Drag selection should NOT enter edit mode on click
+    const card = viewport.querySelector('.transcript-card') as any;
+    const prevGetSelection = (globalThis as any).window.getSelection;
+    const prevMatchMedia = (globalThis as any).window.matchMedia;
+    let lastScrollArg: any = null;
+    card.scrollIntoView = (arg: any) => { lastScrollArg = arg; };
+
+    try {
+      const clickHandlers = (viewport as any)._listeners?.get?.('click') || [];
+      expect(clickHandlers.length).toBeGreaterThan(0);
+
+      // Drag selection should NOT enter edit mode on normal click
+      (globalThis as any).window.getSelection = () => ({ isCollapsed: false, toString: () => 'Clear maybe' });
+      clickHandlers.forEach((fn: any) => fn({ target: wordEls[1], shiftKey: false, stopPropagation: () => {} }));
+      expect(card.classList.contains('is-editing-text')).toBe(false);
+
+      // Collapsed selection DOES enter edit mode on normal click
+      (globalThis as any).window.getSelection = () => ({ isCollapsed: true, toString: () => '' });
+      clickHandlers.forEach((fn: any) => fn({ target: wordEls[1], shiftKey: false, stopPropagation: () => {} }));
+      expect(card.classList.contains('is-editing-text')).toBe(true);
+      card.querySelector('.transcript-text-input').onblur();
+      expect(card.classList.contains('is-editing-text')).toBe(false);
+
+      // Shift+Click still approves even if browser reports a selection
+      (globalThis as any).window.getSelection = () => ({ isCollapsed: false, toString: () => 'Clear maybe' });
+      const refreshedWordEls = viewport.querySelectorAll('.transcript-word');
+      clickHandlers.forEach((fn: any) => fn({ target: refreshedWordEls[1], shiftKey: true, stopPropagation: () => {} }));
+      expect(transcriptViewer.lines[0].words?.[1].reviewed).toBe(true);
+      const updatedWords = viewport.querySelectorAll('.transcript-word');
+      expect(updatedWords[1].getAttribute('tabindex')).toBe('-1');
+
+      // Re-test reduced motion scroll behavior on another flagged line
+      (globalThis as any).window.matchMedia = (q: string) => ({ matches: q.includes('prefers-reduced-motion') });
+      undoTranscriptOperation();
+      const restoredCard = viewport.querySelector('.transcript-card') as any;
+      restoredCard.scrollIntoView = (arg: any) => { lastScrollArg = arg; };
+      expect(jumpToConfidenceWord(1)).toBe(true);
+      expect(lastScrollArg).toEqual({ behavior: 'auto', block: 'center' });
+    } finally {
+      (globalThis as any).window.getSelection = prevGetSelection;
+      (globalThis as any).window.matchMedia = prevMatchMedia;
+    }
+  });
+
+  it('preserves jump anchor across quick-approval so Alt+Down/Up continues sequentially without resetting to #1', () => {
+    const viewport = registerMockEl('transcript-viewport');
+    registerMockEl('btn-toggle-confidence', 'BUTTON');
+    registerMockEl('btn-copy-transcript', 'BUTTON');
+    const prevBtn = registerMockEl('btn-confidence-prev', 'BUTTON') as any;
+    const nextBtn = registerMockEl('btn-confidence-next', 'BUTTON') as any;
+    const counterEl = registerMockEl('confidence-jump-counter', 'SPAN') as any;
+    const summaryEl = registerMockEl('confidence-review-summary', 'SPAN') as any;
+
+    const lines: TranscriptLine[] = [
+      {
+        id: 0,
+        timeRange: '[00:00:01.000 --> 00:00:04.000]',
+        text: 'one two three',
+        startMs: 1000,
+        endMs: 4000,
+        words: [
+          { text: 'one', startMs: 1000, endMs: 2000, prob: 0.45 },
+          { text: 'two', startMs: 2000, endMs: 3000, prob: 0.48 },
+          { text: 'three', startMs: 3000, endMs: 4000, prob: 0.50 }
+        ]
+      }
+    ];
+
+    transcriptViewer.lines = lines;
+    renderTranscriptLines(lines, false);
+    toggleConfidenceHighlighting(true);
+
+    // Jump to #1 ("one"), then #2 ("two")
+    expect(jumpToConfidenceWord(1)).toBe(true);
+    expect(jumpToConfidenceWord(1)).toBe(true);
+    expect(counterEl.textContent).toBe('2 / 3');
+
+    // Approve "two" (index 1); next Alt+Down must land on "three" (now 2 / 2), NOT bounce back to "one"
+    expect(markConfidenceWordReviewed(0, 1)).toBe(true);
+    expect(jumpToConfidenceWord(1)).toBe(true);
+    expect(counterEl.textContent).toBe('2 / 2');
+    expect(viewport.querySelector('.transcript-word.confidence-word-focused')?.textContent).toBe('three');
+
+    // Approve "three"; Alt+Up must land on remaining "one" (1 / 1)
+    expect(markConfidenceWordReviewed(0, 2)).toBe(true);
+    expect(jumpToConfidenceWord(-1)).toBe(true);
+    expect(counterEl.textContent).toBe('1 / 1');
+    expect(viewport.querySelector('.transcript-word.confidence-word-focused')?.textContent).toBe('one');
+
+    // Approve final uncertain word "one" -> clean all-clear state
+    expect(markConfidenceWordReviewed(0, 0)).toBe(true);
+    expect(summaryEl.dataset.status).toBe('ok');
+    expect(prevBtn.disabled).toBe(true);
+    expect(nextBtn.disabled).toBe(true);
+    expect(counterEl.hidden).toBe(true);
+    expect(jumpToConfidenceWord(1)).toBe(false);
+  });
+
+  it('keeps #btn-toggle-confidence disabled and review bar closed when syncConfidenceButtonAndReviewBar runs during active transcription', () => {
+    registerMockEl('transcript-viewport');
+    const btn = registerMockEl('btn-toggle-confidence', 'BUTTON') as any;
+    const badge = registerMockEl('confidence-btn-badge', 'SPAN') as any;
+    const reviewBar = registerMockEl('confidence-review-bar', 'DIV') as any;
+
+    const lines: TranscriptLine[] = [
+      {
+        id: 0,
+        timeRange: '[00:00:01.000 --> 00:00:03.000]',
+        text: 'maybe',
+        startMs: 1000,
+        endMs: 3000,
+        words: [{ text: 'maybe', startMs: 1000, endMs: 3000, prob: 0.45 }]
+      }
+    ];
+
+    const prevBatchFlag = (globalThis as any).window.isBatchExtracting;
+    try {
+      (globalThis as any).window.isBatchExtracting = true;
+      transcriptViewer.lines = lines;
+      renderTranscriptLines(lines, false);
+
+      expect(btn.disabled).toBe(true);
+      expect(badge.style.display).toBe('none');
+      expect(reviewBar.hidden).toBe(true);
+    } finally {
+      (globalThis as any).window.isBatchExtracting = prevBatchFlag;
+    }
+  });
+
+  it('clears active/aria-pressed on #btn-toggle-confidence when confidence data disappears and restores word focus on Escape', () => {
+    const viewport = registerMockEl('transcript-viewport');
+    const btn = registerMockEl('btn-toggle-confidence', 'BUTTON') as any;
+    const reviewBar = registerMockEl('confidence-review-bar', 'DIV') as any;
+    registerMockEl('btn-copy-transcript', 'BUTTON');
+
+    const lines: TranscriptLine[] = [
+      {
+        id: 0,
+        timeRange: '[00:00:01.000 --> 00:00:03.000]',
+        text: 'Clear maybe',
+        startMs: 1000,
+        endMs: 3000,
+        words: [
+          { text: 'Clear', startMs: 1000, endMs: 1800, prob: 0.96 },
+          { text: 'maybe', startMs: 1800, endMs: 3000, prob: 0.45 }
+        ]
+      }
+    ];
+
+    transcriptViewer.lines = lines;
+    renderTranscriptLines(lines, false);
+    toggleConfidenceHighlighting(true);
+    expect(jumpToConfidenceWord(1)).toBe(true);
+
+    const card = viewport.querySelector('.transcript-card') as any;
+    const textarea = card.querySelector('.transcript-text-input') as any;
+    textarea.blur = () => textarea.onblur();
+
+    // Enter edit mode via click on "maybe", then press Escape -> focus returns to restored "maybe" span
+    const origFocus = (globalThis as any).document.activeElement;
+    try {
+      const clickHandlers = (viewport as any)._listeners?.get?.('click') || [];
+      const maybeSpan = viewport.querySelector('.transcript-word.low-confidence') as any;
+      clickHandlers.forEach((fn: any) => fn({ target: maybeSpan, shiftKey: false, stopPropagation: () => {} }));
+      expect(card.classList.contains('is-editing-text')).toBe(true);
+
+      let focusedText = '';
+      const origCreateElement = document.createElement.bind(document);
+      const createSpy = vi.spyOn(document, 'createElement').mockImplementation((tag: any) => {
+        const el: any = origCreateElement(tag);
+        if (String(tag).toLowerCase() === 'span') {
+          el.focus = () => {
+            focusedText = el.textContent;
+          };
+        }
+        return el;
+      });
+      try {
+        textarea.onkeydown({ key: 'Escape', preventDefault: () => {} });
+      } finally {
+        createSpy.mockRestore();
+      }
+      expect(card.classList.contains('is-editing-text')).toBe(false);
+      expect(focusedText).toBe('maybe');
+    } finally {
+      (globalThis as any).document.activeElement = origFocus;
+    }
+
+    // Emptying the sole segment removes confidence data -> button must not stay visually active while disabled
+    textarea.onfocus();
+    textarea.value = '';
+    textarea.oninput();
+    textarea.onblur();
+
+    expect(btn.disabled).toBe(true);
+    expect(btn.getAttribute('aria-pressed')).toBe('false');
+    expect(btn.classList.contains('active')).toBe(false);
+    expect(reviewBar.hidden).toBe(true);
   });
 });
