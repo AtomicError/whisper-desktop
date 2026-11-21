@@ -117,6 +117,8 @@ pub struct WhisperSettings {
     pub close_to_tray: bool,
     #[serde(default = "default_ui_language")]
     pub ui_language: String,
+    #[serde(default = "default_confidence_threshold", deserialize_with = "deserialize_i32_lenient")]
+    pub confidence_threshold: i32,
     #[serde(default)]
     pub recent_spoken_languages: Vec<String>,
     #[serde(default)]
@@ -189,6 +191,10 @@ fn default_output_dir_mode() -> String {
 
 fn default_ui_language() -> String {
     "en".to_string()
+}
+
+fn default_confidence_threshold() -> i32 {
+    70
 }
 
 impl Default for WhisperSettings {
@@ -266,6 +272,7 @@ impl WhisperSettings {
             monochrome_canvas: false,
             close_to_tray: false,
             ui_language: "en".to_string(),
+            confidence_threshold: 70,
             recent_spoken_languages: Vec::new(),
             recent_translation_targets: Vec::new(),
         }
@@ -356,6 +363,11 @@ impl WhisperSettings {
         }
         self.ui_scale = (self.ui_scale * 100.0).round() / 100.0;
         self.ui_scale = self.ui_scale.clamp(0.70, 1.60);
+
+        if self.confidence_threshold <= 0 {
+            self.confidence_threshold = default_confidence_threshold();
+        }
+        self.confidence_threshold = self.confidence_threshold.clamp(40, 95);
 
         self.threads = self.threads.max(1);
         self.processors = self.processors.max(1);
@@ -1220,6 +1232,7 @@ mod tests {
         settings.theme = "ruby-red".to_string();
         settings.ui_language = "fa".to_string();
         settings.ui_scale = 1.25;
+        settings.confidence_threshold = 85;
         settings.output_dir_path = "/custom/output".to_string();
         settings.translate_ai_providers = "[{\"name\":\"custom-ai\",\"apiKey\":\"secret\"}]".to_string();
         settings.translate_ai_provider = "custom-ai".to_string();
@@ -1251,6 +1264,7 @@ mod tests {
         assert_eq!(settings.theme, "ruby-red");
         assert_eq!(settings.ui_language, "fa");
         assert_eq!(settings.ui_scale, 1.25);
+        assert_eq!(settings.confidence_threshold, 85);
         assert_eq!(settings.output_dir_path, "/custom/output");
         assert_eq!(settings.translate_ai_providers, "[{\"name\":\"custom-ai\",\"apiKey\":\"secret\"}]");
         assert_eq!(settings.translate_ai_provider, "custom-ai");
@@ -1278,6 +1292,27 @@ mod tests {
         settings.sanitize_and_validate();
         assert!(!settings.output_srt);
         assert!(settings.output_vtt);
+    }
+
+    #[test]
+    fn test_confidence_threshold_defaults_and_clamping() {
+        let mut settings: WhisperSettings = serde_json::from_str(r#"{"theme":"emerald"}"#).unwrap();
+        assert_eq!(settings.confidence_threshold, 70);
+
+        settings.confidence_threshold = 0;
+        settings.sanitize_and_validate();
+        assert_eq!(settings.confidence_threshold, 70);
+
+        settings.confidence_threshold = 20;
+        settings.sanitize_and_validate();
+        assert_eq!(settings.confidence_threshold, 40);
+
+        settings.confidence_threshold = 120;
+        settings.sanitize_and_validate();
+        assert_eq!(settings.confidence_threshold, 95);
+
+        let from_str: WhisperSettings = serde_json::from_str(r#"{"confidenceThreshold":"80"}"#).unwrap();
+        assert_eq!(from_str.confidence_threshold, 80);
     }
 }
 

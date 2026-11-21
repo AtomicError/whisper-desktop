@@ -14,6 +14,10 @@ import {
   clearTranscriptHistory,
   toggleConfidenceHighlighting,
   isConfidenceHighlightingActive,
+  setConfidenceThreshold,
+  getConfidenceThreshold,
+  toggleConfidenceLowOnlyFilter,
+  jumpToConfidenceWord,
   loadTranscriptFromJsonData,
   filterTranscriptLines,
   renderTranscriptLines,
@@ -609,32 +613,38 @@ describe('Transcript Segment Splitting & Merging with Word Timestamps', () => {
     const win = (globalThis as any);
     win.seekCompanionPlayer = () => { seekTriggered = true; };
 
-    const cardEl = transcriptViewer.createCard({
-      id: 0,
-      timeRange: '[00:00:01.000 --> 00:00:03.000]',
-      text: 'Double click test',
-      startMs: 1000,
-      endMs: 3000,
-      words: [{ text: 'Double', startMs: 1000, endMs: 2000, prob: 0.9 }]
-    });
+    toggleConfidenceHighlighting(true);
+    try {
+      const cardEl = transcriptViewer.createCard({
+        id: 0,
+        timeRange: '[00:00:01.000 --> 00:00:03.000]',
+        text: 'Double click test',
+        startMs: 1000,
+        endMs: 3000,
+        words: [{ text: 'Double', startMs: 1000, endMs: 2000, prob: 0.9 }]
+      });
 
-    // Simulated double click on textarea
-    const textarea = cardEl.querySelector('.transcript-text-input') as any;
-    expect(textarea).not.toBeNull();
-    seekTriggered = false;
-    cardEl.ondblclick({ target: textarea } as any);
-    expect(seekTriggered).toBe(false);
+      // Simulated double click on textarea
+      const textarea = cardEl.querySelector('.transcript-text-input') as any;
+      expect(textarea).not.toBeNull();
+      seekTriggered = false;
+      cardEl.ondblclick({ target: textarea } as any);
+      expect(seekTriggered).toBe(false);
 
-    // Simulated double click on words bar
-    const wordsBar = cardEl.querySelector('.transcript-words-bar') as any;
-    seekTriggered = false;
-    cardEl.ondblclick({ target: wordsBar } as any);
-    expect(seekTriggered).toBe(false);
+      // Simulated double click on unified confidence view
+      const confView = cardEl.querySelector('.transcript-confidence-view') as any;
+      expect(confView).not.toBeNull();
+      seekTriggered = false;
+      cardEl.ondblclick({ target: confView } as any);
+      expect(seekTriggered).toBe(false);
 
-    // Simulated double click on card blank space (header/card background)
-    seekTriggered = false;
-    cardEl.ondblclick({ target: cardEl } as any);
-    expect(seekTriggered).toBe(true);
+      // Simulated double click on card blank space (header/card background)
+      seekTriggered = false;
+      cardEl.ondblclick({ target: cardEl } as any);
+      expect(seekTriggered).toBe(true);
+    } finally {
+      toggleConfidenceHighlighting(false);
+    }
   });
 });
 
@@ -1184,8 +1194,8 @@ describe('Companion Media Player & DOM Controls', () => {
     expect(videoContainer.classList.contains('aspect-vertical')).toBe(true);
   });
 
-  it('ensures wordsBar always includes confidence-bar-dimmed class so toggling off works reliably', () => {
-    const cardEl = transcriptViewer.createCard({
+  it('lazily mounts unified confidence view only when confidence highlighting is active (zero DOM bloat when off)', () => {
+    const sampleLine = {
       id: 0,
       timeRange: '[00:00:01.000 --> 00:00:03.000]',
       text: 'Confidence test word',
@@ -1196,11 +1206,23 @@ describe('Companion Media Player & DOM Controls', () => {
         { text: 'test', startMs: 2000, endMs: 2500, prob: 0.40 },
         { text: 'word', startMs: 2500, endMs: 3000, prob: 0.98 }
       ]
-    });
+    };
 
-    const wordsBar = cardEl.querySelector('.transcript-words-bar');
-    expect(wordsBar).not.toBeNull();
-    expect(wordsBar?.classList.contains('confidence-bar-dimmed')).toBe(true);
+    toggleConfidenceHighlighting(false);
+    const cardWhenOff = transcriptViewer.createCard(sampleLine);
+    expect(cardWhenOff.querySelector('.transcript-confidence-view')).toBeNull();
+    expect(cardWhenOff.classList.contains('has-confidence-view')).toBe(false);
+
+    toggleConfidenceHighlighting(true);
+    try {
+      const cardWhenOn = transcriptViewer.createCard(sampleLine);
+      const confView = cardWhenOn.querySelector('.transcript-confidence-view');
+      expect(confView).not.toBeNull();
+      expect(cardWhenOn.classList.contains('has-confidence-view')).toBe(true);
+      expect(confView?.getAttribute('dir')).toBe('ltr');
+    } finally {
+      toggleConfidenceHighlighting(false);
+    }
   });
 
   it('retains user-chosen playbackRate and volume slider levels when loading new media', async () => {
@@ -1223,7 +1245,7 @@ describe('Companion Media Player & DOM Controls', () => {
     expect(videoEl.muted).toBe(false);
   });
 
-  it('updates confidence button and copy button disabled state on empty vs populated lines', () => {
+  it('updates confidence button and copy button disabled state based on lines and word-level confidence availability', () => {
     registerMockEl('transcript-viewport');
     const btnCopy = registerMockEl('btn-copy-transcript', 'BUTTON') as any;
     const btnConfidence = registerMockEl('btn-toggle-confidence', 'BUTTON') as any;
@@ -1235,9 +1257,24 @@ describe('Companion Media Player & DOM Controls', () => {
     expect(btnCopy.disabled).toBe(true);
     expect(btnConfidence.disabled).toBe(true);
 
-    // 2. Render populated
+    // 2. Render populated WITHOUT word-level confidence tokens (e.g., plain .srt/.txt)
     renderTranscriptLines([
       { id: 0, timeRange: '[00:00:01.000 --> 00:00:02.000]', text: 'Populated line' }
+    ]);
+    expect(btnCopy.disabled).toBe(false);
+    expect(btnConfidence.disabled).toBe(true);
+
+    // 3. Render populated WITH word-level confidence tokens
+    renderTranscriptLines([
+      {
+        id: 0,
+        timeRange: '[00:00:01.000 --> 00:00:02.000]',
+        text: 'Populated line',
+        words: [
+          { text: 'Populated', startMs: 1000, endMs: 1500, prob: 0.92 },
+          { text: 'line', startMs: 1500, endMs: 2000, prob: 0.55 }
+        ]
+      }
     ]);
     expect(btnCopy.disabled).toBe(false);
     expect(btnConfidence.disabled).toBe(false);
@@ -1480,7 +1517,7 @@ describe('Studio Refinements, Isolation & Keyboard Accessibility', () => {
     mockDocument.querySelector = origQS;
   });
 
-  it('focuses textarea and selects word range when clicking a word badge in wordsBar', () => {
+  it('switches card to edit mode, focuses textarea, and selects word range when clicking a word in unified confidence view', () => {
     let focused = false;
     let selStart = -1;
     let selEnd = -1;
@@ -1496,24 +1533,30 @@ describe('Studio Refinements, Isolation & Keyboard Accessibility', () => {
       ]
     };
 
-    const card = createTranscriptCardElement(lineObj as any);
-    const textarea = card.querySelector('.transcript-text-input') as any;
-    textarea.focus = () => { focused = true; };
-    textarea.setSelectionRange = (s: number, e: number) => {
-      selStart = s;
-      selEnd = e;
-    };
+    toggleConfidenceHighlighting(true);
+    try {
+      const card = createTranscriptCardElement(lineObj as any);
+      const textarea = card.querySelector('.transcript-text-input') as any;
+      textarea.focus = () => { focused = true; };
+      textarea.setSelectionRange = (s: number, e: number) => {
+        selStart = s;
+        selEnd = e;
+      };
 
-    const words = card.querySelectorAll('.transcript-word');
-    expect(words.length).toBe(3);
+      const words = card.querySelectorAll('.transcript-word');
+      expect(words.length).toBe(3);
 
-    // Click 'world' (2nd word)
-    const worldBadge = words[1];
-    worldBadge.onclick({ stopPropagation: () => {} });
+      // Click 'world' (2nd word)
+      const worldBadge = words[1];
+      card.onclick!({ target: worldBadge, stopPropagation: () => {} } as any);
 
-    expect(focused).toBe(true);
-    expect(selStart).toBe(6);
-    expect(selEnd).toBe(11);
+      expect(card.classList.contains('is-editing-text')).toBe(true);
+      expect(focused).toBe(true);
+      expect(selStart).toBe(6);
+      expect(selEnd).toBe(11);
+    } finally {
+      toggleConfidenceHighlighting(false);
+    }
   });
 
   it('unloads companion player when clearBatchQueue is called', () => {
@@ -2054,27 +2097,32 @@ describe('Studio Refinements, Isolation & Keyboard Accessibility', () => {
       ]
     };
 
-    const card = createTranscriptCardElement(lineWithTokens);
-    const textarea = card.querySelector('.transcript-text-input') as any;
-    let selectedStart = -1;
-    let selectedEnd = -1;
-    textarea.setSelectionRange = (s: number, e: number) => {
-      selectedStart = s;
-      selectedEnd = e;
-    };
+    toggleConfidenceHighlighting(true);
+    try {
+      const card = createTranscriptCardElement(lineWithTokens);
+      const textarea = card.querySelector('.transcript-text-input') as any;
+      let selectedStart = -1;
+      let selectedEnd = -1;
+      textarea.setSelectionRange = (s: number, e: number) => {
+        selectedStart = s;
+        selectedEnd = e;
+      };
 
-    // Click the 3rd word badge ('in')
-    const wordsBar = card.querySelector('.transcript-words-bar');
-    const wordSpans = wordsBar?.querySelectorAll('.transcript-word') || [];
-    const inBadge = wordSpans[2] as HTMLElement; // word "in"
-    expect(inBadge.textContent).toBe('in');
+      // Click the 3rd word ('in')
+      const confView = card.querySelector('.transcript-confidence-view');
+      const wordSpans = confView?.querySelectorAll('.transcript-word') || [];
+      const inBadge = wordSpans[2] as HTMLElement; // word "in"
+      expect(inBadge.textContent).toBe('in');
 
-    inBadge.onclick!({ stopPropagation: () => {} } as any);
+      card.onclick!({ target: inBadge, stopPropagation: () => {} } as any);
 
-    // 'The beginning in the end' -> 'The beginning ' is 14 chars. 'in' starts at 14, ends at 16.
-    // It should NOT match 'in' inside 'beginning' (which would be at index 7)!
-    expect(selectedStart).toBe(14);
-    expect(selectedEnd).toBe(16);
+      // 'The beginning in the end' -> 'The beginning ' is 14 chars. 'in' starts at 14, ends at 16.
+      // It should NOT match 'in' inside 'beginning' (which would be at index 7)!
+      expect(selectedStart).toBe(14);
+      expect(selectedEnd).toBe(16);
+    } finally {
+      toggleConfidenceHighlighting(false);
+    }
   });
 
   it('aggregates subword BPE tokens into whole words for English and Persian', () => {
@@ -2200,7 +2248,7 @@ describe('Studio Refinements, Isolation & Keyboard Accessibility', () => {
     expect(savedContents['/path/to/batch0.srt']).not.toContain('Item 1 text');
   });
 
-  it('invalidates stale word tokens and hides words bar container when line text is edited', () => {
+  it('reconciles unchanged words on partial edit and invalidates tokens on full rewrite', () => {
     // Clear any stale mock cards from earlier tests
     const vp = document.getElementById('transcript-viewport');
     if (vp) vp.children = [];
@@ -2212,26 +2260,27 @@ describe('Studio Refinements, Isolation & Keyboard Accessibility', () => {
       {
         id: 0,
         timeRange: '[00:00:00.000 --> 00:00:05.000]',
-        text: 'Initial text',
+        text: 'Initial uncertain text',
+        startMs: 0,
+        endMs: 5000,
         words: [
-          { text: 'Initial', startMs: 0, endMs: 2500, prob: 0.95 },
-          { text: 'text', startMs: 2500, endMs: 5000, prob: 0.90 }
+          { text: 'Initial', startMs: 0, endMs: 1500, prob: 0.45 },
+          { text: 'uncertain', startMs: 1500, endMs: 3200, prob: 0.52 },
+          { text: 'text', startMs: 3200, endMs: 5000, prob: 0.90 }
         ]
       }
     ];
 
-    const card = registerMockEl('card-edit-test', 'DIV', 'transcript-card', { id: '0' });
-    const wordsBar = document.createElement('div');
-    wordsBar.className = 'transcript-words-bar';
-    card.appendChild(wordsBar);
-
+    // Partial edit: fixing 'Initial' -> 'Fixed' keeps 'uncertain' (0.52) and 'text' (0.90) intact
+    updateTranscriptLineText(0, 'Fixed uncertain text');
     expect(transcriptViewer.lines[0].words).toBeDefined();
+    expect(transcriptViewer.lines[0].words?.[0]).toMatchObject({ text: 'Fixed', prob: 1.0, reviewed: true });
+    expect(transcriptViewer.lines[0].words?.[1]).toMatchObject({ text: 'uncertain', prob: 0.52 });
+    expect(transcriptViewer.lines[0].words?.[2]).toMatchObject({ text: 'text', prob: 0.90 });
 
-    updateTranscriptLineText(0, 'Modified user text');
-
-    // Words should be invalidated so stale tokens are not preserved
+    // Complete rewrite with zero shared words cleanly invalidates stale tokens
+    updateTranscriptLineText(0, 'Completely brand new sentence');
     expect(transcriptViewer.lines[0].words).toBeUndefined();
-    expect(wordsBar.style.display).toBe('none');
   });
 
   it('splitTranscriptSegment uses proportional interpolation and sets words to undefined when tokens do not match text', () => {
@@ -3075,5 +3124,127 @@ describe('Studio Refinements, Isolation & Keyboard Accessibility', () => {
     expect(video.currentTime).toBe(45);
 
     clearBatchQueue();
+  });
+});
+
+describe('Modern Confidence Proofreading Workflow (Threshold, Review Bar, Filter, Jump & BiDi)', () => {
+  beforeEach(() => {
+    elementRegistry.clear();
+    toggleConfidenceHighlighting(false);
+    setConfidenceThreshold(70, false);
+  });
+
+  it('live-updates highlights, review bar summary, low-only filter, and prev/next jump across thresholds', () => {
+    const viewport = registerMockEl('transcript-viewport');
+    const btnConfidence = registerMockEl('btn-toggle-confidence', 'BUTTON') as any;
+    const btnBadge = registerMockEl('confidence-btn-badge', 'SPAN') as any;
+    const reviewBar = registerMockEl('confidence-review-bar', 'DIV') as any;
+    const summaryEl = registerMockEl('confidence-review-summary', 'SPAN') as any;
+    const quickSel = registerMockEl('confidence-threshold-quick', 'SELECT') as any;
+    const filterBtn = registerMockEl('btn-confidence-filter-low', 'BUTTON') as any;
+    const prevBtn = registerMockEl('btn-confidence-prev', 'BUTTON') as any;
+    const nextBtn = registerMockEl('btn-confidence-next', 'BUTTON') as any;
+    const searchInput = registerMockEl('transcript-search', 'INPUT') as any;
+    registerMockEl('btn-copy-transcript', 'BUTTON');
+    registerMockEl('btn-undo-transcript', 'BUTTON');
+    registerMockEl('btn-redo-transcript', 'BUTTON');
+
+    const lines: TranscriptLine[] = [
+      {
+        id: 0,
+        timeRange: '[00:00:01.000 --> 00:00:03.000]',
+        text: 'Slice the onion vertically.',
+        startMs: 1000,
+        endMs: 3000,
+        words: [
+          { text: 'Slice', startMs: 1000, endMs: 1400, prob: 0.96 },
+          { text: 'the', startMs: 1400, endMs: 1700, prob: 0.99 },
+          { text: 'onion', startMs: 1700, endMs: 2200, prob: 0.76 }, // flagged only at >= 80%
+          { text: 'vertically.', startMs: 2200, endMs: 3000, prob: 0.58 } // low at 70%
+        ]
+      },
+      {
+        id: 1,
+        timeRange: '[00:00:04.000 --> 00:00:06.000]',
+        text: 'سلام دنیای زیبا',
+        startMs: 4000,
+        endMs: 6000,
+        words: [
+          { text: 'سلام', startMs: 4000, endMs: 4600, prob: 0.95 },
+          { text: 'دنیای', startMs: 4600, endMs: 5300, prob: 0.92 },
+          { text: 'زیبا', startMs: 5300, endMs: 6000, prob: 0.94 }
+        ]
+      },
+      {
+        id: 2,
+        timeRange: '[00:00:07.000 --> 00:00:09.000]',
+        text: 'Critical acoustic drop',
+        startMs: 7000,
+        endMs: 9000,
+        words: [
+          { text: 'Critical', startMs: 7000, endMs: 7600, prob: 0.91 },
+          { text: 'acoustic', startMs: 7600, endMs: 8200, prob: 0.31 }, // critical (< 45%)
+          { text: 'drop', startMs: 8200, endMs: 9000, prob: 0.93 }
+        ]
+      }
+    ];
+
+    transcriptViewer.lines = lines;
+    renderTranscriptLines(lines, false);
+
+    // At 70% default: 2 flagged words ('vertically.' 58%, 'acoustic' 31%) across 2 segments
+    expect(btnConfidence.disabled).toBe(false);
+    expect(btnBadge.textContent).toBe('2');
+    expect(btnBadge.classList.contains('is-critical')).toBe(true);
+    expect(reviewBar.hidden).toBe(true);
+
+    // Turn Confidence Mode ON
+    toggleConfidenceHighlighting(true);
+    expect(reviewBar.hidden).toBe(false);
+    expect(quickSel.value).toBe('70');
+    expect(prevBtn.disabled).toBe(false);
+    expect(nextBtn.disabled).toBe(false);
+
+    // Verify BiDi direction on unified views: English LTR, Persian RTL
+    const cards = viewport.querySelectorAll('.transcript-card');
+    expect(cards[0].querySelector('.transcript-confidence-view')?.getAttribute('dir')).toBe('ltr');
+    expect(cards[1].querySelector('.transcript-confidence-view')?.getAttribute('dir')).toBe('rtl');
+    expect(cards[0].dataset.confidenceLevel).toBe('low');
+    expect(cards[1].dataset.confidenceLevel).toBeUndefined();
+    expect(cards[2].dataset.confidenceLevel).toBe('critical');
+
+    // Raise threshold live to 80% -> 'onion' (76%) is now also flagged (3 words total)
+    setConfidenceThreshold(80, false);
+    expect(getConfidenceThreshold()).toBe(80);
+    expect(btnBadge.textContent).toBe('3');
+    expect(quickSel.value).toBe('80');
+    expect(summaryEl.dataset.status).toBe('critical');
+
+    // Enable Low-Only filter -> clean Persian card (#1) is hidden while flagged cards remain visible
+    toggleConfidenceLowOnlyFilter(true);
+    expect(filterBtn.classList.contains('active')).toBe(true);
+    expect(cards[0].style.display).toBe('flex');
+    expect(cards[1].style.display).toBe('none');
+    expect(cards[2].style.display).toBe('flex');
+
+    // Compose with search query -> narrows down further
+    searchInput.value = 'acoustic';
+    filterTranscriptLines();
+    expect(cards[0].style.display).toBe('none');
+    expect(cards[2].style.display).toBe('flex');
+
+    // Clear search -> both flagged cards visible, Prev/Next jump cycles through flagged words
+    searchInput.value = '';
+    filterTranscriptLines();
+    expect(jumpToConfidenceWord(1)).toBe(true);
+    expect(viewport.querySelectorAll('.transcript-word.confidence-word-focused').length).toBe(1);
+    expect(jumpToConfidenceWord(1)).toBe(true);
+    expect(jumpToConfidenceWord(-1)).toBe(true);
+
+    // Turn Confidence Mode OFF -> cleans up review bar, resets filter, restores all cards
+    toggleConfidenceHighlighting(false);
+    expect(reviewBar.hidden).toBe(true);
+    expect(cards[1].style.display).toBe('flex');
+    expect(cards[0].querySelector('.transcript-confidence-view')).toBeNull();
   });
 });

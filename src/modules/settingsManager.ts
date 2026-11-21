@@ -22,6 +22,10 @@ import {
   computeTrimSliderState
 } from './transcribeConfigHelpers';
 import {
+  clampConfidenceThreshold,
+  CONFIDENCE_THRESHOLD_DEFAULT
+} from './confidenceHelpers';
+import {
   registerTranscribeDeckHost,
   type SettingsState
 } from './transcribeDeckHost';
@@ -121,6 +125,9 @@ declare global {
     setQuickMaxLen: (val: number, keepCustomOpen?: boolean) => void;
     activateCustomMaxLen: () => void;
     stepQuickMaxLen: (delta: number) => void;
+    setConfidenceThresholdPreference: (val: number, save?: boolean) => number;
+    adjustConfidenceThresholdPreference: (delta: number) => number;
+    setConfidenceThreshold?: (percent: number, persist?: boolean) => number;
     syncQuickTimeRangeUI: (current?: SettingsState | null) => void;
     syncCustomSelects?: () => void;
     saveCurrentSettings: (immediate?: boolean) => any;
@@ -897,6 +904,12 @@ export async function refreshSettings(): Promise<void> {
       applyUiZoom(loaded.uiScale, false, false);
     }
 
+    const loadedConfThreshold = clampConfidenceThreshold(loaded?.confidenceThreshold ?? CONFIDENCE_THRESHOLD_DEFAULT);
+    if (loaded) {
+      loaded.confidenceThreshold = loadedConfThreshold;
+    }
+    syncConfidenceThresholdSettingsUI(loadedConfThreshold, true);
+
     const isMonochrome = (loaded && typeof loaded.monochromeCanvas === 'boolean')
       ? loaded.monochromeCanvas
       : (typeof localStorage !== 'undefined' && localStorage.getItem('whisper_monochrome_canvas') === 'true');
@@ -1080,6 +1093,10 @@ export function bindSettingsToDOM(): void {
             setLanguage(val);
             return;
           }
+          if (key === 'confidenceThreshold') {
+            setConfidenceThresholdPreference(val, true);
+            return;
+          }
 
           current[key] = val;
           if (key === 'offsetT' || key === 'duration') {
@@ -1129,6 +1146,9 @@ export function bindSettingsToDOM(): void {
   });
 
   syncJsonConfidenceDependency();
+  const initialConfThreshold = clampConfidenceThreshold(current.confidenceThreshold ?? CONFIDENCE_THRESHOLD_DEFAULT);
+  current.confidenceThreshold = initialConfThreshold;
+  syncConfidenceThresholdSettingsUI(initialConfThreshold, true);
   selectBackend(current.selectedBackend, true);
   const isSplashActive =
     typeof document !== 'undefined' &&
@@ -1150,6 +1170,48 @@ export function bindSettingsToDOM(): void {
 export function syncJsonConfidenceDependency(): void {
   // Deprecated: Internal full detailed JSON (-ojf) and word confidence are always generated automatically.
   // Maintained as safe no-op for backward compatibility with external consumers.
+}
+
+export function syncConfidenceThresholdSettingsUI(percent: number, notifyViewer = false): number {
+  const clamped = clampConfidenceThreshold(percent);
+  const win = getGlobal();
+  if (typeof document !== 'undefined') {
+    const sel = document.getElementById('opt-confidenceThreshold') as HTMLSelectElement | null;
+    if (sel && sel.value !== String(clamped)) {
+      sel.value = String(clamped);
+    }
+    const badge = document.getElementById('confidence-threshold-badge');
+    if (badge) {
+      badge.textContent = `${clamped}%`;
+    }
+  }
+  if (notifyViewer && typeof win.setConfidenceThreshold === 'function') {
+    win.setConfidenceThreshold(clamped, false);
+  }
+  return clamped;
+}
+
+export function setConfidenceThresholdPreference(val: number, save = true): number {
+  const clamped = clampConfidenceThreshold(val);
+  const current = getSettingsState();
+  if (current) {
+    current.confidenceThreshold = clamped;
+  }
+  syncConfidenceThresholdSettingsUI(clamped, true);
+  const win = getGlobal();
+  if (typeof win.syncCustomSelects === 'function') {
+    win.syncCustomSelects();
+  }
+  if (save) {
+    void saveCurrentSettings(true);
+  }
+  return clamped;
+}
+
+export function adjustConfidenceThresholdPreference(delta: number): number {
+  const current = getSettingsState();
+  const base = clampConfidenceThreshold(current?.confidenceThreshold ?? CONFIDENCE_THRESHOLD_DEFAULT);
+  return setConfidenceThresholdPreference(base + delta, true);
 }
 
 // ----------------- FFmpeg Status & Version Formatting -----------------
@@ -1280,7 +1342,8 @@ export async function refreshWhisperStatus(sourceOverride?: string, userInitiate
 // ----------------- Numeric Typing & Sanitization -----------------
 export const INT_SETTING_KEYS = new Set([
   'threads', 'processors', 'offsetT', 'duration', 'maxContext', 'maxLen',
-  'bestOf', 'beamSize', 'audioCtx', 'deviceId', 'vadMinSpeech', 'vadMinSil', 'vadSpeechPad'
+  'bestOf', 'beamSize', 'audioCtx', 'deviceId', 'vadMinSpeech', 'vadMinSil', 'vadSpeechPad',
+  'confidenceThreshold'
 ]);
 
 export const FLOAT_SETTING_KEYS = new Set([
@@ -1910,6 +1973,8 @@ export function syncSettingsManagerWindowBindings(): void {
   win.setQuickMaxLen = setQuickMaxLen;
   win.activateCustomMaxLen = activateCustomMaxLen;
   win.stepQuickMaxLen = stepQuickMaxLen;
+  win.setConfidenceThresholdPreference = setConfidenceThresholdPreference;
+  win.adjustConfidenceThresholdPreference = adjustConfidenceThresholdPreference;
   win.syncQuickTimeRangeUI = syncQuickTimeRangeUI;
   win.updateDeckScrollCue = updateDeckScrollCue;
   win.saveCurrentSettings = saveCurrentSettings;
@@ -2018,6 +2083,9 @@ export const settingsManager = {
   refreshSettings,
   bindSettingsToDOM,
   syncJsonConfidenceDependency,
+  syncConfidenceThresholdSettingsUI,
+  setConfidenceThresholdPreference,
+  adjustConfidenceThresholdPreference,
   formatFFmpegVersion,
   refreshFFmpegStatus,
   formatWhisperVersion,

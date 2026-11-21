@@ -1,12 +1,26 @@
 // Live Transcript Viewer Controller for Whisper Desktop
-import { t, applyTextDirection } from '../i18n/index';
+import { t, applyTextDirection, applyContentDirection } from '../i18n/index';
 import { escapeHTML } from './logsController';
+import {
+  CONFIDENCE_THRESHOLD_DEFAULT,
+  clampConfidenceThreshold,
+  classifyWordConfidence,
+  isStandalonePunctuationToken,
+  lineHasConfidenceData,
+  transcriptHasConfidenceData,
+  evaluateLineConfidence,
+  computeConfidenceSummary,
+  reconcileWordsAfterEdit,
+  findWordOffsetInText,
+  computeWordSeekMs
+} from './confidenceHelpers';
 
 export interface WordToken {
   text: string;
   startMs: number;
   endMs: number;
   prob: number;
+  reviewed?: boolean;
 }
 
 export interface TranscriptLine {
@@ -25,6 +39,10 @@ let inFlightSavePromise: Promise<void> | null = null;
 let pendingTranscriptTargetFiles: string[] | null = null;
 let pendingTranscriptSnapshotLines: TranscriptLine[] | null = null;
 let confidenceHighlightingActive = false;
+let confidenceThresholdPercent = CONFIDENCE_THRESHOLD_DEFAULT;
+let confidenceLowOnlyFilter = false;
+let activeConfidenceJumpIndex = -1;
+const reviewedSegmentIdsInSession = new Set<number>();
 
 export interface UndoHistoryEntry {
   lines: TranscriptLine[];
@@ -59,10 +77,237 @@ export function autoResizeTranscriptField(el: HTMLElement | null): void {
   }
 }
 
+function resolveLineForCard(cardEl: HTMLElement): TranscriptLine | undefined {
+  const ref = (cardEl as any)._lineRef as TranscriptLine | undefined;
+  const idStr = cardEl.dataset?.id;
+  if (idStr !== undefined) {
+    const idNum = Number(idStr);
+    const found = transcriptLines.find(l => l.id === idNum);
+    if (found && (!ref || found === ref)) {
+      return found;
+    }
+  }
+  return ref;
+}
+
+function buildConfidenceViewElement(lineObj: TranscriptLine): HTMLDivElement | null {
+  if (typeof document === 'undefined' || !lineHasConfidenceData(lineObj)) {
+    return null;
+  }
+  const viewEl = document.createElement('div');
+  viewEl.className = 'transcript-confidence-view';
+  viewEl.dataset.lineId = String(lineObj.id);
+  applyContentDirection(viewEl, lineObj.text);
+
+  const words = lineObj.words || [];
+  let appendedCount = 0;
+  words.forEach((w, idx) => {
+    const cleanWordText = w.text.trim();
+    if (!cleanWordText) return;
+
+    if (appendedCount > 0 && typeof document.createTextNode === 'function') {
+      viewEl.appendChild(document.createTextNode(' '));
+    }
+
+    const wordSpan = document.createElement('span');
+    wordSpan.className = 'transcript-word';
+    wordSpan.dataset.wordIdx = String(idx);
+    wordSpan.setAttribute('role', 'button');
+    wordSpan.setAttribute('tabindex', '0');
+
+    const percentStr = Math.round(Math.max(0, Math.min(1, w.prob)) * 100).toString();
+    if (w.reviewed) {
+      wordSpan.classList.add('confidence-reviewed');
+      wordSpan.title =
+        t('transcribe.wordConfidenceReviewedTooltip', { word: cleanWordText }) ||
+        `Word: "${cleanWordText}" • Reviewed`;
+    } else {
+      const severity = classifyWordConfidence(w.prob, confidenceThresholdPercent);
+      if (severity === 'critical') {
+        wordSpan.classList.add('low-confidence', 'critical-confidence');
+        wordSpan.title =
+          t('transcribe.wordConfidenceCriticalTooltip', { word: cleanWordText, percent: percentStr }) ||
+          `Word: "${cleanWordText}" • Confidence: ${percentStr}% (Very low certainty)`;
+      } else if (severity === 'low') {
+        wordSpan.classList.add('low-confidence');
+        wordSpan.title =
+          t('transcribe.wordConfidenceLowTooltip', { word: cleanWordText, percent: percentStr }) ||
+          `Word: "${cleanWordText}" • Confidence: ${percentStr}% (Low certainty)`;
+      } else {
+        wordSpan.title =
+          t('transcribe.wordConfidenceTooltip', { word: cleanWordText, percent: percentStr }) ||
+          `Word: "${cleanWordText}" • Confidence: ${percentStr}%`;
+      }
+    }
+
+    wordSpan.textContent = cleanWordText;
+    viewEl.appendChild(wordSpan);
+    appendedCount++;
+  });
+
+  return appendedCount > 0 ? viewEl : null;
+}
+
+function syncCardConfidenceMeta(cardEl: HTMLElement, lineObj: TranscriptLine): void {
+  const evalResult = evaluateLineConfidence(lineObj, confidenceThresholdPercent);
+  const isReviewed = reviewedSegmentIdsInSession.has(lineObj.id) && evalResult.flaggedCount === 0;
+
+  if (evalResult.level === 'critical') {
+    cardEl.dataset.confidenceLevel = 'critical';
+  } else if (evalResult.level === 'low') {
+    cardEl.dataset.confidenceLevel = 'low';
+  } else {
+    delete cardEl.dataset.confidenceLevel;
+  }
+
+  if (isReviewed) {
+    cardEl.dataset.confidenceReviewed = 'true';
+  } else {
+    delete cardEl.dataset.confidenceReviewed;
+  }
+
+  const badgeWrap = cardEl.querySelector('.transcript-card-badge-wrap') as HTMLElement | null;
+  if (!badgeWrap) return;
+
+  let pill = badgeWrap.querySelector('.transcript-card-conf-pill') as HTMLElement | null;
+  if (!confidenceHighlightingActive || (evalResult.flaggedCount === 0 && !isReviewed)) {
+    if (pill) pill.remove();
+    return;
+  }
+
+  if (!pill) {
+    pill = document.createElement('span');
+    pill.className = 'transcript-card-conf-pill';
+    badgeWrap.appendChild(pill);
+  }
+
+  if (evalResult.flaggedCount > 0) {
+    pill.className = `transcript-card-conf-pill is-${evalResult.level}`;
+    pill.textContent = String(evalResult.flaggedCount);
+    pill.title =
+      t('transcribe.segmentLowWordsTooltip', {
+        count: evalResult.flaggedCount,
+        threshold: confidenceThresholdPercent
+      }) || `${evalResult.flaggedCount} word(s) below ${confidenceThresholdPercent}%`;
+  } else {
+    pill.className = 'transcript-card-conf-pill is-reviewed';
+    pill.textContent = '✓';
+    pill.title = t('transcribe.segmentReviewedTooltip') || 'Reviewed';
+  }
+}
+
+function mountOrRefreshCardConfidenceView(cardEl: HTMLElement, lineObj: TranscriptLine): void {
+  const bodyEl = cardEl.querySelector('.transcript-card-body') as HTMLElement | null;
+  if (!bodyEl) return;
+
+  const existing = bodyEl.querySelector('.transcript-confidence-view') as HTMLElement | null;
+  if (existing) existing.remove();
+
+  if (confidenceHighlightingActive && lineHasConfidenceData(lineObj)) {
+    const viewEl = buildConfidenceViewElement(lineObj);
+    if (viewEl) {
+      bodyEl.appendChild(viewEl);
+      cardEl.classList.add('has-confidence-view');
+    } else {
+      cardEl.classList.remove('has-confidence-view');
+    }
+  } else {
+    cardEl.classList.remove('has-confidence-view');
+  }
+
+  syncCardConfidenceMeta(cardEl, lineObj);
+}
+
+function enterCardEditMode(cardEl: HTMLElement, wordIdx?: number, seekPlayer = false): void {
+  const textarea = cardEl.querySelector('.transcript-text-input') as HTMLTextAreaElement | null;
+  if (!textarea) return;
+
+  const lineObj = resolveLineForCard(cardEl);
+  cardEl.classList.add('is-editing-text');
+  autoResizeTranscriptField(textarea);
+
+  if (lineObj && typeof wordIdx === 'number' && Array.isArray(lineObj.words)) {
+    const word = lineObj.words[wordIdx];
+    if (word) {
+      if (seekPlayer) {
+        const win = getGlobal();
+        if (typeof win.seekCompanionPlayer === 'function') {
+          const { startMs } = extractLineStartEndMs(lineObj, lineObj.id);
+          win.seekCompanionPlayer(computeWordSeekMs(word.startMs, startMs), undefined, lineObj.id);
+        }
+      }
+      const offset = findWordOffsetInText(textarea.value, lineObj.words, wordIdx);
+      if (typeof textarea.focus === 'function') {
+        textarea.focus();
+      }
+      if (offset && typeof textarea.setSelectionRange === 'function') {
+        textarea.setSelectionRange(offset.start, offset.end);
+      }
+      return;
+    }
+  }
+
+  if (typeof textarea.focus === 'function') {
+    textarea.focus();
+  }
+}
+
+function handleConfidenceViewInteraction(cardEl: HTMLElement, target: HTMLElement | null): boolean {
+  if (!target) return false;
+  const wordSpan = typeof target.closest === 'function'
+    ? (target.closest('.transcript-word') as HTMLElement | null)
+    : (target.classList?.contains?.('transcript-word') ? target : null);
+  if (wordSpan) {
+    const idx = parseInt(wordSpan.dataset?.wordIdx ?? '', 10);
+    enterCardEditMode(cardEl, Number.isNaN(idx) ? undefined : idx, true);
+    return true;
+  }
+  const confView = typeof target.closest === 'function'
+    ? (target.closest('.transcript-confidence-view') as HTMLElement | null)
+    : (target.classList?.contains?.('transcript-confidence-view') ? target : null);
+  if (confView) {
+    enterCardEditMode(cardEl, undefined, false);
+    return true;
+  }
+  return false;
+}
+
+function ensureViewportConfidenceDelegation(viewport: HTMLElement | null): void {
+  if (!viewport) return;
+  const vp = viewport as any;
+  if (vp._hasConfidenceDelegation || typeof viewport.addEventListener !== 'function') return;
+  vp._hasConfidenceDelegation = true;
+
+  viewport.addEventListener('click', (e: MouseEvent) => {
+    const target = e.target as HTMLElement | null;
+    if (!target || typeof target.closest !== 'function') return;
+    if (!target.closest('.transcript-confidence-view')) return;
+    const cardEl = target.closest('.transcript-card') as HTMLElement | null;
+    if (!cardEl) return;
+    e.stopPropagation();
+    handleConfidenceViewInteraction(cardEl, target);
+  });
+
+  viewport.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const target = e.target as HTMLElement | null;
+    if (!target || !target.classList?.contains('transcript-word')) return;
+    const cardEl = typeof target.closest === 'function'
+      ? (target.closest('.transcript-card') as HTMLElement | null)
+      : null;
+    if (!cardEl) return;
+    e.preventDefault();
+    e.stopPropagation();
+    handleConfidenceViewInteraction(cardEl, target);
+  });
+}
+
 export function setupTranscriptDirection(): void {
   if (typeof document === 'undefined' || typeof window === 'undefined') return;
   const viewport = document.getElementById('transcript-viewport') as any;
-  if (!viewport || viewport._hasDirectionListener) return;
+  if (!viewport) return;
+  ensureViewportConfidenceDelegation(viewport);
+  if (viewport._hasDirectionListener) return;
   viewport._hasDirectionListener = true;
   
   viewport.addEventListener('input', (e: Event) => {
@@ -80,6 +325,7 @@ export function setupTranscriptDirection(): void {
       applyTextDirection(input);
       autoResizeTranscriptField(input);
     });
+    syncConfidenceButtonAndReviewBar();
   });
 
   let resizeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -125,6 +371,7 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
   const cardEl = document.createElement('div');
   cardEl.className = 'transcript-card transcript-line';
   cardEl.dataset.id = String(lineObj.id);
+  (cardEl as any)._lineRef = lineObj;
 
   const headerEl = document.createElement('div');
   headerEl.className = 'transcript-card-header';
@@ -268,6 +515,8 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
   applyTextDirection(textarea);
   textarea.onfocus = () => {
     sessionSnapshotTaken = false;
+    cardEl.classList.add('is-editing-text');
+    autoResizeTranscriptField(textarea);
     const win = getGlobal();
     if (typeof win.highlightActiveTranscriptSegment === 'function') {
       win.highlightActiveTranscriptSegment(startMs / 1000, lineObj.id);
@@ -282,8 +531,18 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
     updateTranscriptLineText(lineObj.id, textarea.value);
   };
   textarea.onblur = () => {
+    const didType = Boolean((textarea as any)._hasTyped);
     (textarea as any)._hasTyped = false;
     sessionSnapshotTaken = false;
+    cardEl.classList.remove('is-editing-text');
+    if (confidenceHighlightingActive) {
+      const liveLine = resolveLineForCard(cardEl) || lineObj;
+      if (didType) {
+        reviewedSegmentIdsInSession.add(liveLine.id);
+      }
+      mountOrRefreshCardConfidenceView(cardEl, liveLine);
+      syncConfidenceButtonAndReviewBar();
+    }
   };
   textarea.onchange = () => {
     updateTranscriptLineText(lineObj.id, textarea.value);
@@ -304,8 +563,10 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
       if (currentIndex !== -1) {
         const nextCard = e.shiftKey ? visibleCards[currentIndex - 1] : visibleCards[currentIndex + 1];
         const targetInput = nextCard?.querySelector('.transcript-text-input') as HTMLTextAreaElement | null;
-        if (targetInput) {
+        if (nextCard && targetInput) {
           e.preventDefault();
+          nextCard.classList.add('is-editing-text');
+          autoResizeTranscriptField(targetInput);
           targetInput.focus();
         }
       }
@@ -313,97 +574,24 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
   };
   bodyEl.appendChild(textarea);
 
-  // Word-level confidence badges / clickable words bar
-  if (Array.isArray(lineObj.words) && lineObj.words.length > 0) {
-    const wordsBar = document.createElement('div');
-    wordsBar.className = 'transcript-words-bar confidence-bar-dimmed';
-    lineObj.words.forEach(w => {
-      const wordSpan = document.createElement('span');
-      wordSpan.className = 'transcript-word';
-      const isLow = w.prob < 0.60;
-      const cleanWordText = w.text.trim();
-      const percentStr = Math.round(w.prob * 100).toString();
-      if (isLow) {
-        wordSpan.classList.add('low-confidence');
-        wordSpan.title = t('transcribe.wordConfidenceLowTooltip', { word: cleanWordText, percent: percentStr })
-          || `Word: "${cleanWordText}" • Confidence: ${percentStr}% (Low certainty)`;
-      } else {
-        wordSpan.title = t('transcribe.wordConfidenceTooltip', { word: cleanWordText, percent: percentStr })
-          || `Word: "${cleanWordText}" • Confidence: ${percentStr}%`;
-      }
-      wordSpan.textContent = cleanWordText;
-      wordSpan.onclick = (e) => {
-        e.stopPropagation();
-        const win = getGlobal();
-        if (typeof win.seekCompanionPlayer === 'function') {
-          win.seekCompanionPlayer(w.startMs, undefined, lineObj.id);
-        }
-        if (textarea) {
-          const cleanWord = w.text.trim();
-          if (cleanWord) {
-            const textVal = textarea.value;
-            let occurrenceIndex = 0;
-            const wordsArr = lineObj.words || [];
-            const thisIdx = wordsArr.indexOf(w);
-            for (let wi = 0; wi < thisIdx; wi++) {
-              if (wordsArr[wi].text.trim() === cleanWord) {
-                occurrenceIndex++;
-              }
-            }
-            let searchFrom = 0;
-            let foundPos = -1;
-
-            // Match whole word with boundaries first to prevent substring collisions (e.g. "in" in "beginning")
-            const escapedWord = cleanWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const wordRegex = new RegExp(`(^|\\s|[.,!?;:،؛«»"'\`\\(\\)\\[\\]])${escapedWord}(?=$|\\s|[.,!?;:،؛«»"'\`\\(\\)\\[\\]])`, 'g');
-            let match: RegExpExecArray | null = null;
-            let currentOccurrence = 0;
-
-            while ((match = wordRegex.exec(textVal)) !== null) {
-              const matchWordStart = match.index + match[1].length;
-              if (currentOccurrence === occurrenceIndex) {
-                foundPos = matchWordStart;
-                break;
-              }
-              currentOccurrence++;
-            }
-
-            // Fallback to substring matching if punctuation or boundary pattern differed
-            if (foundPos === -1) {
-              for (let occ = 0; occ <= occurrenceIndex; occ++) {
-                foundPos = textVal.indexOf(cleanWord, searchFrom);
-                if (foundPos === -1) break;
-                searchFrom = foundPos + cleanWord.length;
-              }
-            }
-            if (foundPos === -1) {
-              foundPos = textVal.indexOf(cleanWord);
-            }
-            if (foundPos !== -1) {
-              if (typeof textarea.focus === 'function') {
-                textarea.focus();
-              }
-              if (typeof textarea.setSelectionRange === 'function') {
-                textarea.setSelectionRange(foundPos, foundPos + cleanWord.length);
-              }
-            }
-          }
-        }
-      };
-      wordsBar.appendChild(wordSpan);
-    });
-    bodyEl.appendChild(wordsBar);
-  }
-
   cardEl.onclick = (e: MouseEvent) => {
     const target = e.target as HTMLElement | null;
     const isAction = typeof target?.closest === 'function' && target.closest('.btn-card-action');
-    const isWordsBar = typeof target?.closest === 'function' && target.closest('.transcript-words-bar');
+    const isConfView = typeof target?.closest === 'function' &&
+      (target.closest('.transcript-confidence-view') || target.closest('.transcript-words-bar'));
     const isTextarea = (typeof HTMLTextAreaElement !== 'undefined' && target instanceof HTMLTextAreaElement) ||
       target?.tagName === 'TEXTAREA' ||
       target?.classList?.contains('transcript-text-input');
     const isHeader = typeof target?.closest === 'function' && target.closest('.transcript-card-header');
-    if (isAction || isWordsBar || isTextarea || isHeader) {
+    if (isConfView) {
+      // Handle standalone detached cards (viewport delegation handles mounted cards)
+      const inViewport = typeof cardEl.closest === 'function' && cardEl.closest('#transcript-viewport');
+      if (!inViewport) {
+        handleConfidenceViewInteraction(cardEl, target);
+      }
+      return;
+    }
+    if (isAction || isTextarea || isHeader) {
       return;
     }
     const win = getGlobal();
@@ -415,11 +603,12 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
   cardEl.ondblclick = (e: MouseEvent) => {
     const target = e.target as HTMLElement | null;
     const isAction = typeof target?.closest === 'function' && target.closest('.btn-card-action');
-    const isWordsBar = typeof target?.closest === 'function' && target.closest('.transcript-words-bar');
+    const isConfView = typeof target?.closest === 'function' &&
+      (target.closest('.transcript-confidence-view') || target.closest('.transcript-words-bar'));
     const isTextarea = (typeof HTMLTextAreaElement !== 'undefined' && target instanceof HTMLTextAreaElement) ||
       target?.tagName === 'TEXTAREA' ||
       target?.classList?.contains('transcript-text-input');
-    if (isAction || isWordsBar || isTextarea) {
+    if (isAction || isConfView || isTextarea) {
       return;
     }
     const win = getGlobal();
@@ -430,6 +619,11 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
 
   cardEl.appendChild(headerEl);
   cardEl.appendChild(bodyEl);
+
+  if (confidenceHighlightingActive) {
+    mountOrRefreshCardConfidenceView(cardEl, lineObj);
+  }
+
   return cardEl;
 }
 
@@ -437,6 +631,7 @@ export function renderTranscriptLines(lines: TranscriptLine[], preserveScroll = 
   if (typeof document === 'undefined') return;
   const viewport = document.getElementById('transcript-viewport');
   if (!viewport) return;
+  ensureViewportConfidenceDelegation(viewport);
   const vp = viewport as any;
   if (!preserveScroll && vp._scrollDebounce) {
     clearTimeout(vp._scrollDebounce);
@@ -449,18 +644,32 @@ export function renderTranscriptLines(lines: TranscriptLine[], preserveScroll = 
   if (placeholder) placeholder.remove();
 
   const btnCopy = document.getElementById('btn-copy-transcript') as HTMLButtonElement | null;
-  const btnConfidence = document.getElementById('btn-toggle-confidence') as HTMLButtonElement | null;
 
   if (!lines || lines.length === 0) {
     viewport.innerHTML = `<div style="color: var(--color-text-dim); text-align: center; margin-top: 40px;" data-i18n="transcribe.noSegments">${escapeHTML(t('transcribe.noSegments') || 'No transcript segments generated yet.')}</div>`;
     if (btnCopy) btnCopy.disabled = true;
-    if (btnConfidence) btnConfidence.disabled = true;
+    if (confidenceHighlightingActive) {
+      toggleConfidenceHighlighting(false);
+    } else {
+      syncConfidenceButtonAndReviewBar(lines);
+    }
     updateUndoRedoButtonsUI();
     return;
   }
 
   if (btnCopy) btnCopy.disabled = false;
-  if (btnConfidence) btnConfidence.disabled = false;
+
+  const hasConfidenceData = transcriptHasConfidenceData(lines);
+  if (confidenceHighlightingActive && !hasConfidenceData) {
+    confidenceHighlightingActive = false;
+    confidenceLowOnlyFilter = false;
+    activeConfidenceJumpIndex = -1;
+    reviewedSegmentIdsInSession.clear();
+    const viewerCard = document.getElementById('transcribe-viewer-card');
+    if (viewerCard) viewerCard.classList.remove('highlight-confidence-active');
+    viewport.classList.remove('highlight-confidence-active');
+  }
+
   updateUndoRedoButtonsUI();
 
   const frag = document.createDocumentFragment();
@@ -475,12 +684,14 @@ export function renderTranscriptLines(lines: TranscriptLine[], preserveScroll = 
     autoResizeTranscriptField(input);
   });
 
+  syncConfidenceButtonAndReviewBar(lines);
+
   if (prevScrollTop > 0) {
     viewport.scrollTop = prevScrollTop;
   }
 
   const searchInput = document.getElementById('transcript-search') as HTMLInputElement | null;
-  if (searchInput && searchInput.value.trim() !== '') {
+  if ((searchInput && searchInput.value.trim() !== '') || (confidenceHighlightingActive && confidenceLowOnlyFilter)) {
     filterTranscriptLines();
   }
 
@@ -781,7 +992,8 @@ export function updateTranscriptLineText(id: number, value: string): void {
   if (line) {
     if (line.text !== value) {
       changed = true;
-      line.words = undefined;
+      const { startMs, endMs } = extractLineStartEndMs(line, line.id);
+      line.words = reconcileWordsAfterEdit(line.words, value, startMs, endMs);
     }
     line.text = value;
   }
@@ -793,24 +1005,34 @@ export function updateTranscriptLineText(id: number, value: string): void {
       if (itemLine) {
         if (itemLine.text !== value) {
           changed = true;
-          itemLine.words = undefined;
+          const { startMs, endMs } = extractLineStartEndMs(itemLine, itemLine.id);
+          itemLine.words = line?.words
+            ? line.words.map(w => ({ ...w }))
+            : reconcileWordsAfterEdit(itemLine.words, value, startMs, endMs);
         }
         itemLine.text = value;
       }
     }
   }
   if (changed) {
+    if (confidenceHighlightingActive) {
+      reviewedSegmentIdsInSession.add(id);
+    }
     if (typeof document !== 'undefined' && typeof document.querySelector === 'function') {
       const cardEl = (document.querySelector(`.transcript-card[data-id="${id}"]`) ||
         (typeof document.getElementById === 'function' ? document.getElementById(`transcript-card-${id}`) : null)) as HTMLElement | null;
-      if (cardEl && typeof cardEl.querySelector === 'function') {
-        const wordsBar = (cardEl.querySelector('.transcript-words-bar') ||
-          cardEl.querySelector('.transcript-words-container')) as HTMLElement | null;
-        if (wordsBar) {
-          wordsBar.style.display = 'none';
+      if (cardEl && line) {
+        if (confidenceHighlightingActive && !cardEl.classList.contains('is-editing-text')) {
+          mountOrRefreshCardConfidenceView(cardEl, line);
+        } else if (!line.words) {
+          const existingView = cardEl.querySelector('.transcript-confidence-view') as HTMLElement | null;
+          if (existingView) existingView.remove();
+          cardEl.classList.remove('has-confidence-view');
         }
+        syncCardConfidenceMeta(cardEl, line);
       }
     }
+    syncConfidenceButtonAndReviewBar();
     transcriptDirty = true;
     scheduleTranscriptDiskSync();
     if (typeof win.renderCompanionSubtitle === 'function') {
@@ -819,38 +1041,240 @@ export function updateTranscriptLineText(id: number, value: string): void {
   }
 }
 
+export function hasTranscriptConfidenceData(lines: readonly TranscriptLine[] = transcriptLines): boolean {
+  return transcriptHasConfidenceData(lines);
+}
+
+export function getConfidenceThreshold(): number {
+  return confidenceThresholdPercent;
+}
+
 export function isConfidenceHighlightingActive(): boolean {
   return confidenceHighlightingActive;
 }
 
-export function toggleConfidenceHighlighting(): boolean {
-  confidenceHighlightingActive = !confidenceHighlightingActive;
-  if (typeof document !== 'undefined') {
-    const btn = document.getElementById('btn-toggle-confidence');
-    const viewerCard = document.getElementById('transcribe-viewer-card');
-    const viewport = document.getElementById('transcript-viewport');
-    if (btn) {
-      if (confidenceHighlightingActive) {
-        btn.classList.add('active');
-      } else {
-        btn.classList.remove('active');
-      }
+export function isConfidenceLowOnlyFilterActive(): boolean {
+  return confidenceLowOnlyFilter;
+}
+
+function refreshAllRenderedConfidenceViews(): void {
+  if (typeof document === 'undefined' || typeof document.getElementById !== 'function') return;
+  const viewport = document.getElementById('transcript-viewport');
+  if (!viewport) return;
+  const cards = Array.from(viewport.querySelectorAll('.transcript-card')) as HTMLElement[];
+  cards.forEach(cardEl => {
+    const lineObj = resolveLineForCard(cardEl);
+    if (!lineObj) return;
+    if (!confidenceHighlightingActive) {
+      cardEl.classList.remove('is-editing-text');
     }
-    if (viewerCard) {
-      if (confidenceHighlightingActive) {
-        viewerCard.classList.add('highlight-confidence-active');
-      } else {
-        viewerCard.classList.remove('highlight-confidence-active');
-      }
+    mountOrRefreshCardConfidenceView(cardEl, lineObj);
+  });
+}
+
+export function syncConfidenceButtonAndReviewBar(lines: readonly TranscriptLine[] = transcriptLines): void {
+  if (typeof document === 'undefined' || typeof document.getElementById !== 'function') return;
+  const summary = computeConfidenceSummary(lines, confidenceThresholdPercent);
+
+  const btn = document.getElementById('btn-toggle-confidence') as HTMLButtonElement | null;
+  if (btn) {
+    btn.disabled = !summary.hasConfidenceData;
+    btn.setAttribute('aria-pressed', String(confidenceHighlightingActive));
+    if (confidenceHighlightingActive) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
     }
-    if (viewport) {
-      if (confidenceHighlightingActive) {
-        viewport.classList.add('highlight-confidence-active');
-      } else {
-        viewport.classList.remove('highlight-confidence-active');
+    const tooltipText = summary.hasConfidenceData
+      ? (t('transcribe.toggleConfidenceTooltip', { threshold: confidenceThresholdPercent }) ||
+          `Highlight low-confidence words (< ${confidenceThresholdPercent}%)`)
+      : (t('transcribe.confidenceUnavailableTooltip') ||
+          'Word-level confidence data is unavailable for this transcript');
+    btn.title = tooltipText;
+  }
+
+  const btnBadge = document.getElementById('confidence-btn-badge');
+  if (btnBadge) {
+    if (summary.hasConfidenceData && summary.lowWordCount > 0) {
+      btnBadge.textContent = String(summary.lowWordCount);
+      btnBadge.style.display = '';
+      btnBadge.classList.toggle('is-critical', summary.criticalWordCount > 0);
+    } else {
+      btnBadge.textContent = '';
+      btnBadge.style.display = 'none';
+      btnBadge.classList.remove('is-critical');
+    }
+  }
+
+  const reviewBar = document.getElementById('confidence-review-bar') as HTMLElement | null;
+  if (reviewBar) {
+    const showBar = confidenceHighlightingActive && summary.hasConfidenceData;
+    reviewBar.hidden = !showBar;
+    reviewBar.dataset.state = showBar ? 'open' : 'closed';
+  }
+
+  const summaryEl = document.getElementById('confidence-review-summary');
+  if (summaryEl) {
+    if (summary.lowWordCount > 0) {
+      summaryEl.textContent =
+        t('transcribe.confidenceReviewSummary', {
+          words: summary.lowWordCount,
+          segments: summary.flaggedSegmentCount
+        }) || `${summary.lowWordCount} words in ${summary.flaggedSegmentCount} segments`;
+      summaryEl.dataset.status = summary.criticalWordCount > 0 ? 'critical' : 'low';
+    } else {
+      summaryEl.textContent =
+        t('transcribe.confidenceAllClear', { threshold: confidenceThresholdPercent }) ||
+        `All words ≥ ${confidenceThresholdPercent}%`;
+      summaryEl.dataset.status = 'ok';
+    }
+  }
+
+  const quickSelect = document.getElementById('confidence-threshold-quick') as HTMLSelectElement | null;
+  if (quickSelect && quickSelect.value !== String(confidenceThresholdPercent)) {
+    quickSelect.value = String(confidenceThresholdPercent);
+  }
+
+  const filterBtn = document.getElementById('btn-confidence-filter-low') as HTMLButtonElement | null;
+  if (filterBtn) {
+    filterBtn.classList.toggle('active', confidenceLowOnlyFilter);
+    filterBtn.setAttribute('aria-pressed', String(confidenceLowOnlyFilter));
+    filterBtn.disabled = !summary.hasConfidenceData;
+  }
+
+  const prevBtn = document.getElementById('btn-confidence-prev') as HTMLButtonElement | null;
+  const nextBtn = document.getElementById('btn-confidence-next') as HTMLButtonElement | null;
+  const disableJump = !confidenceHighlightingActive || summary.lowWordCount === 0;
+  if (prevBtn) prevBtn.disabled = disableJump;
+  if (nextBtn) nextBtn.disabled = disableJump;
+}
+
+export function setConfidenceThreshold(percent: number, persist = true): number {
+  const clamped = clampConfidenceThreshold(percent);
+  const changed = clamped !== confidenceThresholdPercent;
+  confidenceThresholdPercent = clamped;
+  if (changed) {
+    activeConfidenceJumpIndex = -1;
+  }
+
+  if (confidenceHighlightingActive) {
+    refreshAllRenderedConfidenceViews();
+    if (confidenceLowOnlyFilter) {
+      filterTranscriptLines();
+    }
+  }
+  syncConfidenceButtonAndReviewBar();
+
+  if (persist) {
+    const win = getGlobal();
+    if (typeof win.setConfidenceThresholdPreference === 'function') {
+      win.setConfidenceThresholdPreference(clamped, true);
+    }
+  }
+
+  return clamped;
+}
+
+export function toggleConfidenceLowOnlyFilter(forceState?: boolean): boolean {
+  const next = typeof forceState === 'boolean' ? forceState : !confidenceLowOnlyFilter;
+  confidenceLowOnlyFilter = next;
+  activeConfidenceJumpIndex = -1;
+  if (!confidenceLowOnlyFilter) {
+    reviewedSegmentIdsInSession.clear();
+    if (confidenceHighlightingActive) {
+      refreshAllRenderedConfidenceViews();
+    }
+  }
+  syncConfidenceButtonAndReviewBar();
+  filterTranscriptLines();
+  return confidenceLowOnlyFilter;
+}
+
+export function jumpToConfidenceWord(direction: 1 | -1 = 1): boolean {
+  if (typeof document === 'undefined' || !confidenceHighlightingActive) return false;
+  const viewport = document.getElementById('transcript-viewport');
+  if (!viewport) return false;
+
+  const allFlagged = Array.from(viewport.querySelectorAll('.transcript-word.low-confidence')) as HTMLElement[];
+  const visibleFlagged = allFlagged.filter(el => {
+    const card = typeof el.closest === 'function' ? (el.closest('.transcript-card') as HTMLElement | null) : null;
+    return !card || card.style.display !== 'none';
+  });
+
+  if (visibleFlagged.length === 0) {
+    activeConfidenceJumpIndex = -1;
+    return false;
+  }
+
+  viewport.querySelectorAll('.transcript-word.confidence-word-focused').forEach(el => {
+    el.classList.remove('confidence-word-focused');
+  });
+
+  if (activeConfidenceJumpIndex < 0 || activeConfidenceJumpIndex >= visibleFlagged.length) {
+    activeConfidenceJumpIndex = direction >= 0 ? 0 : visibleFlagged.length - 1;
+  } else {
+    activeConfidenceJumpIndex = (activeConfidenceJumpIndex + direction + visibleFlagged.length) % visibleFlagged.length;
+  }
+
+  const targetWordEl = visibleFlagged[activeConfidenceJumpIndex];
+  targetWordEl.classList.add('confidence-word-focused');
+
+  const targetCard = typeof targetWordEl.closest === 'function'
+    ? (targetWordEl.closest('.transcript-card') as HTMLElement | null)
+    : null;
+
+  if (targetCard) {
+    if (typeof targetCard.scrollIntoView === 'function') {
+      targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    const lineObj = resolveLineForCard(targetCard);
+    const wordIdx = parseInt(targetWordEl.dataset?.wordIdx ?? '', 10);
+    if (lineObj && !Number.isNaN(wordIdx) && Array.isArray(lineObj.words) && lineObj.words[wordIdx]) {
+      const { startMs } = extractLineStartEndMs(lineObj, lineObj.id);
+      const seekMs = computeWordSeekMs(lineObj.words[wordIdx].startMs, startMs);
+      const win = getGlobal();
+      if (typeof win.seekCompanionPlayer === 'function') {
+        win.seekCompanionPlayer(seekMs, false, lineObj.id);
+      } else if (typeof win.highlightActiveTranscriptSegment === 'function') {
+        win.highlightActiveTranscriptSegment(seekMs / 1000, lineObj.id);
       }
     }
   }
+
+  return true;
+}
+
+export function toggleConfidenceHighlighting(forceState?: boolean): boolean {
+  confidenceHighlightingActive = typeof forceState === 'boolean' ? forceState : !confidenceHighlightingActive;
+  activeConfidenceJumpIndex = -1;
+
+  if (!confidenceHighlightingActive) {
+    confidenceLowOnlyFilter = false;
+    reviewedSegmentIdsInSession.clear();
+  }
+
+  if (typeof document !== 'undefined') {
+    const viewerCard = document.getElementById('transcribe-viewer-card');
+    const viewport = document.getElementById('transcript-viewport');
+    if (viewerCard) {
+      viewerCard.classList.toggle('highlight-confidence-active', confidenceHighlightingActive);
+    }
+    if (viewport) {
+      viewport.classList.toggle('highlight-confidence-active', confidenceHighlightingActive);
+      viewport.querySelectorAll('.transcript-word.confidence-word-focused').forEach(el => {
+        el.classList.remove('confidence-word-focused');
+      });
+    }
+    refreshAllRenderedConfidenceViews();
+    if (!confidenceHighlightingActive && viewport) {
+      viewport.querySelectorAll('.transcript-text-input').forEach((input: any) => {
+        autoResizeTranscriptField(input);
+      });
+    }
+    syncConfidenceButtonAndReviewBar();
+    filterTranscriptLines();
+  }
+
   return confidenceHighlightingActive;
 }
 
@@ -1306,6 +1730,7 @@ export function filterTranscriptLines(): void {
   const rawQuery = searchInput ? searchInput.value.trim() : '';
   const query = normalizeSearchText(rawQuery);
   const queryNoSpace = query.replace(/\s+/g, '');
+  const applyLowOnly = confidenceHighlightingActive && confidenceLowOnlyFilter;
   const lines = document.querySelectorAll('.transcript-line');
   const viewport = document.getElementById('transcript-viewport');
   let matchCount = 0;
@@ -1314,9 +1739,21 @@ export function filterTranscriptLines(): void {
     const textInput = lineEl.querySelector('.transcript-text-input');
     if (textInput) {
       const normText = normalizeSearchText(textInput.value);
-      const match = !query ||
+      const matchesSearch = !query ||
         normText.includes(query) ||
         (queryNoSpace.length >= 2 && normText.replace(/\s+/g, '').includes(queryNoSpace));
+
+      let matchesConfidence = true;
+      if (applyLowOnly) {
+        const lineObj = resolveLineForCard(lineEl);
+        const evalRes = evaluateLineConfidence(lineObj, confidenceThresholdPercent);
+        const keepEditedVisible =
+          (lineObj ? reviewedSegmentIdsInSession.has(lineObj.id) : false) ||
+          Boolean(lineEl.classList?.contains('is-editing-text'));
+        matchesConfidence = evalRes.flaggedCount > 0 || keepEditedVisible;
+      }
+
+      const match = matchesSearch && matchesConfidence;
       lineEl.style.display = match ? 'flex' : 'none';
       if (match) {
         matchCount++;
@@ -1327,7 +1764,7 @@ export function filterTranscriptLines(): void {
 
   if (viewport && lines.length > 0) {
     let emptySearchEl = document.getElementById('transcript-search-empty');
-    if (query && matchCount === 0) {
+    if ((query || applyLowOnly) && matchCount === 0) {
       if (!emptySearchEl) {
         emptySearchEl = document.createElement('div');
         emptySearchEl.id = 'transcript-search-empty';
@@ -1335,8 +1772,15 @@ export function filterTranscriptLines(): void {
         emptySearchEl.style.cssText = 'padding: 32px 16px; text-align: center; color: var(--color-text-dim); font-size: 0.85rem; user-select: none;';
         viewport.appendChild(emptySearchEl);
       }
-      emptySearchEl.setAttribute('data-i18n', 'transcribe.noMatchingTranscript');
-      emptySearchEl.textContent = t('transcribe.noMatchingTranscript') || 'No matching transcript lines found.';
+      if (applyLowOnly && !query) {
+        emptySearchEl.removeAttribute('data-i18n');
+        emptySearchEl.textContent =
+          t('transcribe.confidenceAllClear', { threshold: confidenceThresholdPercent }) ||
+          `All words ≥ ${confidenceThresholdPercent}%`;
+      } else {
+        emptySearchEl.setAttribute('data-i18n', 'transcribe.noMatchingTranscript');
+        emptySearchEl.textContent = t('transcribe.noMatchingTranscript') || 'No matching transcript lines found.';
+      }
       emptySearchEl.style.display = 'block';
     } else if (emptySearchEl) {
       emptySearchEl.style.display = 'none';
@@ -1435,7 +1879,7 @@ export function aggregateTokensIntoWords(
   if (validTokens.length === 0) return [];
 
   const words: WordToken[] = [];
-  let currentWord: { text: string; startMs: number; endMs: number; prob: number } | null = null;
+  let currentWord: { text: string; startMs: number; endMs: number; prob: number; hasLexicalProb: boolean } | null = null;
   let textSearchIdx = 0;
   let lastMatchedEndIdx = 0;
 
@@ -1443,6 +1887,7 @@ export function aggregateTokensIntoWords(
     const tok = validTokens[i];
     const tokTrimmed = tok.text.trim();
     if (!tokTrimmed) continue;
+    const tokIsPunct = isStandalonePunctuationToken(tokTrimmed);
 
     let isContinuation = false;
 
@@ -1471,7 +1916,17 @@ export function aggregateTokensIntoWords(
     if (isContinuation && currentWord) {
       currentWord.text += tokTrimmed;
       currentWord.endMs = Math.max(currentWord.endMs, tok.endMs);
-      currentWord.prob = Math.min(currentWord.prob, tok.prob);
+      if (!tokIsPunct) {
+        if (currentWord.hasLexicalProb) {
+          currentWord.prob = Math.min(currentWord.prob, tok.prob);
+        } else {
+          // Leading punctuation (e.g. opening quote/paren) should not poison the following word
+          currentWord.prob = tok.prob;
+          currentWord.hasLexicalProb = true;
+        }
+      } else if (!currentWord.hasLexicalProb) {
+        currentWord.prob = Math.min(currentWord.prob, tok.prob);
+      }
     } else {
       if (currentWord && currentWord.text.trim()) {
         words.push({
@@ -1486,6 +1941,7 @@ export function aggregateTokensIntoWords(
         startMs: tok.startMs,
         endMs: tok.endMs,
         prob: tok.prob,
+        hasLexicalProb: !tokIsPunct,
       };
     }
   }
@@ -1514,6 +1970,8 @@ export function parseAndApplyTranscriptContent(text: string, ext: string, should
       }
       transcriptDirty = false;
       transcriptLines = lines;
+      reviewedSegmentIdsInSession.clear();
+      activeConfidenceJumpIndex = -1;
       clearTranscriptHistory();
       renderTranscriptLines(transcriptLines, preserveScroll);
     }
@@ -1856,9 +2314,11 @@ export function clearTranscriptLines(): void {
   }
   transcriptDirty = false;
   transcriptLines = [];
+  reviewedSegmentIdsInSession.clear();
+  activeConfidenceJumpIndex = -1;
   clearTranscriptHistory();
   if (confidenceHighlightingActive) {
-    toggleConfidenceHighlighting();
+    toggleConfidenceHighlighting(false);
   }
   renderTranscriptLines([]);
 }
@@ -1926,6 +2386,8 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
   window.addEventListener('whisper:languageChanged', () => {
     if (transcriptLines && transcriptLines.length > 0) {
       renderTranscriptLines(transcriptLines);
+    } else {
+      syncConfidenceButtonAndReviewBar();
     }
     updateUndoRedoButtonsUI();
   });
@@ -1961,6 +2423,13 @@ if (typeof window !== 'undefined') {
   (window as any).setTranscriptHistory = setTranscriptHistory;
   (window as any).toggleConfidenceHighlighting = toggleConfidenceHighlighting;
   (window as any).isConfidenceHighlightingActive = isConfidenceHighlightingActive;
+  (window as any).hasTranscriptConfidenceData = hasTranscriptConfidenceData;
+  (window as any).getConfidenceThreshold = getConfidenceThreshold;
+  (window as any).setConfidenceThreshold = setConfidenceThreshold;
+  (window as any).toggleConfidenceLowOnlyFilter = toggleConfidenceLowOnlyFilter;
+  (window as any).isConfidenceLowOnlyFilterActive = isConfidenceLowOnlyFilterActive;
+  (window as any).jumpToConfidenceWord = jumpToConfidenceWord;
+  (window as any).syncConfidenceButtonAndReviewBar = syncConfidenceButtonAndReviewBar;
   (window as any).copyLiveTranscriptToClipboard = copyLiveTranscriptToClipboard;
   (window as any).copyEditorTranscriptToClipboard = copyLiveTranscriptToClipboard;
   (window as any).getTranscriptLines = getTranscriptLines;
@@ -1995,6 +2464,13 @@ export const transcriptViewer = {
   setHistory: setTranscriptHistory,
   toggleConfidence: toggleConfidenceHighlighting,
   isConfidenceActive: isConfidenceHighlightingActive,
+  hasConfidenceData: hasTranscriptConfidenceData,
+  getConfidenceThreshold,
+  setConfidenceThreshold,
+  toggleConfidenceLowOnly: toggleConfidenceLowOnlyFilter,
+  isConfidenceLowOnly: isConfidenceLowOnlyFilterActive,
+  jumpToConfidenceWord,
+  syncConfidenceUI: syncConfidenceButtonAndReviewBar,
   loadFromJson: loadTranscriptFromJsonData,
   aggregateTokens: aggregateTokensIntoWords,
   flushEdits: flushPendingTranscriptEdits,

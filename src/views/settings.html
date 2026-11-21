@@ -248,6 +248,41 @@
                     </div>
                   </div>
 
+                  <!-- Confidence Highlight Threshold Card -->
+                  <div class="setting-card" data-search-tags="confidence threshold highlight percent proofreading uncertain accuracy ضریب اطمینان آستانه درصد بازبینی کلمات مشکوک">
+                    <div class="setting-info">
+                      <div class="setting-label-row">
+                        <span class="setting-title" data-i18n="settings.confidenceThresholdTitle">Confidence Highlight Threshold</span>
+                        <span id="confidence-threshold-badge" class="setting-status-pill checking">70%</span>
+                      </div>
+                      <div class="setting-desc"><span data-i18n="settings.confidenceThresholdDesc">Words with Whisper recognition confidence below this percentage are highlighted for proofreading in the Transcript Viewer.</span>
+                        <div class="setting-desc-points" data-i18n-html="settings.confidenceThresholdPoints">
+                          <span class="setting-desc-point"><strong>Instant visual update:</strong> Changes apply immediately to open transcripts without re-transcribing.</span>
+                          <span class="setting-desc-point"><strong>Default:</strong> <code>70%</code> (higher values flag more words for stricter review)</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="setting-control ui-scale-control-group">
+                      <button class="btn-secondary ui-scale-btn ui-scale-btn-icon" type="button" onclick="adjustConfidenceThresholdPreference(-5)" data-i18n-title="settings.confidenceThresholdDecrease" title="Decrease threshold (-5%)" data-i18n-aria="settings.confidenceThresholdDecrease" aria-label="Decrease threshold (-5%)">−</button>
+                      <select class="select-control" id="opt-confidenceThreshold" style="min-width:120px; width:120px;" onchange="setConfidenceThresholdPreference(parseInt(this.value, 10), true)" data-i18n-aria="settings.confidenceThresholdTitle" aria-label="Confidence Highlight Threshold">
+                        <option value="40">40%</option>
+                        <option value="45">45%</option>
+                        <option value="50">50%</option>
+                        <option value="55">55%</option>
+                        <option value="60">60%</option>
+                        <option value="65">65%</option>
+                        <option value="70" selected>70%</option>
+                        <option value="75">75%</option>
+                        <option value="80">80%</option>
+                        <option value="85">85%</option>
+                        <option value="90">90%</option>
+                        <option value="95">95%</option>
+                      </select>
+                      <button class="btn-secondary ui-scale-btn ui-scale-btn-icon" type="button" onclick="adjustConfidenceThresholdPreference(5)" data-i18n-title="settings.confidenceThresholdIncrease" title="Increase threshold (+5%)" data-i18n-aria="settings.confidenceThresholdIncrease" aria-label="Increase threshold (+5%)">+</button>
+                      <button class="btn-secondary ui-scale-btn ui-scale-btn-text" type="button" onclick="setConfidenceThresholdPreference(70, true)" data-i18n-title="settings.confidenceThresholdResetTooltip" title="Reset to 70%" data-i18n-aria="settings.confidenceThresholdResetTooltip" aria-label="Reset to 70%" data-i18n="settings.uiScaleReset">Reset</button>
+                    </div>
+                  </div>
+
                   <!-- Minimize to Tray Card -->
                   <div class="setting-card">
                     <div class="setting-info">

@@ -404,6 +404,7 @@ describe('workflowBridge module', () => {
       setLastTranscribedSubtitlePath('/output/movie.srt');
       setLastTranscribedOutputDir('/output');
       setLastTranscribedOutputFiles([{ name: 'movie.srt', path: '/output/movie.srt', type: 'subtitle' }]);
+      (globalThis as any).window.transcriptLines = [];
 
       updateTranscribeWorkflowButtons();
 
@@ -412,9 +413,18 @@ describe('workflowBridge module', () => {
       expect(btnSendTranslate.disabled).toBe(false);
       expect(btnSendHardsub.disabled).toBe(false);
       expect(btnSendStudio.disabled).toBe(false);
-      expect(btnConfidence.disabled).toBe(false);
+      // Without word-level confidence tokens, confidence button remains disabled
+      expect(btnConfidence.disabled).toBe(true);
       expect(btnCopy.disabled).toBe(false);
       expect(btnOpenFile.title).toContain('movie.srt');
+
+      // Once word-level confidence tokens are present, confidence button activates
+      (globalThis as any).window.transcriptLines = [
+        { id: 0, text: 'Hello', words: [{ text: 'Hello', startMs: 0, endMs: 500, prob: 0.92 }] }
+      ];
+      updateTranscribeWorkflowButtons();
+      expect(btnConfidence.disabled).toBe(false);
+      (globalThis as any).window.transcriptLines = [];
     });
 
     it('keeps workflow buttons disabled while transcription is actively running', () => {

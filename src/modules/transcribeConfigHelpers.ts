@@ -99,10 +99,15 @@ export function clampIntSettingValue(key: string, raw: unknown): number {
   const parsed = parseInt(normalizeDigitsToAscii(String(raw ?? '')).trim(), 10);
   if (Number.isNaN(parsed)) {
     if (key === 'maxContext') return -1;
+    if (key === 'confidenceThreshold') return 70;
     if (key === 'threads' || key === 'processors' || key === 'bestOf' || key === 'beamSize') return 1;
     return 0;
   }
 
+  if (key === 'confidenceThreshold') {
+    if (parsed <= 0) return 70;
+    return Math.max(40, Math.min(95, parsed));
+  }
   if (key === 'bestOf' || key === 'beamSize') {
     return Math.max(1, Math.min(8, parsed));
   }

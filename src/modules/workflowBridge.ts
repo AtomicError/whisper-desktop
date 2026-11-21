@@ -11,7 +11,12 @@ import {
 } from './nativeWindow';
 import { escapeHTML } from './logsController';
 import { batchProcessor } from './batchProcessor';
-import { flushPendingTranscriptEdits, hasPendingTranscriptEdits } from './transcriptViewer';
+import {
+  flushPendingTranscriptEdits,
+  hasPendingTranscriptEdits,
+  hasTranscriptConfidenceData,
+  syncConfidenceButtonAndReviewBar
+} from './transcriptViewer';
 
 if (typeof window === 'undefined') {
   (globalThis as any).window = globalThis;
@@ -336,7 +341,22 @@ export function updateTranscribeWorkflowButtons(): void {
 
   const btnConfidence = document.getElementById('btn-toggle-confidence') as HTMLButtonElement | null;
   if (btnConfidence) {
-    btnConfidence.disabled = !hasTranscript;
+    const windowLinesHaveWords =
+      Array.isArray(transcriptLines) &&
+      transcriptLines.some((l: any) => Array.isArray(l?.words) && l.words.length > 0);
+    const hasConfidence = !isRunning && (hasTranscriptConfidenceData() || windowLinesHaveWords);
+    if (isRunning) {
+      btnConfidence.disabled = true;
+    } else if (hasTranscriptConfidenceData()) {
+      syncConfidenceButtonAndReviewBar();
+    } else {
+      btnConfidence.disabled = !hasConfidence;
+      if (!hasConfidence) {
+        btnConfidence.title =
+          t('transcribe.confidenceUnavailableTooltip') ||
+          'Word-level confidence data is unavailable for this transcript';
+      }
+    }
   }
 }
 

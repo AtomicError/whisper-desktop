@@ -63,6 +63,7 @@ export interface SettingsState {
   monochromeCanvas?: boolean;
   uiScale?: number;
   uiLanguage?: string;
+  confidenceThreshold?: number;
   closeToTray?: boolean;
   recentSpokenLanguages?: string[];
   recentTranslationTargets?: string[];
