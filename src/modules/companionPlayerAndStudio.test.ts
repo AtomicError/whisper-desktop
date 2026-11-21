@@ -4068,4 +4068,331 @@ describe('Modern Confidence Proofreading Workflow (Threshold, Review Bar, Filter
     expect(btn.classList.contains('active')).toBe(false);
     expect(reviewBar.hidden).toBe(true);
   });
+
+  it('prevents native Shift+mousedown text selection on confidence words while preserving regular drag selection', () => {
+    const viewport = registerMockEl('transcript-viewport');
+    registerMockEl('btn-toggle-confidence', 'BUTTON');
+    registerMockEl('confidence-review-bar', 'DIV');
+    registerMockEl('btn-copy-transcript', 'BUTTON');
+
+    const lines: TranscriptLine[] = [
+      {
+        id: 0,
+        timeRange: '[00:00:01.000 --> 00:00:03.000]',
+        text: 'Check maybe',
+        startMs: 1000,
+        endMs: 3000,
+        words: [
+          { text: 'Check', startMs: 1000, endMs: 1800, prob: 0.96 },
+          { text: 'maybe', startMs: 1800, endMs: 3000, prob: 0.45 }
+        ]
+      }
+    ];
+
+    transcriptViewer.lines = lines;
+    renderTranscriptLines(lines, false);
+    toggleConfidenceHighlighting(true);
+
+    const maybeSpan = viewport.querySelector('.transcript-word.low-confidence') as any;
+    const mousedownHandlers = (viewport as any)._listeners?.get?.('mousedown') || [];
+    const clickHandlers = (viewport as any)._listeners?.get?.('click') || [];
+
+    // Regular mousedown (without Shift) must NOT preventDefault so user can drag-select text
+    let regularPrevented = false;
+    mousedownHandlers.forEach((fn: any) =>
+      fn({ target: maybeSpan, shiftKey: false, preventDefault: () => { regularPrevented = true; } })
+    );
+    expect(regularPrevented).toBe(false);
+
+    // Shift+mousedown on a word MUST preventDefault to block cross-card native range selection
+    let shiftMousedownPrevented = false;
+    mousedownHandlers.forEach((fn: any) =>
+      fn({ target: maybeSpan, shiftKey: true, preventDefault: () => { shiftMousedownPrevented = true; } })
+    );
+    expect(shiftMousedownPrevented).toBe(true);
+
+    // Shift+mousedown on the gap inside .transcript-confidence-view MUST also preventDefault
+    const confView = viewport.querySelector('.transcript-confidence-view') as any;
+    let shiftGapPrevented = false;
+    mousedownHandlers.forEach((fn: any) =>
+      fn({ target: confView, shiftKey: true, preventDefault: () => { shiftGapPrevented = true; } })
+    );
+    expect(shiftGapPrevented).toBe(true);
+
+    // Shift+click approves the word and calls preventDefault
+    let shiftClickPrevented = false;
+    clickHandlers.forEach((fn: any) =>
+      fn({
+        target: maybeSpan,
+        shiftKey: true,
+        preventDefault: () => { shiftClickPrevented = true; },
+        stopPropagation: () => {}
+      })
+    );
+    expect(shiftClickPrevented).toBe(true);
+    expect(transcriptViewer.lines[0].words?.[1].reviewed).toBe(true);
+
+    // Detached card parity: cardEl.onmousedown prevents native selection on Shift+mousedown
+    const detachedLine: TranscriptLine = {
+      id: 10,
+      timeRange: '[00:00:05.000 --> 00:00:07.000]',
+      text: 'solo',
+      startMs: 5000,
+      endMs: 7000,
+      words: [{ text: 'solo', startMs: 5000, endMs: 7000, prob: 0.42 }]
+    };
+    const detachedCard = transcriptViewer.createCard(detachedLine) as any;
+    const detachedConfView = detachedCard.querySelector('.transcript-confidence-view') as any;
+    let detachedPrevented = false;
+    detachedCard.onmousedown({
+      target: detachedConfView,
+      shiftKey: true,
+      preventDefault: () => { detachedPrevented = true; }
+    });
+    expect(detachedPrevented).toBe(true);
+  });
+
+  it('keeps confidence view intact and focuses the first flagged word after deleting a segment in confidence mode', async () => {
+    vi.useFakeTimers();
+    try {
+      const viewport = registerMockEl('transcript-viewport');
+      registerMockEl('btn-toggle-confidence', 'BUTTON');
+      registerMockEl('confidence-review-bar', 'DIV');
+      registerMockEl('btn-copy-transcript', 'BUTTON');
+
+      const lines: TranscriptLine[] = [
+        {
+          id: 0,
+          timeRange: '[00:00:00.000 --> 00:00:02.000]',
+          text: 'noise',
+          startMs: 0,
+          endMs: 2000,
+          words: [{ text: 'noise', startMs: 0, endMs: 2000, prob: 0.32 }]
+        },
+        {
+          id: 1,
+          timeRange: '[00:00:02.000 --> 00:00:05.000]',
+          text: 'Clear suspect',
+          startMs: 2000,
+          endMs: 5000,
+          words: [
+            { text: 'Clear', startMs: 2000, endMs: 3200, prob: 0.96 },
+            { text: 'suspect', startMs: 3200, endMs: 5000, prob: 0.42 }
+          ]
+        }
+      ];
+
+      transcriptViewer.lines = lines;
+      renderTranscriptLines(lines, false);
+      toggleConfidenceHighlighting(true);
+
+      let focusedWordText = '';
+      const origCreateElement = document.createElement.bind(document);
+      const createSpy = vi.spyOn(document, 'createElement').mockImplementation((tag: any) => {
+        const el: any = origCreateElement(tag);
+        if (String(tag).toLowerCase() === 'span') {
+          el.focus = () => {
+            focusedWordText = el.textContent;
+          };
+        }
+        return el;
+      });
+      try {
+        expect(deleteTranscriptSegment(0)).toBe(true);
+        vi.advanceTimersByTime(40);
+      } finally {
+        createSpy.mockRestore();
+      }
+
+      const remainingCard = viewport.querySelector('.transcript-card') as any;
+      expect(remainingCard).toBeTruthy();
+      expect(remainingCard.classList.contains('is-editing-text')).toBe(false);
+      expect(focusedWordText).toBe('suspect');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not show a reviewed badge on an emptied segment when other segments still carry confidence data', () => {
+    const viewport = registerMockEl('transcript-viewport');
+    registerMockEl('btn-toggle-confidence', 'BUTTON');
+    registerMockEl('confidence-review-bar', 'DIV');
+    registerMockEl('btn-copy-transcript', 'BUTTON');
+
+    const lines: TranscriptLine[] = [
+      {
+        id: 0,
+        timeRange: '[00:00:00.000 --> 00:00:02.000]',
+        text: 'hello maybe',
+        startMs: 0,
+        endMs: 2000,
+        words: [
+          { text: 'hello', startMs: 0, endMs: 900, prob: 0.95 },
+          { text: 'maybe', startMs: 900, endMs: 2000, prob: 0.45 }
+        ]
+      },
+      {
+        id: 1,
+        timeRange: '[00:00:02.000 --> 00:00:04.000]',
+        text: 'other',
+        startMs: 2000,
+        endMs: 4000,
+        words: [{ text: 'other', startMs: 2000, endMs: 4000, prob: 0.92 }]
+      }
+    ];
+
+    transcriptViewer.lines = lines;
+    renderTranscriptLines(lines, false);
+    toggleConfidenceHighlighting(true);
+
+    const card0 = viewport.querySelectorAll('.transcript-card')[0] as any;
+    const textarea0 = card0.querySelector('.transcript-text-input') as any;
+    textarea0.onfocus();
+    textarea0.value = '';
+    textarea0.oninput();
+    textarea0.onblur();
+
+    expect(card0.dataset.confidenceReviewed).toBeUndefined();
+    expect(card0.querySelector('.transcript-card-conf-pill')).toBeNull();
+  });
+
+  it('anchors Alt+Down sequentially after direct mouse click-and-edit on a flagged word without prior jump', () => {
+    const viewport = registerMockEl('transcript-viewport');
+    registerMockEl('btn-toggle-confidence', 'BUTTON');
+    registerMockEl('confidence-review-bar', 'DIV');
+    registerMockEl('confidence-review-summary', 'SPAN');
+    registerMockEl('confidence-review-status', 'DIV');
+    registerMockEl('btn-confidence-prev', 'BUTTON');
+    registerMockEl('btn-confidence-next', 'BUTTON');
+    const counterEl = registerMockEl('confidence-jump-counter', 'SPAN') as any;
+    registerMockEl('btn-copy-transcript', 'BUTTON');
+
+    const lines: TranscriptLine[] = [
+      {
+        id: 0,
+        timeRange: '[00:00:00.000 --> 00:00:02.000]',
+        text: 'first',
+        startMs: 0,
+        endMs: 2000,
+        words: [{ text: 'first', startMs: 0, endMs: 2000, prob: 0.45 }]
+      },
+      {
+        id: 1,
+        timeRange: '[00:00:02.000 --> 00:00:04.000]',
+        text: 'second',
+        startMs: 2000,
+        endMs: 4000,
+        words: [{ text: 'second', startMs: 2000, endMs: 4000, prob: 0.45 }]
+      },
+      {
+        id: 2,
+        timeRange: '[00:00:04.000 --> 00:00:06.000]',
+        text: 'third',
+        startMs: 4000,
+        endMs: 6000,
+        words: [{ text: 'third', startMs: 4000, endMs: 6000, prob: 0.45 }]
+      }
+    ];
+
+    transcriptViewer.lines = lines;
+    renderTranscriptLines(lines, false);
+    toggleConfidenceHighlighting(true);
+
+    // Click directly on flagged word #2 ("second") without any prior Alt+Down jump
+    const cards = viewport.querySelectorAll('.transcript-card');
+    const secondSpan = cards[1].querySelector('.transcript-word.low-confidence') as any;
+    const secondTextarea = cards[1].querySelector('.transcript-text-input') as any;
+    secondTextarea.blur = () => secondTextarea.onblur();
+
+    const clickHandlers = (viewport as any)._listeners?.get?.('click') || [];
+    clickHandlers.forEach((fn: any) =>
+      fn({ target: secondSpan, shiftKey: false, preventDefault: () => {}, stopPropagation: () => {} })
+    );
+
+    secondTextarea.onfocus();
+    secondTextarea.value = 'second_fixed';
+    secondTextarea.oninput();
+    secondTextarea.onblur();
+
+    // Subsequent Alt+Down must continue directly to "third" (2 / 2), not reset to "first" (1 / 2)
+    expect(jumpToConfidenceWord(1)).toBe(true);
+    expect(counterEl.textContent).toBe('2 / 2');
+    expect(viewport.querySelector('.transcript-word.confidence-word-focused')?.textContent).toBe('third');
+  });
+
+  it('prioritizes direct click-edit anchor over stale activeConfidenceJumpIndex and prior pendingConfidenceJumpAnchor', () => {
+    const viewport = registerMockEl('transcript-viewport');
+    registerMockEl('btn-toggle-confidence', 'BUTTON');
+    registerMockEl('confidence-review-bar', 'DIV');
+    registerMockEl('confidence-review-summary', 'SPAN');
+    registerMockEl('confidence-review-status', 'DIV');
+    registerMockEl('btn-confidence-prev', 'BUTTON');
+    registerMockEl('btn-confidence-next', 'BUTTON');
+    const counterEl = registerMockEl('confidence-jump-counter', 'SPAN') as any;
+    registerMockEl('btn-copy-transcript', 'BUTTON');
+
+    const lines: TranscriptLine[] = [
+      { id: 0, timeRange: '[00:00:00.000 --> 00:00:01.000]', text: 'one', startMs: 0, endMs: 1000, words: [{ text: 'one', startMs: 0, endMs: 1000, prob: 0.45 }] },
+      { id: 1, timeRange: '[00:00:01.000 --> 00:00:02.000]', text: 'two', startMs: 1000, endMs: 2000, words: [{ text: 'two', startMs: 1000, endMs: 2000, prob: 0.45 }] },
+      { id: 2, timeRange: '[00:00:02.000 --> 00:00:03.000]', text: 'three', startMs: 2000, endMs: 3000, words: [{ text: 'three', startMs: 2000, endMs: 3000, prob: 0.45 }] },
+      { id: 3, timeRange: '[00:00:03.000 --> 00:00:04.000]', text: 'four', startMs: 3000, endMs: 4000, words: [{ text: 'four', startMs: 3000, endMs: 4000, prob: 0.45 }] },
+      { id: 4, timeRange: '[00:00:04.000 --> 00:00:05.000]', text: 'five', startMs: 4000, endMs: 5000, words: [{ text: 'five', startMs: 4000, endMs: 5000, prob: 0.45 }] }
+    ];
+
+    transcriptViewer.lines = lines;
+    renderTranscriptLines(lines, false);
+    toggleConfidenceHighlighting(true);
+
+    const clickHandlers = (viewport as any)._listeners?.get?.('click') || [];
+
+    // Path A: Alt+Down jumps to "one" (index 0), then user clicks & edits "two" (index 1).
+    // Next Alt+Down must continue forward to "three", NOT jump backwards to "one".
+    expect(jumpToConfidenceWord(1)).toBe(true);
+    expect(viewport.querySelector('.transcript-word.confidence-word-focused')?.textContent).toBe('one');
+
+    let cards = viewport.querySelectorAll('.transcript-card');
+    const twoSpan = cards[1].querySelector('.transcript-word.low-confidence') as any;
+    const twoTextarea = cards[1].querySelector('.transcript-text-input') as any;
+    twoTextarea.blur = () => twoTextarea.onblur();
+
+    clickHandlers.forEach((fn: any) =>
+      fn({ target: twoSpan, shiftKey: false, preventDefault: () => {}, stopPropagation: () => {} })
+    );
+    twoTextarea.onfocus();
+    twoTextarea.value = 'two_fixed';
+    twoTextarea.oninput();
+    twoTextarea.onblur();
+
+    expect(jumpToConfidenceWord(1)).toBe(true);
+    expect(viewport.querySelector('.transcript-word.confidence-word-focused')?.textContent).toBe('three');
+    expect(counterEl.textContent).toBe('2 / 4');
+
+    // Path B: Shift+Click approves "one" (sets pending anchor = 0), then without jumping
+    // user directly clicks & edits "four" (visible index 1 of ["three", "four", "five"]).
+    // Next Alt+Down must continue to "five", NOT jump back to "three".
+    expect(markConfidenceWordReviewed(0, 0)).toBe(true);
+
+    cards = viewport.querySelectorAll('.transcript-card');
+    const fourSpan = cards[3].querySelector('.transcript-word.low-confidence') as any;
+    const fourTextarea = cards[3].querySelector('.transcript-text-input') as any;
+    fourTextarea.blur = () => fourTextarea.onblur();
+
+    clickHandlers.forEach((fn: any) =>
+      fn({ target: fourSpan, shiftKey: false, preventDefault: () => {}, stopPropagation: () => {} })
+    );
+    fourTextarea.onfocus();
+    fourTextarea.value = 'four_fixed';
+    fourTextarea.oninput();
+    fourTextarea.onblur();
+
+    expect(jumpToConfidenceWord(1)).toBe(true);
+    expect(viewport.querySelector('.transcript-word.confidence-word-focused')?.textContent).toBe('five');
+    expect(counterEl.textContent).toBe('2 / 2');
+  });
+
+  it('uses transparent outline on already-highlighted confidence-word-focused spans for clean dark mode and forced-colors safety', () => {
+    const cssSource = readFileSync(resolve(process.cwd(), 'src/styles/views/transcribe.css'), 'utf-8');
+    expect(cssSource).toMatch(/\.transcript-word:focus-visible\s*\{[^}]*outline:/);
+    expect(cssSource).toMatch(/\.transcript-word\.confidence-word-focused:focus-visible\s*\{[^}]*outline:\s*2px solid transparent;/);
+  });
 });

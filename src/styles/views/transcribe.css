@@ -2992,6 +2992,10 @@ html[dir="rtl"] #transcript-search::placeholder,
   background: rgba(var(--color-red-rgb, 244, 63, 94), 0.28);
 }
 
+.transcript-word.confidence-word-focused:focus-visible {
+  outline: 2px solid transparent;
+}
+
 #btn-toggle-confidence.active {
   background: rgba(var(--color-gold-rgb, 245, 158, 11), 0.18);
   border-color: rgba(var(--color-gold-rgb, 245, 158, 11), 0.42);
