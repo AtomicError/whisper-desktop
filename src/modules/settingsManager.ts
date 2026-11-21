@@ -131,7 +131,8 @@ declare global {
     adjustConfidenceThresholdPreference: (delta: number) => number;
     setConfidenceThreshold?: (percent: number, persist?: boolean) => number;
     syncQuickTimeRangeUI: (current?: SettingsState | null) => void;
-    syncCustomSelects?: () => void;
+    syncCustomSelects?: (updateOptions?: boolean, excludeLanguageSelects?: boolean) => void;
+    markSettingsDirty: () => void;
     saveCurrentSettings: (immediate?: boolean) => any;
     refreshSettings: () => Promise<void>;
     refreshBuildStatuses: () => Promise<void>;
@@ -679,12 +680,18 @@ export function switchSettingsCategory(catName: string): void {
     scrollContainer.scrollTop = 0;
   }
 
-  document.querySelectorAll('.settings-search-group-header').forEach(h => h.remove());
+  const isFrozenClone = (el: Element): boolean =>
+    typeof el.closest === 'function' && Boolean(el.closest('#theme-wipe-overlay'));
+
+  document.querySelectorAll('.settings-search-group-header').forEach(h => {
+    if (!isFrozenClone(h)) h.remove();
+  });
   const emptyEl = document.getElementById('settings-search-empty');
   if (emptyEl) emptyEl.style.display = 'none';
 
   const tabs = document.querySelectorAll('.settings-cat-btn');
   tabs.forEach(tab => {
+    if (isFrozenClone(tab)) return;
     tab.classList.remove('active', 'search-dimmed');
     const badge = tab.querySelector('.cat-match-badge');
     if (badge) badge.remove();
@@ -695,6 +702,7 @@ export function switchSettingsCategory(catName: string): void {
 
   const groups = document.querySelectorAll('.settings-group');
   groups.forEach(group => {
+    if (isFrozenClone(group)) return;
     group.classList.remove('active');
     (group as HTMLElement).style.display = '';
     group.querySelectorAll('.setting-card').forEach(card => {
@@ -707,7 +715,7 @@ export function switchSettingsCategory(catName: string): void {
     targetGroup.classList.add('active');
     const win = getGlobal();
     if (typeof win.syncCustomSelects === 'function') {
-      win.syncCustomSelects();
+      win.syncCustomSelects(false, true);
     }
   }
 
@@ -733,8 +741,10 @@ export function executeFilterSettings(query: string): void {
   const clearBtn = document.getElementById('settings-search-clear');
   const emptyEl = document.getElementById('settings-search-empty');
   const emptyDescEl = document.getElementById('settings-search-empty-desc');
-  const groups = document.querySelectorAll('.settings-group');
-  const tabs = document.querySelectorAll('.settings-cat-btn');
+  const isFrozenClone = (el: Element): boolean =>
+    typeof el.closest === 'function' && Boolean(el.closest('#theme-wipe-overlay'));
+  const groups = Array.from(document.querySelectorAll('.settings-group')).filter(g => !isFrozenClone(g));
+  const tabs = Array.from(document.querySelectorAll('.settings-cat-btn')).filter(t => !isFrozenClone(t));
   const scrollContainer = document.querySelector('.settings-scroll-container');
 
   if (clearBtn) {
@@ -743,7 +753,9 @@ export function executeFilterSettings(query: string): void {
 
   if (!q) {
     if (emptyEl) emptyEl.style.display = 'none';
-    document.querySelectorAll('.settings-search-group-header').forEach(h => h.remove());
+    document.querySelectorAll('.settings-search-group-header').forEach(h => {
+      if (!isFrozenClone(h)) h.remove();
+    });
 
     tabs.forEach(tab => {
       tab.classList.remove('search-dimmed');
@@ -1391,6 +1403,11 @@ export function sanitizeSettingsPayload(state: any): any {
 }
 
 let saveSettingsDebounceTimer: any = null;
+let hasUnsavedSettings = false;
+
+export function markSettingsDirty(): void {
+  hasUnsavedSettings = true;
+}
 
 export async function saveCurrentSettings(immediate = false): Promise<void> {
   const current = getSettingsState();
@@ -1408,6 +1425,7 @@ export async function saveCurrentSettings(immediate = false): Promise<void> {
   }
 
   const doSave = async () => {
+    hasUnsavedSettings = false;
     try {
       updateTranscribeUIConfigs();
       const cleanPayload = sanitizeSettingsPayload(current);
@@ -1928,29 +1946,28 @@ export function updateTranscribeOutputDirUI(): void {
 }
 
 // ----------------- Auto Unload / Disposal Event Listeners -----------------
-if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
-  window.addEventListener('beforeunload', () => {
-    const current = getSettingsState();
-    if (saveSettingsDebounceTimer && current) {
+export function flushPendingSettingsOnUnload(): void {
+  const current = getSettingsState();
+  if ((saveSettingsDebounceTimer || hasUnsavedSettings) && current) {
+    if (saveSettingsDebounceTimer) {
       clearTimeout(saveSettingsDebounceTimer);
       saveSettingsDebounceTimer = null;
-      try {
-        const cleanPayload = sanitizeSettingsPayload(current);
-        invoke('save_settings', { settings: cleanPayload });
-      } catch (_) {}
     }
+    hasUnsavedSettings = false;
+    try {
+      const cleanPayload = sanitizeSettingsPayload(current);
+      invoke('save_settings', { settings: cleanPayload });
+    } catch (_) {}
+  }
+}
+
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('beforeunload', () => {
+    flushPendingSettingsOnUnload();
   });
 
   window.addEventListener('pagehide', () => {
-    const current = getSettingsState();
-    if (saveSettingsDebounceTimer && current) {
-      clearTimeout(saveSettingsDebounceTimer);
-      saveSettingsDebounceTimer = null;
-      try {
-        const cleanPayload = sanitizeSettingsPayload(current);
-        invoke('save_settings', { settings: cleanPayload });
-      } catch (_) {}
-    }
+    flushPendingSettingsOnUnload();
     const win = getGlobal();
     if (win.hardsubController && typeof win.hardsubController.dispose === 'function') {
       win.hardsubController.dispose();
@@ -1996,6 +2013,7 @@ export function syncSettingsManagerWindowBindings(): void {
   win.adjustConfidenceThresholdPreference = adjustConfidenceThresholdPreference;
   win.syncQuickTimeRangeUI = syncQuickTimeRangeUI;
   win.updateDeckScrollCue = updateDeckScrollCue;
+  win.markSettingsDirty = markSettingsDirty;
   win.saveCurrentSettings = saveCurrentSettings;
   win.refreshSettings = refreshSettings;
   win.refreshBuildStatuses = refreshBuildStatuses;
@@ -2112,6 +2130,8 @@ export const settingsManager = {
   INT_SETTING_KEYS,
   FLOAT_SETTING_KEYS,
   sanitizeSettingsPayload,
+  markSettingsDirty,
+  flushPendingSettingsOnUnload,
   saveCurrentSettings,
   confirmResetWhisperEngine,
   getStepperBounds,

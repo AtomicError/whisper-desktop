@@ -42,6 +42,7 @@ let pendingTranscriptSnapshotLines: TranscriptLine[] | null = null;
 let confidenceHighlightingActive = false;
 let confidenceThresholdPercent = CONFIDENCE_THRESHOLD_DEFAULT;
 let confidenceLowOnlyFilter = false;
+let pendingTranscriptLanguageRefresh = false;
 let activeConfidenceJumpIndex = -1;
 let pendingConfidenceJumpAnchor: number | null = null;
 const reviewedSegmentIdsInSession = new Set<number>();
@@ -418,6 +419,8 @@ export function setupTranscriptDirection(): void {
 
   if (typeof window.addEventListener === 'function') {
     window.addEventListener('whisper:languageChanged', () => {
+      const panel = typeof document !== 'undefined' ? document.getElementById('panel-transcribe') : null;
+      if (panel && !panel.classList.contains('active')) return;
       viewport.querySelectorAll('.transcript-text-input').forEach((input: HTMLElement) => {
         applyTextDirection(input);
         autoResizeTranscriptField(input);
@@ -2867,6 +2870,17 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
   });
 }
 
+export function flushPendingTranscriptLanguageRefresh(): void {
+  if (!pendingTranscriptLanguageRefresh) return;
+  pendingTranscriptLanguageRefresh = false;
+  if (transcriptLines && transcriptLines.length > 0) {
+    renderTranscriptLines(transcriptLines);
+  } else {
+    syncConfidenceButtonAndReviewBar();
+  }
+  updateUndoRedoButtonsUI();
+}
+
 // Guarantee in-flight debounced edits are flushed before window unloads
 if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
   window.addEventListener('beforeunload', () => {
@@ -2876,6 +2890,12 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
     void flushPendingTranscriptEdits();
   });
   window.addEventListener('whisper:languageChanged', () => {
+    const panel = typeof document !== 'undefined' ? document.getElementById('panel-transcribe') : null;
+    if (panel && !panel.classList.contains('active')) {
+      pendingTranscriptLanguageRefresh = true;
+      return;
+    }
+    pendingTranscriptLanguageRefresh = false;
     if (transcriptLines && transcriptLines.length > 0) {
       renderTranscriptLines(transcriptLines);
     } else {
@@ -2971,6 +2991,7 @@ export const transcriptViewer = {
   loadFromJson: loadTranscriptFromJsonData,
   aggregateTokens: aggregateTokensIntoWords,
   flushEdits: flushPendingTranscriptEdits,
+  flushPendingLanguageRefresh: flushPendingTranscriptLanguageRefresh,
   hasPendingEdits: hasPendingTranscriptEdits,
   serializeForFile: serializeTranscriptLinesForFile,
   filter: filterTranscriptLines,

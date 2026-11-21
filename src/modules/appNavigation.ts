@@ -1,4 +1,4 @@
-import { t, APP_NAME, applyTextDirection } from '../i18n/index';
+import { t, APP_NAME, applyTextDirection, cancelScrambleForElement } from '../i18n/index';
 import { customSelectsMap } from './customSelect';
 import { logsController } from './logsController';
 import { modelHub } from './modelHub';
@@ -80,9 +80,10 @@ export function switchView(viewName: string): void {
     });
   }
 
-  // Update nav link active states and accessibility
+  // Update nav link active states and accessibility (never mutate frozen theme-wipe clone)
   const navItems = document.querySelectorAll('.nav-item');
   navItems.forEach(item => {
+    if (typeof item.closest === 'function' && item.closest('#theme-wipe-overlay')) return;
     const isTarget = (item as HTMLElement).dataset.view === viewName;
     if (isTarget) {
       item.classList.add('active');
@@ -95,9 +96,10 @@ export function switchView(viewName: string): void {
     }
   });
 
-  // Update view panel active states
+  // Update view panel active states (never mutate frozen theme-wipe clone)
   const panels = document.querySelectorAll('.view-panel');
   panels.forEach(panel => {
+    if (typeof panel.closest === 'function' && panel.closest('#theme-wipe-overlay')) return;
     panel.classList.remove('active');
   });
 
@@ -106,6 +108,9 @@ export function switchView(viewName: string): void {
     targetPanel.classList.add('active');
     if (viewName === 'transcribe') {
       requestAnimationFrame(() => {
+        if (typeof (transcriptViewer as any).flushPendingLanguageRefresh === 'function') {
+          (transcriptViewer as any).flushPendingLanguageRefresh();
+        }
         const viewport = document.getElementById('transcript-viewport');
         if (viewport) {
           viewport.querySelectorAll('.transcript-text-input').forEach(el => {
@@ -136,10 +141,11 @@ export function switchView(viewName: string): void {
     window.hardsubController.setPageActive(viewName === 'hardsub');
   }
 
-  // Update Header Title with transition
+  // Update Header Title with transition (detach any active language scramble so stale title never overwrites it)
   const localizedViewTitle = t(`nav.${viewName}`) || APP_NAME;
   const titleEl = document.getElementById('current-view-title');
   if (titleEl) {
+    cancelScrambleForElement(titleEl);
     titleEl.style.opacity = '0.7';
     titleEl.textContent = localizedViewTitle;
     requestAnimationFrame(() => {

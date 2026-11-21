@@ -10,7 +10,7 @@ import { modelHub } from './modules/modelHub';
 import { transcriptViewer } from './modules/transcriptViewer';
 import { initCompanionPlayerDOM } from './modules/companionPlayer';
 import { initTranscribeLayoutResizer } from './modules/transcribeLayoutResizer';
-import { initializeCustomSelects, syncCustomSelects } from './modules/customSelect';
+import { initializeCustomSelects, syncCustomSelects, customSelectsMap } from './modules/customSelect';
 import {
   batchProcessor,
   updateBatchSpecs,
@@ -21,8 +21,7 @@ import {
   setupTranslationEventListeners,
   updateFilterCounts,
   renderProvidersGrid,
-  applyModelsFilterAndRender,
-  filterModelsTable
+  applyModelsFilterAndRender
 } from './modules/translationProviders';
 import {
   syncAppVersionUI,
@@ -112,7 +111,10 @@ if (typeof window !== 'undefined') {
 }
 
 // Unified language change coordinator
-window.addEventListener('whisper:languageChanged', () => {
+let deferredSettingsSearchFilterTimer: ReturnType<typeof setTimeout> | null = null;
+
+window.addEventListener('whisper:languageChanged', (e: Event) => {
+  const isAnimated = Boolean((e as CustomEvent)?.detail?.animated);
   renderUpdateCheckerUI();
   updateFilterCounts();
   const currentSettings = getSettingsState();
@@ -120,7 +122,7 @@ window.addEventListener('whisper:languageChanged', () => {
     renderProvidersGrid();
   }
   if (currentSettings && translationProviders.getModels().length > 0) {
-    applyModelsFilterAndRender(0);
+    applyModelsFilterAndRender(isAnimated ? (getActiveView() === 'settings' ? 820 : 900) : 0);
   }
 
   const curMetadata = getProbedMetadata();
@@ -135,7 +137,7 @@ window.addEventListener('whisper:languageChanged', () => {
   }
 
   const msgEl = document.getElementById('lbl-radial-msg');
-  if (msgEl) {
+  if (msgEl && !msgEl.classList.contains('text-scrambling')) {
     if (msgEl.dataset.batchSummaryTotal) {
       const lang = getLanguage();
       const successStr = formatLocalizedNumber(Number(msgEl.dataset.batchSummarySuccess || 0), lang, 0);
@@ -159,7 +161,7 @@ window.addEventListener('whisper:languageChanged', () => {
   }
 
   const analyticTimeEl = document.getElementById('analytic-time');
-  if (analyticTimeEl && analyticTimeEl.dataset.elapsedSeconds) {
+  if (analyticTimeEl && analyticTimeEl.dataset.elapsedSeconds && !analyticTimeEl.classList.contains('text-scrambling')) {
     analyticTimeEl.textContent = formatLocalizedTimeDuration(parseFloat(analyticTimeEl.dataset.elapsedSeconds));
   }
 
@@ -176,15 +178,29 @@ window.addEventListener('whisper:languageChanged', () => {
     const curMedia = getSelectedMediaFile();
     if (curMedia) {
       updateMediaCardName(curMedia);
-      filePathEl.textContent = curMedia;
+      if (typeof filePathEl.removeAttribute === 'function') {
+        filePathEl.removeAttribute('data-i18n');
+      }
+      if (!filePathEl.classList.contains('text-scrambling')) {
+        filePathEl.textContent = curMedia;
+      }
     } else if (!batchProcessor.getItems() || batchProcessor.getItems().length === 0) {
-      updateMediaCardName(null);
-      filePathEl.textContent = t('transcribe.selectFilePrompt');
+      if (!fileNameEl.classList.contains('text-scrambling')) {
+        updateMediaCardName(null);
+      }
+      if (typeof filePathEl.setAttribute === 'function') {
+        filePathEl.setAttribute('data-i18n', 'transcribe.selectFilePrompt');
+      }
+      if (!filePathEl.classList.contains('text-scrambling')) {
+        filePathEl.textContent = t('transcribe.selectFilePrompt');
+      }
     } else if (batchProcessor.getIsBatchMode() && batchProcessor.getItems().length > 0) {
       if (typeof fileNameEl.setAttribute === 'function') {
         fileNameEl.setAttribute('data-i18n', 'transcribe.batchModeActive');
       }
-      fileNameEl.textContent = t('transcribe.batchModeActive');
+      if (!fileNameEl.classList.contains('text-scrambling')) {
+        fileNameEl.textContent = t('transcribe.batchModeActive');
+      }
       if (typeof fileNameEl.removeAttribute === 'function') {
         fileNameEl.removeAttribute('title');
       }
@@ -193,7 +209,7 @@ window.addEventListener('whisper:languageChanged', () => {
   }
 
   const nextStep2Btn = document.getElementById('btn-next-step-2');
-  if (nextStep2Btn) {
+  if (nextStep2Btn && !nextStep2Btn.classList.contains('text-scrambling')) {
     if (batchProcessor.getItems() && batchProcessor.getItems().length > 0) {
       nextStep2Btn.textContent = t('transcribe.continueToBatchSetup');
     } else {
@@ -212,17 +228,30 @@ window.addEventListener('whisper:languageChanged', () => {
       else if (opt.value === 'CUDA') opt.textContent = t('transcribe.backendCuda');
       else if (opt.value === 'OpenVINO') opt.textContent = t('transcribe.backendOpenvino');
     });
+    const backendCs = customSelectsMap.get('opt-selectedBackend');
+    if (backendCs) {
+      backendCs.updateOptions(true);
+    }
   }
 
-  syncCustomSelects();
-
-  if (getActiveView() === 'settings') {
-    filterModelsTable(0);
+  if (deferredSettingsSearchFilterTimer !== null) {
+    clearTimeout(deferredSettingsSearchFilterTimer);
+    deferredSettingsSearchFilterTimer = null;
   }
-
   const settingsSearchInput = document.getElementById('settings-search-input') as HTMLInputElement | null;
   if (settingsSearchInput && settingsSearchInput.value) {
-    filterSettings(settingsSearchInput.value);
+    if (isAnimated && getActiveView() === 'settings') {
+      // Wait for the 800ms scramble wave so card titles/descriptions hold resolved text before filtering
+      deferredSettingsSearchFilterTimer = setTimeout(() => {
+        deferredSettingsSearchFilterTimer = null;
+        const liveInput = document.getElementById('settings-search-input') as HTMLInputElement | null;
+        if (liveInput && liveInput.value) {
+          filterSettings(liveInput.value, true);
+        }
+      }, 820);
+    } else {
+      filterSettings(settingsSearchInput.value, true);
+    }
   }
 
   updateTranscribeActionButtons();

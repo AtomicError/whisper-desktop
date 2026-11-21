@@ -900,6 +900,7 @@ export class HardsubController {
   private wasPlayingBeforeSeek: boolean = false;
   private videoLoadGeneration = 0;
   private pageActive = false;
+  private pendingLocalizationRefresh = false;
   private disposed = false;
   private phase: 'idle' | 'loading' | 'preparing' | 'ready' | 'error' | 'cancelled' = 'idle';
   private playbackError: 'network' | 'decode' | 'timeout' | null = null;
@@ -963,9 +964,15 @@ export class HardsubController {
     if (!active) {
       this.clearPlayerWork();
       this.videoElement?.pause();
-    } else if (this.phase === 'ready') {
-      this.updateVideoPreviewOverlayBounds();
-      this.updatePlaybackTime();
+    } else {
+      if (this.pendingLocalizationRefresh) {
+        this.pendingLocalizationRefresh = false;
+        this.refreshLocalization();
+      }
+      if (this.phase === 'ready') {
+        this.updateVideoPreviewOverlayBounds();
+        this.updatePlaybackTime();
+      }
     }
     this.renderPlayerPhase();
   }
@@ -1868,6 +1875,11 @@ export class HardsubController {
     this.updateAlignmentUI = updateAlignmentState;
 
     this.on(window, 'whisper:languageChanged', () => {
+      if (!this.pageActive) {
+        this.pendingLocalizationRefresh = true;
+        return;
+      }
+      this.pendingLocalizationRefresh = false;
       this.refreshLocalization();
     });
 

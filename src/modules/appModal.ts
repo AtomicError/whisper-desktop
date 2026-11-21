@@ -585,7 +585,9 @@ export function renderSidebarUpdateIndicator(): void {
     sidebarBtn.setAttribute('aria-label', availableTitle);
     if (badge) {
       badge.hidden = false;
-      badge.textContent = t('about.sidebarUpdateBadge');
+      if (!badge.classList?.contains('text-scrambling')) {
+        badge.textContent = t('about.sidebarUpdateBadge');
+      }
     }
   } else {
     sidebarBtn.classList.remove('has-update');
@@ -618,6 +620,11 @@ export function renderUpdateCheckerUI(): void {
   card.classList.remove('state-checking', 'state-up-to-date', 'state-update-available', 'state-error');
 
   const currentVer = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '3.1.0';
+  const setTextSafe = (el: HTMLElement, text: string) => {
+    if (!el.classList?.contains('text-scrambling')) {
+      el.textContent = text;
+    }
+  };
 
   switch (_updateCheckerState.status) {
     case 'checking':
@@ -625,10 +632,10 @@ export function renderUpdateCheckerUI(): void {
       btn.disabled = true;
       btn.onclick = null;
       statusEl.removeAttribute('data-i18n');
-      statusEl.textContent = t('about.checkingUpdates');
+      setTextSafe(statusEl, t('about.checkingUpdates'));
       subtextEl.textContent = 'api.github.com';
       btnText.removeAttribute('data-i18n');
-      btnText.textContent = t('about.checkingShort');
+      setTextSafe(btnText, t('about.checkingShort'));
       if (iconWrapper) {
         iconWrapper.innerHTML = `
           <svg class="about-update-icon icon-checking" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -643,10 +650,10 @@ export function renderUpdateCheckerUI(): void {
       btn.disabled = false;
       btn.onclick = () => checkForAppUpdates();
       statusEl.removeAttribute('data-i18n');
-      statusEl.textContent = t('about.upToDate');
+      setTextSafe(statusEl, t('about.upToDate'));
       subtextEl.textContent = `v${currentVer}`;
       btnText.removeAttribute('data-i18n');
-      btnText.textContent = t('about.checkAgain');
+      setTextSafe(btnText, t('about.checkAgain'));
       if (iconWrapper) {
         iconWrapper.innerHTML = `
           <svg class="about-update-icon icon-success" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -670,10 +677,10 @@ export function renderUpdateCheckerUI(): void {
         }
       };
       statusEl.removeAttribute('data-i18n');
-      statusEl.textContent = t('about.updateAvailable', { version: _updateCheckerState.latestVersion || '' });
+      setTextSafe(statusEl, t('about.updateAvailable', { version: _updateCheckerState.latestVersion || '' }));
       subtextEl.textContent = `v${currentVer} → ${_updateCheckerState.latestVersion}`;
       btnText.removeAttribute('data-i18n');
-      btnText.textContent = t('about.viewRelease');
+      setTextSafe(btnText, t('about.viewRelease'));
       if (iconWrapper) {
         iconWrapper.innerHTML = `
           <svg class="about-update-icon icon-update" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -690,10 +697,10 @@ export function renderUpdateCheckerUI(): void {
       btn.disabled = false;
       btn.onclick = () => checkForAppUpdates();
       statusEl.removeAttribute('data-i18n');
-      statusEl.textContent = t('about.updateError');
+      setTextSafe(statusEl, t('about.updateError'));
       subtextEl.textContent = _updateCheckerState.errorMsg || 'GitHub API unreachable';
       btnText.removeAttribute('data-i18n');
-      btnText.textContent = t('about.retryCheck');
+      setTextSafe(btnText, t('about.retryCheck'));
       if (iconWrapper) {
         iconWrapper.innerHTML = `
           <svg class="about-update-icon icon-error" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -710,10 +717,10 @@ export function renderUpdateCheckerUI(): void {
       btn.disabled = false;
       btn.onclick = () => checkForAppUpdates();
       statusEl.setAttribute('data-i18n', 'about.updateTitle');
-      statusEl.textContent = t('about.updateTitle');
+      setTextSafe(statusEl, t('about.updateTitle'));
       subtextEl.textContent = 'GitHub Releases';
       btnText.setAttribute('data-i18n', 'about.checkUpdate');
-      btnText.textContent = t('about.checkUpdate');
+      setTextSafe(btnText, t('about.checkUpdate'));
       if (iconWrapper) {
         iconWrapper.innerHTML = `
           <svg class="about-update-icon icon-idle" id="about-update-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">

@@ -126,6 +126,7 @@ export function isMonochromeCanvasActive(): boolean {
 
 export function applyMonochromeCanvas(isMonochrome: boolean, persist = true, animated = true): void {
   if (typeof document === 'undefined') return;
+  cancelActiveThemeWipe();
   const root = document.documentElement;
   const currentActive = isMonochromeCanvasActive();
 
@@ -171,6 +172,9 @@ export function applyMonochromeCanvas(isMonochrome: boolean, persist = true, ani
 
     if ((window as any).settingsState) {
       (window as any).settingsState.monochromeCanvas = isMonochrome;
+      if (persist && typeof (window as any).markSettingsDirty === 'function') {
+        (window as any).markSettingsDirty();
+      }
     }
   };
 
@@ -254,14 +258,11 @@ export function applyTheme(themeName: string): void {
   const targetCardId = themeCardMap[activeThemeId] || 'theme-card-royal';
 
   document.querySelectorAll('.theme-picker-card').forEach(card => {
+    if (card.closest('#theme-wipe-overlay')) return;
     const isActive = (card.id === targetCardId || (targetCardId === 'theme-card-ruby' && card.id === 'theme-card-carbon'));
     card.classList.toggle('active', isActive);
     card.setAttribute('aria-checked', isActive ? 'true' : 'false');
   });
-
-  if ((window as any).syncCustomSelects) {
-    (window as any).syncCustomSelects();
-  }
 }
 
 export function toggleTheme(): void {
@@ -318,10 +319,32 @@ export function runThemeWipe(
 
   const titlebar = document.querySelector('.titlebar');
 
-  // 1. Create overlay containing the cloned app in the OLD theme and canvas state
+  // 1. Capture live scroll offsets & form states BEFORE mutating the real app
+  const origAppElements = appContainer.querySelectorAll('*');
+  const savedScrolls: Array<{ index: number; scrollTop: number; scrollLeft: number }> = [];
+  const rootScrollTop = appContainer.scrollTop;
+  const rootScrollLeft = appContainer.scrollLeft;
+
+  origAppElements.forEach((el, index) => {
+    const htmlEl = el as HTMLElement;
+    if (htmlEl.scrollTop !== 0 || htmlEl.scrollLeft !== 0) {
+      savedScrolls.push({
+        index,
+        scrollTop: htmlEl.scrollTop,
+        scrollLeft: htmlEl.scrollLeft
+      });
+    }
+  });
+
+  // 2. Create overlay containing the cloned app in the OLD theme and canvas state.
+  // Keep original element IDs so #app-container, #theme-card-*, and #id-scoped CSS rules
+  // render with 100% pixel-accurate layout parity (overlay is appended AFTER real DOM,
+  // marked inert + aria-hidden + pointer-events: none).
   const overlay = document.createElement('div');
   overlay.id = 'theme-wipe-overlay';
   overlay.setAttribute('data-theme', oldThemeId);
+  overlay.setAttribute('aria-hidden', 'true');
+  overlay.setAttribute('inert', '');
   if (oldCanvasAttr) {
     overlay.setAttribute('data-canvas', oldCanvasAttr);
   }
@@ -332,22 +355,31 @@ export function runThemeWipe(
   if (titlebar) {
     cloneWrap.appendChild(titlebar.cloneNode(true));
   }
-  cloneWrap.appendChild(appContainer.cloneNode(true));
+  const clonedApp = appContainer.cloneNode(true) as HTMLElement;
+  cloneWrap.appendChild(clonedApp);
   overlay.appendChild(cloneWrap);
 
-  // Synchronize scroll positions of view scroll containers
-  const origScrolls = document.querySelectorAll('.settings-scroll-container, .main-view, .transcribe-panel');
-  const cloneScrolls = cloneWrap.querySelectorAll('.settings-scroll-container, .main-view, .transcribe-panel');
-  origScrolls.forEach((orig, idx) => {
-    if (cloneScrolls[idx]) {
-      (cloneScrolls[idx] as HTMLElement).scrollTop = (orig as HTMLElement).scrollTop;
-      (cloneScrolls[idx] as HTMLElement).scrollLeft = (orig as HTMLElement).scrollLeft;
+  // Synchronize live form control states (checked / value) onto the clone
+  const cloneAppElements = clonedApp.querySelectorAll('*');
+  origAppElements.forEach((orig, idx) => {
+    const clone = cloneAppElements[idx];
+    if (!clone) return;
+    if (orig instanceof HTMLInputElement && clone instanceof HTMLInputElement) {
+      if (orig.type === 'checkbox' || orig.type === 'radio') {
+        clone.checked = orig.checked;
+      } else {
+        clone.value = orig.value;
+      }
+    } else if (orig instanceof HTMLTextAreaElement && clone instanceof HTMLTextAreaElement) {
+      clone.value = orig.value;
+    } else if (orig instanceof HTMLSelectElement && clone instanceof HTMLSelectElement) {
+      clone.value = orig.value;
     }
   });
 
   // Synchronize canvas pixel buffers so graphic surfaces / subtitle overlays are preserved in the clone
-  const origCanvases = document.querySelectorAll<HTMLCanvasElement>('canvas');
-  const cloneCanvases = cloneWrap.querySelectorAll<HTMLCanvasElement>('canvas');
+  const origCanvases = appContainer.querySelectorAll<HTMLCanvasElement>('canvas');
+  const cloneCanvases = clonedApp.querySelectorAll<HTMLCanvasElement>('canvas');
   origCanvases.forEach((orig, idx) => {
     const clone = cloneCanvases[idx];
     if (clone && orig.width > 0 && orig.height > 0) {
@@ -371,29 +403,43 @@ export function runThemeWipe(
     } catch (_) {}
   });
 
-  // Strip duplicate IDs and Tauri drag regions from visual clone to prevent DOM / webview hit-test collisions
-  cloneWrap.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
+  // Strip Tauri drag regions from visual clone to prevent native window hit-test collisions
   cloneWrap.querySelectorAll('[data-tauri-drag-region]').forEach((el) => el.removeAttribute('data-tauri-drag-region'));
 
-  // 2. Create the SVG Laser Blade Layer (luminous white line cutting across the seam)
+  // 3. Create the SVG Laser Blade Layer (luminous white line cutting across the seam)
   const svgLayer = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svgLayer.setAttribute('class', 'theme-wipe-svg-layer');
+  svgLayer.setAttribute('aria-hidden', 'true');
 
   const bladeLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
   bladeLine.setAttribute('class', 'theme-wipe-blade-line');
   svgLayer.appendChild(bladeLine);
 
+  // 4. Switch the real underlying app to the NEW state BEFORE attaching the clone overlay
+  // so document.querySelectorAll(...) inside onApplyNewState cannot mutate the clone!
+  onApplyNewState();
+
+  // 5. Attach overlay + blade to DOM, then restore captured scroll positions (requires live layout boxes)
   document.body.appendChild(overlay);
   document.body.appendChild(svgLayer);
 
-  // 3. Immediately switch the real underlying app to the NEW state!
-  onApplyNewState();
+  if (rootScrollTop !== 0 || rootScrollLeft !== 0) {
+    clonedApp.scrollTop = rootScrollTop;
+    clonedApp.scrollLeft = rootScrollLeft;
+  }
+  for (const entry of savedScrolls) {
+    const cloneEl = cloneAppElements[entry.index] as HTMLElement | undefined;
+    if (cloneEl) {
+      cloneEl.scrollTop = entry.scrollTop;
+      cloneEl.scrollLeft = entry.scrollLeft;
+    }
+  }
 
   // 4. Smooth 1000ms cinematic diagonal wipe loop
   let rafId: number | null = null;
   let isDone = false;
   const duration = 1000;
-  const startTime = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  let startTime: number | null = null;
 
   const cleanup = () => {
     if (isDone) return;
@@ -416,8 +462,9 @@ export function runThemeWipe(
 
   const tick = (now: number) => {
     if (isDone) return;
+    if (startTime === null) startTime = now;
 
-    const elapsed = now - startTime;
+    const elapsed = Math.max(0, now - startTime);
     const progress = Math.min(1.0, elapsed / duration);
 
     // Smooth, cinematic sine-based ease-in-out for steady, tangible momentum
@@ -516,8 +563,12 @@ export function switchTheme(themeName: string, animated = true): void {
   };
 
   // Synchronize settingsState immediately so the active state is consistent across the app
+  // and mark settings dirty so an early window close still persists the new theme to disk.
   if ((window as any).settingsState) {
     (window as any).settingsState.theme = config.id;
+    if (typeof (window as any).markSettingsDirty === 'function') {
+      (window as any).markSettingsDirty();
+    }
   }
 
   const appContainer = document.getElementById('app-container');
@@ -609,7 +660,7 @@ export async function applyUiZoom(scale: number | string, persist = true, showTo
       selectEl.value = numScale.toString();
     }
     if ((window as any).syncCustomSelects) {
-      (window as any).syncCustomSelects();
+      (window as any).syncCustomSelects(false, true);
     }
   }
 

@@ -257,6 +257,8 @@ const DISPLAY_NAME_ALIASES: Record<string, string> = {
 const MAX_RECENT_LANGUAGES = 3;
 
 const displayNamesCache = new Map<string, Intl.DisplayNames | null>();
+const localizedLabelCache = new Map<string, string>();
+const nativeLabelCache = new Map<string, string>();
 
 function getDisplayNames(locale: string): Intl.DisplayNames | null {
   if (displayNamesCache.has(locale)) {
@@ -290,13 +292,22 @@ function resolveDisplayName(dn: Intl.DisplayNames | null, code: string): string 
 
 /** Localized label for a BCP-47 code in the given UI language (CLDR-based). */
 export function localizedLanguageLabel(code: string, uiLang: string, fallback: string): string {
-  const localized = resolveDisplayName(getDisplayNames(uiLang), code);
-  return localized || fallback;
+  const key = `${uiLang}:${code}:${fallback}`;
+  const cached = localizedLabelCache.get(key);
+  if (cached !== undefined) return cached;
+  const resolved = resolveDisplayName(getDisplayNames(uiLang), code) || fallback;
+  localizedLabelCache.set(key, resolved);
+  return resolved;
 }
 
 /** Name of the language in its own language (native script), for search. */
 export function nativeLanguageLabel(code: string, fallback: string): string {
-  return resolveDisplayName(getDisplayNames(code), code) || fallback;
+  const key = `${code}:${fallback}`;
+  const cached = nativeLabelCache.get(key);
+  if (cached !== undefined) return cached;
+  const resolved = resolveDisplayName(getDisplayNames(code), code) || fallback;
+  nativeLabelCache.set(key, resolved);
+  return resolved;
 }
 
 /** Locale-aware comparator for localized language labels. */

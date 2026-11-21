@@ -31,6 +31,7 @@ const LANGUAGE_SELECT_IDS: Record<LanguageSelectKind, string[]> = {
 
 const AUTO_LANGUAGE_VALUE = 'auto';
 const pendingRefreshCancels = new Map<string, () => void>();
+const sortedEntriesCache = new Map<string, readonly LanguageEntry[]>();
 
 function getSettingsState(): any {
   return (window as any).settingsState || null;
@@ -46,25 +47,33 @@ function buildSearchAliases(parts: string[]): string {
   return normalizeForSearch(parts.filter(Boolean).join(' '));
 }
 
-function buildEntries(kind: LanguageSelectKind, uiLang: string): LanguageEntry[] {
-  if (kind === 'spoken') {
-    return WHISPER_SPOKEN_LANGUAGES.map((lang) => {
-      const label = localizedLanguageLabel(lang.code, uiLang, lang.name);
-      return {
-        value: lang.code,
-        label,
-        search: buildSearchAliases([label, lang.name, nativeLanguageLabel(lang.code, lang.name), lang.code])
-      };
-    });
-  }
-  return TRANSLATION_TARGET_LANGUAGES.map((lang) => {
-    const label = localizedLanguageLabel(lang.code, uiLang, lang.name);
-    return {
-      value: lang.value,
-      label,
-      search: buildSearchAliases([label, lang.name, nativeLanguageLabel(lang.code, lang.name), lang.code])
-    };
-  });
+function getSortedEntries(kind: LanguageSelectKind, uiLang: string): readonly LanguageEntry[] {
+  const cacheKey = `${kind}:${uiLang}`;
+  const cached = sortedEntriesCache.get(cacheKey);
+  if (cached) return cached;
+
+  const raw = kind === 'spoken'
+    ? WHISPER_SPOKEN_LANGUAGES.map((lang) => {
+        const label = localizedLanguageLabel(lang.code, uiLang, lang.name);
+        return {
+          value: lang.code,
+          label,
+          search: buildSearchAliases([label, lang.name, nativeLanguageLabel(lang.code, lang.name), lang.code])
+        };
+      })
+    : TRANSLATION_TARGET_LANGUAGES.map((lang) => {
+        const label = localizedLanguageLabel(lang.code, uiLang, lang.name);
+        return {
+          value: lang.value,
+          label,
+          search: buildSearchAliases([label, lang.name, nativeLanguageLabel(lang.code, lang.name), lang.code])
+        };
+      });
+
+  const compare = makeLanguageComparator(uiLang);
+  const sorted = [...raw].sort((a, b) => compare(a.label, b.label) || a.value.localeCompare(b.value));
+  sortedEntriesCache.set(cacheKey, sorted);
+  return sorted;
 }
 
 function buildAutoEntry(): LanguageEntry {
@@ -99,7 +108,7 @@ function getSelectInstance(selectId: string): any {
 function refreshCustomSelectInstance(select: HTMLSelectElement): void {
   const instance = getSelectInstance(select.id);
   if (instance && typeof instance.updateOptions === 'function') {
-    instance.updateOptions();
+    instance.updateOptions(true);
   }
 }
 
@@ -112,7 +121,7 @@ function refreshCustomSelectInstance(select: HTMLSelectElement): void {
 export function renderLanguageSelect(select: HTMLSelectElement, kind: LanguageSelectKind, currentValue?: string): void {
   if (!select) return;
   const uiLang = getLanguage();
-  const entries = buildEntries(kind, uiLang);
+  const entries = getSortedEntries(kind, uiLang);
 
   let targetValue = (currentValue === undefined ? getCurrentSettingsValue(kind) : currentValue).trim();
   if (!targetValue) {
@@ -146,12 +155,9 @@ export function renderLanguageSelect(select: HTMLSelectElement, kind: LanguageSe
   }
 
   const recentValuesSet = new Set(recentEntries.map((entry) => entry.value.toLowerCase()));
-  const compare = makeLanguageComparator(uiLang);
-  const sorted = entries
-    .filter((entry) => !recentValuesSet.has(entry.value.toLowerCase()))
-    .sort((a, b) => compare(a.label, b.label) || a.value.localeCompare(b.value));
-  if (sorted.length > 0) {
-    select.appendChild(makeGroupElement(t('languages.all'), sorted));
+  const remaining = entries.filter((entry) => !recentValuesSet.has(entry.value.toLowerCase()));
+  if (remaining.length > 0) {
+    select.appendChild(makeGroupElement(t('languages.all'), remaining));
   }
 
   if (!matchedEntry && !(kind === 'spoken' && targetValue === AUTO_LANGUAGE_VALUE)) {
@@ -168,15 +174,19 @@ export function renderLanguageSelect(select: HTMLSelectElement, kind: LanguageSe
   refreshCustomSelectInstance(select);
 }
 
+function cancelPendingSingleRefresh(id: string): void {
+  const cancelPending = pendingRefreshCancels.get(id);
+  if (cancelPending) {
+    cancelPending();
+    pendingRefreshCancels.delete(id);
+  }
+}
+
 function reRenderKind(kind: LanguageSelectKind, activeValue?: string, excludeId?: string): void {
   const value = activeValue !== undefined ? activeValue : getCurrentSettingsValue(kind);
   LANGUAGE_SELECT_IDS[kind].forEach((id) => {
     if (excludeId && id === excludeId) return;
-    const cancelPending = pendingRefreshCancels.get(id);
-    if (cancelPending) {
-      cancelPending();
-      pendingRefreshCancels.delete(id);
-    }
+    cancelPendingSingleRefresh(id);
     const el = document.getElementById(id) as HTMLSelectElement | null;
     if (el) {
       renderLanguageSelect(el, kind, value || el.value);
@@ -257,8 +267,91 @@ function attachRecentsListener(select: HTMLSelectElement, kind: LanguageSelectKi
   });
 }
 
+let deferredLanguageRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+let deferredLanguageRefreshGen = 0;
+
+function cancelDeferredLanguageSelectsRefresh(): void {
+  deferredLanguageRefreshGen++;
+  if (deferredLanguageRefreshTimer !== null) {
+    clearTimeout(deferredLanguageRefreshTimer);
+    deferredLanguageRefreshTimer = null;
+  }
+}
+
+function resolveSingleLanguageTriggerLabel(kind: LanguageSelectKind, value: string, uiLang: string): string {
+  const trimmed = String(value || '').trim();
+  if (kind === 'spoken') {
+    if (!trimmed || trimmed.toLowerCase() === AUTO_LANGUAGE_VALUE) {
+      return t('transcribe.langAuto');
+    }
+    const match = WHISPER_SPOKEN_LANGUAGES.find((lang) => lang.code.toLowerCase() === trimmed.toLowerCase());
+    return match ? localizedLanguageLabel(match.code, uiLang, match.name) : trimmed;
+  }
+  const targetValue = trimmed || TRANSLATION_TARGET_LANGUAGES[0].value;
+  const match = TRANSLATION_TARGET_LANGUAGES.find((lang) => lang.value.toLowerCase() === targetValue.toLowerCase());
+  return match ? localizedLanguageLabel(match.code, uiLang, match.name) : targetValue;
+}
+
+function scheduleLanguageSelectsRefresh(): void {
+  cancelDeferredLanguageSelectsRefresh();
+  const uiLang = getLanguage();
+  const tasks: Array<{ kind: LanguageSelectKind; id: string }> = [];
+
+  (Object.keys(LANGUAGE_SELECT_IDS) as LanguageSelectKind[]).forEach((kind) => {
+    const currentVal = getCurrentSettingsValue(kind);
+    LANGUAGE_SELECT_IDS[kind].forEach((id) => {
+      cancelPendingSingleRefresh(id);
+      const el = document.getElementById(id) as HTMLSelectElement | null;
+      if (!el) return;
+      const instance = getSelectInstance(id);
+      if (instance) {
+        if (typeof instance.syncTriggerLabelText === 'function') {
+          const val = el.value || currentVal;
+          instance.syncTriggerLabelText(resolveSingleLanguageTriggerLabel(kind, val, uiLang));
+        }
+        if (typeof instance.setPendingOptionsRefresh === 'function') {
+          instance.setPendingOptionsRefresh(() => {
+            renderLanguageSelect(el, kind);
+          });
+        }
+      }
+      tasks.push({ kind, id });
+    });
+  });
+
+  if (tasks.length === 0) return;
+
+  // Rebuild heavy searchable language lists one per frame after the 800ms scramble completes
+  const gen = deferredLanguageRefreshGen;
+  deferredLanguageRefreshTimer = setTimeout(() => {
+    deferredLanguageRefreshTimer = null;
+    if (gen !== deferredLanguageRefreshGen) return;
+    let idx = 0;
+    const step = () => {
+      if (gen !== deferredLanguageRefreshGen) return;
+      while (idx < tasks.length) {
+        const task = tasks[idx++];
+        const el = document.getElementById(task.id) as HTMLSelectElement | null;
+        if (!el) continue;
+        const instance = getSelectInstance(task.id);
+        if (instance?.isOpen) continue;
+        if (instance && typeof instance.hasPendingOptionsRefresh === 'function' && !instance.hasPendingOptionsRefresh()) {
+          continue;
+        }
+        renderLanguageSelect(el, task.kind);
+        break;
+      }
+      if (idx < tasks.length && gen === deferredLanguageRefreshGen) {
+        safeRaf(step);
+      }
+    };
+    safeRaf(step);
+  }, 840);
+}
+
 /** Re-renders all language dropdowns (on UI language change). */
 export function refreshLanguageSelects(): void {
+  cancelDeferredLanguageSelectsRefresh();
   (Object.keys(LANGUAGE_SELECT_IDS) as LanguageSelectKind[]).forEach((kind) => reRenderKind(kind));
 }
 
@@ -277,8 +370,13 @@ export function initLanguageSelects(): void {
 
   if (!languageChangedHooked) {
     languageChangedHooked = true;
-    window.addEventListener('whisper:languageChanged', () => {
-      refreshLanguageSelects();
+    window.addEventListener('whisper:languageChanged', (e: Event) => {
+      const isAnimated = Boolean((e as CustomEvent)?.detail?.animated);
+      if (isAnimated) {
+        scheduleLanguageSelectsRefresh();
+      } else {
+        refreshLanguageSelects();
+      }
     });
   }
 }

@@ -203,6 +203,7 @@ html {
   --color-red-rgb: 239, 68, 68;
   --color-hot: #f43f5e;
   --color-text: #f3f4f6;
+  --color-text-main: #f3f4f6;
   --color-text-muted: #9ca3af;
   --color-text-dim: #94a3b8;
 
@@ -290,6 +291,8 @@ html {
   --bg-glass-card: rgba(28, 15, 8, 0.65);
   --border-glass: rgba(255, 255, 255, 0.07);
   --border-glass-active: rgba(255, 107, 0, 0.45);
+  --bg-player-stage: rgba(15, 23, 42, 0.9);
+  --bg-player-controls: rgba(15, 23, 42, 0.9);
   
   --color-accent: #ff6b00;
   --color-accent-rgb: 255, 107, 0;
@@ -312,6 +315,10 @@ html {
   --color-red: #ef4444;
   --color-red-rgb: 239, 68, 68;
   --color-hot: #f43f5e;
+  --color-text: #f3f4f6;
+  --color-text-main: #f3f4f6;
+  --color-text-muted: #9ca3af;
+  --color-text-dim: #94a3b8;
   --accent-primary: var(--color-accent);
   --accent-hover: var(--color-accent-dark);
 
@@ -606,17 +613,32 @@ html {
 /* ==========================================================================
    SMOOTH DESKTOP THEME TRANSITION: REAL DUAL-THEME DIAGONAL WIPE + LASER BLADE
    ========================================================================== */
+#theme-wipe-overlay:not([data-canvas="monochrome"]) {
+  --bg-app: #09090b;
+  --bg-surface: #121215;
+  --bg-elevated: #18181b;
+  --bg-hover: #27272a;
+}
+
 #theme-wipe-overlay {
   position: fixed;
   inset: 0;
   width: 100vw;
   height: 100vh;
+  border-radius: 12px;
   z-index: 99998;
   pointer-events: none;
   overflow: hidden;
   background-color: var(--bg-space);
   contain: strict;
   will-change: clip-path;
+}
+
+#theme-wipe-overlay *,
+#theme-wipe-overlay *::before,
+#theme-wipe-overlay *::after {
+  transition: none !important;
+  animation: none !important;
 }
 
 .theme-wipe-clone-content {
@@ -757,14 +779,35 @@ html {
 }
 
 /* ==========================================================================
-   TERMINAL BLOCK CURSOR / REWRITING DECIPHER STYLING
+   SOLID BLOCK CELL DECIPHER / LANGUAGE SWITCH STYLING
    ========================================================================== */
 .text-scrambling {
-  color: var(--text-primary, #fafafa) !important;
-  text-shadow: 0 0 8px rgba(255, 255, 255, 0.28);
   font-feature-settings: "tnum" 1;
   font-variant-numeric: tabular-nums;
   user-select: none;
+}
+
+.scramble-block-cell {
+  display: inline-block;
+  text-align: center;
+  min-width: 1.05ch;
+  padding-inline: 0.14ch;
+  margin-block: 0;
+  margin-inline: 1px;
+  height: 1.16em;
+  line-height: 1.16em;
+  border-radius: 2px;
+  background-color: var(--color-sky, #38bdf8);
+  color: #09090b;
+  -webkit-text-fill-color: #09090b;
+  font-family: var(--font-mono, "JetBrains Mono", monospace);
+  font-style: normal;
+  font-size: 0.84em;
+  font-weight: 700;
+  vertical-align: baseline;
+  box-shadow: 0 0 8px rgba(var(--color-sky-rgb, 56, 189, 248), 0.42);
+  text-shadow: none;
+  contain: layout style;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -775,6 +818,9 @@ html {
   .text-scrambling {
     color: inherit !important;
     text-shadow: none !important;
+  }
+  .scramble-block-cell {
+    display: none !important;
   }
 }
 

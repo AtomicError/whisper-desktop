@@ -551,8 +551,10 @@ export class TranslationStudioController {
     this.setupSynchronizedHighlighting();
     this.setupStudioShortcuts();
 
-    // Re-render strings when language changes globally
+    // Re-render strings when language changes globally (defer inactive panel until switchView('translate'))
     const onLanguageChange = () => {
+      const panel = typeof document !== 'undefined' ? document.getElementById('panel-translate') : null;
+      if (panel && !panel.classList.contains('active')) return;
       this.refreshLocalization();
     };
     window.addEventListener?.('whisper:languageChanged', onLanguageChange);

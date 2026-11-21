@@ -256,4 +256,66 @@ describe('languageSelect', () => {
 
     vi.useRealTimers();
   });
+
+  it('refreshes immediately on non-animated whisper:languageChanged and avoids double rebuild when opened early on animated switches', async () => {
+    vi.useFakeTimers();
+    vi.resetModules();
+    const winListeners = new Map<string, Array<(e: any) => void>>();
+    const select = new FakeSelect() as any;
+    select.id = 'opt-language';
+    select.dataset = {};
+    select.value = 'en';
+    select.addEventListener = vi.fn();
+
+    let pendingFn: (() => void) | null = null;
+    const instance = {
+      isOpen: false,
+      updateOptions: vi.fn(() => {
+        pendingFn = null;
+      }),
+      syncTriggerLabelText: vi.fn(),
+      setPendingOptionsRefresh: vi.fn((fn: (() => void) | null) => {
+        pendingFn = fn;
+      }),
+      hasPendingOptionsRefresh: vi.fn(() => pendingFn !== null)
+    };
+
+    (globalThis as any).document.getElementById = (id: string) => (id === 'opt-language' ? select : null);
+    (globalThis as any).window.addEventListener = (ev: string, fn: (e: any) => void) => {
+      if (!winListeners.has(ev)) winListeners.set(ev, []);
+      winListeners.get(ev)!.push(fn);
+    };
+    (globalThis as any).window.requestAnimationFrame = (cb: () => void) => {
+      cb();
+      return 1;
+    };
+    const { initLanguageSelects: freshInit } = await import('./languageSelect');
+    (globalThis as any).window.customSelectsMap = new Map([['opt-language', instance]]);
+    freshInit();
+    instance.updateOptions.mockClear();
+
+    const handlers = winListeners.get('whisper:languageChanged') || [];
+    expect(handlers.length).toBeGreaterThan(0);
+
+    // 1. Non-animated switch refreshes immediately without waiting 840ms
+    handlers.forEach(fn => fn({ detail: { language: 'fa', isRtl: true, animated: false } }));
+    expect(instance.updateOptions).toHaveBeenCalledTimes(1);
+
+    // 2. Animated switch defers refresh, and flushing early skips redundant 840ms rebuild
+    instance.updateOptions.mockClear();
+    handlers.forEach(fn => fn({ detail: { language: 'en', isRtl: false, animated: true } }));
+    expect(instance.updateOptions).not.toHaveBeenCalled();
+    expect(instance.hasPendingOptionsRefresh()).toBe(true);
+
+    // Simulate user opening dropdown before 840ms
+    pendingFn?.();
+    expect(instance.updateOptions).toHaveBeenCalledTimes(1);
+    expect(instance.hasPendingOptionsRefresh()).toBe(false);
+
+    // Advancing past 840ms must NOT rebuild a second time
+    vi.advanceTimersByTime(1000);
+    expect(instance.updateOptions).toHaveBeenCalledTimes(1);
+
+    vi.useRealTimers();
+  });
 });

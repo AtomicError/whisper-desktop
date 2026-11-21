@@ -12,6 +12,8 @@ import {
 import { customSelectsMap } from './customSelect';
 import { batchProcessor } from './batchProcessor';
 import * as transcribePipeline from './transcribePipeline';
+import { scrambleBatch, cancelActiveScramble } from '../i18n/textScramble';
+import { setLanguage, t } from '../i18n/index';
 
 class MockElement {
   public tagName: string;
@@ -198,6 +200,66 @@ describe('appNavigation module', () => {
       expect(mockDropdown.close).toHaveBeenCalled();
 
       customSelectsMap.delete('test-select');
+    });
+
+    it('never mutates .nav-item or .view-panel elements inside #theme-wipe-overlay', () => {
+      const cloneNav = new MockElement('DIV');
+      cloneNav.className = 'nav-item active';
+      cloneNav.dataset.view = 'transcribe';
+      (cloneNav as any).closest = (sel: string) => (sel === '#theme-wipe-overlay' ? { id: 'theme-wipe-overlay' } : null);
+
+      const clonePanel = new MockElement('DIV');
+      clonePanel.className = 'view-panel active';
+      (clonePanel as any).closest = (sel: string) => (sel === '#theme-wipe-overlay' ? { id: 'theme-wipe-overlay' } : null);
+
+      navItems.push(cloneNav);
+      panels.push(clonePanel);
+
+      switchView('settings');
+
+      expect(domMap.get('nav-tab-transcribe')?.classList.contains('active')).toBe(false);
+      expect(domMap.get('nav-tab-settings')?.classList.contains('active')).toBe(true);
+      expect(cloneNav.classList.contains('active')).toBe(true);
+      expect(clonePanel.classList.contains('active')).toBe(true);
+    });
+
+    it('detaches #current-view-title from an in-flight language scramble when switching views', () => {
+      const rafQueue: FrameRequestCallback[] = [];
+      vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+        rafQueue.push(cb);
+        return rafQueue.length;
+      });
+      vi.stubGlobal('cancelAnimationFrame', vi.fn());
+
+      try {
+        setLanguage('en', false);
+        switchView('settings');
+        const titleEl = domMap.get('current-view-title')!;
+        expect(titleEl.textContent).toBe(t('nav.settings'));
+
+        // Simulate active language scramble targeting Settings title
+        setLanguage('fa', false);
+        const targetSettingsTitle = t('nav.settings');
+        const targetTranscribeTitle = t('nav.transcribe');
+        scrambleBatch([{ el: titleEl as any, targetText: targetSettingsTitle }], { duration: 800 });
+
+        rafQueue[0](0);
+        rafQueue[rafQueue.length - 1](200);
+        expect(titleEl.classList.contains('text-scrambling')).toBe(true);
+
+        // User switches view before the 800ms scramble completes
+        switchView('transcribe');
+        expect(titleEl.textContent).toBe(targetTranscribeTitle);
+        expect(titleEl.classList.contains('text-scrambling')).toBe(false);
+
+        // Completing the remaining scramble frames must not revert #current-view-title to Settings
+        rafQueue[rafQueue.length - 1](850);
+        expect(titleEl.textContent).toBe(targetTranscribeTitle);
+      } finally {
+        cancelActiveScramble();
+        vi.unstubAllGlobals();
+        setLanguage('en', false);
+      }
     });
   });
 

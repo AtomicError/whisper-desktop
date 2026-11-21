@@ -11,7 +11,9 @@ import { pt } from '../locales/pt';
 import { it } from '../locales/it';
 import { tr } from '../locales/tr';
 import { ko } from '../locales/ko';
-import { scrambleBatch } from './textScramble';
+import { scrambleBatch, cancelActiveScramble, cancelScrambleForElement } from './textScramble';
+
+export { cancelScrambleForElement };
 
 export type SupportedLanguage =
   | 'en'
@@ -301,12 +303,32 @@ function isElementVisible(el: HTMLElement): boolean {
     if (!el.isConnected) return false;
     // Native select options are non-rendered DOM elements replaced by custom selects
     if (el.tagName === 'OPTION') return false;
-    if (el.closest('.titlebar, header, sidebar, .sidebar-nav, .brand')) return true;
-    if (el.closest('.view-panel.active, .fixed-layout-panel.active')) return true;
-    return el.offsetParent !== null;
+    // Never scramble or mutate elements inside the frozen theme-wipe snapshot overlay
+    if (el.closest('#theme-wipe-overlay')) return false;
+    // Fast-path: reject inactive panels/groups before querying offsetParent or bounding rects
+    if (el.closest('.view-panel:not(.active), .settings-group:not(.active)')) return false;
+    // Reject elements inside display:none ancestors (e.g. closed modals, hidden sections)
+    // Position-fixed layers (.titlebar, open modals, toast container) have null offsetParent even when visible
+    if (
+      el.offsetParent === null &&
+      !el.closest('.titlebar, .modal-overlay.show, #app-modal-overlay.show, #toast-container')
+    ) {
+      return false;
+    }
+    if (typeof el.getBoundingClientRect === 'function' && typeof window !== 'undefined') {
+      const rect = el.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) return false;
+      const vh = window.innerHeight || document.documentElement?.clientHeight || 1080;
+      if (rect.bottom < -40 || rect.top > vh + 40) return false;
+    }
+    return true;
   } catch (_) {
     return true;
   }
+}
+
+function isInsideThemeWipeOverlay(el: HTMLElement): boolean {
+  return typeof el.closest === 'function' && Boolean(el.closest('#theme-wipe-overlay'));
 }
 
 function translateNonTextI18n(root?: Document | Element): void {
@@ -316,6 +338,7 @@ function translateNonTextI18n(root?: Document | Element): void {
   // Translate rich HTML content with defensive sanitization
   const htmlElements = doc.querySelectorAll<HTMLElement>('[data-i18n-html]');
   for (const el of htmlElements) {
+    if (isInsideThemeWipeOverlay(el)) continue;
     const key = el.getAttribute('data-i18n-html');
     if (key) {
       const raw = t(key);
@@ -329,6 +352,7 @@ function translateNonTextI18n(root?: Document | Element): void {
   // Translate specific helper attributes
   const placeholderEls = doc.querySelectorAll<HTMLElement>('[data-i18n-placeholder]');
   for (const el of placeholderEls) {
+    if (isInsideThemeWipeOverlay(el)) continue;
     const key = el.getAttribute('data-i18n-placeholder');
     if (key) {
       el.setAttribute('placeholder', t(key));
@@ -337,6 +361,7 @@ function translateNonTextI18n(root?: Document | Element): void {
 
   const titleEls = doc.querySelectorAll<HTMLElement>('[data-i18n-title]');
   for (const el of titleEls) {
+    if (isInsideThemeWipeOverlay(el)) continue;
     const key = el.getAttribute('data-i18n-title');
     if (key) {
       el.setAttribute('title', t(key));
@@ -345,6 +370,7 @@ function translateNonTextI18n(root?: Document | Element): void {
 
   const ariaEls = doc.querySelectorAll<HTMLElement>('[data-i18n-aria]');
   for (const el of ariaEls) {
+    if (isInsideThemeWipeOverlay(el)) continue;
     const key = el.getAttribute('data-i18n-aria');
     if (key) {
       el.setAttribute('aria-label', t(key));
@@ -354,6 +380,7 @@ function translateNonTextI18n(root?: Document | Element): void {
   // Translate compound attributes (format: "title:key,placeholder:key2")
   const attrElements = doc.querySelectorAll<HTMLElement>('[data-i18n-attr]');
   for (const el of attrElements) {
+    if (isInsideThemeWipeOverlay(el)) continue;
     const rawAttr = el.getAttribute('data-i18n-attr');
     if (!rawAttr) continue;
     const pairs = rawAttr.split(',');
@@ -373,6 +400,7 @@ export function translateDOM(root?: Document | Element): void {
   // Translate text content
   const textElements = doc.querySelectorAll<HTMLElement>('[data-i18n]');
   for (const el of textElements) {
+    if (isInsideThemeWipeOverlay(el)) continue;
     const key = el.getAttribute('data-i18n');
     if (key) {
       el.textContent = t(key);
@@ -380,6 +408,81 @@ export function translateDOM(root?: Document | Element): void {
   }
 
   translateNonTextI18n(doc);
+}
+
+let pendingLanguageFrameId: number | null = null;
+let pendingLanguageTimerId: ReturnType<typeof setTimeout> | null = null;
+
+function cancelPendingLanguageSwitch(): void {
+  if (pendingLanguageFrameId !== null && typeof cancelAnimationFrame === 'function') {
+    cancelAnimationFrame(pendingLanguageFrameId);
+    pendingLanguageFrameId = null;
+  }
+  if (pendingLanguageTimerId !== null) {
+    clearTimeout(pendingLanguageTimerId);
+    pendingLanguageTimerId = null;
+  }
+  if (typeof window !== 'undefined' && typeof (window as any).cancelScheduledCustomSelectsRefresh === 'function') {
+    (window as any).cancelScheduledCustomSelectsRefresh();
+  }
+}
+
+function applyDocumentDirection(lang: SupportedLanguage, isRtl: boolean): void {
+  if (typeof document === 'undefined' || !document.documentElement) return;
+  document.documentElement.setAttribute('lang', lang);
+  document.documentElement.setAttribute('dir', isRtl ? 'rtl' : 'ltr');
+  if (isRtl) {
+    document.documentElement.classList.add('rtl-layout');
+  } else {
+    document.documentElement.classList.remove('rtl-layout');
+  }
+  document.title = APP_NAME;
+}
+
+function collectI18nPartition(): {
+  scrambleItems: Array<{ el: HTMLElement; targetText: string }>;
+  hiddenUpdates: Array<{ el: HTMLElement; targetText: string }>;
+} {
+  const scrambleItems: Array<{ el: HTMLElement; targetText: string }> = [];
+  const hiddenUpdates: Array<{ el: HTMLElement; targetText: string }> = [];
+  if (typeof document === 'undefined') {
+    return { scrambleItems, hiddenUpdates };
+  }
+
+  // Pure read pass: inspect visibility before mutating any textContent to avoid layout thrashing
+  const allTextEls = document.querySelectorAll<HTMLElement>('[data-i18n]');
+  for (const el of allTextEls) {
+    if (isInsideThemeWipeOverlay(el)) continue;
+    const key = el.getAttribute('data-i18n');
+    if (!key) continue;
+    const targetText = t(key);
+    if (isElementVisible(el)) {
+      scrambleItems.push({ el, targetText });
+    } else {
+      hiddenUpdates.push({ el, targetText });
+    }
+  }
+
+  const activeNav = document.querySelector<HTMLElement>('.nav-item.active');
+  const viewTitle = document.getElementById('current-view-title');
+  if (activeNav && activeNav.dataset.view && viewTitle) {
+    const locTitle = t(`nav.${activeNav.dataset.view}`);
+    if (locTitle) {
+      if (isElementVisible(viewTitle)) {
+        scrambleItems.push({ el: viewTitle, targetText: locTitle });
+      } else {
+        hiddenUpdates.push({ el: viewTitle, targetText: locTitle });
+      }
+    }
+  }
+
+  return { scrambleItems, hiddenUpdates };
+}
+
+function dispatchLanguageChanged(lang: SupportedLanguage, isRtl: boolean, animated: boolean = false): void {
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    window.dispatchEvent(new CustomEvent('whisper:languageChanged', { detail: { language: lang, isRtl, animated } }));
+  }
 }
 
 export function setLanguage(
@@ -390,98 +493,26 @@ export function setLanguage(
     lang = 'en';
   }
 
+  cancelPendingLanguageSwitch();
+  cancelActiveScramble();
+
+  const prevLang = currentLang;
   currentLang = lang;
   try {
     localStorage.setItem(STORAGE_KEY, lang);
   } catch (_) {}
 
   const isRtl = isRtlLanguage(lang);
-  if (typeof document !== 'undefined' && document.documentElement) {
-    document.documentElement.setAttribute('lang', lang);
-    document.documentElement.setAttribute('dir', isRtl ? 'rtl' : 'ltr');
-    if (isRtl) {
-      document.documentElement.classList.add('rtl-layout');
-    } else {
-      document.documentElement.classList.remove('rtl-layout');
-    }
-  }
 
-  // Sync select dropdown in UI if present
+  // Sync select dropdown value immediately
   if (typeof document !== 'undefined') {
     const selectEl = document.getElementById('opt-uiLanguage') as HTMLSelectElement | null;
     if (selectEl && selectEl.value !== lang) {
       selectEl.value = lang;
     }
-    document.title = APP_NAME;
   }
 
-  const isSplash = typeof document !== 'undefined' && Boolean(document.getElementById('splash-curtain'));
-  const isTestEnv = typeof (globalThis as any).process !== 'undefined' && (globalThis as any).process?.env?.NODE_ENV === 'test';
-  const shouldAnimate = animated && !isSplash && !isTestEnv &&
-    typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function' &&
-    !window.matchMedia('(prefers-reduced-motion: reduce)').matches &&
-    typeof requestAnimationFrame === 'function' &&
-    typeof document !== 'undefined' &&
-    typeof document.querySelectorAll === 'function';
-
-  if (shouldAnimate) {
-    const allTextEls = document.querySelectorAll<HTMLElement>('[data-i18n]');
-    const scrambleItems: Array<{ el: HTMLElement; targetText: string }> = [];
-
-    for (const el of allTextEls) {
-      const key = el.getAttribute('data-i18n');
-      if (!key) continue;
-      const target = t(key);
-
-      if (isElementVisible(el)) {
-        scrambleItems.push({ el, targetText: target });
-      } else {
-        el.textContent = target;
-      }
-    }
-
-    const activeNav = document.querySelector<HTMLElement>('.nav-item.active');
-    const viewTitle = document.getElementById('current-view-title');
-    if (activeNav && activeNav.dataset.view && viewTitle) {
-      const locTitle = t(`nav.${activeNav.dataset.view}`);
-      if (locTitle) {
-        scrambleItems.push({ el: viewTitle, targetText: locTitle });
-      }
-    }
-
-    translateNonTextI18n();
-
-    if (typeof (window as any).syncCustomSelects === 'function') {
-      (window as any).syncCustomSelects(true);
-    }
-
-    scrambleBatch(scrambleItems, {
-      duration: 1000,
-      onComplete: () => {
-        if (typeof (window as any).syncCustomSelects === 'function') {
-          (window as any).syncCustomSelects(true);
-        }
-      }
-    });
-  } else {
-    translateDOM();
-
-    if (typeof (window as any).syncCustomSelects === 'function') {
-      (window as any).syncCustomSelects(true);
-    }
-
-    if (typeof document !== 'undefined') {
-      const activeNav = document.querySelector<HTMLElement>('.nav-item.active');
-      const viewTitle = document.getElementById('current-view-title');
-      if (activeNav && activeNav.dataset.view) {
-        const locTitle = t(`nav.${activeNav.dataset.view}`);
-        if (viewTitle && locTitle) viewTitle.textContent = locTitle;
-      }
-    }
-  }
-
-  // Synchronize with settingsState and save to backend if available (non-blocking!)
+  // Synchronize settingsState and schedule non-blocking backend save
   if (typeof window !== 'undefined') {
     const win = window as any;
     if (win.settingsState && win.settingsState.uiLanguage !== lang) {
@@ -492,10 +523,82 @@ export function setLanguage(
     }
   }
 
-  // Dispatch global event for components that listen to language change
-  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
-    window.dispatchEvent(new CustomEvent('whisper:languageChanged', { detail: { language: lang, isRtl } }));
+  const isSplash = typeof document !== 'undefined' && Boolean(document.getElementById('splash-curtain'));
+  const isTestEnv = typeof (globalThis as any).process !== 'undefined' && (globalThis as any).process?.env?.NODE_ENV === 'test';
+  const shouldAnimate = animated && prevLang !== lang && !isSplash && !isTestEnv &&
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    !window.matchMedia('(prefers-reduced-motion: reduce)').matches &&
+    typeof requestAnimationFrame === 'function' &&
+    typeof document !== 'undefined' &&
+    typeof document.querySelectorAll === 'function';
+
+  if (shouldAnimate) {
+    // Yield one animation frame so an open dropdown closes smoothly before layout/text transition begins
+    pendingLanguageFrameId = requestAnimationFrame(() => {
+      pendingLanguageFrameId = null;
+      // Read visibility BEFORE mutating html[dir]/rtl-layout so scrambleBatch's getComputedStyle loop avoids forced layout recalc
+      const { scrambleItems, hiddenUpdates } = collectI18nPartition();
+
+      scrambleBatch(scrambleItems, {
+        duration: 800,
+        onComplete: () => {
+          if (currentLang !== lang) return;
+          const win = typeof window !== 'undefined' ? (window as any) : null;
+          if (!win) return;
+          if (typeof win.flushPreparedCustomSelectsOptionsRefresh === 'function') {
+            win.flushPreparedCustomSelectsOptionsRefresh(true);
+          } else if (typeof win.scheduleCustomSelectsOptionsRefresh === 'function') {
+            win.scheduleCustomSelectsOptionsRefresh(true);
+          } else if (typeof win.syncCustomSelects === 'function') {
+            win.syncCustomSelects(true, true);
+          }
+        }
+      });
+
+      applyDocumentDirection(lang, isRtl);
+
+      // Wait until Frame 1 of scrambleBatch has painted before running lightweight background DOM updates
+      pendingLanguageFrameId = requestAnimationFrame(() => {
+        pendingLanguageFrameId = null;
+        pendingLanguageTimerId = setTimeout(() => {
+          pendingLanguageTimerId = null;
+          for (const item of hiddenUpdates) {
+            item.el.textContent = item.targetText;
+          }
+          translateNonTextI18n();
+          const win = typeof window !== 'undefined' ? (window as any) : null;
+          // Sync visible select triggers immediately and mark deferred option rebuilds as on-demand if opened early
+          if (win && typeof win.syncCustomSelects === 'function') {
+            win.syncCustomSelects(false, true);
+          }
+          if (win && typeof win.prepareCustomSelectsOptionsRefresh === 'function') {
+            win.prepareCustomSelectsOptionsRefresh(true);
+          }
+          dispatchLanguageChanged(lang, isRtl, true);
+        }, 0);
+      });
+    });
+    return;
   }
+
+  applyDocumentDirection(lang, isRtl);
+  translateDOM();
+
+  if (typeof (window as any).syncCustomSelects === 'function') {
+    (window as any).syncCustomSelects(true);
+  }
+
+  if (typeof document !== 'undefined') {
+    const activeNav = document.querySelector<HTMLElement>('.nav-item.active');
+    const viewTitle = document.getElementById('current-view-title');
+    if (activeNav && activeNav.dataset.view) {
+      const locTitle = t(`nav.${activeNav.dataset.view}`);
+      if (viewTitle && locTitle) viewTitle.textContent = locTitle;
+    }
+  }
+
+  dispatchLanguageChanged(lang, isRtl, false);
 }
 
 export function initI18n(): void {
@@ -513,6 +616,14 @@ export function initI18n(): void {
   } catch (_) {}
 
   setLanguage(initialLang, false);
+
+  // Fallback binding in case backend settings fail to load before bindSettingsToDOM runs
+  if (typeof document !== 'undefined' && typeof document.getElementById === 'function') {
+    const selectEl = document.getElementById('opt-uiLanguage') as HTMLSelectElement | null;
+    if (selectEl && !selectEl.onchange) {
+      selectEl.onchange = () => setLanguage(selectEl.value as SupportedLanguage);
+    }
+  }
 }
 
 // Expose globals for convenience across the existing vanilla codebase

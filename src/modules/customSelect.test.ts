@@ -4,6 +4,10 @@ import {
   customSelectsMap,
   initializeCustomSelects,
   syncCustomSelects,
+  prepareCustomSelectsOptionsRefresh,
+  flushPreparedCustomSelectsOptionsRefresh,
+  scheduleCustomSelectsOptionsRefresh,
+  cancelScheduledCustomSelectsRefresh,
   customSelect
 } from './customSelect';
 
@@ -1453,8 +1457,146 @@ describe('CustomSelect Module', () => {
       syncSelectedValueSpy.mockClear();
 
       syncCustomSelects(true);
-      expect(updateOptionsSpy).toHaveBeenCalled();
-      expect(syncSelectedValueSpy).toHaveBeenCalled();
+      expect(updateOptionsSpy).toHaveBeenCalledWith(true);
+      expect(syncSelectedValueSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('skips trigger tooltip measurement when updateOptions(true) is called', () => {
+      const selectEl = createTestSelect('skip-tooltip-sel');
+      const cs = new CustomSelect(selectEl);
+      const tooltipSpy = vi.spyOn(cs, 'updateTriggerTooltip');
+
+      cs.updateOptions(true);
+      expect(tooltipSpy).not.toHaveBeenCalled();
+
+      cs.updateOptions(false);
+      expect(tooltipSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('flushes deferred options refresh immediately when open() is called before scheduled rAF completes', () => {
+      const selectEl = createTestSelect('deferred-open-sel');
+      const cs = new CustomSelect(selectEl);
+      const updateSpy = vi.spyOn(cs, 'updateOptions');
+
+      const win = (globalThis as any).window;
+      const prevRaf = win.requestAnimationFrame;
+      const queued: Array<() => void> = [];
+      win.requestAnimationFrame = (cb: () => void) => {
+        queued.push(cb);
+        return queued.length;
+      };
+
+      try {
+        scheduleCustomSelectsOptionsRefresh(true, 1);
+        expect(queued.length).toBe(1);
+        expect(updateSpy).not.toHaveBeenCalled();
+
+        // User opens dropdown before queued rAF chunk runs
+        cs.open();
+        expect(updateSpy).toHaveBeenCalledTimes(1);
+        expect(updateSpy).toHaveBeenCalledWith(true);
+
+        // Draining queued rAF afterwards must not re-run updateOptions for the already-flushed select
+        queued.forEach(fn => fn());
+        expect(updateSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        win.requestAnimationFrame = prevRaf;
+        cs.close();
+        cancelScheduledCustomSelectsRefresh();
+      }
+    });
+
+    it('prepares deferred options refresh on-demand and flushes skipped open selects upon close()', () => {
+      const selectEl = createTestSelect('deferred-close-sel');
+      const cs = new CustomSelect(selectEl);
+      const updateSpy = vi.spyOn(cs, 'updateOptions');
+
+      const win = (globalThis as any).window;
+      const prevRaf = win.requestAnimationFrame;
+      const queued: Array<() => void> = [];
+      win.requestAnimationFrame = (cb: () => void) => {
+        queued.push(cb);
+        return queued.length;
+      };
+
+      try {
+        // 1. Register pending refresh immediately (before 800ms scramble completes)
+        prepareCustomSelectsOptionsRefresh(true);
+        expect(cs.hasPendingOptionsRefresh()).toBe(true);
+        expect(updateSpy).not.toHaveBeenCalled();
+
+        // 2. Keep dropdown open while chunked flush runs -> skipped because isOpen === true
+        cs.isOpen = true;
+        flushPreparedCustomSelectsOptionsRefresh(true, 6);
+        queued.forEach(fn => fn());
+        expect(updateSpy).not.toHaveBeenCalled();
+        expect(cs.hasPendingOptionsRefresh()).toBe(true);
+
+        // 3. Closing dropdown flushes the pending refresh via finalizeCloseVisuals
+        cs.isOpen = false;
+        cs.close();
+        expect(updateSpy).toHaveBeenCalledTimes(1);
+        expect(cs.hasPendingOptionsRefresh()).toBe(false);
+      } finally {
+        win.requestAnimationFrame = prevRaf;
+        cancelScheduledCustomSelectsRefresh();
+      }
+    });
+
+    it('clears stale trigger title when syncSelectedValue(true) skips tooltip measurement', () => {
+      const selectEl = createTestSelect('stale-title-sel');
+      const cs = new CustomSelect(selectEl);
+      const valEl = cs.trigger?.querySelector('.custom-select-value') as HTMLElement;
+      valEl.title = 'Old Language Title';
+      cs.trigger!.title = 'Old Language Title';
+      const tooltipSpy = vi.spyOn(cs, 'updateTriggerTooltip');
+
+      cs.syncSelectedValue(true);
+
+      expect(tooltipSpy).not.toHaveBeenCalled();
+      expect(valEl.getAttribute('title')).toBeNull();
+      expect(cs.trigger!.getAttribute('title')).toBeNull();
+    });
+
+    it('ignores MutationObserver rebuilds and drains pending records while deferred refresh is armed', () => {
+      const takeRecordsSpy = vi.fn(() => [{ type: 'childList' }]);
+      let observerCb: (() => void) | null = null;
+
+      const PrevObserver = (globalThis as any).MutationObserver;
+      (globalThis as any).MutationObserver = class {
+        constructor(cb: () => void) {
+          observerCb = cb;
+        }
+        observe() {}
+        disconnect() {}
+        takeRecords = takeRecordsSpy;
+      };
+
+      try {
+        const guardedSelect = createTestSelect('observer-guard-sel');
+        const guardedCs = new CustomSelect(guardedSelect);
+        const guardedUpdateSpy = vi.spyOn(guardedCs, 'updateOptions');
+
+        guardedCs.setPendingOptionsRefresh(() => {
+          guardedCs.updateOptions(true);
+        });
+        expect(takeRecordsSpy).toHaveBeenCalled();
+
+        // Simulate queued MutationObserver firing while _pendingOptionsRefresh is armed
+        expect(observerCb).not.toBeNull();
+        observerCb!();
+        expect(guardedUpdateSpy).not.toHaveBeenCalled();
+        expect(guardedCs.hasPendingOptionsRefresh()).toBe(true);
+
+        // Once opened, pending refresh flushes cleanly
+        guardedCs.open();
+        expect(guardedUpdateSpy).toHaveBeenCalledTimes(1);
+        expect(guardedUpdateSpy).toHaveBeenCalledWith(true);
+        guardedCs.close();
+        guardedCs.destroy();
+      } finally {
+        (globalThis as any).MutationObserver = PrevObserver;
+      }
     });
 
     it('exposes global backwards compatibility shims and customSelect controller', () => {

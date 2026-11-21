@@ -53,8 +53,11 @@ import {
   setupNumberInputControls,
   setupQuickConfigDeckEventListeners,
   resetTranscribeOutputDir,
-  syncSettingsManagerWindowBindings
+  syncSettingsManagerWindowBindings,
+  markSettingsDirty,
+  flushPendingSettingsOnUnload
 } from './settingsManager';
+import { switchTheme } from './themeManager';
 import { resetQuickDeckState } from './transcribeQuickDeck';
 import { setLanguage } from '../i18n/index';
 
@@ -1816,6 +1819,54 @@ describe('settingsManager module', () => {
         expect(invokeSpy).not.toHaveBeenCalled();
       } finally {
         (globalThis as any).window.__TAURI__ = prevTauri;
+      }
+    });
+
+    it('flushes dirty theme state on unload even when no debounce timer is active', () => {
+      const invokeSpy = vi.fn().mockResolvedValue(undefined);
+      const prevTauri = (globalThis as any).window.__TAURI__;
+      const prevMarkDirty = (globalThis as any).window.markSettingsDirty;
+      const docObj = (globalThis as any).document as any;
+      const prevDocEl = docObj.documentElement;
+      const mockDocEl = new MockElement('HTML');
+      (mockDocEl as any).style = { setProperty: vi.fn(), removeProperty: vi.fn() };
+      docObj.documentElement = mockDocEl;
+      (globalThis as any).window.__TAURI__ = { core: { invoke: invokeSpy } };
+      syncSettingsManagerWindowBindings();
+
+      try {
+        // 1. switchTheme marks settings dirty synchronously via window.markSettingsDirty
+        const dirtySpy = vi.fn(markSettingsDirty);
+        (globalThis as any).window.markSettingsDirty = dirtySpy;
+        setSettingsState({ theme: 'royal-blue', uiLanguage: 'en' });
+        switchTheme('emerald', true);
+        expect(dirtySpy).toHaveBeenCalledTimes(1);
+
+        // Flush any debounce timer created by non-animated test-env finalization, then reset spy
+        flushPendingSettingsOnUnload();
+        invokeSpy.mockClear();
+
+        // 2. Simulate theme/monochrome update marked dirty with NO debounce timer armed (mid-1000ms wipe)
+        setSettingsState({ theme: 'fire-orange', uiLanguage: 'en' });
+        markSettingsDirty();
+        flushPendingSettingsOnUnload();
+
+        expect(invokeSpy).toHaveBeenCalledTimes(1);
+        expect(invokeSpy).toHaveBeenCalledWith(
+          'save_settings',
+          expect.objectContaining({
+            settings: expect.objectContaining({ theme: 'fire-orange' })
+          })
+        );
+
+        // Second flush without new dirty changes must be a no-op
+        flushPendingSettingsOnUnload();
+        expect(invokeSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        flushPendingSettingsOnUnload();
+        docObj.documentElement = prevDocEl;
+        (globalThis as any).window.__TAURI__ = prevTauri;
+        (globalThis as any).window.markSettingsDirty = prevMarkDirty;
       }
     });
   });

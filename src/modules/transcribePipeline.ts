@@ -263,6 +263,9 @@ export function clearSingleMediaFile(): void {
   }
   const filePathEl = document.getElementById('lbl-file-path');
   if (filePathEl) {
+    if (typeof filePathEl.setAttribute === 'function') {
+      filePathEl.setAttribute('data-i18n', 'transcribe.selectFilePrompt');
+    }
     filePathEl.textContent = t('transcribe.selectFilePrompt');
     filePathEl.style.display = 'block';
     filePathEl.removeAttribute('title');
@@ -446,6 +449,9 @@ export function applySingleFileSelectedUI(filePath: string): void {
   if (filePathEl) filePathEl.style.display = 'block';
   updateMediaCardName(filePath);
   if (filePathEl) {
+    if (typeof filePathEl.removeAttribute === 'function') {
+      filePathEl.removeAttribute('data-i18n');
+    }
     filePathEl.textContent = filePath;
     filePathEl.title = isolateLtr(filePath);
   }

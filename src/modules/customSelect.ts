@@ -87,6 +87,7 @@ export class CustomSelect {
   private _lockedDropdownWidth: number | null = null;
   private _openCleanupCancel: (() => void) | null = null;
   private _closeCleanupCancel: (() => void) | null = null;
+  private _pendingOptionsRefresh: (() => void) | null = null;
 
   constructor(selectElement: HTMLSelectElement, options: CustomSelectOptions = {}) {
     this.select = selectElement;
@@ -373,6 +374,10 @@ export class CustomSelect {
 
     if (shouldObserve && typeof MutationObserver !== 'undefined') {
       this.observer = new MutationObserver(() => {
+        if (this._pendingOptionsRefresh) {
+          this.syncDisabledState();
+          return;
+        }
         this.updateOptions();
         this.syncDisabledState();
       });
@@ -706,13 +711,15 @@ export class CustomSelect {
     }
   }
 
-  public updateOptions(): void {
+  public updateOptions(skipTooltip = false): void {
     if (!this.select || !this.optionsContainer || !this.container) return;
+    this._pendingOptionsRefresh = null;
     const wasOpen = this.isOpen;
     this._cachedOptions = [];
     this._cachedOptionByEl = new WeakMap<HTMLElement, CachedOptionEntry>();
     const frag = document.createDocumentFragment();
 
+    const isSearchable = this.isSearchable();
     let optionIdx = 0;
     const appendOption = (opt: HTMLOptionElement) => {
       if (opt.hidden || (opt.disabled && opt.value === '')) {
@@ -734,15 +741,20 @@ export class CustomSelect {
         optDiv.classList.add('disabled');
         optDiv.setAttribute('aria-disabled', 'true');
       }
-      const labelText = normalizeForSearch(opt.textContent || '');
-      const cachedEntry: CachedOptionEntry = {
-        el: optDiv,
-        labelText,
-        valueText: normalizeForSearch(opt.value || ''),
-        searchText: normalizeForSearch(`${opt.textContent || ''} ${searchData || ''}`)
-      };
-      this._cachedOptions.push(cachedEntry);
-      this._cachedOptionByEl.set(optDiv, cachedEntry);
+      if (isSearchable) {
+        const labelText = normalizeForSearch(opt.textContent || '');
+        const normalizedAlias = searchData ? normalizeForSearch(searchData) : '';
+        const cachedEntry: CachedOptionEntry = {
+          el: optDiv,
+          labelText,
+          valueText: normalizeForSearch(opt.value || ''),
+          searchText: normalizedAlias ? `${labelText} ${normalizedAlias}` : labelText
+        };
+        this._cachedOptions.push(cachedEntry);
+        this._cachedOptionByEl.set(optDiv, cachedEntry);
+      } else {
+        this._cachedOptions.push({ el: optDiv, labelText: '', valueText: '', searchText: '' });
+      }
       frag.appendChild(optDiv);
     };
     const appendGroup = (group: HTMLOptGroupElement) => {
@@ -797,7 +809,7 @@ export class CustomSelect {
       this.optionsContainer.removeAttribute('dir');
     }
 
-    this.syncSelectedValue();
+    this.syncSelectedValue(skipTooltip);
     if (wasOpen) {
       if (this.isSearchable() && this.searchInput) {
         this.applyFilter(this.searchInput.value);
@@ -1037,7 +1049,7 @@ export class CustomSelect {
     }
   }
 
-  public syncSelectedValue(): void {
+  public syncSelectedValue(skipTooltip = false): void {
     if (!this.select || !this.trigger || !this.optionsContainer) return;
     let selectedOpt = this.select.options ? this.select.options[this.select.selectedIndex] : null;
     if (!selectedOpt || selectedOpt.value !== this.select.value) {
@@ -1050,7 +1062,12 @@ export class CustomSelect {
     if (valEl) {
       valEl.textContent = valText;
     }
-    this.updateTriggerTooltip();
+    if (!skipTooltip) {
+      this.updateTriggerTooltip();
+    } else {
+      if (valEl) valEl.removeAttribute('title');
+      this.trigger.removeAttribute('title');
+    }
     this.syncAccessibleName();
 
     const optionDivs = this.getOptionDivs();
@@ -1229,9 +1246,48 @@ export class CustomSelect {
     }
   }
 
+  public setPendingOptionsRefresh(fn: (() => void) | null): void {
+    this._pendingOptionsRefresh = fn;
+    if (fn && this.observer && typeof this.observer.takeRecords === 'function') {
+      this.observer.takeRecords();
+    }
+  }
+
+  public hasPendingOptionsRefresh(): boolean {
+    return this._pendingOptionsRefresh !== null;
+  }
+
+  public flushPendingOptionsRefresh(): void {
+    if (this._pendingOptionsRefresh) {
+      const fn = this._pendingOptionsRefresh;
+      this._pendingOptionsRefresh = null;
+      fn();
+    }
+  }
+
+  public syncTriggerLabelText(overrideText?: string): void {
+    if (!this.select || !this.trigger) return;
+    let valText = overrideText;
+    if (valText === undefined) {
+      let selectedOpt = this.select.options ? this.select.options[this.select.selectedIndex] : null;
+      if (!selectedOpt || selectedOpt.value !== this.select.value) {
+        const opts = Array.from(this.select.options || []);
+        const found = opts.find((o: any) => o.value === this.select.value);
+        if (found) selectedOpt = found;
+      }
+      valText = (selectedOpt && selectedOpt.textContent) ? selectedOpt.textContent : this.getPlaceholder();
+    }
+    const valEl = this.trigger.querySelector('.custom-select-value') as HTMLElement | null;
+    if (valEl && valEl.textContent !== valText) {
+      valEl.textContent = valText;
+    }
+    this.syncAccessibleName();
+  }
+
   public open(): void {
     if ((this.select && this.select.disabled) || !this.optionsContainer || !this.trigger || !this.container) return;
     if (this.isOpen) return;
+    this.flushPendingOptionsRefresh();
     if (customSelectsMap) {
       customSelectsMap.forEach(cs => {
         if (cs !== this && cs && typeof cs.close === 'function' && cs.isOpen) {
@@ -1372,6 +1428,7 @@ export class CustomSelect {
       if (this.isSearchable()) {
         this.clearFilter();
       }
+      this.flushPendingOptionsRefresh();
     };
 
     if (wasOpen) {
@@ -1389,6 +1446,7 @@ export class CustomSelect {
 
   public destroy(): void {
     clearTimeout(this.typeaheadTimeout);
+    this._pendingOptionsRefresh = null;
     this.isOpen = false;
     this._lockedOpenUpward = null;
     this._lockedDropdownWidth = null;
@@ -1473,15 +1531,93 @@ export function initializeCustomSelects(): void {
   });
 }
 
-export function syncCustomSelects(updateOptions = false): void {
+let scheduledOptionsRefreshGen = 0;
+
+export function cancelScheduledCustomSelectsRefresh(): void {
+  scheduledOptionsRefreshGen++;
   if (customSelectsMap) {
     customSelectsMap.forEach(cs => {
-      if (updateOptions) {
-        cs.updateOptions();
+      if (typeof cs.setPendingOptionsRefresh === 'function') {
+        cs.setPendingOptionsRefresh(null);
       }
-      cs.syncSelectedValue();
     });
   }
+}
+
+function isExcludedFromBatchRefresh(cs: CustomSelect, excludeLanguageSelects: boolean): boolean {
+  return Boolean(
+    excludeLanguageSelects &&
+      (cs.select?.hasAttribute?.('data-language-select') ||
+        cs.select?.classList?.contains?.('model-reasoning-select'))
+  );
+}
+
+export function syncCustomSelects(updateOptions = false, excludeLanguageSelects = false): void {
+  if (customSelectsMap) {
+    customSelectsMap.forEach(cs => {
+      if (isExcludedFromBatchRefresh(cs, excludeLanguageSelects)) {
+        return;
+      }
+      if (updateOptions) {
+        cs.updateOptions(true);
+      } else {
+        cs.syncSelectedValue(true);
+      }
+    });
+  }
+}
+
+export function prepareCustomSelectsOptionsRefresh(excludeLanguageSelects = true): void {
+  cancelScheduledCustomSelectsRefresh();
+  if (!customSelectsMap || customSelectsMap.size === 0) return;
+
+  customSelectsMap.forEach(cs => {
+    if (isExcludedFromBatchRefresh(cs, excludeLanguageSelects)) {
+      return;
+    }
+    cs.setPendingOptionsRefresh(() => {
+      cs.updateOptions(true);
+    });
+  });
+}
+
+export function flushPreparedCustomSelectsOptionsRefresh(excludeLanguageSelects = true, batchSize = 6): void {
+  if (!customSelectsMap || customSelectsMap.size === 0) return;
+
+  const gen = scheduledOptionsRefreshGen;
+  const queue: CustomSelect[] = [];
+  customSelectsMap.forEach(cs => {
+    if (isExcludedFromBatchRefresh(cs, excludeLanguageSelects)) {
+      return;
+    }
+    if (typeof cs.hasPendingOptionsRefresh === 'function' ? cs.hasPendingOptionsRefresh() : Boolean((cs as any)._pendingOptionsRefresh)) {
+      queue.push(cs);
+    }
+  });
+
+  if (queue.length === 0) return;
+
+  let cursor = 0;
+  const processChunk = () => {
+    if (gen !== scheduledOptionsRefreshGen) return;
+    const end = Math.min(queue.length, cursor + batchSize);
+    for (; cursor < end; cursor++) {
+      const cs = queue[cursor];
+      if (!cs.isOpen && cs.select?.isConnected !== false) {
+        cs.flushPendingOptionsRefresh();
+      }
+    }
+    if (cursor < queue.length && gen === scheduledOptionsRefreshGen) {
+      safeRaf(processChunk);
+    }
+  };
+
+  safeRaf(processChunk);
+}
+
+export function scheduleCustomSelectsOptionsRefresh(excludeLanguageSelects = true, batchSize = 6): void {
+  prepareCustomSelectsOptionsRefresh(excludeLanguageSelects);
+  flushPreparedCustomSelectsOptionsRefresh(excludeLanguageSelects, batchSize);
 }
 
 // Bind to window for global backwards-compatibility and inline HTML handlers
@@ -1490,11 +1626,19 @@ if (typeof window !== 'undefined') {
   (window as any).customSelectsMap = customSelectsMap;
   (window as any).initializeCustomSelects = initializeCustomSelects;
   (window as any).syncCustomSelects = syncCustomSelects;
+  (window as any).prepareCustomSelectsOptionsRefresh = prepareCustomSelectsOptionsRefresh;
+  (window as any).flushPreparedCustomSelectsOptionsRefresh = flushPreparedCustomSelectsOptionsRefresh;
+  (window as any).scheduleCustomSelectsOptionsRefresh = scheduleCustomSelectsOptionsRefresh;
+  (window as any).cancelScheduledCustomSelectsRefresh = cancelScheduledCustomSelectsRefresh;
 }
 
 export const customSelect = {
   CustomSelect,
   map: customSelectsMap,
   initAll: initializeCustomSelects,
-  syncAll: syncCustomSelects
+  syncAll: syncCustomSelects,
+  prepareOptionsRefresh: prepareCustomSelectsOptionsRefresh,
+  flushPreparedOptionsRefresh: flushPreparedCustomSelectsOptionsRefresh,
+  scheduleOptionsRefresh: scheduleCustomSelectsOptionsRefresh,
+  cancelScheduledOptionsRefresh: cancelScheduledCustomSelectsRefresh
 };

@@ -406,27 +406,34 @@ export function updateTranscribeActionButtons(isTranscribingParam?: boolean): vo
   if (btnRun) {
     const canRun = !isTranscribing && hasSingleMedia;
     btnRun.disabled = !canRun;
+    const isScramblingRun = Boolean(btnRunSpan?.classList?.contains('text-scrambling'));
     if (isTranscribing) {
       const transcribingText = t('transcribe.transcribingWithAi') || t('transcribe.statusExtracting');
       btnRun.title = transcribingText;
       btnRun.setAttribute('data-i18n-title', 'transcribe.transcribingWithAi');
       if (btnRunSpan) {
         btnRunSpan.setAttribute('data-i18n', 'transcribe.transcribingWithAi');
-        btnRunSpan.textContent = transcribingText;
+        if (!isScramblingRun) {
+          btnRunSpan.textContent = transcribingText;
+        }
       }
     } else if (!hasSingleMedia) {
       btnRun.title = t('toasts.noFileSelected');
       btnRun.setAttribute('data-i18n-title', 'toasts.noFileSelected');
       if (btnRunSpan) {
         btnRunSpan.setAttribute('data-i18n', 'transcribe.startAiExtraction');
-        btnRunSpan.textContent = t('transcribe.startAiExtraction');
+        if (!isScramblingRun) {
+          btnRunSpan.textContent = t('transcribe.startAiExtraction');
+        }
       }
     } else {
       btnRun.title = t('transcribe.startAiExtraction');
       btnRun.setAttribute('data-i18n-title', 'transcribe.startAiExtraction');
       if (btnRunSpan) {
         btnRunSpan.setAttribute('data-i18n', 'transcribe.startAiExtraction');
-        btnRunSpan.textContent = t('transcribe.startAiExtraction');
+        if (!isScramblingRun) {
+          btnRunSpan.textContent = t('transcribe.startAiExtraction');
+        }
       }
     }
   }
@@ -434,27 +441,34 @@ export function updateTranscribeActionButtons(isTranscribingParam?: boolean): vo
   if (btnBatch) {
     const canRunBatch = !isBatchExtracting && hasBatchMedia;
     btnBatch.disabled = !canRunBatch;
+    const isScramblingBatch = Boolean(btnBatchSpan?.classList?.contains('text-scrambling'));
     if (isBatchExtracting) {
       const batchRunningText = t('transcribe.transcribingWithAi') || t('transcribe.batchRunning');
       btnBatch.title = batchRunningText;
       btnBatch.setAttribute('data-i18n-title', 'transcribe.transcribingWithAi');
       if (btnBatchSpan) {
         btnBatchSpan.setAttribute('data-i18n', 'transcribe.transcribingWithAi');
-        btnBatchSpan.textContent = batchRunningText;
+        if (!isScramblingBatch) {
+          btnBatchSpan.textContent = batchRunningText;
+        }
       }
     } else if (!hasBatchMedia) {
       btnBatch.title = t('toasts.noFileSelected');
       btnBatch.setAttribute('data-i18n-title', 'toasts.noFileSelected');
       if (btnBatchSpan) {
         btnBatchSpan.setAttribute('data-i18n', 'transcribe.startBatchAiExtraction');
-        btnBatchSpan.textContent = t('transcribe.startBatchAiExtraction');
+        if (!isScramblingBatch) {
+          btnBatchSpan.textContent = t('transcribe.startBatchAiExtraction');
+        }
       }
     } else {
       btnBatch.title = t('transcribe.startBatchAiExtraction');
       btnBatch.setAttribute('data-i18n-title', 'transcribe.startBatchAiExtraction');
       if (btnBatchSpan) {
         btnBatchSpan.setAttribute('data-i18n', 'transcribe.startBatchAiExtraction');
-        btnBatchSpan.textContent = t('transcribe.startBatchAiExtraction');
+        if (!isScramblingBatch) {
+          btnBatchSpan.textContent = t('transcribe.startBatchAiExtraction');
+        }
       }
     }
   }
@@ -463,14 +477,18 @@ export function updateTranscribeActionButtons(isTranscribingParam?: boolean): vo
     const cancelSpan = cancelBtn.querySelector('span');
     if (cancelSpan) {
       cancelSpan.setAttribute('data-i18n', 'transcribe.cancelTranscription');
-      cancelSpan.textContent = t('transcribe.cancelTranscription');
+      if (!cancelSpan.classList?.contains('text-scrambling')) {
+        cancelSpan.textContent = t('transcribe.cancelTranscription');
+      }
     }
   }
   if (cancelBatchBtn) {
     const cancelBatchSpan = cancelBatchBtn.querySelector('span');
     if (cancelBatchSpan) {
       cancelBatchSpan.setAttribute('data-i18n', 'transcribe.cancelBatch');
-      cancelBatchSpan.textContent = t('transcribe.cancelBatch');
+      if (!cancelBatchSpan.classList?.contains('text-scrambling')) {
+        cancelBatchSpan.textContent = t('transcribe.cancelBatch');
+      }
     }
   }
 }

@@ -389,12 +389,14 @@ export function updateTranscribeUIConfigs(): void {
   }
 
   const quickLangSelect = document.getElementById('quick-opt-language') as HTMLSelectElement | null;
+  let quickLangValueChanged = false;
   if (quickLangSelect) {
     const targetLang = (current.language || 'auto').trim();
     if (!quickLangSelect.options || quickLangSelect.options.length === 0) {
       renderLanguageSelect(quickLangSelect, 'spoken', targetLang);
     } else if (quickLangSelect.value !== targetLang) {
       quickLangSelect.value = targetLang;
+      quickLangValueChanged = true;
     }
   }
 
@@ -409,8 +411,14 @@ export function updateTranscribeUIConfigs(): void {
   if (typeof win.updateTranscribeWorkflowButtons === 'function') {
     win.updateTranscribeWorkflowButtons();
   }
+  if (quickLangValueChanged && win.customSelectsMap?.get) {
+    const quickLangCs = win.customSelectsMap.get('quick-opt-language');
+    if (quickLangCs && typeof quickLangCs.syncSelectedValue === 'function') {
+      quickLangCs.syncSelectedValue(true);
+    }
+  }
   if (typeof win.syncCustomSelects === 'function') {
-    win.syncCustomSelects();
+    win.syncCustomSelects(false, true);
   }
 }
 
