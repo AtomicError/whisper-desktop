@@ -1017,6 +1017,7 @@ export function updateTranscriptLineText(id: number, value: string): void {
   if (changed) {
     if (confidenceHighlightingActive) {
       reviewedSegmentIdsInSession.add(id);
+      activeConfidenceJumpIndex = -1;
     }
     if (typeof document !== 'undefined' && typeof document.querySelector === 'function') {
       const cardEl = (document.querySelector(`.transcript-card[data-id="${id}"]`) ||
@@ -1072,6 +1073,53 @@ function refreshAllRenderedConfidenceViews(): void {
   });
 }
 
+function getVisibleFlaggedWordElements(viewport: HTMLElement | null): HTMLElement[] {
+  if (!viewport || typeof viewport.querySelectorAll !== 'function') return [];
+  const allFlagged = Array.from(viewport.querySelectorAll('.transcript-word.low-confidence')) as HTMLElement[];
+  return allFlagged.filter(el => {
+    const card = typeof el.closest === 'function' ? (el.closest('.transcript-card') as HTMLElement | null) : null;
+    return !card || card.style.display !== 'none';
+  });
+}
+
+function syncConfidenceJumpControls(fallbackCount?: number): void {
+  if (typeof document === 'undefined' || typeof document.getElementById !== 'function') return;
+  const viewport = document.getElementById('transcript-viewport');
+  const prevBtn = document.getElementById('btn-confidence-prev') as HTMLButtonElement | null;
+  const nextBtn = document.getElementById('btn-confidence-next') as HTMLButtonElement | null;
+  const counterEl = document.getElementById('confidence-jump-counter') as HTMLElement | null;
+
+  let visibleCount = typeof fallbackCount === 'number' ? fallbackCount : 0;
+  if (confidenceHighlightingActive && viewport && typeof viewport.querySelectorAll === 'function') {
+    const hasCards = viewport.querySelectorAll('.transcript-card').length > 0;
+    if (hasCards) {
+      visibleCount = getVisibleFlaggedWordElements(viewport).length;
+    } else if (typeof fallbackCount !== 'number') {
+      visibleCount = computeConfidenceSummary(transcriptLines, confidenceThresholdPercent).lowWordCount;
+    }
+  } else if (typeof fallbackCount !== 'number') {
+    visibleCount = computeConfidenceSummary(transcriptLines, confidenceThresholdPercent).lowWordCount;
+  }
+
+  const disableJump = !confidenceHighlightingActive || visibleCount === 0;
+  if (prevBtn) prevBtn.disabled = disableJump;
+  if (nextBtn) nextBtn.disabled = disableJump;
+
+  if (disableJump || activeConfidenceJumpIndex >= visibleCount) {
+    activeConfidenceJumpIndex = -1;
+  }
+
+  if (counterEl) {
+    if (!disableJump && activeConfidenceJumpIndex >= 0) {
+      counterEl.textContent = `${activeConfidenceJumpIndex + 1} / ${visibleCount}`;
+      counterEl.hidden = false;
+    } else {
+      counterEl.textContent = '';
+      counterEl.hidden = true;
+    }
+  }
+}
+
 export function syncConfidenceButtonAndReviewBar(lines: readonly TranscriptLine[] = transcriptLines): void {
   if (typeof document === 'undefined' || typeof document.getElementById !== 'function') return;
   const summary = computeConfidenceSummary(lines, confidenceThresholdPercent);
@@ -1087,7 +1135,7 @@ export function syncConfidenceButtonAndReviewBar(lines: readonly TranscriptLine[
     }
     const tooltipText = summary.hasConfidenceData
       ? (t('transcribe.toggleConfidenceTooltip', { threshold: confidenceThresholdPercent }) ||
-          `Highlight low-confidence words (< ${confidenceThresholdPercent}%)`)
+          `Highlight uncertain words (below ${confidenceThresholdPercent}%)`)
       : (t('transcribe.confidenceUnavailableTooltip') ||
           'Word-level confidence data is unavailable for this transcript');
     btn.title = tooltipText;
@@ -1113,6 +1161,15 @@ export function syncConfidenceButtonAndReviewBar(lines: readonly TranscriptLine[
     reviewBar.dataset.state = showBar ? 'open' : 'closed';
   }
 
+  const statusKey = summary.lowWordCount > 0
+    ? (summary.criticalWordCount > 0 ? 'critical' : 'low')
+    : 'ok';
+
+  const statusWrap = document.getElementById('confidence-review-status');
+  if (statusWrap) {
+    statusWrap.dataset.status = statusKey;
+  }
+
   const summaryEl = document.getElementById('confidence-review-summary');
   if (summaryEl) {
     if (summary.lowWordCount > 0) {
@@ -1120,33 +1177,38 @@ export function syncConfidenceButtonAndReviewBar(lines: readonly TranscriptLine[
         t('transcribe.confidenceReviewSummary', {
           words: summary.lowWordCount,
           segments: summary.flaggedSegmentCount
-        }) || `${summary.lowWordCount} words in ${summary.flaggedSegmentCount} segments`;
-      summaryEl.dataset.status = summary.criticalWordCount > 0 ? 'critical' : 'low';
+        }) || `${summary.lowWordCount} uncertain in ${summary.flaggedSegmentCount} segments`;
     } else {
       summaryEl.textContent =
         t('transcribe.confidenceAllClear', { threshold: confidenceThresholdPercent }) ||
-        `All words ≥ ${confidenceThresholdPercent}%`;
-      summaryEl.dataset.status = 'ok';
+        'No uncertain words';
     }
+    summaryEl.dataset.status = statusKey;
   }
 
   const quickSelect = document.getElementById('confidence-threshold-quick') as HTMLSelectElement | null;
-  if (quickSelect && quickSelect.value !== String(confidenceThresholdPercent)) {
-    quickSelect.value = String(confidenceThresholdPercent);
+  if (quickSelect) {
+    if (quickSelect.value !== String(confidenceThresholdPercent)) {
+      quickSelect.value = String(confidenceThresholdPercent);
+    }
+    const win = getGlobal();
+    const csMap = win?.customSelectsMap;
+    if (csMap && typeof csMap.get === 'function') {
+      const cs = csMap.get('confidence-threshold-quick');
+      if (cs && typeof cs.syncSelectedValue === 'function') {
+        cs.syncSelectedValue();
+      }
+    }
   }
 
   const filterBtn = document.getElementById('btn-confidence-filter-low') as HTMLButtonElement | null;
   if (filterBtn) {
     filterBtn.classList.toggle('active', confidenceLowOnlyFilter);
     filterBtn.setAttribute('aria-pressed', String(confidenceLowOnlyFilter));
-    filterBtn.disabled = !summary.hasConfidenceData;
+    filterBtn.disabled = !summary.hasConfidenceData || (summary.lowWordCount === 0 && !confidenceLowOnlyFilter);
   }
 
-  const prevBtn = document.getElementById('btn-confidence-prev') as HTMLButtonElement | null;
-  const nextBtn = document.getElementById('btn-confidence-next') as HTMLButtonElement | null;
-  const disableJump = !confidenceHighlightingActive || summary.lowWordCount === 0;
-  if (prevBtn) prevBtn.disabled = disableJump;
-  if (nextBtn) nextBtn.disabled = disableJump;
+  syncConfidenceJumpControls(summary.lowWordCount);
 }
 
 export function setConfidenceThreshold(percent: number, persist = true): number {
@@ -1157,7 +1219,7 @@ export function setConfidenceThreshold(percent: number, persist = true): number 
     activeConfidenceJumpIndex = -1;
   }
 
-  if (confidenceHighlightingActive) {
+  if (changed && confidenceHighlightingActive) {
     refreshAllRenderedConfidenceViews();
     if (confidenceLowOnlyFilter) {
       filterTranscriptLines();
@@ -1195,14 +1257,27 @@ export function jumpToConfidenceWord(direction: 1 | -1 = 1): boolean {
   const viewport = document.getElementById('transcript-viewport');
   if (!viewport) return false;
 
-  const allFlagged = Array.from(viewport.querySelectorAll('.transcript-word.low-confidence')) as HTMLElement[];
-  const visibleFlagged = allFlagged.filter(el => {
-    const card = typeof el.closest === 'function' ? (el.closest('.transcript-card') as HTMLElement | null) : null;
-    return !card || card.style.display !== 'none';
-  });
+  // Exit any card currently in inline edit mode so highlighted words are visible and reachable
+  if (typeof viewport.querySelectorAll === 'function') {
+    const editingCards = Array.from(viewport.querySelectorAll('.transcript-card.is-editing-text')) as HTMLElement[];
+    editingCards.forEach(cardEl => {
+      const textarea = cardEl.querySelector('.transcript-text-input') as HTMLTextAreaElement | null;
+      if (textarea && typeof textarea.blur === 'function' && document.activeElement === textarea) {
+        textarea.blur();
+      }
+      cardEl.classList.remove('is-editing-text');
+      const liveLine = resolveLineForCard(cardEl);
+      if (liveLine) {
+        mountOrRefreshCardConfidenceView(cardEl, liveLine);
+      }
+    });
+  }
+
+  const visibleFlagged = getVisibleFlaggedWordElements(viewport);
 
   if (visibleFlagged.length === 0) {
     activeConfidenceJumpIndex = -1;
+    syncConfidenceJumpControls(0);
     return false;
   }
 
@@ -1218,6 +1293,7 @@ export function jumpToConfidenceWord(direction: 1 | -1 = 1): boolean {
 
   const targetWordEl = visibleFlagged[activeConfidenceJumpIndex];
   targetWordEl.classList.add('confidence-word-focused');
+  syncConfidenceJumpControls(visibleFlagged.length);
 
   const targetCard = typeof targetWordEl.closest === 'function'
     ? (targetWordEl.closest('.transcript-card') as HTMLElement | null)
@@ -1412,6 +1488,8 @@ export function splitTranscriptSegment(lineId: number, cursorPosition?: number):
 
   transcriptLines.splice(index, 1, line1, line2);
   transcriptLines.forEach((l, idx) => { l.id = idx; });
+  reviewedSegmentIdsInSession.clear();
+  activeConfidenceJumpIndex = -1;
   transcriptDirty = true;
 
   // Sync batch mode if active
@@ -1496,6 +1574,8 @@ export function mergeTranscriptSegmentWithPrevious(lineId: number): boolean {
 
   transcriptLines.splice(index, 1);
   transcriptLines.forEach((l, idx) => { l.id = idx; });
+  reviewedSegmentIdsInSession.clear();
+  activeConfidenceJumpIndex = -1;
   transcriptDirty = true;
 
   // Sync batch mode if active
@@ -1626,6 +1706,8 @@ export function undoTranscriptOperation(): boolean {
     words: Array.isArray(l.words) ? l.words.map(w => ({ ...w })) : undefined
   }));
   transcriptLines.forEach((l, idx) => { l.id = idx; });
+  reviewedSegmentIdsInSession.clear();
+  activeConfidenceJumpIndex = -1;
   transcriptDirty = true;
 
   const win = getGlobal();
@@ -1656,6 +1738,8 @@ export function redoTranscriptOperation(): boolean {
     words: Array.isArray(l.words) ? l.words.map(w => ({ ...w })) : undefined
   }));
   transcriptLines.forEach((l, idx) => { l.id = idx; });
+  reviewedSegmentIdsInSession.clear();
+  activeConfidenceJumpIndex = -1;
   transcriptDirty = true;
 
   const win = getGlobal();
@@ -1677,6 +1761,8 @@ export function deleteTranscriptSegment(lineId: number): boolean {
 
   transcriptLines.splice(index, 1);
   transcriptLines.forEach((l, idx) => { l.id = idx; });
+  reviewedSegmentIdsInSession.clear();
+  activeConfidenceJumpIndex = -1;
   transcriptDirty = true;
 
   const win = getGlobal();
@@ -1762,29 +1848,79 @@ export function filterTranscriptLines(): void {
     }
   });
 
+  if (viewport && typeof viewport.querySelectorAll === 'function') {
+    activeConfidenceJumpIndex = -1;
+    viewport.querySelectorAll('.transcript-word.confidence-word-focused').forEach(el => {
+      el.classList.remove('confidence-word-focused');
+    });
+  }
+
   if (viewport && lines.length > 0) {
-    let emptySearchEl = document.getElementById('transcript-search-empty');
+    let emptySearchEl =
+      document.getElementById('transcript-search-empty') ||
+      (typeof viewport.querySelector === 'function'
+        ? (viewport.querySelector('.transcript-empty-notice') as HTMLElement | null)
+        : null);
     if ((query || applyLowOnly) && matchCount === 0) {
       if (!emptySearchEl) {
         emptySearchEl = document.createElement('div');
         emptySearchEl.id = 'transcript-search-empty';
         emptySearchEl.className = 'transcript-empty-notice';
-        emptySearchEl.style.cssText = 'padding: 32px 16px; text-align: center; color: var(--color-text-dim); font-size: 0.85rem; user-select: none;';
         viewport.appendChild(emptySearchEl);
       }
+      emptySearchEl.innerHTML = '';
       if (applyLowOnly && !query) {
+        emptySearchEl.className = 'transcript-empty-notice transcript-empty-notice--confidence';
         emptySearchEl.removeAttribute('data-i18n');
-        emptySearchEl.textContent =
+
+        const iconWrap = document.createElement('div');
+        iconWrap.className = 'transcript-empty-notice-icon';
+        iconWrap.setAttribute('aria-hidden', 'true');
+        iconWrap.innerHTML = `
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="m9 12 2 2 4-4"/>
+          </svg>
+        `;
+
+        const titleEl = document.createElement('div');
+        titleEl.className = 'transcript-empty-notice-title';
+        titleEl.textContent =
           t('transcribe.confidenceAllClear', { threshold: confidenceThresholdPercent }) ||
-          `All words ≥ ${confidenceThresholdPercent}%`;
+          'No uncertain words';
+
+        const descEl = document.createElement('div');
+        descEl.className = 'transcript-empty-notice-desc';
+        descEl.textContent =
+          t('transcribe.confidenceAllClearDesc', { threshold: confidenceThresholdPercent }) ||
+          `All words are above the ${confidenceThresholdPercent}% threshold.`;
+
+        const resetBtn = document.createElement('button');
+        resetBtn.type = 'button';
+        resetBtn.className = 'btn-secondary transcript-empty-reset-btn';
+        resetBtn.textContent =
+          t('transcribe.confidenceShowAllSegments') || 'Show all segments';
+        resetBtn.onclick = () => {
+          toggleConfidenceLowOnlyFilter(false);
+        };
+
+        emptySearchEl.appendChild(iconWrap);
+        emptySearchEl.appendChild(titleEl);
+        emptySearchEl.appendChild(descEl);
+        emptySearchEl.appendChild(resetBtn);
       } else {
+        emptySearchEl.className = 'transcript-empty-notice transcript-empty-notice--search';
         emptySearchEl.setAttribute('data-i18n', 'transcribe.noMatchingTranscript');
         emptySearchEl.textContent = t('transcribe.noMatchingTranscript') || 'No matching transcript lines found.';
       }
-      emptySearchEl.style.display = 'block';
+      emptySearchEl.style.display = 'flex';
     } else if (emptySearchEl) {
       emptySearchEl.style.display = 'none';
     }
+  }
+
+  if (confidenceHighlightingActive) {
+    syncConfidenceJumpControls();
   }
 }
 

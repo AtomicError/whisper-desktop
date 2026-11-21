@@ -206,10 +206,15 @@ describe('Confidence feature locale symmetry across all 13 languages', () => {
   it('includes parameterized threshold placeholder and all review bar & settings keys in every locale', () => {
     for (const [code, loc] of Object.entries(allLocales)) {
       expect(loc.transcribe.toggleConfidenceTooltip, `${code}.toggleConfidenceTooltip`).toContain('{threshold}');
+      expect(loc.transcribe.toggleConfidenceTooltip, `${code}.toggleConfidenceTooltip`).not.toMatch(/[<>≤≥]/);
       expect(loc.transcribe.confidenceUnavailableTooltip, `${code}.confidenceUnavailableTooltip`).toBeTruthy();
       expect(loc.transcribe.confidenceReviewSummary, `${code}.confidenceReviewSummary`).toContain('{words}');
       expect(loc.transcribe.confidenceReviewSummary, `${code}.confidenceReviewSummary`).toContain('{segments}');
-      expect(loc.transcribe.confidenceAllClear, `${code}.confidenceAllClear`).toContain('{threshold}');
+      expect(loc.transcribe.confidenceAllClear, `${code}.confidenceAllClear`).toBeTruthy();
+      expect(loc.transcribe.confidenceAllClear, `${code}.confidenceAllClear`).not.toMatch(/[<>≤≥]/);
+      expect(loc.transcribe.confidenceAllClearDesc, `${code}.confidenceAllClearDesc`).toContain('{threshold}');
+      expect(loc.transcribe.confidenceAllClearDesc, `${code}.confidenceAllClearDesc`).not.toMatch(/[<>≤≥]/);
+      expect(loc.transcribe.confidenceShowAllSegments, `${code}.confidenceShowAllSegments`).toBeTruthy();
       expect(loc.transcribe.confidenceThresholdShort, `${code}.confidenceThresholdShort`).toBeTruthy();
       expect(loc.transcribe.confidenceLowOnly, `${code}.confidenceLowOnly`).toBeTruthy();
       expect(loc.transcribe.confidencePrevTooltip, `${code}.confidencePrevTooltip`).toBeTruthy();

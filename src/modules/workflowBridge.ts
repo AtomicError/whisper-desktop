@@ -15,6 +15,8 @@ import {
   flushPendingTranscriptEdits,
   hasPendingTranscriptEdits,
   hasTranscriptConfidenceData,
+  isConfidenceHighlightingActive,
+  toggleConfidenceHighlighting,
   syncConfidenceButtonAndReviewBar
 } from './transcriptViewer';
 
@@ -345,13 +347,29 @@ export function updateTranscribeWorkflowButtons(): void {
       Array.isArray(transcriptLines) &&
       transcriptLines.some((l: any) => Array.isArray(l?.words) && l.words.length > 0);
     const hasConfidence = !isRunning && (hasTranscriptConfidenceData() || windowLinesHaveWords);
+    const hideConfidenceBadge = () => {
+      const btnBadge = document.getElementById('confidence-btn-badge');
+      if (btnBadge) {
+        btnBadge.textContent = '';
+        btnBadge.style.display = 'none';
+        btnBadge.classList.remove('is-critical');
+      }
+    };
     if (isRunning) {
+      if (isConfidenceHighlightingActive()) {
+        toggleConfidenceHighlighting(false);
+      }
       btnConfidence.disabled = true;
+      hideConfidenceBadge();
     } else if (hasTranscriptConfidenceData()) {
       syncConfidenceButtonAndReviewBar();
     } else {
+      if (!hasConfidence && isConfidenceHighlightingActive()) {
+        toggleConfidenceHighlighting(false);
+      }
       btnConfidence.disabled = !hasConfidence;
       if (!hasConfidence) {
+        hideConfidenceBadge();
         btnConfidence.title =
           t('transcribe.confidenceUnavailableTooltip') ||
           'Word-level confidence data is unavailable for this transcript';

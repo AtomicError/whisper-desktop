@@ -1186,7 +1186,11 @@ export function syncConfidenceThresholdSettingsUI(percent: number, notifyViewer 
     }
   }
   if (notifyViewer && typeof win.setConfidenceThreshold === 'function') {
-    win.setConfidenceThreshold(clamped, false);
+    const alreadyMatches =
+      typeof win.getConfidenceThreshold === 'function' && win.getConfidenceThreshold() === clamped;
+    if (!alreadyMatches) {
+      win.setConfidenceThreshold(clamped, false);
+    }
   }
   return clamped;
 }

@@ -3247,4 +3247,170 @@ describe('Modern Confidence Proofreading Workflow (Threshold, Review Bar, Filter
     expect(cards[1].style.display).toBe('flex');
     expect(cards[0].querySelector('.transcript-confidence-view')).toBeNull();
   });
+
+  it('syncs CustomSelect trigger, live jump counter, edit-mode exit, search-aware nav disable, and actionable empty state', () => {
+    const viewport = registerMockEl('transcript-viewport');
+    const btnConfidence = registerMockEl('btn-toggle-confidence', 'BUTTON') as any;
+    const btnBadge = registerMockEl('confidence-btn-badge', 'SPAN') as any;
+    const reviewBar = registerMockEl('confidence-review-bar', 'DIV') as any;
+    const statusWrap = registerMockEl('confidence-review-status', 'DIV') as any;
+    const summaryEl = registerMockEl('confidence-review-summary', 'SPAN') as any;
+    const quickSel = registerMockEl('confidence-threshold-quick', 'SELECT') as any;
+    const filterBtn = registerMockEl('btn-confidence-filter-low', 'BUTTON') as any;
+    const prevBtn = registerMockEl('btn-confidence-prev', 'BUTTON') as any;
+    const nextBtn = registerMockEl('btn-confidence-next', 'BUTTON') as any;
+    const jumpCounter = registerMockEl('confidence-jump-counter', 'SPAN') as any;
+    const searchInput = registerMockEl('transcript-search', 'INPUT') as any;
+    registerMockEl('btn-copy-transcript', 'BUTTON');
+    registerMockEl('btn-undo-transcript', 'BUTTON');
+    registerMockEl('btn-redo-transcript', 'BUTTON');
+
+    let customSelectSyncCount = 0;
+    const prevMap = (globalThis as any).window.customSelectsMap;
+    (globalThis as any).window.customSelectsMap = new Map([
+      ['confidence-threshold-quick', { syncSelectedValue: () => { customSelectSyncCount++; } }]
+    ]);
+
+    try {
+      const lines: TranscriptLine[] = [
+        {
+          id: 0,
+          timeRange: '[00:00:01.000 --> 00:00:03.000]',
+          text: 'Clear line',
+          startMs: 1000,
+          endMs: 3000,
+          words: [
+            { text: 'Clear', startMs: 1000, endMs: 1800, prob: 0.95 },
+            { text: 'line', startMs: 1800, endMs: 3000, prob: 0.94 }
+          ]
+        },
+        {
+          id: 1,
+          timeRange: '[00:00:04.000 --> 00:00:06.000]',
+          text: 'Alpha maybe beta',
+          startMs: 4000,
+          endMs: 6000,
+          words: [
+            { text: 'Alpha', startMs: 4000, endMs: 4600, prob: 0.91 },
+            { text: 'maybe', startMs: 4600, endMs: 5300, prob: 0.55 },
+            { text: 'beta', startMs: 5300, endMs: 6000, prob: 0.62 }
+          ]
+        }
+      ];
+
+      transcriptViewer.lines = lines;
+      renderTranscriptLines(lines, false);
+      toggleConfidenceHighlighting(true);
+
+      // CustomSelect sync is invoked and status wrapper mirrors severity
+      expect(customSelectSyncCount).toBeGreaterThan(0);
+      expect(statusWrap.dataset.status).toBe('low');
+      expect(filterBtn.disabled).toBe(false);
+      expect(jumpCounter.hidden).toBe(true);
+
+      // Jump exits any active inline edit mode and updates live counter ("1 / 2" -> "2 / 2")
+      const cards = viewport.querySelectorAll('.transcript-card');
+      cards[1].classList.add('is-editing-text');
+      expect(jumpToConfidenceWord(1)).toBe(true);
+      expect(cards[1].classList.contains('is-editing-text')).toBe(false);
+      expect(jumpCounter.hidden).toBe(false);
+      expect(jumpCounter.textContent).toBe('1 / 2');
+
+      expect(jumpToConfidenceWord(1)).toBe(true);
+      expect(jumpCounter.textContent).toBe('2 / 2');
+
+      // Search query hiding all flagged segments disables prev/next and hides jump counter
+      searchInput.value = 'Clear';
+      filterTranscriptLines();
+      expect(prevBtn.disabled).toBe(true);
+      expect(nextBtn.disabled).toBe(true);
+      expect(jumpCounter.hidden).toBe(true);
+
+      // Clear search and enable Low-Only filter, then drop threshold to 40% (0 uncertain words)
+      searchInput.value = '';
+      filterTranscriptLines();
+      toggleConfidenceLowOnlyFilter(true);
+      setConfidenceThreshold(40, false);
+
+      expect(statusWrap.dataset.status).toBe('ok');
+      expect(summaryEl.dataset.status).toBe('ok');
+      expect(btnConfidence.disabled).toBe(false);
+      expect(btnBadge.style.display).toBe('none');
+      // Filter button stays enabled while active so user can turn it off
+      expect(filterBtn.disabled).toBe(false);
+      expect(reviewBar.hidden).toBe(false);
+      expect(quickSel.value).toBe('40');
+
+      // Actionable empty state includes a reset button that restores all segments
+      const emptyEl = viewport.querySelector('.transcript-empty-notice') as any;
+      expect(emptyEl).toBeTruthy();
+      expect(emptyEl?.style.display).toBe('flex');
+      const resetBtn = emptyEl?.querySelector('.transcript-empty-reset-btn') as any;
+      expect(resetBtn).toBeTruthy();
+      resetBtn.onclick();
+      expect(filterBtn.classList.contains('active')).toBe(false);
+      // Now that filter is off and 0 uncertain words remain, filter button disables cleanly
+      expect(filterBtn.disabled).toBe(true);
+    } finally {
+      (globalThis as any).window.customSelectsMap = prevMap;
+    }
+  });
+
+  it('clears reviewed segment markers on structural deletion so re-indexed cards never inherit stale badges', () => {
+    const viewport = registerMockEl('transcript-viewport');
+    registerMockEl('btn-toggle-confidence', 'BUTTON');
+    registerMockEl('btn-copy-transcript', 'BUTTON');
+    registerMockEl('btn-undo-transcript', 'BUTTON');
+    registerMockEl('btn-redo-transcript', 'BUTTON');
+
+    const lines: TranscriptLine[] = [
+      {
+        id: 0,
+        timeRange: '[00:00:01.000 --> 00:00:02.000]',
+        text: 'First line',
+        startMs: 1000,
+        endMs: 2000,
+        words: [{ text: 'First', startMs: 1000, endMs: 1500, prob: 0.95 }, { text: 'line', startMs: 1500, endMs: 2000, prob: 0.95 }]
+      },
+      {
+        id: 1,
+        timeRange: '[00:00:02.000 --> 00:00:04.000]',
+        text: 'Second uncertain',
+        startMs: 2000,
+        endMs: 4000,
+        words: [{ text: 'Second', startMs: 2000, endMs: 3000, prob: 0.95 }, { text: 'uncertain', startMs: 3000, endMs: 4000, prob: 0.5 }]
+      },
+      {
+        id: 2,
+        timeRange: '[00:00:04.000 --> 00:00:06.000]',
+        text: 'Third untouched',
+        startMs: 4000,
+        endMs: 6000,
+        words: [{ text: 'Third', startMs: 4000, endMs: 5000, prob: 0.95 }, { text: 'untouched', startMs: 5000, endMs: 6000, prob: 0.95 }]
+      }
+    ];
+
+    transcriptViewer.lines = lines;
+    renderTranscriptLines(lines, false);
+    toggleConfidenceHighlighting(true);
+
+    // Edit segment #1 to fix its uncertain word -> marks id=1 as reviewed in session
+    updateTranscriptLineText(1, 'Second fixed');
+    let cards = viewport.querySelectorAll('.transcript-card');
+    expect(cards[1].dataset.confidenceReviewed).toBe('true');
+
+    // Delete segment #0 -> former segment #2 shifts down to id=1; must NOT inherit reviewed badge
+    deleteTranscriptSegment(0);
+    cards = viewport.querySelectorAll('.transcript-card');
+    expect(cards.length).toBe(2);
+    expect(cards[1].dataset.confidenceReviewed).toBeUndefined();
+  });
+
+  it('uses app-native select-control and clean percentage options without math inequality symbols in transcribe.html', () => {
+    const transcribeHtml = readFileSync(resolve(__dirname, '../views/transcribe.html'), 'utf-8');
+    expect(transcribeHtml).toMatch(/<select[^>]*class="[^"]*select-control[^"]*"[^>]*id="confidence-threshold-quick"/);
+    expect(transcribeHtml).toContain('<option value="70" selected>70%</option>');
+    expect(transcribeHtml).not.toContain('&lt; 40%');
+    expect(transcribeHtml).not.toContain('&lt; 70%');
+  });
 });

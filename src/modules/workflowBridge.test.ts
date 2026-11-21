@@ -457,6 +457,10 @@ describe('workflowBridge module', () => {
 
       // Simulate active transcription running
       (globalThis as any).window.isTranscribing = true;
+      const btnBadge = new MockElement('SPAN');
+      btnBadge.id = 'confidence-btn-badge';
+      btnBadge.textContent = '3';
+      domMap.set(btnBadge.id, btnBadge);
 
       updateTranscribeWorkflowButtons();
 
@@ -466,6 +470,8 @@ describe('workflowBridge module', () => {
       expect(btnSendHardsub.disabled).toBe(true);
       expect(btnSendStudio.disabled).toBe(true);
       expect(btnConfidence.disabled).toBe(true);
+      expect(btnBadge.style.display).toBe('none');
+      expect(btnBadge.textContent).toBe('');
       expect(btnCopy.disabled).toBe(true);
 
       // Reset
