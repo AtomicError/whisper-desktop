@@ -1199,7 +1199,13 @@ export const ja: Translations = {
     shortcutsVolume: '音量調整 (5%)',
     shortcutsSeekCue: '字幕タイミングに動画をシーク',
     shortcutsExitFullscreen: '全画面表示を終了',
-    shortcutsOr: 'または'
+    shortcutsOr: 'または',
+    shortcutsTranslateOpen: '字幕ファイルを開く',
+    shortcutsTranslateStart: '翻訳を開始',
+    shortcutsTranslateCopy: '翻訳済み字幕をコピー',
+    shortcutsTranslateViewMode: '表示を切り替え（分割 / 原文 / 翻訳）',
+    shortcutsTranslateCueNav: '字幕項目間を移動',
+    shortcutsTranslateCueSide: '原文と翻訳の列を切り替え'
   },
   toasts: {
     testCancelled: '接続テストがキャンセルされました。',

@@ -904,6 +904,10 @@ html[dir="rtl"] .about-modal-close-btn {
   margin-bottom: 18px;
 }
 
+.shortcuts-section-full {
+  grid-column: 1 / -1;
+}
+
 .shortcuts-section-global {
   grid-column: 1 / -1;
   background: rgba(255, 255, 255, 0.02);

@@ -1201,7 +1201,13 @@ export const fa: Translations = {
     shortcutsVolume: 'تنظیم بلندی صدا (۵٪)',
     shortcutsSeekCue: 'پرش ویدیو به زمان سگمنت',
     shortcutsExitFullscreen: 'خروج از نمای تمام‌صفحه',
-    shortcutsOr: 'یا'
+    shortcutsOr: 'یا',
+    shortcutsTranslateOpen: 'باز کردن فایل زیرنویس',
+    shortcutsTranslateStart: 'شروع ترجمه',
+    shortcutsTranslateCopy: 'کپی زیرنویس ترجمه‌شده',
+    shortcutsTranslateViewMode: 'تغییر نما (دوطرفه / اصلی / ترجمه)',
+    shortcutsTranslateCueNav: 'جابه‌جایی بین سطرها',
+    shortcutsTranslateCueSide: 'جابه‌جایی بین ستون اصلی و ترجمه'
   },
   toasts: {
     testCancelled: 'آزمون اتصال لغو شد.',

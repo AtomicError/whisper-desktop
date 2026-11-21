@@ -1194,7 +1194,13 @@ export const pt: Translations = {
     shortcutsVolume: 'Ajustar volume (5%)',
     shortcutsSeekCue: 'Avançar vídeo para o tempo da legenda',
     shortcutsExitFullscreen: 'Sair da tela cheia',
-    shortcutsOr: 'ou'
+    shortcutsOr: 'ou',
+    shortcutsTranslateOpen: 'Abrir arquivo de legenda',
+    shortcutsTranslateStart: 'Iniciar tradução',
+    shortcutsTranslateCopy: 'Copiar legendas traduzidas',
+    shortcutsTranslateViewMode: 'Alternar visualização (Dividida / Original / Traduzida)',
+    shortcutsTranslateCueNav: 'Navegar entre legendas',
+    shortcutsTranslateCueSide: 'Alternar entre legenda original e traduzida'
   },
   toasts: {
     testCancelled: 'Teste de conexão cancelado.',

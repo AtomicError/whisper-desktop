@@ -1194,7 +1194,13 @@ export const es: Translations = {
     shortcutsVolume: 'Ajustar volumen (5%)',
     shortcutsSeekCue: 'Saltar video al tiempo del subtítulo',
     shortcutsExitFullscreen: 'Salir de pantalla completa',
-    shortcutsOr: 'o'
+    shortcutsOr: 'o',
+    shortcutsTranslateOpen: 'Abrir archivo de subtítulos',
+    shortcutsTranslateStart: 'Iniciar traducción',
+    shortcutsTranslateCopy: 'Copiar subtítulos traducidos',
+    shortcutsTranslateViewMode: 'Cambiar vista (Dividida / Original / Traducido)',
+    shortcutsTranslateCueNav: 'Navegar entre subtítulos',
+    shortcutsTranslateCueSide: 'Alternar entre subtítulo original y traducido'
   },
   toasts: {
     testCancelled: 'Prueba de conexión cancelada.',

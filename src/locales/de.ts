@@ -1199,7 +1199,13 @@ export const de: Translations = {
     shortcutsVolume: 'Lautstärke anpassen (5%)',
     shortcutsSeekCue: 'Video zu Untertitelzeit springen',
     shortcutsExitFullscreen: 'Vollbildmodus beenden',
-    shortcutsOr: 'oder'
+    shortcutsOr: 'oder',
+    shortcutsTranslateOpen: 'Untertiteldatei öffnen',
+    shortcutsTranslateStart: 'Übersetzung starten',
+    shortcutsTranslateCopy: 'Übersetzte Untertitel kopieren',
+    shortcutsTranslateViewMode: 'Ansicht wechseln (Geteilt / Original / Übersetzt)',
+    shortcutsTranslateCueNav: 'Zwischen Untertiteln navigieren',
+    shortcutsTranslateCueSide: 'Zwischen Original- und übersetztem Cue wechseln'
   },
   toasts: {
     testCancelled: 'Verbindungstest abgebrochen.',

@@ -425,5 +425,323 @@ describe('subtitle loading', () => {
       (globalThis as any).window = origWin;
     }
   });
+
+  it('handles Translation Studio keyboard shortcuts with panel, modal, and input guards', () => {
+    let docKeyHandler: ((e: any) => void) | null = null;
+    let isTranslatePanelActive = true;
+    let openOverlaySelectorResult: any = null;
+    let activeEl: any = null;
+
+    const origDoc = (globalThis as any).document;
+    const origWin = (globalThis as any).window;
+
+    const removeEventListener = vi.fn();
+    (globalThis as any).document = {
+      readyState: 'loading',
+      addEventListener: vi.fn((event: string, handler: any) => {
+        if (event === 'keydown') docKeyHandler = handler;
+      }),
+      removeEventListener,
+      getElementById: vi.fn((id: string) => {
+        if (id === 'panel-translate') {
+          return { classList: { contains: (cls: string) => cls === 'active' && isTranslatePanelActive } };
+        }
+        return null;
+      }),
+      querySelector: vi.fn(() => openOverlaySelectorResult),
+      get activeElement() {
+        return activeEl;
+      },
+    };
+    (globalThis as any).window = {
+      ...origWin,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    };
+
+    try {
+      const controller = new TranslationStudioController();
+      (controller as any).setupEventListeners();
+      expect(docKeyHandler).toBeDefined();
+
+      const startSpy = vi.spyOn(controller, 'startTranslation').mockResolvedValue();
+      const browseSpy = vi.spyOn(controller, 'browseSubtitleFile').mockResolvedValue();
+      const copySpy = vi.spyOn(controller, 'copyTranslatedText').mockResolvedValue();
+      const viewSpy = vi.spyOn(controller, 'setViewMode');
+
+      const dispatch = (overrides: Record<string, any>) => {
+        const event = {
+          key: '',
+          code: '',
+          ctrlKey: false,
+          metaKey: false,
+          altKey: false,
+          shiftKey: false,
+          defaultPrevented: false,
+          isComposing: false,
+          target: null,
+          preventDefault: vi.fn(() => { event.defaultPrevented = true; }),
+          ...overrides,
+        };
+        docKeyHandler!(event);
+        return event;
+      };
+
+      // 1/2/3 view mode switching (including Digit codes for non-Latin keyboard layouts)
+      dispatch({ key: '2', code: 'Digit2' });
+      expect(viewSpy).toHaveBeenCalledWith('source');
+      dispatch({ key: '۳', code: 'Digit3' });
+      expect(viewSpy).toHaveBeenCalledWith('target');
+      dispatch({ key: '1', code: 'Digit1' });
+      expect(viewSpy).toHaveBeenCalledWith('split');
+
+      // Ctrl+O opens subtitle file when not translating
+      dispatch({ key: 'o', ctrlKey: true });
+      expect(browseSpy).toHaveBeenCalledTimes(1);
+
+      // Ctrl+Enter requires subtitlePath + activeModel
+      dispatch({ key: 'Enter', ctrlKey: true });
+      expect(startSpy).not.toHaveBeenCalled();
+
+      controller.state.subtitlePath = '/sub.srt';
+      controller.state.activeModel = 'gpt-4o';
+      dispatch({ key: 'Enter', ctrlKey: true });
+      expect(startSpy).toHaveBeenCalledTimes(1);
+
+      // Ctrl+Shift+C prevents default even before translated cues exist (avoid DevTools inspect leak)
+      const earlyCopyEvent = dispatch({ key: 'C', ctrlKey: true, shiftKey: true });
+      expect(earlyCopyEvent.preventDefault).toHaveBeenCalledTimes(1);
+      expect(copySpy).not.toHaveBeenCalled();
+
+      controller.state.translatedPath = '/out.srt';
+      controller.state.translatedCues = [{ id: 1, startMs: 0, endMs: 1000, startTimeStr: '00:00:00,000', endTimeStr: '00:00:01,000', text: 'Hi' }];
+      dispatch({ key: 'C', ctrlKey: true, shiftKey: true });
+      expect(copySpy).toHaveBeenCalledTimes(1);
+
+      // Non-Latin keyboard layouts (e.g. Persian) trigger Ctrl+O and Ctrl+Shift+C via code fallback
+      dispatch({ key: 'خ', code: 'KeyO', ctrlKey: true });
+      expect(browseSpy).toHaveBeenCalledTimes(2);
+      dispatch({ key: 'ژ', code: 'KeyC', ctrlKey: true, shiftKey: true });
+      expect(copySpy).toHaveBeenCalledTimes(2);
+
+      // Numpad with NumLock ON works, while NumLock OFF navigation keys (End/ArrowDown/PageDown) are ignored
+      dispatch({ key: 'End', code: 'Numpad1' });
+      dispatch({ key: 'ArrowDown', code: 'Numpad2' });
+      dispatch({ key: 'PageDown', code: 'Numpad3' });
+      expect(viewSpy).toHaveBeenCalledTimes(3);
+      dispatch({ key: '2', code: 'Numpad2' });
+      expect(viewSpy).toHaveBeenLastCalledWith('source');
+      dispatch({ key: '1', code: 'Numpad1' });
+      expect(viewSpy).toHaveBeenLastCalledWith('split');
+
+      // Key repeat is ignored
+      dispatch({ key: 'o', code: 'KeyO', ctrlKey: true, repeat: true });
+      expect(browseSpy).toHaveBeenCalledTimes(2);
+
+      // Blocked when editing an input/textarea, but allowed on checkbox (polish toggle)
+      activeEl = { tagName: 'INPUT', type: 'text', isContentEditable: false };
+      dispatch({ key: '2', code: 'Digit2' });
+      dispatch({ key: 'Enter', ctrlKey: true });
+      expect(viewSpy).toHaveBeenCalledTimes(5);
+      expect(startSpy).toHaveBeenCalledTimes(1);
+
+      activeEl = { tagName: 'INPUT', type: 'checkbox', isContentEditable: false };
+      dispatch({ key: '2', code: 'Digit2' });
+      expect(viewSpy).toHaveBeenCalledTimes(6);
+      dispatch({ key: '1', code: 'Digit1' });
+      expect(viewSpy).toHaveBeenCalledTimes(7);
+
+      // CustomSelect trigger (closed): 1/2/3 must not hijack typeahead, while Ctrl+Enter / Ctrl+O still work
+      activeEl = {
+        tagName: 'DIV',
+        classList: { contains: (c: string) => c === 'custom-select-trigger' },
+        getAttribute: (attr: string) => (attr === 'aria-expanded' ? 'false' : null),
+        closest: (sel: string) => (sel.includes('.custom-select-trigger') && !sel.includes('[aria-expanded="true"]') ? activeEl : null),
+      };
+      dispatch({ key: '2', code: 'Digit2', target: activeEl });
+      expect(viewSpy).toHaveBeenCalledTimes(7);
+      dispatch({ key: 'Enter', ctrlKey: true, target: activeEl });
+      expect(startSpy).toHaveBeenCalledTimes(2);
+
+      // CustomSelect trigger opening/open (aria-expanded="true" or .custom-select-container.open): all shortcuts blocked
+      activeEl = {
+        tagName: 'DIV',
+        classList: { contains: (c: string) => c === 'custom-select-trigger' },
+        getAttribute: (attr: string) => (attr === 'aria-expanded' ? 'true' : null),
+        closest: (sel: string) => (sel.includes('.custom-select-trigger[aria-expanded="true"]') || sel.includes('.custom-select-container.open') ? activeEl : null),
+      };
+      dispatch({ key: 'Enter', ctrlKey: true, target: activeEl });
+      dispatch({ key: 'o', ctrlKey: true, target: activeEl });
+      expect(startSpy).toHaveBeenCalledTimes(2);
+      expect(browseSpy).toHaveBeenCalledTimes(2);
+      activeEl = null;
+
+      // Blocked when modal or dropdown is open
+      openOverlaySelectorResult = {};
+      dispatch({ key: 'o', ctrlKey: true });
+      expect(browseSpy).toHaveBeenCalledTimes(2);
+      openOverlaySelectorResult = null;
+
+      // Blocked when translate panel is inactive
+      isTranslatePanelActive = false;
+      dispatch({ key: 'o', ctrlKey: true });
+      expect(browseSpy).toHaveBeenCalledTimes(2);
+      isTranslatePanelActive = true;
+
+      // Blocked during active translation, yet Ctrl+O / Ctrl+Shift+C still preventDefault
+      controller.state.isTranslating = true;
+      const busyOpenEvt = dispatch({ key: 'o', ctrlKey: true });
+      dispatch({ key: 'Enter', ctrlKey: true });
+      const busyCopyEvt = dispatch({ key: 'C', ctrlKey: true, shiftKey: true });
+      expect(busyOpenEvt.preventDefault).toHaveBeenCalledTimes(1);
+      expect(busyCopyEvt.preventDefault).toHaveBeenCalledTimes(1);
+      expect(browseSpy).toHaveBeenCalledTimes(2);
+      expect(startSpy).toHaveBeenCalledTimes(2);
+      expect(copySpy).toHaveBeenCalledTimes(2);
+
+      // Dispose cleans up document keydown listener
+      controller.dispose();
+      expect(removeEventListener).toHaveBeenCalledWith('keydown', docKeyHandler);
+    } finally {
+      (globalThis as any).document = origDoc;
+      (globalThis as any).window = origWin;
+    }
+  });
+
+  it('focuses initial cue on ArrowDown/ArrowUp outside left panel and ignores modified cue navigation', async () => {
+    let docKeyHandler: ((e: any) => void) | null = null;
+    let sourceKeyHandler: ((e: any) => void) | null = null;
+    let activeEl: any = null;
+
+    const origDoc = (globalThis as any).document;
+    const origWin = (globalThis as any).window;
+
+    const makeCue = (id: string) => ({
+      dataset: { id },
+      classList: { contains: (c: string) => c === 'translate-cue-item' },
+      closest: vi.fn((sel: string) => (sel.includes('.translate-cue-item') ? makeCue(id) : null)),
+      focus: vi.fn(),
+      scrollIntoView: vi.fn(),
+      nextElementSibling: null as any,
+      previousElementSibling: null as any,
+    });
+
+    const sourceCue1 = makeCue('1');
+    const sourceCue2 = makeCue('2');
+    sourceCue1.nextElementSibling = sourceCue2;
+    sourceCue2.previousElementSibling = sourceCue1;
+    const targetCue1 = makeCue('1');
+
+    const sourceListEl = {
+      addEventListener: vi.fn((evt: string, h: any) => {
+        if (evt === 'keydown') sourceKeyHandler = h;
+      }),
+      querySelectorAll: vi.fn(() => [sourceCue1, sourceCue2]),
+    };
+    const targetListEl = {
+      addEventListener: vi.fn(),
+      querySelectorAll: vi.fn(() => [targetCue1]),
+    };
+
+    let resolveDialog: ((val: string | null) => void) | null = null;
+    (globalThis as any).document = {
+      readyState: 'loading',
+      addEventListener: vi.fn((event: string, handler: any) => {
+        if (event === 'keydown') docKeyHandler = handler;
+      }),
+      removeEventListener: vi.fn(),
+      getElementById: vi.fn((id: string) => {
+        if (id === 'panel-translate') {
+          return { classList: { contains: (cls: string) => cls === 'active' } };
+        }
+        if (id === 'translate-source-cues-list') return sourceListEl;
+        if (id === 'translate-target-cues-list') return targetListEl;
+        return null;
+      }),
+      querySelector: vi.fn(() => null),
+      get activeElement() {
+        return activeEl;
+      },
+    };
+    const invokeMock = vi.fn((cmd: string) => {
+      if (cmd === 'select_subtitle_file') {
+        return new Promise<string | null>((res) => {
+          resolveDialog = res;
+        });
+      }
+      return Promise.resolve(null);
+    });
+    (globalThis as any).window = {
+      ...origWin,
+      __TAURI__: { core: { invoke: invokeMock } },
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    };
+
+    try {
+      const controller = new TranslationStudioController();
+      (controller as any).initDOMElements();
+      (controller as any).setupEventListeners();
+
+      expect(docKeyHandler).toBeDefined();
+      expect(sourceKeyHandler).toBeDefined();
+
+      // ArrowDown enters first source cue in split/source mode; ArrowUp enters last source cue
+      const downEvt = { key: 'ArrowDown', code: 'ArrowDown', defaultPrevented: false, isComposing: false, repeat: false, target: null, preventDefault: vi.fn() };
+      docKeyHandler!(downEvt);
+      expect(downEvt.preventDefault).toHaveBeenCalled();
+      expect(sourceCue1.focus).toHaveBeenCalledTimes(1);
+
+      const upEvt = { key: 'ArrowUp', code: 'ArrowUp', defaultPrevented: false, isComposing: false, repeat: false, target: null, preventDefault: vi.fn() };
+      docKeyHandler!(upEvt);
+      expect(upEvt.preventDefault).toHaveBeenCalled();
+      expect(sourceCue2.focus).toHaveBeenCalledTimes(1);
+
+      // In target-only mode, ArrowDown focuses target cue
+      controller.setViewMode('target');
+      docKeyHandler!({ key: 'ArrowDown', code: 'ArrowDown', defaultPrevented: false, isComposing: false, repeat: false, target: null, preventDefault: vi.fn() });
+      expect(targetCue1.focus).toHaveBeenCalledTimes(1);
+
+      // In source-only mode with empty source list, ArrowDown does not fall back to hidden target cues
+      controller.setViewMode('source');
+      sourceListEl.querySelectorAll.mockReturnValueOnce([]);
+      const hiddenFallbackEvt = { key: 'ArrowDown', code: 'ArrowDown', defaultPrevented: false, isComposing: false, repeat: false, target: null, preventDefault: vi.fn() };
+      docKeyHandler!(hiddenFallbackEvt);
+      expect(hiddenFallbackEvt.preventDefault).not.toHaveBeenCalled();
+      expect(targetCue1.focus).toHaveBeenCalledTimes(1);
+
+      // Ignored inside left panel or when already inside a cue
+      activeEl = { tagName: 'DIV', closest: vi.fn((sel: string) => (sel.includes('.translate-left-panel') ? {} : null)) };
+      docKeyHandler!({ key: 'ArrowDown', code: 'ArrowDown', defaultPrevented: false, isComposing: false, repeat: false, target: activeEl, preventDefault: vi.fn() });
+      expect(targetCue1.focus).toHaveBeenCalledTimes(1);
+      activeEl = null;
+
+      // Modified arrow keys inside cue list do not navigate cues
+      const modCueEvt = { key: 'ArrowDown', altKey: true, defaultPrevented: false, target: sourceCue1, preventDefault: vi.fn() };
+      sourceKeyHandler!(modCueEvt);
+      expect(modCueEvt.preventDefault).not.toHaveBeenCalled();
+
+      // Concurrent browseSubtitleFile calls while dialog is open are ignored
+      const firstBrowse = controller.browseSubtitleFile();
+      const secondBrowse = controller.browseSubtitleFile();
+      expect(invokeMock).toHaveBeenCalledTimes(1);
+      resolveDialog!(null);
+      await Promise.all([firstBrowse, secondBrowse]);
+
+      // Pending startTranslation guard blocks Ctrl+O / browseSubtitleFile and clearLoadedSubtitle
+      controller.state.subtitlePath = '/sub.srt';
+      (controller as any).isStartingTranslation = true;
+      const startingOpenEvt = { key: 'o', code: 'KeyO', ctrlKey: true, defaultPrevented: false, isComposing: false, repeat: false, target: null, preventDefault: vi.fn() };
+      docKeyHandler!(startingOpenEvt);
+      expect(startingOpenEvt.preventDefault).toHaveBeenCalledTimes(1);
+      expect(invokeMock).toHaveBeenCalledTimes(1);
+      controller.clearLoadedSubtitle();
+      expect(controller.state.subtitlePath).toBe('/sub.srt');
+      (controller as any).isStartingTranslation = false;
+    } finally {
+      (globalThis as any).document = origDoc;
+      (globalThis as any).window = origWin;
+    }
+  });
 });
 

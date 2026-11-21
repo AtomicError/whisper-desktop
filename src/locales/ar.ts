@@ -1199,7 +1199,13 @@ export const ar: Translations = {
     shortcutsVolume: 'ضبط مستوى الصوت (٥٪)',
     shortcutsSeekCue: 'الانتقال بالفيديو لزمن المقطع',
     shortcutsExitFullscreen: 'الخروج من ملء الشاشة',
-    shortcutsOr: 'أو'
+    shortcutsOr: 'أو',
+    shortcutsTranslateOpen: 'فتح ملف ترجمة',
+    shortcutsTranslateStart: 'بدء الترجمة',
+    shortcutsTranslateCopy: 'نسخ الترجمة النصية',
+    shortcutsTranslateViewMode: 'تبديل العرض (مزدوج / الأصل / المترجم)',
+    shortcutsTranslateCueNav: 'التنقل بين المقاطع',
+    shortcutsTranslateCueSide: 'التبديل بين النص الأصلي والمترجم'
   },
   toasts: {
     testCancelled: 'تم إلغاء اختبار الاتصال.',

@@ -1201,7 +1201,13 @@ export const tr: Translations = {
     shortcutsVolume: 'Ses düzeyini ayarla (%5)',
     shortcutsSeekCue: 'Videoyu altyazı zamanına sar',
     shortcutsExitFullscreen: 'Tam ekrandan çık',
-    shortcutsOr: 'veya'
+    shortcutsOr: 'veya',
+    shortcutsTranslateOpen: 'Altyazı dosyası aç',
+    shortcutsTranslateStart: 'Çeviriyi başlat',
+    shortcutsTranslateCopy: 'Çevrilmiş altyazıları kopyala',
+    shortcutsTranslateViewMode: 'Görünümü değiştir (Bölünmüş / Orijinal / Çeviri)',
+    shortcutsTranslateCueNav: 'Altyazı satırları arasında gezin',
+    shortcutsTranslateCueSide: 'Orijinal ve çeviri satırı arasında geç'
   },
   toasts: {
     testCancelled: 'Bağlantı testi iptal edildi.',

@@ -1194,7 +1194,13 @@ export const zh: Translations = {
     shortcutsVolume: '调节音量 (5%)',
     shortcutsSeekCue: '跳转视频至字幕对应时间',
     shortcutsExitFullscreen: '退出全屏播放',
-    shortcutsOr: '或'
+    shortcutsOr: '或',
+    shortcutsTranslateOpen: '打开字幕文件',
+    shortcutsTranslateStart: '开始翻译',
+    shortcutsTranslateCopy: '复制已翻译字幕',
+    shortcutsTranslateViewMode: '切换视图（分屏 / 原文 / 译文）',
+    shortcutsTranslateCueNav: '在字幕条目间导航',
+    shortcutsTranslateCueSide: '在原文和译文列之间切换'
   },
   toasts: {
     testCancelled: '已取消连接测试。',

@@ -1199,7 +1199,13 @@ export const ru: Translations = {
     shortcutsVolume: 'Регулировка громкости (5%)',
     shortcutsSeekCue: 'Перейти к времени субтитра',
     shortcutsExitFullscreen: 'Выйти из полноэкранного режима',
-    shortcutsOr: 'или'
+    shortcutsOr: 'или',
+    shortcutsTranslateOpen: 'Открыть файл субтитров',
+    shortcutsTranslateStart: 'Начать перевод',
+    shortcutsTranslateCopy: 'Копировать переведённые субтитры',
+    shortcutsTranslateViewMode: 'Переключить вид (Раздельный / Оригинал / Перевод)',
+    shortcutsTranslateCueNav: 'Навигация между субтитрами',
+    shortcutsTranslateCueSide: 'Переключение между оригиналом и переводом'
   },
   toasts: {
     testCancelled: 'Проверка подключения отменена.',

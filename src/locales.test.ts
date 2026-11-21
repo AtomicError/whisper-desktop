@@ -239,7 +239,13 @@ describe('locale consistency for speed presets', () => {
         'shortcutsVolume',
         'shortcutsSeekCue',
         'shortcutsExitFullscreen',
-        'shortcutsOr'
+        'shortcutsOr',
+        'shortcutsTranslateOpen',
+        'shortcutsTranslateStart',
+        'shortcutsTranslateCopy',
+        'shortcutsTranslateViewMode',
+        'shortcutsTranslateCueNav',
+        'shortcutsTranslateCueSide'
       ];
       for (const k of shortcutKeys) {
         expect(typeof modals[k]).toBe('string');

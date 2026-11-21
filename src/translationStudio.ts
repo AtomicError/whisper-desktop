@@ -308,6 +308,8 @@ export class TranslationStudioController {
   private scrollThrottledTimeout: any = null;
   private syncScrollRaf: number | null = null;
   private subtitleLoadId = 0;
+  private isBrowsingSubtitle = false;
+  private isStartingTranslation = false;
   private unlisteners: Array<() => void> = [];
 
   public state: TranslationStudioState = {
@@ -547,6 +549,7 @@ export class TranslationStudioController {
 
     this.setupSynchronizedScrolling();
     this.setupSynchronizedHighlighting();
+    this.setupStudioShortcuts();
 
     // Re-render strings when language changes globally
     const onLanguageChange = () => {
@@ -554,6 +557,153 @@ export class TranslationStudioController {
     };
     window.addEventListener?.('whisper:languageChanged', onLanguageChange);
     this.unlisteners.push(() => window.removeEventListener?.('whisper:languageChanged', onLanguageChange));
+  }
+
+  private isEditingField(el: HTMLElement | null): boolean {
+    if (!el) return false;
+    if (el.isContentEditable) return true;
+    if (typeof el.closest === 'function') {
+      return Boolean(
+        el.closest(
+          'textarea, select, input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]), [contenteditable]:not([contenteditable="false"]), .custom-select-container.open, .custom-select-trigger[aria-expanded="true"]'
+        )
+      );
+    }
+    if (el.classList?.contains('custom-select-trigger') && el.getAttribute?.('aria-expanded') === 'true') {
+      return true;
+    }
+    const tag = el.tagName;
+    if (tag === 'TEXTAREA' || tag === 'SELECT') return true;
+    if (tag === 'INPUT') {
+      const inputType = ((el as HTMLInputElement).type || '').toLowerCase();
+      return inputType !== 'button' && inputType !== 'submit' && inputType !== 'reset' && inputType !== 'checkbox';
+    }
+    return false;
+  }
+
+  private isCustomSelectTrigger(el: HTMLElement | null): boolean {
+    if (!el) return false;
+    if (typeof el.closest === 'function') {
+      return Boolean(el.closest('.custom-select-trigger'));
+    }
+    return Boolean(el.classList?.contains('custom-select-trigger'));
+  }
+
+  private matchesShortcutLetter(e: KeyboardEvent, letter: string, code: string): boolean {
+    const keyLower = (e.key || '').toLowerCase();
+    return keyLower === letter || (e.code === code && !/^[a-z]$/i.test(e.key || ''));
+  }
+
+  private focusInitialCueFromKeyboard(e: KeyboardEvent, target: HTMLElement | null, activeEl: HTMLElement | null) {
+    const isBlockedContext = (el: HTMLElement | null): boolean => {
+      if (!el) return false;
+      const tag = el.tagName;
+      if (tag === 'BUTTON' || tag === 'A') return true;
+      if (typeof el.closest === 'function') {
+        return Boolean(
+          el.closest('.translate-cue-item, .translate-left-panel, button, a, [role="tab"], .custom-select-trigger')
+        );
+      }
+      return false;
+    };
+
+    if (isBlockedContext(target) || isBlockedContext(activeEl)) return;
+
+    const pickItems = (list: HTMLElement | null) =>
+      (list && typeof list.querySelectorAll === 'function')
+        ? list.querySelectorAll('.translate-cue-item')
+        : null;
+
+    const preferredItems = pickItems(this.state.viewMode === 'target' ? this.targetList : this.sourceList);
+    const items = (preferredItems && preferredItems.length > 0)
+      ? preferredItems
+      : (this.state.viewMode === 'split' ? pickItems(this.targetList) : null);
+    if (!items || items.length === 0) return;
+
+    const cue = (e.key === 'ArrowDown' ? items[0] : items[items.length - 1]) as HTMLElement;
+    e.preventDefault();
+    cue.focus?.();
+    cue.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  private setupStudioShortcuts() {
+    if (typeof document === 'undefined' || typeof document.addEventListener !== 'function') return;
+
+    const onStudioKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.isComposing || e.repeat) return;
+
+      const translatePanel = typeof document.getElementById === 'function' ? document.getElementById('panel-translate') : null;
+      if (!translatePanel || !translatePanel.classList?.contains('active')) return;
+
+      const hasOpenOverlay = typeof document.querySelector === 'function' && Boolean(
+        document.querySelector(
+          '.modal-overlay.show, #app-modal-overlay:not([style*="display: none"]), .custom-select-options.open, .custom-select-container.open, .custom-select-trigger[aria-expanded="true"]'
+        )
+      );
+      if (hasOpenOverlay) return;
+
+      const target = e.target as HTMLElement | null;
+      const activeEl = (typeof document.activeElement !== 'undefined' ? document.activeElement : null) as HTMLElement | null;
+      if (this.isEditingField(target) || this.isEditingField(activeEl)) return;
+
+      this.handleStudioShortcutKey(e, target, activeEl);
+    };
+
+    document.addEventListener('keydown', onStudioKeyDown);
+    this.unlisteners.push(() => document.removeEventListener?.('keydown', onStudioKeyDown));
+  }
+
+  private handleStudioShortcutKey(e: KeyboardEvent, target: HTMLElement | null, activeEl: HTMLElement | null) {
+    const isCtrlOrCmd = Boolean(e.ctrlKey || e.metaKey);
+
+    if (isCtrlOrCmd && !e.altKey && !e.shiftKey && e.key === 'Enter') {
+      const canStart = !this.state.isTranslating && !this.isStartingTranslation && Boolean(this.state.subtitlePath) && Boolean(this.state.activeModel) && !this.btnStart?.disabled;
+      if (!canStart) return;
+      e.preventDefault();
+      void this.startTranslation();
+      return;
+    }
+
+    if (isCtrlOrCmd && !e.altKey && !e.shiftKey && this.matchesShortcutLetter(e, 'o', 'KeyO')) {
+      e.preventDefault();
+      if (this.state.isTranslating || this.isStartingTranslation || this.isBrowsingSubtitle) return;
+      void this.browseSubtitleFile();
+      return;
+    }
+
+    if (isCtrlOrCmd && e.shiftKey && !e.altKey && this.matchesShortcutLetter(e, 'c', 'KeyC')) {
+      e.preventDefault();
+      const canCopy = !this.state.isTranslating && Boolean(this.state.translatedPath) && this.state.translatedCues.length > 0;
+      if (!canCopy) return;
+      void this.copyTranslatedText();
+      return;
+    }
+
+    if (isCtrlOrCmd || e.altKey || e.shiftKey) return;
+    if (this.isCustomSelectTrigger(target) || this.isCustomSelectTrigger(activeEl)) return;
+
+    const isNumpadNavKey = Boolean(e.code?.startsWith('Numpad')) && /^(End|ArrowDown|PageDown)$/i.test(e.key || '');
+    if (!isNumpadNavKey) {
+      if (e.code === 'Digit1' || e.code === 'Numpad1' || e.key === '1') {
+        e.preventDefault();
+        this.setViewMode('split');
+        return;
+      }
+      if (e.code === 'Digit2' || e.code === 'Numpad2' || e.key === '2') {
+        e.preventDefault();
+        this.setViewMode('source');
+        return;
+      }
+      if (e.code === 'Digit3' || e.code === 'Numpad3' || e.key === '3') {
+        e.preventDefault();
+        this.setViewMode('target');
+        return;
+      }
+    }
+
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      this.focusInitialCueFromKeyboard(e, target, activeEl);
+    }
   }
 
   private markScrolling() {
@@ -617,6 +767,7 @@ export class TranslationStudioController {
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.isComposing || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
       const target = (e.target as HTMLElement)?.closest('.translate-cue-item') as HTMLElement | null;
       if (!target) return;
 
@@ -679,17 +830,20 @@ export class TranslationStudioController {
       }
     };
 
-    this.sourceList?.addEventListener('mouseover', handleMouseOver);
-    this.sourceList?.addEventListener('mouseout', handleMouseOut);
-    this.sourceList?.addEventListener('focusin', handleFocusIn);
-    this.sourceList?.addEventListener('focusout', handleFocusOut);
-    this.sourceList?.addEventListener('keydown', handleKeyDown);
-
-    this.targetList?.addEventListener('mouseover', handleMouseOver);
-    this.targetList?.addEventListener('mouseout', handleMouseOut);
-    this.targetList?.addEventListener('focusin', handleFocusIn);
-    this.targetList?.addEventListener('focusout', handleFocusOut);
-    this.targetList?.addEventListener('keydown', handleKeyDown);
+    const listeners: Array<[string, EventListener]> = [
+      ['mouseover', handleMouseOver as EventListener],
+      ['mouseout', handleMouseOut as EventListener],
+      ['focusin', handleFocusIn as EventListener],
+      ['focusout', handleFocusOut as EventListener],
+      ['keydown', handleKeyDown as EventListener],
+    ];
+    for (const listEl of [this.sourceList, this.targetList]) {
+      if (!listEl) continue;
+      for (const [evt, handler] of listeners) {
+        listEl.addEventListener(evt, handler);
+        this.unlisteners.push(() => listEl.removeEventListener?.(evt, handler));
+      }
+    }
   }
 
   private setupSynchronizedScrolling() {
@@ -794,6 +948,8 @@ export class TranslationStudioController {
   }
 
   public async browseSubtitleFile() {
+    if (this.isBrowsingSubtitle || this.state.isTranslating || this.isStartingTranslation) return;
+    this.isBrowsingSubtitle = true;
     try {
       const selectedPath = await invoke<string | null>('select_subtitle_file');
       if (selectedPath) {
@@ -802,6 +958,8 @@ export class TranslationStudioController {
     } catch (err) {
       console.error('Failed to select subtitle file:', err);
       this.notify(t('translate.noSubSelectedError'), 'error');
+    } finally {
+      this.isBrowsingSubtitle = false;
     }
   }
 
@@ -864,7 +1022,7 @@ export class TranslationStudioController {
   }
 
   public clearLoadedSubtitle() {
-    if (this.state.isTranslating) return;
+    if (this.state.isTranslating || this.isStartingTranslation) return;
     this.subtitleLoadId++;
     this.state.subtitlePath = '';
     this.state.subtitleName = '';
@@ -1404,6 +1562,7 @@ export class TranslationStudioController {
   }
 
   public async startTranslation() {
+    if (this.state.isTranslating || this.isStartingTranslation) return;
     if (!this.state.subtitlePath) {
       this.notify(t('translate.noSubSelectedError'), 'error');
       return;
@@ -1413,15 +1572,22 @@ export class TranslationStudioController {
       return;
     }
 
-    const win = window as any;
-    let globalSettings = win.settingsState;
-    if (!globalSettings) {
-      try {
-        globalSettings = await invoke('load_settings');
-        win.settingsState = globalSettings;
-      } catch (_) {
-        globalSettings = {};
+    this.isStartingTranslation = true;
+    let globalSettings: any;
+    try {
+      const win = window as any;
+      globalSettings = win.settingsState;
+      if (!globalSettings) {
+        try {
+          globalSettings = await invoke('load_settings');
+          win.settingsState = globalSettings;
+        } catch (_) {
+          globalSettings = {};
+        }
       }
+      this.state.isTranslating = true;
+    } finally {
+      this.isStartingTranslation = false;
     }
 
     const parentDir = getParentDir(this.state.subtitlePath);
@@ -1436,7 +1602,6 @@ export class TranslationStudioController {
       translateAiPolish: this.state.polishPass,
     };
 
-    this.state.isTranslating = true;
     this.state.progress = 0;
     this.state.currentLine = 0;
     this.state.translatedPath = '';

@@ -1201,7 +1201,13 @@ export const ko: Translations = {
     shortcutsVolume: '음량 조절 (5%)',
     shortcutsSeekCue: '자막 시간으로 비디오 탐색',
     shortcutsExitFullscreen: '전체 화면 종료',
-    shortcutsOr: '또는'
+    shortcutsOr: '또는',
+    shortcutsTranslateOpen: '자막 파일 열기',
+    shortcutsTranslateStart: '번역 시작',
+    shortcutsTranslateCopy: '번역된 자막 복사',
+    shortcutsTranslateViewMode: '보기 전환 (분할 / 원문 / 번역)',
+    shortcutsTranslateCueNav: '자막 항목 간 이동',
+    shortcutsTranslateCueSide: '원문과 번역 항목 간 전환'
   },
   toasts: {
     testCancelled: '연결 테스트가 취소되었습니다.',

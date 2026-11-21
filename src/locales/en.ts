@@ -1199,7 +1199,13 @@ export const en = {
     shortcutsVolume: 'Adjust volume (5%)',
     shortcutsSeekCue: 'Seek video to subtitle cue',
     shortcutsExitFullscreen: 'Exit fullscreen video',
-    shortcutsOr: 'or'
+    shortcutsOr: 'or',
+    shortcutsTranslateOpen: 'Open subtitle file',
+    shortcutsTranslateStart: 'Start translation',
+    shortcutsTranslateCopy: 'Copy translated subtitles',
+    shortcutsTranslateViewMode: 'Switch view (Split / Original / Translated)',
+    shortcutsTranslateCueNav: 'Navigate between cues',
+    shortcutsTranslateCueSide: 'Switch between original and translated cue'
   },
   toasts: {
     testCancelled: 'Connection test cancelled.',
