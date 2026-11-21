@@ -367,7 +367,8 @@ impl WhisperSettings {
         if self.confidence_threshold <= 0 {
             self.confidence_threshold = default_confidence_threshold();
         }
-        self.confidence_threshold = self.confidence_threshold.clamp(40, 95);
+        let clamped_conf = self.confidence_threshold.clamp(40, 95);
+        self.confidence_threshold = (((clamped_conf + 2) / 5) * 5).clamp(40, 95);
 
         self.threads = self.threads.max(1);
         self.processors = self.processors.max(1);
@@ -1310,6 +1311,14 @@ mod tests {
         settings.confidence_threshold = 120;
         settings.sanitize_and_validate();
         assert_eq!(settings.confidence_threshold, 95);
+
+        settings.confidence_threshold = 73;
+        settings.sanitize_and_validate();
+        assert_eq!(settings.confidence_threshold, 75);
+
+        settings.confidence_threshold = 72;
+        settings.sanitize_and_validate();
+        assert_eq!(settings.confidence_threshold, 70);
 
         let from_str: WhisperSettings = serde_json::from_str(r#"{"confidenceThreshold":"80"}"#).unwrap();
         assert_eq!(from_str.confidence_threshold, 80);

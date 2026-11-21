@@ -618,12 +618,17 @@ export async function selectBatchItemTranscript(index: number): Promise<void> {
     transcriptViewer.setHistory(item.history || { undoStack: [], redoStack: [] });
   }
 
+  const cloneBatchLine = (l: any): any => ({
+    ...l,
+    words: Array.isArray(l?.words) ? l.words.map((w: any) => ({ ...w })) : undefined
+  });
+
   if (isActive) {
     if (typeof win.unloadCompanionPlayer === 'function') {
       win.unloadCompanionPlayer();
     }
     if (item.transcriptLines && item.transcriptLines.length > 0) {
-      transcriptViewer.lines = item.transcriptLines.map((l: any) => ({ ...l }));
+      transcriptViewer.lines = item.transcriptLines.map(cloneBatchLine);
       if (win && win.transcriptLines !== transcriptViewer.lines) win.transcriptLines = transcriptViewer.lines;
       transcriptViewer.render(transcriptViewer.lines);
       if (typeof document !== 'undefined') {
@@ -635,6 +640,11 @@ export async function selectBatchItemTranscript(index: number): Promise<void> {
     } else {
       transcriptViewer.lines = [];
       if (win && win.transcriptLines !== transcriptViewer.lines) win.transcriptLines = [];
+      if (transcriptViewer.isConfidenceActive()) {
+        transcriptViewer.toggleConfidence(false);
+      } else {
+        transcriptViewer.syncConfidenceUI([]);
+      }
       if (typeof document !== 'undefined') {
         const viewport = document.getElementById('transcript-viewport');
         if (viewport) {
@@ -653,7 +663,7 @@ export async function selectBatchItemTranscript(index: number): Promise<void> {
     }
   } else if (isCompleted) {
     if (Array.isArray(item.transcriptLines)) {
-      transcriptViewer.lines = item.transcriptLines.map((l: any) => ({ ...l }));
+      transcriptViewer.lines = item.transcriptLines.map(cloneBatchLine);
       if (win && win.transcriptLines !== transcriptViewer.lines) win.transcriptLines = transcriptViewer.lines;
       transcriptViewer.render(transcriptViewer.lines, false);
       if (typeof document !== 'undefined') {
@@ -675,8 +685,8 @@ export async function selectBatchItemTranscript(index: number): Promise<void> {
               const loaded = await loadTranscriptFromJsonData(sessionJson, false);
               if (isStaleSelection()) return;
               if (loaded && loaded.length > 0) {
-                item.transcriptLines = loaded.map((l: any) => ({ ...l }));
-                const loadedLines = item.transcriptLines.map((l: any) => ({ ...l }));
+                item.transcriptLines = loaded.map(cloneBatchLine);
+                const loadedLines = item.transcriptLines.map(cloneBatchLine);
                 transcriptViewer.lines = loadedLines;
                 if (win && win.transcriptLines !== transcriptViewer.lines) win.transcriptLines = loadedLines;
                 transcriptViewer.render(loadedLines, false);
@@ -698,7 +708,7 @@ export async function selectBatchItemTranscript(index: number): Promise<void> {
           try {
             const loaded = await loadTranscriptFromFile(item.subtitlePath, false);
             if (isStaleSelection()) return;
-            item.transcriptLines = (loaded || []).map((l: any) => ({ ...l }));
+            item.transcriptLines = (loaded || []).map(cloneBatchLine);
           } catch (e) {
             console.error("Failed to load batch item subtitle:", e);
           }
@@ -706,7 +716,7 @@ export async function selectBatchItemTranscript(index: number): Promise<void> {
           try {
             const loaded = await loadTranscriptFromFile(item.txtPath, false);
             if (isStaleSelection()) return;
-            item.transcriptLines = (loaded || []).map((l: any) => ({ ...l }));
+            item.transcriptLines = (loaded || []).map(cloneBatchLine);
           } catch (e) {
             console.error("Failed to load batch item transcript:", e);
           }
@@ -714,7 +724,7 @@ export async function selectBatchItemTranscript(index: number): Promise<void> {
           item.transcriptLines = [];
         }
         if (isStaleSelection()) return;
-        const fallbackLines = (item.transcriptLines || []).map((l: any) => ({ ...l }));
+        const fallbackLines = (item.transcriptLines || []).map(cloneBatchLine);
         transcriptViewer.lines = fallbackLines;
         if (win && win.transcriptLines !== transcriptViewer.lines) win.transcriptLines = fallbackLines;
         transcriptViewer.render(fallbackLines, false);
@@ -1312,7 +1322,10 @@ export async function runBatchExtraction(): Promise<void> {
             const shouldRender = (activeBatchViewerIndex === i);
             const parsedLines = await loadTranscriptFromJsonData(sessionJson, shouldRender);
             if (parsedLines && parsedLines.length > 0) {
-              item.transcriptLines = parsedLines.map((l: any) => ({ ...l }));
+              item.transcriptLines = parsedLines.map((l: any) => ({
+                ...l,
+                words: Array.isArray(l?.words) ? l.words.map((w: any) => ({ ...w })) : undefined
+              }));
               if (shouldRender && win && win.transcriptLines !== transcriptViewer.lines) {
                 win.transcriptLines = transcriptViewer.lines;
               }

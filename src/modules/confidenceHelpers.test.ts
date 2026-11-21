@@ -9,9 +9,11 @@ import {
   isStandalonePunctuationToken,
   evaluateLineConfidence,
   computeConfidenceSummary,
+  markWordAsReviewed,
   reconcileWordsAfterEdit,
   findWordOffsetInText,
-  computeWordSeekMs
+  computeWordSeekMs,
+  type WordTokenLike
 } from './confidenceHelpers';
 import { aggregateTokensIntoWords } from './transcriptViewer';
 import { en } from '../locales/en';
@@ -40,6 +42,8 @@ describe('confidenceHelpers — threshold clamping & two-tier classification', (
     expect(clampConfidenceThreshold(25)).toBe(CONFIDENCE_THRESHOLD_MIN);
     expect(clampConfidenceThreshold(120)).toBe(CONFIDENCE_THRESHOLD_MAX);
     expect(clampConfidenceThreshold(80)).toBe(80);
+    expect(clampConfidenceThreshold(73)).toBe(75);
+    expect(clampConfidenceThreshold(72)).toBe(70);
     expect(clampConfidenceThreshold('۸۰')).toBe(80);
     expect(clampConfidenceThreshold('٨٥')).toBe(85);
   });
@@ -134,13 +138,47 @@ describe('reconcileWordsAfterEdit & summary evaluation', () => {
     expect(next?.[2]).toEqual({ text: 'vertically', startMs: 600, endMs: 1100, prob: 0.55 });
   });
 
-  it('invalidates tokens cleanly when text is completely rewritten or emptied', () => {
+  it('returns proportionally timed reviewed tokens on complete non-empty rewrite and undefined only when emptied', () => {
     const prev = [
-      { text: 'Hello', startMs: 0, endMs: 500, prob: 0.9 },
-      { text: 'world', startMs: 500, endMs: 1000, prob: 0.5 }
+      { text: 'Hello', startMs: 1000, endMs: 1500, prob: 0.9 },
+      { text: 'world', startMs: 1500, endMs: 2000, prob: 0.5 }
     ];
-    expect(reconcileWordsAfterEdit(prev, 'Completely unrelated sentence', 0, 1000)).toBeUndefined();
-    expect(reconcileWordsAfterEdit(prev, '   ', 0, 1000)).toBeUndefined();
+    const rewritten = reconcileWordsAfterEdit(prev, 'Completely unrelated sentence', 1000, 2000);
+    expect(rewritten).toBeDefined();
+    expect(rewritten?.length).toBe(3);
+    expect(rewritten?.every(w => w.prob === 1.0 && w.reviewed === true)).toBe(true);
+    expect(rewritten?.[0].startMs).toBe(1000);
+    expect(rewritten?.[2].endMs).toBe(2000);
+    expect(rewritten![0].endMs).toBeLessThanOrEqual(rewritten![1].startMs);
+    expect(rewritten![1].endMs).toBeLessThanOrEqual(rewritten![2].startMs);
+
+    // 1-word correction preserves Confidence view with reviewed status
+    const oneWordFix = reconcileWordsAfterEdit(
+      [{ text: 'کلام', startMs: 500, endMs: 900, prob: 0.4 }],
+      'سلام',
+      500,
+      900
+    );
+    expect(oneWordFix).toEqual([{ text: 'سلام', startMs: 500, endMs: 900, prob: 1.0, reviewed: true }]);
+
+    // Empty / whitespace text invalidates cleanly
+    expect(reconcileWordsAfterEdit(prev, '   ', 1000, 2000)).toBeUndefined();
+  });
+
+  it('immutably marks a single word as reviewed via markWordAsReviewed', () => {
+    const original: WordTokenLike[] = [
+      { text: 'Slice', startMs: 0, endMs: 300, prob: 0.95 },
+      { text: 'onion', startMs: 300, endMs: 600, prob: 0.52 }
+    ];
+    const updated = markWordAsReviewed(original, 1);
+    expect(updated).toBeDefined();
+    expect(updated?.[1]).toEqual({ text: 'onion', startMs: 300, endMs: 600, prob: 1.0, reviewed: true });
+    // Immutability check: original array and element untouched
+    expect(original[1].prob).toBe(0.52);
+    expect(original[1].reviewed).toBeUndefined();
+    // Already reviewed or out-of-bounds returns undefined
+    expect(markWordAsReviewed(updated, 1)).toBeUndefined();
+    expect(markWordAsReviewed(original, 5)).toBeUndefined();
   });
 
   it('computes accurate multi-segment summary and skips reviewed words', () => {
@@ -189,7 +227,7 @@ describe('reconcileWordsAfterEdit & summary evaluation', () => {
     expect(computeWordSeekMs(0, 0)).toBe(0);
   });
 
-  it('finds exact whole-word offsets without matching inner substrings', () => {
+  it('finds exact whole-word offsets without matching inner substrings or punctuation-suffixed duplicates', () => {
     const words = [
       { text: 'The', startMs: 0, endMs: 100, prob: 0.9 },
       { text: 'beginning', startMs: 100, endMs: 300, prob: 0.9 },
@@ -197,6 +235,24 @@ describe('reconcileWordsAfterEdit & summary evaluation', () => {
       { text: 'the', startMs: 400, endMs: 500, prob: 0.9 }
     ];
     expect(findWordOffsetInText('The beginning in the', words, 2)).toEqual({ start: 14, end: 16 });
+
+    const punctDuplicates = [
+      { text: 'onion,', startMs: 0, endMs: 300, prob: 0.95 },
+      { text: 'onion', startMs: 300, endMs: 600, prob: 0.48 }
+    ];
+    expect(findWordOffsetInText('onion, onion', punctDuplicates, 1)).toEqual({ start: 7, end: 12 });
+
+    const persianQuotesDuplicates = [
+      { text: '«سلام»', startMs: 0, endMs: 300, prob: 0.95 },
+      { text: 'سلام', startMs: 300, endMs: 600, prob: 0.45 }
+    ];
+    expect(findWordOffsetInText('«سلام» سلام', persianQuotesDuplicates, 1)).toEqual({ start: 7, end: 11 });
+
+    const persianQuestionDuplicates = [
+      { text: 'سلام؟', startMs: 0, endMs: 300, prob: 0.95 },
+      { text: 'سلام', startMs: 300, endMs: 600, prob: 0.45 }
+    ];
+    expect(findWordOffsetInText('سلام؟ سلام', persianQuestionDuplicates, 1)).toEqual({ start: 6, end: 10 });
   });
 });
 

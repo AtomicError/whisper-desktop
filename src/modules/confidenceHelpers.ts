@@ -37,20 +37,25 @@ export const CONFIDENCE_WORD_PREROLL_MS = 220;
 const STANDALONE_PUNCTUATION_RE = /^[\s.,!?;:…،؛؟«»"'`()[\]{}\-–—/\\|•·]+$/;
 
 /**
- * Parses and clamps a confidence threshold percentage to [40, 95], defaulting to 70.
+ * Parses, clamps, and snaps a confidence threshold percentage to step-5 values in [40, 95], defaulting to 70.
  * Accepts ASCII, Persian, and Arabic-Indic numerals as well as numbers.
  */
 export function clampConfidenceThreshold(raw: unknown): number {
+  const snapAndClamp = (val: number): number => {
+    const clamped = Math.max(CONFIDENCE_THRESHOLD_MIN, Math.min(CONFIDENCE_THRESHOLD_MAX, val));
+    const snapped = Math.round(clamped / CONFIDENCE_THRESHOLD_STEP) * CONFIDENCE_THRESHOLD_STEP;
+    return Math.max(CONFIDENCE_THRESHOLD_MIN, Math.min(CONFIDENCE_THRESHOLD_MAX, snapped));
+  };
   if (typeof raw === 'number') {
     if (!Number.isFinite(raw) || raw <= 0) return CONFIDENCE_THRESHOLD_DEFAULT;
-    return Math.max(CONFIDENCE_THRESHOLD_MIN, Math.min(CONFIDENCE_THRESHOLD_MAX, Math.round(raw)));
+    return snapAndClamp(Math.round(raw));
   }
   const normalized = normalizeDigitsToAscii(String(raw ?? '')).trim();
   const parsed = parseInt(normalized, 10);
   if (Number.isNaN(parsed) || parsed <= 0) {
     return CONFIDENCE_THRESHOLD_DEFAULT;
   }
-  return Math.max(CONFIDENCE_THRESHOLD_MIN, Math.min(CONFIDENCE_THRESHOLD_MAX, parsed));
+  return snapAndClamp(parsed);
 }
 
 /**
@@ -183,12 +188,61 @@ export function computeConfidenceSummary(
 }
 
 /**
+ * Builds proportionally timed, human-reviewed word tokens across [spanStart, spanEnd].
+ */
+function buildProportionalReviewedWords(
+  tokens: readonly string[],
+  spanStartMs: number,
+  spanEndMs: number
+): WordTokenLike[] {
+  const safeStart = Math.max(0, Math.round(Number(spanStartMs) || 0));
+  const safeEnd = Math.max(safeStart, Math.round(Number(spanEndMs) || safeStart));
+  const duration = safeEnd - safeStart;
+  const totalWeight = tokens.reduce((sum, tok) => sum + Math.max(1, tok.length), 0);
+
+  let consumedWeight = 0;
+  return tokens.map((tok, idx) => {
+    const weight = Math.max(1, tok.length);
+    const wordStart = safeStart + Math.round((consumedWeight / totalWeight) * duration);
+    consumedWeight += weight;
+    const wordEnd = idx === tokens.length - 1
+      ? safeEnd
+      : Math.max(wordStart, safeStart + Math.round((consumedWeight / totalWeight) * duration));
+    return {
+      text: tok,
+      startMs: wordStart,
+      endMs: wordEnd,
+      prob: 1.0,
+      reviewed: true
+    };
+  });
+}
+
+/**
+ * Immutably marks a single word token as human-reviewed (`prob: 1.0, reviewed: true`).
+ * Returns `undefined` if the index is invalid or the word is already reviewed.
+ */
+export function markWordAsReviewed(
+  words: readonly WordTokenLike[] | undefined,
+  wordIdx: number
+): WordTokenLike[] | undefined {
+  if (!Array.isArray(words) || wordIdx < 0 || wordIdx >= words.length) {
+    return undefined;
+  }
+  if (words[wordIdx]?.reviewed) {
+    return undefined;
+  }
+  return words.map((w, idx) => (idx === wordIdx ? { ...w, prob: 1.0, reviewed: true } : { ...w }));
+}
+
+/**
  * Reconciles word-level confidence metadata after a user edits a segment's text.
  * - Unchanged words retain their original Whisper timestamps and probabilities,
  *   so fixing one low-confidence word does NOT wipe warnings on other words in the same segment.
  * - Modified or newly inserted words are marked as human-reviewed (`prob: 1.0, reviewed: true`).
- * - If the text is emptied or shares zero words with the original tokens (complete rewrite),
- *   returns `undefined` so stale tokens are cleanly invalidated.
+ * - Complete non-empty rewrites (including 1-word fixes like "helo" -> "hello") produce proportionally
+ *   timed reviewed tokens within the segment span so the unified Confidence view stays intact.
+ * - Emptied text returns `undefined`.
  */
 export function reconcileWordsAfterEdit(
   previousWords: readonly WordTokenLike[] | undefined,
@@ -205,13 +259,20 @@ export function reconcileWordsAfterEdit(
   const newTokens = trimmed.split(/\s+/).filter(Boolean);
   if (newTokens.length === 0) return undefined;
 
+  const baseStart = previousWords[0]?.startMs ?? segStartMs;
+  const baseEnd = Math.max(
+    baseStart,
+    previousWords[previousWords.length - 1]?.endMs ?? segEndMs,
+    segEndMs
+  );
+
   const oldClean = previousWords.map(w => w.text.trim());
   const m = oldClean.length;
   const n = newTokens.length;
 
   // Guard against degenerate very long segments (fallback cleanly)
   if (m * n > 25000) {
-    return undefined;
+    return buildProportionalReviewedWords(newTokens, baseStart, baseEnd);
   }
 
   // Standard LCS table on exact word text so preserved words stay mapped in order
@@ -228,8 +289,8 @@ export function reconcileWordsAfterEdit(
 
   const matchedCount = dp[0][0];
   if (matchedCount === 0) {
-    // Complete rewrite: invalidate stale tokens cleanly
-    return undefined;
+    // Complete rewrite or 1-word fix: keep segment in reviewed Confidence view with proportional timestamps
+    return buildProportionalReviewedWords(newTokens, baseStart, baseEnd);
   }
 
   // Reconstruct newIndex -> oldIndex mapping
@@ -247,9 +308,6 @@ export function reconcileWordsAfterEdit(
       j++;
     }
   }
-
-  const baseStart = previousWords[0]?.startMs ?? segStartMs;
-  const baseEnd = previousWords[previousWords.length - 1]?.endMs ?? Math.max(baseStart, segEndMs);
 
   const reconciled: WordTokenLike[] = new Array(n);
   for (let k = 0; k < n; k++) {
@@ -296,7 +354,9 @@ export function reconcileWordsAfterEdit(
 
 /**
  * Locates the exact character range `[start, end]` of `wordsArr[targetIdx]` inside `textVal`,
- * preferring whole-word boundary matches to prevent substring collisions (e.g. "in" inside "beginning").
+ * advancing sequentially across preceding tokens and preferring whole-word boundary matches
+ * to prevent substring collisions (e.g. "in" inside "beginning") and punctuation variant mismatches
+ * (e.g. "onion," followed by "onion").
  */
 export function findWordOffsetInText(
   textVal: string,
@@ -308,40 +368,38 @@ export function findWordOffsetInText(
   const cleanWord = targetWord.text.trim();
   if (!cleanWord) return null;
 
-  let occurrenceIndex = 0;
+  const boundaryChars = '\\s.,!?;:…،؛؟«»"\'`\\(\\)\\[\\]\\{\\}\\-–—/\\\\|•·';
+  const findTokenFrom = (token: string, fromIdx: number): number => {
+    const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const rx = new RegExp(
+      `(^|[${boundaryChars}])${escaped}(?=$|[${boundaryChars}])`,
+      'g'
+    );
+    rx.lastIndex = Math.max(0, fromIdx - 1);
+    let m: RegExpExecArray | null = null;
+    while ((m = rx.exec(textVal)) !== null) {
+      const candidateStart = m.index + m[1].length;
+      if (candidateStart >= fromIdx) {
+        return candidateStart;
+      }
+      if (rx.lastIndex <= m.index) {
+        rx.lastIndex = m.index + 1;
+      }
+    }
+    return textVal.indexOf(token, fromIdx);
+  };
+
+  let searchFrom = 0;
   for (let wi = 0; wi < targetIdx; wi++) {
-    if (wordsArr[wi].text.trim() === cleanWord) {
-      occurrenceIndex++;
+    const prevClean = wordsArr[wi]?.text.trim();
+    if (!prevClean) continue;
+    const prevPos = findTokenFrom(prevClean, searchFrom);
+    if (prevPos !== -1) {
+      searchFrom = prevPos + prevClean.length;
     }
   }
 
-  const escapedWord = cleanWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const wordRegex = new RegExp(
-    `(^|\\s|[.,!?;:،؛«»"'\`\\(\\)\\[\\]])${escapedWord}(?=$|\\s|[.,!?;:،؛«»"'\`\\(\\)\\[\\]])`,
-    'g'
-  );
-  let match: RegExpExecArray | null = null;
-  let currentOccurrence = 0;
-  let foundPos = -1;
-
-  while ((match = wordRegex.exec(textVal)) !== null) {
-    const matchWordStart = match.index + match[1].length;
-    if (currentOccurrence === occurrenceIndex) {
-      foundPos = matchWordStart;
-      break;
-    }
-    currentOccurrence++;
-  }
-
-  if (foundPos === -1) {
-    let searchFrom = 0;
-    for (let occ = 0; occ <= occurrenceIndex; occ++) {
-      foundPos = textVal.indexOf(cleanWord, searchFrom);
-      if (foundPos === -1) break;
-      searchFrom = foundPos + cleanWord.length;
-    }
-  }
-
+  let foundPos = findTokenFrom(cleanWord, searchFrom);
   if (foundPos === -1) {
     foundPos = textVal.indexOf(cleanWord);
   }

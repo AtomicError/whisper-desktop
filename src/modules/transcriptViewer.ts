@@ -10,6 +10,7 @@ import {
   transcriptHasConfidenceData,
   evaluateLineConfidence,
   computeConfidenceSummary,
+  markWordAsReviewed,
   reconcileWordsAfterEdit,
   findWordOffsetInText,
   computeWordSeekMs
@@ -148,9 +149,29 @@ function buildConfidenceViewElement(lineObj: TranscriptLine): HTMLDivElement | n
   return appendedCount > 0 ? viewEl : null;
 }
 
+function cloneTranscriptLines(lines: readonly TranscriptLine[]): TranscriptLine[] {
+  return lines.map(l => ({
+    ...l,
+    words: Array.isArray(l.words) ? l.words.map(w => ({ ...w })) : undefined
+  }));
+}
+
+function clearConfidenceWordFocusInViewport(): void {
+  activeConfidenceJumpIndex = -1;
+  if (typeof document === 'undefined' || typeof document.getElementById !== 'function') return;
+  const viewport = document.getElementById('transcript-viewport');
+  if (viewport && typeof viewport.querySelectorAll === 'function') {
+    viewport.querySelectorAll('.transcript-word.confidence-word-focused').forEach(el => {
+      el.classList.remove('confidence-word-focused');
+    });
+  }
+}
+
 function syncCardConfidenceMeta(cardEl: HTMLElement, lineObj: TranscriptLine): void {
   const evalResult = evaluateLineConfidence(lineObj, confidenceThresholdPercent);
-  const isReviewed = reviewedSegmentIdsInSession.has(lineObj.id) && evalResult.flaggedCount === 0;
+  const isReviewed =
+    (evalResult.hasReviewedWords || reviewedSegmentIdsInSession.has(lineObj.id)) &&
+    evalResult.flaggedCount === 0;
 
   if (evalResult.level === 'critical') {
     cardEl.dataset.confidenceLevel = 'critical';
@@ -252,13 +273,24 @@ function enterCardEditMode(cardEl: HTMLElement, wordIdx?: number, seekPlayer = f
   }
 }
 
-function handleConfidenceViewInteraction(cardEl: HTMLElement, target: HTMLElement | null): boolean {
+function handleConfidenceViewInteraction(
+  cardEl: HTMLElement,
+  target: HTMLElement | null,
+  approveWord = false
+): boolean {
   if (!target) return false;
   const wordSpan = typeof target.closest === 'function'
     ? (target.closest('.transcript-word') as HTMLElement | null)
     : (target.classList?.contains?.('transcript-word') ? target : null);
   if (wordSpan) {
     const idx = parseInt(wordSpan.dataset?.wordIdx ?? '', 10);
+    if (approveWord) {
+      const lineObj = resolveLineForCard(cardEl);
+      if (lineObj && !Number.isNaN(idx)) {
+        markConfidenceWordReviewed(lineObj.id, idx);
+      }
+      return true;
+    }
     enterCardEditMode(cardEl, Number.isNaN(idx) ? undefined : idx, true);
     return true;
   }
@@ -266,6 +298,7 @@ function handleConfidenceViewInteraction(cardEl: HTMLElement, target: HTMLElemen
     ? (target.closest('.transcript-confidence-view') as HTMLElement | null)
     : (target.classList?.contains?.('transcript-confidence-view') ? target : null);
   if (confView) {
+    if (approveWord) return true;
     enterCardEditMode(cardEl, undefined, false);
     return true;
   }
@@ -285,7 +318,7 @@ function ensureViewportConfidenceDelegation(viewport: HTMLElement | null): void 
     const cardEl = target.closest('.transcript-card') as HTMLElement | null;
     if (!cardEl) return;
     e.stopPropagation();
-    handleConfidenceViewInteraction(cardEl, target);
+    handleConfidenceViewInteraction(cardEl, target, Boolean(e.shiftKey));
   });
 
   viewport.addEventListener('keydown', (e: KeyboardEvent) => {
@@ -298,7 +331,7 @@ function ensureViewportConfidenceDelegation(viewport: HTMLElement | null): void 
     if (!cardEl) return;
     e.preventDefault();
     e.stopPropagation();
-    handleConfidenceViewInteraction(cardEl, target);
+    handleConfidenceViewInteraction(cardEl, target, Boolean(e.shiftKey));
   });
 }
 
@@ -307,6 +340,7 @@ export function setupTranscriptDirection(): void {
   const viewport = document.getElementById('transcript-viewport') as any;
   if (!viewport) return;
   ensureViewportConfidenceDelegation(viewport);
+  syncConfidenceButtonAndReviewBar();
   if (viewport._hasDirectionListener) return;
   viewport._hasDirectionListener = true;
   
@@ -320,23 +354,24 @@ export function setupTranscriptDirection(): void {
     }
   });
 
-  window.addEventListener('whisper:languageChanged', () => {
-    viewport.querySelectorAll('.transcript-text-input').forEach((input: HTMLElement) => {
-      applyTextDirection(input);
-      autoResizeTranscriptField(input);
-    });
-    syncConfidenceButtonAndReviewBar();
-  });
-
-  let resizeTimer: ReturnType<typeof setTimeout> | null = null;
-  window.addEventListener('resize', () => {
-    if (resizeTimer) clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => {
+  if (typeof window.addEventListener === 'function') {
+    window.addEventListener('whisper:languageChanged', () => {
       viewport.querySelectorAll('.transcript-text-input').forEach((input: HTMLElement) => {
+        applyTextDirection(input);
         autoResizeTranscriptField(input);
       });
-    }, 100);
-  });
+    });
+
+    let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+    window.addEventListener('resize', () => {
+      if (resizeTimer) clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        viewport.querySelectorAll('.transcript-text-input').forEach((input: HTMLElement) => {
+          autoResizeTranscriptField(input);
+        });
+      }, 100);
+    });
+  }
 }
 
 export function parseTranscriptTimeRange(timeRange: string): { raw: string; durLabel: string } {
@@ -515,6 +550,10 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
   applyTextDirection(textarea);
   textarea.onfocus = () => {
     sessionSnapshotTaken = false;
+    const liveLine = resolveLineForCard(cardEl) || lineObj;
+    (textarea as any)._preEditWords = Array.isArray(liveLine?.words)
+      ? liveLine.words.map(w => ({ ...w }))
+      : undefined;
     cardEl.classList.add('is-editing-text');
     autoResizeTranscriptField(textarea);
     const win = getGlobal();
@@ -528,19 +567,35 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
       recordTranscriptHistorySnapshot('Text Edit');
     }
     (textarea as any)._hasTyped = true;
-    updateTranscriptLineText(lineObj.id, textarea.value);
+    const preEditWords = (textarea as any)._preEditWords as readonly WordToken[] | undefined;
+    updateTranscriptLineText(lineObj.id, textarea.value, preEditWords);
   };
   textarea.onblur = () => {
     const didType = Boolean((textarea as any)._hasTyped);
     (textarea as any)._hasTyped = false;
+    (textarea as any)._preEditWords = undefined;
     sessionSnapshotTaken = false;
     cardEl.classList.remove('is-editing-text');
     if (confidenceHighlightingActive) {
+      const prevFocusedWord = !didType
+        ? (cardEl.querySelector('.transcript-word.confidence-word-focused') as HTMLElement | null)
+        : null;
+      const prevFocusedIdx = prevFocusedWord?.dataset?.wordIdx;
       const liveLine = resolveLineForCard(cardEl) || lineObj;
       if (didType) {
         reviewedSegmentIdsInSession.add(liveLine.id);
       }
       mountOrRefreshCardConfidenceView(cardEl, liveLine);
+      if (prevFocusedIdx !== undefined && prevFocusedIdx !== '') {
+        const restoredWord = cardEl.querySelector(
+          `.transcript-word.low-confidence[data-word-idx="${prevFocusedIdx}"]`
+        ) as HTMLElement | null;
+        if (restoredWord) {
+          restoredWord.classList.add('confidence-word-focused');
+        } else {
+          activeConfidenceJumpIndex = -1;
+        }
+      }
       syncConfidenceButtonAndReviewBar();
     }
   };
@@ -549,6 +604,13 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
     void flushPendingTranscriptEdits();
   };
   textarea.onkeydown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape' && confidenceHighlightingActive) {
+      e.preventDefault();
+      if (typeof textarea.blur === 'function') {
+        textarea.blur();
+      }
+      return;
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       splitTranscriptSegment(lineObj.id, textarea.selectionStart);
@@ -587,7 +649,7 @@ export function createTranscriptCardElement(lineObj: TranscriptLine): HTMLDivEle
       // Handle standalone detached cards (viewport delegation handles mounted cards)
       const inViewport = typeof cardEl.closest === 'function' && cardEl.closest('#transcript-viewport');
       if (!inViewport) {
-        handleConfidenceViewInteraction(cardEl, target);
+        handleConfidenceViewInteraction(cardEl, target, Boolean(e.shiftKey));
       }
       return;
     }
@@ -902,7 +964,7 @@ export async function persistTranscriptLinesToDisk(): Promise<void> {
     : collectActiveTranscriptTargetFiles();
   const linesSnapshot = (pendingTranscriptSnapshotLines && pendingTranscriptSnapshotLines.length > 0)
     ? pendingTranscriptSnapshotLines
-    : transcriptLines.map(l => ({ ...l }));
+    : cloneTranscriptLines(transcriptLines);
 
   pendingTranscriptTargetFiles = null;
   pendingTranscriptSnapshotLines = null;
@@ -943,10 +1005,7 @@ function scheduleTranscriptDiskSync(): void {
       pendingTranscriptTargetFiles = currentTargets;
     }
   }
-  pendingTranscriptSnapshotLines = transcriptLines.map(l => ({
-    ...l,
-    words: Array.isArray(l.words) ? l.words.map(w => ({ ...w })) : undefined
-  }));
+  pendingTranscriptSnapshotLines = cloneTranscriptLines(transcriptLines);
   if (transcriptSaveTimer !== null) {
     clearTimeout(transcriptSaveTimer);
   }
@@ -986,14 +1045,19 @@ export async function flushPendingTranscriptEdits(): Promise<void> {
   }
 }
 
-export function updateTranscriptLineText(id: number, value: string): void {
+export function updateTranscriptLineText(
+  id: number,
+  value: string,
+  baseWordsOverride?: readonly WordToken[]
+): void {
   let changed = false;
   const line = transcriptLines.find(l => l.id === id);
   if (line) {
     if (line.text !== value) {
       changed = true;
       const { startMs, endMs } = extractLineStartEndMs(line, line.id);
-      line.words = reconcileWordsAfterEdit(line.words, value, startMs, endMs);
+      const sourceWords = baseWordsOverride ?? line.words;
+      line.words = reconcileWordsAfterEdit(sourceWords, value, startMs, endMs);
     }
     line.text = value;
   }
@@ -1008,7 +1072,7 @@ export function updateTranscriptLineText(id: number, value: string): void {
           const { startMs, endMs } = extractLineStartEndMs(itemLine, itemLine.id);
           itemLine.words = line?.words
             ? line.words.map(w => ({ ...w }))
-            : reconcileWordsAfterEdit(itemLine.words, value, startMs, endMs);
+            : reconcileWordsAfterEdit(baseWordsOverride ?? itemLine.words, value, startMs, endMs);
         }
         itemLine.text = value;
       }
@@ -1017,7 +1081,7 @@ export function updateTranscriptLineText(id: number, value: string): void {
   if (changed) {
     if (confidenceHighlightingActive) {
       reviewedSegmentIdsInSession.add(id);
-      activeConfidenceJumpIndex = -1;
+      clearConfidenceWordFocusInViewport();
     }
     if (typeof document !== 'undefined' && typeof document.querySelector === 'function') {
       const cardEl = (document.querySelector(`.transcript-card[data-id="${id}"]`) ||
@@ -1252,6 +1316,60 @@ export function toggleConfidenceLowOnlyFilter(forceState?: boolean): boolean {
   return confidenceLowOnlyFilter;
 }
 
+export function markConfidenceWordReviewed(lineId: number, wordIdx: number): boolean {
+  const line = transcriptLines.find(l => l.id === lineId);
+  if (!line || !Array.isArray(line.words)) return false;
+  const word = line.words[wordIdx];
+  if (!word || word.reviewed) return false;
+  if (classifyWordConfidence(word.prob, confidenceThresholdPercent) === 'ok') return false;
+
+  const updatedWords = markWordAsReviewed(line.words, wordIdx);
+  if (!updatedWords) return false;
+
+  recordTranscriptHistorySnapshot('Review Word');
+  line.words = updatedWords;
+
+  const win = getGlobal();
+  if (win.isBatchMode && win.activeBatchViewerIndex >= 0 && win.batchItems && win.batchItems[win.activeBatchViewerIndex]) {
+    const item = win.batchItems[win.activeBatchViewerIndex];
+    const itemLine = item?.transcriptLines?.find((l: any) => l.id === lineId);
+    if (itemLine) {
+      itemLine.words = updatedWords.map(w => ({ ...w }));
+    }
+  }
+
+  reviewedSegmentIdsInSession.add(lineId);
+  clearConfidenceWordFocusInViewport();
+
+  if (typeof document !== 'undefined' && typeof document.querySelector === 'function') {
+    const cardEl = (document.querySelector(`.transcript-card[data-id="${lineId}"]`) ||
+      (typeof document.getElementById === 'function' ? document.getElementById(`transcript-card-${lineId}`) : null)) as HTMLElement | null;
+    if (cardEl) {
+      const activeEl = typeof document.activeElement !== 'undefined' ? document.activeElement : null;
+      const hadFocusInCard = Boolean(
+        activeEl &&
+        (activeEl === cardEl ||
+          (typeof cardEl.contains === 'function' && cardEl.contains(activeEl)) ||
+          (typeof (activeEl as HTMLElement).closest === 'function' && (activeEl as HTMLElement).closest('.transcript-card') === cardEl))
+      );
+      mountOrRefreshCardConfidenceView(cardEl, line);
+      if (hadFocusInCard && typeof cardEl.querySelector === 'function') {
+        const restoredWordEl = cardEl.querySelector(`.transcript-word[data-word-idx="${wordIdx}"]`) as HTMLElement | null;
+        if (restoredWordEl && typeof restoredWordEl.focus === 'function') {
+          try {
+            restoredWordEl.focus({ preventScroll: true });
+          } catch (_) {
+            restoredWordEl.focus();
+          }
+        }
+      }
+    }
+  }
+
+  syncConfidenceButtonAndReviewBar();
+  return true;
+}
+
 export function jumpToConfidenceWord(direction: 1 | -1 = 1): boolean {
   if (typeof document === 'undefined' || !confidenceHighlightingActive) return false;
   const viewport = document.getElementById('transcript-viewport');
@@ -1265,10 +1383,12 @@ export function jumpToConfidenceWord(direction: 1 | -1 = 1): boolean {
       if (textarea && typeof textarea.blur === 'function' && document.activeElement === textarea) {
         textarea.blur();
       }
-      cardEl.classList.remove('is-editing-text');
-      const liveLine = resolveLineForCard(cardEl);
-      if (liveLine) {
-        mountOrRefreshCardConfidenceView(cardEl, liveLine);
+      if (cardEl.classList.contains('is-editing-text')) {
+        cardEl.classList.remove('is-editing-text');
+        const liveLine = resolveLineForCard(cardEl);
+        if (liveLine) {
+          mountOrRefreshCardConfidenceView(cardEl, liveLine);
+        }
       }
     });
   }
@@ -1295,6 +1415,18 @@ export function jumpToConfidenceWord(direction: 1 | -1 = 1): boolean {
   targetWordEl.classList.add('confidence-word-focused');
   syncConfidenceJumpControls(visibleFlagged.length);
 
+  const activeEl = typeof document.activeElement !== 'undefined' ? document.activeElement : null;
+  const isStepperBtnFocused = Boolean(
+    activeEl && (activeEl.id === 'btn-confidence-prev' || activeEl.id === 'btn-confidence-next')
+  );
+  if (!isStepperBtnFocused && typeof targetWordEl.focus === 'function') {
+    try {
+      targetWordEl.focus({ preventScroll: true });
+    } catch (_) {
+      targetWordEl.focus();
+    }
+  }
+
   const targetCard = typeof targetWordEl.closest === 'function'
     ? (targetWordEl.closest('.transcript-card') as HTMLElement | null)
     : null;
@@ -1310,7 +1442,7 @@ export function jumpToConfidenceWord(direction: 1 | -1 = 1): boolean {
       const seekMs = computeWordSeekMs(lineObj.words[wordIdx].startMs, startMs);
       const win = getGlobal();
       if (typeof win.seekCompanionPlayer === 'function') {
-        win.seekCompanionPlayer(seekMs, false, lineObj.id);
+        win.seekCompanionPlayer(seekMs, undefined, lineObj.id);
       } else if (typeof win.highlightActiveTranscriptSegment === 'function') {
         win.highlightActiveTranscriptSegment(seekMs / 1000, lineObj.id);
       }
@@ -1414,6 +1546,7 @@ export function splitTranscriptSegment(lineId: number, cursorPosition?: number):
   if (Array.isArray(line.words) && line.words.length > 1) {
     let searchIdx = 0;
     let splitWordIdx = -1;
+    let splitInsideWord = false;
     for (let i = 0; i < line.words.length; i++) {
       const wText = line.words[i].text.trim();
       if (!wText) continue;
@@ -1426,6 +1559,7 @@ export function splitTranscriptSegment(lineId: number, cursorPosition?: number):
           break;
         } else if (splitPos <= wordEndPos) {
           splitWordIdx = i;
+          splitInsideWord = splitPos > foundPos && splitPos < wordEndPos;
           break;
         }
       }
@@ -1442,11 +1576,24 @@ export function splitTranscriptSegment(lineId: number, cursorPosition?: number):
       leftWords = undefined;
       rightWords = undefined;
     } else {
-      leftWords = line.words.slice(0, splitWordIdx + 1);
-      rightWords = line.words.slice(splitWordIdx + 1);
+      leftWords = line.words.slice(0, splitWordIdx + 1).map(w => ({ ...w }));
+      rightWords = line.words.slice(splitWordIdx + 1).map(w => ({ ...w }));
       if (leftWords.length > 0 && rightWords.length > 0) {
         splitEndMs = leftWords[leftWords.length - 1].endMs;
         splitStartMs = rightWords[0].startMs;
+        if (splitInsideWord) {
+          leftWords = reconcileWordsAfterEdit(leftWords, leftText, startMs, splitEndMs);
+          rightWords = reconcileWordsAfterEdit(rightWords, rightText, splitStartMs, endMs);
+        } else {
+          const leftJoined = leftWords.map(w => w.text.trim()).filter(Boolean).join(' ');
+          const rightJoined = rightWords.map(w => w.text.trim()).filter(Boolean).join(' ');
+          const normLeft = leftText.split(/\s+/).filter(Boolean).join(' ');
+          const normRight = rightText.split(/\s+/).filter(Boolean).join(' ');
+          if (leftJoined !== normLeft || rightJoined !== normRight) {
+            leftWords = undefined;
+            rightWords = undefined;
+          }
+        }
       } else {
         const ratio = Math.max(0.05, Math.min(0.95, splitPos / Math.max(1, fullText.length)));
         const mid = Math.round(startMs + ratio * Math.max(0, endMs - startMs));
@@ -1495,7 +1642,7 @@ export function splitTranscriptSegment(lineId: number, cursorPosition?: number):
   // Sync batch mode if active
   const win = getGlobal();
   if (win.isBatchMode && win.activeBatchViewerIndex >= 0 && win.batchItems && win.batchItems[win.activeBatchViewerIndex]) {
-    win.batchItems[win.activeBatchViewerIndex].transcriptLines = transcriptLines.map(l => ({ ...l }));
+    win.batchItems[win.activeBatchViewerIndex].transcriptLines = cloneTranscriptLines(transcriptLines);
   }
 
   renderTranscriptLines(transcriptLines);
@@ -1504,11 +1651,15 @@ export function splitTranscriptSegment(lineId: number, cursorPosition?: number):
     if (typeof document !== 'undefined') {
       const nextInput = document.querySelector(`.transcript-card[data-id="${index + 1}"] .transcript-text-input`) as HTMLTextAreaElement | null;
       if (nextInput && typeof nextInput.focus === 'function') {
+        const card = nextInput.closest('.transcript-card') as HTMLElement | null;
+        if (card) {
+          card.classList.add('is-editing-text');
+        }
+        autoResizeTranscriptField(nextInput);
         nextInput.focus();
         if (typeof nextInput.setSelectionRange === 'function') {
           nextInput.setSelectionRange(0, 0);
         }
-        const card = nextInput.closest('.transcript-card');
         if (card && typeof card.scrollIntoView === 'function') {
           card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
@@ -1581,7 +1732,7 @@ export function mergeTranscriptSegmentWithPrevious(lineId: number): boolean {
   // Sync batch mode if active
   const win = getGlobal();
   if (win.isBatchMode && win.activeBatchViewerIndex >= 0 && win.batchItems && win.batchItems[win.activeBatchViewerIndex]) {
-    win.batchItems[win.activeBatchViewerIndex].transcriptLines = transcriptLines.map(l => ({ ...l }));
+    win.batchItems[win.activeBatchViewerIndex].transcriptLines = cloneTranscriptLines(transcriptLines);
   }
 
   renderTranscriptLines(transcriptLines);
@@ -1590,12 +1741,16 @@ export function mergeTranscriptSegmentWithPrevious(lineId: number): boolean {
     if (typeof document !== 'undefined') {
       const prevInput = document.querySelector(`.transcript-card[data-id="${index - 1}"] .transcript-text-input`) as HTMLTextAreaElement | null;
       if (prevInput && typeof prevInput.focus === 'function') {
+        const card = prevInput.closest('.transcript-card') as HTMLElement | null;
+        if (card) {
+          card.classList.add('is-editing-text');
+        }
+        autoResizeTranscriptField(prevInput);
         prevInput.focus();
         if (typeof prevInput.setSelectionRange === 'function') {
           const targetPos = Math.min(mergedText.length, prevLen + 1);
           prevInput.setSelectionRange(targetPos, targetPos);
         }
-        const card = prevInput.closest('.transcript-card');
         if (card && typeof card.scrollIntoView === 'function') {
           card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
@@ -1691,20 +1846,14 @@ export function updateUndoRedoButtonsUI(): void {
 
 export function undoTranscriptOperation(): boolean {
   if (undoStack.length === 0) return false;
-  const currentSnapshot: TranscriptLine[] = transcriptLines.map(l => ({
-    ...l,
-    words: Array.isArray(l.words) ? l.words.map(w => ({ ...w })) : undefined
-  }));
+  const currentSnapshot: TranscriptLine[] = cloneTranscriptLines(transcriptLines);
   redoStack.push({ lines: currentSnapshot, description: 'Revert' });
   if (redoStack.length > MAX_UNDO_DEPTH) {
     redoStack.shift();
   }
 
   const previous = undoStack.pop()!;
-  transcriptLines = previous.lines.map(l => ({
-    ...l,
-    words: Array.isArray(l.words) ? l.words.map(w => ({ ...w })) : undefined
-  }));
+  transcriptLines = cloneTranscriptLines(previous.lines);
   transcriptLines.forEach((l, idx) => { l.id = idx; });
   reviewedSegmentIdsInSession.clear();
   activeConfidenceJumpIndex = -1;
@@ -1712,7 +1861,7 @@ export function undoTranscriptOperation(): boolean {
 
   const win = getGlobal();
   if (win.isBatchMode && win.activeBatchViewerIndex >= 0 && win.batchItems && win.batchItems[win.activeBatchViewerIndex]) {
-    win.batchItems[win.activeBatchViewerIndex].transcriptLines = transcriptLines.map(l => ({ ...l }));
+    win.batchItems[win.activeBatchViewerIndex].transcriptLines = cloneTranscriptLines(transcriptLines);
   }
 
   renderTranscriptLines(transcriptLines);
@@ -1723,20 +1872,14 @@ export function undoTranscriptOperation(): boolean {
 
 export function redoTranscriptOperation(): boolean {
   if (redoStack.length === 0) return false;
-  const currentSnapshot: TranscriptLine[] = transcriptLines.map(l => ({
-    ...l,
-    words: Array.isArray(l.words) ? l.words.map(w => ({ ...w })) : undefined
-  }));
+  const currentSnapshot: TranscriptLine[] = cloneTranscriptLines(transcriptLines);
   undoStack.push({ lines: currentSnapshot, description: 'Undo' });
   if (undoStack.length > MAX_UNDO_DEPTH) {
     undoStack.shift();
   }
 
   const next = redoStack.pop()!;
-  transcriptLines = next.lines.map(l => ({
-    ...l,
-    words: Array.isArray(l.words) ? l.words.map(w => ({ ...w })) : undefined
-  }));
+  transcriptLines = cloneTranscriptLines(next.lines);
   transcriptLines.forEach((l, idx) => { l.id = idx; });
   reviewedSegmentIdsInSession.clear();
   activeConfidenceJumpIndex = -1;
@@ -1744,7 +1887,7 @@ export function redoTranscriptOperation(): boolean {
 
   const win = getGlobal();
   if (win.isBatchMode && win.activeBatchViewerIndex >= 0 && win.batchItems && win.batchItems[win.activeBatchViewerIndex]) {
-    win.batchItems[win.activeBatchViewerIndex].transcriptLines = transcriptLines.map(l => ({ ...l }));
+    win.batchItems[win.activeBatchViewerIndex].transcriptLines = cloneTranscriptLines(transcriptLines);
   }
 
   renderTranscriptLines(transcriptLines);
@@ -1767,7 +1910,7 @@ export function deleteTranscriptSegment(lineId: number): boolean {
 
   const win = getGlobal();
   if (win.isBatchMode && win.activeBatchViewerIndex >= 0 && win.batchItems && win.batchItems[win.activeBatchViewerIndex]) {
-    win.batchItems[win.activeBatchViewerIndex].transcriptLines = transcriptLines.map(l => ({ ...l }));
+    win.batchItems[win.activeBatchViewerIndex].transcriptLines = cloneTranscriptLines(transcriptLines);
   }
 
   renderTranscriptLines(transcriptLines);
@@ -2475,11 +2618,19 @@ export async function loadTranscriptFromJsonData(jsonData: string, shouldRender 
   }
 }
 
-// Keyboard shortcut listener for structural Undo/Redo
+// Keyboard shortcut listener for structural Undo/Redo and Confidence word navigation
 if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
   window.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.defaultPrevented) return;
+    const isConfidenceNav =
+      confidenceHighlightingActive &&
+      e.altKey &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      !e.shiftKey &&
+      (e.key === 'ArrowDown' || e.key === 'ArrowUp');
     const isCtrlOrCmd = e.ctrlKey || e.metaKey;
-    if (!isCtrlOrCmd) return;
+    if (!isCtrlOrCmd && !isConfidenceNav) return;
 
     // Do not intercept if an application modal overlay is open
     const modalOverlay = document.getElementById('app-modal-overlay');
@@ -2490,6 +2641,12 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
     // Only active when transcribe panel is active
     const transcribePanel = document.getElementById('panel-transcribe');
     if (!transcribePanel || !transcribePanel.classList.contains('active')) return;
+
+    if (isConfidenceNav) {
+      e.preventDefault();
+      jumpToConfidenceWord(e.key === 'ArrowDown' ? 1 : -1);
+      return;
+    }
 
     const activeEl = document.activeElement;
     const isTranscriptField = activeEl instanceof HTMLTextAreaElement && activeEl.classList.contains('transcript-text-input');
@@ -2564,6 +2721,7 @@ if (typeof window !== 'undefined') {
   (window as any).setConfidenceThreshold = setConfidenceThreshold;
   (window as any).toggleConfidenceLowOnlyFilter = toggleConfidenceLowOnlyFilter;
   (window as any).isConfidenceLowOnlyFilterActive = isConfidenceLowOnlyFilterActive;
+  (window as any).markConfidenceWordReviewed = markConfidenceWordReviewed;
   (window as any).jumpToConfidenceWord = jumpToConfidenceWord;
   (window as any).syncConfidenceButtonAndReviewBar = syncConfidenceButtonAndReviewBar;
   (window as any).copyLiveTranscriptToClipboard = copyLiveTranscriptToClipboard;
@@ -2581,6 +2739,8 @@ export const transcriptViewer = {
     }
     transcriptDirty = false;
     transcriptLines = val;
+    reviewedSegmentIdsInSession.clear();
+    activeConfidenceJumpIndex = -1;
   },
   getLines: getTranscriptLines,
   clear: clearTranscriptLines,
@@ -2605,6 +2765,7 @@ export const transcriptViewer = {
   setConfidenceThreshold,
   toggleConfidenceLowOnly: toggleConfidenceLowOnlyFilter,
   isConfidenceLowOnly: isConfidenceLowOnlyFilterActive,
+  markConfidenceWordReviewed,
   jumpToConfidenceWord,
   syncConfidenceUI: syncConfidenceButtonAndReviewBar,
   loadFromJson: loadTranscriptFromJsonData,

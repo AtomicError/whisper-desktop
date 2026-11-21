@@ -2895,15 +2895,18 @@ html[dir="rtl"] #transcript-search::placeholder,
 }
 
 .highlight-confidence-active .transcript-card[data-confidence-level="low"] {
-  border-inline-start: 2.5px solid rgba(245, 158, 11, 0.78);
+  border-inline-start: 2.5px solid rgba(var(--color-gold-rgb, 245, 158, 11), 0.78);
+  padding-inline-start: 12.5px;
 }
 
 .highlight-confidence-active .transcript-card[data-confidence-level="critical"] {
-  border-inline-start: 2.5px solid rgba(244, 63, 94, 0.88);
+  border-inline-start: 2.5px solid rgba(var(--color-red-rgb, 244, 63, 94), 0.88);
+  padding-inline-start: 12.5px;
 }
 
 .highlight-confidence-active .transcript-card[data-confidence-reviewed="true"] {
-  border-inline-start: 2.5px solid rgba(16, 185, 129, 0.65);
+  border-inline-start: 2.5px solid rgba(var(--color-green-rgb, 16, 185, 129), 0.65);
+  padding-inline-start: 12.5px;
 }
 
 .transcript-card-conf-pill {
@@ -2921,21 +2924,21 @@ html[dir="rtl"] #transcript-search::placeholder,
 }
 
 .transcript-card-conf-pill.is-low {
-  color: #fbbf24;
-  background: rgba(245, 158, 11, 0.16);
-  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: var(--color-gold, #fbbf24);
+  background: rgba(var(--color-gold-rgb, 245, 158, 11), 0.16);
+  border: 1px solid rgba(var(--color-gold-rgb, 245, 158, 11), 0.35);
 }
 
 .transcript-card-conf-pill.is-critical {
-  color: #fb7185;
-  background: rgba(244, 63, 94, 0.18);
-  border: 1px solid rgba(244, 63, 94, 0.42);
+  color: var(--color-hot, #fb7185);
+  background: rgba(var(--color-red-rgb, 244, 63, 94), 0.18);
+  border: 1px solid rgba(var(--color-red-rgb, 244, 63, 94), 0.42);
 }
 
 .transcript-card-conf-pill.is-reviewed {
-  color: #34d399;
-  background: rgba(16, 185, 129, 0.14);
-  border: 1px solid rgba(16, 185, 129, 0.32);
+  color: var(--color-green, #34d399);
+  background: rgba(var(--color-green-rgb, 16, 185, 129), 0.14);
+  border: 1px solid rgba(var(--color-green-rgb, 16, 185, 129), 0.32);
 }
 
 .transcript-word {
@@ -2943,7 +2946,7 @@ html[dir="rtl"] #transcript-search::placeholder,
   cursor: pointer;
   padding: 0 2px;
   border-radius: 3px;
-  transition: background-color 0.12s ease, color 0.12s ease;
+  transition: background-color 0.12s ease, color 0.12s ease, box-shadow 0.16s ease;
 }
 
 .transcript-word:hover {
@@ -2956,43 +2959,43 @@ html[dir="rtl"] #transcript-search::placeholder,
 }
 
 .transcript-word.low-confidence {
-  color: #fbbf24;
-  background: rgba(245, 158, 11, 0.12);
-  border-bottom: 1.5px dotted rgba(245, 158, 11, 0.85);
+  color: var(--color-gold, #fbbf24);
+  background: rgba(var(--color-gold-rgb, 245, 158, 11), 0.12);
+  border-bottom: 1.5px dotted rgba(var(--color-gold-rgb, 245, 158, 11), 0.85);
 }
 
 .transcript-word.low-confidence:hover {
-  background: rgba(245, 158, 11, 0.22);
+  background: rgba(var(--color-gold-rgb, 245, 158, 11), 0.22);
 }
 
 .transcript-word.critical-confidence {
-  color: #fb7185;
-  background: rgba(244, 63, 94, 0.14);
-  border-bottom: 1.5px dashed rgba(244, 63, 94, 0.9);
+  color: var(--color-hot, #fb7185);
+  background: rgba(var(--color-red-rgb, 244, 63, 94), 0.14);
+  border-bottom: 1.5px dashed rgba(var(--color-red-rgb, 244, 63, 94), 0.9);
 }
 
 .transcript-word.critical-confidence:hover {
-  background: rgba(244, 63, 94, 0.24);
+  background: rgba(var(--color-red-rgb, 244, 63, 94), 0.24);
 }
 
 .transcript-word.confidence-reviewed {
-  border-bottom: 1px dotted rgba(16, 185, 129, 0.55);
+  border-bottom: 1px dotted rgba(var(--color-green-rgb, 16, 185, 129), 0.55);
 }
 
 .transcript-word.confidence-word-focused {
-  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.65);
-  background: rgba(245, 158, 11, 0.25);
+  box-shadow: 0 0 0 2px rgba(var(--color-gold-rgb, 245, 158, 11), 0.65);
+  background: rgba(var(--color-gold-rgb, 245, 158, 11), 0.25);
 }
 
 .transcript-word.critical-confidence.confidence-word-focused {
-  box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.72);
-  background: rgba(244, 63, 94, 0.28);
+  box-shadow: 0 0 0 2px rgba(var(--color-red-rgb, 244, 63, 94), 0.72);
+  background: rgba(var(--color-red-rgb, 244, 63, 94), 0.28);
 }
 
 #btn-toggle-confidence.active {
-  background: rgba(245, 158, 11, 0.18);
-  border-color: rgba(245, 158, 11, 0.42);
-  color: #fbbf24;
+  background: rgba(var(--color-gold-rgb, 245, 158, 11), 0.18);
+  border-color: rgba(var(--color-gold-rgb, 245, 158, 11), 0.42);
+  color: var(--color-gold, #fbbf24);
 }
 
 .confidence-btn-badge {
@@ -3008,15 +3011,15 @@ html[dir="rtl"] #transcript-search::placeholder,
   font-size: 0.67rem;
   font-weight: 700;
   line-height: 1;
-  color: #fbbf24;
-  background: rgba(245, 158, 11, 0.18);
-  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: var(--color-gold, #fbbf24);
+  background: rgba(var(--color-gold-rgb, 245, 158, 11), 0.18);
+  border: 1px solid rgba(var(--color-gold-rgb, 245, 158, 11), 0.35);
 }
 
 .confidence-btn-badge.is-critical {
-  color: #fb7185;
-  background: rgba(244, 63, 94, 0.18);
-  border-color: rgba(244, 63, 94, 0.42);
+  color: var(--color-hot, #fb7185);
+  background: rgba(var(--color-red-rgb, 244, 63, 94), 0.18);
+  border-color: rgba(var(--color-red-rgb, 244, 63, 94), 0.42);
 }
 
 .confidence-review-bar {
@@ -3032,6 +3035,18 @@ html[dir="rtl"] #transcript-search::placeholder,
   flex-shrink: 0;
   user-select: none;
   -webkit-user-select: none;
+  animation: confidenceBarReveal 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes confidenceBarReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .confidence-review-bar[hidden] {
@@ -3160,7 +3175,8 @@ select.confidence-threshold-select {
   height: 28px !important;
   min-height: 28px !important;
   max-height: 28px !important;
-  padding: 0 8px 0 10px !important;
+  padding-block: 0 !important;
+  padding-inline: 10px 8px !important;
   font-family: var(--font-mono) !important;
   font-size: 0.75rem !important;
   font-weight: 600 !important;
@@ -3211,6 +3227,10 @@ select.confidence-threshold-select {
   color: var(--color-text-dim) !important;
 }
 
+#custom-select-confidence-threshold-quick.open .custom-select-trigger .custom-select-arrow {
+  color: var(--color-text) !important;
+}
+
 #options-for-confidence-threshold-quick .custom-select-option,
 .options-for-confidence-threshold-quick .custom-select-option {
   padding-block: 7px;
@@ -3254,6 +3274,10 @@ select.confidence-threshold-select {
   background: var(--bg-card-hover);
   border-color: var(--border-glass-active);
   color: var(--color-text);
+}
+
+.confidence-review-btn:active:not(:disabled) {
+  opacity: 0.86;
 }
 
 .confidence-review-btn:focus-visible {
@@ -3392,6 +3416,12 @@ select.confidence-threshold-select {
 @container transcript-card (max-width: 560px) {
   .confidence-bar-divider {
     display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .confidence-review-bar {
+    animation: none !important;
   }
 }
 

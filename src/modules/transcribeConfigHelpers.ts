@@ -106,7 +106,8 @@ export function clampIntSettingValue(key: string, raw: unknown): number {
 
   if (key === 'confidenceThreshold') {
     if (parsed <= 0) return 70;
-    return Math.max(40, Math.min(95, parsed));
+    const clamped = Math.max(40, Math.min(95, parsed));
+    return Math.max(40, Math.min(95, Math.round(clamped / 5) * 5));
   }
   if (key === 'bestOf' || key === 'beamSize') {
     return Math.max(1, Math.min(8, parsed));
