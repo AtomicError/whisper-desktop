@@ -37,7 +37,9 @@ export const ru: Translations = {
     updateAvailable: 'Доступна новая версия {version}!',
     viewRelease: 'Открыть и скачать на GitHub',
     updateError: 'Не удалось проверить обновления',
-    retryCheck: 'Повторить'
+    retryCheck: 'Повторить',
+    viewUpdate: 'Открыть',
+    sidebarUpdateBadge: 'Обновление'
   },
   theme: {
     royal: 'Королевский синий',
@@ -864,6 +866,8 @@ export const ru: Translations = {
     whisperSystem: "Системный",
     trayTitle: 'Работать в фоновом режиме при закрытии окна',
     trayDesc: 'Продолжать работу приложения в фоновом режиме при закрытии окна.',
+    autoCheckUpdatesTitle: 'Проверять обновления при запуске',
+    autoCheckUpdatesDesc: 'Тихо проверяет GitHub Releases при запуске и уведомляет, если доступна более новая версия.',
     uiScaleTitle: 'Масштаб интерфейса',
     uiScaleDesc: 'Настройка масштабирования элементов для экранов высокой четкости (HiDPI / 4K).',
     uiScaleReset: 'Сброс',
@@ -1065,6 +1069,7 @@ export const ru: Translations = {
     ffmpegPoints: '<span class="setting-desc-point"><strong>Встроенный:</strong> Автономный исполняемый файл (рекомендуется)</span><span class="setting-desc-point"><strong>Системный:</strong> Использовать FFmpeg, установленный в ОС</span>',
     whisperSourcePoints: "<span class=\"setting-desc-point\"><strong>Встроенный:</strong> Автономный исполняемый файл (рекомендуется)</span><span class=\"setting-desc-point\"><strong>Системный:</strong> Использовать whisper-cli и модули ggml, установленные в ОС</span>",
     trayPoints: '<span class="setting-desc-point"><strong>По умолчанию:</strong> Отключено (полный выход при закрытии окна)</span>',
+    autoCheckUpdatesPoints: '<span class="setting-desc-point"><strong>По умолчанию:</strong> Включено (ненавязчивая проверка; можно отключить для полностью офлайн-режима или пакетного менеджера)</span>',
     uiScalePoints: '<span class="setting-desc-point"><strong>Горячие клавиши:</strong> <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">+</kbd> (Увеличить) &middot; <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">&minus;</kbd> (Уменьшить) &middot; <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">0</kbd> (Сброс 100%)</span><span class="setting-desc-point"><strong>По умолчанию:</strong> <code>100%</code></span>',
     confidenceThresholdTitle: 'Порог подсветки уверенности',
     confidenceThresholdDesc: 'Слова с уверенностью распознавания Whisper ниже этого процента подсвечиваются для вычитки в просмотрщике текста.',

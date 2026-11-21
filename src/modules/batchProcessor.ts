@@ -4,6 +4,7 @@ import { formatLocalizedNumber } from '../i18n/formatters';
 import { escapeHTML, logsController } from './logsController';
 import { transcriptViewer, loadTranscriptFromFile, loadTranscriptFromJsonData, cloneTranscriptLine } from './transcriptViewer';
 import { customSelectsMap } from './customSelect';
+import type { ToastAction } from './appModal';
 import { formatMsToTimecode } from './transcribeConfigHelpers';
 import {
   getSettingsState,
@@ -62,7 +63,7 @@ declare global {
     updateTranscribeWorkflowButtons: () => void;
     updateTranscribeActionButtons: (running?: boolean) => void;
     saveCurrentSettings: (immediate?: boolean) => any;
-    showNotification: (msg: string, type: string) => void;
+    showNotification: (msg: string, type: string, customDuration?: number | null, action?: ToastAction | null) => void;
     switchView: (view: string) => void;
     sendTranscribeToTranslationStudio: () => Promise<void>;
     settingsState: SettingsState | null;

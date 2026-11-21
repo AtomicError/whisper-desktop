@@ -37,7 +37,9 @@ export const ar: Translations = {
     updateAvailable: 'يتوفر إصدار جديد {version}!',
     viewRelease: 'عرض وتنزيل من GitHub',
     updateError: 'تعذر التحقق من التحديثات',
-    retryCheck: 'إعادة المحاولة'
+    retryCheck: 'إعادة المحاولة',
+    viewUpdate: 'عرض',
+    sidebarUpdateBadge: 'تحديث'
   },
   theme: {
     royal: 'الأزرق الملكي',
@@ -864,6 +866,8 @@ export const ar: Translations = {
     whisperSystem: 'النظام',
     trayTitle: 'التشغيل في الخلفية عند إغلاق النافذة',
     trayDesc: 'إبقاء البرنامج قيد التشغيل في الخلفية عند إغلاق النافذة الرئيسية.',
+    autoCheckUpdatesTitle: 'التحقق من التحديثات تلقائيًا عند التشغيل',
+    autoCheckUpdatesDesc: 'يفحص إصدارات GitHub بصمت عند بدء التشغيل ويُعلمك عند توفر إصدار أحدث.',
     uiScaleTitle: 'تكبير ومقياس الواجهة',
     uiScaleDesc: 'ضبط مقياس وحجم الخطوط للشاشات ذات الكثافة العالية (HiDPI / 4K).',
     uiScaleReset: 'إعادة تعيين',
@@ -1065,6 +1069,7 @@ export const ar: Translations = {
     ffmpegPoints: '<span class="setting-desc-point"><strong>داخلي:</strong> ملف تنفيذي مدمج مستقل (موصى به، بدون إعداد)</span><span class="setting-desc-point"><strong>النظام:</strong> استخدام حزمة FFmpeg المثبتة على نظام التشغيل</span>',
     whisperSourcePoints: '<span class="setting-desc-point"><strong>داخلي:</strong> ملف تنفيذي مدمج مستقل (موصى به، بدون إعداد)</span><span class="setting-desc-point"><strong>النظام:</strong> استخدام حزمة whisper-cli وواجهات ggml المثبتة على النظام</span>',
     trayPoints: '<span class="setting-desc-point"><strong>افتراضي:</strong> معطل (إغلاق تام عند إغلاق النافذة)</span>',
+    autoCheckUpdatesPoints: '<span class="setting-desc-point"><strong>افتراضي:</strong> مُفعّل (فحص غير مزعج؛ يمكن تعطيله للاستخدام دون إنترنت تمامًا أو التثبيت عبر مدير الحزم)</span>',
     uiScalePoints: '<span class="setting-desc-point"><strong>اختصارات:</strong> <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">+</kbd> (تكبير) &middot; <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">&minus;</kbd> (تصغير) &middot; <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">0</kbd> (استعادة)</span><span class="setting-desc-point"><strong>افتراضي:</strong> <code>100%</code></span>',
     confidenceThresholdTitle: 'عتبة تمييز الثقة',
     confidenceThresholdDesc: 'يتم تمييز الكلمات التي تقل ثقة التعرف عليها في Whisper عن هذه النسبة للمراجعة السريعة في عارض النص.',

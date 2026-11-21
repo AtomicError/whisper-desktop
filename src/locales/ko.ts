@@ -37,7 +37,9 @@ export const ko: Translations = {
     updateAvailable: '새 버전 {version}을(를) 사용할 수 있습니다!',
     viewRelease: 'GitHub에서 확인 및 다운로드',
     updateError: '업데이트를 확인할 수 없습니다',
-    retryCheck: '다시 시도'
+    retryCheck: '다시 시도',
+    viewUpdate: '보기',
+    sidebarUpdateBadge: '업데이트'
   },
   theme: {
     royal: '로열 블루',
@@ -865,6 +867,8 @@ export const ko: Translations = {
     whisperSystem: "시스템",
     trayTitle: '창을 닫아도 백그라운드에서 계속 실행',
     trayDesc: '창을 닫아도 백그라운드에서 작업을 계속 유지합니다.',
+    autoCheckUpdatesTitle: '시작 시 업데이트 확인',
+    autoCheckUpdatesDesc: '앱을 실행할 때 백그라운드에서 GitHub Releases를 조용히 확인하고 새 버전이 있으면 알려줍니다.',
     uiScaleTitle: 'UI 배율 및 확대/축소',
     uiScaleDesc: '고해상도(High-DPI) 디스플레이에 맞게 인터페이스 크기를 조정합니다.',
     uiScaleReset: '초기화',
@@ -1067,6 +1071,7 @@ export const ko: Translations = {
     ffmpegPoints: '<span class="setting-desc-point"><strong>내장:</strong> 독립형 번들 바이너리 (권장, 추가 설정 불필요)</span><span class="setting-desc-point"><strong>시스템:</strong> OS에 설치된 FFmpeg 바이너리 사용</span>',
     whisperSourcePoints: "<span class=\"setting-desc-point\"><strong>내장:</strong> 독립형 번들 바이너리 (권장, 추가 설정 불필요)</span><span class=\"setting-desc-point\"><strong>시스템:</strong> OS에 설치된 whisper-cli 및 ggml 백엔드 사용</span>",
     trayPoints: '<span class="setting-desc-point"><strong>기본값:</strong> 비활성화 (창 닫을 때 프로그램 종료)</span>',
+    autoCheckUpdatesPoints: '<span class="setting-desc-point"><strong>기본값:</strong> 활성화 (방해 없는 확인; 완전 오프라인 또는 패키지 관리자 환경에서는 비활성화 가능)</span>',
     uiScalePoints: '<span class="setting-desc-point"><strong>단축키:</strong> <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">+</kbd> (확대) &middot; <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">&minus;</kbd> (축소) &middot; <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">0</kbd> (기본값)</span><span class="setting-desc-point"><strong>기본값:</strong> <code>100%</code></span>',
     confidenceThresholdTitle: '신뢰도 강조 임계값',
     confidenceThresholdDesc: 'Whisper 인식 신뢰도가 이 백분율 미만인 단어를 텍스트 뷰어에서 교정용으로 강조 표시합니다.',

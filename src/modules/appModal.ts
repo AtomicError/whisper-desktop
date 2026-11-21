@@ -8,9 +8,14 @@ if (typeof window === 'undefined') {
 declare const __APP_VERSION__: string;
 declare const __WHISPER_CPP_VERSION__: string;
 
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
 declare global {
   interface Window {
-    showNotification: (msg: string, type: string) => void;
+    showNotification: (msg: string, type: string, customDuration?: number | null, action?: ToastAction | null) => void;
     showAppModal: (title: string, message: string, details?: string) => void;
     closeAppModal: () => void;
     showConfirmModal: (title: string, message: string, confirmButtonText?: string | null) => Promise<boolean>;
@@ -22,7 +27,7 @@ declare global {
     closeAboutModal: () => void;
     openShortcutsModal: () => void;
     closeShortcutsModal: () => void;
-    checkForAppUpdates: () => Promise<void>;
+    checkForAppUpdates: (options?: { silent?: boolean }) => Promise<void>;
     renderUpdateCheckerUI: () => void;
     syncAppVersionUI: () => void;
     openUrl?: (url: string, target?: string) => void;
@@ -47,7 +52,12 @@ export function formatToastMessage(text: string | null | undefined): string | nu
   }).join('\n');
 }
 
-export function showNotification(message: any, type = 'info', customDuration: number | null = null): void {
+export function showNotification(
+  message: any,
+  type = 'info',
+  customDuration: number | null = null,
+  action: ToastAction | null = null
+): void {
   if (typeof document === 'undefined') return;
 
   let container = document.getElementById('toast-container');
@@ -225,6 +235,23 @@ export function showNotification(message: any, type = 'info', customDuration: nu
       e.stopPropagation();
       closeToast();
     });
+  }
+
+  if (action && action.label && typeof action.onClick === 'function') {
+    const actionBtn = document.createElement('button') as HTMLButtonElement;
+    actionBtn.type = 'button';
+    actionBtn.className = 'toast-action-btn';
+    actionBtn.textContent = action.label;
+    actionBtn.addEventListener('click', (e: MouseEvent) => {
+      e.stopPropagation();
+      closeToast();
+      action.onClick();
+    });
+    if (typeof toast.insertBefore === 'function' && closeBtn && closeBtn.parentNode === toast) {
+      toast.insertBefore(actionBtn, closeBtn);
+    } else {
+      toast.appendChild(actionBtn);
+    }
   }
   
   setTimeout(() => {
@@ -478,13 +505,27 @@ export function getUpdateCheckerState(): UpdateCheckerState {
   return _updateCheckerState;
 }
 
-export function resetUpdateCheckerState(): void {
+let _isBackgroundUpdateCheck = false;
+let _updateCheckGeneration = 0;
+let _activeUpdateController: AbortController | null = null;
+
+export function resetUpdateCheckerState(clearStorage = false): void {
+  _isBackgroundUpdateCheck = false;
+  _updateCheckGeneration++;
+  if (_activeUpdateController) {
+    _activeUpdateController.abort();
+    _activeUpdateController = null;
+  }
   _updateCheckerState = {
     status: 'idle',
     latestVersion: null,
     releaseUrl: null,
     errorMsg: null
   };
+  if (clearStorage) {
+    removeStorageItem(UPDATE_CACHE_STORAGE_KEY);
+    removeStorageItem(UPDATE_NOTIFIED_VERSION_KEY);
+  }
 }
 
 export function compareSemver(v1: string, v2: string): number {
@@ -526,8 +567,44 @@ export function compareSemver(v1: string, v2: string): number {
   return 0;
 }
 
+export function renderSidebarUpdateIndicator(): void {
+  if (typeof document === 'undefined') return;
+
+  const sidebarBtn = document.getElementById('sidebar-about-btn');
+  if (!sidebarBtn) return;
+
+  const badge = document.getElementById('sidebar-about-update-badge');
+  const hasUpdate = _updateCheckerState.status === 'available';
+
+  if (hasUpdate) {
+    sidebarBtn.classList.add('has-update');
+    sidebarBtn.setAttribute('data-update-available', 'true');
+    sidebarBtn.removeAttribute('data-i18n-title');
+    const availableTitle = t('about.updateAvailable', { version: _updateCheckerState.latestVersion || '' });
+    sidebarBtn.title = availableTitle;
+    sidebarBtn.setAttribute('aria-label', availableTitle);
+    if (badge) {
+      badge.hidden = false;
+      badge.textContent = t('about.sidebarUpdateBadge');
+    }
+  } else {
+    sidebarBtn.classList.remove('has-update');
+    sidebarBtn.removeAttribute('data-update-available');
+    sidebarBtn.setAttribute('data-i18n-title', 'nav.about');
+    const defaultTitle = t('nav.about');
+    sidebarBtn.title = defaultTitle;
+    sidebarBtn.setAttribute('aria-label', defaultTitle);
+    if (badge) {
+      badge.hidden = true;
+      badge.textContent = '';
+    }
+  }
+}
+
 export function renderUpdateCheckerUI(): void {
   if (typeof document === 'undefined') return;
+
+  renderSidebarUpdateIndicator();
 
   const card = document.getElementById('about-update-card');
   const iconWrapper = document.getElementById('about-update-icon-wrapper');
@@ -653,6 +730,103 @@ export function renderUpdateCheckerUI(): void {
 
 const MIN_UPDATE_CHECK_DELAY_MS = 600;
 const UPDATE_CHECK_TIMEOUT_MS = 8000;
+const STARTUP_UPDATE_CHECK_TTL_MS = 6 * 60 * 60 * 1000;
+const UPDATE_CACHE_STORAGE_KEY = 'whisper_update_check_cache';
+const UPDATE_NOTIFIED_VERSION_KEY = 'whisper_last_notified_update_version';
+
+interface UpdateCheckCache {
+  checkedAt: number;
+  latestVersion: string;
+  releaseUrl: string;
+}
+
+function readStorageItem(key: string): string | null {
+  try {
+    if (typeof localStorage !== 'undefined' && typeof localStorage.getItem === 'function') {
+      return localStorage.getItem(key);
+    }
+  } catch (_) {}
+  return null;
+}
+
+function writeStorageItem(key: string, value: string): void {
+  try {
+    if (typeof localStorage !== 'undefined' && typeof localStorage.setItem === 'function') {
+      localStorage.setItem(key, value);
+    }
+  } catch (_) {}
+}
+
+function removeStorageItem(key: string): void {
+  try {
+    if (typeof localStorage !== 'undefined' && typeof localStorage.removeItem === 'function') {
+      localStorage.removeItem(key);
+    }
+  } catch (_) {}
+}
+
+const DEFAULT_RELEASES_URL = 'https://github.com/AtomicError/whisper-desktop/releases/latest';
+
+function isSafeHttpsUrl(url: string | undefined | null): url is string {
+  return typeof url === 'string' && url.trim().startsWith('https://');
+}
+
+function formatReleaseTag(tag: string): string {
+  const trimmed = tag.trim();
+  return /^v/i.test(trimmed) ? `v${trimmed.slice(1)}` : `v${trimmed}`;
+}
+
+function readUpdateCache(): UpdateCheckCache | null {
+  const raw = readStorageItem(UPDATE_CACHE_STORAGE_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<UpdateCheckCache>;
+    const ageMs = typeof parsed.checkedAt === 'number' ? Date.now() - parsed.checkedAt : NaN;
+    if (
+      typeof parsed.checkedAt === 'number' &&
+      Number.isFinite(parsed.checkedAt) &&
+      ageMs >= 0 &&
+      ageMs < STARTUP_UPDATE_CHECK_TTL_MS &&
+      typeof parsed.latestVersion === 'string' &&
+      parsed.latestVersion.trim().length > 0 &&
+      isSafeHttpsUrl(parsed.releaseUrl)
+    ) {
+      return {
+        checkedAt: parsed.checkedAt,
+        latestVersion: parsed.latestVersion.trim(),
+        releaseUrl: parsed.releaseUrl.trim()
+      };
+    }
+  } catch (_) {}
+  return null;
+}
+
+function writeUpdateCache(latestVersion: string, releaseUrl: string): void {
+  const payload: UpdateCheckCache = {
+    checkedAt: Date.now(),
+    latestVersion,
+    releaseUrl
+  };
+  writeStorageItem(UPDATE_CACHE_STORAGE_KEY, JSON.stringify(payload));
+}
+
+function notifyUpdateAvailableOnce(latestVersion: string): boolean {
+  if (!latestVersion) return false;
+  const lastNotified = readStorageItem(UPDATE_NOTIFIED_VERSION_KEY);
+  if (lastNotified === latestVersion) return false;
+
+  writeStorageItem(UPDATE_NOTIFIED_VERSION_KEY, latestVersion);
+  showNotification(
+    t('about.updateAvailable', { version: latestVersion }),
+    'info',
+    9000,
+    {
+      label: t('about.viewUpdate'),
+      onClick: () => openAboutModal()
+    }
+  );
+  return true;
+}
 
 interface GitHubReleaseResponse {
   tag_name?: string;
@@ -684,7 +858,7 @@ export async function fetchLatestRelease(signal?: AbortSignal): Promise<{ latest
 
   const data: GitHubReleaseResponse = await res.json();
   const latestTag = (data.tag_name || data.name || '').trim();
-  const releaseUrl = data.html_url || 'https://github.com/AtomicError/whisper-desktop/releases/latest';
+  const releaseUrl = isSafeHttpsUrl(data.html_url) ? data.html_url.trim() : DEFAULT_RELEASES_URL;
 
   if (!latestTag) {
     throw new Error('Invalid release metadata');
@@ -693,23 +867,37 @@ export async function fetchLatestRelease(signal?: AbortSignal): Promise<{ latest
   return { latestTag, releaseUrl };
 }
 
-export async function checkForAppUpdates(): Promise<void> {
-  if (_updateCheckerState.status === 'checking') return;
+export async function checkForAppUpdates(options?: { silent?: boolean }): Promise<void> {
+  const silent = Boolean(options?.silent);
+  if (silent) {
+    if (_updateCheckerState.status === 'checking' || _isBackgroundUpdateCheck) return;
+    _isBackgroundUpdateCheck = true;
+  } else {
+    if (_updateCheckerState.status === 'checking') return;
+    _isBackgroundUpdateCheck = false;
+    if (_activeUpdateController) {
+      _activeUpdateController.abort();
+      _activeUpdateController = null;
+    }
+    _updateCheckerState = {
+      status: 'checking',
+      latestVersion: null,
+      releaseUrl: null,
+      errorMsg: null
+    };
+    renderUpdateCheckerUI();
+  }
 
-  _updateCheckerState = {
-    status: 'checking',
-    latestVersion: null,
-    releaseUrl: null,
-    errorMsg: null
-  };
-  renderUpdateCheckerUI();
-
+  const generation = ++_updateCheckGeneration;
+  const controller = new AbortController();
+  _activeUpdateController = controller;
   let timeoutId: any = null;
+  let uiRendered = false;
+
   try {
-    const controller = new AbortController();
     timeoutId = setTimeout(() => controller.abort(), UPDATE_CHECK_TIMEOUT_MS);
 
-    const minDelay = new Promise(resolve => setTimeout(resolve, MIN_UPDATE_CHECK_DELAY_MS));
+    const minDelay = silent ? Promise.resolve() : new Promise(resolve => setTimeout(resolve, MIN_UPDATE_CHECK_DELAY_MS));
     let fetchError: any = null;
     let releaseData: { latestTag: string; releaseUrl: string } | null = null;
 
@@ -721,20 +909,26 @@ export async function checkForAppUpdates(): Promise<void> {
 
     await minDelay;
 
-    if (fetchError) {
-      throw fetchError;
-    }
-
     if (timeoutId) {
       clearTimeout(timeoutId);
       timeoutId = null;
     }
 
+    if (generation !== _updateCheckGeneration) {
+      return;
+    }
+
+    if (fetchError) {
+      throw fetchError;
+    }
+
     const latestTag = releaseData?.latestTag || '';
-    const releaseUrl = releaseData?.releaseUrl || 'https://github.com/AtomicError/whisper-desktop/releases/latest';
+    const releaseUrl = isSafeHttpsUrl(releaseData?.releaseUrl) ? releaseData!.releaseUrl.trim() : DEFAULT_RELEASES_URL;
     const currentVer = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '3.1.0';
     const isNewer = compareSemver(latestTag, currentVer) > 0;
-    const formattedTag = latestTag.startsWith('v') ? latestTag : `v${latestTag}`;
+    const formattedTag = formatReleaseTag(latestTag);
+
+    writeUpdateCache(formattedTag, releaseUrl);
 
     _updateCheckerState = {
       status: isNewer ? 'available' : 'up-to-date',
@@ -742,10 +936,23 @@ export async function checkForAppUpdates(): Promise<void> {
       releaseUrl,
       errorMsg: null
     };
+
+    if (silent && isNewer) {
+      renderUpdateCheckerUI();
+      uiRendered = true;
+      notifyUpdateAvailableOnce(formattedTag);
+    }
   } catch (err: any) {
     if (timeoutId) {
       clearTimeout(timeoutId);
       timeoutId = null;
+    }
+    if (generation !== _updateCheckGeneration) {
+      return;
+    }
+    if (silent) {
+      console.debug('[Updater] Silent startup update check failed:', err?.message || err);
+      return;
     }
     let msg = 'GitHub API unreachable';
     if (err && err.name === 'AbortError') {
@@ -760,8 +967,39 @@ export async function checkForAppUpdates(): Promise<void> {
       errorMsg: msg
     };
   } finally {
-    renderUpdateCheckerUI();
+    if (_activeUpdateController === controller) {
+      _activeUpdateController = null;
+    }
+    if (silent && generation === _updateCheckGeneration) {
+      _isBackgroundUpdateCheck = false;
+    }
+    if (!uiRendered && generation === _updateCheckGeneration) {
+      renderUpdateCheckerUI();
+    }
   }
+}
+
+export async function runStartupUpdateCheck(autoCheckEnabled = true): Promise<void> {
+  if (!autoCheckEnabled) return;
+
+  const cached = readUpdateCache();
+  if (cached) {
+    const currentVer = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '3.1.0';
+    const isNewer = compareSemver(cached.latestVersion, currentVer) > 0;
+    _updateCheckerState = {
+      status: isNewer ? 'available' : 'up-to-date',
+      latestVersion: cached.latestVersion,
+      releaseUrl: cached.releaseUrl,
+      errorMsg: null
+    };
+    renderUpdateCheckerUI();
+    if (isNewer) {
+      notifyUpdateAvailableOnce(cached.latestVersion);
+    }
+    return;
+  }
+
+  await checkForAppUpdates({ silent: true });
 }
 
 export function syncAppVersionUI(): void {
@@ -831,7 +1069,17 @@ export function openAboutModal(): void {
       clearTimeout(_aboutModalTimer);
       _aboutModalTimer = null;
     }
-    _aboutModalLastFocus = document.activeElement as HTMLElement | null;
+    const activeEl = document.activeElement as HTMLElement | null;
+    const isInsideToast = Boolean(
+      activeEl &&
+      (
+        (typeof activeEl.closest === 'function' && activeEl.closest('.toast-notification')) ||
+        (typeof activeEl.className === 'string' && activeEl.className.includes('toast-action-btn'))
+      )
+    );
+    _aboutModalLastFocus = isInsideToast
+      ? (document.getElementById('sidebar-about-btn') as HTMLElement | null)
+      : activeEl;
 
     overlay.style.display = 'flex';
     void overlay.offsetWidth;
@@ -870,9 +1118,15 @@ export function closeAboutModal(): void {
     }, 250);
 
     if (_aboutModalLastFocus && typeof _aboutModalLastFocus.focus === 'function') {
-      try {
-        _aboutModalLastFocus.focus();
-      } catch (_) {}
+      const isInDom = typeof document.body?.contains === 'function' ? document.body.contains(_aboutModalLastFocus) : true;
+      const targetFocus = isInDom
+        ? _aboutModalLastFocus
+        : (document.getElementById('sidebar-about-btn') as HTMLElement | null);
+      if (targetFocus && typeof targetFocus.focus === 'function') {
+        try {
+          targetFocus.focus();
+        } catch (_) {}
+      }
       _aboutModalLastFocus = null;
     }
   }
@@ -1096,6 +1350,7 @@ export const appModal = {
   compareSemver,
   renderUpdateUI: renderUpdateCheckerUI,
   checkUpdates: checkForAppUpdates,
+  checkStartupUpdates: runStartupUpdateCheck,
   fetchLatestRelease,
   syncVersionUI: syncAppVersionUI,
   openAbout: openAboutModal,

@@ -560,6 +560,7 @@ a:focus:not(:focus-visible),
 }
 
 .about-btn-icon-wrapper {
+  position: relative;
   width: 28px;
   height: 28px;
   min-width: 28px;
@@ -572,6 +573,24 @@ a:focus:not(:focus-visible),
   color: var(--color-accent);
   transition: border-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
   flex-shrink: 0;
+}
+
+.about-icon-update-dot {
+  display: none;
+  position: absolute;
+  top: -3px;
+  inset-inline-end: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  border: 2px solid var(--bg-titlebar);
+  box-shadow: 0 0 8px rgba(var(--color-accent-rgb), 0.75);
+  pointer-events: none;
+}
+
+sidebar.sidebar-collapsed .sidebar-about-btn.has-update .about-icon-update-dot {
+  display: block;
 }
 
 .sidebar-about-btn:hover .about-btn-icon-wrapper {
@@ -610,9 +629,16 @@ a:focus:not(:focus-visible),
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  max-width: 100%;
+  min-width: 0;
   font-size: 0.68rem;
   font-family: var(--font-mono);
   color: var(--color-text-dim);
+}
+
+#sidebar-about-version-text {
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .version-pulse-dot {
@@ -624,6 +650,63 @@ a:focus:not(:focus-visible),
   flex-shrink: 0;
   opacity: 0.95;
   box-shadow: 0 0 6px rgba(var(--color-accent-rgb), 0.5);
+}
+
+.sidebar-about-btn.has-update {
+  border-color: rgba(var(--color-accent-rgb), 0.42);
+  background: rgba(var(--color-accent-rgb), 0.08);
+}
+
+.sidebar-about-btn.has-update:hover {
+  border-color: rgba(var(--color-accent-rgb), 0.65);
+  background: rgba(var(--color-accent-rgb), 0.14);
+}
+
+.sidebar-about-btn.has-update .version-pulse-dot {
+  width: 6px;
+  height: 6px;
+  box-shadow: 0 0 8px rgba(var(--color-accent-rgb), 0.85);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sidebar-about-btn.has-update .version-pulse-dot,
+  sidebar.sidebar-collapsed .sidebar-about-btn.has-update .about-icon-update-dot {
+    animation: sidebar-update-pulse 2.2s ease-in-out infinite;
+  }
+}
+
+@keyframes sidebar-update-pulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 6px rgba(var(--color-accent-rgb), 0.75);
+  }
+  50% {
+    opacity: 0.55;
+    box-shadow: 0 0 12px rgba(var(--color-accent-rgb), 0.95);
+  }
+}
+
+.about-update-badge {
+  display: inline-block;
+  vertical-align: middle;
+  margin-inline-start: 2px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(var(--color-accent-rgb), 0.18);
+  border: 1px solid rgba(var(--color-accent-rgb), 0.42);
+  color: var(--color-accent);
+  font-family: var(--font-sans);
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 96px;
+}
+
+.about-update-badge[hidden] {
+  display: none !important;
 }
 
 /* Main Workspace */

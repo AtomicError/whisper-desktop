@@ -37,7 +37,9 @@ export const fa: Translations = {
     updateAvailable: 'نسخه جدید {version} منتشر شده است!',
     viewRelease: 'مشاهده و دانلود در گیت‌هاب',
     updateError: 'برقراری ارتباط با سرور ممکن نشد',
-    retryCheck: 'تلاش مجدد'
+    retryCheck: 'تلاش مجدد',
+    viewUpdate: 'مشاهده',
+    sidebarUpdateBadge: 'نسخه جدید'
   },
   theme: {
     royal: 'آبی سلطنتی',
@@ -865,6 +867,8 @@ export const fa: Translations = {
     whisperSystem: 'سیستمی',
     trayTitle: 'اجرا در پس‌زمینه هنگام بستن پنجره',
     trayDesc: 'هنگام بستن پنجره اصلی، برنامه در پس‌زمینه فعال بماند.',
+    autoCheckUpdatesTitle: 'بررسی خودکار به‌روزرسانی هنگام اجرا',
+    autoCheckUpdatesDesc: 'هنگام باز شدن برنامه، نسخه جدید را به‌صورت بی‌صدا از گیت‌هاب بررسی کرده و در صورت انتشار به‌روزرسانی اطلاع می‌دهد.',
     uiScaleTitle: 'بزرگ‌نمایی و مقیاس رابط کاربری',
     uiScaleDesc: 'تنظیم اندازه المان‌ها و فونت‌ها برای مانیتورهای با تراکم پیکسلی بالا.',
     uiScaleReset: 'بازنشانی',
@@ -1067,6 +1071,7 @@ export const fa: Translations = {
     ffmpegPoints: '<span class="setting-desc-point"><strong>داخلی:</strong> باینری اختصاصی همراه برنامه (پیشنهادی، بدون نیاز به نصب)</span><span class="setting-desc-point"><strong>سیستمی:</strong> استفاده از FFmpeg نصب‌شده روی سیستم‌عامل</span>',
     whisperSourcePoints: '<span class="setting-desc-point"><strong>داخلی:</strong> باینری‌های مستقل باندل‌شده درون برنامه (پیشنهادی و آماده)</span><span class="setting-desc-point"><strong>سیستمی:</strong> استفاده از باینری whisper-cli و ماژول‌های ggml نصب‌شده روی سیستم‌عامل</span>',
     trayPoints: '<span class="setting-desc-point"><strong>پیش‌فرض:</strong> غیرفعال (خروج کامل با بستن پنجره)</span>',
+    autoCheckUpdatesPoints: '<span class="setting-desc-point"><strong>پیش‌فرض:</strong> فعال (بررسی غیرمزاحم؛ مناسب برای غیرفعال‌سازی در استفاده کاملاً آفلاین یا نصب از پکیج‌منیجر)</span>',
     uiScalePoints: '<span class="setting-desc-point"><strong>کلیدهای میانبر:</strong> <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">+</kbd> (بزرگ‌نمایی) &middot; <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">&minus;</kbd> (کوچک‌نمایی) &middot; <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">0</kbd> (بازنشانی)</span><span class="setting-desc-point"><strong>پیش‌فرض:</strong> <code>100%</code></span>',
     confidenceThresholdTitle: 'آستانه هشدار ضریب اطمینان',
     confidenceThresholdDesc: 'کلماتی که ضریب اطمینان تشخیص Whisper آن‌ها کمتر از این درصد باشد، برای بازبینی سریع در نمایشگر متن برجسته می‌شوند.',

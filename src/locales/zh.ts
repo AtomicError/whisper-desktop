@@ -37,7 +37,9 @@ export const zh: Translations = {
     updateAvailable: '发现新版本 {version}！',
     viewRelease: '前往 GitHub 查看与下载',
     updateError: '无法检查版本更新',
-    retryCheck: '重试'
+    retryCheck: '重试',
+    viewUpdate: '查看',
+    sidebarUpdateBadge: '更新'
   },
   theme: {
     royal: '皇家蓝',
@@ -864,6 +866,8 @@ export const zh: Translations = {
     whisperSystem: "系统",
     trayTitle: '关闭窗口时保持后台运行',
     trayDesc: '关闭界面后使 Whisper Desktop 驻留在系统后台托盘中继续服务。',
+    autoCheckUpdatesTitle: '启动时自动检查更新',
+    autoCheckUpdatesDesc: '应用启动时在后台静默检查 GitHub Releases，并在有新版本时提醒您。',
     uiScaleTitle: '界面全局缩放',
     uiScaleDesc: '针对高分屏 (HiDPI / 4K) 精细调整软件字号与控件尺寸。',
     uiScaleReset: '重置',
@@ -1060,6 +1064,7 @@ export const zh: Translations = {
     ffmpegPoints: '<span class="setting-desc-point"><strong>内置引擎：</strong> 免安装独立二进制程序包 (推荐，零配置)</span><span class="setting-desc-point"><strong>系统引擎：</strong> 调用操作系统环境已安装的 FFmpeg</span>',
     whisperSourcePoints: "<span class=\"setting-desc-point\"><strong>内置引擎：</strong> 免安装独立二进制程序包 (推荐，零配置)</span><span class=\"setting-desc-point\"><strong>系统引擎：</strong> 调用操作系统环境已安装的 whisper-cli 与 ggml 后端</span>",
     trayPoints: '<span class="setting-desc-point"><strong>默认设置：</strong> 禁用 (关闭窗口即彻底退出软件)</span>',
+    autoCheckUpdatesPoints: '<span class="setting-desc-point"><strong>默认设置：</strong> 启用（非侵入式检查；纯离线或包管理器安装用户可关闭）</span>',
     uiScalePoints: '<span class="setting-desc-point"><strong>快捷热键：</strong> <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">+</kbd> (放大) &middot; <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">&minus;</kbd> (缩小) &middot; <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">0</kbd> (还原 100%)</span><span class="setting-desc-point"><strong>出厂默认：</strong> <code>100%</code></span>',
     confidenceThresholdTitle: '置信度高亮阈值',
     confidenceThresholdDesc: 'Whisper 识别置信度低于此百分比的词语将在转录查看器中高亮显示，便于快速校对。',

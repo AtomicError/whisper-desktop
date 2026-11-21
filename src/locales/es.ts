@@ -37,7 +37,9 @@ export const es: Translations = {
     updateAvailable: '¡Nueva versión {version} disponible!',
     viewRelease: 'Ver y Descargar en GitHub',
     updateError: 'No se pudo buscar actualizaciones',
-    retryCheck: 'Reintentar'
+    retryCheck: 'Reintentar',
+    viewUpdate: 'Ver',
+    sidebarUpdateBadge: 'Actualizar'
   },
   theme: {
     royal: 'Azul Real',
@@ -864,6 +866,8 @@ export const es: Translations = {
     whisperSystem: "Sistema",
     trayTitle: 'Seguir ejecutando en segundo plano al cerrar la ventana',
     trayDesc: 'Mantiene Whisper Desktop activo en segundo plano al cerrar la ventana principal.',
+    autoCheckUpdatesTitle: 'Buscar actualizaciones al iniciar',
+    autoCheckUpdatesDesc: 'Comprueba silenciosamente GitHub Releases al iniciar y te notifica si hay una versión más reciente.',
     uiScaleTitle: 'Escala y Zoom de Interfaz',
     uiScaleDesc: 'Ajusta el escalado de la interfaz para pantallas de alta densidad (HiDPI).',
     uiScaleReset: 'Restablecer',
@@ -1060,6 +1064,7 @@ export const es: Translations = {
     ffmpegPoints: '<span class="setting-desc-point"><strong>Interno:</strong> Binario independiente integrado (recomendado, sin configuración)</span><span class="setting-desc-point"><strong>Sistema:</strong> Utiliza el binario de FFmpeg instalado en el sistema</span>',
     whisperSourcePoints: "<span class=\"setting-desc-point\"><strong>Interno:</strong> Binario independiente integrado (recomendado, sin configuración)</span><span class=\"setting-desc-point\"><strong>Sistema:</strong> Utiliza whisper-cli y backends ggml instalados en el sistema</span>",
     trayPoints: '<span class="setting-desc-point"><strong>Predeterminado:</strong> Desactivado (cierra la aplicación al cerrar la ventana)</span>',
+    autoCheckUpdatesPoints: '<span class="setting-desc-point"><strong>Predeterminado:</strong> Activado (comprobación discreta; desactívala en entornos sin conexión o gestionados por paquetes)</span>',
     uiScalePoints: '<span class="setting-desc-point"><strong>Atajos:</strong> <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">+</kbd> (Acercar) &middot; <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">&minus;</kbd> (Alejar) &middot; <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">0</kbd> (Restablecer)</span><span class="setting-desc-point"><strong>Predeterminado:</strong> <code>100%</code></span>',
     confidenceThresholdTitle: 'Umbral de resaltado de confianza',
     confidenceThresholdDesc: 'Las palabras con una confianza de reconocimiento de Whisper inferior a este porcentaje se resaltan para revisión en el visor de transcripción.',

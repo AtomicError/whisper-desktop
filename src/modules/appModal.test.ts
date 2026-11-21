@@ -11,6 +11,7 @@ import {
   resolveAppConfirm,
   showBatchErrorDialog,
   checkForAppUpdates,
+  runStartupUpdateCheck,
   fetchLatestRelease,
   renderUpdateCheckerUI,
   getUpdateCheckerState,
@@ -30,6 +31,9 @@ class MockNode {
   public textContent = '';
   private _innerHTML = '';
   public disabled = false;
+  public hidden = false;
+  public title = '';
+  public type = '';
   public onclick: any = null;
   public _rawMessage = '';
   public _restartTimer: any = null;
@@ -660,6 +664,255 @@ describe('appModal & Feedback Module', () => {
       expect(getUpdateCheckerState().status).toBe('error');
       expect(getUpdateCheckerState().errorMsg).toBe('Network offline');
       expect(card.classList.contains('state-error')).toBe(true);
+    });
+  });
+
+  describe('runStartupUpdateCheck, sidebar indicator & one-time toast', () => {
+    let origFetch: any;
+    let origLocalStorage: any;
+    let memStorage: Map<string, string>;
+
+    function setupSidebarAndAboutDom() {
+      const sidebarBtn = new MockNode('BUTTON');
+      sidebarBtn.id = 'sidebar-about-btn';
+      const sidebarBadge = new MockNode('SPAN');
+      sidebarBadge.id = 'sidebar-about-update-badge';
+      sidebarBadge.hidden = true;
+      sidebarBtn.appendChild(sidebarBadge);
+
+      const aboutOverlay = new MockNode('DIV');
+      aboutOverlay.id = 'about-modal-overlay';
+      aboutOverlay.style.display = 'none';
+      const aboutCard = new MockNode('DIV');
+      aboutCard.className = 'about-modal-card';
+      aboutOverlay.appendChild(aboutCard);
+
+      const body = (globalThis as any).document.body;
+      body.appendChild(sidebarBtn);
+      body.appendChild(aboutOverlay);
+      return { sidebarBtn, sidebarBadge, aboutOverlay };
+    }
+
+    beforeEach(() => {
+      origFetch = (globalThis as any).fetch;
+      origLocalStorage = (globalThis as any).localStorage;
+      memStorage = new Map<string, string>();
+      (globalThis as any).localStorage = {
+        getItem: (k: string) => (memStorage.has(k) ? memStorage.get(k)! : null),
+        setItem: (k: string, v: string) => { memStorage.set(k, String(v)); },
+        removeItem: (k: string) => { memStorage.delete(k); },
+        clear: () => { memStorage.clear(); }
+      };
+      resetUpdateCheckerState(true);
+    });
+
+    afterEach(() => {
+      resetUpdateCheckerState(true);
+      (globalThis as any).fetch = origFetch;
+      (globalThis as any).localStorage = origLocalStorage;
+    });
+
+    it('skips network check when auto-check setting is disabled', async () => {
+      // Arrange
+      const fetchSpy = vi.fn();
+      (globalThis as any).fetch = fetchSpy;
+
+      // Act
+      await runStartupUpdateCheck(false);
+
+      // Assert
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(getUpdateCheckerState().status).toBe('idle');
+    });
+
+    it('updates sidebar badge and shows one-time clickable toast when newer release is found', async () => {
+      // Arrange
+      const { sidebarBtn, sidebarBadge, aboutOverlay } = setupSidebarAndAboutDom();
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          tag_name: 'v4.2.0',
+          html_url: 'https://github.com/AtomicError/whisper-desktop/releases/tag/v4.2.0'
+        })
+      });
+      (globalThis as any).fetch = fetchSpy;
+
+      // Act — first startup check
+      await runStartupUpdateCheck(true);
+
+      // Assert — sidebar badge active + single toast with View button
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(getUpdateCheckerState().status).toBe('available');
+      expect(sidebarBtn.classList.contains('has-update')).toBe(true);
+      expect(sidebarBtn.getAttribute('data-update-available')).toBe('true');
+      expect(sidebarBadge.hidden).toBe(false);
+      expect(sidebarBadge.textContent.length).toBeGreaterThan(0);
+
+      const toasts = (globalThis as any).document.body.querySelectorAll('.toast-notification');
+      expect(toasts.length).toBe(1);
+      const actionBtn = toasts[0].querySelector('.toast-action-btn');
+      expect(actionBtn).not.toBeNull();
+
+      // Act — click toast action button -> opens About modal
+      actionBtn!.dispatchEvent({ type: 'click', stopPropagation: vi.fn() });
+      expect(aboutOverlay.style.display).toBe('flex');
+      expect(aboutOverlay.classList.contains('show')).toBe(true);
+
+      // Act — second startup check within TTL for same version
+      toasts[0].remove();
+      await runStartupUpdateCheck(true);
+
+      // Assert — cached (no extra fetch), sidebar badge stays active, NO duplicate toast
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(sidebarBtn.classList.contains('has-update')).toBe(true);
+      expect((globalThis as any).document.body.querySelectorAll('.toast-notification').length).toBe(0);
+    });
+
+    it('fails silently on offline/network error without setting error state or showing toast', async () => {
+      // Arrange
+      const { sidebarBtn, sidebarBadge } = setupSidebarAndAboutDom();
+      (globalThis as any).fetch = vi.fn().mockRejectedValue(new Error('Network offline'));
+
+      // Act
+      await runStartupUpdateCheck(true);
+
+      // Assert
+      expect(getUpdateCheckerState().status).toBe('idle');
+      expect(sidebarBtn.classList.contains('has-update')).toBe(false);
+      expect(sidebarBadge.hidden).toBe(true);
+      expect((globalThis as any).document.body.querySelectorAll('.toast-notification').length).toBe(0);
+    });
+
+    it('treats cached version equal to current version as up-to-date without showing update badge', async () => {
+      // Arrange
+      const { sidebarBtn, sidebarBadge } = setupSidebarAndAboutDom();
+      memStorage.set(
+        'whisper_update_check_cache',
+        JSON.stringify({
+          checkedAt: Date.now(),
+          latestVersion: 'v3.1.0',
+          releaseUrl: 'https://github.com/AtomicError/whisper-desktop/releases/tag/v3.1.0'
+        })
+      );
+      const fetchSpy = vi.fn();
+      (globalThis as any).fetch = fetchSpy;
+
+      // Act
+      await runStartupUpdateCheck(true);
+
+      // Assert
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(getUpdateCheckerState().status).toBe('up-to-date');
+      expect(sidebarBtn.classList.contains('has-update')).toBe(false);
+      expect(sidebarBadge.hidden).toBe(true);
+      expect((globalThis as any).document.body.querySelectorAll('.toast-notification').length).toBe(0);
+    });
+
+    it('normalizes uppercase V tag prefixes, syncs data-i18n-title, and restores focus to sidebar button when opened from toast', async () => {
+      // Arrange
+      const { sidebarBtn } = setupSidebarAndAboutDom();
+      sidebarBtn.setAttribute('data-i18n-title', 'nav.about');
+      (globalThis as any).fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          tag_name: 'V4.3.0',
+          html_url: 'https://github.com/AtomicError/whisper-desktop/releases/tag/V4.3.0'
+        })
+      });
+
+      // Act
+      await runStartupUpdateCheck(true);
+
+      // Assert
+      expect(getUpdateCheckerState().latestVersion).toBe('v4.3.0');
+      expect(sidebarBtn.getAttribute('data-i18n-title')).toBeNull();
+
+      const toast = (globalThis as any).document.body.querySelector('.toast-notification');
+      const actionBtn = toast?.querySelector('.toast-action-btn');
+      expect(actionBtn).not.toBeNull();
+
+      actionBtn!.focus();
+      actionBtn!.dispatchEvent({ type: 'click', stopPropagation: vi.fn() });
+      (window as any).closeAboutModal();
+      expect((globalThis as any).document.activeElement).toBe(sidebarBtn);
+    });
+
+    it('ignores future-dated or non-https cached payloads and fetches fresh release metadata', async () => {
+      // Arrange
+      setupSidebarAndAboutDom();
+      memStorage.set(
+        'whisper_update_check_cache',
+        JSON.stringify({
+          checkedAt: Date.now() + 60_000,
+          latestVersion: 'v9.9.9',
+          releaseUrl: 'http://insecure.example.com/release'
+        })
+      );
+      const fetchSpy = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          tag_name: 'v3.1.0',
+          html_url: 'https://github.com/AtomicError/whisper-desktop/releases/tag/v3.1.0'
+        })
+      });
+      (globalThis as any).fetch = fetchSpy;
+
+      // Act
+      await runStartupUpdateCheck(true);
+
+      // Assert
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(getUpdateCheckerState().status).toBe('up-to-date');
+      expect(getUpdateCheckerState().latestVersion).toBe('v3.1.0');
+    });
+
+    it('aborts an in-flight silent startup check when a manual check is triggered', async () => {
+      // Arrange
+      setupSidebarAndAboutDom();
+      let silentSignal: AbortSignal | undefined;
+      let resolveSilent: ((val: any) => void) | null = null;
+
+      (globalThis as any).fetch = vi.fn().mockImplementation((_url: string, opts: any) => {
+        if (!silentSignal) {
+          silentSignal = opts?.signal;
+          return new Promise((resolve) => {
+            resolveSilent = resolve;
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            tag_name: 'v4.5.0',
+            html_url: 'https://github.com/AtomicError/whisper-desktop/releases/tag/v4.5.0'
+          })
+        });
+      });
+
+      // Act
+      const silentPromise = checkForAppUpdates({ silent: true });
+      expect(silentSignal?.aborted).toBe(false);
+
+      await checkForAppUpdates();
+      expect(silentSignal?.aborted).toBe(true);
+
+      // Resolve superseded silent request with stale data and verify it is ignored
+      resolveSilent?.({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          tag_name: 'v3.1.0',
+          html_url: 'https://github.com/AtomicError/whisper-desktop/releases/tag/v3.1.0'
+        })
+      });
+      await silentPromise;
+
+      // Assert
+      expect(getUpdateCheckerState().status).toBe('available');
+      expect(getUpdateCheckerState().latestVersion).toBe('v4.5.0');
     });
   });
 

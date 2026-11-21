@@ -37,7 +37,9 @@ export const pt: Translations = {
     updateAvailable: 'Nova versão {version} disponível!',
     viewRelease: 'Ver e Baixar no GitHub',
     updateError: 'Não foi possível verificar atualizações',
-    retryCheck: 'Tentar novamente'
+    retryCheck: 'Tentar novamente',
+    viewUpdate: 'Ver',
+    sidebarUpdateBadge: 'Atualização'
   },
   theme: {
     royal: 'Azul Real',
@@ -864,6 +866,8 @@ export const pt: Translations = {
     whisperSystem: "Sistema",
     trayTitle: 'Continuar em segundo plano ao fechar a janela',
     trayDesc: 'Mantém o Whisper Desktop em execução na bandeja do sistema ao fechar a janela principal.',
+    autoCheckUpdatesTitle: 'Verificar atualizações ao iniciar',
+    autoCheckUpdatesDesc: 'Verifica silenciosamente os lançamentos no GitHub ao abrir e notifica quando houver uma nova versão.',
     uiScaleTitle: 'Escala e Zoom da Interface',
     uiScaleDesc: 'Ajuste a proporção dos elementos para monitores de alta densidade (HiDPI).',
     uiScaleReset: 'Redefinir',
@@ -1060,6 +1064,7 @@ export const pt: Translations = {
     ffmpegPoints: '<span class="setting-desc-point"><strong>Interno:</strong> Binário autônomo incluído (recomendado, sem configuração)</span><span class="setting-desc-point"><strong>Sistema:</strong> Utiliza o binário FFmpeg instalado no sistema operacional</span>',
     whisperSourcePoints: "<span class=\"setting-desc-point\"><strong>Interno:</strong> Binário autônomo incluído (recomendado, sem configuração)</span><span class=\"setting-desc-point\"><strong>Sistema:</strong> Utiliza o whisper-cli e backends ggml instalados no sistema</span>",
     trayPoints: '<span class="setting-desc-point"><strong>Padrão:</strong> Desativado (encerra ao fechar a janela)</span>',
+    autoCheckUpdatesPoints: '<span class="setting-desc-point"><strong>Padrão:</strong> Ativado (verificação discreta; desative para uso estritamente offline ou via gerenciador de pacotes)</span>',
     uiScalePoints: '<span class="setting-desc-point"><strong>Atalhos:</strong> <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">+</kbd> (Aumentar) &middot; <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">&minus;</kbd> (Diminuir) &middot; <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">0</kbd> (Restaurar)</span><span class="setting-desc-point"><strong>Padrão:</strong> <code>100%</code></span>',
     confidenceThresholdTitle: 'Limite de destaque de confiança',
     confidenceThresholdDesc: 'Palavras com confiança de reconhecimento Whisper abaixo deste percentual são destacadas para revisão no visualizador.',

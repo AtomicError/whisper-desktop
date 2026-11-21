@@ -37,7 +37,9 @@ export const it: Translations = {
     updateAvailable: 'Nuova versione {version} disponibile!',
     viewRelease: 'Visualizza e Scarica su GitHub',
     updateError: 'Impossibile verificare gli aggiornamenti',
-    retryCheck: 'Riprova'
+    retryCheck: 'Riprova',
+    viewUpdate: 'Visualizza',
+    sidebarUpdateBadge: 'Aggiorna'
   },
   theme: {
     royal: 'Blu Reale',
@@ -865,6 +867,8 @@ export const it: Translations = {
     whisperSystem: "Di Sistema",
     trayTitle: 'Continua in background alla chiusura della finestra',
     trayDesc: 'Mantiene Whisper Desktop attivo nell\'area di notifica di sistema alla chiusura della finestra principale.',
+    autoCheckUpdatesTitle: 'Controlla aggiornamenti all’avvio',
+    autoCheckUpdatesDesc: 'Verifica silenziosamente GitHub Releases all’avvio e ti avvisa quando è disponibile una versione più recente.',
     uiScaleTitle: 'Scala e Zoom Interfaccia',
     uiScaleDesc: 'Regola la scala dell\'interfaccia per schermi ad alta densità di pixel (High-DPI).',
     uiScaleReset: 'Ripristina',
@@ -1067,6 +1071,7 @@ export const it: Translations = {
     ffmpegPoints: '<span class="setting-desc-point"><strong>Interno:</strong> Binario standalone integrato (consigliato, nessuna configurazione)</span><span class="setting-desc-point"><strong>Di Sistema:</strong> Utilizza il binario FFmpeg installato nel sistema operativo</span>',
     whisperSourcePoints: "<span class=\"setting-desc-point\"><strong>Interno:</strong> Binario standalone integrato (consigliato, nessuna configurazione)</span><span class=\"setting-desc-point\"><strong>Di Sistema:</strong> Utilizza whisper-cli e i backend ggml installati nel sistema</span>",
     trayPoints: '<span class="setting-desc-point"><strong>Predefinito:</strong> Disabilitato (esce alla chiusura della finestra)</span>',
+    autoCheckUpdatesPoints: '<span class="setting-desc-point"><strong>Predefinito:</strong> Abilitato (controllo discreto; disattivalo per uso esclusivamente offline o tramite gestore pacchetti)</span>',
     uiScalePoints: '<span class="setting-desc-point"><strong>Scorciatoie:</strong> <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">+</kbd> (Ingrandisci) &middot; <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">&minus;</kbd> (Riduci) &middot; <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">0</kbd> (Reimposta)</span><span class="setting-desc-point"><strong>Predefinito:</strong> <code>100%</code></span>',
     confidenceThresholdTitle: 'Soglia evidenziazione confidenza',
     confidenceThresholdDesc: 'Le parole con confidenza di riconoscimento Whisper inferiore a questa percentuale vengono evidenziate per la revisione nel visualizzatore.',

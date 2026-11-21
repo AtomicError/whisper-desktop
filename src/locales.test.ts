@@ -293,6 +293,24 @@ describe('locale consistency for speed presets', () => {
       expect(transcribe.vadDisabledStatus).toBeUndefined();
       expect(transcribe.vadNoModelStatus).toBeUndefined();
     });
+
+    it(`locale ${code} has all startup update checker and preference keys`, () => {
+      const about = (dict as any).about;
+      const settings = (dict as any).settings;
+      expect(about).toBeDefined();
+      expect(typeof about.viewUpdate).toBe('string');
+      expect(about.viewUpdate.length).toBeGreaterThan(0);
+      expect(typeof about.sidebarUpdateBadge).toBe('string');
+      expect(about.sidebarUpdateBadge.length).toBeGreaterThan(0);
+
+      expect(settings).toBeDefined();
+      expect(typeof settings.autoCheckUpdatesTitle).toBe('string');
+      expect(settings.autoCheckUpdatesTitle.length).toBeGreaterThan(0);
+      expect(typeof settings.autoCheckUpdatesDesc).toBe('string');
+      expect(settings.autoCheckUpdatesDesc.length).toBeGreaterThan(0);
+      expect(typeof settings.autoCheckUpdatesPoints).toBe('string');
+      expect(settings.autoCheckUpdatesPoints.length).toBeGreaterThan(0);
+    });
   }
 
   it('validates fa locale translation improvements', () => {

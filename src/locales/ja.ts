@@ -37,7 +37,9 @@ export const ja: Translations = {
     updateAvailable: '新バージョン {version} が利用可能です！',
     viewRelease: 'GitHub で確認・ダウンロード',
     updateError: '更新を確認できませんでした',
-    retryCheck: '再試行'
+    retryCheck: '再試行',
+    viewUpdate: '表示',
+    sidebarUpdateBadge: '更新'
   },
   theme: {
     royal: 'ロイヤルブルー',
@@ -864,6 +866,8 @@ export const ja: Translations = {
     whisperSystem: "システム",
     trayTitle: 'ウィンドウを閉じた後もバックグラウンドで実行',
     trayDesc: 'ウィンドウを閉じてもバックグラウンドで動作を継続します。',
+    autoCheckUpdatesTitle: '起動時にアップデートを確認',
+    autoCheckUpdatesDesc: '起動時に GitHub Releases をバックグラウンドで確認し、新しいバージョンがある場合に通知します。',
     uiScaleTitle: 'UI スケールと拡大率',
     uiScaleDesc: '高解像度 (4K / HiDPI) ディスプレイに合わせて画面の大きさを調整します。',
     uiScaleReset: 'リセット',
@@ -1065,6 +1069,7 @@ export const ja: Translations = {
     ffmpegPoints: '<span class="setting-desc-point"><strong>内蔵:</strong> スタンドアロン同梱バイナリ (推奨・設定不要)</span><span class="setting-desc-point"><strong>システム:</strong> OS にインストールされた FFmpeg を使用</span>',
     whisperSourcePoints: "<span class=\"setting-desc-point\"><strong>内蔵:</strong> スタンドアロン同梱バイナリ (推奨・設定不要)</span><span class=\"setting-desc-point\"><strong>システム:</strong> OS にインストールされた whisper-cli と ggml バックエンドを使用</span>",
     trayPoints: '<span class="setting-desc-point"><strong>デフォルト:</strong> 無効 (ウィンドウを閉じるとアプリを終了)</span>',
+    autoCheckUpdatesPoints: '<span class="setting-desc-point"><strong>デフォルト:</strong> 有効（控えめな確認。完全オフライン環境やパッケージ管理環境では無効化できます）</span>',
     uiScalePoints: '<span class="setting-desc-point"><strong>ショートカット:</strong> <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">+</kbd> (拡大) &middot; <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">&minus;</kbd> (縮小) &middot; <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">0</kbd> (リセット)</span><span class="setting-desc-point"><strong>デフォルト:</strong> <code>100%</code></span>',
     confidenceThresholdTitle: '信頼度ハイライトしきい値',
     confidenceThresholdDesc: 'Whisper の認識信頼度がこの割合未満の単語を、文字起こしビューアーで校正用に強調表示します。',

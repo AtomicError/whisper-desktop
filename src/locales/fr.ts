@@ -37,7 +37,9 @@ export const fr: Translations = {
     updateAvailable: 'Nouvelle version {version} disponible !',
     viewRelease: 'Voir et Télécharger sur GitHub',
     updateError: 'Impossible de vérifier les mises à jour',
-    retryCheck: 'Réessayer'
+    retryCheck: 'Réessayer',
+    viewUpdate: 'Voir',
+    sidebarUpdateBadge: 'Mise à jour'
   },
   theme: {
     royal: 'Bleu Royal',
@@ -864,6 +866,8 @@ export const fr: Translations = {
     whisperSystem: "Système",
     trayTitle: 'Continuer en arrière-plan à la fermeture',
     trayDesc: 'Garde Whisper Desktop actif en arrière-plan lorsque la fenêtre principale est fermée.',
+    autoCheckUpdatesTitle: 'Vérifier les mises à jour au démarrage',
+    autoCheckUpdatesDesc: 'Vérifie discrètement les versions sur GitHub au lancement et vous avertit lorsqu’une nouvelle version est disponible.',
     uiScaleTitle: 'Mise à l\'Échelle & Zoom de l\'Interface',
     uiScaleDesc: 'Ajuste la taille de l\'interface pour les écrans haute densité (HiDPI).',
     uiScaleReset: 'Réinitialiser',
@@ -1060,6 +1064,7 @@ export const fr: Translations = {
     ffmpegPoints: '<span class="setting-desc-point"><strong>Interne :</strong> Binaire autonome intégré (recommandé, prêt à l\'emploi)</span><span class="setting-desc-point"><strong>Système :</strong> Utilise le FFmpeg installé sur votre système</span>',
     whisperSourcePoints: "<span class=\"setting-desc-point\"><strong>Interne :</strong> Binaire autonome intégré (recommandé, prêt à l'emploi)</span><span class=\"setting-desc-point\"><strong>Système :</strong> Utilise whisper-cli et les backends ggml installés sur le système</span>",
     trayPoints: '<span class="setting-desc-point"><strong>Par défaut :</strong> Désactivé (fermeture complète à la fermeture de la fenêtre)</span>',
+    autoCheckUpdatesPoints: '<span class="setting-desc-point"><strong>Par défaut :</strong> Activé (vérification discrète ; à désactiver pour un usage strictement hors ligne ou via gestionnaire de paquets)</span>',
     uiScalePoints: '<span class="setting-desc-point"><strong>Raccourcis :</strong> <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">+</kbd> (Zoom avant) &middot; <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">&minus;</kbd> (Zoom arrière) &middot; <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">0</kbd> (Réinitialiser)</span><span class="setting-desc-point"><strong>Par défaut :</strong> <code>100%</code></span>',
     confidenceThresholdTitle: 'Seuil de surbrillance de confiance',
     confidenceThresholdDesc: 'Les mots dont la confiance de reconnaissance Whisper est inférieure à ce pourcentage sont surlignés pour relecture dans la visionneuse.',

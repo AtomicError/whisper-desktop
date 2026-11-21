@@ -35,7 +35,9 @@ export const en = {
     updateAvailable: 'New version {version} is available!',
     viewRelease: 'View & Download on GitHub',
     updateError: 'Unable to check for updates',
-    retryCheck: 'Retry'
+    retryCheck: 'Retry',
+    viewUpdate: 'View',
+    sidebarUpdateBadge: 'Update'
   },
   theme: {
     royal: 'Royal Blue',
@@ -863,6 +865,8 @@ export const en = {
     whisperSystem: 'System',
     trayTitle: 'Keep Running in Background on Close',
     trayDesc: 'Keeps Whisper Desktop active in the background system tray when the main window is closed.',
+    autoCheckUpdatesTitle: 'Check for Updates on Startup',
+    autoCheckUpdatesDesc: 'Silently checks GitHub Releases on launch and notifies you when a newer version is available.',
     uiScaleTitle: 'UI Scale & Zoom',
     uiScaleDesc: 'Adjust the interface scaling to fit high-DPI displays.',
     uiScaleReset: 'Reset',
@@ -1065,6 +1069,7 @@ export const en = {
     ffmpegPoints: '<span class="setting-desc-point"><strong>Internal:</strong> Standalone bundled binary (recommended, zero-config)</span><span class="setting-desc-point"><strong>System:</strong> Uses OS-installed FFmpeg binary</span>',
     whisperSourcePoints: '<span class="setting-desc-point"><strong>Internal:</strong> Standalone bundled binary (recommended, zero-config)</span><span class="setting-desc-point"><strong>System:</strong> Uses OS-installed whisper-cli and ggml backends</span>',
     trayPoints: '<span class="setting-desc-point"><strong>Default:</strong> Disabled (exits on window close)</span>',
+    autoCheckUpdatesPoints: '<span class="setting-desc-point"><strong>Default:</strong> Enabled (non-intrusive check; disable for strictly offline or package-managed setups)</span>',
     uiScalePoints: '<span class="setting-desc-point"><strong>Shortcuts:</strong> <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">+</kbd> (In) &middot; <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">&minus;</kbd> (Out) &middot; <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">0</kbd> (Reset)</span><span class="setting-desc-point"><strong>Default:</strong> <code>100%</code></span>',
     confidenceThresholdTitle: 'Confidence Highlight Threshold',
     confidenceThresholdDesc: 'Words with Whisper recognition confidence below this percentage are highlighted for proofreading in the Transcript Viewer.',

@@ -37,7 +37,9 @@ export const tr: Translations = {
     updateAvailable: 'Yeni {version} sürümü mevcut!',
     viewRelease: 'GitHub\'da Görüntüle ve İndir',
     updateError: 'Güncellemeler denetlenemedi',
-    retryCheck: 'Yeniden Dene'
+    retryCheck: 'Yeniden Dene',
+    viewUpdate: 'Görüntüle',
+    sidebarUpdateBadge: 'Güncelleme'
   },
   theme: {
     royal: 'Kraliyet Mavisi',
@@ -865,6 +867,8 @@ export const tr: Translations = {
     whisperSystem: "Sistem",
     trayTitle: 'Pencere kapatıldığında arka planda çalışmaya devam et',
     trayDesc: 'Ana pencere kapatıldığında Whisper Desktop\'ın arka planda sistem tepsisinde çalışmaya devam etmesini sağlar.',
+    autoCheckUpdatesTitle: 'Başlangıçta Güncellemeleri Denetle',
+    autoCheckUpdatesDesc: 'Uygulama açıldığında GitHub Releases üzerinden sessizce kontrol eder ve yeni bir sürüm varsa bildirir.',
     uiScaleTitle: 'Arayüz Ölçeği ve Yakınlaştırma',
     uiScaleDesc: 'Yüksek çözünürlüklü (High-DPI) ekranlar için arayüz ölçeğini ayarlayın.',
     uiScaleReset: 'Sıfırla',
@@ -1067,6 +1071,7 @@ export const tr: Translations = {
     ffmpegPoints: '<span class="setting-desc-point"><strong>Dahili:</strong> Birlikte gelen bağımsız ikili dosya (önerilen, sıfır yapılandırma)</span><span class="setting-desc-point"><strong>Sistem:</strong> İşletim sisteminde yüklü olan FFmpeg ikili dosyasını kullanır</span>',
     whisperSourcePoints: "<span class=\"setting-desc-point\"><strong>Dahili:</strong> Birlikte gelen bağımsız ikili dosya (önerilen, sıfır yapılandırma)</span><span class=\"setting-desc-point\"><strong>Sistem:</strong> İşletim sisteminde yüklü olan whisper-cli ve ggml arka uçlarını kullanır</span>",
     trayPoints: '<span class="setting-desc-point"><strong>Varsayılan:</strong> Devre dışı (pencere kapatıldığında çıkar)</span>',
+    autoCheckUpdatesPoints: '<span class="setting-desc-point"><strong>Varsayılan:</strong> Etkin (rahatsız etmeyen denetim; tamamen çevrimdışı veya paket yöneticisi kurulumlarında kapatabilirsiniz)</span>',
     uiScalePoints: '<span class="setting-desc-point"><strong>Kısayollar:</strong> <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">+</kbd> (Yakınlaştır) &middot; <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">&minus;</kbd> (Uzaklaştır) &middot; <kbd class="kbd-shortcut">Ctrl</kbd> + <kbd class="kbd-shortcut">0</kbd> (Sıfırla)</span><span class="setting-desc-point"><strong>Varsayılan:</strong> <code>%100</code></span>',
     confidenceThresholdTitle: 'Güven Vurgulama Eşiği',
     confidenceThresholdDesc: 'Whisper tanıma güveni bu yüzdenin altında olan kelimeler döküm görüntüleyicide düzeltme için vurgulanır.',

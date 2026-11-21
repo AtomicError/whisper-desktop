@@ -115,6 +115,8 @@ pub struct WhisperSettings {
     pub monochrome_canvas: bool,
     #[serde(default)]
     pub close_to_tray: bool,
+    #[serde(default = "default_auto_check_updates")]
+    pub auto_check_updates: bool,
     #[serde(default = "default_ui_language")]
     pub ui_language: String,
     #[serde(default = "default_confidence_threshold", deserialize_with = "deserialize_i32_lenient")]
@@ -197,6 +199,10 @@ fn default_confidence_threshold() -> i32 {
     70
 }
 
+fn default_auto_check_updates() -> bool {
+    true
+}
+
 impl Default for WhisperSettings {
     fn default() -> Self {
         Self::default_settings()
@@ -271,6 +277,7 @@ impl WhisperSettings {
             theme: "royal-blue".to_string(),
             monochrome_canvas: false,
             close_to_tray: false,
+            auto_check_updates: true,
             ui_language: "en".to_string(),
             confidence_threshold: 70,
             recent_spoken_languages: Vec::new(),
@@ -1234,6 +1241,7 @@ mod tests {
         settings.ui_language = "fa".to_string();
         settings.ui_scale = 1.25;
         settings.confidence_threshold = 85;
+        settings.auto_check_updates = false;
         settings.output_dir_path = "/custom/output".to_string();
         settings.translate_ai_providers = "[{\"name\":\"custom-ai\",\"apiKey\":\"secret\"}]".to_string();
         settings.translate_ai_provider = "custom-ai".to_string();
@@ -1266,6 +1274,7 @@ mod tests {
         assert_eq!(settings.ui_language, "fa");
         assert_eq!(settings.ui_scale, 1.25);
         assert_eq!(settings.confidence_threshold, 85);
+        assert_eq!(settings.auto_check_updates, false);
         assert_eq!(settings.output_dir_path, "/custom/output");
         assert_eq!(settings.translate_ai_providers, "[{\"name\":\"custom-ai\",\"apiKey\":\"secret\"}]");
         assert_eq!(settings.translate_ai_provider, "custom-ai");
@@ -1322,6 +1331,15 @@ mod tests {
 
         let from_str: WhisperSettings = serde_json::from_str(r#"{"confidenceThreshold":"80"}"#).unwrap();
         assert_eq!(from_str.confidence_threshold, 80);
+    }
+
+    #[test]
+    fn test_auto_check_updates_defaults_true_and_respects_explicit_false() {
+        let missing: WhisperSettings = serde_json::from_str(r#"{"theme":"royal-blue"}"#).unwrap();
+        assert!(missing.auto_check_updates);
+
+        let disabled: WhisperSettings = serde_json::from_str(r#"{"autoCheckUpdates":false}"#).unwrap();
+        assert!(!disabled.auto_check_updates);
     }
 }
 

@@ -37,7 +37,9 @@ export const de: Translations = {
     updateAvailable: 'Neue Version {version} ist verfügbar!',
     viewRelease: 'Auf GitHub Anzeigen & Herunterladen',
     updateError: 'Updates konnten nicht geprüft werden',
-    retryCheck: 'Wiederholen'
+    retryCheck: 'Wiederholen',
+    viewUpdate: 'Ansehen',
+    sidebarUpdateBadge: 'Update'
   },
   theme: {
     royal: 'Königsblau',
@@ -864,6 +866,8 @@ export const de: Translations = {
     whisperSystem: "System",
     trayTitle: 'Beim Schließen im Hintergrund weiter ausführen',
     trayDesc: 'Hält die Anwendung beim Schließen des Fensters im Hintergrund aktiv.',
+    autoCheckUpdatesTitle: 'Beim Start automatisch nach Updates suchen',
+    autoCheckUpdatesDesc: 'Prüft beim Start unauffällig GitHub Releases und benachrichtigt Sie, wenn eine neuere Version verfügbar ist.',
     uiScaleTitle: 'UI-Skalierung & Zoom',
     uiScaleDesc: 'Passen Sie die Skalierung der Oberfläche für hochauflösende Monitore an.',
     uiScaleReset: 'Zurücksetzen',
@@ -1065,6 +1069,7 @@ export const de: Translations = {
     ffmpegPoints: '<span class="setting-desc-point"><strong>Intern:</strong> Eigenständige mitgelieferte Binärdatei (empfohlen)</span><span class="setting-desc-point"><strong>System:</strong> Verwendet die im System installierte FFmpeg-Binärdatei</span>',
     whisperSourcePoints: "<span class=\"setting-desc-point\"><strong>Intern:</strong> Eigenständige mitgelieferte Binärdatei (empfohlen)</span><span class=\"setting-desc-point\"><strong>System:</strong> Verwendet das im System installierte whisper-cli und ggml-Backends</span>",
     trayPoints: '<span class="setting-desc-point"><strong>Standard:</strong> Deaktiviert (beendet beim Schließen des Fensters)</span>',
+    autoCheckUpdatesPoints: '<span class="setting-desc-point"><strong>Standard:</strong> Aktiviert (unaufdringliche Prüfung; für rein Offline- oder Paketmanager-Setups deaktivierbar)</span>',
     uiScalePoints: '<span class="setting-desc-point"><strong>Tastaturkürzel:</strong> <kbd class="kbd-shortcut">Strg</kbd> + <kbd class="kbd-shortcut">+</kbd> (Vergrößern) &middot; <kbd class="kbd-shortcut">Strg</kbd> + <kbd class="kbd-shortcut">&minus;</kbd> (Verkleinern) &middot; <kbd class="kbd-shortcut">Strg</kbd> + <kbd class="kbd-shortcut">0</kbd> (Zurücksetzen)</span><span class="setting-desc-point"><strong>Standard:</strong> <code>100%</code></span>',
     confidenceThresholdTitle: 'Konfidenz-Schwellenwert für Hervorhebung',
     confidenceThresholdDesc: 'Wörter mit einer Whisper-Erkennungskonfidenz unter diesem Prozentwert werden zur Überprüfung im Transkript-Viewer hervorgehoben.',

@@ -65,6 +65,7 @@ export interface SettingsState {
   uiLanguage?: string;
   confidenceThreshold?: number;
   closeToTray?: boolean;
+  autoCheckUpdates?: boolean;
   recentSpokenLanguages?: string[];
   recentTranslationTargets?: string[];
   autoTransferToTranslate?: boolean;

@@ -26,7 +26,8 @@ import {
 } from './modules/translationProviders';
 import {
   syncAppVersionUI,
-  renderUpdateCheckerUI
+  renderUpdateCheckerUI,
+  runStartupUpdateCheck
 } from './modules/appModal';
 import {
   setupTitlebar,
@@ -380,6 +381,7 @@ export async function initApp(): Promise<void> {
   void refreshFFmpegStatus();
   void refreshWhisperStatus();
   void hardsubController.loadFontsAndHardware();
+  void runStartupUpdateCheck(getSettingsState()?.autoCheckUpdates !== false);
 
   // Unfreeze theme transitions
   requestAnimationFrame(() => {

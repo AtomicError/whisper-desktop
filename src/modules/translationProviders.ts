@@ -3,7 +3,7 @@ import { t, isRtlLanguage, getLanguage, firstStrongDirection } from '../i18n/ind
 import { escapeHTML } from './logsController';
 import { CustomSelect, customSelectsMap } from './customSelect';
 import { getSettingsState, type SettingsState } from './settingsManager';
-import { showBatchErrorDialog } from './appModal';
+import { showBatchErrorDialog, type ToastAction } from './appModal';
 
 if (typeof window === 'undefined') {
   (globalThis as any).window = globalThis;
@@ -78,7 +78,7 @@ declare global {
     translationStudioController?: any;
     settingsState: SettingsState | null;
     saveCurrentSettings: (immediate?: boolean) => any;
-    showNotification: (msg: string, type: string) => void;
+    showNotification: (msg: string, type: string, customDuration?: number | null, action?: ToastAction | null) => void;
     showConfirmModal: (title: string, message: string, confirmButtonText?: string | null) => Promise<boolean>;
     updateTranscribeUIConfigs: () => void;
     applyDynamicDirection?: (el: HTMLElement) => void;
