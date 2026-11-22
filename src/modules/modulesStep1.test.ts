@@ -7,6 +7,12 @@ describe('logsController', () => {
     clearLogsArray();
   });
 
+  afterEach(() => {
+    clearLogsArray();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
   it('correctly strips ANSI escape codes', () => {
     const raw = '\u001b[31mError message\u001b[0m with \u001b[1;32mcolor\u001b[0m';
     expect(stripAnsi(raw)).toBe('Error message with color');
@@ -555,6 +561,387 @@ describe('logsController', () => {
     expect(logsController.allLogs.map(l => l.seq)).toEqual([5]);
 
     vi.unstubAllGlobals();
+  });
+
+  it('coalesces auto-scroll during continuous rapid log streaming instead of starving', () => {
+    vi.useFakeTimers();
+    logsController.clear();
+
+    const makeEl = (): any => ({
+      className: '',
+      textContent: '',
+      dataset: {},
+      children: [] as any[],
+      checked: true,
+      scrollTop: 0,
+      scrollHeight: 500,
+      clientHeight: 300,
+      classList: { add: vi.fn(), remove: vi.fn() },
+      querySelector: () => null,
+      appendChild: function (c: any) {
+        this.children.push(c);
+        this.scrollHeight += 24;
+        return c;
+      },
+    });
+
+    const viewport = makeEl();
+    const autoScroll = makeEl();
+    autoScroll.checked = true;
+
+    vi.stubGlobal('document', {
+      getElementById: (id: string) => (id === 'log-viewport' ? viewport : id === 'log-autoscroll' ? autoScroll : null),
+      createElement: () => makeEl(),
+    });
+
+    // Stream logs every 25ms across 100ms (would starve an 80ms trailing debounce indefinitely)
+    logsController.appendLogToViewport({ timestamp: '10:00:00', category: 'FFmpeg', message: 'frame=1' });
+    vi.advanceTimersByTime(25);
+    logsController.appendLogToViewport({ timestamp: '10:00:00', category: 'FFmpeg', message: 'frame=2' });
+    vi.advanceTimersByTime(25);
+    logsController.appendLogToViewport({ timestamp: '10:00:00', category: 'FFmpeg', message: 'frame=3' });
+    vi.advanceTimersByTime(35);
+
+    expect(viewport.scrollTop).toBe(viewport.scrollHeight);
+
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('disengages Auto Scroll on manual upward scroll even when overflow <= 140px or already at bottom before scrollLogsToBottom', () => {
+    logsController.clear();
+    const listeners: Record<string, Function> = {};
+    const rafQueue: FrameRequestCallback[] = [];
+
+    const viewport: any = {
+      scrollTop: 100,
+      scrollHeight: 400,
+      clientHeight: 300, // total overflow = 100px <= 140px
+      children: [],
+      addEventListener: (ev: string, fn: Function) => { listeners[ev] = fn; },
+      scrollTo: vi.fn(),
+    };
+    const autoScroll: any = { checked: true, addEventListener: vi.fn() };
+    const pill: any = { classList: { add: vi.fn(), remove: vi.fn() } };
+
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      rafQueue.push(cb);
+      return rafQueue.length;
+    });
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    vi.stubGlobal('document', {
+      getElementById: (id: string) =>
+        id === 'log-viewport' ? viewport : id === 'log-autoscroll' ? autoScroll : id === 'btn-logs-jump-bottom' ? pill : null,
+    });
+
+    logsController.setup();
+
+    // Calling smooth scrollLogsToBottom when already at bottom must not arm a 1200ms lock
+    logsController.scrollToBottom(true);
+    expect(viewport.scrollTo).not.toHaveBeenCalled();
+
+    // User presses Home / drags scrollbar to top (distanceFromBottom = 100 <= 140, scrolledUp = true)
+    viewport.scrollTop = 0;
+    listeners['scroll']();
+    while (rafQueue.length > 0) rafQueue.shift()!(0);
+
+    expect(autoScroll.checked).toBe(false);
+
+    vi.unstubAllGlobals();
+  });
+
+  it('preserves clear watermark during in-flight or failed clear_logs IPC and orders out-of-order seqs', async () => {
+    logsController.clear();
+    const listeners: Record<string, Function> = {};
+    const makeNode = (): any => ({
+      className: '',
+      textContent: '',
+      dataset: {},
+      children: [] as any[],
+      classList: { add: vi.fn(), remove: vi.fn(), toggle: vi.fn() },
+      setAttribute: vi.fn(),
+      removeAttribute: vi.fn(),
+      querySelector: () => null,
+      appendChild: function (c: any) { this.children.push(c); return c; },
+      set innerHTML(v: string) { if (v === '') this.children = []; },
+    });
+
+    const viewport = makeNode();
+    viewport.scrollTop = 0;
+    viewport.scrollHeight = 100;
+    viewport.clientHeight = 100;
+    viewport.addEventListener = (ev: string, fn: Function) => { listeners[ev] = fn; };
+
+    vi.stubGlobal('document', {
+      getElementById: (id: string) => (id === 'log-viewport' ? viewport : null),
+      querySelectorAll: () => [],
+      createElement: () => makeNode(),
+    });
+
+    // Out-of-order concurrent arrival: seq 11 arrives before seq 10
+    expect(logsController.push({ seq: 11, timestamp: '10:00:02', category: 'Whisper', message: 'Second' })).toBe(true);
+    logsController.appendLogToViewport({ seq: 11, timestamp: '10:00:02', category: 'Whisper', message: 'Second' });
+    expect(logsController.push({ seq: 10, timestamp: '10:00:01', category: 'Whisper', message: 'First' })).toBe(true);
+    logsController.appendLogToViewport({ seq: 10, timestamp: '10:00:01', category: 'Whisper', message: 'First' });
+
+    expect(logsController.allLogs.map(l => l.seq)).toEqual([10, 11]);
+    expect(viewport.children.map((c: any) => c.children[2].textContent)).toEqual(['First', 'Second']);
+
+    // Failed clear_logs must still protect pre-clear seq <= 11
+    const failingClear = vi.fn().mockRejectedValue(new Error('IPC error'));
+    await logsController.clearHistory(failingClear);
+    expect(logsController.push({ seq: 11, timestamp: '10:00:02', category: 'Whisper', message: 'Stale' })).toBe(false);
+    expect(logsController.push({ seq: 12, timestamp: '10:00:03', category: 'Whisper', message: 'New' })).toBe(true);
+
+    vi.unstubAllGlobals();
+  });
+
+  it('updates empty state text to noMatchingLogs when non-matching logs arrive under active filter', () => {
+    logsController.clear();
+    const emptyTextEl: any = {
+      attributes: new Map<string, string>([['data-i18n', 'logs.emptyLogs']]),
+      textContent: 'No log events recorded yet.',
+      getAttribute: function (k: string) { return this.attributes.get(k) ?? null; },
+      setAttribute: function (k: string, v: string) { this.attributes.set(k, v); },
+    };
+    const makeNode = (): any => ({
+      className: '',
+      textContent: '',
+      dataset: {},
+      children: [] as any[],
+      appendChild: function (c: any) { this.children.push(c); return c; },
+    });
+    const viewport: any = {
+      children: [emptyTextEl],
+      querySelector: (sel: string) => (sel === '.log-empty-state .log-empty-text' ? emptyTextEl : null),
+      appendChild: function (c: any) { this.children.push(c); return c; },
+      set innerHTML(v: string) { if (v === '') this.children = []; },
+    };
+    const filterBtn: any = { id: 'log-filter-Translate', classList: { toggle: vi.fn() }, setAttribute: vi.fn() };
+
+    vi.stubGlobal('document', {
+      getElementById: (id: string) => (id === 'log-viewport' ? viewport : null),
+      querySelectorAll: () => [filterBtn],
+      createElement: () => makeNode(),
+    });
+
+    logsController.filter('Translate');
+    const entry = { seq: 1, timestamp: '10:00:00', category: 'Whisper', message: 'Loaded model' };
+    logsController.push(entry);
+    logsController.appendLogToViewport(entry);
+
+    expect(emptyTextEl.getAttribute('data-i18n')).toBe('logs.noMatchingLogs');
+    expect(emptyTextEl.textContent).not.toBe('No log events recorded yet.');
+
+    logsController.filter('All');
+    vi.unstubAllGlobals();
+  });
+
+  it('guards deferred timers and rAF callbacks when document becomes undefined', () => {
+    vi.useFakeTimers();
+    const rafQueue: FrameRequestCallback[] = [];
+    const viewport: any = {
+      scrollTop: 0,
+      scrollHeight: 2000,
+      clientHeight: 300,
+      children: [] as any[],
+      classList: { add: vi.fn(), remove: vi.fn() },
+      querySelector: () => null,
+      appendChild: function (c: any) { this.children.push(c); return c; },
+      set innerHTML(v: string) { if (v === '') this.children = []; },
+      scrollTo: vi.fn(),
+    };
+    const searchInput: any = { value: 'err' };
+    const autoScroll: any = { checked: true };
+
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      rafQueue.push(cb);
+      return rafQueue.length;
+    });
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    vi.stubGlobal('document', {
+      getElementById: (id: string) =>
+        id === 'log-viewport' ? viewport : id === 'log-search' ? searchInput : id === 'log-autoscroll' ? autoScroll : null,
+      querySelectorAll: () => [],
+      createElement: () => ({
+        className: '',
+        textContent: '',
+        dataset: {},
+        children: [] as any[],
+        appendChild: function (c: any) { this.children.push(c); return c; },
+      }),
+    });
+
+    logsController.scheduleUpdateButtons();
+    logsController.search();
+    logsController.appendLogToViewport({ timestamp: '10:00:00', category: 'Whisper', message: 'err' });
+    logsController.scrollToBottom(true);
+
+    // Simulate test teardown removing global document before timers/rAF flush
+    vi.stubGlobal('document', undefined);
+    expect(() => {
+      vi.advanceTimersByTime(1500);
+      while (rafQueue.length > 0) rafQueue.shift()!(0);
+    }).not.toThrow();
+  });
+
+  it('disengages Auto Scroll on wheel-up and clears smooth scroll lock on clear or checkbox uncheck', () => {
+    const listeners: Record<string, Function[]> = {};
+    const rafQueue: FrameRequestCallback[] = [];
+    const viewport: any = {
+      scrollTop: 1500,
+      scrollHeight: 2000,
+      clientHeight: 300,
+      children: [],
+      addEventListener: (ev: string, fn: Function) => {
+        listeners[ev] = [...(listeners[ev] || []), fn];
+      },
+      scrollTo: vi.fn(),
+    };
+    const autoScroll: any = {
+      checked: true,
+      addEventListener: (ev: string, fn: Function) => {
+        listeners[`cb:${ev}`] = [...(listeners[`cb:${ev}`] || []), fn];
+      },
+    };
+    const pill: any = { classList: { add: vi.fn(), remove: vi.fn() } };
+
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      rafQueue.push(cb);
+      return rafQueue.length;
+    });
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    vi.stubGlobal('document', {
+      getElementById: (id: string) =>
+        id === 'log-viewport' ? viewport : id === 'log-autoscroll' ? autoScroll : id === 'btn-logs-jump-bottom' ? pill : null,
+    });
+
+    logsController.setup();
+
+    // 1. Wheel up immediately unchecks Auto Scroll
+    listeners['wheel'][0]({ deltaY: -40 });
+    expect(autoScroll.checked).toBe(false);
+
+    // 2. Start smooth scroll to bottom, then manually uncheck Auto Scroll -> lock must cancel immediately
+    viewport.scrollTop = 0;
+    logsController.scrollToBottom(true);
+    expect(autoScroll.checked).toBe(true);
+    autoScroll.checked = false;
+    listeners['cb:change'][0]();
+    pill.classList.add.mockClear();
+    listeners['scroll'][0]();
+    while (rafQueue.length > 0) rafQueue.shift()!(0);
+    expect(pill.classList.add).toHaveBeenCalledWith('visible');
+
+    // 3. Also verify clear() cancels an active smooth-scroll lock so subsequent scroll-up works
+    logsController.scrollToBottom(true);
+    logsController.clear();
+    viewport.scrollTop = 1000;
+    listeners['scroll'][0]();
+    while (rafQueue.length > 0) rafQueue.shift()!(0);
+    viewport.scrollTop = 200;
+    listeners['scroll'][0]();
+    while (rafQueue.length > 0) rafQueue.shift()!(0);
+    expect(autoScroll.checked).toBe(false);
+  });
+
+  it('preserves user scrollTop on out-of-order seq redraw when Auto Scroll is unchecked', () => {
+    const makeNode = (): any => ({
+      className: '',
+      textContent: '',
+      dataset: {},
+      children: [] as any[],
+      appendChild: function (c: any) { this.children.push(c); return c; },
+    });
+    const viewport: any = {
+      scrollTop: 1800,
+      scrollHeight: 3000,
+      clientHeight: 400,
+      children: [] as any[],
+      querySelector: () => null,
+      appendChild: function (c: any) { this.children.push(c); return c; },
+      set innerHTML(v: string) { if (v === '') this.children = []; },
+    };
+    const autoScroll: any = { checked: false };
+    const pill: any = { classList: { add: vi.fn(), remove: vi.fn() } };
+
+    vi.stubGlobal('document', {
+      getElementById: (id: string) =>
+        id === 'log-viewport' ? viewport : id === 'log-autoscroll' ? autoScroll : id === 'btn-logs-jump-bottom' ? pill : null,
+      querySelectorAll: () => [],
+      createElement: () => makeNode(),
+    });
+
+    logsController.push({ seq: 20, timestamp: '10:00:02', category: 'Whisper', message: 'Later' });
+    logsController.appendLogToViewport({ seq: 20, timestamp: '10:00:02', category: 'Whisper', message: 'Later' });
+
+    // Simulate user reading at scrollTop = 1800 when seq 19 arrives out of order
+    viewport.scrollTop = 1800;
+    logsController.push({ seq: 19, timestamp: '10:00:01', category: 'Whisper', message: 'Earlier' });
+    logsController.appendLogToViewport({ seq: 19, timestamp: '10:00:01', category: 'Whisper', message: 'Earlier' });
+
+    expect(viewport.scrollTop).toBe(1800);
+    expect(viewport.children.map((c: any) => c.children[2].textContent)).toEqual(['Earlier', 'Later']);
+  });
+
+  it('rejects late seqs older than evicted MAX_STORED_LOGS cap and purges in-flight entries below clear_logs next_seq', async () => {
+    for (let i = 1; i <= 10005; i++) {
+      logsController.push({ seq: i, timestamp: '10:00:00', category: 'Whisper', message: `m${i}` });
+    }
+    expect(logsController.allLogs.length).toBe(10000);
+    expect(logsController.allLogs[0].seq).toBe(6);
+
+    // seq 3 was evicted above; late arrival must return false and not enter buffer
+    expect(logsController.push({ seq: 3, timestamp: '10:00:00', category: 'Whisper', message: 'late' })).toBe(false);
+    expect(logsController.allLogs[0].seq).toBe(6);
+
+    // Simulate in-flight seq 10006 arriving while clear_logs is pending and resolves with next_seq = 10008
+    vi.stubGlobal('document', { getElementById: () => null });
+    const deferredInvoke = vi.fn().mockImplementation(async () => {
+      logsController.push({ seq: 10006, timestamp: '10:00:01', category: 'Whisper', message: 'in-flight pre-clear' });
+      return 10008;
+    });
+    await logsController.clearHistory(deferredInvoke);
+    expect(logsController.allLogs).toEqual([]);
+    expect(logsController.push({ seq: 10007, timestamp: '10:00:02', category: 'Whisper', message: 'stale' })).toBe(false);
+    expect(logsController.push({ seq: 10008, timestamp: '10:00:03', category: 'Whisper', message: 'fresh' })).toBe(true);
+  });
+
+  it('handles copyAllLogs category toasts, clipboard errors, and error reporter edge cases', async () => {
+    const notifySpy = vi.fn();
+    const copySpy = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('window', { showNotification: notifySpy, copyToClipboard: copySpy });
+    vi.stubGlobal('document', { getElementById: () => null, querySelectorAll: () => [] });
+
+    logsController.push({ timestamp: '10:00:00', category: 'Whisper', message: 'w1' });
+    logsController.push({ timestamp: '10:00:01', category: 'Translate', message: 't1' });
+
+    logsController.filter('Whisper');
+    await logsController.copyAll();
+    expect(notifySpy).toHaveBeenLastCalledWith(expect.stringContaining('Whisper'), 'success');
+
+    logsController.filter('Translate');
+    await logsController.copyAll();
+    expect(notifySpy).toHaveBeenLastCalledWith(expect.stringContaining('Translation'), 'success');
+
+    copySpy.mockRejectedValueOnce(new Error('Clipboard blocked'));
+    await logsController.copyAll();
+    expect(notifySpy).toHaveBeenLastCalledWith(expect.stringContaining('Clipboard blocked'), 'error');
+
+    logsController.filter('All');
+
+    // Error reporter: whitespace string & null-prototype object + toast throttling
+    logsController.clear();
+    notifySpy.mockClear();
+    reportUnhandledRejection({ reason: '   ' });
+    expect(logsController.allLogs[0].message).toBe('Frontend error: Unhandled promise rejection');
+    expect(notifySpy).toHaveBeenCalledTimes(1);
+
+    const nullProto = Object.create(null);
+    reportUnhandledRejection({ reason: nullProto });
+    expect(logsController.allLogs[1].message).toBe('Frontend error: Unhandled promise rejection');
+    // Second toast within 3000ms is throttled
+    expect(notifySpy).toHaveBeenCalledTimes(1);
   });
 });
 

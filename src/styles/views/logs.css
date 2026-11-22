@@ -268,7 +268,7 @@
 
 .log-line .log-cat {
   flex-shrink: 0;
-  width: 80px;
+  width: 92px;
   text-align: center;
   padding: 0px 4px;
   border-radius: 3px;
@@ -280,7 +280,7 @@
 
 .log-line .log-cat-spacer {
   flex-shrink: 0;
-  width: 100px;
+  width: 112px;
 }
 
 .filter-btn:focus-visible,

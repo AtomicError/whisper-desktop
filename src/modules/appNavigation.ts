@@ -129,9 +129,10 @@ export function switchView(viewName: string): void {
         const viewport = document.getElementById('log-viewport');
         const autoScroll = document.getElementById('log-autoscroll') as HTMLInputElement | null;
         if (viewport && (!autoScroll || autoScroll.checked)) {
-          viewport.scrollTop = viewport.scrollHeight;
+          logsController.scrollToBottom(false);
+        } else {
+          logsController.updateLogJumpPillVisibility();
         }
-        logsController.updateLogJumpPillVisibility();
       });
     }
   }
