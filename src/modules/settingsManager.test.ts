@@ -10,7 +10,12 @@ import {
   bindSettingsToDOM,
   formatFFmpegVersion,
   formatWhisperVersion,
+  refreshFFmpegStatus,
   refreshWhisperStatus,
+  resyncEngineSourceControls,
+  validateExecutionEnginesPreflight,
+  isFfmpegBundledAvailable,
+  isWhisperBundledAvailable,
   getStepperBounds,
   clampNumberSetting,
   sanitizeSettingsPayload,
@@ -59,7 +64,7 @@ import {
 } from './settingsManager';
 import { switchTheme } from './themeManager';
 import { resetQuickDeckState } from './transcribeQuickDeck';
-import { setLanguage } from '../i18n/index';
+import { setLanguage, t } from '../i18n/index';
 
 // Headless DOM mock for Node runner
 class MockElement {
@@ -374,6 +379,431 @@ describe('settingsManager module', () => {
 
       expect(badge.className).toBe('setting-status-pill missing');
       expect(badge.innerHTML).toContain('Not Found');
+    });
+
+    it('locks Internal engine option and resyncs label when unbundled Lite edition is detected', async () => {
+      const ffBadge = new MockElement('span');
+      ffBadge.id = 'ffmpeg-status-badge';
+      const wBadge = new MockElement('span');
+      wBadge.id = 'whisper-status-badge';
+
+      const makeSourceSelect = (id: string) => {
+        const sel = new MockElement('SELECT');
+        sel.id = id;
+        const optBundled = new MockElement('OPTION');
+        optBundled.value = 'bundled';
+        optBundled.textContent = 'Internal';
+        const optSystem = new MockElement('OPTION');
+        optSystem.value = 'system';
+        optSystem.textContent = 'System';
+        sel.appendChild(optBundled);
+        sel.appendChild(optSystem);
+        sel.value = 'bundled';
+        return { sel, optBundled, optSystem };
+      };
+
+      const ffSelect = makeSourceSelect('opt-ffmpegSource');
+      const wSelect = makeSourceSelect('opt-whisperSource');
+      elementRegistry.set('ffmpeg-status-badge', ffBadge);
+      elementRegistry.set('whisper-status-badge', wBadge);
+      elementRegistry.set('opt-ffmpegSource', ffSelect.sel);
+      elementRegistry.set('opt-whisperSource', wSelect.sel);
+
+      const syncSelectsSpy = vi.fn();
+      const prevSync = (globalThis as any).window.syncCustomSelects;
+      (globalThis as any).window.syncCustomSelects = syncSelectsSpy;
+      setSettingsState({ ffmpegSource: 'bundled', whisperSource: 'bundled', uiLanguage: 'en' });
+      await setLanguage('en', false);
+
+      try {
+        (window as any).__TAURI__.core.invoke = vi.fn().mockImplementation(async (cmd: string) => {
+          if (cmd === 'get_ffmpeg_status') {
+            return {
+              configuredSource: 'system',
+              resolvedPath: '/usr/bin/ffmpeg',
+              isAvailable: true,
+              bundledAvailable: false,
+              version: 'ffmpeg version 7.1',
+              errorMessage: null
+            };
+          }
+          if (cmd === 'get_whisper_status') {
+            return {
+              configuredSource: 'system',
+              resolvedPath: '/usr/bin/whisper-cli',
+              isAvailable: true,
+              bundledAvailable: false,
+              version: 'whisper.cpp version: 1.9.5-dev',
+              availableBackends: ['Standard', 'Vulkan'],
+              errorMessage: null
+            };
+          }
+          return {};
+        });
+
+        await refreshFFmpegStatus('bundled', false);
+        await refreshWhisperStatus('bundled', false);
+
+        expect(isFfmpegBundledAvailable()).toBe(false);
+        expect(isWhisperBundledAvailable()).toBe(false);
+        expect(ffSelect.optBundled.disabled).toBe(true);
+        expect(wSelect.optBundled.disabled).toBe(true);
+        expect(ffSelect.optBundled.textContent).toContain('Not bundled');
+        expect(wSelect.optBundled.textContent).toContain('Not bundled');
+        expect(ffSelect.sel.value).toBe('system');
+        expect(wSelect.sel.value).toBe('system');
+        expect(getSettingsState()?.ffmpegSource).toBe('system');
+        expect(getSettingsState()?.whisperSource).toBe('system');
+        expect(syncSelectsSpy).toHaveBeenCalledWith(true, true);
+
+        // Switching language to Persian and calling resyncEngineSourceControls keeps Not bundled hint in fa
+        await setLanguage('fa', false);
+        resyncEngineSourceControls();
+        expect(ffSelect.optBundled.textContent).toContain('موجود نیست');
+        expect(wSelect.optBundled.textContent).toContain('موجود نیست');
+      } finally {
+        await setLanguage('en', false);
+        // Restore bundled state for subsequent test suites
+        (window as any).__TAURI__.core.invoke = vi.fn().mockResolvedValue({
+          configuredSource: 'bundled',
+          resolvedPath: 'Internal Resources',
+          isAvailable: true,
+          bundledAvailable: true,
+          version: 'v1.9.5',
+          availableBackends: ['Standard'],
+          errorMessage: null
+        });
+        await refreshFFmpegStatus('bundled', false);
+        await refreshWhisperStatus('bundled', false);
+        (globalThis as any).window.syncCustomSelects = prevSync;
+      }
+    });
+
+    it('validates FFmpeg and Whisper engines in preflight before media conversion', async () => {
+      const switchViewSpy = vi.fn();
+      const prevSwitchView = (globalThis as any).window.switchView;
+      (globalThis as any).window.switchView = switchViewSpy;
+      setSettingsState({ ffmpegSource: 'system', whisperSource: 'system', selectedBackend: 'Vulkan', uiLanguage: 'en' });
+      await setLanguage('en', false);
+
+      try {
+        // 1. Missing FFmpeg
+        (window as any).__TAURI__.core.invoke = vi.fn().mockResolvedValueOnce({
+          configuredSource: 'system',
+          resolvedPath: 'Not Found',
+          isAvailable: false,
+          bundledAvailable: false,
+          version: 'N/A',
+          errorMessage: 'missing ffmpeg'
+        });
+        expect(await validateExecutionEnginesPreflight('Vulkan')).toBe(false);
+        expect(switchViewSpy).toHaveBeenCalledWith('settings');
+
+        // 2. FFmpeg OK, Whisper backend Vulkan missing
+        switchViewSpy.mockClear();
+        (window as any).__TAURI__.core.invoke = vi.fn()
+          .mockResolvedValueOnce({
+            configuredSource: 'system',
+            resolvedPath: '/usr/bin/ffmpeg',
+            isAvailable: true,
+            bundledAvailable: false,
+            version: '7.1',
+            errorMessage: null
+          })
+          .mockResolvedValueOnce({
+            configuredSource: 'system',
+            resolvedPath: '/usr/bin/whisper-cli',
+            isAvailable: true,
+            bundledAvailable: false,
+            version: 'v1.9.5-dev',
+            availableBackends: ['Standard'],
+            errorMessage: null
+          });
+        expect(await validateExecutionEnginesPreflight('Vulkan')).toBe(false);
+        expect(switchViewSpy).toHaveBeenCalledWith('settings');
+
+        // 3. Both FFmpeg and Vulkan system backend OK
+        switchViewSpy.mockClear();
+        (window as any).__TAURI__.core.invoke = vi.fn()
+          .mockResolvedValueOnce({
+            configuredSource: 'system',
+            resolvedPath: '/usr/bin/ffmpeg',
+            isAvailable: true,
+            bundledAvailable: false,
+            version: '7.1',
+            errorMessage: null
+          })
+          .mockResolvedValueOnce({
+            configuredSource: 'system',
+            resolvedPath: '/usr/bin/whisper-cli',
+            isAvailable: true,
+            bundledAvailable: false,
+            version: 'v1.9.5-dev',
+            availableBackends: ['Standard', 'Vulkan'],
+            errorMessage: null
+          });
+        expect(await validateExecutionEnginesPreflight('Vulkan')).toBe(true);
+        expect(switchViewSpy).not.toHaveBeenCalled();
+      } finally {
+        (globalThis as any).window.switchView = prevSwitchView;
+      }
+    });
+
+    it('toggles is-unbundled hint class and localizes missing status badge across languages', async () => {
+      const createSourceSelectEl = (id: string) => {
+        const sel = new MockElement('SELECT');
+        sel.id = id;
+        const optBundled = new MockElement('OPTION');
+        optBundled.value = 'bundled';
+        optBundled.textContent = 'Internal';
+        const optSystem = new MockElement('OPTION');
+        optSystem.value = 'system';
+        optSystem.textContent = 'System';
+        sel.appendChild(optBundled);
+        sel.appendChild(optSystem);
+        sel.value = 'bundled';
+        return sel;
+      };
+
+      const ffBadge = new MockElement('SPAN');
+      const wBadge = new MockElement('SPAN');
+      const ffPoints = new MockElement('DIV');
+      const wPoints = new MockElement('DIV');
+      elementRegistry.set('ffmpeg-status-badge', ffBadge);
+      elementRegistry.set('whisper-status-badge', wBadge);
+      elementRegistry.set('ffmpeg-source-points', ffPoints);
+      elementRegistry.set('whisper-source-points', wPoints);
+      elementRegistry.set('opt-ffmpegSource', createSourceSelectEl('opt-ffmpegSource'));
+      elementRegistry.set('opt-whisperSource', createSourceSelectEl('opt-whisperSource'));
+
+      const prevSettings = getSettingsState();
+      setSettingsState({ ...(prevSettings || {}), ffmpegSource: 'bundled', whisperSource: 'bundled' } as any);
+      const invokeMock = (globalThis as any).__TAURI__.core.invoke;
+
+      try {
+        await setLanguage('en', false);
+        invokeMock
+          .mockResolvedValueOnce({
+            configuredSource: 'system',
+            resolvedPath: '',
+            version: '',
+            isAvailable: false,
+            bundledAvailable: false,
+            errorMessage: 'FFmpeg not found'
+          })
+          .mockResolvedValueOnce({
+            configuredSource: 'system',
+            resolvedPath: '',
+            version: '',
+            isAvailable: false,
+            bundledAvailable: false,
+            availableBackends: [],
+            errorMessage: 'Whisper not found'
+          });
+
+        await refreshFFmpegStatus('bundled', false);
+        await refreshWhisperStatus('bundled', false);
+
+        expect(ffPoints.classList.contains('is-unbundled')).toBe(true);
+        expect(wPoints.classList.contains('is-unbundled')).toBe(true);
+        expect(ffBadge.innerHTML).toContain(t('settings.engineMissingBadge'));
+        expect(wBadge.innerHTML).toContain(t('settings.engineMissingBadge'));
+
+        await setLanguage('fa', false);
+        resyncEngineSourceControls();
+        const faMissingBadge = t('settings.engineMissingBadge');
+        expect(ffBadge.innerHTML).toContain(faMissingBadge);
+        expect(wBadge.innerHTML).toContain(faMissingBadge);
+
+        invokeMock
+          .mockResolvedValueOnce({
+            configuredSource: 'bundled',
+            resolvedPath: '/app/ffmpeg',
+            version: 'ffmpeg version 7.1',
+            isAvailable: true,
+            bundledAvailable: true,
+            errorMessage: null
+          })
+          .mockResolvedValueOnce({
+            configuredSource: 'bundled',
+            resolvedPath: '/app/whisper-cli',
+            version: 'whisper.cpp v1.8.4',
+            isAvailable: true,
+            bundledAvailable: true,
+            availableBackends: ['Standard'],
+            errorMessage: null
+          });
+
+        await refreshFFmpegStatus('bundled', false);
+        await refreshWhisperStatus('bundled', false);
+
+        expect(ffPoints.classList.contains('is-unbundled')).toBe(false);
+        expect(wPoints.classList.contains('is-unbundled')).toBe(false);
+      } finally {
+        await setLanguage('en', false);
+        setSettingsState(prevSettings);
+      }
+    });
+
+    it('navigates preflight errors to app category for missing binary and transcription category for missing backend', async () => {
+      const prevSwitchView = (globalThis as any).window.switchView;
+      const prevSettings = getSettingsState();
+      const prevActiveCat = getActiveSettingsCat();
+      const switchViewSpy = vi.fn();
+      (globalThis as any).window.switchView = switchViewSpy;
+
+      const ffBadge = new MockElement('SPAN');
+      const wBadge = new MockElement('SPAN');
+      elementRegistry.set('ffmpeg-status-badge', ffBadge);
+      elementRegistry.set('whisper-status-badge', wBadge);
+
+      const invokeMock = (globalThis as any).__TAURI__.core.invoke;
+      setSettingsState({ ...(prevSettings || {}), ffmpegSource: 'system', whisperSource: 'system' } as any);
+
+      try {
+        // Missing FFmpeg navigates to settings -> 'app'
+        setActiveSettingsCat('transcription');
+        invokeMock.mockResolvedValue({
+          configuredSource: 'system',
+          resolvedPath: '',
+          version: '',
+          isAvailable: false,
+          bundledAvailable: false,
+          errorMessage: 'missing ffmpeg'
+        });
+        expect(await validateExecutionEnginesPreflight('Standard')).toBe(false);
+        expect(switchViewSpy).toHaveBeenCalledWith('settings');
+        expect(getActiveSettingsCat()).toBe('app');
+
+        // Healthy FFmpeg + healthy Whisper without requested Vulkan backend -> navigates to settings -> 'transcription'
+        switchViewSpy.mockClear();
+        setActiveSettingsCat('app');
+        invokeMock.mockImplementation(async (cmd: string) => {
+          if (cmd === 'get_ffmpeg_status') {
+            return {
+              configuredSource: 'system',
+              resolvedPath: '/usr/bin/ffmpeg',
+              version: 'ffmpeg version 7.1',
+              isAvailable: true,
+              bundledAvailable: false,
+              errorMessage: null
+            };
+          }
+          return {
+            configuredSource: 'system',
+            resolvedPath: '/usr/bin/whisper-cli',
+            version: 'whisper.cpp v1.8.4',
+            isAvailable: true,
+            bundledAvailable: false,
+            availableBackends: ['Standard'],
+            errorMessage: null
+          };
+        });
+        expect(await validateExecutionEnginesPreflight('Vulkan')).toBe(false);
+        expect(switchViewSpy).toHaveBeenCalledWith('settings');
+        expect(getActiveSettingsCat()).toBe('transcription');
+      } finally {
+        (globalThis as any).window.switchView = prevSwitchView;
+        setSettingsState(prevSettings);
+        setActiveSettingsCat(prevActiveCat);
+        invokeMock.mockResolvedValue({
+          configuredSource: 'bundled',
+          resolvedPath: '/app/bin',
+          version: 'v1',
+          isAvailable: true,
+          bundledAvailable: true,
+          availableBackends: ['Standard', 'Vulkan'],
+          errorMessage: null
+        });
+        await refreshFFmpegStatus('bundled', false);
+        await refreshWhisperStatus('bundled', false);
+      }
+    });
+
+    it('refreshes stale status badges when preflight recovers after a previously missing binary', async () => {
+      const prevSettings = getSettingsState();
+      const ffBadge = new MockElement('SPAN');
+      const wBadge = new MockElement('SPAN');
+      elementRegistry.set('ffmpeg-status-badge', ffBadge);
+      elementRegistry.set('whisper-status-badge', wBadge);
+
+      const invokeMock = (globalThis as any).__TAURI__.core.invoke;
+      setSettingsState({ ...(prevSettings || {}), ffmpegSource: 'system', whisperSource: 'system' } as any);
+
+      try {
+        invokeMock.mockImplementation(async (cmd: string) => {
+          if (cmd === 'get_ffmpeg_status') {
+            return {
+              configuredSource: 'system',
+              resolvedPath: '',
+              version: '',
+              isAvailable: false,
+              bundledAvailable: false,
+              errorMessage: 'missing'
+            };
+          }
+          return {
+            configuredSource: 'system',
+            resolvedPath: '',
+            version: '',
+            isAvailable: false,
+            bundledAvailable: false,
+            availableBackends: [],
+            errorMessage: 'missing'
+          };
+        });
+
+        await refreshFFmpegStatus('system', false);
+        await refreshWhisperStatus('system', false);
+        expect(ffBadge.className).toContain('missing');
+        expect(wBadge.className).toContain('missing');
+
+        invokeMock.mockImplementation(async (cmd: string) => {
+          if (cmd === 'get_ffmpeg_status') {
+            return {
+              configuredSource: 'system',
+              resolvedPath: '/usr/bin/ffmpeg',
+              version: 'ffmpeg version 7.1',
+              isAvailable: true,
+              bundledAvailable: false,
+              errorMessage: null
+            };
+          }
+          if (cmd === 'get_whisper_status') {
+            return {
+              configuredSource: 'system',
+              resolvedPath: '/usr/bin/whisper-cli',
+              version: 'whisper.cpp v1.8.4',
+              isAvailable: true,
+              bundledAvailable: false,
+              availableBackends: ['Standard', 'Vulkan'],
+              errorMessage: null
+            };
+          }
+          return {
+            availableBackends: ['Standard', 'Vulkan'],
+            whisperDetected: true
+          };
+        });
+
+        expect(await validateExecutionEnginesPreflight('Vulkan')).toBe(true);
+        await new Promise(resolve => setTimeout(resolve, 0));
+        expect(ffBadge.className).toBe('setting-status-pill ready');
+        expect(wBadge.className).toBe('setting-status-pill ready');
+      } finally {
+        setSettingsState(prevSettings);
+        invokeMock.mockResolvedValue({
+          configuredSource: 'bundled',
+          resolvedPath: '/app/bin',
+          version: 'v1',
+          isAvailable: true,
+          bundledAvailable: true,
+          availableBackends: ['Standard', 'Vulkan'],
+          errorMessage: null
+        });
+        await refreshFFmpegStatus('bundled', false);
+        await refreshWhisperStatus('bundled', false);
+      }
     });
   });
 

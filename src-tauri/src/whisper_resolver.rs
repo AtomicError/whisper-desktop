@@ -11,6 +11,7 @@ pub struct WhisperStatus {
     pub configured_source: String, // "bundled" or "system"
     pub resolved_path: String,
     pub is_available: bool,
+    pub bundled_available: bool,
     pub version: String,
     pub available_backends: Vec<String>,
     pub error_message: Option<String>,
@@ -113,25 +114,7 @@ fn run_command_with_timeout(binary: &Path, args: &[&str], timeout_secs: u64) -> 
     Some((stdout_bytes, stderr_bytes, success))
 }
 
-/// Checks if a system binary exists in PATH without version probing.
-pub fn find_system_binary(binary_name: &str) -> Option<PathBuf> {
-    #[cfg(target_os = "windows")]
-    let full_name = if binary_name.ends_with(".exe") {
-        binary_name.to_string()
-    } else {
-        format!("{}.exe", binary_name)
-    };
-    #[cfg(not(target_os = "windows"))]
-    let full_name = binary_name.to_string();
-
-    let mut search_dirs = Vec::new();
-
-    if let Ok(paths) = std::env::var("PATH") {
-        for dir in std::env::split_paths(&paths) {
-            search_dirs.push(dir);
-        }
-    }
-
+fn collect_fallback_binary_dirs(search_dirs: &mut Vec<PathBuf>) {
     // Common user/system paths often absent from minimal GUI desktop environments
     #[cfg(unix)]
     {
@@ -147,6 +130,46 @@ pub fn find_system_binary(binary_name: &str) -> Option<PathBuf> {
             search_dirs.push(PathBuf::from("/opt/homebrew/bin"));
         }
     }
+
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(local_app) = std::env::var("LOCALAPPDATA") {
+            let local_p = PathBuf::from(local_app);
+            search_dirs.push(local_p.join("Microsoft").join("WinGet").join("Links"));
+            search_dirs.push(local_p.join("Microsoft").join("WindowsApps"));
+        }
+        if let Ok(user_profile) = std::env::var("USERPROFILE") {
+            search_dirs.push(PathBuf::from(user_profile).join("scoop").join("shims"));
+        }
+        if let Ok(choco) = std::env::var("ChocolateyInstall") {
+            search_dirs.push(PathBuf::from(choco).join("bin"));
+        } else {
+            search_dirs.push(PathBuf::from(r"C:\ProgramData\chocolatey\bin"));
+        }
+        search_dirs.push(PathBuf::from(r"C:\Program Files\FFmpeg\bin"));
+        search_dirs.push(PathBuf::from(r"C:\ffmpeg\bin"));
+        search_dirs.push(PathBuf::from(r"C:\Program Files\whisper.cpp\bin"));
+    }
+}
+
+/// Checks if a system binary exists in PATH or standard OS install directories.
+pub fn find_system_binary(binary_name: &str) -> Option<PathBuf> {
+    #[cfg(target_os = "windows")]
+    let full_name = if binary_name.ends_with(".exe") {
+        binary_name.to_string()
+    } else {
+        format!("{}.exe", binary_name)
+    };
+    #[cfg(not(target_os = "windows"))]
+    let full_name = binary_name.to_string();
+
+    let mut search_dirs = Vec::new();
+    if let Ok(paths) = std::env::var("PATH") {
+        for dir in std::env::split_paths(&paths) {
+            search_dirs.push(dir);
+        }
+    }
+    collect_fallback_binary_dirs(&mut search_dirs);
 
     for dir in search_dirs {
         let candidate = dir.join(&full_name);
@@ -208,28 +231,77 @@ pub fn find_system_whisper_with_version() -> Option<(PathBuf, String)> {
     Some((cli_path, version))
 }
 
+fn parse_backend_output(text: &str, backends: &mut Vec<String>) {
+    if text.contains("loaded Vulkan backend") || text.contains("ggml_vulkan:") {
+        add_backend_if_missing(backends, "Vulkan");
+    }
+    if text.contains("loaded OPENVINO backend")
+        || text.contains("OpenVINO: using device")
+        || text.contains("--ov-e-device")
+    {
+        add_backend_if_missing(backends, "OpenVINO");
+    }
+    if text.contains("loaded CUDA backend") || text.contains("ggml_cuda:") {
+        add_backend_if_missing(backends, "CUDA");
+    }
+}
+
+/// Probes `whisper-cli --help` output for runtime-loaded or compiled-in backends.
+fn probe_backends_via_cli_help(cli_path: &Path, backends: &mut Vec<String>) {
+    if let Some((stdout, stderr, _)) = run_command_with_timeout(cli_path, &["--help"], 5) {
+        let out_str = String::from_utf8_lossy(&stdout);
+        let err_str = String::from_utf8_lossy(&stderr);
+        parse_backend_output(&format!("{} {}", out_str, err_str), backends);
+    }
+}
+
+fn collect_cli_parent_dirs(cli_path: &Path) -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+    if let Some(parent) = cli_path.parent() {
+        dirs.push(parent.to_path_buf());
+    }
+    if let Ok(canonical) = std::fs::canonicalize(cli_path) {
+        if let Some(real_parent) = canonical.parent() {
+            let real_buf = real_parent.to_path_buf();
+            if !dirs.contains(&real_buf) {
+                dirs.push(real_buf);
+            }
+        }
+    }
+    dirs
+}
+
+fn push_unique_path(list: &mut Vec<PathBuf>, path: PathBuf) {
+    if !list.contains(&path) {
+        list.push(path);
+    }
+}
+
 /// Probes `whisper-bench --help` to detect dynamically loaded backends (Vulkan, OpenVINO, CUDA).
 fn probe_backends_via_bench(cli_path: &Path, backends: &mut Vec<String>) {
-    let bench_path = cli_path.parent().map(|p| p.join("whisper-bench"))
-        .filter(|p| p.is_file())
+    let bench_name = format!("whisper-bench{}", std::env::consts::EXE_SUFFIX);
+    let bench_path = collect_cli_parent_dirs(cli_path)
+        .into_iter()
+        .map(|p| p.join(&bench_name))
+        .find(|p| p.is_file())
         .or_else(|| find_system_binary("whisper-bench"));
 
     if let Some(bench) = bench_path {
-        if let Some((stdout, stderr, _)) = run_command_with_timeout(&bench, &["--help"], 3) {
+        if let Some((stdout, stderr, _)) = run_command_with_timeout(&bench, &["--help"], 6) {
             let out_str = String::from_utf8_lossy(&stdout);
             let err_str = String::from_utf8_lossy(&stderr);
-            let combined = format!("{} {}", out_str, err_str);
-
-            if combined.contains("loaded Vulkan backend") || combined.contains("ggml_vulkan:") {
-                add_backend_if_missing(backends, "Vulkan");
-            }
-            if combined.contains("loaded OPENVINO backend") || combined.contains("OpenVINO: using device") {
-                add_backend_if_missing(backends, "OpenVINO");
-            }
-            if combined.contains("loaded CUDA backend") || combined.contains("ggml_cuda:") {
-                add_backend_if_missing(backends, "CUDA");
-            }
+            parse_backend_output(&format!("{} {}", out_str, err_str), backends);
         }
+    }
+}
+
+fn match_backend_filename(lower: &str, backends: &mut Vec<String>) {
+    if lower.contains("ggml-vulkan") {
+        add_backend_if_missing(backends, "Vulkan");
+    } else if lower.contains("ggml-openvino") {
+        add_backend_if_missing(backends, "OpenVINO");
+    } else if lower.contains("ggml-cuda") || lower.contains("cublas64_") || lower.contains("cudart64_") {
+        add_backend_if_missing(backends, "CUDA");
     }
 }
 
@@ -243,36 +315,107 @@ fn probe_backends_via_filesystem(cli_path: &Path, backends: &mut Vec<String>) {
         PathBuf::from("/usr/lib/aarch64-linux-gnu/ggml"),
         PathBuf::from("/opt/homebrew/lib/ggml"),
     ];
+    let mut broad_lib_dirs = vec![
+        PathBuf::from("/usr/lib"),
+        PathBuf::from("/usr/lib64"),
+        PathBuf::from("/usr/local/lib"),
+        PathBuf::from("/usr/lib/x86_64-linux-gnu"),
+        PathBuf::from("/usr/lib/aarch64-linux-gnu"),
+    ];
 
-    if let Some(parent) = cli_path.parent() {
-        search_dirs.push(parent.to_path_buf());
-        search_dirs.push(parent.join("ggml"));
-        search_dirs.push(parent.join("../lib/ggml"));
+    for parent in collect_cli_parent_dirs(cli_path) {
+        push_unique_path(&mut search_dirs, parent.clone());
+        push_unique_path(&mut search_dirs, parent.join("ggml"));
+        push_unique_path(&mut search_dirs, parent.join("../lib/ggml"));
+        push_unique_path(&mut search_dirs, parent.join("../lib64/ggml"));
+        push_unique_path(&mut broad_lib_dirs, parent.join("../lib"));
+        push_unique_path(&mut broad_lib_dirs, parent.join("../lib64"));
     }
 
     if let Ok(env_path) = std::env::var("GGML_BACKEND_PATH") {
         for p in std::env::split_paths(&env_path) {
-            search_dirs.push(p);
+            push_unique_path(&mut search_dirs, p);
         }
     }
 
+    scan_plugin_dirs(&search_dirs, backends);
+    check_direct_plugins(&broad_lib_dirs, backends);
+}
+
+fn scan_plugin_dirs(search_dirs: &[PathBuf], backends: &mut Vec<String>) {
     for dir in search_dirs {
         if !dir.is_dir() {
             continue;
         }
         if let Ok(entries) = std::fs::read_dir(dir) {
             for entry in entries.flatten() {
-                let name = entry.file_name().to_string_lossy().to_string();
-                let lower = name.to_lowercase();
-                if lower.contains("ggml-vulkan") {
-                    add_backend_if_missing(backends, "Vulkan");
-                } else if lower.contains("ggml-openvino") {
-                    add_backend_if_missing(backends, "OpenVINO");
-                } else if lower.contains("ggml-cuda") {
-                    add_backend_if_missing(backends, "CUDA");
-                }
+                let lower = entry.file_name().to_string_lossy().to_ascii_lowercase();
+                match_backend_filename(&lower, backends);
             }
         }
+    }
+}
+
+fn check_direct_plugins(broad_lib_dirs: &[PathBuf], backends: &mut Vec<String>) {
+    const DIRECT_PLUGINS: &[(&str, &str)] = &[
+        ("libggml-vulkan.so", "Vulkan"),
+        ("libggml-openvino.so", "OpenVINO"),
+        ("libggml-cuda.so", "CUDA"),
+        ("ggml-vulkan.dll", "Vulkan"),
+        ("ggml-openvino.dll", "OpenVINO"),
+        ("ggml-cuda.dll", "CUDA"),
+    ];
+
+    for dir in broad_lib_dirs {
+        if !dir.is_dir() {
+            continue;
+        }
+        for (file, backend) in DIRECT_PLUGINS {
+            if dir.join(file).is_file() {
+                add_backend_if_missing(backends, backend);
+            }
+        }
+    }
+}
+
+#[cfg(any(target_os = "windows", test))]
+fn contains_ascii_ignore_case(haystack: &[u8], needle: &[u8]) -> bool {
+    if needle.is_empty() || haystack.len() < needle.len() {
+        return false;
+    }
+    haystack
+        .windows(needle.len())
+        .any(|win| win.eq_ignore_ascii_case(needle))
+}
+
+/// Scans PE imports/embedded DLL names on Windows to detect linked GPU backends.
+#[cfg(target_os = "windows")]
+fn probe_backends_via_windows_imports(cli_path: &Path, backends: &mut Vec<String>) {
+    const MAX_PE_SCAN_BYTES: u64 = 64 * 1024 * 1024;
+    let Ok(meta) = std::fs::metadata(cli_path) else {
+        return;
+    };
+    if meta.len() > MAX_PE_SCAN_BYTES {
+        return;
+    }
+    let Ok(bytes) = std::fs::read(cli_path) else {
+        return;
+    };
+    if contains_ascii_ignore_case(&bytes, b"ggml-vulkan.dll")
+        || contains_ascii_ignore_case(&bytes, b"vulkan-1.dll")
+    {
+        add_backend_if_missing(backends, "Vulkan");
+    }
+    if contains_ascii_ignore_case(&bytes, b"ggml-cuda.dll")
+        || contains_ascii_ignore_case(&bytes, b"cublas64_")
+        || contains_ascii_ignore_case(&bytes, b"cudart64_")
+    {
+        add_backend_if_missing(backends, "CUDA");
+    }
+    if contains_ascii_ignore_case(&bytes, b"ggml-openvino.dll")
+        || contains_ascii_ignore_case(&bytes, b"openvino.dll")
+    {
+        add_backend_if_missing(backends, "OpenVINO");
     }
 }
 
@@ -305,24 +448,65 @@ pub fn detect_system_backends(cli_path: &Path) -> Vec<String> {
     // 1. Standard (CPU) is always available when whisper-cli exists
     let mut backends = vec!["Standard".to_string()];
 
-    // 2. Multi-tier backend discovery
-    probe_backends_via_bench(cli_path, &mut backends);
+    // 2. Multi-tier backend discovery (filesystem plugins first, then CLI/bench/linkage probes)
     probe_backends_via_filesystem(cli_path, &mut backends);
+    probe_backends_via_cli_help(cli_path, &mut backends);
+    probe_backends_via_bench(cli_path, &mut backends);
 
     #[cfg(target_os = "linux")]
     probe_backends_via_ldd(cli_path, &mut backends);
 
+    #[cfg(target_os = "windows")]
+    probe_backends_via_windows_imports(cli_path, &mut backends);
+
     backends
+}
+
+fn read_valid_cached_system_cli() -> Option<(PathBuf, Vec<String>)> {
+    let stale = {
+        let lock = CACHED_WHISPER.read().ok()?;
+        let cache = lock.as_ref()?;
+        match (&cache.system_cli_path, &cache.system_backends) {
+            (Some(cli_path), Some(backends)) if cli_path.is_file() => {
+                return Some((cli_path.clone(), backends.clone()));
+            }
+            (Some(_), _) => true,
+            _ => false,
+        }
+    };
+    if stale {
+        invalidate_whisper_cache();
+    }
+    None
+}
+
+fn read_valid_cached_status(configured_source: &str, bundled_available: bool) -> Option<WhisperStatus> {
+    let stale = {
+        let lock = CACHED_WHISPER.read().ok()?;
+        let cache = lock.as_ref()?;
+        let st = cache.status.as_ref()?;
+        if st.is_available
+            && st.configured_source == configured_source
+            && st.bundled_available == bundled_available
+        {
+            if st.configured_source != "system" || Path::new(&st.resolved_path).is_file() {
+                return Some(st.clone());
+            }
+            true
+        } else {
+            false
+        }
+    };
+    if stale {
+        invalidate_whisper_cache();
+    }
+    None
 }
 
 /// Checks whether a specific backend is available on the system.
 pub fn is_system_backend_available(backend: &str) -> bool {
-    if let Ok(lock) = CACHED_WHISPER.read() {
-        if let Some(ref cache) = *lock {
-            if let Some(ref backends) = cache.system_backends {
-                return backends.iter().any(|b| b.eq_ignore_ascii_case(backend));
-            }
-        }
+    if let Some((_, backends)) = read_valid_cached_system_cli() {
+        return backends.iter().any(|b| b.eq_ignore_ascii_case(backend));
     }
 
     if let Some((cli_path, _)) = find_system_whisper_with_version() {
@@ -342,57 +526,61 @@ pub fn is_system_backend_available(backend: &str) -> bool {
     }
 }
 
-/// Resolves the whisper binary for execution based on active settings.
+/// Resolves the system whisper binary for execution, respecting an explicit source override
+/// (e.g. an in-memory fallback to `"system"`) when not forced by an unbundled build.
 pub fn resolve_whisper_binary_for_execution(
     _app: Option<&tauri::AppHandle>,
     backend: &str,
+    source_override: Option<&str>,
 ) -> Result<PathBuf, String> {
-    let settings = crate::settings::load_settings_file();
-    let source = settings.whisper_source.to_lowercase();
-
-    if source == "system" {
-        // Fast-path O(1): check cached resolution first
-        if let Ok(lock) = CACHED_WHISPER.read() {
-            if let Some(ref cache) = *lock {
-                if let (Some(ref cli_path), Some(ref backends)) = (&cache.system_cli_path, &cache.system_backends) {
-                    if backends.iter().any(|b| b.eq_ignore_ascii_case(backend)) {
-                        return Ok(cli_path.clone());
-                    }
-                }
-            }
-        }
-
-        if let Some((cli_path, _)) = find_system_whisper_with_version() {
-            let backends = detect_system_backends(&cli_path);
-            if !backends.iter().any(|b| b.eq_ignore_ascii_case(backend)) {
-                return Err(format!(
-                    "System whisper-cli does not support the '{backend}' backend. Installed backends: [{}]. Please install the required ggml backend package (e.g. 'ggml-vulkan', 'ggml-openvino', 'ggml-cuda') or select an available backend.",
-                    backends.join(", ")
-                ));
-            }
-
-            if let Ok(mut lock) = CACHED_WHISPER.write() {
-                let mut cache = lock.clone().unwrap_or_default();
-                cache.system_cli_path = Some(cli_path.clone());
-                cache.system_backends = Some(backends);
-                *lock = Some(cache);
-            }
-
-            Ok(cli_path)
-        } else {
-            Err("System whisper-cli is not found in PATH or not executable. Please install 'whisper-cpp' on your operating system or switch to 'Internal' in Configuration.".to_string())
-        }
+    let unbundled = crate::settings::is_unbundled_build();
+    let source = if unbundled {
+        "system".to_string()
+    } else if let Some(override_src) = source_override.filter(|s| !s.trim().is_empty()) {
+        override_src.to_lowercase()
     } else {
-        Err("Bundled mode must be resolved through app resources.".to_string())
+        crate::settings::load_settings_file().whisper_source.to_lowercase()
+    };
+
+    if source != "system" {
+        return Err("Bundled mode must be resolved through app resources.".to_string());
+    }
+
+    if let Some((cli_path, backends)) = read_valid_cached_system_cli() {
+        if backends.iter().any(|b| b.eq_ignore_ascii_case(backend)) {
+            return Ok(cli_path);
+        }
+    }
+
+    if let Some((cli_path, _)) = find_system_whisper_with_version() {
+        let backends = detect_system_backends(&cli_path);
+        if !backends.iter().any(|b| b.eq_ignore_ascii_case(backend)) {
+            return Err(format!(
+                "System whisper-cli does not support the '{backend}' backend. Installed backends: [{}]. Please install the required ggml backend package (e.g. 'ggml-vulkan', 'ggml-openvino', 'ggml-cuda') or select an available backend.",
+                backends.join(", ")
+            ));
+        }
+
+        if let Ok(mut lock) = CACHED_WHISPER.write() {
+            let mut cache = lock.clone().unwrap_or_default();
+            cache.system_cli_path = Some(cli_path.clone());
+            cache.system_backends = Some(backends);
+            *lock = Some(cache);
+        }
+
+        Ok(cli_path)
+    } else if unbundled {
+        Err("System whisper-cli was not found in PATH or standard install directories. Please install 'whisper-cpp' on your operating system.".to_string())
+    } else {
+        Err("System whisper-cli is not found in PATH or not executable. Please install 'whisper-cpp' on your operating system or switch to 'Internal' in Configuration.".to_string())
     }
 }
 
-/// Returns the live Whisper status for UI telemetry and settings without duplicate sub-processes.
-pub fn get_current_whisper_status(
-    _app: Option<&tauri::AppHandle>,
-    source_override: Option<String>,
-) -> WhisperStatus {
-    let configured_source = match &source_override {
+fn resolve_whisper_status_source(unbundled: bool, source_override: &Option<String>) -> String {
+    if unbundled {
+        return "system".to_string();
+    }
+    match source_override {
         Some(s) if !s.is_empty() => s.to_lowercase(),
         _ => {
             let settings = crate::settings::load_settings_file();
@@ -402,16 +590,23 @@ pub fn get_current_whisper_status(
                 settings.whisper_source.to_lowercase()
             }
         }
+    }
+}
+
+/// Returns the live Whisper status for UI telemetry and settings without duplicate sub-processes.
+pub fn get_current_whisper_status(
+    app: Option<&tauri::AppHandle>,
+    source_override: Option<String>,
+) -> WhisperStatus {
+    let unbundled = crate::settings::is_unbundled_build();
+    let configured_source = resolve_whisper_status_source(unbundled, &source_override);
+    let bundled_available = match app {
+        Some(a) => crate::builder::has_any_bundled_backend(a),
+        None => !unbundled,
     };
 
-    if let Ok(lock) = CACHED_WHISPER.read() {
-        if let Some(ref cache) = *lock {
-            if let Some(ref st) = cache.status {
-                if st.configured_source == configured_source {
-                    return st.clone();
-                }
-            }
-        }
+    if let Some(cached) = read_valid_cached_status(&configured_source, bundled_available) {
+        return cached;
     }
 
     let status = if configured_source == "system" {
@@ -421,6 +616,7 @@ pub fn get_current_whisper_status(
                 configured_source,
                 resolved_path: cli_path.display().to_string(),
                 is_available: true,
+                bundled_available,
                 version,
                 available_backends: backends,
                 error_message: None,
@@ -430,34 +626,54 @@ pub fn get_current_whisper_status(
                 configured_source,
                 resolved_path: "Not Found".to_string(),
                 is_available: false,
+                bundled_available,
                 version: "N/A".to_string(),
                 available_backends: Vec::new(),
-                error_message: Some("System whisper-cli was not found in PATH or is not executable.".to_string()),
+                error_message: Some("System whisper-cli was not found in PATH or standard install directories.".to_string()),
             }
         }
     } else {
-        // "bundled" mode
-        let mut bundled_backends = Vec::new();
-        for b in &["Standard", "Vulkan", "OpenVINO", "CUDA"] {
-            // Note: bundled checks are executed by builder::check_build_exists
-            bundled_backends.push(b.to_string());
-        }
+        // "bundled" mode (only reachable in bundled builds)
+        let bundled_backends: Vec<String> = match app {
+            Some(a) => ["Standard", "Vulkan", "OpenVINO", "CUDA"]
+                .iter()
+                .filter(|b| crate::builder::has_bundled_binary(a, b))
+                .map(|b| (*b).to_string())
+                .collect(),
+            None => vec![
+                "Standard".to_string(),
+                "Vulkan".to_string(),
+                "OpenVINO".to_string(),
+                "CUDA".to_string(),
+            ],
+        };
+        let is_available = !bundled_backends.is_empty();
 
         WhisperStatus {
             configured_source,
-            resolved_path: "Internal Resources".to_string(),
-            is_available: true,
-            version: "v1.9.5".to_string(),
+            resolved_path: if is_available { "Internal Resources".to_string() } else { "Not Bundled".to_string() },
+            is_available,
+            bundled_available,
+            version: if is_available { "v1.9.5".to_string() } else { "N/A".to_string() },
             available_backends: bundled_backends,
-            error_message: None,
+            error_message: if is_available {
+                None
+            } else {
+                Some("Bundled Whisper binaries are not present in this installation. Switch to System mode.".to_string())
+            },
         }
     };
 
     if let Ok(mut lock) = CACHED_WHISPER.write() {
         let mut cache = lock.clone().unwrap_or_default();
-        if status.is_available && status.configured_source == "system" {
-            cache.system_cli_path = Some(PathBuf::from(&status.resolved_path));
-            cache.system_backends = Some(status.available_backends.clone());
+        if status.configured_source == "system" {
+            if status.is_available {
+                cache.system_cli_path = Some(PathBuf::from(&status.resolved_path));
+                cache.system_backends = Some(status.available_backends.clone());
+            } else {
+                cache.system_cli_path = None;
+                cache.system_backends = None;
+            }
         }
         cache.status = Some(status.clone());
         *lock = Some(cache);
@@ -469,6 +685,9 @@ pub fn get_current_whisper_status(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    static TEST_CACHE_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn test_parse_whisper_version_standard_formats() {
@@ -504,6 +723,7 @@ mod tests {
 
     #[test]
     fn test_invalidate_whisper_cache() {
+        let _guard = TEST_CACHE_LOCK.lock().unwrap();
         if let Ok(mut lock) = CACHED_WHISPER.write() {
             let mut cache = WhisperCache::default();
             cache.system_cli_path = Some(PathBuf::from("/usr/bin/whisper-cli"));
@@ -516,11 +736,106 @@ mod tests {
     }
 
     #[test]
-    fn test_get_current_whisper_status_bundled() {
+    fn test_get_current_whisper_status_respects_build_mode() {
+        let _guard = TEST_CACHE_LOCK.lock().unwrap();
+        invalidate_whisper_cache();
         let status = get_current_whisper_status(None, Some("bundled".to_string()));
-        assert_eq!(status.configured_source, "bundled");
-        assert!(status.is_available);
-        assert!(status.available_backends.contains(&"Standard".to_string()));
+        if crate::settings::is_unbundled_build() {
+            assert_eq!(status.configured_source, "system");
+            assert!(!status.bundled_available);
+        } else {
+            assert_eq!(status.configured_source, "bundled");
+            assert!(status.bundled_available);
+            assert!(status.is_available);
+            assert!(status.available_backends.contains(&"Standard".to_string()));
+        }
+    }
+
+    #[test]
+    fn test_contains_ascii_ignore_case_and_parse_backend_output() {
+        assert!(contains_ascii_ignore_case(b"foo GGML-Vulkan.DLL bar", b"ggml-vulkan.dll"));
+        assert!(!contains_ascii_ignore_case(b"cpu only", b"cublas64_"));
+
+        let mut backends = vec!["Standard".to_string()];
+        parse_backend_output("usage: --ov-e-device CPU", &mut backends);
+        assert!(backends.contains(&"OpenVINO".to_string()));
+    }
+
+    #[test]
+    fn test_stale_cache_is_evicted_when_cached_cli_disappears() {
+        let _guard = TEST_CACHE_LOCK.lock().unwrap();
+        invalidate_whisper_cache();
+
+        let missing_path = std::env::temp_dir().join(format!(
+            "whisper_missing_cli_test_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        let missing_str = missing_path.display().to_string();
+
+        if let Ok(mut lock) = CACHED_WHISPER.write() {
+            let mut cache = WhisperCache::default();
+            cache.system_cli_path = Some(missing_path.clone());
+            cache.system_backends = Some(vec!["Standard".to_string(), "Vulkan".to_string()]);
+            cache.status = Some(WhisperStatus {
+                configured_source: "system".to_string(),
+                resolved_path: missing_str,
+                is_available: true,
+                bundled_available: false,
+                version: "v1.9.5".to_string(),
+                available_backends: vec!["Standard".to_string(), "Vulkan".to_string()],
+                error_message: None,
+            });
+            *lock = Some(cache);
+        }
+
+        assert!(read_valid_cached_system_cli().is_none());
+        assert!(read_valid_cached_status("system", false).is_none());
+        assert!(CACHED_WHISPER.read().unwrap().is_none());
+    }
+
+    #[test]
+    fn test_resolve_whisper_binary_respects_source_override() {
+        let _guard = TEST_CACHE_LOCK.lock().unwrap();
+        invalidate_whisper_cache();
+
+        let res = resolve_whisper_binary_for_execution(None, "Standard", Some("bundled"));
+        if crate::settings::is_unbundled_build() {
+            // Unbundled build always forces system resolution regardless of override
+            if let Err(err) = res {
+                assert!(!err.contains("Bundled mode must be resolved through app resources"));
+            }
+        } else {
+            assert_eq!(
+                res.unwrap_err(),
+                "Bundled mode must be resolved through app resources."
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_probe_backends_via_filesystem_follows_symlink_parent_dir() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let real_bin_dir = temp_dir.path().join("opt").join("bin");
+        let link_bin_dir = temp_dir.path().join("local").join("bin");
+        std::fs::create_dir_all(&real_bin_dir).unwrap();
+        std::fs::create_dir_all(&link_bin_dir).unwrap();
+
+        let real_cli = real_bin_dir.join("whisper-cli");
+        let plugin_so = real_bin_dir.join("libggml-vulkan.so");
+        std::fs::write(&real_cli, b"cli").unwrap();
+        std::fs::write(&plugin_so, b"so").unwrap();
+
+        let link_cli = link_bin_dir.join("whisper-cli");
+        std::os::unix::fs::symlink(&real_cli, &link_cli).unwrap();
+
+        let mut backends = vec!["Standard".to_string()];
+        probe_backends_via_filesystem(&link_cli, &mut backends);
+        assert!(backends.contains(&"Vulkan".to_string()));
     }
 }
 

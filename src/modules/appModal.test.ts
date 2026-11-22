@@ -16,8 +16,10 @@ import {
   renderUpdateCheckerUI,
   getUpdateCheckerState,
   resetUpdateCheckerState,
+  syncAppVersionUI,
   _handleShortcutsModalKeydown
 } from './appModal';
+import { setLatestWhisperEngineStatus } from './transcribeDeckHost';
 
 // Resilient headless DOM mock for Node Vitest runner
 class MockNode {
@@ -972,6 +974,55 @@ describe('appModal & Feedback Module', () => {
       expect(typeof (window as any).showBatchErrorDialog).toBe('function');
       expect(typeof (window as any).openShortcutsModal).toBe('function');
       expect(typeof (window as any).closeShortcutsModal).toBe('function');
+    });
+  });
+
+  describe('syncAppVersionUI live whisper version in Lite/system mode', () => {
+    it('shows system whisper-cli version in About modal when unbundled or running system source', () => {
+      const whisperEl = document.createElement('span');
+      whisperEl.id = 'about-whisper-version-text';
+      document.body.appendChild(whisperEl);
+
+      try {
+        setLatestWhisperEngineStatus({
+          configuredSource: 'system',
+          resolvedPath: '/usr/bin/whisper-cli',
+          isAvailable: true,
+          bundledAvailable: false,
+          version: 'whisper.cpp version: 1.9.5-dev',
+          availableBackends: ['Standard', 'Vulkan'],
+          errorMessage: null
+        });
+        syncAppVersionUI();
+        expect(whisperEl.textContent).toBe('v1.9.5-dev (System)');
+
+        setLatestWhisperEngineStatus({
+          configuredSource: 'system',
+          resolvedPath: 'Not Found',
+          isAvailable: false,
+          bundledAvailable: false,
+          version: 'N/A',
+          availableBackends: [],
+          errorMessage: 'Missing'
+        });
+        syncAppVersionUI();
+        expect(whisperEl.textContent).toBe('System (Not Found)');
+
+        setLatestWhisperEngineStatus({
+          configuredSource: 'bundled',
+          resolvedPath: 'Internal Resources',
+          isAvailable: true,
+          bundledAvailable: true,
+          version: 'v1.9.5',
+          availableBackends: ['Standard'],
+          errorMessage: null
+        });
+        syncAppVersionUI();
+        expect(whisperEl.textContent).toBe('v1.7.4');
+      } finally {
+        setLatestWhisperEngineStatus(null);
+        whisperEl.remove();
+      }
     });
   });
 });

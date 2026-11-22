@@ -470,6 +470,10 @@
   line-height: 1.5;
 }
 
+.setting-desc-points.is-unbundled .setting-desc-point:first-child {
+  display: none;
+}
+
 .setting-desc-point::before {
   content: '';
   display: inline-block;

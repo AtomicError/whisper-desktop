@@ -559,11 +559,16 @@ pub async fn run_transcription(
     let backend_name = settings.selected_backend.to_lowercase();
     let exe_ext = std::env::consts::EXE_SUFFIX;
     let bin_name = format!("whisper-cli-{}{}", backend_name, exe_ext);
-    let is_system_source = settings.whisper_source.eq_ignore_ascii_case("system");
+    let is_system_source = settings.whisper_source.eq_ignore_ascii_case("system")
+        || crate::settings::is_unbundled_build();
 
     use tauri::Manager;
     let bin_path = if is_system_source {
-        crate::whisper_resolver::resolve_whisper_binary_for_execution(Some(&app), &settings.selected_backend)?
+        crate::whisper_resolver::resolve_whisper_binary_for_execution(
+            Some(&app),
+            &settings.selected_backend,
+            Some("system"),
+        )?
     } else {
         let mut resolved_bin: Option<std::path::PathBuf> = None;
         let candidates = compute_bin_candidate_rel_paths(&settings.selected_backend, exe_ext);
@@ -879,17 +884,32 @@ pub async fn run_transcription(
         .stderr(Stdio::piped())
         .kill_on_drop(true);
 
+    let canonical_bin_dir = if is_system_source {
+        std::fs::canonicalize(&bin_path)
+            .ok()
+            .and_then(|p| p.parent().map(Path::to_path_buf))
+    } else {
+        None
+    };
+
     if let Some(bin_dir) = bin_path.parent() {
-        cmd.current_dir(bin_dir);
+        let effective_bin_dir = canonical_bin_dir.as_deref().unwrap_or(bin_dir);
+        cmd.current_dir(effective_bin_dir);
 
         #[cfg(target_os = "windows")]
         {
             if let Some(old_path) = std::env::var_os("PATH") {
                 let mut paths = std::env::split_paths(&old_path).collect::<Vec<_>>();
-                paths.insert(0, bin_dir.to_path_buf());
-                if let Some(parent) = bin_dir.parent() {
-                    if !paths.contains(&parent.to_path_buf()) {
-                        paths.insert(1, parent.to_path_buf());
+                for dir in [effective_bin_dir, bin_dir] {
+                    let buf = dir.to_path_buf();
+                    if !paths.contains(&buf) {
+                        paths.insert(0, buf);
+                    }
+                    if let Some(parent) = dir.parent() {
+                        let parent_buf = parent.to_path_buf();
+                        if !paths.contains(&parent_buf) {
+                            paths.insert(1.min(paths.len()), parent_buf);
+                        }
                     }
                 }
                 if let Ok(new_path) = std::env::join_paths(paths) {
@@ -900,32 +920,90 @@ pub async fn run_transcription(
 
         #[cfg(unix)]
         {
-            let mut paths = Vec::new();
-            paths.push(bin_dir.to_path_buf());
-            if let Some(parent) = bin_dir.parent() {
-                if !paths.contains(&parent.to_path_buf()) {
-                    paths.push(parent.to_path_buf());
-                }
-            }
-            if let Some(ref orig) = orig_bin_dir {
-                if !paths.contains(orig) {
-                    paths.push(orig.clone());
-                }
-                if let Some(orig_parent) = orig.parent() {
-                    if !paths.contains(&orig_parent.to_path_buf()) {
-                        paths.push(orig_parent.to_path_buf());
+            if is_system_source {
+                #[cfg(target_os = "linux")]
+                {
+                    let is_standard_bin_dir = effective_bin_dir == Path::new("/usr/bin")
+                        || effective_bin_dir == Path::new("/bin")
+                        || effective_bin_dir == Path::new("/usr/local/bin");
+                    if !is_standard_bin_dir {
+                        let mut paths = Vec::new();
+                        for dir in [effective_bin_dir, bin_dir] {
+                            let buf = dir.to_path_buf();
+                            if !paths.contains(&buf) {
+                                paths.push(buf);
+                            }
+                            if let Some(parent) = dir.parent() {
+                                for rel in ["lib", "lib64"] {
+                                    let candidate_lib = parent.join(rel);
+                                    if candidate_lib.is_dir() && !paths.contains(&candidate_lib) {
+                                        paths.push(candidate_lib);
+                                    }
+                                }
+                            }
+                        }
+                        if let Some(clean_ld) = crate::get_clean_host_ld_library_path() {
+                            for p in std::env::split_paths(&clean_ld) {
+                                if !paths.contains(&p) {
+                                    paths.push(p);
+                                }
+                            }
+                        }
+                        if let Ok(new_ld) = std::env::join_paths(paths) {
+                            cmd.env("LD_LIBRARY_PATH", new_ld);
+                        }
                     }
                 }
-            }
-            if let Some(old_ld) = std::env::var_os("LD_LIBRARY_PATH") {
-                for p in std::env::split_paths(&old_ld) {
-                    if !paths.contains(&p) {
-                        paths.push(p);
+                #[cfg(not(target_os = "linux"))]
+                {
+                    let mut paths = vec![effective_bin_dir.to_path_buf()];
+                    if bin_dir != effective_bin_dir {
+                        paths.push(bin_dir.to_path_buf());
+                    }
+                    if let Some(parent) = effective_bin_dir.parent() {
+                        if !paths.contains(&parent.to_path_buf()) {
+                            paths.push(parent.to_path_buf());
+                        }
+                    }
+                    if let Some(old_ld) = std::env::var_os("LD_LIBRARY_PATH") {
+                        for p in std::env::split_paths(&old_ld) {
+                            if !paths.contains(&p) {
+                                paths.push(p);
+                            }
+                        }
+                    }
+                    if let Ok(new_ld) = std::env::join_paths(paths) {
+                        cmd.env("LD_LIBRARY_PATH", new_ld);
                     }
                 }
-            }
-            if let Ok(new_ld) = std::env::join_paths(paths) {
-                cmd.env("LD_LIBRARY_PATH", new_ld);
+            } else {
+                let mut paths = Vec::new();
+                paths.push(bin_dir.to_path_buf());
+                if let Some(parent) = bin_dir.parent() {
+                    if !paths.contains(&parent.to_path_buf()) {
+                        paths.push(parent.to_path_buf());
+                    }
+                }
+                if let Some(ref orig) = orig_bin_dir {
+                    if !paths.contains(orig) {
+                        paths.push(orig.clone());
+                    }
+                    if let Some(orig_parent) = orig.parent() {
+                        if !paths.contains(&orig_parent.to_path_buf()) {
+                            paths.push(orig_parent.to_path_buf());
+                        }
+                    }
+                }
+                if let Some(old_ld) = std::env::var_os("LD_LIBRARY_PATH") {
+                    for p in std::env::split_paths(&old_ld) {
+                        if !paths.contains(&p) {
+                            paths.push(p);
+                        }
+                    }
+                }
+                if let Ok(new_ld) = std::env::join_paths(paths) {
+                    cmd.env("LD_LIBRARY_PATH", new_ld);
+                }
             }
         }
 
@@ -933,8 +1011,8 @@ pub async fn run_transcription(
         {
             if let Some(old_dyld) = std::env::var_os("DYLD_LIBRARY_PATH") {
                 let mut dyld_paths = std::env::split_paths(&old_dyld).collect::<Vec<_>>();
-                dyld_paths.insert(0, bin_dir.to_path_buf());
-                if let Some(parent) = bin_dir.parent() {
+                dyld_paths.insert(0, effective_bin_dir.to_path_buf());
+                if let Some(parent) = effective_bin_dir.parent() {
                     if !dyld_paths.contains(&parent.to_path_buf()) {
                         dyld_paths.insert(1, parent.to_path_buf());
                     }
@@ -943,7 +1021,7 @@ pub async fn run_transcription(
                     cmd.env("DYLD_LIBRARY_PATH", new_dyld);
                 }
             } else {
-                cmd.env("DYLD_LIBRARY_PATH", bin_dir);
+                cmd.env("DYLD_LIBRARY_PATH", effective_bin_dir);
             }
         }
     }
@@ -953,16 +1031,29 @@ pub async fn run_transcription(
         cmd.process_group(0);
     }
 
+    let display_bin = if is_system_source {
+        bin_path.display().to_string()
+    } else {
+        bin_name.clone()
+    };
+
     let mut child = cmd.spawn()
         .map_err(|e| {
             let err_str = e.to_string();
             if err_str.contains("Exec format error") || e.raw_os_error() == Some(8) {
-                format!(
-                    "Failed to spawn Whisper process: Exec format error (OS error 8). The binary '{}' is a placeholder or corrupted file, not a valid executable. Please place a compiled whisper-cli binary in src-tauri/resources/.",
-                    bin_name
-                )
+                if is_system_source {
+                    format!(
+                        "Failed to spawn Whisper process: Exec format error (OS error 8). The system binary '{}' is invalid or compiled for an incompatible architecture.",
+                        display_bin
+                    )
+                } else {
+                    format!(
+                        "Failed to spawn Whisper process: Exec format error (OS error 8). The binary '{}' is a placeholder or corrupted file, not a valid executable. Please place a compiled whisper-cli binary in src-tauri/resources/.",
+                        bin_name
+                    )
+                }
             } else {
-                format!("Failed to spawn Whisper process ({}): {}", bin_name, e)
+                format!("Failed to spawn Whisper process ({}): {}", display_bin, e)
             }
         })?;
         
@@ -1075,9 +1166,10 @@ pub async fn run_transcription(
 
             let detailed_err = format_cli_exit_error(
                 &settings.selected_backend,
-                &bin_name,
+                &display_bin,
                 &settings.model_path,
                 status.code(),
+                is_system_source,
             );
             return Err(detailed_err);
         }
@@ -1351,6 +1443,7 @@ pub fn format_cli_exit_error(
     bin_name: &str,
     model_path: &str,
     exit_code: Option<i32>,
+    is_system_source: bool,
 ) -> String {
     let backend_display = match selected_backend {
         "Standard" => "CPU",
@@ -1375,10 +1468,17 @@ pub fn format_cli_exit_error(
                     bin_name
                 )
             } else if backend_lower == "openvino" {
-                format!(
-                    "OpenVINO Runtime Missing: Required OpenVINO/TBB DLLs were not found for '{}' in resources.",
-                    bin_name
-                )
+                if is_system_source {
+                    format!(
+                        "OpenVINO Runtime Missing: Required OpenVINO/TBB DLLs were not found for system '{}'. Please ensure OpenVINO runtime libraries are installed and accessible.",
+                        bin_name
+                    )
+                } else {
+                    format!(
+                        "OpenVINO Runtime Missing: Required OpenVINO/TBB DLLs were not found for '{}' in resources.",
+                        bin_name
+                    )
+                }
             } else if backend_lower == "cuda" {
                 format!(
                     "CUDA Runtime Missing: Required NVIDIA CUDA/cuBLAS DLLs were not found for '{}'.",
@@ -1415,29 +1515,34 @@ mod tests {
     #[test]
     fn test_format_cli_exit_error_all_cases() {
         // Vulkan missing DLL
-        let err_vulkan_dll = format_cli_exit_error("Vulkan", "whisper-cli-vulkan.exe", "ggml-base.bin", Some(-1073741515));
+        let err_vulkan_dll = format_cli_exit_error("Vulkan", "whisper-cli-vulkan.exe", "ggml-base.bin", Some(-1073741515), false);
         assert!(err_vulkan_dll.contains("Vulkan Runtime Missing"));
         assert!(err_vulkan_dll.contains("vulkan-1.dll"));
 
-        // OpenVINO missing DLL
-        let err_ov_dll = format_cli_exit_error("OpenVINO", "whisper-cli-openvino.exe", "ggml-base.bin", Some(-1073741515));
+        // OpenVINO missing DLL (bundled vs system wording)
+        let err_ov_dll = format_cli_exit_error("OpenVINO", "whisper-cli-openvino.exe", "ggml-base.bin", Some(-1073741515), false);
         assert!(err_ov_dll.contains("OpenVINO Runtime Missing"));
+        assert!(err_ov_dll.contains("in resources"));
+
+        let err_ov_sys_dll = format_cli_exit_error("OpenVINO", "C:\\whisper\\whisper-cli.exe", "ggml-base.bin", Some(-1073741515), true);
+        assert!(err_ov_sys_dll.contains("OpenVINO Runtime Missing"));
+        assert!(!err_ov_sys_dll.contains("in resources"));
 
         // CUDA missing DLL
-        let err_cuda_dll = format_cli_exit_error("CUDA", "whisper-cli-cuda.exe", "ggml-base.bin", Some(-1073741515));
+        let err_cuda_dll = format_cli_exit_error("CUDA", "whisper-cli-cuda.exe", "ggml-base.bin", Some(-1073741515), false);
         assert!(err_cuda_dll.contains("CUDA Runtime Missing"));
 
         // CPU illegal instruction (AVX2 incompatibility)
-        let err_cpu_illegal = format_cli_exit_error("Standard", "whisper-cli-standard.exe", "ggml-base.bin", Some(-1073741795));
+        let err_cpu_illegal = format_cli_exit_error("Standard", "whisper-cli-standard.exe", "ggml-base.bin", Some(-1073741795), false);
         assert!(err_cpu_illegal.contains("CPU Instruction Incompatibility"));
         assert!(err_cpu_illegal.contains("AVX2/FMA"));
 
         // Model / GPU init error (exit code 10)
-        let err_code_10 = format_cli_exit_error("Vulkan", "whisper-cli-vulkan.exe", "ggml-base.bin", Some(10));
+        let err_code_10 = format_cli_exit_error("Vulkan", "whisper-cli-vulkan.exe", "ggml-base.bin", Some(10), false);
         assert!(err_code_10.contains("exit code 10"));
 
         // Access violation
-        let err_access_viol = format_cli_exit_error("Standard", "whisper-cli-standard.exe", "ggml-base.bin", Some(-1073741819));
+        let err_access_viol = format_cli_exit_error("Standard", "whisper-cli-standard.exe", "ggml-base.bin", Some(-1073741819), false);
         assert!(err_access_viol.contains("STATUS_ACCESS_VIOLATION"));
     }
 

@@ -83,6 +83,42 @@ export interface BatchDurationItem {
   durationSec?: number | null;
 }
 
+export interface EngineBinaryStatus {
+  configuredSource: string;
+  resolvedPath: string;
+  isAvailable: boolean;
+  bundledAvailable?: boolean;
+  version: string;
+  availableBackends?: string[];
+  errorMessage?: string | null;
+}
+
+let latestWhisperEngineStatus: EngineBinaryStatus | null = null;
+
+export function setLatestWhisperEngineStatus(status: EngineBinaryStatus | null): void {
+  latestWhisperEngineStatus = status;
+}
+
+export function getLatestWhisperEngineStatus(): EngineBinaryStatus | null {
+  return latestWhisperEngineStatus;
+}
+
+export function formatWhisperEngineVersion(versionStr?: string | null): string {
+  if (!versionStr || versionStr === 'Unknown version' || versionStr === 'N/A') {
+    return 'Ready';
+  }
+  const match = versionStr.match(/version:\s*([^\s]+)/i) || versionStr.match(/version\s+([^\s]+)/i);
+  const raw = match ? match[1] : versionStr.trim();
+  if (raw.startsWith('v') || raw.startsWith('V')) {
+    return raw;
+  }
+  const semverMatch = raw.match(/^(\d+(\.\d+)+)/);
+  if (semverMatch) {
+    return `v${raw}`;
+  }
+  return raw.length > 0 ? raw : 'Ready';
+}
+
 export interface TranscribeDeckHost {
   getSettingsState: () => SettingsState | null;
   getCompiledBackends: () => Record<string, boolean>;

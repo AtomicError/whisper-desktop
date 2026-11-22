@@ -1,5 +1,6 @@
 // System Feedback, Toasts, Focus Trap, Confirmation & About Modals, and Online Update Checker
 import { t } from '../i18n/index';
+import { getLatestWhisperEngineStatus, formatWhisperEngineVersion } from './transcribeDeckHost';
 
 if (typeof window === 'undefined') {
   (globalThis as any).window = globalThis;
@@ -1019,9 +1020,26 @@ export function syncAppVersionUI(): void {
     const modalVer = document.getElementById('about-modal-version-text');
     if (modalVer && ver) modalVer.textContent = ver.startsWith('v') ? ver : `v${ver}`;
 
-    const whisperVer = typeof __WHISPER_CPP_VERSION__ !== 'undefined' ? __WHISPER_CPP_VERSION__ : 'v1.7.4';
+    const liveWhisper = getLatestWhisperEngineStatus();
+    const useLiveWhisper = liveWhisper && (liveWhisper.bundledAvailable === false || liveWhisper.configuredSource === 'system');
     const whisperEl = document.getElementById('about-whisper-version-text');
-    if (whisperEl && whisperVer) whisperEl.textContent = whisperVer.startsWith('v') ? whisperVer : `v${whisperVer}`;
+    if (whisperEl) {
+      if (useLiveWhisper) {
+        const sysLabel = t('settings.whisperSystem') || 'System';
+        if (liveWhisper.isAvailable) {
+          const cleaned = formatWhisperEngineVersion(liveWhisper.version);
+          whisperEl.textContent = `${cleaned} (${sysLabel})`;
+        } else {
+          const missingLabel = t('settings.engineMissingBadge') || 'Not Found';
+          whisperEl.textContent = `${sysLabel} (${missingLabel})`;
+        }
+      } else {
+        const whisperVer = typeof __WHISPER_CPP_VERSION__ !== 'undefined' ? __WHISPER_CPP_VERSION__ : 'v1.7.4';
+        if (whisperVer) {
+          whisperEl.textContent = whisperVer.startsWith('v') ? whisperVer : `v${whisperVer}`;
+        }
+      }
+    }
 
     renderUpdateCheckerUI();
   } catch (_) {}

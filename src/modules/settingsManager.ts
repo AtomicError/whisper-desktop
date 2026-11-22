@@ -29,6 +29,10 @@ import {
 } from './confidenceHelpers';
 import {
   registerTranscribeDeckHost,
+  setLatestWhisperEngineStatus,
+  getLatestWhisperEngineStatus,
+  formatWhisperEngineVersion,
+  type EngineBinaryStatus,
   type SettingsState
 } from './transcribeDeckHost';
 import {
@@ -188,6 +192,23 @@ export let activeSettingsCat: string = 'app';
 export let localScannedTransModels: string[] = [];
 export let localScannedVadModels: string[] = [];
 
+let ffmpegBundledAvailable: boolean | null = null;
+let whisperBundledAvailable: boolean | null = null;
+let latestFFmpegStatus: EngineBinaryStatus | null = null;
+let whisperEngineDetected = true;
+
+export function isFfmpegBundledAvailable(): boolean {
+  return ffmpegBundledAvailable !== false;
+}
+
+export function isWhisperBundledAvailable(): boolean {
+  return whisperBundledAvailable !== false;
+}
+
+export function isWhisperEngineDetected(): boolean {
+  return whisperEngineDetected;
+}
+
 export function getSettingsState(): SettingsState | null {
   const win = getGlobal();
   if (win && win.settingsState !== undefined) {
@@ -342,6 +363,8 @@ export async function refreshBuildStatuses(): Promise<void> {
       availableBackends.push(b);
     }
   }
+
+  whisperEngineDetected = availableBackends.length > 0;
 
   // Fallback to Standard CPU if no binaries reported compiled (defensive)
   if (availableBackends.length === 0) {
@@ -1285,6 +1308,197 @@ export function formatFFmpegVersion(versionStr?: string | null): string {
   return 'Ready';
 }
 
+function escapeStatusText(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function renderEngineMissingBadge(badgeEl: HTMLElement, title: string): void {
+  const missingLabel = escapeStatusText(t('settings.engineMissingBadge') || 'Not Found');
+  badgeEl.className = 'setting-status-pill missing';
+  badgeEl.innerHTML = `<span class="ffmpeg-status-dot red"></span> ${missingLabel}`;
+  badgeEl.title = title;
+}
+
+function syncEngineSourceControl(
+  selectId: string,
+  pointsId: string,
+  internalI18nKey: string,
+  settingKey: 'ffmpegSource' | 'whisperSource',
+  info: EngineBinaryStatus | null
+): void {
+  if (typeof document === 'undefined' || !info) return;
+  const bundledSupported = info.bundledAvailable !== false;
+  const pointsEl = document.getElementById(pointsId);
+  if (pointsEl) {
+    pointsEl.classList.toggle('is-unbundled', !bundledSupported);
+  }
+
+  const selectEl = document.getElementById(selectId) as HTMLSelectElement | null;
+  if (!selectEl) return;
+
+  const opts = Array.from(selectEl.options || []);
+  const bundledOpt = opts.find(opt => opt.value === 'bundled') || null;
+  const notBundledHint = t('settings.engineNotBundledShort') || 'Not bundled';
+  const internalLabel = t(internalI18nKey) || 'Internal';
+
+  if (bundledOpt) {
+    bundledOpt.disabled = !bundledSupported;
+    bundledOpt.textContent = bundledSupported ? internalLabel : `${internalLabel} (${notBundledHint})`;
+  }
+
+  if (!bundledSupported) {
+    selectEl.value = 'system';
+    const current = getSettingsState();
+    if (current && current[settingKey] !== 'system') {
+      current[settingKey] = 'system';
+    }
+  }
+
+  const win = getGlobal();
+  if (typeof win?.syncCustomSelects === 'function') {
+    win.syncCustomSelects(true, true);
+  }
+}
+
+export function resyncEngineSourceControls(): void {
+  syncEngineSourceControl(
+    'opt-ffmpegSource',
+    'ffmpeg-source-points',
+    'settings.ffmpegInternal',
+    'ffmpegSource',
+    latestFFmpegStatus
+  );
+  const latestWhisper = getLatestWhisperEngineStatus();
+  syncEngineSourceControl(
+    'opt-whisperSource',
+    'whisper-source-points',
+    'settings.whisperInternal',
+    'whisperSource',
+    latestWhisper
+  );
+
+  if (typeof document !== 'undefined') {
+    const ffBadge = document.getElementById('ffmpeg-status-badge');
+    if (ffBadge && latestFFmpegStatus && !latestFFmpegStatus.isAvailable) {
+      renderEngineMissingBadge(ffBadge, latestFFmpegStatus.errorMessage || 'FFmpeg binary was not found');
+    }
+    const wBadge = document.getElementById('whisper-status-badge');
+    if (wBadge && latestWhisper && !latestWhisper.isAvailable) {
+      renderEngineMissingBadge(wBadge, latestWhisper.errorMessage || 'System whisper-cli binary was not found');
+    }
+  }
+}
+
+function navigateToEngineSettings(category: 'app' | 'transcription' = 'app'): void {
+  const win = getGlobal();
+  if (typeof win?.switchView === 'function') {
+    win.switchView('settings');
+  }
+  switchSettingsCategory(category);
+}
+
+async function checkSystemFfmpegPreflight(source: string): Promise<boolean> {
+  try {
+    const ffStatus = await invoke('get_ffmpeg_status', { source });
+    if (ffStatus && typeof ffStatus.isAvailable === 'boolean' && !ffStatus.isAvailable) {
+      const toastKey = ffStatus.bundledAvailable === false ? 'toasts.ffmpegNotFoundSystem' : 'toasts.ffmpegNotFound';
+      showNotification(t(toastKey), 'error');
+      void refreshFFmpegStatus(source, false);
+      navigateToEngineSettings('app');
+      return false;
+    }
+    if (latestFFmpegStatus && !latestFFmpegStatus.isAvailable) {
+      void refreshFFmpegStatus(source, false);
+    }
+  } catch {
+    // Defer to backend execution if telemetry probe is mocked or unavailable
+  }
+  return true;
+}
+
+function shouldRefreshRecoveredWhisperState(backend: string): boolean {
+  const cachedWhisper = getLatestWhisperEngineStatus();
+  if (!cachedWhisper) return false;
+  if (!cachedWhisper.isAvailable) return true;
+  if (Array.isArray(cachedWhisper.availableBackends)) {
+    const previouslyHadBackend = cachedWhisper.availableBackends.some(
+      (b: string) => b.toLowerCase() === backend.toLowerCase()
+    );
+    if (!previouslyHadBackend) return true;
+  }
+  const activeCompiled = getCompiledBackends() || {};
+  return backend !== 'Standard' && activeCompiled[backend] === false;
+}
+
+async function checkSystemWhisperPreflight(source: string, backend: string): Promise<boolean> {
+  try {
+    const wStatus = await invoke('get_whisper_status', { source });
+    if (!wStatus || typeof wStatus.isAvailable !== 'boolean') {
+      return true;
+    }
+    if (!wStatus.isAvailable) {
+      const toastKey = wStatus.bundledAvailable === false ? 'toasts.whisperNotFoundSystem' : 'toasts.whisperNotFound';
+      showNotification(t(toastKey), 'error');
+      void refreshWhisperStatus(source, false);
+      navigateToEngineSettings('app');
+      return false;
+    }
+    if (
+      Array.isArray(wStatus.availableBackends) &&
+      !wStatus.availableBackends.some((b: string) => b.toLowerCase() === backend.toLowerCase())
+    ) {
+      showNotification(t('toasts.backendNotFound', { backend }), 'error');
+      void refreshWhisperStatus(source, false);
+      navigateToEngineSettings('transcription');
+      return false;
+    }
+    if (shouldRefreshRecoveredWhisperState(backend)) {
+      void refreshWhisperStatus(source, false);
+      void refreshBuildStatuses();
+    }
+  } catch {
+    // Defer to backend execution if telemetry probe is mocked or unavailable
+  }
+  return true;
+}
+
+export async function validateExecutionEnginesPreflight(backend: string): Promise<boolean> {
+  const currentSettings = getSettingsState();
+  const win = getGlobal();
+  const activeCompiled = (typeof getCompiledBackends === 'function' ? getCompiledBackends() : win?.compiledBackends) || {};
+  const forceSystemFfmpeg = !isFfmpegBundledAvailable() || currentSettings?.ffmpegSource === 'system';
+  const forceSystemWhisper = !isWhisperBundledAvailable() || currentSettings?.whisperSource === 'system' || !isWhisperEngineDetected();
+
+  if (!forceSystemWhisper) {
+    const isCompiled = backend === 'Standard' || Boolean(activeCompiled[backend]);
+    if (!isCompiled) {
+      showNotification(t('toasts.backendNotFound', { backend }), 'error');
+      navigateToEngineSettings('transcription');
+      return false;
+    }
+  }
+
+  if (forceSystemFfmpeg) {
+    const ffSource = isFfmpegBundledAvailable() ? (currentSettings?.ffmpegSource || 'bundled') : 'system';
+    if (!(await checkSystemFfmpegPreflight(ffSource))) {
+      return false;
+    }
+  }
+
+  if (forceSystemWhisper) {
+    const wSource = isWhisperBundledAvailable() ? (currentSettings?.whisperSource || 'bundled') : 'system';
+    if (!(await checkSystemWhisperPreflight(wSource, backend))) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 export async function refreshFFmpegStatus(sourceOverride?: string, userInitiated = false): Promise<void> {
   if (typeof document === 'undefined') return;
   const badgeEl = document.getElementById('ffmpeg-status-badge');
@@ -1294,18 +1508,28 @@ export async function refreshFFmpegStatus(sourceOverride?: string, userInitiated
   const currentSource = sourceOverride || (current ? current.ffmpegSource : 'bundled');
 
   try {
-    const info = await invoke('get_ffmpeg_status', { source: currentSource });
+    const info: EngineBinaryStatus = await invoke('get_ffmpeg_status', { source: currentSource });
+    latestFFmpegStatus = info;
+    ffmpegBundledAvailable = info.bundledAvailable !== false;
+    syncEngineSourceControl(
+      'opt-ffmpegSource',
+      'ffmpeg-source-points',
+      'settings.ffmpegInternal',
+      'ffmpegSource',
+      info
+    );
+
     if (info.isAvailable) {
-      const verFormatted = formatFFmpegVersion(info.version);
+      const safeVer = escapeStatusText(formatFFmpegVersion(info.version));
       badgeEl.className = 'setting-status-pill ready';
-      badgeEl.innerHTML = `<span class="ffmpeg-status-dot blue"></span> ${verFormatted}`;
+      badgeEl.innerHTML = `<span class="ffmpeg-status-dot blue"></span> ${safeVer}`;
       badgeEl.title = `Source: ${info.configuredSource}\nPath: ${isolateLtr(info.resolvedPath)}\n${info.version}`;
     } else {
-      badgeEl.className = 'setting-status-pill missing';
-      badgeEl.innerHTML = `<span class="ffmpeg-status-dot red"></span> Not Found`;
-      badgeEl.title = info.errorMessage || 'FFmpeg binary was not found';
-      if (currentSource === 'system' && userInitiated) {
-        showNotification(t('toasts.ffmpegNotFound'), "warning");
+      renderEngineMissingBadge(badgeEl, info.errorMessage || 'FFmpeg binary was not found');
+      const resolvedSource = info.configuredSource || currentSource;
+      if (resolvedSource === 'system' && userInitiated) {
+        const toastKey = info.bundledAvailable === false ? 'toasts.ffmpegNotFoundSystem' : 'toasts.ffmpegNotFound';
+        showNotification(t(toastKey), "warning");
       }
     }
   } catch (err) {
@@ -1318,21 +1542,7 @@ export async function refreshFFmpegStatus(sourceOverride?: string, userInitiated
 }
 
 // ----------------- Whisper Status & Version Formatting -----------------
-export function formatWhisperVersion(versionStr?: string | null): string {
-  if (!versionStr || versionStr === 'Unknown version' || versionStr === 'N/A') {
-    return 'Ready';
-  }
-  const match = versionStr.match(/version:\s*([^\s]+)/i) || versionStr.match(/version\s+([^\s]+)/i);
-  const raw = match ? match[1] : versionStr.trim();
-  if (raw.startsWith('v') || raw.startsWith('V')) {
-    return raw;
-  }
-  const semverMatch = raw.match(/^(\d+(\.\d+)+)/);
-  if (semverMatch) {
-    return `v${raw}`;
-  }
-  return raw.length > 0 ? raw : 'Ready';
-}
+export const formatWhisperVersion = formatWhisperEngineVersion;
 
 export async function refreshWhisperStatus(sourceOverride?: string, userInitiated = false): Promise<void> {
   if (typeof document === 'undefined') return;
@@ -1343,10 +1553,19 @@ export async function refreshWhisperStatus(sourceOverride?: string, userInitiate
   const currentSource = sourceOverride || (current ? current.whisperSource : 'bundled');
 
   try {
-    const info = await invoke('get_whisper_status', { source: currentSource });
+    const info: EngineBinaryStatus = await invoke('get_whisper_status', { source: currentSource });
+    setLatestWhisperEngineStatus(info);
+    whisperBundledAvailable = info.bundledAvailable !== false;
+    syncEngineSourceControl(
+      'opt-whisperSource',
+      'whisper-source-points',
+      'settings.whisperInternal',
+      'whisperSource',
+      info
+    );
+
     if (info.isAvailable) {
-      const verFormatted = formatWhisperVersion(info.version);
-      const safeVer = verFormatted.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const safeVer = escapeStatusText(formatWhisperVersion(info.version));
       badgeEl.className = 'setting-status-pill ready';
       badgeEl.innerHTML = `<span class="ffmpeg-status-dot blue"></span> ${safeVer}`;
       const backendsStr = info.availableBackends && info.availableBackends.length > 0
@@ -1354,12 +1573,17 @@ export async function refreshWhisperStatus(sourceOverride?: string, userInitiate
         : '';
       badgeEl.title = `Source: ${info.configuredSource}\nPath: ${isolateLtr(info.resolvedPath)}\n${info.version}${backendsStr}`;
     } else {
-      badgeEl.className = 'setting-status-pill missing';
-      badgeEl.innerHTML = `<span class="ffmpeg-status-dot red"></span> Not Found`;
-      badgeEl.title = info.errorMessage || 'System whisper-cli binary was not found';
-      if (currentSource === 'system' && userInitiated) {
-        showNotification(t('toasts.whisperNotFound'), "warning");
+      renderEngineMissingBadge(badgeEl, info.errorMessage || 'System whisper-cli binary was not found');
+      const resolvedSource = info.configuredSource || currentSource;
+      if (resolvedSource === 'system' && userInitiated) {
+        const toastKey = info.bundledAvailable === false ? 'toasts.whisperNotFoundSystem' : 'toasts.whisperNotFound';
+        showNotification(t(toastKey), "warning");
       }
+    }
+
+    const win = getGlobal();
+    if (typeof win?.syncAppVersionUI === 'function') {
+      win.syncAppVersionUI();
     }
   } catch (err) {
     console.warn("Failed to check Whisper status:", err);
@@ -2127,6 +2351,11 @@ export const settingsManager = {
   refreshFFmpegStatus,
   formatWhisperVersion,
   refreshWhisperStatus,
+  isFfmpegBundledAvailable,
+  isWhisperBundledAvailable,
+  isWhisperEngineDetected,
+  resyncEngineSourceControls,
+  validateExecutionEnginesPreflight,
   INT_SETTING_KEYS,
   FLOAT_SETTING_KEYS,
   sanitizeSettingsPayload,

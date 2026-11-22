@@ -39,6 +39,7 @@ import {
   refreshBuildStatuses,
   refreshFFmpegStatus,
   refreshWhisperStatus,
+  resyncEngineSourceControls,
   scanAndPopulateModels,
   setupNumberInputControls,
   updateTranscribeUIConfigs,
@@ -233,6 +234,9 @@ window.addEventListener('whisper:languageChanged', (e: Event) => {
       backendCs.updateOptions(true);
     }
   }
+
+  resyncEngineSourceControls();
+  syncAppVersionUI();
 
   if (deferredSettingsSearchFilterTimer !== null) {
     clearTimeout(deferredSettingsSearchFilterTimer);

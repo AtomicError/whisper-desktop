@@ -100,6 +100,7 @@ pub struct WhisperSettings {
     pub translate_ai_providers: String,
     pub translate_ai_custom_prompt: String,
     pub translate_ai_polish: bool,
+    #[serde(default = "default_engine_source")]
     pub ffmpeg_source: String, // "bundled" or "system"
     #[serde(default = "default_whisper_source")]
     pub whisper_source: String, // "bundled" or "system"
@@ -175,6 +176,18 @@ where
     }
 }
 
+pub const fn is_unbundled_build() -> bool {
+    cfg!(feature = "unbundled")
+}
+
+fn default_engine_source() -> String {
+    if is_unbundled_build() {
+        "system".to_string()
+    } else {
+        "bundled".to_string()
+    }
+}
+
 fn default_theme() -> String {
     "royal-blue".to_string()
 }
@@ -184,7 +197,7 @@ fn default_ui_scale() -> f64 {
 }
 
 fn default_whisper_source() -> String {
-    "bundled".to_string()
+    default_engine_source()
 }
 
 fn default_output_dir_mode() -> String {
@@ -269,8 +282,8 @@ impl WhisperSettings {
             translate_ai_providers: "[]".to_string(),
             translate_ai_custom_prompt: "".to_string(),
             translate_ai_polish: false,
-            ffmpeg_source: "bundled".to_string(),
-            whisper_source: "bundled".to_string(),
+            ffmpeg_source: default_engine_source(),
+            whisper_source: default_engine_source(),
             output_dir_mode: "input_dir".to_string(),
             output_dir_path: "".to_string(),
             ui_scale: 1.0,
@@ -427,14 +440,18 @@ impl WhisperSettings {
             self.models_dir = resolve_default_models_dir().to_string_lossy().to_string();
         }
 
-        // FFmpeg source fallback
-        if self.ffmpeg_source != "bundled" && self.ffmpeg_source != "system" {
-            self.ffmpeg_source = "bundled".to_string();
+        // FFmpeg source fallback (unbundled builds always enforce "system")
+        if is_unbundled_build()
+            || (self.ffmpeg_source != "bundled" && self.ffmpeg_source != "system")
+        {
+            self.ffmpeg_source = default_engine_source();
         }
 
-        // Whisper source fallback
-        if self.whisper_source != "bundled" && self.whisper_source != "system" {
-            self.whisper_source = "bundled".to_string();
+        // Whisper source fallback (unbundled builds always enforce "system")
+        if is_unbundled_build()
+            || (self.whisper_source != "bundled" && self.whisper_source != "system")
+        {
+            self.whisper_source = default_engine_source();
         }
 
         self.recent_spoken_languages = sanitize_recent_list(&self.recent_spoken_languages, true);
@@ -967,10 +984,26 @@ mod tests {
         assert_eq!(loaded.logprob_thold, 0.0);
         assert_eq!(loaded.offset_t, 0);
         assert_eq!(loaded.device_id, 0);
-        assert_eq!(loaded.ffmpeg_source, "bundled");
-        assert_eq!(loaded.whisper_source, "bundled");
+        assert_eq!(loaded.ffmpeg_source, default_engine_source());
+        assert_eq!(loaded.whisper_source, default_engine_source());
 
         let _ = fs::remove_file(&temp_path);
+    }
+
+    #[test]
+    fn unbundled_build_enforces_system_engine_sources() {
+        let mut s = WhisperSettings::default_settings();
+        s.ffmpeg_source = "bundled".to_string();
+        s.whisper_source = "bundled".to_string();
+        s.sanitize_and_validate();
+
+        if is_unbundled_build() {
+            assert_eq!(s.ffmpeg_source, "system");
+            assert_eq!(s.whisper_source, "system");
+        } else {
+            assert_eq!(s.ffmpeg_source, "bundled");
+            assert_eq!(s.whisper_source, "bundled");
+        }
     }
 
     #[test]

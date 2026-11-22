@@ -9,7 +9,7 @@ import { formatMsToTimecode } from './transcribeConfigHelpers';
 import {
   getSettingsState,
   saveCurrentSettings,
-  compiledBackends,
+  validateExecutionEnginesPreflight,
   localScannedTransModels,
   resetTranscribeTimeRange,
   updateTranscribeRangeVisibility,
@@ -1075,12 +1075,7 @@ export async function runBatchExtraction(): Promise<void> {
 
   const runSettings: SettingsState = { ...(getSettingsState() || {}) };
   const backend = runSettings.selectedBackend || 'Standard';
-  const isCompiled = backend === 'Standard' || Boolean(compiledBackends[backend]);
-  if (!isCompiled) {
-    if (typeof win.showNotification === 'function') {
-      win.showNotification(t('toasts.backendNotFound', { backend }), "error");
-    }
-    if (typeof win.switchView === 'function') win.switchView('settings');
+  if (!(await validateExecutionEnginesPreflight(backend))) {
     return;
   }
 

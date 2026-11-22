@@ -17,6 +17,10 @@ edition = "2021"
 name = "whisper_desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[features]
+default = []
+unbundled = []
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 

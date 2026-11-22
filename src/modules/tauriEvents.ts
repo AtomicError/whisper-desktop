@@ -202,6 +202,7 @@ export const invoke = async function(cmd: string, args: any = {}): Promise<any> 
       configuredSource: src,
       resolvedPath: '/usr/bin/ffmpeg',
       isAvailable: true,
+      bundledAvailable: true,
       version: 'ffmpeg version 7.1',
       errorMessage: null
     };
@@ -213,6 +214,7 @@ export const invoke = async function(cmd: string, args: any = {}): Promise<any> 
       configuredSource: src,
       resolvedPath: '/usr/bin/whisper-cli',
       isAvailable: true,
+      bundledAvailable: true,
       version: 'whisper.cpp version: 1.9.5-dev',
       availableBackends: ['Standard', 'Vulkan', 'OpenVINO'],
       errorMessage: null

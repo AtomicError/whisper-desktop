@@ -14,7 +14,7 @@ import {
 import {
   getSettingsState,
   saveCurrentSettings,
-  compiledBackends,
+  validateExecutionEnginesPreflight,
   localScannedTransModels,
   resetTranscribeTimeRange,
   updateTranscribeRangeVisibility,
@@ -753,12 +753,7 @@ export async function runWhisperTranscription(): Promise<void> {
   const liveSettings = getSettingsState();
   const currentSettings = liveSettings ? { ...liveSettings } : null;
   const backend = currentSettings?.selectedBackend || 'Standard';
-  const isCompiled = backend === 'Standard' || Boolean(compiledBackends[backend]);
-  if (!isCompiled) {
-    showNotification(t('toasts.backendNotFound', { backend }), "error");
-    if (typeof win.switchView === 'function') {
-      win.switchView('settings');
-    }
+  if (!(await validateExecutionEnginesPreflight(backend))) {
     return;
   }
 

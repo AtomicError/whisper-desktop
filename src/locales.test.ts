@@ -311,6 +311,21 @@ describe('locale consistency for speed presets', () => {
       expect(typeof settings.autoCheckUpdatesPoints).toBe('string');
       expect(settings.autoCheckUpdatesPoints.length).toBeGreaterThan(0);
     });
+
+    it(`locale ${code} has all engine source and unbundled notification keys`, () => {
+      const settings = (dict as any).settings;
+      const toasts = (dict as any).toasts;
+      expect(settings).toBeDefined();
+      expect(typeof settings.engineNotBundledShort).toBe('string');
+      expect(settings.engineNotBundledShort.length).toBeGreaterThan(0);
+      expect(typeof settings.engineMissingBadge).toBe('string');
+      expect(settings.engineMissingBadge.length).toBeGreaterThan(0);
+      expect(toasts).toBeDefined();
+      expect(typeof toasts.ffmpegNotFoundSystem).toBe('string');
+      expect(toasts.ffmpegNotFoundSystem.length).toBeGreaterThan(0);
+      expect(typeof toasts.whisperNotFoundSystem).toBe('string');
+      expect(toasts.whisperNotFoundSystem.length).toBeGreaterThan(0);
+    });
   }
 
   it('validates fa locale translation improvements', () => {

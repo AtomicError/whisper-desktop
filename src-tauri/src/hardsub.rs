@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
@@ -112,10 +112,11 @@ pub fn collect_system_fonts() -> Vec<FontItem> {
 
     // 2. Scan system fonts via fc-list (if fontconfig is installed)
     let mut scanned_system = false;
-    if let Ok(output) = std::process::Command::new("fc-list")
-        .args([":", "family"])
-        .output()
-    {
+    let mut fc_list_cmd = std::process::Command::new("fc-list");
+    fc_list_cmd.args([":", "family"]);
+    #[cfg(target_os = "linux")]
+    crate::sanitize_host_command(&mut fc_list_cmd);
+    if let Ok(output) = fc_list_cmd.output() {
         if output.status.success() {
             scanned_system = true;
             let stdout = String::from_utf8_lossy(&output.stdout);
@@ -366,10 +367,11 @@ fn resolve_font_file<R: tauri::Runtime>(font_name: &str, bold: bool, italic: boo
     if italic {
         pattern.push_str(":italic");
     }
-    if let Ok(out) = std::process::Command::new("fc-match")
-        .args(["-f", "%{file}\t%{family}", &pattern])
-        .output()
-    {
+    let mut fc_match_cmd = std::process::Command::new("fc-match");
+    fc_match_cmd.args(["-f", "%{file}\t%{family}", &pattern]);
+    #[cfg(target_os = "linux")]
+    crate::sanitize_host_command(&mut fc_match_cmd);
+    if let Ok(out) = fc_match_cmd.output() {
         if out.status.success() {
             let stdout = String::from_utf8_lossy(&out.stdout);
             let mut parts = stdout.trim().split('\t');
@@ -678,8 +680,10 @@ async fn probe_hardware_encoders(bin: &Path) -> HardwareEncodersStatus {
 
 #[tauri::command]
 pub async fn check_hardware_encoders(app: tauri::AppHandle) -> HardwareEncodersStatus {
-    let primary_bin = crate::ffmpeg_resolver::ensure_ffmpeg_available(Some(&app))
-        .unwrap_or_else(|_| PathBuf::from("ffmpeg"));
+    let primary_bin = match crate::ffmpeg_resolver::ensure_ffmpeg_available(Some(&app)) {
+        Ok(bin) => bin,
+        Err(_) => return HardwareEncodersStatus::default(),
+    };
     let mut status = probe_hardware_encoders(&primary_bin).await;
 
     // If primary binary is missing any hardware acceleration and a system binary is available,

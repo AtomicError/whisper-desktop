@@ -12,6 +12,7 @@ pub struct FFmpegStatus {
     pub configured_source: String, // "bundled" or "system"
     pub resolved_path: String,
     pub is_available: bool,
+    pub bundled_available: bool,
     pub version: String,
     pub error_message: Option<String>,
 }
@@ -46,6 +47,10 @@ fn is_valid_bundled_binary(p: &Path) -> bool {
 
 /// Finds the bundled binary path in Tauri resource dir, dev environment, or adjacent to exe.
 fn find_bundled_binary(app: Option<&tauri::AppHandle>, binary_name: &str) -> Option<PathBuf> {
+    if crate::settings::is_unbundled_build() {
+        return None;
+    }
+
     let exe_suffix = std::env::consts::EXE_SUFFIX;
     let full_name = if binary_name.ends_with(exe_suffix) || exe_suffix.is_empty() {
         binary_name.to_string()
@@ -163,19 +168,20 @@ fn binary_version_output(binary: &Path) -> Option<Vec<u8>> {
     }
 }
 
-/// Checks if a system binary exists in PATH and extracts its version in a single sub-process invocation.
+/// Checks if a system binary exists in PATH or standard install dirs and extracts its version.
 fn find_system_binary_with_version(binary_name: &str) -> Option<(PathBuf, String)> {
-    if let Some(output) = binary_version_output(Path::new(binary_name)) {
+    let resolved = crate::whisper_resolver::find_system_binary(binary_name)?;
+    if let Some(output) = binary_version_output(&resolved) {
         let out_str = String::from_utf8_lossy(&output);
         let ver = out_str.lines().next().unwrap_or("Unknown version").trim().to_string();
-        return Some((PathBuf::from(binary_name), ver));
+        return Some((resolved, ver));
     }
     None
 }
 
 /// Checks if a system binary is executable in PATH without extra version formatting.
 pub fn find_system_binary(binary_name: &str) -> Option<PathBuf> {
-    find_system_binary_with_version(binary_name).map(|(path, _)| path)
+    crate::whisper_resolver::find_system_binary(binary_name)
 }
 
 /// Extracts version string from a working binary path.
@@ -201,8 +207,8 @@ pub fn resolve_binary_for_execution(app: Option<&tauri::AppHandle>, binary_name:
                 _ => None,
             };
             if let Some(p) = cached_path {
-                // Verify that cached path is either a system command or still exists on disk
-                if p.components().count() == 1 || p.exists() {
+                // Verify that cached path is either a system command or still a valid file on disk
+                if p.components().count() == 1 || p.is_file() {
                     return Ok(p.clone());
                 }
             }
@@ -210,11 +216,21 @@ pub fn resolve_binary_for_execution(app: Option<&tauri::AppHandle>, binary_name:
     }
 
     let settings = crate::settings::load_settings_file();
-    let source = settings.ffmpeg_source.to_lowercase();
+    let unbundled = crate::settings::is_unbundled_build();
+    let source = if unbundled {
+        "system".to_string()
+    } else {
+        settings.ffmpeg_source.to_lowercase()
+    };
 
     let resolved_path = if source == "system" {
         if let Some(sys_path) = find_system_binary(binary_name) {
             sys_path
+        } else if unbundled {
+            return Err(format!(
+                "System {} was not found in PATH or standard install directories. Please install FFmpeg on your operating system.",
+                binary_name
+            ));
         } else {
             return Err(format!(
                 "System {} is not found in PATH or not executable. Please install {} on your operating system or switch to 'Internal' in Configuration.",
@@ -278,9 +294,9 @@ pub fn resolve_ffmpeg_for_hardsub(app: Option<&tauri::AppHandle>, hw_accel: &str
         return Ok(default_bin);
     }
 
-    // 1. If user explicitly configured system ffmpeg, use it directly
+    // 1. If unbundled or user explicitly configured system ffmpeg, use it directly
     let settings = crate::settings::load_settings_file();
-    if settings.ffmpeg_source.to_lowercase() == "system" {
+    if crate::settings::is_unbundled_build() || settings.ffmpeg_source.eq_ignore_ascii_case("system") {
         return Ok(default_bin);
     }
 
@@ -300,9 +316,11 @@ pub fn resolve_ffmpeg_for_hardsub(app: Option<&tauri::AppHandle>, hw_accel: &str
     Ok(default_bin)
 }
 
-/// Returns the live FFmpeg status for UI telemetry without executing unnecessary duplicate sub-processes.
-pub fn get_current_ffmpeg_status(app: Option<&tauri::AppHandle>, source_override: Option<String>) -> FFmpegStatus {
-    let configured_source = match &source_override {
+fn resolve_ffmpeg_status_source(unbundled: bool, source_override: &Option<String>) -> String {
+    if unbundled {
+        return "system".to_string();
+    }
+    match source_override {
         Some(s) if !s.is_empty() => s.to_lowercase(),
         _ => {
             let settings = crate::settings::load_settings_file();
@@ -312,7 +330,19 @@ pub fn get_current_ffmpeg_status(app: Option<&tauri::AppHandle>, source_override
                 settings.ffmpeg_source.to_lowercase()
             }
         }
+    }
+}
+
+/// Returns the live FFmpeg status for UI telemetry without executing unnecessary duplicate sub-processes.
+pub fn get_current_ffmpeg_status(app: Option<&tauri::AppHandle>, source_override: Option<String>) -> FFmpegStatus {
+    let unbundled = crate::settings::is_unbundled_build();
+    let configured_source = resolve_ffmpeg_status_source(unbundled, &source_override);
+    let bundled_path_opt = if unbundled {
+        None
+    } else {
+        find_bundled_binary(app, "ffmpeg")
     };
+    let bundled_available = !unbundled && bundled_path_opt.is_some();
 
     if configured_source == "system" {
         if let Some((path, version)) = find_system_binary_with_version("ffmpeg") {
@@ -320,6 +350,7 @@ pub fn get_current_ffmpeg_status(app: Option<&tauri::AppHandle>, source_override
                 configured_source,
                 resolved_path: path.display().to_string(),
                 is_available: true,
+                bundled_available,
                 version,
                 error_message: None,
             }
@@ -328,18 +359,20 @@ pub fn get_current_ffmpeg_status(app: Option<&tauri::AppHandle>, source_override
                 configured_source,
                 resolved_path: "Not Found".to_string(),
                 is_available: false,
+                bundled_available,
                 version: "N/A".to_string(),
-                error_message: Some("System FFmpeg was not found in PATH or not executable.".to_string()),
+                error_message: Some("System FFmpeg was not found in PATH or standard install directories.".to_string()),
             }
         }
     } else {
-        // "bundled" mode (default)
-        if let Some(bundled_path) = find_bundled_binary(app, "ffmpeg") {
+        // "bundled" mode (only reachable in bundled builds)
+        if let Some(bundled_path) = bundled_path_opt {
             let version = extract_binary_version(&bundled_path);
             FFmpegStatus {
                 configured_source,
                 resolved_path: bundled_path.display().to_string(),
                 is_available: true,
+                bundled_available,
                 version,
                 error_message: None,
             }
@@ -349,6 +382,7 @@ pub fn get_current_ffmpeg_status(app: Option<&tauri::AppHandle>, source_override
                 configured_source,
                 resolved_path: path.display().to_string(),
                 is_available: true,
+                bundled_available,
                 version,
                 error_message: None,
             }
@@ -357,6 +391,7 @@ pub fn get_current_ffmpeg_status(app: Option<&tauri::AppHandle>, source_override
                 configured_source,
                 resolved_path: "Not Found".to_string(),
                 is_available: false,
+                bundled_available,
                 version: "N/A".to_string(),
                 error_message: Some("FFmpeg could not be found (neither internal standalone in resources nor in system PATH).".to_string()),
             }

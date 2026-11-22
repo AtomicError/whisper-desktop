@@ -84,10 +84,9 @@ pub fn is_valid_executable(path: &Path) -> bool {
     has_valid_binary_header(path)
 }
 
-pub fn check_build_exists(app: &AppHandle, backend: &str) -> bool {
-    let settings = crate::settings::load_settings_file();
-    if settings.whisper_source.eq_ignore_ascii_case("system") {
-        return crate::whisper_resolver::is_system_backend_available(backend);
+pub fn has_bundled_binary(app: &AppHandle, backend: &str) -> bool {
+    if crate::settings::is_unbundled_build() {
+        return false;
     }
 
     let exe_ext = std::env::consts::EXE_SUFFIX;
@@ -154,4 +153,24 @@ pub fn check_build_exists(app: &AppHandle, backend: &str) -> bool {
     }
 
     false
+}
+
+pub fn has_any_bundled_backend(app: &AppHandle) -> bool {
+    if crate::settings::is_unbundled_build() {
+        return false;
+    }
+    ["Standard", "Vulkan", "OpenVINO", "CUDA"]
+        .iter()
+        .any(|backend| has_bundled_binary(app, backend))
+}
+
+pub fn check_build_exists(app: &AppHandle, backend: &str) -> bool {
+    let settings = crate::settings::load_settings_file();
+    if crate::settings::is_unbundled_build()
+        || settings.whisper_source.eq_ignore_ascii_case("system")
+    {
+        return crate::whisper_resolver::is_system_backend_available(backend);
+    }
+
+    has_bundled_binary(app, backend)
 }
