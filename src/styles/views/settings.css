@@ -1835,6 +1835,10 @@ select.select-control {
   padding-right: 36px !important;
 }
 
+.provider-manager-card .password-input-wrapper .text-input {
+  padding-right: 40px !important;
+}
+
 .provider-manager-card select.select-control {
   padding-right: 36px !important;
 }

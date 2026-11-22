@@ -135,6 +135,42 @@ export function clampIntSettingValue(key: string, raw: unknown): number {
 }
 
 /**
+ * Parses and clamps floating-point Whisper settings safely within Rust backend bounds,
+ * supporting ASCII, Persian, and Arabic-Indic numerals.
+ */
+export function clampFloatSettingValue(key: string, raw: unknown): number {
+  const parsed = parseFloat(normalizeDigitsToAscii(String(raw ?? '')).trim());
+  const isValid = Number.isFinite(parsed);
+
+  if (key === 'vadMaxSpeech') {
+    if (!isValid || parsed <= 0.0 || parsed >= 1000.0) return 30.0;
+    return Math.max(1.0, Math.min(300.0, parsed));
+  }
+  if (key === 'uiScale') {
+    if (!isValid || parsed <= 0.0) return 1.0;
+    const rounded = Math.round(parsed * 100) / 100;
+    return Math.max(0.7, Math.min(1.6, rounded));
+  }
+  if (key === 'vadThold' || key === 'vadOverlap' || key === 'wordThold' || key === 'noSpeechThold') {
+    if (!isValid) return 0.0;
+    return Math.max(0.0, Math.min(1.0, parsed));
+  }
+  if (key === 'temperature' || key === 'temperatureInc') {
+    if (!isValid) return 0.0;
+    return Math.max(0.0, Math.min(2.0, parsed));
+  }
+  if (key === 'entropyThold') {
+    if (!isValid) return 0.0;
+    return Math.max(0.0, parsed);
+  }
+  if (key === 'logprobThold') {
+    if (!isValid) return 0.0;
+    return Math.min(0.0, parsed);
+  }
+  return isValid ? parsed : 0.0;
+}
+
+/**
  * Formats milliseconds into a clean digital timecode (`MM:SS` or `HH:MM:SS`).
  * When `preserveSubseconds` is true and `ms` has a non-zero millisecond remainder,
  * appends trimmed fractional seconds (e.g. `00:01.5`) for lossless round-tripping.

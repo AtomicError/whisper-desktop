@@ -9,6 +9,7 @@ import {
   normalizeDigitsToAscii,
   filterNumericInputPreservingLocalizedDigits,
   clampIntSettingValue,
+  clampFloatSettingValue,
   formatMsToTimecode,
   parseTimecodeToMs,
   evaluateCustomTimeRange,
@@ -205,6 +206,27 @@ describe('transcribeConfigHelpers', () => {
       expect(clampIntSettingValue('beamSize', '۱۲')).toBe(8);
       expect(clampIntSettingValue('bestOf', '۰')).toBe(1);
       expect(clampIntSettingValue('maxLen', '۴۲')).toBe(42);
+    });
+
+    it('clamps float settings consistently with Rust backend bounds and localized numerals', () => {
+      expect(clampFloatSettingValue('vadThold', '5')).toBe(1.0);
+      expect(clampFloatSettingValue('vadThold', -0.5)).toBe(0.0);
+      expect(clampFloatSettingValue('vadOverlap', '۰.۵')).toBe(0.5);
+      expect(clampFloatSettingValue('vadOverlap', 2.4)).toBe(1.0);
+      expect(clampFloatSettingValue('wordThold', '1.8')).toBe(1.0);
+      expect(clampFloatSettingValue('noSpeechThold', -1)).toBe(0.0);
+      expect(clampFloatSettingValue('temperature', -0.2)).toBe(0.0);
+      expect(clampFloatSettingValue('temperature', 3.5)).toBe(2.0);
+      expect(clampFloatSettingValue('temperatureInc', 9)).toBe(2.0);
+      expect(clampFloatSettingValue('entropyThold', -2)).toBe(0.0);
+      expect(clampFloatSettingValue('logprobThold', 5)).toBe(0.0);
+      expect(clampFloatSettingValue('logprobThold', -1.5)).toBe(-1.5);
+      expect(clampFloatSettingValue('vadMaxSpeech', 'invalid')).toBe(30.0);
+      expect(clampFloatSettingValue('vadMaxSpeech', 0)).toBe(30.0);
+      expect(clampFloatSettingValue('vadMaxSpeech', 500)).toBe(300.0);
+      expect(clampFloatSettingValue('uiScale', 0.4)).toBe(0.7);
+      expect(clampFloatSettingValue('uiScale', 2.2)).toBe(1.6);
+      expect(clampFloatSettingValue('uiScale', 1.126)).toBe(1.13);
     });
   });
 });

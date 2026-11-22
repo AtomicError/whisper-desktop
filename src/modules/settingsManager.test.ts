@@ -5,6 +5,8 @@ vi.mock('./appModal', () => ({
   showConfirmModal: vi.fn().mockResolvedValue(true)
 }));
 
+import { showConfirmModal } from './appModal';
+
 import {
   settingsManager,
   bindSettingsToDOM,
@@ -2297,6 +2299,253 @@ describe('settingsManager module', () => {
         docObj.documentElement = prevDocEl;
         (globalThis as any).window.__TAURI__ = prevTauri;
         (globalThis as any).window.markSettingsDirty = prevMarkDirty;
+      }
+    });
+  });
+
+  describe('Settings page audit regressions', () => {
+    it('re-scans models when selectedBackend changes in bindSettingsToDOM', async () => {
+      const invokeSpy = vi.fn().mockImplementation((cmd: string) => {
+        if (cmd === 'check_build') return Promise.resolve(true);
+        if (cmd === 'scan_models') return Promise.resolve({ models: ['ggml-small.bin'], vadModels: [] });
+        return Promise.resolve({});
+      });
+      (globalThis as any).__TAURI__.core.invoke = invokeSpy;
+
+      const backendSel = new MockElement('SELECT');
+      backendSel.id = 'opt-selectedBackend';
+      const optStd = new MockElement('OPTION');
+      optStd.value = 'Standard';
+      const optOv = new MockElement('OPTION');
+      optOv.value = 'OpenVINO';
+      backendSel.appendChild(optStd);
+      backendSel.appendChild(optOv);
+      elementRegistry.set('opt-selectedBackend', backendSel);
+
+      const transSel = new MockElement('SELECT');
+      transSel.id = 'opt-modelPath';
+      elementRegistry.set('opt-modelPath', transSel);
+
+      setSettingsState({ selectedBackend: 'Standard', modelsDir: '/tmp/models', modelPath: 'ggml-base.bin' });
+      bindSettingsToDOM();
+      invokeSpy.mockClear();
+
+      backendSel.value = 'OpenVINO';
+      (backendSel as any).onchange?.();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(invokeSpy).toHaveBeenCalledWith('scan_models', expect.objectContaining({ backend: 'OpenVINO' }));
+    });
+
+    it('re-scans models and VAD files inside confirmResetWhisperEngine', async () => {
+      vi.mocked(showConfirmModal).mockResolvedValueOnce(true);
+      const invokeSpy = vi.fn().mockImplementation((cmd: string) => {
+        if (cmd === 'reset_whisper_core_settings') {
+          return Promise.resolve({
+            selectedBackend: 'Standard',
+            modelsDir: '/tmp/models',
+            modelPath: 'ggml-base.en.bin',
+            vadModel: 'ggml-silero-v6.2.0.bin',
+            vad: false,
+            outputSrt: true
+          });
+        }
+        if (cmd === 'scan_models') {
+          return Promise.resolve({
+            models: ['ggml-base.en.bin'],
+            vadModels: ['ggml-silero-v5.1.2.bin']
+          });
+        }
+        if (cmd === 'check_build') return Promise.resolve(true);
+        return Promise.resolve({});
+      });
+      (globalThis as any).__TAURI__.core.invoke = invokeSpy;
+
+      const vadSel = new MockElement('SELECT');
+      vadSel.id = 'opt-vadModel';
+      elementRegistry.set('opt-vadModel', vadSel);
+
+      await settingsManager.confirmResetWhisperEngine();
+
+      expect(invokeSpy).toHaveBeenCalledWith('reset_whisper_core_settings', undefined);
+      expect(invokeSpy).toHaveBeenCalledWith('scan_models', expect.objectContaining({ modelsDir: '/tmp/models', backend: 'Standard' }));
+      expect(getSettingsState().vadModel).toBe('ggml-silero-v5.1.2.bin');
+    });
+
+    it('clamps float settings in both sanitizeSettingsPayload and bindSettingsToDOM onchange', () => {
+      const cleaned = sanitizeSettingsPayload({
+        vadThold: '5',
+        temperature: '-1',
+        temperatureInc: '4.5',
+        wordThold: '2',
+        noSpeechThold: '-0.4',
+        vadOverlap: '3',
+        entropyThold: '-2',
+        logprobThold: '5',
+        vadMaxSpeech: '500',
+        uiScale: '2.5'
+      });
+
+      expect(cleaned.vadThold).toBe(1.0);
+      expect(cleaned.temperature).toBe(0.0);
+      expect(cleaned.temperatureInc).toBe(2.0);
+      expect(cleaned.wordThold).toBe(1.0);
+      expect(cleaned.noSpeechThold).toBe(0.0);
+      expect(cleaned.vadOverlap).toBe(1.0);
+      expect(cleaned.entropyThold).toBe(0.0);
+      expect(cleaned.logprobThold).toBe(0.0);
+      expect(cleaned.vadMaxSpeech).toBe(300.0);
+      expect(cleaned.uiScale).toBe(1.6);
+
+      const vadTholdInput = new MockElement('INPUT');
+      vadTholdInput.type = 'number';
+      vadTholdInput.id = 'opt-vadThold';
+      elementRegistry.set('opt-vadThold', vadTholdInput);
+
+      setSettingsState({ vadThold: 0.5 });
+      bindSettingsToDOM();
+
+      vadTholdInput.value = '5';
+      (vadTholdInput as any).onchange?.();
+      expect(vadTholdInput.value).toBe('1');
+      expect(getSettingsState().vadThold).toBe(1.0);
+    });
+
+    it('reveals matched auto-translate cards or matching provider sub-tabs during search and restores on clear', () => {
+      const mgrCard = new MockElement('DIV');
+      mgrCard.id = 'provider-manager-card';
+
+      const btnAuto = new MockElement('BUTTON');
+      btnAuto.id = 'tab-btn-auto';
+      btnAuto.className = 'provider-tab-btn';
+      btnAuto.textContent = 'Auto-Translate';
+
+      const btnProv = new MockElement('BUTTON');
+      btnProv.id = 'tab-btn-providers';
+      btnProv.className = 'provider-tab-btn active';
+      btnProv.textContent = 'API Providers';
+
+      const btnGen = new MockElement('BUTTON');
+      btnGen.id = 'tab-btn-general';
+      btnGen.className = 'provider-tab-btn';
+      btnGen.textContent = 'Provider Configuration';
+
+      mgrCard.appendChild(btnAuto);
+      mgrCard.appendChild(btnProv);
+      mgrCard.appendChild(btnGen);
+
+      const paneAuto = new MockElement('DIV');
+      paneAuto.id = 'provider-tab-auto';
+      paneAuto.className = 'provider-tab-content';
+      paneAuto.style.display = 'none';
+
+      const autoCard = new MockElement('DIV');
+      autoCard.className = 'setting-card';
+      const autoTitle = new MockElement('DIV');
+      autoTitle.className = 'setting-title';
+      autoTitle.textContent = 'Enable Polish Pass';
+      autoCard.appendChild(autoTitle);
+      paneAuto.appendChild(autoCard);
+
+      const paneProv = new MockElement('DIV');
+      paneProv.id = 'provider-tab-providers';
+      paneProv.className = 'provider-tab-content';
+      paneProv.style.display = 'block';
+
+      const paneGen = new MockElement('DIV');
+      paneGen.id = 'provider-tab-general';
+      paneGen.className = 'provider-tab-content';
+      paneGen.style.display = 'none';
+      const genLabel = new MockElement('LABEL');
+      genLabel.textContent = 'Base URL';
+      paneGen.appendChild(genLabel);
+      paneGen.querySelectorAll = (sel: string) => (sel.includes('label') ? [genLabel] : []);
+
+      const groupTrans = new MockElement('DIV');
+      groupTrans.id = 'group-translation';
+      groupTrans.className = 'settings-group';
+      groupTrans.appendChild(mgrCard);
+      mgrCard.appendChild(paneAuto);
+      mgrCard.appendChild(paneProv);
+      mgrCard.appendChild(paneGen);
+
+      const catTrans = new MockElement('BUTTON');
+      catTrans.id = 'cat-btn-translation';
+      catTrans.className = 'settings-cat-btn';
+      catTrans.textContent = 'AI Translation';
+
+      elementRegistry.set('cat-btn-translation', catTrans);
+      elementRegistry.set('group-translation', groupTrans);
+      elementRegistry.set('provider-manager-card', mgrCard);
+      elementRegistry.set('tab-btn-auto', btnAuto);
+      elementRegistry.set('tab-btn-providers', btnProv);
+      elementRegistry.set('tab-btn-general', btnGen);
+      elementRegistry.set('provider-tab-auto', paneAuto);
+      elementRegistry.set('provider-tab-providers', paneProv);
+      elementRegistry.set('provider-tab-general', paneGen);
+
+      executeFilterSettings('Polish');
+      expect(paneAuto.style.display).toBe('flex');
+      expect(paneProv.style.display).toBe('none');
+      expect(btnAuto.classList.contains('active')).toBe(true);
+      expect(catTrans.querySelector('.cat-match-badge')?.textContent).toBe('1');
+
+      executeFilterSettings('Base URL');
+      expect(paneGen.style.display).toBe('block');
+      expect(paneAuto.style.display).toBe('none');
+      expect(btnGen.classList.contains('active')).toBe(true);
+      expect(catTrans.querySelector('.cat-match-badge')?.textContent).toBe('1');
+
+      executeFilterSettings('');
+      expect(paneProv.style.display).toBe('block');
+      expect(btnProv.classList.contains('active')).toBe(true);
+    });
+
+    it('sets initial title tooltip on opt-outputDirPath during refreshSettings', async () => {
+      const docObj = (globalThis as any).document as any;
+      const prevDocEl = docObj.documentElement;
+      const prevStorage = (globalThis as any).localStorage;
+      const mockDocEl = new MockElement('HTML');
+      (mockDocEl as any).style = { setProperty: vi.fn(), removeProperty: vi.fn() };
+      docObj.documentElement = mockDocEl;
+      const store = new Map<string, string>();
+      (globalThis as any).localStorage = {
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => store.set(k, v),
+        removeItem: (k: string) => store.delete(k)
+      };
+
+      const invokeSpy = vi.fn().mockImplementation((cmd: string) => {
+        if (cmd === 'load_settings') {
+          return Promise.resolve({
+            selectedBackend: 'Standard',
+            modelsDir: '/models/path',
+            outputDirPath: '/custom/output/path',
+            outputSrt: true
+          });
+        }
+        if (cmd === 'scan_models') return Promise.resolve({ models: [], vadModels: [] });
+        if (cmd === 'check_build') return Promise.resolve(true);
+        return Promise.resolve({});
+      });
+      (globalThis as any).__TAURI__.core.invoke = invokeSpy;
+
+      try {
+        const outWrap = new MockElement('DIV');
+        const outInput = new MockElement('INPUT');
+        outInput.type = 'text';
+        outInput.id = 'opt-outputDirPath';
+        outWrap.appendChild(outInput);
+        elementRegistry.set('opt-outputDirPath', outInput);
+
+        await settingsManager.refreshSettings();
+        expect(outInput.value).toBe('/custom/output/path');
+        expect(outInput.title).toContain('/custom/output/path');
+        expect(outWrap.title).toContain('/custom/output/path');
+      } finally {
+        docObj.documentElement = prevDocEl;
+        (globalThis as any).localStorage = prevStorage;
       }
     });
   });

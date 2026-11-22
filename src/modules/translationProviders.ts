@@ -530,6 +530,8 @@ export function onProviderChanged(keepCurrentTab: boolean | string = false, skip
     const keyInput = document.getElementById('mgr-provider-key') as HTMLInputElement | null;
     if (keyInput) {
       keyInput.type = 'password';
+      delete keyInput.dataset.keyringError;
+      keyInput.removeAttribute('title');
       const eyeBtn = keyInput.nextElementSibling as HTMLElement | null;
       if (eyeBtn) eyeBtn.style.color = 'var(--color-text-muted)';
       
@@ -544,14 +546,19 @@ export function onProviderChanged(keepCurrentTab: boolean | string = false, skip
             if (currentSelect && currentSelect.value === providerName) {
               keyInput.value = realKey;
               keyInput.dataset.isKeyring = 'false';
+              delete keyInput.dataset.keyringError;
+              keyInput.removeAttribute('title');
             }
           } catch (e) {
             console.error("Background keyring credential fetch failed:", e);
             const currentSelect = document.getElementById('opt-translateAiProvider') as HTMLSelectElement | null;
             if (currentSelect && currentSelect.value === providerName) {
-              keyInput.value = '';
-              keyInput.placeholder = 'sk-...';
-              keyInput.dataset.isKeyring = 'false';
+              // Preserve the keyring placeholder and flag instead of clearing to '',
+              // so edits to other provider fields do not silently delete the stored secret.
+              keyInput.value = '••••••••••••••••';
+              keyInput.dataset.isKeyring = 'true';
+              keyInput.dataset.keyringError = 'true';
+              keyInput.title = t('toasts.keyringLoadError', { error: String(e) });
             }
           }
         })();
@@ -652,8 +659,12 @@ export async function togglePasswordVisibility(inputId: string, btn: HTMLElement
         const realKey = await invoke('get_keyring_credential', { providerName: providerSelect.value });
         input.value = realKey;
         input.dataset.isKeyring = 'false';
+        delete input.dataset.keyringError;
+        input.removeAttribute('title');
       } catch (e) {
+        input.dataset.keyringError = 'true';
         notify(t('toasts.keyringLoadError', { error: String(e) }), "error");
+        return;
       } finally {
         (btn as HTMLButtonElement).disabled = false;
       }
@@ -780,14 +791,21 @@ export async function saveActiveProviderGeneral(silent = false): Promise<void> {
   
   let keyToSave = provider.apiKey || provider.api_key || '';
   let useKeyring = provider.useKeyring !== false;
-  
+  const hadKeyringError = keyEl?.dataset.keyringError === 'true';
+
   if (key === '') {
-    try {
-      await invoke('delete_keyring_credential', { providerName });
-    } catch (e) {}
-    keyToSave = '';
-    useKeyring = false;
+    if (!hadKeyringError) {
+      try {
+        await invoke('delete_keyring_credential', { providerName });
+      } catch (e) {}
+      keyToSave = '';
+      useKeyring = false;
+    }
   } else if (key !== '••••••••••••••••') {
+    if (keyEl) {
+      delete keyEl.dataset.keyringError;
+      keyEl.removeAttribute('title');
+    }
     try {
       await invoke('store_keyring_credential', { providerName, key });
       keyToSave = '__KEYRING__';
@@ -1443,12 +1461,20 @@ export function createModelRowElement(modelObj: ModelObject, isActive: boolean, 
     </div>
   `;
 
+  const isRowActive = (): boolean => {
+    const settings = getSettingsState();
+    const activeId = ((settings && settings.translateAiModel) || '').trim().toLowerCase();
+    const thisId = (modelObj.id || '').trim().toLowerCase();
+    if (activeId) return Boolean(thisId && activeId === thisId);
+    return row.classList.contains('active-model-row');
+  };
+
   const handleActivate = () => {
     if (!modelObj.id || !modelObj.id.trim()) {
       notify(t('toasts.noModelIdError'), 'info');
       return;
     }
-    if (!isActive) {
+    if (!isRowActive()) {
       setActiveModelFromTable(modelObj.id.trim());
     }
   };
@@ -1457,10 +1483,7 @@ export function createModelRowElement(modelObj: ModelObject, isActive: boolean, 
     const trashBtn = (e.target as HTMLElement).closest('.model-btn-trash');
     if (trashBtn) {
       e.stopPropagation();
-      const settings = getSettingsState();
-      const currentActive = ((settings && settings.translateAiModel) || '').toLowerCase();
-      const thisId = (modelObj.id || '').toLowerCase();
-      if (isActive || (currentActive && currentActive === thisId)) {
+      if (isRowActive()) {
         notify(t('toasts.cannotDeleteActiveModel'), "info");
         return;
       }
@@ -1554,9 +1577,10 @@ export function createModelRowElement(modelObj: ModelObject, isActive: boolean, 
         input.removeEventListener('blur', onBlur);
         const val = input.value.trim();
         if (val && val !== modelObj.id) {
+          const wasRowActive = isRowActive();
           modelObj.id = val;
           row.dataset.modelId = val.toLowerCase();
-          if (isActive) {
+          if (wasRowActive) {
             const settings = getSettingsState();
             if (settings) {
               settings.translateAiModel = val;
@@ -1753,6 +1777,33 @@ export function addManualModelRow(
   }
 }
 
+let modelsFetchSeq = 0;
+
+function normalizeProviderModelsList(models: ModelObject[]): ModelObject[] {
+  const validModels: ModelObject[] = [];
+  const seenIds = new Set<string>();
+  models.forEach(m => {
+    const trimmedId = (m.id || '').trim();
+    if (trimmedId && !seenIds.has(trimmedId)) {
+      seenIds.add(trimmedId);
+      const supportsReasoning = typeof m.supportsReasoning === 'boolean'
+        ? m.supportsReasoning
+        : (typeof m.supports_reasoning === 'boolean' ? m.supports_reasoning : undefined);
+
+      validModels.push({
+        id: trimmedId,
+        contextWindow: m.contextWindow || 200000,
+        reasoning: m.reasoning || 'None',
+        supportsReasoning: supportsReasoning !== undefined
+          ? supportsReasoning
+          : (m.reasoning && m.reasoning.toLowerCase() !== 'none' ? true : undefined),
+        enabled: m.enabled !== false
+      });
+    }
+  });
+  return validModels;
+}
+
 export async function fetchActiveProviderModels(): Promise<void> {
   if (typeof document === 'undefined') return;
   const providerSelect = document.getElementById('opt-translateAiProvider') as HTMLSelectElement | null;
@@ -1794,15 +1845,21 @@ export async function fetchActiveProviderModels(): Promise<void> {
     <span>${t('common.loading')}</span>
   `;
   
+  const fetchSeq = ++modelsFetchSeq;
+
   if ((!apiKey || apiKey === '••••••••••••••••') && (provider.useKeyring || provider.apiKey === '__KEYRING__' || provider.api_key === '__KEYRING__')) {
     try {
       apiKey = await invoke('get_keyring_credential', { providerName });
-    } catch(e) {}
+    } catch (e) {
+      notify(t('toasts.keyringLoadError', { error: String(e) }), "error");
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+      return;
+    }
   }
   
   try {
     const modelsList = await invoke('fetch_provider_models', { baseUrl, apiKey, apiFormat });
-    const currentActive = settingsState ? settingsState.translateAiModel : '';
     
     const existingMap = new Map<string, any>();
     if (provider && Array.isArray(provider.models)) {
@@ -1811,7 +1868,7 @@ export async function fetchActiveProviderModels(): Promise<void> {
       });
     }
 
-    currentProviderModels = modelsList.map((m: any) => {
+    const fetchedModels: ModelObject[] = modelsList.map((m: any) => {
       const modelId = String((m && typeof m === 'object') ? m.id : m);
       const modelCtx = (m && typeof m === 'object') ? (m.contextWindow || m.context_window || 200000) : 200000;
       const isReasoning = isReasoningSupportedModel(m);
@@ -1839,16 +1896,42 @@ export async function fetchActiveProviderModels(): Promise<void> {
         enabled
       };
     });
-    
-    if (!currentActive && currentProviderModels.length > 0 && settingsState) {
-      settingsState.translateAiModel = currentProviderModels[0].id;
+
+    const liveSettings = getSettingsState();
+    const activeProviderName = (liveSettings && liveSettings.translateAiProvider) || '';
+    if (fetchSeq !== modelsFetchSeq && activeProviderName === providerName) {
+      return;
     }
-    
-    currentModelsPage = 1;
-    currentModelsSortCol = null;
-    currentModelsSortDir = 'none';
-    updateFilterCounts();
-    await saveActiveProviderModels(true, false);
+
+    if (activeProviderName === providerName) {
+      currentProviderModels = fetchedModels;
+      const currentActive = liveSettings ? liveSettings.translateAiModel : '';
+      if (!currentActive && currentProviderModels.length > 0 && liveSettings) {
+        liveSettings.translateAiModel = currentProviderModels[0].id;
+      }
+
+      currentModelsPage = 1;
+      currentModelsSortCol = null;
+      currentModelsSortDir = 'none';
+      updateFilterCounts();
+      await saveActiveProviderModels(true, false, providerName);
+    } else if (liveSettings) {
+      // User switched providers mid-fetch: persist models onto the target provider
+      // without clobbering the newly selected provider's active state or UI table.
+      let latestProviders: ProviderConfig[] = [];
+      try {
+        latestProviders = JSON.parse(liveSettings.translateAiProviders || '[]');
+      } catch (_) {}
+      const targetIdx = latestProviders.findIndex(p => p.name === providerName);
+      if (targetIdx !== -1) {
+        latestProviders[targetIdx] = {
+          ...latestProviders[targetIdx],
+          models: normalizeProviderModelsList(fetchedModels)
+        };
+        liveSettings.translateAiProviders = JSON.stringify(latestProviders);
+        await saveSettings();
+      }
+    }
     notify(t('toasts.modelsFetchedSuccess', { count: modelsList.length }), "success");
   } catch (e) {
     notify(t('toasts.modelsFetchError', { error: String(e) }), "error");
@@ -1876,27 +1959,7 @@ export async function saveActiveProviderModels(
   if (providerIdx === -1) return;
   
   const provider = providers[providerIdx];
-  const validModels: ModelObject[] = [];
-  const seenIds = new Set<string>();
-  currentProviderModels.forEach(m => {
-    const trimmedId = (m.id || '').trim();
-    if (trimmedId && !seenIds.has(trimmedId)) {
-      seenIds.add(trimmedId);
-      const supportsReasoning = typeof m.supportsReasoning === 'boolean'
-        ? m.supportsReasoning
-        : (typeof m.supports_reasoning === 'boolean' ? m.supports_reasoning : undefined);
-
-      validModels.push({
-        id: trimmedId,
-        contextWindow: m.contextWindow || 200000,
-        reasoning: m.reasoning || 'None',
-        supportsReasoning: supportsReasoning !== undefined
-          ? supportsReasoning
-          : (m.reasoning && m.reasoning.toLowerCase() !== 'none' ? true : undefined),
-        enabled: m.enabled !== false
-      });
-    }
-  });
+  const validModels = normalizeProviderModelsList(currentProviderModels);
 
   provider.models = validModels;
   providers[providerIdx] = provider;
@@ -1980,10 +2043,12 @@ export function openAddProviderModal(): void {
   const nameEl = document.getElementById('provider-name') as HTMLInputElement | null;
   const urlEl = document.getElementById('provider-url') as HTMLInputElement | null;
   const keyEl = document.getElementById('provider-key') as HTMLInputElement | null;
+  const keyringEl = document.getElementById('provider-use-keyring') as HTMLInputElement | null;
 
   if (nameEl) nameEl.value = '';
   if (urlEl) urlEl.value = '';
   if (keyEl) keyEl.value = '';
+  if (keyringEl) keyringEl.checked = true;
   
   const modal = document.getElementById('translation-provider-modal');
   if (!modal) return;
@@ -2017,32 +2082,19 @@ export async function saveProviderConfig(): Promise<void> {
   const urlEl = document.getElementById('provider-url') as HTMLInputElement | null;
   const fmtEl = document.getElementById('provider-format') as HTMLSelectElement | null;
   const keyEl = document.getElementById('provider-key') as HTMLInputElement | null;
+  const keyringEl = document.getElementById('provider-use-keyring') as HTMLInputElement | null;
 
   const name = nameEl ? nameEl.value.trim() : '';
   const baseUrl = urlEl ? urlEl.value.trim() : '';
   const apiFormat = fmtEl ? fmtEl.value : 'Chat completions';
   const key = keyEl ? keyEl.value.trim() : '';
+  const preferKeyring = keyringEl ? keyringEl.checked : true;
   
   if (!name || !baseUrl) {
     notify(t('toasts.nameAndUrlRequired'), "info");
     return;
   }
-  
-  let keyToSave = key;
-  let useKeyring = false;
-  
-  if (key) {
-    try {
-      await invoke('store_keyring_credential', { providerName: name, key });
-      keyToSave = '__KEYRING__';
-      useKeyring = true;
-    } catch (e) {
-      console.warn("Failed to store API Key in system keyring:", e);
-      keyToSave = key;
-      useKeyring = false;
-    }
-  }
-  
+
   const settingsState = getSettingsState();
   let providers: ProviderConfig[] = [];
   try {
@@ -2054,6 +2106,21 @@ export async function saveProviderConfig(): Promise<void> {
   if (providers.some(p => p.name === name)) {
     notify(t('toasts.providerNameExists', { name }), "error");
     return;
+  }
+  
+  let keyToSave = key;
+  let useKeyring = false;
+  
+  if (key && preferKeyring) {
+    try {
+      await invoke('store_keyring_credential', { providerName: name, key });
+      keyToSave = '__KEYRING__';
+      useKeyring = true;
+    } catch (e) {
+      console.warn("Failed to store API Key in system keyring:", e);
+      keyToSave = key;
+      useKeyring = false;
+    }
   }
   
   const providerData: ProviderConfig = {

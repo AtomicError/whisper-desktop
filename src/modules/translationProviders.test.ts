@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import {
   translationProviders,
   toEnglishDigits,
@@ -8,8 +8,17 @@ import {
   isReasoningSupportedModel,
   formatLocalizedNumber,
   POPULAR_PROVIDER_FILTERS,
+  openAddProviderModal,
+  saveProviderConfig,
+  onProviderChanged,
+  saveActiveProviderGeneral,
+  togglePasswordVisibility,
+  createModelRowElement,
+  setActiveModelFromTable,
+  fetchActiveProviderModels,
   type ModelObject
 } from './translationProviders';
+import { setSettingsState, getSettingsState } from './settingsManager';
 
 describe('translationProviders module', () => {
   beforeEach(() => {
@@ -198,6 +207,349 @@ describe('translationProviders module', () => {
       (window as any).currentProviderModels = [{ id: 'gemini-2.0-flash', contextWindow: 1048576 }];
       expect(translationProviders.getModels()).toHaveLength(1);
       expect(translationProviders.getModels()[0].id).toBe('gemini-2.0-flash');
+    });
+  });
+
+  describe('Provider & Models audit bug regressions', () => {
+    let prevDoc: any;
+    let prevTauri: any;
+    let prevNotify: any;
+    let prevRaf: any;
+    let registry: Map<string, any>;
+
+    const makeEl = (tag: string, id = ''): any => {
+      const el: any = {
+        tagName: tag.toUpperCase(),
+        id,
+        className: '',
+        value: '',
+        checked: false,
+        disabled: false,
+        type: 'text',
+        placeholder: '',
+        textContent: '',
+        _innerHTML: '',
+        dataset: {} as Record<string, string>,
+        style: {} as Record<string, string>,
+        children: [] as any[],
+        options: [] as any[],
+        listeners: {} as Record<string, ((e: any) => void)[]>,
+        nextElementSibling: null as any,
+        classList: {
+          add(cls: string) {
+            const set = new Set((el.className || '').split(/\s+/).filter(Boolean));
+            set.add(cls);
+            el.className = Array.from(set).join(' ');
+          },
+          remove(cls: string) {
+            const set = new Set((el.className || '').split(/\s+/).filter(Boolean));
+            set.delete(cls);
+            el.className = Array.from(set).join(' ');
+          },
+          contains(cls: string) {
+            return (el.className || '').split(/\s+/).filter(Boolean).includes(cls);
+          }
+        },
+        setAttribute(k: string, v: string) {
+          el[`_attr_${k}`] = v;
+        },
+        getAttribute(k: string) {
+          return el[`_attr_${k}`] ?? null;
+        },
+        removeAttribute(k: string) {
+          delete el[`_attr_${k}`];
+          if (k === 'title') el.title = '';
+        },
+        appendChild(child: any) {
+          el.children.push(child);
+          if (el.tagName === 'SELECT' && child.tagName === 'OPTION') el.options.push(child);
+          return child;
+        },
+        addEventListener(type: string, fn: (e: any) => void) {
+          el.listeners[type] = el.listeners[type] || [];
+          el.listeners[type].push(fn);
+        },
+        removeEventListener(type: string, fn: (e: any) => void) {
+          el.listeners[type] = (el.listeners[type] || []).filter((f: any) => f !== fn);
+        },
+        dispatchClick(targetOverride?: any) {
+          const ev = { target: targetOverride || el, stopPropagation: () => {}, preventDefault: () => {} };
+          (el.listeners.click || []).forEach((fn: any) => fn(ev));
+        },
+        closest(sel: string) {
+          if (sel.startsWith('.') && el.classList.contains(sel.slice(1))) return el;
+          return null;
+        },
+        querySelector(sel: string) {
+          if (sel === '.td-active') return el._tdActive || null;
+          if (sel === '.td-action') return el._tdAction || null;
+          if (sel === '.model-id-display') return el._idDisplay || null;
+          if (sel === '.model-radio-btn') return el._radioBtn || null;
+          if (sel === '.model-btn-trash') return el._trashBtn || null;
+          if (sel === 'svg') return null;
+          return null;
+        },
+        querySelectorAll(sel: string) {
+          if (sel === '.model-data-row') return el.children.filter((c: any) => c.classList.contains('model-data-row'));
+          return [];
+        },
+        focus() {},
+        select() {},
+        get innerHTML() {
+          return el._innerHTML;
+        },
+        set innerHTML(v: string) {
+          el._innerHTML = v;
+          if (v.includes('td-active')) {
+            el._tdActive = makeEl('div');
+            el._tdAction = makeEl('div');
+            el._idDisplay = makeEl('div');
+            el._idDisplay.replaceWith = (inputNode: any) => {
+              el._replacedInput = inputNode;
+            };
+          }
+        }
+      };
+      if (id) registry.set(id, el);
+      return el;
+    };
+
+    beforeEach(() => {
+      prevDoc = (globalThis as any).document;
+      prevTauri = (globalThis as any).window.__TAURI__;
+      prevNotify = (globalThis as any).window.showNotification;
+      prevRaf = (globalThis as any).requestAnimationFrame;
+      registry = new Map();
+
+      (globalThis as any).requestAnimationFrame = (cb: () => void) => {
+        cb();
+        return 0;
+      };
+      (globalThis as any).window.showNotification = vi.fn();
+      (globalThis as any).document = {
+        getElementById: (id: string) => registry.get(id) || null,
+        createElement: (tag: string) => makeEl(tag),
+        createDocumentFragment: () => makeEl('fragment'),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        querySelector: () => null,
+        querySelectorAll: () => []
+      };
+    });
+
+    afterEach(() => {
+      (globalThis as any).document = prevDoc;
+      (globalThis as any).window.__TAURI__ = prevTauri;
+      (globalThis as any).window.showNotification = prevNotify;
+      (globalThis as any).requestAnimationFrame = prevRaf;
+      vi.restoreAllMocks();
+    });
+
+    it('respects #provider-use-keyring checkbox, checks duplicate before storing credential, and resets checkbox on openAddProviderModal', async () => {
+      const invokeSpy = vi.fn().mockResolvedValue(undefined);
+      (globalThis as any).window.__TAURI__ = { core: { invoke: invokeSpy } };
+
+      const nameEl = makeEl('input', 'provider-name');
+      const urlEl = makeEl('input', 'provider-url');
+      const fmtEl = makeEl('select', 'provider-format');
+      const keyEl = makeEl('input', 'provider-key');
+      const keyringChk = makeEl('input', 'provider-use-keyring');
+      const modal = makeEl('div', 'translation-provider-modal');
+      modal.querySelectorAll = () => [];
+
+      keyringChk.checked = false;
+      openAddProviderModal();
+      expect(keyringChk.checked).toBe(true);
+
+      // Case 1: User unchecks system keyring storage
+      setSettingsState({ translateAiProviders: '[]', translateAiProvider: '' });
+      nameEl.value = 'LocalProxy';
+      urlEl.value = 'https://proxy.local/v1';
+      fmtEl.value = 'Chat completions';
+      keyEl.value = 'plain-secret-key';
+      keyringChk.checked = false;
+
+      await saveProviderConfig();
+
+      expect(invokeSpy).not.toHaveBeenCalledWith('store_keyring_credential', expect.anything());
+      const savedProviders = JSON.parse(getSettingsState().translateAiProviders);
+      expect(savedProviders[0].apiKey).toBe('plain-secret-key');
+      expect(savedProviders[0].useKeyring).toBe(false);
+
+      // Case 2: Duplicate name does not touch keyring before failing validation
+      invokeSpy.mockClear();
+      keyringChk.checked = true;
+      nameEl.value = 'LocalProxy';
+      urlEl.value = 'https://other.local/v1';
+      keyEl.value = 'should-not-overwrite-keyring';
+      await saveProviderConfig();
+      expect(invokeSpy).not.toHaveBeenCalledWith('store_keyring_credential', expect.anything());
+    });
+
+    it('preserves keyring secret when get_keyring_credential fails on provider load and another field saves', async () => {
+      const invokeSpy = vi.fn().mockImplementation((cmd: string) => {
+        if (cmd === 'get_keyring_credential') return Promise.reject(new Error('Keyring locked'));
+        return Promise.resolve(undefined);
+      });
+      (globalThis as any).window.__TAURI__ = { core: { invoke: invokeSpy } };
+
+      const provSelect = makeEl('select', 'opt-translateAiProvider');
+      provSelect.value = 'OpenAI';
+      makeEl('select', 'opt-translateAiModel');
+      makeEl('div', 'provider-manager-card');
+      const urlInput = makeEl('input', 'mgr-provider-url');
+      const fmtSelect = makeEl('select', 'mgr-provider-format');
+      const keyInput = makeEl('input', 'mgr-provider-key');
+      const eyeBtn = makeEl('button');
+      keyInput.nextElementSibling = eyeBtn;
+      const promptEl = makeEl('textarea', 'mgr-provider-prompt');
+
+      setSettingsState({
+        translateAiProvider: 'OpenAI',
+        translateAiModel: '',
+        translateAiProviders: JSON.stringify([
+          { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', apiKey: '__KEYRING__', useKeyring: true, models: [] }
+        ])
+      });
+
+      onProviderChanged('general');
+      await new Promise(r => setTimeout(r, 0));
+
+      expect(keyInput.value).toBe('••••••••••••••••');
+      expect(keyInput.dataset.isKeyring).toBe('true');
+      expect(keyInput.dataset.keyringError).toBe('true');
+
+      // Clicking eye button keeps input as password on keyring error
+      await togglePasswordVisibility('mgr-provider-key', eyeBtn);
+      expect(keyInput.type).toBe('password');
+
+      // Changing another field and saving must NOT delete the keyring secret
+      urlInput.value = 'https://api.openai.com/v2';
+      promptEl.value = 'Updated prompt';
+      await saveActiveProviderGeneral(true);
+
+      expect(invokeSpy).not.toHaveBeenCalledWith('delete_keyring_credential', expect.anything());
+      const providersAfter = JSON.parse(getSettingsState().translateAiProviders);
+      expect(providersAfter[0].apiKey).toBe('__KEYRING__');
+      expect(providersAfter[0].useKeyring).toBe(true);
+    });
+
+    it('keeps row activation, deletion, and rename accurate after in-place setActiveModelFromTable', async () => {
+      const invokeSpy = vi.fn().mockResolvedValue(undefined);
+      (globalThis as any).window.__TAURI__ = { core: { invoke: invokeSpy } };
+
+      const tbody = makeEl('div', 'mgr-models-tbody');
+      const provSelect = makeEl('select', 'opt-translateAiProvider');
+      provSelect.value = 'OpenRouter';
+      makeEl('select', 'opt-translateAiModel');
+
+      const modelA: ModelObject = { id: 'model-a', contextWindow: 128000, reasoning: 'None', enabled: true };
+      const modelB: ModelObject = { id: 'model-b', contextWindow: 128000, reasoning: 'None', enabled: true };
+      translationProviders.setModels([modelA, modelB]);
+      setSettingsState({
+        translateAiProvider: 'OpenRouter',
+        translateAiModel: 'model-a',
+        translateAiProviders: JSON.stringify([
+          { name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', apiKey: 'k', useKeyring: false, models: [modelA, modelB] }
+        ])
+      });
+
+      const rowA = createModelRowElement(modelA, true, 0);
+      const rowB = createModelRowElement(modelB, false, 1);
+      tbody.appendChild(rowA);
+      tbody.appendChild(rowB);
+
+      // Switch active model from A -> B in-place
+      await setActiveModelFromTable('model-b');
+      expect(getSettingsState().translateAiModel).toBe('model-b');
+      expect(rowA.classList.contains('active-model-row')).toBe(false);
+      expect(rowB.classList.contains('active-model-row')).toBe(true);
+
+      // Renaming newly active row B (while still the same in-place DOM row created with isActive=false) updates translateAiModel
+      (rowB as any)._idDisplay.listeners.dblclick[0]({ stopPropagation: () => {} });
+      const renameInput = (rowB as any)._replacedInput;
+      renameInput.value = 'model-b-renamed';
+      renameInput.listeners.keydown[0]({ key: 'Enter', preventDefault: () => {} });
+      expect(getSettingsState().translateAiModel).toBe('model-b-renamed');
+
+      // Re-create rows cleanly for reactivation & delete check on previously active row A
+      const freshA = createModelRowElement(modelA, true, 0);
+      const freshB = createModelRowElement(modelB, false, 1);
+      tbody.children = [freshA, freshB];
+      setSettingsState({
+        translateAiProvider: 'OpenRouter',
+        translateAiModel: 'model-a',
+        translateAiProviders: JSON.stringify([
+          { name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', apiKey: 'k', useKeyring: false, models: [modelA, modelB] }
+        ])
+      });
+      await setActiveModelFromTable('model-b-renamed');
+
+      // Previously active row A can now be re-activated
+      (freshA as any).dispatchClick();
+      await Promise.resolve();
+      expect(getSettingsState().translateAiModel).toBe('model-a');
+
+      // Switch back to model-b-renamed, then delete A (must succeed instead of triggering cannotDeleteActiveModel)
+      await setActiveModelFromTable('model-b-renamed');
+      const trashTarget = { closest: (s: string) => (s === '.model-btn-trash' ? {} : null) };
+      (freshA as any).dispatchClick(trashTarget);
+      expect(translationProviders.getModels().map(m => m.id)).toEqual(['model-b-renamed']);
+    });
+
+    it('does not overwrite active provider B models when provider A fetchActiveProviderModels completes late', async () => {
+      let resolveFetch!: (val: any) => void;
+      const invokeSpy = vi.fn().mockImplementation((cmd: string) => {
+        if (cmd === 'fetch_provider_models') {
+          return new Promise(res => {
+            resolveFetch = res;
+          });
+        }
+        return Promise.resolve(undefined);
+      });
+      (globalThis as any).window.__TAURI__ = { core: { invoke: invokeSpy } };
+
+      const provSelect = makeEl('select', 'opt-translateAiProvider');
+      provSelect.value = 'ProviderA';
+      const urlInput = makeEl('input', 'mgr-provider-url');
+      urlInput.value = 'https://a.example/v1';
+      makeEl('select', 'mgr-provider-format').value = 'Chat completions';
+      makeEl('input', 'mgr-provider-key').value = 'key-a';
+      makeEl('button', 'mgr-btn-fetch-models');
+
+      const existingBModels: ModelObject[] = [{ id: 'b-only-model', contextWindow: 64000, reasoning: 'None', enabled: true }];
+      translationProviders.setModels(existingBModels);
+      setSettingsState({
+        translateAiProvider: 'ProviderA',
+        translateAiModel: '',
+        translateAiProviders: JSON.stringify([
+          { name: 'ProviderA', baseUrl: 'https://a.example/v1', apiKey: 'key-a', useKeyring: false, models: [] },
+          { name: 'ProviderB', baseUrl: 'https://b.example/v1', apiKey: 'key-b', useKeyring: false, models: existingBModels }
+        ])
+      });
+
+      const fetchPromise = fetchActiveProviderModels();
+      await Promise.resolve();
+
+      // Switch active provider to ProviderB before ProviderA response arrives
+      getSettingsState().translateAiProvider = 'ProviderB';
+      getSettingsState().translateAiModel = 'b-only-model';
+      translationProviders.setModels(existingBModels);
+
+      resolveFetch([{ id: 'a-fetched-model', contextWindow: 128000 }]);
+      await fetchPromise;
+
+      // Active provider B state and currentProviderModels must remain untouched
+      expect(getSettingsState().translateAiProvider).toBe('ProviderB');
+      expect(getSettingsState().translateAiModel).toBe('b-only-model');
+      expect(translationProviders.getModels().map(m => m.id)).toEqual(['b-only-model']);
+
+      // ProviderA got its fetched models persisted cleanly
+      const updatedProviders = JSON.parse(getSettingsState().translateAiProviders);
+      const provA = updatedProviders.find((p: any) => p.name === 'ProviderA');
+      const provB = updatedProviders.find((p: any) => p.name === 'ProviderB');
+      expect(provA.models.map((m: any) => m.id)).toEqual(['a-fetched-model']);
+      expect(provB.models.map((m: any) => m.id)).toEqual(['b-only-model']);
     });
   });
 });

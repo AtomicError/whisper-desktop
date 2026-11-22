@@ -16,6 +16,7 @@ import {
   getRecommendedThreadCount,
   normalizeDigitsToAscii,
   clampIntSettingValue,
+  clampFloatSettingValue,
   formatMsToTimecode,
   evaluateCustomTimeRange,
   evaluateBatchTimeRange,
@@ -637,7 +638,8 @@ export async function scanAndPopulateModels(): Promise<void> {
       });
       if (!vadMatched && validVadModels.length > 0) {
         vadSelect.selectedIndex = 0;
-        current.vadModel = vadSelect.value;
+        vadSelect.value = validVadModels[0];
+        current.vadModel = validVadModels[0];
       } else if (validVadModels.length === 0) {
         current.vadModel = '';
       }
@@ -758,6 +760,57 @@ export function clearSettingsSearch(): void {
   }
 }
 
+let _preSearchProviderTab: string | null = null;
+
+function getActiveProviderSubTab(): string | null {
+  const managerCard = document.getElementById('provider-manager-card');
+  if (!managerCard) return null;
+  const activeBtn = managerCard.querySelector('.provider-tab-btn.active') as HTMLElement | null;
+  if (activeBtn?.id?.startsWith('tab-btn-')) {
+    return activeBtn.id.replace('tab-btn-', '');
+  }
+  const tabIds = ['auto', 'providers', 'general', 'models'];
+  for (const id of tabIds) {
+    const tabEl = document.getElementById(`provider-tab-${id}`);
+    if (tabEl && tabEl.style.display !== 'none') return id;
+  }
+  return null;
+}
+
+function setSearchProviderTab(tabName: string): void {
+  const win = getGlobal();
+  if (typeof win.switchProviderTab === 'function') {
+    win.switchProviderTab(tabName);
+    return;
+  }
+  const tabs = ['auto', 'providers', 'general', 'models'];
+  tabs.forEach(name => {
+    const btn = document.getElementById(`tab-btn-${name}`);
+    const pane = document.getElementById(`provider-tab-${name}`);
+    const isActive = name === tabName;
+    if (btn) btn.classList.toggle('active', isActive);
+    if (pane) pane.style.display = isActive ? (name === 'auto' ? 'flex' : 'block') : 'none';
+  });
+}
+
+function findMatchingProviderSubTab(q: string): 'providers' | 'general' | 'models' | null {
+  const specs: Array<{ tab: 'general' | 'models' | 'providers'; selector: string }> = [
+    { tab: 'general', selector: 'label, span, button' },
+    { tab: 'models', selector: 'th, button, span' },
+    { tab: 'providers', selector: '.provider-tile-name' }
+  ];
+  for (const { tab, selector } of specs) {
+    const btnText = document.getElementById(`tab-btn-${tab}`)?.textContent?.toLowerCase() || '';
+    const pane = document.getElementById(`provider-tab-${tab}`);
+    const paneNodes = pane ? Array.from(pane.querySelectorAll(selector)) : [];
+    const paneText = paneNodes.length > 0
+      ? paneNodes.map(el => el.textContent?.toLowerCase() || '').join(' ')
+      : (pane?.textContent?.toLowerCase() || '');
+    if (`${btnText} ${paneText}`.includes(q)) return tab;
+  }
+  return null;
+}
+
 export function executeFilterSettings(query: string): void {
   if (typeof document === 'undefined') return;
   const q = (query || '').trim().toLowerCase();
@@ -779,6 +832,11 @@ export function executeFilterSettings(query: string): void {
     document.querySelectorAll('.settings-search-group-header').forEach(h => {
       if (!isFrozenClone(h)) h.remove();
     });
+
+    if (_preSearchProviderTab !== null) {
+      setSearchProviderTab(_preSearchProviderTab);
+      _preSearchProviderTab = null;
+    }
 
     tabs.forEach(tab => {
       tab.classList.remove('search-dimmed');
@@ -807,6 +865,10 @@ export function executeFilterSettings(query: string): void {
       toggleOutputDirCustomField();
     }
     return;
+  }
+
+  if (_preSearchProviderTab === null) {
+    _preSearchProviderTab = getActiveProviderSubTab();
   }
 
   let totalMatches = 0;
@@ -854,6 +916,19 @@ export function executeFilterSettings(query: string): void {
         (card as HTMLElement).style.display = 'none';
       }
     });
+
+    if (catName === 'translation') {
+      if (groupMatches > 0) {
+        setSearchProviderTab('auto');
+      } else {
+        const matchedSubTab = findMatchingProviderSubTab(q);
+        if (matchedSubTab) {
+          setSearchProviderTab(matchedSubTab);
+          groupMatches++;
+          totalMatches++;
+        }
+      }
+    }
 
     catMatches[catName] = groupMatches;
 
@@ -981,6 +1056,24 @@ export async function refreshSettings(): Promise<void> {
         }
       }
 
+      const outputInputEl = document.getElementById('opt-outputDirPath') as HTMLInputElement | null;
+      if (outputInputEl) {
+        const outPath = loaded.outputDirPath || '';
+        outputInputEl.value = outPath;
+        if (outPath) {
+          const isolatedOut = isolateLtr(outPath);
+          outputInputEl.title = isolatedOut;
+          if (outputInputEl.parentElement) {
+            outputInputEl.parentElement.title = isolatedOut;
+          }
+        } else {
+          outputInputEl.removeAttribute('title');
+          if (outputInputEl.parentElement) {
+            outputInputEl.parentElement.removeAttribute('title');
+          }
+        }
+      }
+
       initLanguageSelects();
       bindSettingsToDOM();
     }
@@ -1078,6 +1171,17 @@ export function bindSettingsToDOM(): void {
         };
       } else if (el.tagName === 'SELECT' || el.tagName === 'TEXTAREA' || (el as HTMLInputElement).type === 'text' || (el as HTMLInputElement).type === 'number') {
         el.value = current[key] ?? '';
+        if (el.id === 'opt-outputDirPath' || el.id === 'opt-modelsDir') {
+          const dirStr = String(el.value || '');
+          if (dirStr) {
+            const isolatedDir = isolateLtr(dirStr);
+            el.title = isolatedDir;
+            if (el.parentElement) el.parentElement.title = isolatedDir;
+          } else {
+            el.removeAttribute('title');
+            if (el.parentElement) el.parentElement.removeAttribute('title');
+          }
+        }
         if (key === 'prompt' || el.id === 'opt-prompt' || el.hasAttribute('dir')) {
           safeApplyDynamicDirection(el as HTMLElement);
           if (!(el as any)._hasDynamicDirListener) {
@@ -1105,17 +1209,8 @@ export function bindSettingsToDOM(): void {
             val = clampIntSettingValue(key, el.value);
             el.value = String(val);
           } else if (FLOAT_SETTING_KEYS.has(key)) {
-            val = parseFloat(normalizeDigitsToAscii(String(el.value ?? '')));
-            if (isNaN(val)) {
-              val = (key === 'vadMaxSpeech') ? 30.0 : 0.0;
-            } else if (key === 'vadMaxSpeech') {
-              if (val <= 0.0 || val >= 1000.0) {
-                val = 30.0;
-              } else {
-                val = Math.max(1.0, Math.min(300.0, val));
-              }
-              el.value = String(val);
-            }
+            val = clampFloatSettingValue(key, el.value);
+            el.value = String(val);
           }
           if (key === 'uiScale') {
             const numVal = parseFloat(val) || 1.0;
@@ -1158,6 +1253,7 @@ export function bindSettingsToDOM(): void {
           }
           if (key === 'selectedBackend') {
             refreshBuildStatuses();
+            void scanAndPopulateModels();
           }
           if (key === 'ffmpegSource') {
             refreshFFmpegStatus(val, true);
@@ -1618,8 +1714,7 @@ export function sanitizeSettingsPayload(state: any): any {
     if (INT_SETTING_KEYS.has(key)) {
       clean[key] = clampIntSettingValue(key, clean[key]);
     } else if (FLOAT_SETTING_KEYS.has(key)) {
-      const parsed = parseFloat(normalizeDigitsToAscii(String(clean[key] ?? '')));
-      clean[key] = isNaN(parsed) ? (key === 'vadMaxSpeech' ? 30.0 : 0.0) : parsed;
+      clean[key] = clampFloatSettingValue(key, clean[key]);
     }
   }
   ensureAtLeastOneOutputFormat(clean);
@@ -1643,8 +1738,7 @@ export async function saveCurrentSettings(immediate = false): Promise<void> {
     if (INT_SETTING_KEYS.has(key) && typeof current[key] === 'string') {
       current[key] = clampIntSettingValue(key, current[key]);
     } else if (FLOAT_SETTING_KEYS.has(key) && typeof current[key] === 'string') {
-      const parsed = parseFloat(normalizeDigitsToAscii(current[key]));
-      current[key] = isNaN(parsed) ? (key === 'vadMaxSpeech' ? 30.0 : 0.0) : parsed;
+      current[key] = clampFloatSettingValue(key, current[key]);
     }
   }
 
@@ -1707,6 +1801,7 @@ export async function confirmResetWhisperEngine(): Promise<void> {
     if (typeof refreshBuildStatuses === 'function') {
       refreshBuildStatuses();
     }
+    await scanAndPopulateModels();
     showNotification(t('toasts.engineSettingsReset'), 'success');
   } catch (err) {
     console.error('Failed to reset whisper engine settings:', err);

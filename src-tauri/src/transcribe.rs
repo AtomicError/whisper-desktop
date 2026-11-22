@@ -523,10 +523,11 @@ pub async fn run_transcription(
     app: AppHandle,
     logs: std::sync::Arc<AppLogs>,
     session: std::sync::Arc<std::sync::Mutex<crate::TranscriptionSession>>,
-    settings: WhisperSettings,
+    mut settings: WhisperSettings,
     wav_path: String,
     mut duration_sec: f64,
 ) -> Result<TranscriptionResult, String> {
+    settings.sanitize_and_validate();
     let wav_path_buf = std::path::PathBuf::from(&wav_path);
     let _wav_guard = FileGuard(wav_path_buf.clone());
     let stale_wav = {
