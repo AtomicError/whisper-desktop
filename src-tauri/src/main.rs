@@ -20,7 +20,7 @@ use tauri::{AppHandle, Manager, State};
 
 use settings::{WhisperSettings, load_settings_file, save_settings_file};
 use hardware::HardwareMonitor;
-use logger::AppLogs;
+use logger::{AppLogs, LogPayload};
 use builder::check_build_exists;
 use transcribe::{probe_file_metadata, convert_to_wav, run_transcription, FileMetadata, TranscriptionResult, read_text_file};
 use downloader::{DownloadSession, DownloadState, start_download, get_all_models_status, pause_download_model, delete_model_file};
@@ -349,8 +349,8 @@ async fn cancel_hardsub_task(
 }
 
 #[tauri::command]
-fn get_logs(state: State<'_, LogState>) -> String {
-    state.0.get_all()
+fn get_logs(state: State<'_, LogState>) -> Vec<LogPayload> {
+    state.0.get_entries()
 }
 
 #[tauri::command]

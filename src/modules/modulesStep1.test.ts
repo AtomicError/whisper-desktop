@@ -84,6 +84,163 @@ describe('logsController', () => {
 
     vi.unstubAllGlobals();
   });
+
+  it('hydrates backend logs without duplicating seq entries, preserves frontend System logs, and strips ANSI', () => {
+    logsController.clear();
+    // Simulate a backend log received via live event before get_logs completes
+    logsController.push({ seq: 2, timestamp: '10:00:02', category: 'Settings', message: 'Live warning' });
+    // Simulate a frontend System error during startup
+    logsController.push({ timestamp: '10:00:03', category: 'System', message: 'Frontend error: test' });
+
+    logsController.hydrate([
+      { seq: 1, timestamp: '10:00:01', category: 'Whisper', message: '\u001b[32mBoot\u001b[0m' },
+      { seq: 2, timestamp: '10:00:02', category: 'Settings', message: 'Live warning' },
+    ]);
+
+    const logs = getLogs();
+    expect(logs.length).toBe(3);
+    expect(logs.map(l => l.seq)).toEqual([1, 2, undefined]);
+    expect(logs[0].message).toBe('Boot');
+    expect(logs[2].category).toBe('System');
+  });
+
+  it('renders filtered older logs even when total log count exceeds 1500', () => {
+    logsController.clear();
+
+    const makeMockEl = (tag = 'div'): any => {
+      const attrs = new Map<string, string>();
+      const listeners = new Map<string, Function[]>();
+      const el: any = {
+        tagName: tag.toUpperCase(),
+        id: '',
+        className: '',
+        textContent: '',
+        dataset: {},
+        disabled: false,
+        checked: true,
+        scrollTop: 0,
+        scrollHeight: 1000,
+        clientHeight: 200,
+        children: [] as any[],
+        classList: {
+          add: vi.fn(),
+          remove: vi.fn(),
+          contains: () => false,
+        },
+        setAttribute: (k: string, v: string) => attrs.set(k, v),
+        getAttribute: (k: string) => attrs.get(k) ?? null,
+        removeAttribute: (k: string) => attrs.delete(k),
+        querySelector: () => null,
+        querySelectorAll: () => [],
+        appendChild: (child: any) => {
+          el.children.push(child);
+          return child;
+        },
+        removeChild: (child: any) => {
+          const idx = el.children.indexOf(child);
+          if (idx >= 0) el.children.splice(idx, 1);
+        },
+        get firstElementChild() {
+          return el.children[0] || null;
+        },
+        set innerHTML(val: string) {
+          if (val === '') el.children = [];
+        },
+        addEventListener: (ev: string, fn: Function) => {
+          listeners.set(ev, [...(listeners.get(ev) || []), fn]);
+        },
+        scrollTo: vi.fn(),
+      };
+      return el;
+    };
+
+    const viewport = makeMockEl('div');
+    const clearBtn = makeMockEl('button');
+    const copyBtn = makeMockEl('button');
+    const autoScroll = makeMockEl('input');
+    autoScroll.checked = false;
+
+    const elements: Record<string, any> = {
+      'log-viewport': viewport,
+      'btn-clear-all-logs': clearBtn,
+      'btn-copy-all-logs': copyBtn,
+      'log-autoscroll': autoScroll,
+    };
+
+    vi.stubGlobal('document', {
+      getElementById: (id: string) => elements[id] || null,
+      querySelectorAll: () => [],
+      createElement: (tag: string) => makeMockEl(tag),
+    });
+
+    // Push 3 Translate logs followed by 1600 Whisper logs
+    for (let i = 0; i < 3; i++) {
+      logsController.push({ timestamp: '10:00:00', category: 'Translate', message: `Old translate ${i}` });
+    }
+    for (let i = 0; i < 1600; i++) {
+      logsController.push({ timestamp: '10:00:01', category: 'Whisper', message: `Whisper line ${i}` });
+    }
+
+    logsController.filter('Translate');
+    expect(viewport.children.length).toBe(3);
+    expect(viewport.children[0].children[2].textContent).toBe('Old translate 0');
+
+    // Reset filter to All for clean subsequent tests and verify Clear tooltip when empty
+    logsController.filter('All');
+    logsController.clear();
+    logsController.redraw();
+    expect(clearBtn.getAttribute('title')).not.toBe('No logs available to copy.');
+
+    vi.unstubAllGlobals();
+  });
+
+  it('cancels pending append auto-scroll timer when scrolling to top', () => {
+    vi.useFakeTimers();
+    logsController.clear();
+
+    const makeEl = (): any => {
+      const attrs = new Map<string, string>();
+      const el: any = {
+        children: [] as any[],
+        dataset: {},
+        className: '',
+        textContent: '',
+        checked: true,
+        scrollTop: 500,
+        scrollHeight: 1200,
+        clientHeight: 300,
+        classList: { add: vi.fn(), remove: vi.fn() },
+        setAttribute: (k: string, v: string) => attrs.set(k, v),
+        getAttribute: (k: string) => attrs.get(k) ?? null,
+        removeAttribute: (k: string) => attrs.delete(k),
+        querySelector: () => null,
+        appendChild: (c: any) => { el.children.push(c); return c; },
+        scrollTo: vi.fn(() => { el.scrollTop = 0; }),
+      };
+      return el;
+    };
+
+    const viewport = makeEl();
+    const autoScroll = makeEl();
+    autoScroll.checked = true;
+
+    vi.stubGlobal('document', {
+      getElementById: (id: string) => (id === 'log-viewport' ? viewport : id === 'log-autoscroll' ? autoScroll : null),
+      createElement: () => makeEl(),
+    });
+
+    logsController.appendLogToViewport({ timestamp: '12:00:00', category: 'Whisper', message: 'Streaming' });
+    logsController.scrollToTop(true);
+    expect(autoScroll.checked).toBe(false);
+    expect(viewport.scrollTop).toBe(0);
+
+    vi.advanceTimersByTime(150);
+    // Must stay at top and NOT snap back to scrollHeight (1200)
+    expect(viewport.scrollTop).toBe(0);
+
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
 });
 
 describe('themeManager', () => {

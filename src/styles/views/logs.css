@@ -65,6 +65,13 @@
   border-radius: 6px;
   color: #fff;
   font-size: 0.8rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.log-search-input:focus {
+  border-color: var(--color-royal-blue);
+  box-shadow: 0 0 12px rgba(var(--color-royal-blue-rgb), 0.2);
+  outline: none;
 }
 
 .logs-actions {
@@ -254,10 +261,25 @@
   width: 100px;
 }
 
+.filter-btn:focus-visible,
+.log-nav-btn:focus-visible,
+.log-jump-bottom-pill:focus-visible,
+.logs-actions .btn-secondary:focus-visible {
+  outline: 2px solid var(--color-royal-blue);
+  outline-offset: 2px;
+}
+
+.logs-actions .checkbox-container input:focus-visible ~ .custom-checkmark {
+  outline: 2px solid var(--color-royal-blue);
+  outline-offset: 2px;
+}
+
 .log-line .log-cat.translate { background: rgba(168, 85, 247, 0.12); color: #a855f7; }
 .log-line .log-cat.hardsub { background: rgba(236, 72, 153, 0.12); color: #ec4899; }
 .log-line .log-cat.ffmpeg { background: rgba(var(--color-cyan-rgb), 0.1); color: var(--color-cyan); }
 .log-line .log-cat.whisper { background: rgba(var(--color-gold-rgb), 0.1); color: var(--color-gold); }
+.log-line .log-cat.settings { background: rgba(148, 163, 184, 0.14); color: #cbd5e1; }
+.log-line .log-cat.system { background: rgba(var(--color-red-rgb), 0.14); color: var(--color-red); }
 
 .log-line .log-msg {
   flex-grow: 1;

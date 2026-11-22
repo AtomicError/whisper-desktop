@@ -2,18 +2,66 @@
 import { t } from '../i18n/index';
 
 export interface LogEntry {
+  seq?: number;
   category: string;
   message: string;
   timestamp: string;
 }
 
+const MAX_STORED_LOGS = 10000;
+const MAX_VIEWPORT_LINES = 1500;
+
 let activeLogCategory = 'All';
 let logSearchQuery = '';
 let allLogsArray: LogEntry[] = [];
+const seenBackendSeqs = new Set<number>();
 let lastAppendedCategory: string | null = null;
 let _isProgrammaticBottomScroll = false;
-let _programmaticBottomScrollTimer: any = null;
-let _updateLogsButtonsTimer: any = null;
+let _programmaticBottomScrollTimer: ReturnType<typeof setTimeout> | null = null;
+let _updateLogsButtonsTimer: ReturnType<typeof setTimeout> | null = null;
+let _appendScrollDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let _searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+function cancelPendingAppendScroll(): void {
+  if (_appendScrollDebounceTimer !== null) {
+    clearTimeout(_appendScrollDebounceTimer);
+    _appendScrollDebounceTimer = null;
+  }
+}
+
+function cancelProgrammaticBottomScroll(): void {
+  _isProgrammaticBottomScroll = false;
+  if (_programmaticBottomScrollTimer !== null) {
+    clearTimeout(_programmaticBottomScrollTimer);
+    _programmaticBottomScrollTimer = null;
+  }
+}
+
+function trimStoredLogsToCap(): void {
+  if (allLogsArray.length > MAX_STORED_LOGS) {
+    const evicted = allLogsArray.splice(0, allLogsArray.length - MAX_STORED_LOGS);
+    for (const item of evicted) {
+      if (typeof item.seq === 'number') {
+        seenBackendSeqs.delete(item.seq);
+      }
+    }
+  }
+}
+
+function matchesActiveFilter(entry: LogEntry): boolean {
+  if (activeLogCategory !== 'All' && entry.category !== activeLogCategory) {
+    return false;
+  }
+  if (logSearchQuery !== '') {
+    const q = logSearchQuery.toLowerCase();
+    const msgMatch = Boolean(entry.message && entry.message.toLowerCase().includes(q));
+    const catMatch = Boolean(entry.category && entry.category.toLowerCase().includes(q));
+    if (!msgMatch && !catMatch) {
+      return false;
+    }
+  }
+  return true;
+}
 
 export function stripAnsi(str: string): string {
   if (typeof str !== 'string') return '';
@@ -40,28 +88,77 @@ export function getLogs(): LogEntry[] {
 
 export function clearLogsArray(): void {
   allLogsArray = [];
+  seenBackendSeqs.clear();
   lastAppendedCategory = null;
+  cancelPendingAppendScroll();
 }
 
 export function pushLogEntry(entry: LogEntry): void {
-  allLogsArray.push(entry);
-  if (allLogsArray.length > 10000) {
-    allLogsArray.splice(0, allLogsArray.length - 10000);
+  if (typeof entry.seq === 'number') {
+    if (seenBackendSeqs.has(entry.seq)) {
+      return;
+    }
+    seenBackendSeqs.add(entry.seq);
   }
+  allLogsArray.push(entry);
+  trimStoredLogsToCap();
+}
+
+export function hydrateLogs(entries: LogEntry[]): void {
+  const bySeq = new Map<number, LogEntry>();
+  const frontendEntries: LogEntry[] = [];
+
+  for (const existing of allLogsArray) {
+    if (typeof existing.seq === 'number') {
+      bySeq.set(existing.seq, existing);
+    } else {
+      frontendEntries.push(existing);
+    }
+  }
+
+  for (const incoming of entries) {
+    if (!incoming) continue;
+    const normalized: LogEntry = {
+      ...incoming,
+      message: stripAnsi(incoming.message || ''),
+    };
+    if (typeof normalized.seq === 'number') {
+      bySeq.set(normalized.seq, normalized);
+    } else {
+      frontendEntries.push(normalized);
+    }
+  }
+
+  const orderedBackend = Array.from(bySeq.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([, item]) => item);
+
+  allLogsArray = [...orderedBackend, ...frontendEntries];
+  seenBackendSeqs.clear();
+  trimStoredLogsToCap();
+  for (const item of allLogsArray) {
+    if (typeof item.seq === 'number') {
+      seenBackendSeqs.add(item.seq);
+    }
+  }
+  lastAppendedCategory = null;
 }
 
 export function scrollLogsToBottom(smooth = false): void {
   const viewport = document.getElementById('log-viewport');
   if (!viewport) return;
+  cancelPendingAppendScroll();
+
   const pill = document.getElementById('btn-logs-jump-bottom');
   if (pill) {
     pill.classList.remove('visible');
   }
+  cancelProgrammaticBottomScroll();
   _isProgrammaticBottomScroll = true;
-  clearTimeout(_programmaticBottomScrollTimer);
   _programmaticBottomScrollTimer = setTimeout(() => {
     _isProgrammaticBottomScroll = false;
-  }, smooth ? 600 : 50);
+    _programmaticBottomScrollTimer = null;
+  }, smooth ? 1200 : 50);
 
   if (smooth) {
     viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
@@ -72,12 +169,17 @@ export function scrollLogsToBottom(smooth = false): void {
   if (autoScroll && !autoScroll.checked) {
     autoScroll.checked = true;
   }
-  updateLogJumpPillVisibility();
+  if (!smooth) {
+    updateLogJumpPillVisibility();
+  }
 }
 
 export function scrollLogsToTop(smooth = false): void {
   const viewport = document.getElementById('log-viewport');
   if (!viewport) return;
+  cancelPendingAppendScroll();
+  cancelProgrammaticBottomScroll();
+
   if (smooth) {
     viewport.scrollTo({ top: 0, behavior: 'smooth' });
   } else {
@@ -113,7 +215,8 @@ export function setupLogsControls(): void {
 
     logViewport.addEventListener('wheel', (e: WheelEvent) => {
       if (e.deltaY < 0) {
-        _isProgrammaticBottomScroll = false;
+        cancelPendingAppendScroll();
+        cancelProgrammaticBottomScroll();
         const autoScrollEl = document.getElementById('log-autoscroll') as HTMLInputElement | null;
         if (autoScrollEl && autoScrollEl.checked) {
           autoScrollEl.checked = false;
@@ -127,13 +230,22 @@ export function setupLogsControls(): void {
         scrollRaf = null;
         const autoScrollEl = document.getElementById('log-autoscroll') as HTMLInputElement | null;
         const distanceFromBottom = logViewport.scrollHeight - logViewport.scrollTop - logViewport.clientHeight;
-        if (!_isProgrammaticBottomScroll && distanceFromBottom > 140) {
+        if (_isProgrammaticBottomScroll && distanceFromBottom <= 2) {
+          cancelProgrammaticBottomScroll();
+        } else if (!_isProgrammaticBottomScroll && distanceFromBottom > 140) {
           if (autoScrollEl && autoScrollEl.checked) {
             autoScrollEl.checked = false;
           }
         }
         updateLogJumpPillVisibility();
       });
+    }, { passive: true });
+
+    logViewport.addEventListener('scrollend', () => {
+      if (_isProgrammaticBottomScroll) {
+        cancelProgrammaticBottomScroll();
+        updateLogJumpPillVisibility();
+      }
     }, { passive: true });
   }
 
@@ -150,15 +262,16 @@ export function setupLogsControls(): void {
 
 export function filterLogs(category: string): void {
   activeLogCategory = category;
-  
-  const filters = document.querySelectorAll('.filter-btn');
+
+  const scope = document.getElementById('panel-logs') || document;
+  const filters = scope.querySelectorAll('.filter-btn');
   filters.forEach(btn => {
     btn.classList.remove('active');
     if (btn.id === `log-filter-${category}`) {
       btn.classList.add('active');
     }
   });
-  
+
   redrawLogsViewport();
 }
 
@@ -167,10 +280,11 @@ export function handleLogSearch(): void {
   if (searchInput && (window as any).applyDynamicDirection) {
     (window as any).applyDynamicDirection(searchInput);
   }
-  const fn: any = handleLogSearch;
-  if (fn._timer) clearTimeout(fn._timer);
-  fn._timer = setTimeout(() => {
-    fn._timer = null;
+  if (_searchDebounceTimer !== null) {
+    clearTimeout(_searchDebounceTimer);
+  }
+  _searchDebounceTimer = setTimeout(() => {
+    _searchDebounceTimer = null;
     logSearchQuery = searchInput ? searchInput.value.toLowerCase().trim() : '';
     redrawLogsViewport();
   }, 120);
@@ -236,24 +350,52 @@ export function updateLogsButtonsState(): void {
     } else {
       btnClear.removeAttribute('disabled');
     }
-    btnClear.setAttribute('title', hasAnyLogs ? t('logs.clearBtn') : t('toasts.noLogsToCopy'));
+    btnClear.setAttribute('title', hasAnyLogs ? t('logs.clearBtn') : t('logs.emptyLogs'));
   }
 }
 
+function createLogLineElement(payload: LogEntry): HTMLDivElement {
+  const logLine = document.createElement('div');
+  logLine.className = 'log-line';
+
+  const category = payload.category || '';
+  const catClass = category.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+  logLine.dataset.category = category;
+
+  if (category === lastAppendedCategory) {
+    const timeSpacer = document.createElement('span');
+    timeSpacer.className = 'log-time-spacer';
+    const catSpacer = document.createElement('span');
+    catSpacer.className = 'log-cat-spacer';
+    logLine.appendChild(timeSpacer);
+    logLine.appendChild(catSpacer);
+  } else {
+    const timeEl = document.createElement('span');
+    timeEl.className = 'log-time';
+    timeEl.textContent = payload.timestamp || '';
+
+    const catEl = document.createElement('span');
+    catEl.className = catClass ? `log-cat ${catClass}` : 'log-cat';
+    catEl.textContent = category.toUpperCase();
+
+    logLine.appendChild(timeEl);
+    logLine.appendChild(catEl);
+    lastAppendedCategory = category;
+  }
+
+  const msgEl = document.createElement('span');
+  msgEl.className = 'log-msg';
+  msgEl.textContent = payload.message || '';
+  logLine.appendChild(msgEl);
+
+  return logLine;
+}
+
 export function appendLogToViewport(payload: LogEntry, isBatchRedraw = false): void {
-  if (activeLogCategory !== 'All' && payload.category !== activeLogCategory) {
+  if (!matchesActiveFilter(payload)) {
     return;
   }
-  
-  if (logSearchQuery !== '') {
-    const q = logSearchQuery.toLowerCase();
-    const msgMatch = Boolean(payload.message && payload.message.toLowerCase().includes(q));
-    const catMatch = Boolean(payload.category && payload.category.toLowerCase().includes(q));
-    if (!msgMatch && !catMatch) {
-      return;
-    }
-  }
-  
+
   const viewport = document.getElementById('log-viewport');
   if (!viewport) return;
 
@@ -264,31 +406,25 @@ export function appendLogToViewport(payload: LogEntry, isBatchRedraw = false): v
     }
   }
 
-  const logLine = document.createElement('div');
-  logLine.className = 'log-line';
-  
-  const catClass = payload.category.toLowerCase();
-  logLine.dataset.category = payload.category;
-  if (payload.category === lastAppendedCategory) {
-    logLine.innerHTML = '<span class="log-time-spacer"></span><span class="log-cat-spacer"></span><span class="log-msg">' + escapeHTML(payload.message) + '</span>';
-  } else {
-    logLine.innerHTML = '<span class="log-time">' + payload.timestamp + '</span><span class="log-cat ' + catClass + '">' + payload.category.toUpperCase() + '</span><span class="log-msg">' + escapeHTML(payload.message) + '</span>';
-    lastAppendedCategory = payload.category;
-  }
-  
+  const logLine = createLogLineElement(payload);
   viewport.appendChild(logLine);
-  
-  if (viewport.children.length > 1500) {
-    viewport.removeChild(viewport.firstElementChild!);
+
+  if (viewport.children.length > MAX_VIEWPORT_LINES && viewport.firstElementChild) {
+    viewport.removeChild(viewport.firstElementChild);
   }
-  
+
   if (isBatchRedraw) return;
 
   const autoScroll = (document.getElementById('log-autoscroll') as HTMLInputElement | null)?.checked;
-  const vp: any = viewport;
   if (autoScroll) {
-    clearTimeout(vp._scrollDebounce);
-    vp._scrollDebounce = setTimeout(() => {
+    cancelPendingAppendScroll();
+    _appendScrollDebounceTimer = setTimeout(() => {
+      _appendScrollDebounceTimer = null;
+      const liveAutoScroll = (document.getElementById('log-autoscroll') as HTMLInputElement | null)?.checked;
+      if (!liveAutoScroll) {
+        updateLogJumpPillVisibility();
+        return;
+      }
       viewport.scrollTop = viewport.scrollHeight;
       updateLogJumpPillVisibility();
     }, 80);
@@ -302,13 +438,14 @@ export function redrawLogsViewport(): void {
     clearTimeout(_updateLogsButtonsTimer);
     _updateLogsButtonsTimer = null;
   }
+  cancelPendingAppendScroll();
   lastAppendedCategory = null;
   const viewport = document.getElementById('log-viewport');
   updateLogsButtonsState();
   if (!viewport) return;
   viewport.innerHTML = '';
-  
-  const logsToRender = allLogsArray.slice(-1500);
+
+  const logsToRender = getFilteredLogs().slice(-MAX_VIEWPORT_LINES);
   logsToRender.forEach(payload => {
     appendLogToViewport(payload, true);
   });
@@ -470,8 +607,17 @@ if (typeof window !== 'undefined') {
 
 export const logsController = {
   get allLogs() { return allLogsArray; },
-  set allLogs(arr) { allLogsArray = arr; },
+  set allLogs(arr) {
+    allLogsArray = arr;
+    seenBackendSeqs.clear();
+    for (const item of allLogsArray) {
+      if (typeof item.seq === 'number') {
+        seenBackendSeqs.add(item.seq);
+      }
+    }
+  },
   push: pushLogEntry,
+  hydrate: hydrateLogs,
   clear: clearLogsArray,
   appendLogToViewport,
   redraw: redrawLogsViewport,

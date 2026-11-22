@@ -4,7 +4,7 @@
 
 import { hardsubController } from './hardsub';
 import './translationStudio';
-import { logsController, reportGlobalFrontendError } from './modules/logsController';
+import { logsController, reportGlobalFrontendError, stripAnsi, type LogEntry } from './modules/logsController';
 import { themeManager } from './modules/themeManager';
 import { modelHub } from './modules/modelHub';
 import { transcriptViewer } from './modules/transcriptViewer';
@@ -390,20 +390,32 @@ export async function initApp(): Promise<void> {
 
   try {
     const logs = await invoke('get_logs');
-    if (logs && typeof logs === 'string') {
+    if (Array.isArray(logs)) {
+      const entries: LogEntry[] = logs
+        .filter((item): item is LogEntry => Boolean(item && typeof item === 'object'))
+        .map((item) => ({
+          seq: typeof item.seq === 'number' ? item.seq : undefined,
+          timestamp: String(item.timestamp || ''),
+          category: String(item.category || ''),
+          message: stripAnsi(String(item.message || '')),
+        }));
+      logsController.hydrate(entries);
+    } else if (logs && typeof logs === 'string') {
+      const parsed: LogEntry[] = [];
       const lines = logs.trim().split('\n');
       for (const line of lines) {
         if (line.trim()) {
           const match = line.match(/^\[(\d{2}:\d{2}:\d{2})\] \[([^\]]+)\] (.*)$/);
           if (match) {
-            logsController.push({
+            parsed.push({
               timestamp: match[1],
               category: match[2],
-              message: match[3]
+              message: stripAnsi(match[3])
             });
           }
         }
       }
+      logsController.hydrate(parsed);
     }
   } catch (e) {
     console.error("Failed to load initial logs:", e);

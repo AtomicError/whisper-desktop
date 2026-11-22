@@ -286,6 +286,7 @@
   }
   .log-search-container {
     width: 100% !important;
+    max-width: none !important;
   }
   .log-search-input {
     font-size: 0.85rem !important;
