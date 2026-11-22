@@ -27,6 +27,7 @@ declare global {
     hasActiveBackgroundJob: () => boolean;
     updateTaskbarProgress: (progressFraction: number, active: boolean, statusType?: string) => void;
     setupTitlebar: () => void;
+    flushPendingSettingsOnUnload?: () => Promise<void> | void;
     settingsState: SettingsState | null;
     __TAURI__?: any;
   }
@@ -440,9 +441,20 @@ export function setupTitlebar(): void {
         });
       }
 
+      const flushPendingSettingsBeforeExit = async (): Promise<void> => {
+        if (typeof win.flushPendingSettingsOnUnload === 'function') {
+          try {
+            await win.flushPendingSettingsOnUnload();
+          } catch (err) {
+            console.warn('Failed to flush pending settings before exit:', err);
+          }
+        }
+      };
+
       const requestSafeExit = async () => {
         const settingsState = win.settingsState || null;
         if (settingsState && settingsState.closeToTray) {
+          await flushPendingSettingsBeforeExit();
           try {
             await invoke('hide_to_tray');
           } catch {
@@ -458,6 +470,7 @@ export function setupTitlebar(): void {
             t('modals.confirmExitBtn')
           );
           if (confirmed) {
+            await flushPendingSettingsBeforeExit();
             try {
               await invoke('exit_app');
             } catch {
@@ -465,6 +478,7 @@ export function setupTitlebar(): void {
             }
           }
         } else {
+          await flushPendingSettingsBeforeExit();
           try {
             await invoke('exit_app');
           } catch {

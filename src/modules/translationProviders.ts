@@ -481,6 +481,23 @@ export function populateProvidersDropdown(): void {
   }
 }
 
+function makeTileKeyboardAccessible(
+  el: HTMLElement,
+  onActivate: () => void,
+  ignoreTargetSelector?: string
+): void {
+  el.setAttribute('role', 'button');
+  el.tabIndex = 0;
+  el.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    if (ignoreTargetSelector && (e.target as HTMLElement | null)?.closest?.(ignoreTargetSelector)) {
+      return;
+    }
+    e.preventDefault();
+    onActivate();
+  });
+}
+
 export function renderProvidersGrid(providers: ProviderConfig[] | null = null): void {
   if (typeof document === 'undefined') return;
   const grid = document.getElementById('providers-tiles-grid');
@@ -540,8 +557,8 @@ export function renderProvidersGrid(providers: ProviderConfig[] | null = null): 
         <span class="provider-tile-badge ${isActive ? 'active' : ''}">
           ${isActive ? `<span class="pulse-dot"></span>${t('settings.activeBadge')}` : t('settings.inactiveBadge')}
         </span>
-        <button class="provider-tile-delete" title="${t('settings.deleteProvider')}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+        <button type="button" class="provider-tile-delete" title="${escapeHTML(t('settings.deleteProvider'))}" aria-label="${escapeHTML(t('settings.deleteProvider'))}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;" aria-hidden="true">
             <polyline points="3 6 5 6 21 6"></polyline>
             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
             <line x1="10" y1="11" x2="10" y2="17"></line>
@@ -551,14 +568,20 @@ export function renderProvidersGrid(providers: ProviderConfig[] | null = null): 
       </div>
     `;
     
-    tile.onclick = (e: MouseEvent) => {
-      if ((e.target as HTMLElement).closest('.provider-tile-delete')) return;
-      
+    const activateTile = () => {
       const select = document.getElementById('opt-translateAiProvider') as HTMLSelectElement | null;
       if (select) {
         select.value = p.name;
         onProviderChanged(true);
       }
+    };
+
+    tile.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    makeTileKeyboardAccessible(tile, activateTile, '.provider-tile-delete');
+
+    tile.onclick = (e: MouseEvent) => {
+      if ((e.target as HTMLElement).closest('.provider-tile-delete')) return;
+      activateTile();
     };
     
     const delBtn = tile.querySelector('.provider-tile-delete') as HTMLElement;
@@ -582,6 +605,7 @@ export function renderProvidersGrid(providers: ProviderConfig[] | null = null): 
     <span style="font-size: 0.88rem; font-weight: 500;">${t('settings.addProvider')}</span>
   `;
   addTile.onclick = () => openAddProviderModal();
+  makeTileKeyboardAccessible(addTile, () => openAddProviderModal());
   grid.appendChild(addTile);
 }
 
@@ -768,9 +792,14 @@ export function onProviderChanged(keepCurrentTab: boolean | string = false, skip
     if (keyEl) keyEl.value = '';
     const countEl = document.getElementById('provider-models-count');
     if (countEl) countEl.textContent = '0';
-    
-    const tbody = document.getElementById('mgr-models-tbody');
-    if (tbody) tbody.innerHTML = '';
+
+    currentProviderModels = [];
+    currentModelsPage = 1;
+    currentModelStatusFilter = 'all';
+    currentModelsSortCol = null;
+    currentModelsSortDir = 'none';
+    updateFilterCounts();
+    applyModelsFilterAndRender(0);
   }
 
   if (window.translationStudioController) {

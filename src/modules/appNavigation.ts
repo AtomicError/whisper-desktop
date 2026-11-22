@@ -236,25 +236,37 @@ export function setupHorizontalTabScroll(): void {
 /**
  * Vertical tablist keyboard navigation (WAI-ARIA Roving Tabindex, automatic activation)
  */
-export function setupVerticalTabKeyboardNavigation(): void {
-  const navItems = Array.from(document.querySelectorAll('.nav-item')) as HTMLElement[];
-  if (!navItems.length) return;
+function setupTablistKeyboardNavigation(
+  selector: string,
+  orientation: 'vertical' | 'horizontal'
+): void {
+  const items = Array.from(document.querySelectorAll(selector)) as HTMLElement[];
+  if (!items.length) return;
 
-  const moveTabFocus = (e: KeyboardEvent, item: HTMLElement): number => {
-    let targetIndex = -1;
-    if (e.key === 'ArrowDown') {
-      targetIndex = (navItems.indexOf(item) + 1) % navItems.length;
-    } else if (e.key === 'ArrowUp') {
-      targetIndex = (navItems.indexOf(item) - 1 + navItems.length) % navItems.length;
-    } else if (e.key === 'Home') {
-      targetIndex = 0;
-    } else if (e.key === 'End') {
-      targetIndex = navItems.length - 1;
+  const getTargetIndex = (e: KeyboardEvent, item: HTMLElement): number => {
+    const idx = items.indexOf(item);
+    if (idx < 0) return -1;
+
+    if (e.key === 'Home') return 0;
+    if (e.key === 'End') return items.length - 1;
+
+    if (orientation === 'vertical') {
+      if (e.key === 'ArrowDown') return (idx + 1) % items.length;
+      if (e.key === 'ArrowUp') return (idx - 1 + items.length) % items.length;
+      return -1;
     }
-    return targetIndex;
+
+    const isRtl = typeof document !== 'undefined' && document.documentElement?.getAttribute('dir') === 'rtl';
+    const nextKey = isRtl ? 'ArrowLeft' : 'ArrowRight';
+    const prevKey = isRtl ? 'ArrowRight' : 'ArrowLeft';
+    if (e.key === nextKey) return (idx + 1) % items.length;
+    if (e.key === prevKey) return (idx - 1 + items.length) % items.length;
+    return -1;
   };
 
-  navItems.forEach(item => {
+  items.forEach(item => {
+    if ((item as any)._hasTabKeyNav) return;
+    (item as any)._hasTabKeyNav = true;
     item.addEventListener('keydown', (e: KeyboardEvent) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
@@ -262,16 +274,20 @@ export function setupVerticalTabKeyboardNavigation(): void {
         return;
       }
 
-      const targetIndex = moveTabFocus(e, item);
-      if (targetIndex >= 0) {
+      const targetIndex = getTargetIndex(e, item);
+      if (targetIndex >= 0 && items[targetIndex]) {
         e.preventDefault();
-        if (navItems[targetIndex]) {
-          navItems[targetIndex].focus();
-          navItems[targetIndex].click();
-        }
+        items[targetIndex].focus();
+        items[targetIndex].click();
       }
     });
   });
+}
+
+export function setupVerticalTabKeyboardNavigation(): void {
+  setupTablistKeyboardNavigation('.nav-item', 'vertical');
+  setupTablistKeyboardNavigation('.settings-cat-btn', 'vertical');
+  setupTablistKeyboardNavigation('.provider-tab-btn', 'horizontal');
 }
 
 /**

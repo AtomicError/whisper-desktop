@@ -1100,6 +1100,12 @@ select.select-control {
   color: #ffffff;
 }
 
+.provider-tab-btn:focus-visible {
+  outline: 2px solid var(--color-royal-blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 /* Active Tab buttons */
 .provider-tab-btn.active {
   color: var(--color-royal-blue);
@@ -1161,6 +1167,11 @@ select.select-control {
 .password-toggle-btn:hover {
   color: #ffffff;
   background: rgba(255, 255, 255, 0.05);
+}
+
+.password-toggle-btn:focus-visible {
+  outline: 2px solid var(--color-royal-blue);
+  outline-offset: 1px;
 }
 
 /* Static Glowing Active Indicator Dot */
@@ -1375,6 +1386,11 @@ select.select-control {
   font-weight: 600;
 }
 
+.btn-filter:focus-visible {
+  outline: 2px solid var(--color-royal-blue);
+  outline-offset: 2px;
+}
+
 .filter-badge {
   display: inline-flex;
   align-items: center;
@@ -1459,6 +1475,12 @@ select.select-control {
   border-color: rgba(var(--color-royal-blue-rgb), 0.4);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.22), 0 0 16px rgba(var(--color-royal-blue-rgb), 0.12);
   background: var(--bg-card);
+}
+
+.provider-tile:focus-visible,
+.provider-tile-add:focus-visible {
+  outline: 2px solid var(--color-royal-blue);
+  outline-offset: 2px;
 }
 
 .provider-tile.active {
@@ -1605,6 +1627,11 @@ select.select-control {
 .provider-tile-delete:hover {
   color: var(--color-red);
   background: rgba(var(--color-red-rgb), 0.12);
+}
+
+.provider-tile-delete:focus-visible {
+  outline: 2px solid var(--color-royal-blue);
+  outline-offset: 1px;
 }
 
 .provider-tile-add {
@@ -1828,8 +1855,8 @@ select.select-control {
 
 /* Unify Input Heights, Paddings, and Roundness in General Config Card */
 .provider-manager-card .text-input:not(.models-search-input),
-.provider-manager-card .select-control,
-.provider-manager-card .custom-select-trigger {
+.provider-manager-card .select-control:not(.pagination-size-select),
+.provider-manager-card .custom-select-container:not(.pagination-size-select) .custom-select-trigger {
   height: 42px !important;
   padding: 10px 14px !important;
   border-radius: 8px !important;
@@ -1850,7 +1877,7 @@ select.select-control {
   padding-right: 40px !important;
 }
 
-.provider-manager-card select.select-control {
+.provider-manager-card select.select-control:not(.pagination-size-select) {
   padding-inline-end: 36px !important;
 }
 

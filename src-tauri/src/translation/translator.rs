@@ -3,7 +3,7 @@ use crate::logger::AppLogs;
 use crate::translation::chunker::chunk_dialogues;
 use crate::translation::formatter::ParsedSubtitle;
 use crate::translation::prompts::build_system_prompt;
-use crate::translation::provider::{get_keyring_key, AiProvider, ApiFormat, ANTHROPIC_VERSION};
+use crate::translation::provider::{get_keyring_key, AiModel, AiProvider, ApiFormat, RequestOptions, ANTHROPIC_VERSION};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;
@@ -988,25 +988,7 @@ pub async fn translate_files(
     // `None` = auto mode (conservative default, reactive discovery).
     let mut max_output_override = active_model.and_then(|m| m.max_output_tokens).filter(|&t| t >= MIN_OUTPUT_TOKENS);
 
-    let mut request_options = crate::translation::provider::RequestOptions {
-        max_output_tokens: if api_format == ApiFormat::AnthropicMessages {
-            Some(estimate_max_output_tokens(0, max_output_override))
-        } else {
-            None
-        },
-        reasoning_effort: active_model.and_then(|m| {
-            if m.supports_reasoning == Some(false) {
-                return None;
-            }
-            let r = m.reasoning.trim().to_lowercase();
-            if r == "minimal" || r == "low" || r == "medium" || r == "high" || r == "xhigh" || r == "max" || r == "ultra" {
-                Some(m.reasoning.clone())
-            } else {
-                None
-            }
-        }),
-        ..crate::translation::provider::RequestOptions::default()
-    };
+    let mut request_options = build_initial_request_options(api_format, active_model, 0);
 
     let lang_code = get_language_code(&settings.translate_ai_target_lang);
     let mut successfully_translated = Vec::new();
@@ -1545,6 +1527,41 @@ pub struct PreviewLine {
     pub is_fallback: bool,
 }
 
+/// Builds initial per-model `RequestOptions` shared by both real translation and
+/// Settings preview tests so reasoning effort and output caps never drift apart.
+fn build_initial_request_options(
+    api_format: ApiFormat,
+    active_model: Option<&AiModel>,
+    prompt_char_len: usize,
+) -> RequestOptions {
+    let max_output_override = active_model
+        .and_then(|m| m.max_output_tokens)
+        .filter(|&t| t >= MIN_OUTPUT_TOKENS);
+
+    RequestOptions {
+        max_output_tokens: if api_format == ApiFormat::AnthropicMessages {
+            Some(estimate_max_output_tokens(prompt_char_len, max_output_override))
+        } else {
+            None
+        },
+        reasoning_effort: active_model.and_then(|m| {
+            if m.supports_reasoning == Some(false) {
+                return None;
+            }
+            let r = m.reasoning.trim().to_lowercase();
+            if matches!(
+                r.as_str(),
+                "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | "ultra"
+            ) {
+                Some(m.reasoning.clone())
+            } else {
+                None
+            }
+        }),
+        ..RequestOptions::default()
+    }
+}
+
 /// Run a quick test translation on the first few cues of a subtitle file.
 ///
 /// Unlike the full subtitle translation pipeline, this directly returns errors
@@ -1649,14 +1666,12 @@ pub async fn preview_translate(
         .collect::<Vec<String>>()
         .join("\n");
 
-    let mut request_options = crate::translation::provider::RequestOptions {
-        max_output_tokens: if api_format == ApiFormat::AnthropicMessages {
-            Some(estimate_max_output_tokens(system_prompt.len() + user_content.len(), None))
-        } else {
-            None
-        },
-        ..crate::translation::provider::RequestOptions::default()
-    };
+    let active_model = provider.models.iter().find(|m| m.id == model);
+    let mut request_options = build_initial_request_options(
+        api_format,
+        active_model,
+        system_prompt.len() + user_content.len(),
+    );
 
     let cancel_watcher = async {
         loop {
@@ -2183,5 +2198,37 @@ mod alignment_tests {
         assert!(is_unsupported_system_role_error("Developer instruction is not enabled"));
         assert!(is_unsupported_system_role_error("System prompt not supported, only user messages allowed"));
         assert!(!is_unsupported_system_role_error("Internal server error in system backend"));
+    }
+
+    #[test]
+    fn build_initial_request_options_aligns_reasoning_and_anthropic_cap() {
+        let reasoning_model = AiModel {
+            id: "claude-sonnet".to_string(),
+            context_window: 200_000,
+            max_output_tokens: Some(4096),
+            reasoning: "Low".to_string(),
+            supports_reasoning: Some(true),
+            vision: false,
+            enabled: true,
+        };
+        let anthropic_opts = build_initial_request_options(
+            ApiFormat::AnthropicMessages,
+            Some(&reasoning_model),
+            120_000,
+        );
+        assert_eq!(anthropic_opts.reasoning_effort.as_deref(), Some("Low"));
+        assert_eq!(anthropic_opts.max_output_tokens, Some(4096));
+
+        let blocked_reasoning = AiModel {
+            supports_reasoning: Some(false),
+            ..reasoning_model.clone()
+        };
+        let openai_opts = build_initial_request_options(
+            ApiFormat::OpenAiCompatible,
+            Some(&blocked_reasoning),
+            500,
+        );
+        assert_eq!(openai_opts.reasoning_effort, None);
+        assert_eq!(openai_opts.max_output_tokens, None);
     }
 }

@@ -17,6 +17,7 @@ import {
   createModelRowElement,
   setActiveModelFromTable,
   fetchActiveProviderModels,
+  renderProvidersGrid,
   renderModelsRegistryTable,
   saveActiveProviderModels,
   testTranslationConnection,
@@ -803,6 +804,76 @@ describe('translationProviders module', () => {
 
       await testTranslationConnection();
       expect(testBtn.disabled).toBe(false);
+    });
+
+    it('clears currentProviderModels and destroys row CustomSelects when no provider remains in onProviderChanged', () => {
+      const destroyMock = vi.fn();
+      const staleSel = makeEl('select', 'model-reasoning-stale');
+      staleSel.className = 'model-reasoning-select';
+      staleSel.dataset = { customSelectInitialized: 'true' };
+
+      const tbody = makeEl('tbody', 'mgr-models-tbody');
+      tbody.children = [staleSel];
+      tbody.querySelectorAll = (sel: string) => (sel.includes('model-reasoning-select') ? [staleSel] : []);
+
+      (globalThis as any).window.customSelectsMap = new Map([
+        ['model-reasoning-stale', { destroy: destroyMock }]
+      ]);
+
+      const provSelect = makeEl('select', 'opt-translateAiProvider');
+      provSelect.value = '';
+      makeEl('select', 'opt-translateAiModel');
+      makeEl('div', 'provider-manager-card');
+      const countEl = makeEl('span', 'provider-models-count');
+
+      translationProviders.setModels([
+        { id: 'stale-model', contextWindow: 128000, reasoning: 'None', vision: false, enabled: true }
+      ]);
+      setSettingsState({
+        translateAiProvider: '',
+        translateAiModel: '',
+        translateAiProviders: '[]'
+      });
+
+      onProviderChanged(true, false);
+
+      expect(destroyMock).toHaveBeenCalledTimes(1);
+      expect(translationProviders.getModels()).toEqual([]);
+      expect(countEl.textContent).toBe('0');
+      expect((globalThis as any).window.customSelectsMap.size).toBe(0);
+    });
+
+    it('renders provider tiles and add-tile with keyboard button semantics and delete button type', () => {
+      const grid = makeEl('div', 'providers-tiles-grid');
+      grid.appendChild = (child: any) => {
+        grid.children.push(child);
+        return child;
+      };
+
+      const provSelect = makeEl('select', 'opt-translateAiProvider');
+      const opt1 = makeEl('option');
+      opt1.value = 'OpenAI';
+      provSelect.appendChild(opt1);
+      provSelect.value = 'OpenAI';
+
+      setSettingsState({
+        translateAiProvider: 'OpenAI',
+        translateAiProviders: JSON.stringify([
+          { name: 'OpenAI', apiFormat: 'Chat completions', baseUrl: 'https://api.openai.com/v1', apiKey: '', models: [] }
+        ])
+      });
+
+      renderProvidersGrid();
+
+      expect(grid.children.length).toBe(2);
+      const tile = grid.children[0];
+      const addTile = grid.children[1];
+      expect(tile.getAttribute('role')).toBe('button');
+      expect(tile.tabIndex).toBe(0);
+      expect(tile.getAttribute('aria-pressed')).toBe('true');
+      expect(tile.innerHTML).toContain('type="button"');
+      expect(addTile.getAttribute('role')).toBe('button');
+      expect(addTile.tabIndex).toBe(0);
     });
   });
 });

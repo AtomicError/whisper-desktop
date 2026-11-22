@@ -62,9 +62,12 @@ import {
   resetTranscribeOutputDir,
   syncSettingsManagerWindowBindings,
   markSettingsDirty,
-  flushPendingSettingsOnUnload
+  flushPendingSettingsOnUnload,
+  filterSettings,
+  saveCurrentSettings,
+  confirmResetWhisperEngine
 } from './settingsManager';
-import { switchTheme } from './themeManager';
+import { switchTheme, applyUiZoom } from './themeManager';
 import { resetQuickDeckState } from './transcribeQuickDeck';
 import { setLanguage, t } from '../i18n/index';
 
@@ -2778,6 +2781,92 @@ describe('settingsManager module', () => {
         expect(wBadge.className).toContain('ready');
       } finally {
         setSettingsState(prevSettings);
+      }
+    });
+
+    it('flushes pending debounced/zoom/toggle settings BEFORE invoking reset_whisper_core_settings', async () => {
+      vi.useFakeTimers();
+      const prevSettings = getSettingsState();
+      const callOrder: string[] = [];
+      const invokeMock = vi.fn().mockImplementation(async (cmd: string) => {
+        callOrder.push(cmd);
+        if (cmd === 'reset_whisper_core_settings') {
+          return { theme: 'emerald', uiScale: 1.25, uiLanguage: 'en', selectedBackend: 'Standard', modelPath: 'ggml-base.bin' };
+        }
+        if (cmd === 'scan_models') return { transModels: ['ggml-base.bin'], vadModels: [] };
+        return true;
+      });
+      (globalThis as any).__TAURI__.core.invoke = invokeMock;
+      setSettingsState({ theme: 'royal-blue', uiScale: 1.0, uiLanguage: 'en', closeToTray: false });
+      syncSettingsManagerWindowBindings();
+
+      try {
+        await applyUiZoom(1.25, true, false);
+        const cur = getSettingsState();
+        if (cur) cur.closeToTray = true;
+        await saveCurrentSettings(false);
+
+        await confirmResetWhisperEngine();
+
+        expect(callOrder.indexOf('save_settings')).toBeGreaterThanOrEqual(0);
+        expect(callOrder.indexOf('save_settings')).toBeLessThan(callOrder.indexOf('reset_whisper_core_settings'));
+        expect(invokeMock).toHaveBeenCalledWith(
+          'save_settings',
+          expect.objectContaining({
+            settings: expect.objectContaining({ uiScale: 1.25, closeToTray: true })
+          })
+        );
+
+        // Advancing timers must not trigger a second redundant save from cleared zoom/debounce timers
+        const saveCountAfterReset = invokeMock.mock.calls.filter(c => c[0] === 'save_settings').length;
+        vi.advanceTimersByTime(1000);
+        expect(invokeMock.mock.calls.filter(c => c[0] === 'save_settings').length).toBe(saveCountAfterReset);
+      } finally {
+        vi.useRealTimers();
+        setSettingsState(prevSettings);
+      }
+    });
+
+    it('cancels pending debounced filterSettings timer when switchSettingsCategory is called', () => {
+      vi.useFakeTimers();
+      try {
+        const searchInput = new MockElement('INPUT');
+        searchInput.id = 'settings-search-input';
+        searchInput.value = 'vulkan';
+        elementRegistry.set('settings-search-input', searchInput);
+
+        const appGroup = new MockElement('DIV');
+        appGroup.id = 'group-app';
+        appGroup.className = 'settings-group active';
+        elementRegistry.set('group-app', appGroup);
+
+        const gpuGroup = new MockElement('DIV');
+        gpuGroup.id = 'group-gpu';
+        gpuGroup.className = 'settings-group';
+        elementRegistry.set('group-gpu', gpuGroup);
+
+        const appTab = new MockElement('BUTTON');
+        appTab.id = 'cat-btn-app';
+        appTab.className = 'settings-cat-btn active';
+        elementRegistry.set('cat-btn-app', appTab);
+
+        const gpuTab = new MockElement('BUTTON');
+        gpuTab.id = 'cat-btn-gpu';
+        gpuTab.className = 'settings-cat-btn';
+        elementRegistry.set('cat-btn-gpu', gpuTab);
+
+        // Trigger debounced search, then switch category immediately before 80ms elapses
+        filterSettings('vulkan', false);
+        searchInput.value = '';
+        switchSettingsCategory('gpu');
+
+        vi.advanceTimersByTime(150);
+
+        expect(getActiveSettingsCat()).toBe('gpu');
+        expect(gpuGroup.classList.contains('active')).toBe(true);
+        expect(appGroup.classList.contains('active')).toBe(false);
+      } finally {
+        vi.useRealTimers();
       }
     });
   });

@@ -325,5 +325,79 @@ describe('nativeWindow & OS Module', () => {
       expect(typeof (window as any).showInFolder).toBe('function');
       expect(typeof (window as any).openFileInEditor).toBe('function');
     });
+
+    it('flushes and awaits pending settings before invoking exit_app when closing titlebar', async () => {
+      const prevDoc = (globalThis as any).document;
+      const prevTauri = (globalThis as any).window.__TAURI__;
+      const prevFlush = (globalThis as any).window.flushPendingSettingsOnUnload;
+      const prevSettings = (globalThis as any).window.settingsState;
+
+      const makeBtn = (id: string) => {
+        const listeners: Record<string, Function[]> = {};
+        return {
+          id,
+          listeners,
+          addEventListener: (ev: string, fn: Function) => {
+            listeners[ev] = listeners[ev] || [];
+            listeners[ev].push(fn);
+          },
+          click: () => {
+            (listeners['click'] || []).forEach(fn => fn({ preventDefault: () => {} }));
+          }
+        };
+      };
+
+      const minBtn = makeBtn('titlebar-minimize');
+      const maxBtn = makeBtn('titlebar-maximize');
+      const closeBtn = makeBtn('titlebar-close');
+      const events: string[] = [];
+
+      const invokeMock = vi.fn().mockImplementation(async (cmd: string) => {
+        events.push(`invoke:${cmd}`);
+      });
+
+      const appWindowMock = {
+        minimize: vi.fn().mockResolvedValue(undefined),
+        toggleMaximize: vi.fn().mockResolvedValue(undefined),
+        hide: vi.fn().mockResolvedValue(undefined),
+        close: vi.fn().mockResolvedValue(undefined),
+        destroy: vi.fn().mockResolvedValue(undefined),
+        onCloseRequested: vi.fn()
+      };
+
+      (globalThis as any).document = {
+        getElementById: (id: string) => {
+          if (id === 'titlebar-minimize') return minBtn;
+          if (id === 'titlebar-maximize') return maxBtn;
+          if (id === 'titlebar-close') return closeBtn;
+          return null;
+        },
+        querySelector: () => null
+      };
+      (globalThis as any).window.__TAURI__ = {
+        core: { invoke: invokeMock },
+        window: { getCurrentWindow: () => appWindowMock }
+      };
+      (globalThis as any).window.settingsState = { closeToTray: false };
+      (globalThis as any).window.flushPendingSettingsOnUnload = vi.fn().mockImplementation(async () => {
+        await Promise.resolve();
+        events.push('flush');
+      });
+
+      try {
+        nativeWindow.setupTitlebar();
+        closeBtn.click();
+        await new Promise(resolve => setTimeout(resolve, 10));
+
+        expect((globalThis as any).window.flushPendingSettingsOnUnload).toHaveBeenCalledTimes(1);
+        expect(invokeMock.mock.calls.some(c => c[0] === 'exit_app')).toBe(true);
+        expect(events).toEqual(['flush', 'invoke:exit_app']);
+      } finally {
+        (globalThis as any).document = prevDoc;
+        (globalThis as any).window.__TAURI__ = prevTauri;
+        (globalThis as any).window.flushPendingSettingsOnUnload = prevFlush;
+        (globalThis as any).window.settingsState = prevSettings;
+      }
+    });
   });
 });

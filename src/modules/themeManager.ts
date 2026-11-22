@@ -103,6 +103,16 @@ export const MONOCHROME_META_COLORS: Record<string, string> = {
 let currentUiZoom = 1.0;
 let zoomSaveTimeout: any = null;
 
+/** Cancels any pending debounced zoom save timer and reports whether one was armed. */
+export function clearPendingUiZoomSave(): boolean {
+  if (zoomSaveTimeout) {
+    clearTimeout(zoomSaveTimeout);
+    zoomSaveTimeout = null;
+    return true;
+  }
+  return false;
+}
+
 export function resolveThemeConfig(themeName: string): ThemeConfig {
   if (themeName === 'ruby-red' || themeName === 'ruby' || themeName === 'carbon') {
     return THEME_REGISTRY['ruby-red'];
@@ -673,6 +683,7 @@ export async function applyUiZoom(scale: number | string, persist = true, showTo
       clearTimeout(zoomSaveTimeout);
     }
     zoomSaveTimeout = setTimeout(() => {
+      zoomSaveTimeout = null;
       if (typeof (window as any).saveCurrentSettings === 'function') {
         (window as any).saveCurrentSettings();
       }
@@ -745,6 +756,7 @@ if (typeof window !== 'undefined') {
   (window as any).applyUiZoom = applyUiZoom;
   (window as any).adjustUiZoom = adjustUiZoom;
   (window as any).setUiZoom = setUiZoom;
+  (window as any).clearPendingUiZoomSave = clearPendingUiZoomSave;
 }
 
 export const themeManager = {
@@ -757,6 +769,7 @@ export const themeManager = {
   applyUiZoom,
   adjustUiZoom,
   setUiZoom,
+  clearPendingUiZoomSave,
   setupShortcuts: setupZoomKeyboardShortcuts,
   resolveTheme: resolveThemeConfig,
   THEME_REGISTRY,

@@ -333,5 +333,46 @@ describe('appNavigation module', () => {
 
       expect(clickSpy).toHaveBeenCalled();
     });
+
+    it('navigates settings category tabs vertically and provider tabs horizontally (respecting RTL)', () => {
+      const settingsCats = ['app', 'transcription', 'gpu'].map((name, i) => {
+        const el = new MockElement('BUTTON');
+        el.id = `cat-btn-${name}`;
+        el.className = `settings-cat-btn${i === 0 ? ' active' : ''}`;
+        return el;
+      });
+      const providerTabs = ['auto', 'providers', 'general'].map((name, i) => {
+        const el = new MockElement('BUTTON');
+        el.id = `tab-btn-${name}`;
+        el.className = `provider-tab-btn${i === 0 ? ' active' : ''}`;
+        return el;
+      });
+
+      const origQsa = (globalThis as any).document.querySelectorAll;
+      let mockDir = 'ltr';
+      (globalThis as any).document.documentElement = {
+        getAttribute: (attr: string) => (attr === 'dir' ? mockDir : null)
+      };
+      (globalThis as any).document.querySelectorAll = (selector: string) => {
+        if (selector === '.settings-cat-btn') return settingsCats;
+        if (selector === '.provider-tab-btn') return providerTabs;
+        return origQsa(selector);
+      };
+
+      setupVerticalTabKeyboardNavigation();
+
+      const catClickSpy = vi.spyOn(settingsCats[1], 'click');
+      settingsCats[0].dispatchEvent({ key: 'ArrowDown', type: 'keydown', preventDefault: vi.fn() });
+      expect(catClickSpy).toHaveBeenCalledTimes(1);
+
+      const provNextSpy = vi.spyOn(providerTabs[1], 'click');
+      providerTabs[0].dispatchEvent({ key: 'ArrowRight', type: 'keydown', preventDefault: vi.fn() });
+      expect(provNextSpy).toHaveBeenCalledTimes(1);
+
+      // In RTL, ArrowLeft advances forward from tab 0 to tab 1
+      mockDir = 'rtl';
+      providerTabs[0].dispatchEvent({ key: 'ArrowLeft', type: 'keydown', preventDefault: vi.fn() });
+      expect(provNextSpy).toHaveBeenCalledTimes(2);
+    });
   });
 });

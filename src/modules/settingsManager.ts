@@ -2,7 +2,7 @@
 import { t, getLanguage, setLanguage, isolateLtr, applyTextDirection } from '../i18n/index';
 import { showNotification, showConfirmModal } from './appModal';
 import { getBasename, openFileInEditor } from './nativeWindow';
-import { applyMonochromeCanvas, applyTheme, switchTheme, applyUiZoom } from './themeManager';
+import { applyMonochromeCanvas, applyTheme, switchTheme, applyUiZoom, clearPendingUiZoomSave } from './themeManager';
 import { initLanguageSelects } from '../languageSelect';
 import { invalidateModelStatusesCache } from './modelHub';
 import type { ProviderConfig } from './translationProviders';
@@ -693,6 +693,10 @@ export async function scanAndPopulateModels(): Promise<void> {
 // ----------------- Category Switch & Filter / Search -----------------
 export function switchSettingsCategory(catName: string): void {
   if (typeof document === 'undefined') return;
+  if (_filterSettingsTimer) {
+    clearTimeout(_filterSettingsTimer);
+    _filterSettingsTimer = null;
+  }
   if (catName === 'general') catName = 'app';
 
   const searchInput = document.getElementById('settings-search-input') as HTMLInputElement | null;
@@ -1135,9 +1139,9 @@ export function bindSettingsToDOM(): void {
       current.autoTransferToTranslate = autoTransferCheckbox.checked;
       current.translateAiEnabled = autoTransferCheckbox.checked;
       markSettingsDirty();
-      setTimeout(() => {
+      scheduleDeferredToggleSave('__autoTransfer__', () => {
         saveCurrentSettings();
-      }, 240);
+      });
     };
   }
 
@@ -1176,7 +1180,7 @@ export function bindSettingsToDOM(): void {
           }
 
           // Defer heavy side-effects so the 220ms toggle CSS transition completes at pure 60fps
-          setTimeout(() => {
+          scheduleDeferredToggleSave(key, () => {
             if (key === 'monochromeCanvas') {
               applyMonochromeCanvas(chk.checked, true);
             }
@@ -1192,7 +1196,7 @@ export function bindSettingsToDOM(): void {
             if (key === 'translateAiPolish' && win.translationStudioController?.syncFromGlobalSettings) {
               win.translationStudioController.syncFromGlobalSettings();
             }
-          }, 240);
+          });
         };
       } else if (el.tagName === 'SELECT' || el.tagName === 'TEXTAREA' || (el as HTMLInputElement).type === 'text' || (el as HTMLInputElement).type === 'number') {
         el.value = current[key] ?? '';
@@ -1792,6 +1796,26 @@ export function sanitizeSettingsPayload(state: any): any {
 
 let saveSettingsDebounceTimer: any = null;
 let hasUnsavedSettings = false;
+const pendingToggleSaveTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function scheduleDeferredToggleSave(key: string, task: () => void): void {
+  const existing = pendingToggleSaveTimers.get(key);
+  if (existing) {
+    clearTimeout(existing);
+  }
+  const timer = setTimeout(() => {
+    pendingToggleSaveTimers.delete(key);
+    task();
+  }, 240);
+  pendingToggleSaveTimers.set(key, timer);
+}
+
+function clearPendingToggleSaveTimers(): boolean {
+  if (pendingToggleSaveTimers.size === 0) return false;
+  pendingToggleSaveTimers.forEach(timer => clearTimeout(timer));
+  pendingToggleSaveTimers.clear();
+  return true;
+}
 
 export function markSettingsDirty(): void {
   hasUnsavedSettings = true;
@@ -1863,14 +1887,7 @@ export async function confirmResetWhisperEngine(): Promise<void> {
   if (resetIcon) resetIcon.classList.add('is-spinning');
 
   try {
-    if (typeof win.flushPendingModelCatalogChanges === 'function' && win.flushPendingModelCatalogChanges()) {
-      await saveCurrentSettings(true);
-    }
-    if (saveSettingsDebounceTimer) {
-      clearTimeout(saveSettingsDebounceTimer);
-      saveSettingsDebounceTimer = null;
-    }
-    hasUnsavedSettings = false;
+    await flushPendingSettingsOnUnload();
     const updated = await invoke('reset_whisper_core_settings');
     if (updated) {
       setSettingsState(updated);
@@ -2345,7 +2362,7 @@ export function updateTranscribeOutputDirUI(): void {
 }
 
 // ----------------- Auto Unload / Disposal Event Listeners -----------------
-export function flushPendingSettingsOnUnload(): void {
+export function flushPendingSettingsOnUnload(): Promise<void> {
   const current = getSettingsState();
   const win = getGlobal();
   let hadPendingInputCommit = false;
@@ -2374,12 +2391,14 @@ export function flushPendingSettingsOnUnload(): void {
     }
   }
 
+  const hadPendingToggle = clearPendingToggleSaveTimers();
+  const hadPendingZoom = clearPendingUiZoomSave();
   const hadPendingModels =
     typeof win?.flushPendingModelCatalogChanges === 'function'
       ? Boolean(win.flushPendingModelCatalogChanges())
       : false;
 
-  if ((saveSettingsDebounceTimer || hasUnsavedSettings || hadPendingModels || hadPendingInputCommit) && current) {
+  if ((saveSettingsDebounceTimer || hasUnsavedSettings || hadPendingModels || hadPendingInputCommit || hadPendingToggle || hadPendingZoom) && current) {
     if (saveSettingsDebounceTimer) {
       clearTimeout(saveSettingsDebounceTimer);
       saveSettingsDebounceTimer = null;
@@ -2387,18 +2406,23 @@ export function flushPendingSettingsOnUnload(): void {
     hasUnsavedSettings = false;
     try {
       const cleanPayload = sanitizeSettingsPayload(current);
-      invoke('save_settings', { settings: cleanPayload });
+      return Promise.resolve(invoke('save_settings', { settings: cleanPayload })).then(() => undefined).catch(() => undefined);
     } catch (_) {}
   }
+  return Promise.resolve();
+}
+
+if (typeof window !== 'undefined') {
+  (window as any).flushPendingSettingsOnUnload = flushPendingSettingsOnUnload;
 }
 
 if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
   window.addEventListener('beforeunload', () => {
-    flushPendingSettingsOnUnload();
+    void flushPendingSettingsOnUnload();
   });
 
   window.addEventListener('pagehide', () => {
-    flushPendingSettingsOnUnload();
+    void flushPendingSettingsOnUnload();
     const win = getGlobal();
     if (win.hardsubController && typeof win.hardsubController.dispose === 'function') {
       win.hardsubController.dispose();
@@ -2445,6 +2469,7 @@ export function syncSettingsManagerWindowBindings(): void {
   win.syncQuickTimeRangeUI = syncQuickTimeRangeUI;
   win.updateDeckScrollCue = updateDeckScrollCue;
   win.markSettingsDirty = markSettingsDirty;
+  win.flushPendingSettingsOnUnload = flushPendingSettingsOnUnload;
   win.saveCurrentSettings = saveCurrentSettings;
   win.refreshSettings = refreshSettings;
   win.refreshBuildStatuses = refreshBuildStatuses;
