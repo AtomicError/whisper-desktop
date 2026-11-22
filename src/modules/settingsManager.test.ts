@@ -2655,5 +2655,130 @@ describe('settingsManager module', () => {
 
       expect(customCard.style.display).toBe('none');
     });
+
+    it('marks settings dirty immediately on #opt-autoTransferToTranslate toggle so flushPendingSettingsOnUnload saves before 240ms', () => {
+      const invokeSpy = vi.fn().mockResolvedValue(undefined);
+      (globalThis as any).__TAURI__.core.invoke = invokeSpy;
+
+      const chk = new MockElement('INPUT');
+      chk.type = 'checkbox';
+      chk.id = 'opt-autoTransferToTranslate';
+      elementRegistry.set('opt-autoTransferToTranslate', chk);
+
+      setSettingsState({
+        translateAiEnabled: false,
+        outputSrt: true
+      });
+      bindSettingsToDOM();
+
+      chk.checked = true;
+      (chk as any).onchange();
+
+      flushPendingSettingsOnUnload();
+      expect(invokeSpy).toHaveBeenCalledWith(
+        'save_settings',
+        expect.objectContaining({
+          settings: expect.objectContaining({
+            translateAiEnabled: true,
+            autoTransferToTranslate: true
+          })
+        })
+      );
+    });
+
+    it('saves plain number inputs on input event via flushPendingSettingsOnUnload without rewriting el.value mid-typing', () => {
+      const invokeSpy = vi.fn().mockResolvedValue(undefined);
+      (globalThis as any).__TAURI__.core.invoke = invokeSpy;
+
+      const numInput = new MockElement('INPUT');
+      numInput.type = 'number';
+      numInput.id = 'opt-vadThold';
+      elementRegistry.set('opt-vadThold', numInput);
+
+      setSettingsState({
+        vadThold: 0.5,
+        outputSrt: true
+      });
+      bindSettingsToDOM();
+
+      numInput.value = '0.75';
+      numInput.dispatchEvent(new Event('input'));
+
+      expect(getSettingsState()?.vadThold).toBe(0.75);
+      expect(numInput.value).toBe('0.75');
+
+      flushPendingSettingsOnUnload();
+      expect(invokeSpy).toHaveBeenCalledWith(
+        'save_settings',
+        expect.objectContaining({
+          settings: expect.objectContaining({ vadThold: 0.75 })
+        })
+      );
+    });
+
+    it('persists system fallback and re-probes status & builds when bundled whisper binary is missing', async () => {
+      const prevSettings = getSettingsState();
+      const wBadge = new MockElement('SPAN');
+      const wSelect = new MockElement('SELECT');
+      wSelect.id = 'opt-whisperSource';
+      const optBundled = new MockElement('OPTION');
+      optBundled.value = 'bundled';
+      optBundled.textContent = 'Internal';
+      const optSystem = new MockElement('OPTION');
+      optSystem.value = 'system';
+      optSystem.textContent = 'System';
+      wSelect.appendChild(optBundled);
+      wSelect.appendChild(optSystem);
+      wSelect.value = 'bundled';
+
+      elementRegistry.set('whisper-status-badge', wBadge);
+      elementRegistry.set('opt-whisperSource', wSelect);
+
+      const invokeMock = vi.fn().mockImplementation(async (cmd: string, args?: any) => {
+        if (cmd === 'get_whisper_status' && args?.source === 'bundled') {
+          return {
+            configuredSource: 'bundled',
+            resolvedPath: 'Not Bundled',
+            isAvailable: false,
+            bundledAvailable: false,
+            version: 'N/A',
+            availableBackends: [],
+            errorMessage: 'Bundled binaries missing'
+          };
+        }
+        if (cmd === 'get_whisper_status' && args?.source === 'system') {
+          return {
+            configuredSource: 'system',
+            resolvedPath: '/usr/bin/whisper-cli',
+            isAvailable: true,
+            bundledAvailable: false,
+            version: 'whisper.cpp v1.9.5',
+            availableBackends: ['Standard', 'Vulkan'],
+            errorMessage: null
+          };
+        }
+        if (cmd === 'check_build') {
+          return args?.backend === 'Standard' || args?.backend === 'Vulkan';
+        }
+        return {};
+      });
+      (globalThis as any).__TAURI__.core.invoke = invokeMock;
+      setSettingsState({ whisperSource: 'bundled', selectedBackend: 'Standard', uiLanguage: 'en' });
+
+      try {
+        await refreshWhisperStatus('bundled', false);
+
+        expect(getSettingsState()?.whisperSource).toBe('system');
+        expect(wSelect.value).toBe('system');
+        expect(invokeMock).toHaveBeenCalledWith('save_settings', expect.objectContaining({
+          settings: expect.objectContaining({ whisperSource: 'system' })
+        }));
+        expect(invokeMock).toHaveBeenCalledWith('get_whisper_status', { source: 'system' });
+        expect(invokeMock).toHaveBeenCalledWith('check_build', { backend: 'Vulkan' });
+        expect(wBadge.className).toContain('ready');
+      } finally {
+        setSettingsState(prevSettings);
+      }
+    });
   });
 });

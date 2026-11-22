@@ -11,6 +11,7 @@ import {
   openAddProviderModal,
   saveProviderConfig,
   onProviderChanged,
+  switchProviderTab,
   saveActiveProviderGeneral,
   togglePasswordVisibility,
   createModelRowElement,
@@ -675,6 +676,133 @@ describe('translationProviders module', () => {
 
       (rowB as any).dispatchClick({ closest: (s: string) => (s === '.model-ctx-value' ? {} : null) });
       expect(getSettingsState().translateAiModel).toBe('model-a');
+    });
+
+    it('flushes debounced model catalog edits synchronously via flushPendingModelCatalogChanges', () => {
+      const modelA: ModelObject = { id: 'model-a', contextWindow: 128000, reasoning: 'None', enabled: true };
+      const modelB: ModelObject = { id: 'model-b', contextWindow: 64000, reasoning: 'None', enabled: true };
+      translationProviders.setModels([modelA, modelB]);
+      setSettingsState({
+        translateAiProvider: 'OpenAI',
+        translateAiModel: 'model-a',
+        translateAiProviders: JSON.stringify([
+          { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', apiKey: 'k', useKeyring: false, models: [modelA, modelB] }
+        ])
+      });
+
+      const rowB = createModelRowElement(modelB, false, 1);
+      (rowB as any).dispatchClick({ closest: (s: string) => (s === '.model-btn-trash' ? {} : null) });
+
+      expect(translationProviders.getModels().map(m => m.id)).toEqual(['model-a']);
+      const flushed = translationProviders.flushPendingModelCatalogChanges();
+      expect(flushed).toBe(true);
+
+      const savedProviders = JSON.parse(getSettingsState().translateAiProviders);
+      expect(savedProviders[0].models.map((m: any) => m.id)).toEqual(['model-a']);
+      expect(translationProviders.flushPendingModelCatalogChanges()).toBe(false);
+    });
+
+    it('unlocks #mgr-btn-fetch-models when switching providers mid-fetch and ignores stale finally resets', async () => {
+      let resolveFetchA!: (models: any[]) => void;
+      const invokeSpy = vi.fn().mockImplementation((cmd: string, args?: any) => {
+        if (cmd === 'fetch_provider_models' && args?.baseUrl === 'https://a.example/v1') {
+          return new Promise(res => { resolveFetchA = res; });
+        }
+        if (cmd === 'fetch_provider_models' && args?.baseUrl === 'https://b.example/v1') {
+          return Promise.resolve([{ id: 'b-model', contextWindow: 64000 }]);
+        }
+        return Promise.resolve(undefined);
+      });
+      (globalThis as any).window.__TAURI__ = { core: { invoke: invokeSpy } };
+
+      const provSelect = makeEl('select', 'opt-translateAiProvider');
+      provSelect.value = 'ProviderA';
+      makeEl('select', 'opt-translateAiModel');
+      makeEl('div', 'provider-manager-card');
+      const urlInput = makeEl('input', 'mgr-provider-url');
+      urlInput.value = 'https://a.example/v1';
+      makeEl('select', 'mgr-provider-format').value = 'Chat completions';
+      makeEl('input', 'mgr-provider-key').value = 'key-a';
+      const fetchBtn = makeEl('button', 'mgr-btn-fetch-models');
+      fetchBtn.innerHTML = '<span>Fetch Models</span>';
+
+      setSettingsState({
+        translateAiProvider: 'ProviderA',
+        translateAiModel: '',
+        translateAiProviders: JSON.stringify([
+          { name: 'ProviderA', baseUrl: 'https://a.example/v1', apiKey: 'key-a', useKeyring: false, models: [] },
+          { name: 'ProviderB', baseUrl: 'https://b.example/v1', apiKey: 'key-b', useKeyring: false, models: [] }
+        ])
+      });
+
+      const fetchAPromise = fetchActiveProviderModels();
+      expect(fetchBtn.disabled).toBe(true);
+
+      provSelect.value = 'ProviderB';
+      onProviderChanged(true, true);
+      expect(fetchBtn.disabled).toBe(false);
+      expect(fetchBtn.innerHTML).toBe('<span>Fetch Models</span>');
+
+      await fetchActiveProviderModels();
+      expect(fetchBtn.disabled).toBe(false);
+
+      resolveFetchA([{ id: 'a-model', contextWindow: 128000 }]);
+      await fetchAPromise;
+
+      const providersAfter = JSON.parse(getSettingsState().translateAiProviders);
+      expect(providersAfter.find((p: any) => p.name === 'ProviderA').models.map((m: any) => m.id)).toEqual(['a-model']);
+      expect(providersAfter.find((p: any) => p.name === 'ProviderB').models.map((m: any) => m.id)).toEqual(['b-model']);
+    });
+
+    it('filters disabled models consistently in saveActiveProviderModels and updates aria-selected in switchProviderTab', async () => {
+      (globalThis as any).window.__TAURI__ = { core: { invoke: vi.fn().mockResolvedValue(undefined) } };
+
+      const modelSelect = makeEl('select', 'opt-translateAiModel');
+      const disabledModel: ModelObject = { id: 'disabled-m', contextWindow: 64000, reasoning: 'None', enabled: false };
+      const enabledModel: ModelObject = { id: 'enabled-m', contextWindow: 128000, reasoning: 'None', enabled: true };
+      translationProviders.setModels([disabledModel, enabledModel]);
+
+      setSettingsState({
+        translateAiProvider: 'OpenAI',
+        translateAiModel: 'disabled-m',
+        translateAiProviders: JSON.stringify([
+          { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', apiKey: 'k', useKeyring: false, models: [disabledModel, enabledModel] }
+        ])
+      });
+
+      await saveActiveProviderModels(true, true, 'OpenAI');
+      expect(getSettingsState().translateAiModel).toBe('enabled-m');
+      expect(modelSelect.options.map((o: any) => o.value)).toEqual(['enabled-m']);
+
+      const btnAuto = makeEl('button', 'tab-btn-auto');
+      const btnGen = makeEl('button', 'tab-btn-general');
+      makeEl('div', 'provider-tab-auto');
+      makeEl('div', 'provider-tab-general');
+      switchProviderTab('general');
+      expect(btnAuto.getAttribute('aria-selected')).toBe('false');
+      expect(btnGen.getAttribute('aria-selected')).toBe('true');
+    });
+
+    it('restores testBtn.disabled when testTranslationConnection returns early without modal DOM', async () => {
+      (globalThis as any).window.__TAURI__ = { core: { invoke: vi.fn().mockResolvedValue(undefined) } };
+
+      const provSelect = makeEl('select', 'opt-translateAiProvider');
+      provSelect.value = 'OpenAI';
+      makeEl('input', 'mgr-provider-url').value = 'https://api.openai.com/v1';
+      makeEl('select', 'mgr-provider-format').value = 'Chat completions';
+      makeEl('input', 'mgr-provider-key').value = 'sk-test';
+      const testBtn = makeEl('button', 'mgr-btn-test-connection');
+
+      setSettingsState({
+        translateAiProvider: 'OpenAI',
+        translateAiModel: 'gpt-4o',
+        translateAiProviders: JSON.stringify([
+          { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', apiKey: 'sk-test', useKeyring: false, models: [{ id: 'gpt-4o' }] }
+        ])
+      });
+
+      await testTranslationConnection();
+      expect(testBtn.disabled).toBe(false);
     });
   });
 });

@@ -825,10 +825,10 @@ export const fa: Translations = {
     catTranslation: 'ترجمه با هوش مصنوعی',
     resetEngineBtn: 'بازنشانی تنظیمات رونویسی',
     resetEngineTooltip: 'بازنشانی تنظیمات رونویسی به مقادیر پیش‌فرض',
-    searchPlaceholder: 'جستجو...',
+    searchPlaceholder: 'جست‌وجو...',
     searchNoResults: 'تنظیمی یافت نشد',
     searchNoResultsDesc: 'هیچ گزینه‌ای با عبارت «{query}» همخوانی ندارد.',
-    clearSearch: 'پاک کردن جستجو',
+    clearSearch: 'پاک‌کردن جست‌وجو',
     
     // General
     themeTitle: 'پوستهٔ برنامه',

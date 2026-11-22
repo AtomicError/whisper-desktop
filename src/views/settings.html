@@ -11,7 +11,7 @@
                   <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                 </svg>
                 <input class="text-input settings-search-input" id="settings-search-input" type="text" placeholder="Search..." data-i18n-placeholder="settings.searchPlaceholder" oninput="filterSettings(this.value)" autocomplete="off" spellcheck="false" />
-                <button type="button" class="settings-search-clear" id="settings-search-clear" onclick="clearSettingsSearch()" style="display: none;" title="Clear Search" aria-label="Clear Search">
+                <button type="button" class="settings-search-clear" id="settings-search-clear" onclick="clearSettingsSearch()" style="display: none;" title="Clear Search" data-i18n-title="settings.clearSearch" aria-label="Clear Search" data-i18n-aria="settings.clearSearch">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                 </button>
               </div>
@@ -1245,11 +1245,11 @@
                       </div>
                     </div>
                     <!-- Tab buttons -->
-                    <div class="provider-tabs">
-                      <button type="button" class="provider-tab-btn active" onclick="switchProviderTab('auto')" id="tab-btn-auto" data-i18n="settings.tabAutoTranslate">Auto-Translate</button>
-                      <button type="button" class="provider-tab-btn" onclick="switchProviderTab('providers')" id="tab-btn-providers" data-i18n="settings.tabProviders">API Providers</button>
-                      <button type="button" class="provider-tab-btn" onclick="switchProviderTab('general')" id="tab-btn-general" data-i18n="settings.tabGeneral">Provider Configuration</button>
-                      <button type="button" class="provider-tab-btn" onclick="switchProviderTab('models')" id="tab-btn-models"><span data-i18n="settings.tabModels">Models</span> (<span id="provider-models-count">0</span>)</button>
+                    <div class="provider-tabs" role="tablist">
+                      <button type="button" role="tab" aria-selected="true" aria-controls="provider-tab-auto" class="provider-tab-btn active" onclick="switchProviderTab('auto')" id="tab-btn-auto" data-i18n="settings.tabAutoTranslate">Auto-Translate</button>
+                      <button type="button" role="tab" aria-selected="false" aria-controls="provider-tab-providers" class="provider-tab-btn" onclick="switchProviderTab('providers')" id="tab-btn-providers" data-i18n="settings.tabProviders">API Providers</button>
+                      <button type="button" role="tab" aria-selected="false" aria-controls="provider-tab-general" class="provider-tab-btn" onclick="switchProviderTab('general')" id="tab-btn-general" data-i18n="settings.tabGeneral">Provider Configuration</button>
+                      <button type="button" role="tab" aria-selected="false" aria-controls="provider-tab-models" class="provider-tab-btn" onclick="switchProviderTab('models')" id="tab-btn-models"><span data-i18n="settings.tabModels">Models</span> (<span id="provider-models-count">0</span>)</button>
                     </div>
 
                     <!-- Tab 0 Content: Auto-Translate Automation Settings -->
@@ -1334,11 +1334,11 @@
                       <div id="general-config-fields" style="display: none;">
                         <div class="provider-grid-two">
                           <div class="provider-field">
-                            <label data-i18n="settings.baseUrl">Base URL</label>
+                            <label for="mgr-provider-url" data-i18n="settings.baseUrl">Base URL</label>
                             <input class="text-input" id="mgr-provider-url" type="text" placeholder="https://..." />
                           </div>
                           <div class="provider-field">
-                            <label data-i18n="settings.apiFormat">API Format</label>
+                            <label for="mgr-provider-format" data-i18n="settings.apiFormat">API Format</label>
                             <select class="select-control" id="mgr-provider-format">
                               <option value="Chat completions">Chat completions</option>
                               <option value="Anthropic messages">Anthropic messages</option>
@@ -1348,7 +1348,7 @@
                         </div>
 
                         <div class="provider-field" style="margin-bottom: 20px;">
-                          <label data-i18n="settings.apiKeyUpdate">API Key (Update)</label>
+                          <label for="mgr-provider-key" data-i18n="settings.apiKeyUpdate">API Key (Update)</label>
                           <div class="password-input-wrapper">
                             <input class="text-input" id="mgr-provider-key" type="password" placeholder="••••••••••••••••" />
                             <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('mgr-provider-key', this)" aria-label="Toggle API key visibility">
@@ -1361,7 +1361,7 @@
                         </div>
 
                         <div class="provider-field" style="margin-bottom: 16px;">
-                          <label data-i18n="settings.providerCustomPrompt">Provider Custom System Prompt</label>
+                          <label for="mgr-provider-prompt" data-i18n="settings.providerCustomPrompt">Provider Custom System Prompt</label>
                           <span data-i18n="settings.providerCustomPromptDesc">Custom instructions to guide translation tone, domain vocabulary, or formatting conventions. Leave blank for system defaults.</span>
                           <textarea class="textarea-control" id="mgr-provider-prompt" rows="3" placeholder="You are a professional translator..." data-i18n-placeholder="settings.providerCustomPromptPlaceholder" dir="auto"></textarea>
                         </div>
@@ -1394,7 +1394,7 @@
                               <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                             </svg>
                             <input class="text-input models-search-input" id="mgr-models-search" type="text" placeholder="Search models by identifier..." data-i18n-placeholder="settings.searchModelsPlaceholder" oninput="filterModelsTable()" />
-                            <button type="button" class="models-search-clear" id="mgr-models-search-clear" onclick="clearModelsSearch()" style="display: none;" title="Clear Search" data-i18n-title="settings.clearSearch">
+                            <button type="button" class="models-search-clear" id="mgr-models-search-clear" onclick="clearModelsSearch()" style="display: none;" title="Clear Search" data-i18n-title="settings.clearSearch" aria-label="Clear Search" data-i18n-aria="settings.clearSearch">
                               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <line x1="18" y1="6" x2="6" y2="18"></line>
                                 <line x1="6" y1="6" x2="18" y2="18"></line>

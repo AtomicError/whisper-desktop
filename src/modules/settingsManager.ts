@@ -138,6 +138,7 @@ declare global {
     syncQuickTimeRangeUI: (current?: SettingsState | null) => void;
     syncCustomSelects?: (updateOptions?: boolean, excludeLanguageSelects?: boolean) => void;
     markSettingsDirty: () => void;
+    flushPendingModelCatalogChanges: () => boolean;
     saveCurrentSettings: (immediate?: boolean) => any;
     refreshSettings: () => Promise<void>;
     refreshBuildStatuses: () => Promise<void>;
@@ -1133,6 +1134,7 @@ export function bindSettingsToDOM(): void {
     autoTransferCheckbox.onchange = () => {
       current.autoTransferToTranslate = autoTransferCheckbox.checked;
       current.translateAiEnabled = autoTransferCheckbox.checked;
+      markSettingsDirty();
       setTimeout(() => {
         saveCurrentSettings();
       }, 240);
@@ -1221,6 +1223,26 @@ export function bindSettingsToDOM(): void {
               saveCurrentSettings(false);
             });
           }
+        }
+        if ((el as HTMLInputElement).type === 'number' && !el.closest?.('.number-input-control') && !(el as any)._hasNumericInputListener) {
+          (el as any)._hasNumericInputListener = true;
+          el.addEventListener('input', () => {
+            const live = getSettingsState();
+            if (!live) return;
+            const normalized = normalizeDigitsToAscii(el.value).trim();
+            if (!normalized || normalized === '-' || normalized === '.') return;
+            const parsed = Number(normalized);
+            if (!Number.isFinite(parsed)) return;
+            if (INT_SETTING_KEYS.has(key)) {
+              live[key] = clampIntSettingValue(key, normalized);
+            } else if (FLOAT_SETTING_KEYS.has(key)) {
+              live[key] = clampFloatSettingValue(key, normalized);
+            } else {
+              live[key] = parsed;
+            }
+            markSettingsDirty();
+            saveCurrentSettings(false);
+          });
         }
         el.onchange = () => {
           const stepperCtrl = el.closest?.('.number-input-control') as (HTMLElement & { _stepperInitialized?: boolean }) | null;
@@ -1448,8 +1470,8 @@ function syncEngineSourceControl(
   internalI18nKey: string,
   settingKey: 'ffmpegSource' | 'whisperSource',
   info: EngineBinaryStatus | null
-): void {
-  if (typeof document === 'undefined' || !info) return;
+): boolean {
+  if (typeof document === 'undefined' || !info) return false;
   const bundledSupported = info.bundledAvailable !== false;
   const pointsEl = document.getElementById(pointsId);
   if (pointsEl) {
@@ -1457,7 +1479,7 @@ function syncEngineSourceControl(
   }
 
   const selectEl = document.getElementById(selectId) as HTMLSelectElement | null;
-  if (!selectEl) return;
+  if (!selectEl) return false;
 
   const opts = Array.from(selectEl.options || []);
   const bundledOpt = opts.find(opt => opt.value === 'bundled') || null;
@@ -1469,11 +1491,13 @@ function syncEngineSourceControl(
     bundledOpt.textContent = bundledSupported ? internalLabel : `${internalLabel} (${notBundledHint})`;
   }
 
+  let switchedToSystem = false;
   if (!bundledSupported) {
     selectEl.value = 'system';
     const current = getSettingsState();
     if (current && current[settingKey] !== 'system') {
       current[settingKey] = 'system';
+      switchedToSystem = true;
     }
   }
 
@@ -1481,6 +1505,7 @@ function syncEngineSourceControl(
   if (typeof win?.syncCustomSelects === 'function') {
     win.syncCustomSelects(true, true);
   }
+  return switchedToSystem;
 }
 
 export function resyncEngineSourceControls(): void {
@@ -1618,7 +1643,11 @@ export async function validateExecutionEnginesPreflight(backend: string): Promis
   return true;
 }
 
-export async function refreshFFmpegStatus(sourceOverride?: string, userInitiated = false): Promise<void> {
+export async function refreshFFmpegStatus(
+  sourceOverride?: string,
+  userInitiated = false,
+  allowSystemFallbackRetry = true
+): Promise<void> {
   if (typeof document === 'undefined') return;
   const badgeEl = document.getElementById('ffmpeg-status-badge');
   if (!badgeEl) return;
@@ -1630,13 +1659,19 @@ export async function refreshFFmpegStatus(sourceOverride?: string, userInitiated
     const info: EngineBinaryStatus = await invoke('get_ffmpeg_status', { source: currentSource });
     latestFFmpegStatus = info;
     ffmpegBundledAvailable = info.bundledAvailable !== false;
-    syncEngineSourceControl(
+    const switchedToSystem = syncEngineSourceControl(
       'opt-ffmpegSource',
       'ffmpeg-source-points',
       'settings.ffmpegInternal',
       'ffmpegSource',
       info
     );
+
+    if (switchedToSystem && allowSystemFallbackRetry && info.configuredSource !== 'system') {
+      await saveCurrentSettings(true);
+      await refreshFFmpegStatus('system', false, false);
+      return;
+    }
 
     if (info.isAvailable) {
       const safeVer = escapeStatusText(formatFFmpegVersion(info.version));
@@ -1663,7 +1698,11 @@ export async function refreshFFmpegStatus(sourceOverride?: string, userInitiated
 // ----------------- Whisper Status & Version Formatting -----------------
 export const formatWhisperVersion = formatWhisperEngineVersion;
 
-export async function refreshWhisperStatus(sourceOverride?: string, userInitiated = false): Promise<void> {
+export async function refreshWhisperStatus(
+  sourceOverride?: string,
+  userInitiated = false,
+  allowSystemFallbackRetry = true
+): Promise<void> {
   if (typeof document === 'undefined') return;
   const badgeEl = document.getElementById('whisper-status-badge');
   if (!badgeEl) return;
@@ -1675,13 +1714,20 @@ export async function refreshWhisperStatus(sourceOverride?: string, userInitiate
     const info: EngineBinaryStatus = await invoke('get_whisper_status', { source: currentSource });
     setLatestWhisperEngineStatus(info);
     whisperBundledAvailable = info.bundledAvailable !== false;
-    syncEngineSourceControl(
+    const switchedToSystem = syncEngineSourceControl(
       'opt-whisperSource',
       'whisper-source-points',
       'settings.whisperInternal',
       'whisperSource',
       info
     );
+
+    if (switchedToSystem && allowSystemFallbackRetry && info.configuredSource !== 'system') {
+      await saveCurrentSettings(true);
+      await refreshWhisperStatus('system', false, false);
+      await refreshBuildStatuses();
+      return;
+    }
 
     if (info.isAvailable) {
       const safeVer = escapeStatusText(formatWhisperVersion(info.version));
@@ -1817,6 +1863,9 @@ export async function confirmResetWhisperEngine(): Promise<void> {
   if (resetIcon) resetIcon.classList.add('is-spinning');
 
   try {
+    if (typeof win.flushPendingModelCatalogChanges === 'function' && win.flushPendingModelCatalogChanges()) {
+      await saveCurrentSettings(true);
+    }
     if (saveSettingsDebounceTimer) {
       clearTimeout(saveSettingsDebounceTimer);
       saveSettingsDebounceTimer = null;
@@ -2298,7 +2347,39 @@ export function updateTranscribeOutputDirUI(): void {
 // ----------------- Auto Unload / Disposal Event Listeners -----------------
 export function flushPendingSettingsOnUnload(): void {
   const current = getSettingsState();
-  if ((saveSettingsDebounceTimer || hasUnsavedSettings) && current) {
+  const win = getGlobal();
+  let hadPendingInputCommit = false;
+
+  if (typeof document !== 'undefined' && current) {
+    const activeEl = document.activeElement as HTMLInputElement | null;
+    if (
+      activeEl &&
+      activeEl.tagName === 'INPUT' &&
+      activeEl.type === 'number' &&
+      typeof activeEl.id === 'string' &&
+      activeEl.id.startsWith('opt-') &&
+      !activeEl.closest?.('.number-input-control')
+    ) {
+      const key = activeEl.id.slice(4);
+      const normalized = normalizeDigitsToAscii(activeEl.value).trim();
+      if (normalized && normalized !== '-' && normalized !== '.') {
+        if (INT_SETTING_KEYS.has(key)) {
+          current[key] = clampIntSettingValue(key, normalized);
+          hadPendingInputCommit = true;
+        } else if (FLOAT_SETTING_KEYS.has(key)) {
+          current[key] = clampFloatSettingValue(key, normalized);
+          hadPendingInputCommit = true;
+        }
+      }
+    }
+  }
+
+  const hadPendingModels =
+    typeof win?.flushPendingModelCatalogChanges === 'function'
+      ? Boolean(win.flushPendingModelCatalogChanges())
+      : false;
+
+  if ((saveSettingsDebounceTimer || hasUnsavedSettings || hadPendingModels || hadPendingInputCommit) && current) {
     if (saveSettingsDebounceTimer) {
       clearTimeout(saveSettingsDebounceTimer);
       saveSettingsDebounceTimer = null;

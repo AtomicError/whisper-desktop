@@ -37,7 +37,7 @@
             <h3 id="provider-modal-title" style="color: var(--color-cyan);" data-i18n="modals.addProviderTitle">Add API Provider</h3>
           </div>
         </div>
-        <div class="modal-body" style="max-height: 480px; overflow-y: auto; padding-right: 8px;">
+        <div class="modal-body" style="max-height: 480px; overflow-y: auto; padding-inline-end: 8px;">
           <div style="display: flex; flex-direction: column; gap: 14px; margin-bottom: 16px;">
             <div style="display: flex; flex-direction: column; gap: 6px;">
               <label for="provider-name" style="font-size: 0.85rem; color: var(--color-text-muted);" data-i18n="modals.providerName">Provider Name</label>
@@ -61,7 +61,15 @@
 
           <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px;">
             <label for="provider-key" style="font-size: 0.85rem; color: var(--color-text-muted);" data-i18n="modals.apiKey">API Key</label>
-            <input class="text-input mono" id="provider-key" type="password" placeholder="sk-..." style="width: 100%;" />
+            <div class="password-input-wrapper">
+              <input class="text-input mono" id="provider-key" type="password" placeholder="sk-..." style="width: 100%;" />
+              <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('provider-key', this)" aria-label="Toggle API key visibility">
+                <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              </button>
+            </div>
           </div>
           
           <div style="margin-bottom: 16px; padding-inline-start: 8px;">
@@ -73,8 +81,8 @@
           </div>
         </div>
         <div class="modal-footer" style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 16px;">
-          <button class="btn-secondary" onclick="closeProviderModal()" style="padding: 10px 20px; font-size: 0.9rem;" data-i18n="modals.cancel">Cancel</button>
-          <button class="btn-primary" onclick="saveProviderConfig()" style="padding: 10px 20px; font-size: 0.9rem;" data-i18n="modals.saveProvider">Save Provider</button>
+          <button type="button" class="btn-secondary" onclick="closeProviderModal()" style="padding: 10px 20px; font-size: 0.9rem;" data-i18n="modals.cancel">Cancel</button>
+          <button type="button" class="btn-primary" onclick="saveProviderConfig()" style="padding: 10px 20px; font-size: 0.9rem;" data-i18n="modals.saveProvider">Save Provider</button>
         </div>
       </div>
     </div>
@@ -111,14 +119,14 @@
     <div class="modal-overlay" id="translation-test-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="test-conn-title" onclick="handleTestModalBackdropClick(event)">
       <div class="glass-card modal-card" style="max-width: 480px; position: relative;">
         <!-- Close Button (X) -->
-        <button class="about-modal-close-btn" id="test-modal-close-x" onclick="abortAndCloseTestModal()" aria-label="Close" data-i18n-aria="common.close">
+        <button type="button" class="about-modal-close-btn" id="test-modal-close-x" onclick="abortAndCloseTestModal()" aria-label="Close" data-i18n-aria="common.close">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <line x1="18" y1="6" x2="6" y2="18"></line>
             <line x1="6" y1="6" x2="18" y2="18"></line>
           </svg>
         </button>
         <div class="modal-header">
-          <div class="modal-title-row" style="padding-right: 32px; margin-bottom: 0;">
+          <div class="modal-title-row" style="padding-inline-end: 32px; margin-bottom: 0;">
             <svg class="modal-icon" viewBox="0 0 24 24" fill="none" stroke="var(--color-cyan)" stroke-width="2" style="width: 24px; height: 24px;">
               <circle cx="12" cy="12" r="10"/>
               <polyline points="12 6 12 12 16 14"/>
@@ -133,8 +141,8 @@
           </div>
         </div>
         <div class="modal-footer" style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 16px;">
-          <button class="btn-secondary" id="test-modal-cancel-btn" onclick="abortAndCloseTestModal()" style="padding: 10px 20px; font-size: 0.9rem; flex: 1; justify-content: center;" data-i18n="modals.cancelBtn">Cancel</button>
-          <button class="btn-primary" id="test-modal-ok-btn" onclick="closeTestModal()" style="padding: 10px 20px; font-size: 0.9rem; flex: 1; justify-content: center; display: none;" data-i18n="modals.ok">OK</button>
+          <button type="button" class="btn-secondary" id="test-modal-cancel-btn" onclick="abortAndCloseTestModal()" style="padding: 10px 20px; font-size: 0.9rem; flex: 1; justify-content: center;" data-i18n="modals.cancelBtn">Cancel</button>
+          <button type="button" class="btn-primary" id="test-modal-ok-btn" onclick="closeTestModal()" style="padding: 10px 20px; font-size: 0.9rem; flex: 1; justify-content: center; display: none;" data-i18n="modals.ok">OK</button>
         </div>
       </div>
     </div>

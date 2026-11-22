@@ -1845,11 +1845,12 @@ select.select-control {
   padding-right: 36px !important;
 }
 
+.password-input-wrapper .text-input,
 .provider-manager-card .password-input-wrapper .text-input {
   padding-right: 40px !important;
 }
 
 .provider-manager-card select.select-control {
-  padding-right: 36px !important;
+  padding-inline-end: 36px !important;
 }
 
