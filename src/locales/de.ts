@@ -1143,6 +1143,9 @@ export const de: Translations = {
     scrollToBottom: 'Nach unten scrollen',
     scrollToTop: 'Nach oben scrollen',
     jumpToBottom: 'Neueste Protokolle',
+    filterGroupAria: 'Protokollkategorie-Filter',
+    scrollControlsAria: 'Scroll-Steuerung für Protokolle',
+    searchAria: 'Aktivitätsprotokolle durchsuchen',
   },
   modals: {
     compilationErrorTitle: 'Ausführungsfehler',

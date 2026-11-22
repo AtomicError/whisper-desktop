@@ -1145,6 +1145,9 @@ export const it: Translations = {
     scrollToBottom: 'Scorri in fondo',
     scrollToTop: 'Scorri in cima',
     jumpToBottom: 'Ultimi log',
+    filterGroupAria: 'Filtri categoria log',
+    scrollControlsAria: 'Controlli di scorrimento log',
+    searchAria: 'Cerca nei log di attività',
   },
   modals: {
     compilationErrorTitle: 'Errore di Compilazione',

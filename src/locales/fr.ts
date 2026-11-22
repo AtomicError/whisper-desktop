@@ -1138,6 +1138,9 @@ export const fr: Translations = {
     scrollToBottom: 'Faire défiler vers le bas',
     scrollToTop: 'Faire défiler vers le haut',
     jumpToBottom: 'Derniers journaux',
+    filterGroupAria: 'Filtres de catégorie de journal',
+    scrollControlsAria: 'Contrôles de défilement des journaux',
+    searchAria: 'Rechercher dans les journaux d’activité',
   },
   modals: {
     compilationErrorTitle: 'Erreur d\'Exécution',

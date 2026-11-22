@@ -1145,6 +1145,9 @@ export const ko: Translations = {
     scrollToBottom: '맨 아래로 스크롤',
     scrollToTop: '맨 위로 스크롤',
     jumpToBottom: '최신 로그',
+    filterGroupAria: '로그 카테고리 필터',
+    scrollControlsAria: '로그 스크롤 제어',
+    searchAria: '활동 로그 검색',
   },
   modals: {
     compilationErrorTitle: '컴파일 오류',

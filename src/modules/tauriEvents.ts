@@ -574,9 +574,10 @@ export function setupTauriListeners(): void {
     if (!payload.timestamp) {
       payload.timestamp = formatLogTimestamp();
     }
-    logsController.push(payload);
-    scheduleUpdateLogsButtonsState();
-    appendLogToViewport(payload);
+    if (logsController.push(payload)) {
+      scheduleUpdateLogsButtonsState();
+      appendLogToViewport(payload);
+    }
 
     // Intercept Whisper lines containing timestamp ranges
     if (payload.category === 'Whisper' && payload.message) {

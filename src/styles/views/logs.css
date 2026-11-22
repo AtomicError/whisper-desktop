@@ -81,6 +81,20 @@
   gap: 12px;
 }
 
+.logs-action-btn {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+}
+
+.logs-clear-btn:not(:disabled) {
+  border-color: var(--color-red);
+  color: var(--color-red);
+}
+
+.logs-clear-btn:not(:disabled):hover {
+  background: rgba(var(--color-red-rgb), 0.1);
+}
+
 .logs-scroll-btns {
   display: flex;
   align-items: center;
@@ -292,10 +306,12 @@
 
 .log-line .log-msg {
   flex-grow: 1;
+  min-width: 0;
   color: var(--color-text);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   direction: ltr !important;
+  unicode-bidi: plaintext;
   text-align: left !important;
 }
 

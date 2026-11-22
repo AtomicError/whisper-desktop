@@ -1143,6 +1143,9 @@ export const ar: Translations = {
     scrollToBottom: 'التمرير للأسفل',
     scrollToTop: 'التمرير للأعلى',
     jumpToBottom: 'أحدث السجلات',
+    filterGroupAria: 'فلاتر فئات السجل',
+    scrollControlsAria: 'عناصر التحكم في التمرير',
+    searchAria: 'البحث في سجلات النشاط',
   },
   modals: {
     compilationErrorTitle: 'خطأ في التنفيذ',

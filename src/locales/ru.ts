@@ -1143,6 +1143,9 @@ export const ru: Translations = {
     scrollToBottom: 'Прокрутить вниз',
     scrollToTop: 'Прокрутить вверх',
     jumpToBottom: 'Последние логи',
+    filterGroupAria: 'Фильтры категорий логов',
+    scrollControlsAria: 'Управление прокруткой логов',
+    searchAria: 'Поиск по журналу активности',
   },
   modals: {
     compilationErrorTitle: 'Ошибка выполнения',

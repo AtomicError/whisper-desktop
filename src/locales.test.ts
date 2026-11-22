@@ -120,7 +120,14 @@ describe('locale consistency for speed presets', () => {
     it(`locale ${code} has all required log scroll keys`, () => {
       const logs = (dict as any).logs;
       expect(logs).toBeDefined();
-      const requiredLogKeys = ['scrollToBottom', 'scrollToTop', 'jumpToBottom'];
+      const requiredLogKeys = [
+        'scrollToBottom',
+        'scrollToTop',
+        'jumpToBottom',
+        'filterGroupAria',
+        'scrollControlsAria',
+        'searchAria'
+      ];
       for (const key of requiredLogKeys) {
         expect(typeof logs[key]).toBe('string');
         expect(logs[key].length).toBeGreaterThan(0);

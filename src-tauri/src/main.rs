@@ -354,8 +354,8 @@ fn get_logs(state: State<'_, LogState>) -> Vec<LogPayload> {
 }
 
 #[tauri::command]
-fn clear_logs(state: State<'_, LogState>) {
-    state.0.clear();
+fn clear_logs(state: State<'_, LogState>) -> u64 {
+    state.0.clear()
 }
 
 #[derive(serde::Serialize)]

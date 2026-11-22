@@ -15,6 +15,10 @@ let activeLogCategory = 'All';
 let logSearchQuery = '';
 let allLogsArray: LogEntry[] = [];
 const seenBackendSeqs = new Set<number>();
+const attachedScrollViewports = new WeakSet<object>();
+const attachedAutoScrollInputs = new WeakSet<object>();
+let _minAcceptedBackendSeq = 0;
+let _lastViewportScrollTop = 0;
 let lastAppendedCategory: string | null = null;
 let _isProgrammaticBottomScroll = false;
 let _programmaticBottomScrollTimer: ReturnType<typeof setTimeout> | null = null;
@@ -58,7 +62,8 @@ function cancelProgrammaticBottomScroll(): void {
   }
 }
 
-function syncSearchQueryFromInput(): void {
+function syncSearchQueryFromInput(): boolean {
+  const hadPendingTimer = _searchDebounceTimer !== null;
   if (_searchDebounceTimer !== null) {
     clearTimeout(_searchDebounceTimer);
     _searchDebounceTimer = null;
@@ -67,8 +72,12 @@ function syncSearchQueryFromInput(): void {
     ? (document.getElementById('log-search') as HTMLInputElement | null)
     : null;
   if (searchInput) {
-    logSearchQuery = searchInput.value.toLowerCase().trim();
+    const nextQuery = searchInput.value.toLowerCase().trim();
+    const changed = nextQuery !== logSearchQuery;
+    logSearchQuery = nextQuery;
+    return hadPendingTimer || changed;
   }
+  return hadPendingTimer;
 }
 
 function trimStoredLogsToCap(): void {
@@ -123,20 +132,23 @@ export function getLogs(): LogEntry[] {
 export function clearLogsArray(): void {
   allLogsArray = [];
   seenBackendSeqs.clear();
+  _minAcceptedBackendSeq = 0;
+  _lastViewportScrollTop = 0;
   lastAppendedCategory = null;
   cancelPendingAppendScroll();
   cancelPendingScrollRaf();
 }
 
-export function pushLogEntry(entry: LogEntry): void {
+export function pushLogEntry(entry: LogEntry): boolean {
   if (typeof entry.seq === 'number') {
-    if (seenBackendSeqs.has(entry.seq)) {
-      return;
+    if (entry.seq < _minAcceptedBackendSeq || seenBackendSeqs.has(entry.seq)) {
+      return false;
     }
     seenBackendSeqs.add(entry.seq);
   }
   allLogsArray.push(entry);
   trimStoredLogsToCap();
+  return true;
 }
 
 export function hydrateLogs(entries: LogEntry[]): void {
@@ -145,7 +157,9 @@ export function hydrateLogs(entries: LogEntry[]): void {
 
   for (const existing of allLogsArray) {
     if (typeof existing.seq === 'number') {
-      bySeq.set(existing.seq, existing);
+      if (existing.seq >= _minAcceptedBackendSeq) {
+        bySeq.set(existing.seq, existing);
+      }
     } else {
       frontendEntries.push(existing);
     }
@@ -158,7 +172,9 @@ export function hydrateLogs(entries: LogEntry[]): void {
       message: stripAnsi(incoming.message || ''),
     };
     if (typeof normalized.seq === 'number') {
-      bySeq.set(normalized.seq, normalized);
+      if (normalized.seq >= _minAcceptedBackendSeq) {
+        bySeq.set(normalized.seq, normalized);
+      }
     } else {
       frontendEntries.push(normalized);
     }
@@ -195,12 +211,14 @@ export function scrollLogsToBottom(smooth = false): void {
   _programmaticBottomScrollTimer = setTimeout(() => {
     _isProgrammaticBottomScroll = false;
     _programmaticBottomScrollTimer = null;
+    updateLogJumpPillVisibility();
   }, effectiveSmooth ? 1200 : 50);
 
   if (effectiveSmooth) {
     viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
   } else {
     viewport.scrollTop = viewport.scrollHeight;
+    _lastViewportScrollTop = viewport.scrollTop;
   }
   const autoScroll = document.getElementById('log-autoscroll') as HTMLInputElement | null;
   if (autoScroll && !autoScroll.checked) {
@@ -223,6 +241,7 @@ export function scrollLogsToTop(smooth = false): void {
     viewport.scrollTo({ top: 0, behavior: 'smooth' });
   } else {
     viewport.scrollTop = 0;
+    _lastViewportScrollTop = viewport.scrollTop;
   }
   const autoScroll = document.getElementById('log-autoscroll') as HTMLInputElement | null;
   if (autoScroll) {
@@ -247,9 +266,10 @@ export function updateLogJumpPillVisibility(): void {
 }
 
 export function setupLogsControls(): void {
-  const logViewport = document.getElementById('log-viewport') as any;
-  if (logViewport && !logViewport._scrollHandlerAttached) {
-    logViewport._scrollHandlerAttached = true;
+  const logViewport = document.getElementById('log-viewport');
+  if (logViewport && !attachedScrollViewports.has(logViewport)) {
+    attachedScrollViewports.add(logViewport);
+    _lastViewportScrollTop = logViewport.scrollTop || 0;
 
     logViewport.addEventListener('wheel', (e: WheelEvent) => {
       if (e.deltaY < 0 && logViewport.scrollHeight > logViewport.clientHeight) {
@@ -263,33 +283,51 @@ export function setupLogsControls(): void {
     }, { passive: true });
 
     logViewport.addEventListener('scroll', () => {
+      const immediateDistanceFromBottom = logViewport.scrollHeight - logViewport.scrollTop - logViewport.clientHeight;
+      if (!_isProgrammaticBottomScroll && immediateDistanceFromBottom > 140) {
+        cancelPendingAppendScroll();
+      }
       if (_scrollRafId !== null) return;
       _scrollRafId = requestAnimationFrame(() => {
         _scrollRafId = null;
+        const currentScrollTop = logViewport.scrollTop;
+        const scrolledDown = currentScrollTop > _lastViewportScrollTop;
+        _lastViewportScrollTop = currentScrollTop;
+
         const autoScrollEl = document.getElementById('log-autoscroll') as HTMLInputElement | null;
-        const distanceFromBottom = logViewport.scrollHeight - logViewport.scrollTop - logViewport.clientHeight;
+        const distanceFromBottom = logViewport.scrollHeight - currentScrollTop - logViewport.clientHeight;
+        const isScrollable = logViewport.scrollHeight > logViewport.clientHeight + 2;
+
         if (_isProgrammaticBottomScroll && distanceFromBottom <= 2) {
           cancelProgrammaticBottomScroll();
         } else if (!_isProgrammaticBottomScroll && distanceFromBottom > 140) {
           if (autoScrollEl && autoScrollEl.checked) {
             autoScrollEl.checked = false;
           }
+        } else if (!_isProgrammaticBottomScroll && isScrollable && scrolledDown && distanceFromBottom <= 8) {
+          if (autoScrollEl && !autoScrollEl.checked) {
+            autoScrollEl.checked = true;
+          }
         }
-        updateLogJumpPillVisibility();
+
+        if (!_isProgrammaticBottomScroll) {
+          updateLogJumpPillVisibility();
+        }
       });
     }, { passive: true });
 
     logViewport.addEventListener('scrollend', () => {
       if (_isProgrammaticBottomScroll) {
+        _lastViewportScrollTop = logViewport.scrollTop;
         cancelProgrammaticBottomScroll();
         updateLogJumpPillVisibility();
       }
     }, { passive: true });
   }
 
-  const autoScrollEl = document.getElementById('log-autoscroll') as any;
-  if (autoScrollEl && !autoScrollEl._changeHandlerAttached) {
-    autoScrollEl._changeHandlerAttached = true;
+  const autoScrollEl = document.getElementById('log-autoscroll') as HTMLInputElement | null;
+  if (autoScrollEl && !attachedAutoScrollInputs.has(autoScrollEl)) {
+    attachedAutoScrollInputs.add(autoScrollEl);
     autoScrollEl.addEventListener('change', () => {
       if (autoScrollEl.checked) {
         scrollLogsToBottom(true);
@@ -481,6 +519,7 @@ export function appendLogToViewport(payload: LogEntry, isBatchRedraw = false): v
         return;
       }
       viewport.scrollTop = viewport.scrollHeight;
+      _lastViewportScrollTop = viewport.scrollTop;
       updateLogJumpPillVisibility();
     }, 80);
   } else {
@@ -546,6 +585,7 @@ export function redrawLogsViewport(): void {
   if (autoScroll) {
     const commitBottomScroll = () => {
       viewport.scrollTop = viewport.scrollHeight;
+      _lastViewportScrollTop = viewport.scrollTop;
       cancelProgrammaticBottomScroll();
       updateLogJumpPillVisibility();
     };
@@ -555,15 +595,19 @@ export function redrawLogsViewport(): void {
       commitBottomScroll();
     }
   } else {
+    _lastViewportScrollTop = viewport.scrollTop;
     updateLogJumpPillVisibility();
   }
 }
 
 export async function copyAllLogs(): Promise<void> {
-  syncSearchQueryFromInput();
+  if (syncSearchQueryFromInput()) {
+    redrawLogsViewport();
+  }
   const filteredLogs = getFilteredLogs();
-  const showNotification = (window as any).showNotification;
-  const copyToClipboard = (window as any).copyToClipboard;
+  const win = typeof window !== 'undefined' ? (window as any) : null;
+  const showNotification = win?.showNotification;
+  const copyToClipboard = win?.copyToClipboard;
   if (!filteredLogs || filteredLogs.length === 0) {
     const hasAnyLogs = Boolean(allLogsArray && allLogsArray.length > 0);
     if (showNotification) showNotification(hasAnyLogs ? t('toasts.noMatchingLogsToCopy') : t('toasts.noLogsToCopy'), "warning");
@@ -593,6 +637,7 @@ export async function copyAllLogs(): Promise<void> {
 }
 
 const getTauriInvoke = (): any => {
+  if (typeof window === 'undefined') return null;
   const tauri = (window as any).__TAURI__;
   if (tauri && tauri.core && tauri.core.invoke) {
     return tauri.core.invoke;
@@ -602,7 +647,7 @@ const getTauriInvoke = (): any => {
 
 export async function clearLogsHistory(invokeFn?: any): Promise<void> {
   if (!allLogsArray || allLogsArray.length === 0) return;
-  const showConfirmModal = (window as any).showConfirmModal;
+  const showConfirmModal = typeof window !== 'undefined' ? (window as any).showConfirmModal : null;
   const invoke = invokeFn || getTauriInvoke();
   if (showConfirmModal) {
     const confirmed = await showConfirmModal(
@@ -615,7 +660,17 @@ export async function clearLogsHistory(invokeFn?: any): Promise<void> {
   clearLogsArray();
   if (invoke) {
     try {
-      await invoke('clear_logs');
+      const nextSeq = await invoke('clear_logs');
+      if (typeof nextSeq === 'number' && Number.isFinite(nextSeq)) {
+        _minAcceptedBackendSeq = Math.max(_minAcceptedBackendSeq, nextSeq);
+        allLogsArray = allLogsArray.filter(item => typeof item.seq !== 'number' || item.seq >= _minAcceptedBackendSeq);
+        seenBackendSeqs.clear();
+        for (const item of allLogsArray) {
+          if (typeof item.seq === 'number') {
+            seenBackendSeqs.add(item.seq);
+          }
+        }
+      }
     } catch (e) {
       console.warn('[Logs] Failed to invoke clear_logs:', e);
     }
@@ -712,7 +767,9 @@ export const logsController = {
   get allLogs() { return allLogsArray; },
   set allLogs(arr) {
     allLogsArray = arr;
+    lastAppendedCategory = null;
     seenBackendSeqs.clear();
+    trimStoredLogsToCap();
     for (const item of allLogsArray) {
       if (typeof item.seq === 'number') {
         seenBackendSeqs.add(item.seq);

@@ -409,6 +409,153 @@ describe('logsController', () => {
     logsController.filter('All');
     vi.unstubAllGlobals();
   });
+
+  it('keeps Latest Logs pill hidden during smooth scrollLogsToBottom and re-enables Auto Scroll on manual scroll to bottom', () => {
+    logsController.clear();
+    const listeners: Record<string, Function> = {};
+    const rafQueue: FrameRequestCallback[] = [];
+    const pillClasses = new Set<string>(['visible']);
+
+    const viewport: any = {
+      scrollTop: 0,
+      scrollHeight: 2000,
+      clientHeight: 300,
+      children: [],
+      addEventListener: (ev: string, fn: Function) => { listeners[ev] = fn; },
+      scrollTo: vi.fn(),
+    };
+    const autoScroll: any = { checked: false, addEventListener: vi.fn() };
+    const pill: any = {
+      classList: {
+        add: (c: string) => pillClasses.add(c),
+        remove: (c: string) => pillClasses.delete(c),
+        contains: (c: string) => pillClasses.has(c),
+      },
+    };
+
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      rafQueue.push(cb);
+      return rafQueue.length;
+    });
+    vi.stubGlobal('cancelAnimationFrame', (id: number) => {
+      if (id >= 1 && id <= rafQueue.length) rafQueue[id - 1] = () => {};
+    });
+    vi.stubGlobal('document', {
+      getElementById: (id: string) =>
+        id === 'log-viewport' ? viewport : id === 'log-autoscroll' ? autoScroll : id === 'btn-logs-jump-bottom' ? pill : null,
+    });
+
+    logsController.setup();
+
+    // 1. Trigger smooth scroll to bottom; intermediate scroll frame must NOT re-show the jump pill
+    logsController.scrollToBottom(true);
+    expect(pillClasses.has('visible')).toBe(false);
+    expect(autoScroll.checked).toBe(true);
+
+    viewport.scrollTop = 400; // still far from bottom (2000 - 400 - 300 = 1300 > 140)
+    listeners['scroll']();
+    while (rafQueue.length > 0) rafQueue.shift()!(0);
+    expect(pillClasses.has('visible')).toBe(false);
+
+    // Finish smooth scroll at bottom
+    viewport.scrollTop = 1700;
+    listeners['scrollend']();
+    expect(pillClasses.has('visible')).toBe(false);
+
+    // 2. Scroll up manually -> unchecks Auto Scroll and shows pill
+    viewport.scrollTop = 200;
+    listeners['scroll']();
+    while (rafQueue.length > 0) rafQueue.shift()!(0);
+    expect(autoScroll.checked).toBe(false);
+    expect(pillClasses.has('visible')).toBe(true);
+
+    // 3. Scroll manually all the way back down -> re-enables Auto Scroll and hides pill
+    viewport.scrollTop = 1696; // distanceFromBottom = 4 <= 8
+    listeners['scroll']();
+    while (rafQueue.length > 0) rafQueue.shift()!(0);
+    expect(autoScroll.checked).toBe(true);
+    expect(pillClasses.has('visible')).toBe(false);
+
+    vi.unstubAllGlobals();
+  });
+
+  it('redraws viewport when copyAllLogs flushes a pending debounced search query', async () => {
+    vi.useFakeTimers();
+    logsController.clear();
+    const notifySpy = vi.fn();
+    const copySpy = vi.fn().mockResolvedValue(undefined);
+    const searchInput: any = { value: '' };
+
+    const makeMockNode = (): any => {
+      const attrs = new Map<string, string>();
+      const node: any = {
+        className: '',
+        textContent: '',
+        dataset: {},
+        children: [] as any[],
+        disabled: false,
+        setAttribute: (k: string, v: string) => attrs.set(k, v),
+        getAttribute: (k: string) => attrs.get(k) ?? null,
+        removeAttribute: (k: string) => attrs.delete(k),
+        classList: { add: vi.fn(), remove: vi.fn(), toggle: vi.fn() },
+        querySelector: () => null,
+        appendChild: (c: any) => { node.children.push(c); return c; },
+        set innerHTML(v: string) {
+          if (v === '') node.children = [];
+        },
+      };
+      return node;
+    };
+
+    const viewport = makeMockNode();
+    const copyBtn = makeMockNode();
+
+    vi.stubGlobal('window', { showNotification: notifySpy, copyToClipboard: copySpy });
+    vi.stubGlobal('document', {
+      getElementById: (id: string) =>
+        id === 'log-search' ? searchInput : id === 'log-viewport' ? viewport : id === 'btn-copy-all-logs' ? copyBtn : null,
+      querySelectorAll: () => [],
+      createElement: () => makeMockNode(),
+    });
+
+    logsController.push({ timestamp: '10:00:00', category: 'Whisper', message: 'Loaded model' });
+    logsController.push({ timestamp: '10:00:01', category: 'Whisper', message: 'Fatal error occurred' });
+    logsController.redraw();
+    expect(viewport.children.length).toBe(2);
+
+    // User types search query and immediately clicks Copy All before 120ms debounce expires
+    searchInput.value = 'error';
+    logsController.search();
+    await logsController.copyAll();
+
+    expect(copySpy).toHaveBeenCalledWith('[10:00:01] [Whisper] Fatal error occurred');
+    expect(viewport.children.length).toBe(1);
+    expect(viewport.children[0].children[2].textContent).toBe('Fatal error occurred');
+
+    searchInput.value = '';
+    logsController.filter('All');
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('returns boolean from pushLogEntry and drops pre-clear in-flight seqs below clear_logs watermark', async () => {
+    logsController.clear();
+    vi.stubGlobal('document', { getElementById: () => null });
+
+    expect(logsController.push({ seq: 1, timestamp: '10:00:00', category: 'Whisper', message: 'One' })).toBe(true);
+    expect(logsController.push({ seq: 1, timestamp: '10:00:00', category: 'Whisper', message: 'One' })).toBe(false);
+    expect(logsController.allLogs.length).toBe(1);
+
+    const mockClearInvoke = vi.fn().mockResolvedValue(5);
+    await logsController.clearHistory(mockClearInvoke);
+
+    // Pre-clear seq < 5 arriving late must be ignored; seq >= 5 is accepted
+    expect(logsController.push({ seq: 4, timestamp: '10:00:01', category: 'Whisper', message: 'Stale' })).toBe(false);
+    expect(logsController.push({ seq: 5, timestamp: '10:00:02', category: 'Whisper', message: 'Fresh' })).toBe(true);
+    expect(logsController.allLogs.map(l => l.seq)).toEqual([5]);
+
+    vi.unstubAllGlobals();
+  });
 });
 
 describe('themeManager', () => {

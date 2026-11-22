@@ -1145,6 +1145,9 @@ export const tr: Translations = {
     scrollToBottom: 'Aşağı Kaydır',
     scrollToTop: 'Yukarı Kaydır',
     jumpToBottom: 'En Son Günlükler',
+    filterGroupAria: 'Günlük kategori filtreleri',
+    scrollControlsAria: 'Günlük kaydırma kontrolleri',
+    searchAria: 'Etkinlik günlüklerinde ara',
   },
   modals: {
     compilationErrorTitle: 'Derleme Hatası',

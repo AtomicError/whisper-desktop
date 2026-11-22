@@ -1143,6 +1143,9 @@ export const ja: Translations = {
     scrollToBottom: '一番下までスクロール',
     scrollToTop: '一番上までスクロール',
     jumpToBottom: '最新ログ',
+    filterGroupAria: 'ログカテゴリフィルター',
+    scrollControlsAria: 'ログスクロール操作',
+    searchAria: 'アクティビティログを検索',
   },
   modals: {
     compilationErrorTitle: '実行エラー',

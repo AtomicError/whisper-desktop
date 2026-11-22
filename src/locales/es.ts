@@ -1138,6 +1138,9 @@ export const es: Translations = {
     scrollToBottom: 'Desplazarse al final',
     scrollToTop: 'Desplazarse al inicio',
     jumpToBottom: 'Últimos registros',
+    filterGroupAria: 'Filtros de categoría de registro',
+    scrollControlsAria: 'Controles de desplazamiento de registros',
+    searchAria: 'Buscar en los registros de actividad',
   },
   modals: {
     compilationErrorTitle: 'Error de Ejecución',

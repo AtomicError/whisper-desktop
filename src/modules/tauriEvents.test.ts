@@ -289,5 +289,46 @@ describe('tauriEvents module', () => {
       expect(logsController.allLogs[logsController.allLogs.length - 1].timestamp).toMatch(/^\d{2}:\d{2}:\d{2}$/);
       appendSpy.mockRestore();
     });
+
+    it('does not append duplicate DOM log lines when log-message repeats an already-seen seq', async () => {
+      logsController.clear();
+      const viewport = new MockElement('DIV') as MockElement & { innerHTML?: string };
+      viewport.id = 'log-viewport';
+      Object.defineProperty(viewport, 'innerHTML', {
+        set(val: string) {
+          if (val === '') viewport.children = [];
+        },
+        configurable: true,
+      });
+      domMap.set('log-viewport', viewport);
+
+      const handlers: Record<string, (e: any) => void> = {};
+      setOriginalListen(vi.fn().mockImplementation((event: string, handler: (e: any) => void) => {
+        handlers[event] = handler;
+        return Promise.resolve(() => {});
+      }));
+
+      setupTauriListeners();
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      logsController.hydrate([
+        { seq: 42, timestamp: '11:00:00', category: 'Settings', message: 'Hydrated setting warning' }
+      ]);
+      logsController.redraw();
+      expect(viewport.children.length).toBe(1);
+
+      // Simulate late in-flight event with same seq arriving after hydrate/redraw
+      handlers['log-message']({
+        payload: {
+          seq: 42,
+          timestamp: '11:00:00',
+          category: 'Settings',
+          message: 'Hydrated setting warning'
+        }
+      });
+
+      expect(logsController.allLogs.length).toBe(1);
+      expect(viewport.children.length).toBe(1);
+    });
   });
 });

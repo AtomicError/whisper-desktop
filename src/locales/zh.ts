@@ -1138,6 +1138,9 @@ export const zh: Translations = {
     scrollToBottom: '滚动到底部',
     scrollToTop: '滚动到顶部',
     jumpToBottom: '最新日志',
+    filterGroupAria: '日志分类筛选',
+    scrollControlsAria: '日志滚动控制',
+    searchAria: '搜索活动日志',
   },
   modals: {
     compilationErrorTitle: '执行编译错误',

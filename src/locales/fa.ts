@@ -1145,6 +1145,9 @@ export const fa: Translations = {
     scrollToBottom: 'پرش به انتها',
     scrollToTop: 'پرش به ابتدا',
     jumpToBottom: 'آخرین گزارش‌ها',
+    filterGroupAria: 'فیلتر دسته‌بندی گزارش‌ها',
+    scrollControlsAria: 'کنترل‌های پیمایش گزارش‌ها',
+    searchAria: 'جست‌وجو در گزارش‌های عملکرد',
   },
   modals: {
     compilationErrorTitle: 'خطای اجرای برنامه',

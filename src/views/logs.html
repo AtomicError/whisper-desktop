@@ -2,7 +2,7 @@
           <div class="view-panel fixed-layout-panel" id="panel-logs" role="tabpanel" aria-labelledby="nav-tab-logs" tabindex="0">
             <div class="logs-layout">
               <div class="logs-controls">
-                <div class="log-filters" role="group" aria-label="Log category filters">
+                <div class="log-filters" role="group" data-i18n-aria="logs.filterGroupAria" aria-label="Log category filters">
                   <button type="button" class="filter-btn active" id="log-filter-All" aria-pressed="true" onclick="filterLogs('All')" data-i18n="logs.filterAll">All</button>
                   <button type="button" class="filter-btn" id="log-filter-Translate" aria-pressed="false" onclick="filterLogs('Translate')" data-i18n="logs.filterTranslate">Translate</button>
                   <button type="button" class="filter-btn" id="log-filter-Whisper" aria-pressed="false" onclick="filterLogs('Whisper')" data-i18n="logs.filterWhisper">Whisper</button>
@@ -11,7 +11,7 @@
                 </div>
                 
                 <div class="log-search-container">
-                  <input class="log-search-input" type="text" id="log-search" placeholder="Search logs..." data-i18n-placeholder="logs.searchPlaceholder" oninput="handleLogSearch()" />
+                  <input class="log-search-input" type="text" id="log-search" placeholder="Search logs..." data-i18n-placeholder="logs.searchPlaceholder" data-i18n-aria="logs.searchAria" aria-label="Search activity logs" oninput="handleLogSearch()" />
                 </div>
                 
                 <div class="logs-actions">
@@ -20,7 +20,7 @@
                     <span class="custom-checkmark"></span>
                     <span data-i18n="logs.autoScroll">Auto Scroll</span>
                   </label>
-                  <div class="logs-scroll-btns" role="group" aria-label="Log scroll controls">
+                  <div class="logs-scroll-btns" role="group" data-i18n-aria="logs.scrollControlsAria" aria-label="Log scroll controls">
                     <button type="button" class="btn-secondary log-nav-btn" id="btn-scroll-top-logs" onclick="scrollLogsToTop(true)" data-i18n-title="logs.scrollToTop" data-i18n-aria="logs.scrollToTop" title="Scroll to Top" aria-label="Scroll to Top">
                       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
                     </button>
@@ -28,8 +28,8 @@
                       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
                     </button>
                   </div>
-                  <button type="button" class="btn-secondary" id="btn-copy-all-logs" style="padding:6px 12px; font-size:0.8rem;" onclick="copyAllLogs()" data-i18n-aria="logs.copyBtn" aria-label="Copy All Logs" data-i18n="logs.copyBtn">Copy All</button>
-                  <button type="button" class="btn-secondary" id="btn-clear-all-logs" style="padding:6px 12px; font-size:0.8rem; border-color:var(--color-red); color:var(--color-red);" onclick="clearLogsHistory()" data-i18n="logs.clearBtn">Clear</button>
+                  <button type="button" class="btn-secondary logs-action-btn" id="btn-copy-all-logs" onclick="copyAllLogs()" data-i18n-aria="logs.copyBtn" aria-label="Copy All Logs" data-i18n="logs.copyBtn">Copy All</button>
+                  <button type="button" class="btn-secondary logs-action-btn logs-clear-btn" id="btn-clear-all-logs" onclick="clearLogsHistory()" data-i18n="logs.clearBtn">Clear</button>
                 </div>
               </div>
 

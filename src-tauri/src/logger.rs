@@ -77,13 +77,14 @@ impl AppLogs {
         out
     }
 
-    pub fn clear(&self) {
+    pub fn clear(&self) -> u64 {
         let mut buffer = match self.logs.lock() {
             Ok(guard) => guard,
             Err(poisoned) => poisoned.into_inner(),
         };
         // Keep `next_seq` strictly monotonic across clears so in-flight events cannot collide.
         buffer.entries.clear();
+        buffer.next_seq
     }
 
     /// Test-only: append a structured entry without needing an AppHandle.
@@ -148,7 +149,8 @@ mod tests {
         let e1 = logs.push_entry("12:00:00", "Whisper", "first line\nsecond line");
         assert_eq!(e1.seq, 1);
 
-        logs.clear();
+        let cleared_seq = logs.clear();
+        assert_eq!(cleared_seq, 2);
         assert!(logs.get_entries().is_empty());
         assert_eq!(logs.get_all(), "");
 

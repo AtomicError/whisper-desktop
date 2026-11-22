@@ -1143,6 +1143,9 @@ export const en = {
     scrollToBottom: 'Scroll to Bottom',
     scrollToTop: 'Scroll to Top',
     jumpToBottom: 'Latest Logs',
+    filterGroupAria: 'Log category filters',
+    scrollControlsAria: 'Log scroll controls',
+    searchAria: 'Search activity logs',
   },
   modals: {
     compilationErrorTitle: 'Compilation Error',
