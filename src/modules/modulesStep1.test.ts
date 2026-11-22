@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { logsController, stripAnsi, escapeHTML, clearLogsArray, pushLogEntry, getLogs, getFilteredLogs, reportGlobalFrontendError } from './logsController';
+import { logsController, stripAnsi, escapeHTML, clearLogsArray, pushLogEntry, getLogs, getFilteredLogs, reportGlobalFrontendError, reportUnhandledRejection } from './logsController';
 import { themeManager, resolveThemeConfig, THEME_REGISTRY, MONOCHROME_META_COLORS } from './themeManager';
 
 describe('logsController', () => {
@@ -239,6 +239,174 @@ describe('logsController', () => {
     expect(viewport.scrollTop).toBe(0);
 
     vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('logs unhandled promise rejections into System category', () => {
+    logsController.clear();
+    const notifySpy = vi.fn();
+    vi.stubGlobal('window', { showNotification: notifySpy });
+    vi.stubGlobal('document', { getElementById: () => null });
+
+    reportUnhandledRejection({ reason: new Error('Async boom') });
+    expect(logsController.allLogs.length).toBe(1);
+    expect(logsController.allLogs[0].category).toBe('System');
+    expect(logsController.allLogs[0].message).toBe('Frontend error: Async boom');
+    expect(logsController.allLogs[0].timestamp).toMatch(/^\d{2}:\d{2}:\d{2}$/);
+
+    vi.unstubAllGlobals();
+  });
+
+  it('promotes the new first line header when live streaming exceeds 1500 viewport lines', () => {
+    logsController.clear();
+
+    const makeMockNode = (tag = 'div'): any => {
+      const node: any = {
+        tagName: tag.toUpperCase(),
+        className: '',
+        textContent: '',
+        dataset: {} as Record<string, string>,
+        children: [] as any[],
+        classList: { add: vi.fn(), remove: vi.fn(), toggle: vi.fn() },
+        setAttribute: vi.fn(),
+        removeAttribute: vi.fn(),
+        querySelector: (sel: string) => {
+          if (sel === '.log-time-spacer') return node.children.find((c: any) => c.className === 'log-time-spacer') || null;
+          if (sel === '.log-cat-spacer') return node.children.find((c: any) => c.className === 'log-cat-spacer') || null;
+          return null;
+        },
+        appendChild: (c: any) => { node.children.push(c); return c; },
+        removeChild: (c: any) => {
+          const idx = node.children.indexOf(c);
+          if (idx >= 0) node.children.splice(idx, 1);
+          return c;
+        },
+        replaceChild: (next: any, prev: any) => {
+          const idx = node.children.indexOf(prev);
+          if (idx >= 0) node.children.splice(idx, 1, next);
+          return prev;
+        },
+        get firstElementChild() { return node.children[0] || null; },
+      };
+      return node;
+    };
+
+    const viewport = makeMockNode('div');
+    vi.stubGlobal('document', {
+      getElementById: (id: string) => (id === 'log-viewport' ? viewport : null),
+      createElement: (tag: string) => makeMockNode(tag),
+    });
+
+    for (let i = 0; i < 1502; i++) {
+      logsController.appendLogToViewport({
+        timestamp: `10:00:${String(i % 60).padStart(2, '0')}`,
+        category: 'Whisper',
+        message: `Line ${i}`,
+      });
+    }
+
+    expect(viewport.children.length).toBe(1500);
+    const firstLine = viewport.firstElementChild;
+    expect(firstLine.children[0].className).toBe('log-time');
+    expect(firstLine.children[0].textContent).toBe('10:00:02');
+    expect(firstLine.children[1].className).toBe('log-cat whisper');
+    expect(firstLine.children[1].textContent).toBe('WHISPER');
+
+    vi.unstubAllGlobals();
+  });
+
+  it('cancels pending scroll rAF during redraw so Auto Scroll is never accidentally unchecked', () => {
+    logsController.clear();
+    const listeners: Record<string, Function> = {};
+    const rafQueue: FrameRequestCallback[] = [];
+
+    const viewport: any = {
+      scrollTop: 900,
+      scrollHeight: 1000,
+      clientHeight: 200,
+      children: [],
+      classList: { add: vi.fn(), remove: vi.fn() },
+      querySelector: () => null,
+      appendChild: (c: any) => { viewport.children.push(c); return c; },
+      set innerHTML(v: string) {
+        if (v === '') {
+          viewport.children = [];
+          viewport.scrollTop = 0;
+        }
+      },
+      addEventListener: (ev: string, fn: Function) => { listeners[ev] = fn; },
+    };
+    const autoScroll: any = { checked: true, addEventListener: vi.fn() };
+
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      rafQueue.push(cb);
+      return rafQueue.length;
+    });
+    vi.stubGlobal('cancelAnimationFrame', (id: number) => {
+      if (id >= 1 && id <= rafQueue.length) {
+        rafQueue[id - 1] = () => {};
+      }
+    });
+    vi.stubGlobal('document', {
+      getElementById: (id: string) => (id === 'log-viewport' ? viewport : id === 'log-autoscroll' ? autoScroll : null),
+      querySelectorAll: () => [],
+      createElement: () => ({
+        className: '',
+        textContent: '',
+        dataset: {},
+        children: [],
+        appendChild: function (c: any) { this.children.push(c); return c; },
+      }),
+    });
+
+    logsController.setup();
+    logsController.push({ timestamp: '10:00:00', category: 'Whisper', message: 'One' });
+
+    // Queue a scroll rAF right before redraw resets scrollTop to 0
+    listeners['scroll']();
+    logsController.redraw();
+    viewport.scrollHeight = 1500;
+
+    while (rafQueue.length > 0) {
+      const fn = rafQueue.shift()!;
+      fn(0);
+    }
+
+    expect(autoScroll.checked).toBe(true);
+    expect(viewport.scrollTop).toBe(1500);
+
+    vi.unstubAllGlobals();
+  });
+
+  it('flushes search input and reports filtered copy count when category and search are both active', async () => {
+    logsController.clear();
+    const notifySpy = vi.fn();
+    const copySpy = vi.fn().mockResolvedValue(undefined);
+    const searchInput: any = { value: 'error' };
+    const filterAllBtn: any = { id: 'log-filter-All', classList: { toggle: vi.fn(), remove: vi.fn(), add: vi.fn() }, setAttribute: vi.fn() };
+    const filterWhisperBtn: any = { id: 'log-filter-Whisper', classList: { toggle: vi.fn(), remove: vi.fn(), add: vi.fn() }, setAttribute: vi.fn() };
+
+    vi.stubGlobal('window', { showNotification: notifySpy, copyToClipboard: copySpy });
+    vi.stubGlobal('document', {
+      getElementById: (id: string) => (id === 'log-search' ? searchInput : null),
+      querySelectorAll: () => [filterAllBtn, filterWhisperBtn],
+    });
+
+    logsController.push({ timestamp: '10:00:00', category: 'Whisper', message: 'Loaded model' });
+    logsController.push({ timestamp: '10:00:01', category: 'Whisper', message: 'Fatal error occurred' });
+    logsController.filter('Whisper');
+
+    expect(filterWhisperBtn.setAttribute).toHaveBeenCalledWith('aria-pressed', 'true');
+    expect(filterAllBtn.setAttribute).toHaveBeenCalledWith('aria-pressed', 'false');
+
+    await logsController.copyAll();
+
+    expect(copySpy).toHaveBeenCalledWith('[10:00:01] [Whisper] Fatal error occurred');
+    expect(notifySpy).toHaveBeenCalledWith(expect.stringContaining('1'), 'success');
+
+    // Reset filter & search state for isolation
+    searchInput.value = '';
+    logsController.filter('All');
     vi.unstubAllGlobals();
   });
 });

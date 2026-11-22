@@ -3,6 +3,7 @@ import {
   logsController,
   stripAnsi,
   escapeHTML,
+  formatLogTimestamp,
   appendLogToViewport,
   scheduleUpdateLogsButtonsState
 } from './logsController';
@@ -570,9 +571,9 @@ export function setupTauriListeners(): void {
     const payload = event?.payload;
     if (!payload) return;
     payload.message = stripAnsi(payload.message || '');
-    const now = new Date();
-    const pad = (num: number) => num.toString().padStart(2, '0');
-    payload.timestamp = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    if (!payload.timestamp) {
+      payload.timestamp = formatLogTimestamp();
+    }
     logsController.push(payload);
     scheduleUpdateLogsButtonsState();
     appendLogToViewport(payload);

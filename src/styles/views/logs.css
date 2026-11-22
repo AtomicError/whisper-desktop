@@ -54,6 +54,7 @@
 
 .log-search-container {
   flex-grow: 1;
+  min-width: 160px;
   max-width: 300px;
 }
 
@@ -188,6 +189,13 @@
   direction: ltr !important;
   text-align: left !important;
   unicode-bidi: isolate;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.log-viewport:focus-visible {
+  outline: 2px solid var(--color-royal-blue);
+  outline-offset: -2px;
 }
 
 .log-empty-state {
@@ -280,12 +288,13 @@
 .log-line .log-cat.whisper { background: rgba(var(--color-gold-rgb), 0.1); color: var(--color-gold); }
 .log-line .log-cat.settings { background: rgba(148, 163, 184, 0.14); color: #cbd5e1; }
 .log-line .log-cat.system { background: rgba(var(--color-red-rgb), 0.14); color: var(--color-red); }
+.log-line .log-cat.batch { background: rgba(var(--color-royal-blue-rgb), 0.14); color: var(--color-sky); }
 
 .log-line .log-msg {
   flex-grow: 1;
   color: var(--color-text);
   white-space: pre-wrap;
-  word-break: break-all;
+  overflow-wrap: anywhere;
   direction: ltr !important;
   text-align: left !important;
 }

@@ -1,7 +1,7 @@
 // Batch Processing Engine & Queue Controller for Whisper Desktop
 import { t, getLanguage, applyContentDirection, clearContentDirection, isolateLtr, isolateDirection } from '../i18n/index';
 import { formatLocalizedNumber } from '../i18n/formatters';
-import { escapeHTML, logsController } from './logsController';
+import { escapeHTML, formatLogTimestamp, logsController } from './logsController';
 import { transcriptViewer, loadTranscriptFromFile, loadTranscriptFromJsonData, cloneTranscriptLine } from './transcriptViewer';
 import { customSelectsMap } from './customSelect';
 import type { ToastAction } from './appModal';
@@ -1234,11 +1234,14 @@ export async function runBatchExtraction(): Promise<void> {
           name: item.name,
           start: isolateLtr(offsetStr)
         }) || `Skipped '${item.name}': shorter than start time (${offsetStr}).`;
-      logsController.push({
+      const batchEntry = {
         category: 'Batch',
         message: skipMsg,
-        timestamp: new Date().toLocaleTimeString()
-      });
+        timestamp: formatLogTimestamp()
+      };
+      logsController.push(batchEntry);
+      logsController.scheduleUpdateButtons();
+      logsController.appendLogToViewport(batchEntry);
       const skipPct = (((i + 1) / totalCount) * 100).toFixed(0);
       if (fillBar) fillBar.style.width = `${skipPct}%`;
       if (pctEl) pctEl.textContent = `${skipPct}%`;

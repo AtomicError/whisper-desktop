@@ -10,6 +10,7 @@ import {
   setOriginalListen
 } from './tauriEvents';
 import { transcriptViewer } from './transcriptViewer';
+import { logsController } from './logsController';
 
 class MockElement {
   public tagName: string;
@@ -270,12 +271,22 @@ describe('tauriEvents module', () => {
 
       handlers['log-message']({
         payload: {
+          timestamp: '09:15:30',
           category: 'Whisper',
           message: '[00:00:01.000 --> 00:00:03.500] Hello world subtitle segment'
         }
       });
 
       expect(appendSpy).toHaveBeenCalledWith('[00:00:01 --> 00:00:03]', 'Hello world subtitle segment');
+      expect(logsController.allLogs[logsController.allLogs.length - 1].timestamp).toBe('09:15:30');
+
+      handlers['log-message']({
+        payload: {
+          category: 'Whisper',
+          message: 'Fallback timestamp test'
+        }
+      });
+      expect(logsController.allLogs[logsController.allLogs.length - 1].timestamp).toMatch(/^\d{2}:\d{2}:\d{2}$/);
       appendSpy.mockRestore();
     });
   });

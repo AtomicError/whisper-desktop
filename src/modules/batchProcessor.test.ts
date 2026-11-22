@@ -945,6 +945,8 @@ describe('batchProcessor module', () => {
       };
 
       const pushLogSpy = vi.spyOn(logsController, 'push');
+      const appendLogSpy = vi.spyOn(logsController, 'appendLogToViewport');
+      const updateBtnsSpy = vi.spyOn(logsController, 'scheduleUpdateButtons');
       try {
         await runBatchExtraction();
 
@@ -957,10 +959,15 @@ describe('batchProcessor module', () => {
           ([entry]) => entry?.category === 'Batch' && String(entry.message).includes('short.mp4')
         );
         expect(skipLogCall).toBeDefined();
+        expect(skipLogCall?.[0].timestamp).toMatch(/^\d{2}:\d{2}:\d{2}$/);
         expect(skipLogCall?.[0].message).toContain('01:00');
         expect(skipLogCall?.[0].message).not.toContain('{start}');
+        expect(appendLogSpy).toHaveBeenCalledWith(skipLogCall?.[0]);
+        expect(updateBtnsSpy).toHaveBeenCalled();
       } finally {
         pushLogSpy.mockRestore();
+        appendLogSpy.mockRestore();
+        updateBtnsSpy.mockRestore();
         (globalThis as any).document = prevDoc;
       }
     });

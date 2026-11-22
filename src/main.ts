@@ -4,7 +4,7 @@
 
 import { hardsubController } from './hardsub';
 import './translationStudio';
-import { logsController, reportGlobalFrontendError, stripAnsi, type LogEntry } from './modules/logsController';
+import { logsController, reportGlobalFrontendError, reportUnhandledRejection, stripAnsi, type LogEntry } from './modules/logsController';
 import { themeManager } from './modules/themeManager';
 import { modelHub } from './modules/modelHub';
 import { transcriptViewer } from './modules/transcriptViewer';
@@ -81,6 +81,9 @@ import type { SystemSpecs } from './modelRecommender';
 // Global error catcher integrated with application logger and toast system
 if (typeof window !== 'undefined') {
   window.onerror = reportGlobalFrontendError;
+  if (typeof window.addEventListener === 'function') {
+    window.addEventListener('unhandledrejection', reportUnhandledRejection);
+  }
 }
 
 // Global system specifications cache

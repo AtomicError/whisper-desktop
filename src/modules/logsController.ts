@@ -21,6 +21,27 @@ let _programmaticBottomScrollTimer: ReturnType<typeof setTimeout> | null = null;
 let _updateLogsButtonsTimer: ReturnType<typeof setTimeout> | null = null;
 let _appendScrollDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 let _searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let _scrollRafId: number | null = null;
+
+export function formatLogTimestamp(date: Date = new Date()): string {
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+function prefersReducedMotion(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
+}
+
+function cancelPendingScrollRaf(): void {
+  if (_scrollRafId !== null && typeof cancelAnimationFrame === 'function') {
+    cancelAnimationFrame(_scrollRafId);
+    _scrollRafId = null;
+  }
+}
 
 function cancelPendingAppendScroll(): void {
   if (_appendScrollDebounceTimer !== null) {
@@ -34,6 +55,19 @@ function cancelProgrammaticBottomScroll(): void {
   if (_programmaticBottomScrollTimer !== null) {
     clearTimeout(_programmaticBottomScrollTimer);
     _programmaticBottomScrollTimer = null;
+  }
+}
+
+function syncSearchQueryFromInput(): void {
+  if (_searchDebounceTimer !== null) {
+    clearTimeout(_searchDebounceTimer);
+    _searchDebounceTimer = null;
+  }
+  const searchInput = typeof document !== 'undefined'
+    ? (document.getElementById('log-search') as HTMLInputElement | null)
+    : null;
+  if (searchInput) {
+    logSearchQuery = searchInput.value.toLowerCase().trim();
   }
 }
 
@@ -91,6 +125,7 @@ export function clearLogsArray(): void {
   seenBackendSeqs.clear();
   lastAppendedCategory = null;
   cancelPendingAppendScroll();
+  cancelPendingScrollRaf();
 }
 
 export function pushLogEntry(entry: LogEntry): void {
@@ -148,19 +183,21 @@ export function scrollLogsToBottom(smooth = false): void {
   const viewport = document.getElementById('log-viewport');
   if (!viewport) return;
   cancelPendingAppendScroll();
+  cancelPendingScrollRaf();
 
   const pill = document.getElementById('btn-logs-jump-bottom');
   if (pill) {
     pill.classList.remove('visible');
   }
+  const effectiveSmooth = smooth && !prefersReducedMotion();
   cancelProgrammaticBottomScroll();
   _isProgrammaticBottomScroll = true;
   _programmaticBottomScrollTimer = setTimeout(() => {
     _isProgrammaticBottomScroll = false;
     _programmaticBottomScrollTimer = null;
-  }, smooth ? 1200 : 50);
+  }, effectiveSmooth ? 1200 : 50);
 
-  if (smooth) {
+  if (effectiveSmooth) {
     viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
   } else {
     viewport.scrollTop = viewport.scrollHeight;
@@ -169,7 +206,7 @@ export function scrollLogsToBottom(smooth = false): void {
   if (autoScroll && !autoScroll.checked) {
     autoScroll.checked = true;
   }
-  if (!smooth) {
+  if (!effectiveSmooth) {
     updateLogJumpPillVisibility();
   }
 }
@@ -178,9 +215,11 @@ export function scrollLogsToTop(smooth = false): void {
   const viewport = document.getElementById('log-viewport');
   if (!viewport) return;
   cancelPendingAppendScroll();
+  cancelPendingScrollRaf();
   cancelProgrammaticBottomScroll();
 
-  if (smooth) {
+  const effectiveSmooth = smooth && !prefersReducedMotion();
+  if (effectiveSmooth) {
     viewport.scrollTo({ top: 0, behavior: 'smooth' });
   } else {
     viewport.scrollTop = 0;
@@ -211,10 +250,9 @@ export function setupLogsControls(): void {
   const logViewport = document.getElementById('log-viewport') as any;
   if (logViewport && !logViewport._scrollHandlerAttached) {
     logViewport._scrollHandlerAttached = true;
-    let scrollRaf: any = null;
 
     logViewport.addEventListener('wheel', (e: WheelEvent) => {
-      if (e.deltaY < 0) {
+      if (e.deltaY < 0 && logViewport.scrollHeight > logViewport.clientHeight) {
         cancelPendingAppendScroll();
         cancelProgrammaticBottomScroll();
         const autoScrollEl = document.getElementById('log-autoscroll') as HTMLInputElement | null;
@@ -225,9 +263,9 @@ export function setupLogsControls(): void {
     }, { passive: true });
 
     logViewport.addEventListener('scroll', () => {
-      if (scrollRaf) return;
-      scrollRaf = requestAnimationFrame(() => {
-        scrollRaf = null;
+      if (_scrollRafId !== null) return;
+      _scrollRafId = requestAnimationFrame(() => {
+        _scrollRafId = null;
         const autoScrollEl = document.getElementById('log-autoscroll') as HTMLInputElement | null;
         const distanceFromBottom = logViewport.scrollHeight - logViewport.scrollTop - logViewport.clientHeight;
         if (_isProgrammaticBottomScroll && distanceFromBottom <= 2) {
@@ -261,15 +299,15 @@ export function setupLogsControls(): void {
 }
 
 export function filterLogs(category: string): void {
+  syncSearchQueryFromInput();
   activeLogCategory = category;
 
   const scope = document.getElementById('panel-logs') || document;
   const filters = scope.querySelectorAll('.filter-btn');
   filters.forEach(btn => {
-    btn.classList.remove('active');
-    if (btn.id === `log-filter-${category}`) {
-      btn.classList.add('active');
-    }
+    const isMatch = btn.id === `log-filter-${category}`;
+    btn.classList.toggle('active', isMatch);
+    btn.setAttribute('aria-pressed', isMatch ? 'true' : 'false');
   });
 
   redrawLogsViewport();
@@ -292,18 +330,8 @@ export function handleLogSearch(): void {
 
 export function getFilteredLogs(): LogEntry[] {
   if (!allLogsArray || allLogsArray.length === 0) return [];
-  let logs = allLogsArray;
-  if (activeLogCategory !== 'All') {
-    logs = logs.filter(l => l.category === activeLogCategory);
-  }
-  if (logSearchQuery) {
-    const query = logSearchQuery.toLowerCase();
-    logs = logs.filter(l => 
-      (l.message && l.message.toLowerCase().includes(query)) || 
-      (l.category && l.category.toLowerCase().includes(query))
-    );
-  }
-  return logs;
+  if (activeLogCategory === 'All' && !logSearchQuery) return allLogsArray;
+  return allLogsArray.filter(matchesActiveFilter);
 }
 
 export function scheduleUpdateLogsButtonsState(): void {
@@ -354,13 +382,30 @@ export function updateLogsButtonsState(): void {
   }
 }
 
+function buildCategoryClass(category: string): string {
+  return category.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+}
+
+function createHeaderSpans(timestamp: string, category: string): { timeEl: HTMLSpanElement; catEl: HTMLSpanElement } {
+  const catClass = buildCategoryClass(category);
+  const timeEl = document.createElement('span');
+  timeEl.className = 'log-time';
+  timeEl.textContent = timestamp;
+
+  const catEl = document.createElement('span');
+  catEl.className = catClass ? `log-cat ${catClass}` : 'log-cat';
+  catEl.textContent = category.toUpperCase();
+  return { timeEl, catEl };
+}
+
 function createLogLineElement(payload: LogEntry): HTMLDivElement {
   const logLine = document.createElement('div');
   logLine.className = 'log-line';
 
   const category = payload.category || '';
-  const catClass = category.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+  const timestamp = payload.timestamp || '';
   logLine.dataset.category = category;
+  logLine.dataset.timestamp = timestamp;
 
   if (category === lastAppendedCategory) {
     const timeSpacer = document.createElement('span');
@@ -370,14 +415,7 @@ function createLogLineElement(payload: LogEntry): HTMLDivElement {
     logLine.appendChild(timeSpacer);
     logLine.appendChild(catSpacer);
   } else {
-    const timeEl = document.createElement('span');
-    timeEl.className = 'log-time';
-    timeEl.textContent = payload.timestamp || '';
-
-    const catEl = document.createElement('span');
-    catEl.className = catClass ? `log-cat ${catClass}` : 'log-cat';
-    catEl.textContent = category.toUpperCase();
-
+    const { timeEl, catEl } = createHeaderSpans(timestamp, category);
     logLine.appendChild(timeEl);
     logLine.appendChild(catEl);
     lastAppendedCategory = category;
@@ -389,6 +427,22 @@ function createLogLineElement(payload: LogEntry): HTMLDivElement {
   logLine.appendChild(msgEl);
 
   return logLine;
+}
+
+function promoteFirstLogLineHeader(viewport: HTMLElement): void {
+  const first = viewport.firstElementChild as HTMLElement | null;
+  if (!first || typeof first.querySelector !== 'function' || typeof first.replaceChild !== 'function') {
+    return;
+  }
+  const timeSpacer = first.querySelector('.log-time-spacer');
+  const catSpacer = first.querySelector('.log-cat-spacer');
+  if (!timeSpacer && !catSpacer) return;
+
+  const category = first.dataset.category || '';
+  const timestamp = first.dataset.timestamp || '';
+  const { timeEl, catEl } = createHeaderSpans(timestamp, category);
+  if (timeSpacer) first.replaceChild(timeEl, timeSpacer);
+  if (catSpacer) first.replaceChild(catEl, catSpacer);
 }
 
 export function appendLogToViewport(payload: LogEntry, isBatchRedraw = false): void {
@@ -411,6 +465,7 @@ export function appendLogToViewport(payload: LogEntry, isBatchRedraw = false): v
 
   if (viewport.children.length > MAX_VIEWPORT_LINES && viewport.firstElementChild) {
     viewport.removeChild(viewport.firstElementChild);
+    promoteFirstLogLineHeader(viewport);
   }
 
   if (isBatchRedraw) return;
@@ -439,16 +494,41 @@ export function redrawLogsViewport(): void {
     _updateLogsButtonsTimer = null;
   }
   cancelPendingAppendScroll();
+  cancelPendingScrollRaf();
   lastAppendedCategory = null;
   const viewport = document.getElementById('log-viewport');
   updateLogsButtonsState();
   if (!viewport) return;
+
+  const autoScroll = (document.getElementById('log-autoscroll') as HTMLInputElement | null)?.checked;
+  if (autoScroll) {
+    cancelProgrammaticBottomScroll();
+    _isProgrammaticBottomScroll = true;
+    _programmaticBottomScrollTimer = setTimeout(() => {
+      _isProgrammaticBottomScroll = false;
+      _programmaticBottomScrollTimer = null;
+    }, 100);
+  }
+
   viewport.innerHTML = '';
 
   const logsToRender = getFilteredLogs().slice(-MAX_VIEWPORT_LINES);
-  logsToRender.forEach(payload => {
-    appendLogToViewport(payload, true);
-  });
+  const fragment = typeof document.createDocumentFragment === 'function'
+    ? document.createDocumentFragment()
+    : null;
+
+  for (const payload of logsToRender) {
+    const logLine = createLogLineElement(payload);
+    if (fragment) {
+      fragment.appendChild(logLine);
+    } else {
+      viewport.appendChild(logLine);
+    }
+  }
+
+  if (fragment && logsToRender.length > 0) {
+    viewport.appendChild(fragment);
+  }
 
   if (viewport.children.length === 0) {
     const hasAnyLogs = Boolean(allLogsArray && allLogsArray.length > 0);
@@ -463,18 +543,24 @@ export function redrawLogsViewport(): void {
     `;
   }
 
-  const autoScroll = (document.getElementById('log-autoscroll') as HTMLInputElement | null)?.checked;
   if (autoScroll) {
-    requestAnimationFrame(() => {
+    const commitBottomScroll = () => {
       viewport.scrollTop = viewport.scrollHeight;
+      cancelProgrammaticBottomScroll();
       updateLogJumpPillVisibility();
-    });
+    };
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(commitBottomScroll);
+    } else {
+      commitBottomScroll();
+    }
   } else {
     updateLogJumpPillVisibility();
   }
 }
 
 export async function copyAllLogs(): Promise<void> {
+  syncSearchQueryFromInput();
   const filteredLogs = getFilteredLogs();
   const showNotification = (window as any).showNotification;
   const copyToClipboard = (window as any).copyToClipboard;
@@ -491,9 +577,9 @@ export async function copyAllLogs(): Promise<void> {
   try {
     if (copyToClipboard) await copyToClipboard(rawLogs);
     if (!showNotification) return;
-    if (activeLogCategory === 'Whisper') {
+    if (activeLogCategory === 'Whisper' && !logSearchQuery) {
       showNotification(t('toasts.logsCopiedWhisper'), "success");
-    } else if (activeLogCategory === 'Translate') {
+    } else if (activeLogCategory === 'Translate' && !logSearchQuery) {
       showNotification(t('toasts.logsCopiedTranslate'), "success");
     } else if (activeLogCategory !== 'All' || logSearchQuery) {
       showNotification(t('toasts.logsCopiedFiltered', { count: filteredLogs.length }), "success");
@@ -539,32 +625,12 @@ export async function clearLogsHistory(invokeFn?: any): Promise<void> {
 
 let _lastGlobalErrorToastAt = 0;
 
-export function reportGlobalFrontendError(
-  message: string | Event,
-  source?: string,
-  lineno?: number,
-  colno?: number,
-  error?: Error
-): boolean {
-  const msgText = typeof message === 'string'
-    ? message
-    : (error?.message || 'Unexpected frontend error');
-
-  if (msgText.includes('ResizeObserver loop')) {
-    return false;
-  }
-
-  const locationParts = [source, lineno, colno].filter(v => v !== undefined && v !== null && v !== '');
-  const locationSuffix = locationParts.length > 0 ? ` (${locationParts.join(':')})` : '';
+function recordFrontendError(msgText: string, locationSuffix: string): void {
   const formattedLog = `Frontend error: ${msgText}${locationSuffix}`;
-
-  const now = new Date();
-  const pad = (n: number) => n.toString().padStart(2, '0');
-  const timestamp = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
   const entry: LogEntry = {
     category: 'System',
     message: formattedLog,
-    timestamp
+    timestamp: formatLogTimestamp()
   };
 
   try {
@@ -587,8 +653,45 @@ export function reportGlobalFrontendError(
       // Ignore secondary notification errors
     }
   }
+}
+
+export function reportGlobalFrontendError(
+  message: string | Event,
+  source?: string,
+  lineno?: number,
+  colno?: number,
+  error?: Error
+): boolean {
+  const msgText = typeof message === 'string'
+    ? message
+    : (error?.message || 'Unexpected frontend error');
+
+  if (msgText.includes('ResizeObserver loop')) {
+    return false;
+  }
+
+  const locationParts = [source, lineno, colno].filter(v => v !== undefined && v !== null && v !== '');
+  const locationSuffix = locationParts.length > 0 ? ` (${locationParts.join(':')})` : '';
+  recordFrontendError(msgText, locationSuffix);
 
   return false;
+}
+
+export function reportUnhandledRejection(event: { reason?: unknown } | PromiseRejectionEvent): void {
+  const reason = event?.reason;
+  let msgText = 'Unhandled promise rejection';
+  if (typeof reason === 'string' && reason.trim()) {
+    msgText = reason;
+  } else if (reason && typeof reason === 'object' && 'message' in reason && typeof (reason as any).message === 'string') {
+    msgText = (reason as any).message || msgText;
+  } else if (reason !== undefined && reason !== null) {
+    msgText = String(reason);
+  }
+
+  if (msgText.includes('ResizeObserver loop')) {
+    return;
+  }
+  recordFrontendError(msgText, '');
 }
 
 // Bind to window for global inline HTML onclick handlers
@@ -636,5 +739,7 @@ export const logsController = {
   getFilteredLogs,
   stripAnsi,
   escapeHTML,
-  reportGlobalFrontendError
+  formatLogTimestamp,
+  reportGlobalFrontendError,
+  reportUnhandledRejection
 };

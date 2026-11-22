@@ -2,12 +2,12 @@
           <div class="view-panel fixed-layout-panel" id="panel-logs" role="tabpanel" aria-labelledby="nav-tab-logs" tabindex="0">
             <div class="logs-layout">
               <div class="logs-controls">
-                <div class="log-filters">
-                  <button type="button" class="filter-btn active" id="log-filter-All" onclick="filterLogs('All')" data-i18n="logs.filterAll">All</button>
-                  <button type="button" class="filter-btn" id="log-filter-Translate" onclick="filterLogs('Translate')" data-i18n="logs.filterTranslate">Translate</button>
-                  <button type="button" class="filter-btn" id="log-filter-Whisper" onclick="filterLogs('Whisper')" data-i18n="logs.filterWhisper">Whisper</button>
-                  <button type="button" class="filter-btn" id="log-filter-FFmpeg" onclick="filterLogs('FFmpeg')" data-i18n="logs.filterFfmpeg">FFmpeg</button>
-                  <button type="button" class="filter-btn" id="log-filter-Hardsub" onclick="filterLogs('Hardsub')" data-i18n="logs.filterHardsub">Hardsub</button>
+                <div class="log-filters" role="group" aria-label="Log category filters">
+                  <button type="button" class="filter-btn active" id="log-filter-All" aria-pressed="true" onclick="filterLogs('All')" data-i18n="logs.filterAll">All</button>
+                  <button type="button" class="filter-btn" id="log-filter-Translate" aria-pressed="false" onclick="filterLogs('Translate')" data-i18n="logs.filterTranslate">Translate</button>
+                  <button type="button" class="filter-btn" id="log-filter-Whisper" aria-pressed="false" onclick="filterLogs('Whisper')" data-i18n="logs.filterWhisper">Whisper</button>
+                  <button type="button" class="filter-btn" id="log-filter-FFmpeg" aria-pressed="false" onclick="filterLogs('FFmpeg')" data-i18n="logs.filterFfmpeg">FFmpeg</button>
+                  <button type="button" class="filter-btn" id="log-filter-Hardsub" aria-pressed="false" onclick="filterLogs('Hardsub')" data-i18n="logs.filterHardsub">Hardsub</button>
                 </div>
                 
                 <div class="log-search-container">
@@ -35,7 +35,7 @@
 
               <!-- Monospace Log Viewport Wrapper for Floating Button -->
               <div class="log-viewport-wrapper">
-                <div class="log-viewport" id="log-viewport"></div>
+                <div class="log-viewport" id="log-viewport" tabindex="0" role="log" aria-live="off" data-i18n-aria="logs.title" aria-label="Activity Logs"></div>
                 <button type="button" class="log-jump-bottom-pill" id="btn-logs-jump-bottom" onclick="scrollLogsToBottom(true)" data-i18n-aria="logs.jumpToBottom" aria-label="Latest Logs">
                   <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
                   <span data-i18n="logs.jumpToBottom">Latest Logs</span>
