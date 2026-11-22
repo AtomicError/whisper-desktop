@@ -67,6 +67,7 @@
 
   /* Adjust model manager category buttons in tab format */
   .settings-cat-btn {
+    width: auto !important;
     padding: 8px 12px !important;
     font-size: 0.85rem !important;
     flex-shrink: 0 !important;

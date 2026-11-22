@@ -2548,5 +2548,112 @@ describe('settingsManager module', () => {
         (globalThis as any).localStorage = prevStorage;
       }
     });
+
+    it('marks settings dirty immediately on checkbox switch toggle so flushPendingSettingsOnUnload saves before 240ms', () => {
+      const invokeSpy = vi.fn().mockResolvedValue(undefined);
+      (globalThis as any).__TAURI__.core.invoke = invokeSpy;
+
+      const chk = new MockElement('INPUT');
+      chk.type = 'checkbox';
+      chk.id = 'opt-carryPrompt';
+      elementRegistry.set('opt-carryPrompt', chk);
+
+      setSettingsState({
+        carryPrompt: false,
+        outputSrt: true
+      });
+      bindSettingsToDOM();
+
+      chk.checked = true;
+      (chk as any).onchange();
+
+      flushPendingSettingsOnUnload();
+      expect(invokeSpy).toHaveBeenCalledWith(
+        'save_settings',
+        expect.objectContaining({
+          settings: expect.objectContaining({ carryPrompt: true })
+        })
+      );
+    });
+
+    it('ignores stale concurrent scanAndPopulateModels responses and populates empty VAD option when none exist', async () => {
+      let resolveFirst!: (val: any) => void;
+      let callCount = 0;
+      const invokeSpy = vi.fn().mockImplementation((cmd: string) => {
+        if (cmd === 'scan_models') {
+          callCount += 1;
+          if (callCount === 1) {
+            return new Promise(res => { resolveFirst = res; });
+          }
+          return Promise.resolve({ transModels: ['/models/ggml-base.bin'], vadModels: [] });
+        }
+        return Promise.resolve(undefined);
+      });
+      (globalThis as any).__TAURI__.core.invoke = invokeSpy;
+
+      const transSelect = new MockElement('SELECT');
+      transSelect.id = 'opt-modelPath';
+      const vadSelect = new MockElement('SELECT');
+      vadSelect.id = 'opt-vadModel';
+      elementRegistry.set('opt-modelPath', transSelect);
+      elementRegistry.set('opt-vadModel', vadSelect);
+
+      setSettingsState({ selectedBackend: 'Standard', modelsDir: '/models', modelPath: '', vadModel: '' });
+
+      const firstScan = settingsManager.scanAndPopulateModels();
+      const secondScan = settingsManager.scanAndPopulateModels();
+
+      await secondScan;
+      resolveFirst({ transModels: ['/models/ggml-stale.bin'], vadModels: ['/models/stale-vad.bin'] });
+      await firstScan;
+
+      expect(getLocalScannedTransModels()).toEqual(['/models/ggml-base.bin']);
+      expect(getLocalScannedVadModels()).toEqual([]);
+      expect(vadSelect.options.length).toBe(1);
+      expect(vadSelect.options[0].value).toBe('');
+      expect(vadSelect.options[0].textContent).toBeTruthy();
+    });
+
+    it('keeps #output-dir-custom-card hidden during search when outputDirMode is input_dir', () => {
+      const tabOutputs = new MockElement('BUTTON');
+      tabOutputs.id = 'cat-btn-outputs';
+      tabOutputs.className = 'settings-cat-btn';
+      tabOutputs.textContent = 'Outputs';
+
+      const groupOutputs = new MockElement('DIV');
+      groupOutputs.id = 'group-outputs';
+      groupOutputs.className = 'settings-group';
+
+      const modeSelect = new MockElement('SELECT');
+      modeSelect.id = 'opt-outputDirMode';
+      modeSelect.value = 'input_dir';
+      elementRegistry.set('opt-outputDirMode', modeSelect);
+
+      const modeCard = new MockElement('DIV');
+      modeCard.className = 'setting-card';
+      const modeTitle = new MockElement('DIV');
+      modeTitle.className = 'setting-title';
+      modeTitle.textContent = 'Output Directory Mode';
+      modeCard.appendChild(modeTitle);
+
+      const customCard = new MockElement('DIV');
+      customCard.id = 'output-dir-custom-card';
+      customCard.className = 'setting-card';
+      customCard.style.display = 'none';
+      const customTitle = new MockElement('DIV');
+      customTitle.className = 'setting-title';
+      customTitle.textContent = 'Custom Output Path';
+      customCard.appendChild(customTitle);
+
+      groupOutputs.appendChild(modeCard);
+      groupOutputs.appendChild(customCard);
+      elementRegistry.set('cat-btn-outputs', tabOutputs);
+      elementRegistry.set('group-outputs', groupOutputs);
+
+      setSettingsState({ outputDirMode: 'input_dir' });
+      executeFilterSettings('Custom Output');
+
+      expect(customCard.style.display).toBe('none');
+    });
   });
 });

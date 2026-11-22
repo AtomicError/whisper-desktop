@@ -1,7 +1,7 @@
 // AI Translation Configuration, Providers Registry, & Models Management
 import { t, isRtlLanguage, getLanguage, firstStrongDirection } from '../i18n/index';
 import { escapeHTML } from './logsController';
-import { CustomSelect, customSelectsMap } from './customSelect';
+import { CustomSelect, customSelectsMap, syncCustomSelects } from './customSelect';
 import { getSettingsState, type SettingsState } from './settingsManager';
 import { showBatchErrorDialog, type ToastAction } from './appModal';
 
@@ -13,6 +13,9 @@ export interface ModelObject {
   id: string;
   contextWindow?: number;
   context_window?: number;
+  maxOutputTokens?: number;
+  max_output_tokens?: number;
+  vision?: boolean;
   reasoning?: string;
   supportsReasoning?: boolean;
   supports_reasoning?: boolean;
@@ -41,7 +44,7 @@ declare global {
     onProviderChanged: (keepCurrentTab?: boolean | string, skipTableRender?: boolean) => void;
     togglePasswordVisibility: (inputId: string, btn: HTMLElement) => Promise<void>;
     switchProviderTab: (tab: string) => void;
-    saveActiveProviderGeneral: (silent?: boolean) => Promise<void>;
+    saveActiveProviderGeneral: (silent?: boolean) => Promise<boolean>;
     deleteProviderByName: (providerName: string) => Promise<void>;
     deleteActiveProvider: () => Promise<void>;
     toEnglishDigits: (str: any) => string;
@@ -110,6 +113,59 @@ const saveSettings = async (): Promise<void> => {
     await win.saveCurrentSettings();
   }
 };
+
+const syncProviderCustomSelects = (): void => {
+  const win = getGlobal();
+  const fn = typeof win?.syncCustomSelects === 'function' ? win.syncCustomSelects : syncCustomSelects;
+  if (typeof fn === 'function') {
+    fn(false, true);
+  }
+};
+
+function normalizeProviderModel(
+  raw: any,
+  options?: {
+    idOverride?: string;
+    reasoningOverride?: string;
+    supportsReasoningOverride?: boolean;
+    enabledOverride?: boolean;
+    fallbackModel?: any;
+  }
+): ModelObject {
+  const fallback = options?.fallbackModel;
+  const resolvedId = options?.idOverride ?? (raw?.id || '');
+  const rawCtx = raw?.contextWindow ?? raw?.context_window ?? fallback?.contextWindow ?? fallback?.context_window ?? 200000;
+  const rawMaxOut = raw?.maxOutputTokens ?? raw?.max_output_tokens ?? fallback?.maxOutputTokens ?? fallback?.max_output_tokens;
+  const parsedMaxOut = typeof rawMaxOut === 'number' && Number.isFinite(rawMaxOut) && rawMaxOut > 0
+    ? Math.floor(rawMaxOut)
+    : undefined;
+  const vision = typeof raw?.vision === 'boolean'
+    ? raw.vision
+    : (typeof fallback?.vision === 'boolean' ? fallback.vision : undefined);
+
+  const supportsReasoning = options?.supportsReasoningOverride !== undefined
+    ? options.supportsReasoningOverride
+    : (typeof raw?.supportsReasoning === 'boolean'
+        ? raw.supportsReasoning
+        : (typeof raw?.supports_reasoning === 'boolean'
+            ? raw.supports_reasoning
+            : (raw?.reasoning && String(raw.reasoning).toLowerCase() !== 'none' ? true : undefined)));
+
+  const model: ModelObject = {
+    id: resolvedId,
+    contextWindow: parseTokensInput(rawCtx),
+    reasoning: options?.reasoningOverride ?? (raw?.reasoning || 'None'),
+    supportsReasoning,
+    enabled: options?.enabledOverride !== undefined ? options.enabledOverride : (raw?.enabled !== false)
+  };
+  if (parsedMaxOut !== undefined) {
+    model.maxOutputTokens = parsedMaxOut;
+  }
+  if (vision !== undefined) {
+    model.vision = vision;
+  }
+  return model;
+}
 
 const notify = (msg: string, type: 'info' | 'success' | 'error' = 'info'): void => {
   const win = getGlobal();
@@ -538,12 +594,20 @@ export function onProviderChanged(keepCurrentTab: boolean | string = false, skip
       if (keyVal === '__KEYRING__') {
         keyInput.value = '••••••••••••••••';
         keyInput.dataset.isKeyring = 'true';
-        
+        let userModifiedKey = false;
+        const onUserKeyInput = () => {
+          userModifiedKey = true;
+        };
+        if (typeof keyInput.addEventListener === 'function') {
+          keyInput.addEventListener('input', onUserKeyInput, { once: true });
+        }
+
         (async () => {
           try {
             const realKey = await invoke('get_keyring_credential', { providerName });
             const currentSelect = document.getElementById('opt-translateAiProvider') as HTMLSelectElement | null;
-            if (currentSelect && currentSelect.value === providerName) {
+            const userFocusedElsewhere = typeof document !== 'undefined' && document.activeElement === keyInput && userModifiedKey;
+            if (currentSelect && currentSelect.value === providerName && !userModifiedKey && !userFocusedElsewhere) {
               keyInput.value = realKey;
               keyInput.dataset.isKeyring = 'false';
               delete keyInput.dataset.keyringError;
@@ -552,13 +616,17 @@ export function onProviderChanged(keepCurrentTab: boolean | string = false, skip
           } catch (e) {
             console.error("Background keyring credential fetch failed:", e);
             const currentSelect = document.getElementById('opt-translateAiProvider') as HTMLSelectElement | null;
-            if (currentSelect && currentSelect.value === providerName) {
+            if (currentSelect && currentSelect.value === providerName && !userModifiedKey) {
               // Preserve the keyring placeholder and flag instead of clearing to '',
               // so edits to other provider fields do not silently delete the stored secret.
               keyInput.value = '••••••••••••••••';
               keyInput.dataset.isKeyring = 'true';
               keyInput.dataset.keyringError = 'true';
               keyInput.title = t('toasts.keyringLoadError', { error: String(e) });
+            }
+          } finally {
+            if (typeof keyInput.removeEventListener === 'function') {
+              keyInput.removeEventListener('input', onUserKeyInput);
             }
           }
         })();
@@ -641,7 +709,8 @@ export function onProviderChanged(keepCurrentTab: boolean | string = false, skip
   if (window.translationStudioController) {
     window.translationStudioController.refreshModelOptions();
   }
-  
+
+  syncProviderCustomSelects();
   saveSettings();
   triggerUpdateTranscribeUI();
 }
@@ -756,11 +825,11 @@ export function switchProviderTab(tab: string): void {
   }
 }
 
-export async function saveActiveProviderGeneral(silent = false): Promise<void> {
+export async function saveActiveProviderGeneral(silent = false): Promise<boolean> {
   const providerSelect = document.getElementById('opt-translateAiProvider') as HTMLSelectElement | null;
-  if (!providerSelect) return;
+  if (!providerSelect) return false;
   const providerName = providerSelect.value;
-  if (!providerName) return;
+  if (!providerName) return false;
   
   const settingsState = getSettingsState();
   let providers: ProviderConfig[] = [];
@@ -771,7 +840,7 @@ export async function saveActiveProviderGeneral(silent = false): Promise<void> {
   }
   
   const providerIdx = providers.findIndex(p => p.name === providerName);
-  if (providerIdx === -1) return;
+  if (providerIdx === -1) return false;
   
   const provider = providers[providerIdx];
   const urlEl = document.getElementById('mgr-provider-url') as HTMLInputElement | null;
@@ -786,7 +855,7 @@ export async function saveActiveProviderGeneral(silent = false): Promise<void> {
   
   if (!baseUrl) {
     if (!silent) notify(t('toasts.baseUrlRequired'), "info");
-    return;
+    return false;
   }
   
   let keyToSave = provider.apiKey || provider.api_key || '';
@@ -842,6 +911,7 @@ export async function saveActiveProviderGeneral(silent = false): Promise<void> {
   if (!silent) {
     notify(t('toasts.providerSettingsSaved'), "success");
   }
+  return true;
 }
 
 export async function deleteProviderByName(providerName: string): Promise<void> {
@@ -992,18 +1062,16 @@ export function clearModelsSearch(): void {
 export function renderModelsRegistryTable(provider: ProviderConfig): void {
   currentProviderModels = (provider && provider.models ? provider.models : []).map(m => {
     const isReasoning = isReasoningSupportedModel(m);
-    let reasoningVal = isReasoning
+    const reasoningVal = isReasoning
       ? ((m.reasoning !== undefined && m.reasoning !== null && m.reasoning !== '') ? m.reasoning : 'Medium')
       : 'None';
-    return {
-      id: m.id || '',
-      contextWindow: parseTokensInput(m.contextWindow || m.context_window || 200000),
-      reasoning: reasoningVal,
-      supportsReasoning: typeof m.supportsReasoning === 'boolean'
-        ? m.supportsReasoning
-        : (typeof m.supports_reasoning === 'boolean' ? m.supports_reasoning : (isReasoning ? true : undefined)),
-      enabled: m.enabled !== false
-    };
+    const supportsReasoning = typeof m.supportsReasoning === 'boolean'
+      ? m.supportsReasoning
+      : (typeof m.supports_reasoning === 'boolean' ? m.supports_reasoning : (isReasoning ? true : undefined));
+    return normalizeProviderModel(m, {
+      reasoningOverride: reasoningVal,
+      supportsReasoningOverride: supportsReasoning
+    });
   });
   
   currentModelsPage = 1;
@@ -1501,7 +1569,9 @@ export function createModelRowElement(modelObj: ModelObject, isActive: boolean, 
       (e.target as HTMLElement).closest('.model-reasoning-select') ||
       (e.target as HTMLElement).closest('.custom-select-container') ||
       (e.target as HTMLElement).closest('input') ||
-      (e.target as HTMLElement).closest('.reasoning-none-dash')
+      (e.target as HTMLElement).closest('.reasoning-none-dash') ||
+      (e.target as HTMLElement).closest('.model-id-display') ||
+      (e.target as HTMLElement).closest('.model-ctx-value')
     ) {
       return;
     }
@@ -1659,6 +1729,19 @@ export function createModelRowElement(modelObj: ModelObject, isActive: boolean, 
     });
   }
 
+  const scheduleEmptyManualRowCleanup = () => {
+    setTimeout(() => {
+      if (!row.contains(document.activeElement)) {
+        const idx = currentProviderModels.indexOf(modelObj);
+        if (idx !== -1 && (!modelObj.id || !modelObj.id.trim())) {
+          currentProviderModels.splice(idx, 1);
+          updateFilterCounts();
+        }
+        applyModelsFilterAndRender(0);
+      }
+    }, 120);
+  };
+
   const idInput = row.querySelector('.model-id-input') as HTMLInputElement | null;
   if (idInput) {
     idInput.addEventListener('click', e => e.stopPropagation());
@@ -1678,16 +1761,7 @@ export function createModelRowElement(modelObj: ModelObject, isActive: boolean, 
           }
         }, 120);
       } else {
-        setTimeout(() => {
-          if (!row.contains(document.activeElement)) {
-            const idx = currentProviderModels.indexOf(modelObj);
-            if (idx !== -1 && !modelObj.id) {
-              currentProviderModels.splice(idx, 1);
-              updateFilterCounts();
-              applyModelsFilterAndRender(0);
-            }
-          }
-        }, 120);
+        scheduleEmptyManualRowCleanup();
       }
     });
     idInput.addEventListener('keydown', (e: KeyboardEvent) => {
@@ -1706,11 +1780,7 @@ export function createModelRowElement(modelObj: ModelObject, isActive: boolean, 
       saveActiveProviderModelsDebounced();
     });
     ctxInput.addEventListener('blur', () => {
-      setTimeout(() => {
-        if (!row.contains(document.activeElement)) {
-          applyModelsFilterAndRender(0);
-        }
-      }, 120);
+      scheduleEmptyManualRowCleanup();
     });
     ctxInput.addEventListener('keydown', (e: KeyboardEvent) => {
       if (e.key === 'Enter') {
@@ -1786,19 +1856,7 @@ function normalizeProviderModelsList(models: ModelObject[]): ModelObject[] {
     const trimmedId = (m.id || '').trim();
     if (trimmedId && !seenIds.has(trimmedId)) {
       seenIds.add(trimmedId);
-      const supportsReasoning = typeof m.supportsReasoning === 'boolean'
-        ? m.supportsReasoning
-        : (typeof m.supports_reasoning === 'boolean' ? m.supports_reasoning : undefined);
-
-      validModels.push({
-        id: trimmedId,
-        contextWindow: m.contextWindow || 200000,
-        reasoning: m.reasoning || 'None',
-        supportsReasoning: supportsReasoning !== undefined
-          ? supportsReasoning
-          : (m.reasoning && m.reasoning.toLowerCase() !== 'none' ? true : undefined),
-        enabled: m.enabled !== false
-      });
+      validModels.push(normalizeProviderModel(m, { idOverride: trimmedId }));
     }
   });
   return validModels;
@@ -1888,13 +1946,16 @@ export async function fetchActiveProviderModels(): Promise<void> {
           enabled = existing.enabled;
         }
       }
-      return {
-        id: modelId,
-        contextWindow: parseTokensInput(modelCtx),
-        reasoning,
-        supportsReasoning: isReasoning,
-        enabled
-      };
+      return normalizeProviderModel(
+        (m && typeof m === 'object') ? { ...m, contextWindow: modelCtx } : { id: modelId, contextWindow: modelCtx },
+        {
+          idOverride: modelId,
+          reasoningOverride: reasoning,
+          supportsReasoningOverride: isReasoning,
+          enabledOverride: enabled,
+          fallbackModel: existing
+        }
+      );
     });
 
     const liveSettings = getSettingsState();
@@ -1903,6 +1964,7 @@ export async function fetchActiveProviderModels(): Promise<void> {
       return;
     }
 
+    let persistedForTarget = false;
     if (activeProviderName === providerName) {
       currentProviderModels = fetchedModels;
       const currentActive = liveSettings ? liveSettings.translateAiModel : '';
@@ -1915,6 +1977,7 @@ export async function fetchActiveProviderModels(): Promise<void> {
       currentModelsSortDir = 'none';
       updateFilterCounts();
       await saveActiveProviderModels(true, false, providerName);
+      persistedForTarget = true;
     } else if (liveSettings) {
       // User switched providers mid-fetch: persist models onto the target provider
       // without clobbering the newly selected provider's active state or UI table.
@@ -1930,9 +1993,12 @@ export async function fetchActiveProviderModels(): Promise<void> {
         };
         liveSettings.translateAiProviders = JSON.stringify(latestProviders);
         await saveSettings();
+        persistedForTarget = true;
       }
     }
-    notify(t('toasts.modelsFetchedSuccess', { count: modelsList.length }), "success");
+    if (persistedForTarget) {
+      notify(t('toasts.modelsFetchedSuccess', { count: modelsList.length }), "success");
+    }
   } catch (e) {
     notify(t('toasts.modelsFetchError', { error: String(e) }), "error");
   } finally {
@@ -2355,10 +2421,20 @@ export async function testTranslationConnection(): Promise<void> {
   testBtn.disabled = true;
   testBtn.textContent = t('modals.testingBtn');
   
+  let savedOk = false;
   try {
-    await saveActiveProviderGeneral(true);
+    savedOk = await saveActiveProviderGeneral(true);
   } catch (e) {
     console.warn("Failed to silently save provider configuration before test:", e);
+  }
+  if (!savedOk) {
+    const urlEl = document.getElementById('mgr-provider-url') as HTMLInputElement | null;
+    if (!urlEl || !urlEl.value.trim()) {
+      notify(t('toasts.baseUrlRequired'), "info");
+    }
+    testBtn.disabled = false;
+    testBtn.textContent = originalText;
+    return;
   }
 
   const settingsState = getSettingsState();

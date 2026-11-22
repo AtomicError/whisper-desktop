@@ -378,8 +378,10 @@ impl WhisperSettings {
             _ => "en".to_string(),
         };
 
-        if self.ui_scale <= 0.0 || self.ui_scale.is_nan() {
-            self.ui_scale = 1.0;
+        let defaults = Self::default_settings();
+
+        if !self.ui_scale.is_finite() || self.ui_scale <= 0.0 {
+            self.ui_scale = defaults.ui_scale;
         }
         self.ui_scale = (self.ui_scale * 100.0).round() / 100.0;
         self.ui_scale = self.ui_scale.clamp(0.70, 1.60);
@@ -405,30 +407,30 @@ impl WhisperSettings {
         self.audio_ctx = self.audio_ctx.max(0);
         self.device_id = self.device_id.max(0);
 
-        self.vad_thold = self.vad_thold.clamp(0.0, 1.0);
+        self.vad_thold = if self.vad_thold.is_finite() { self.vad_thold } else { defaults.vad_thold }.clamp(0.0, 1.0);
         if self.vad_min_speech < 0 {
-            self.vad_min_speech = 250;
+            self.vad_min_speech = defaults.vad_min_speech;
         }
         if self.vad_min_sil < 0 {
-            self.vad_min_sil = 100;
+            self.vad_min_sil = defaults.vad_min_sil;
         }
-        if self.vad_max_speech <= 0.0 || self.vad_max_speech >= 1000.0 {
-            self.vad_max_speech = 30.0;
+        if !self.vad_max_speech.is_finite() || self.vad_max_speech <= 0.0 || self.vad_max_speech >= 1000.0 {
+            self.vad_max_speech = defaults.vad_max_speech;
         } else {
             self.vad_max_speech = self.vad_max_speech.clamp(1.0, 300.0);
         }
         if self.vad_speech_pad < 0 {
-            self.vad_speech_pad = 30;
+            self.vad_speech_pad = defaults.vad_speech_pad;
         }
-        self.vad_overlap = self.vad_overlap.clamp(0.0, 1.0);
+        self.vad_overlap = if self.vad_overlap.is_finite() { self.vad_overlap } else { defaults.vad_overlap }.clamp(0.0, 1.0);
 
-        self.temperature = self.temperature.clamp(0.0, 2.0);
-        self.temperature_inc = self.temperature_inc.clamp(0.0, 2.0);
+        self.temperature = if self.temperature.is_finite() { self.temperature } else { defaults.temperature }.clamp(0.0, 2.0);
+        self.temperature_inc = if self.temperature_inc.is_finite() { self.temperature_inc } else { defaults.temperature_inc }.clamp(0.0, 2.0);
 
-        self.word_thold = self.word_thold.clamp(0.0, 1.0);
-        self.no_speech_thold = self.no_speech_thold.clamp(0.0, 1.0);
-        self.entropy_thold = self.entropy_thold.max(0.0);
-        self.logprob_thold = self.logprob_thold.min(0.0);
+        self.word_thold = if self.word_thold.is_finite() { self.word_thold } else { defaults.word_thold }.clamp(0.0, 1.0);
+        self.no_speech_thold = if self.no_speech_thold.is_finite() { self.no_speech_thold } else { defaults.no_speech_thold }.clamp(0.0, 1.0);
+        self.entropy_thold = if self.entropy_thold.is_finite() { self.entropy_thold } else { defaults.entropy_thold }.max(0.0);
+        self.logprob_thold = if self.logprob_thold.is_finite() { self.logprob_thold } else { defaults.logprob_thold }.min(0.0);
 
         // Backend fallback
         if self.selected_backend.trim().is_empty() {
@@ -1373,6 +1375,39 @@ mod tests {
 
         let disabled: WhisperSettings = serde_json::from_str(r#"{"autoCheckUpdates":false}"#).unwrap();
         assert!(!disabled.auto_check_updates);
+    }
+
+    #[test]
+    fn test_sanitize_recovers_non_finite_float_fields_from_nan_or_infinity() {
+        let json = r#"{
+            "uiScale": "NaN",
+            "vadThold": "NaN",
+            "vadMaxSpeech": "NaN",
+            "vadOverlap": "Infinity",
+            "temperature": "NaN",
+            "temperatureInc": "-Infinity",
+            "wordThold": "NaN",
+            "noSpeechThold": "NaN",
+            "entropyThold": "Infinity",
+            "logprobThold": "-Infinity"
+        }"#;
+        let mut settings: WhisperSettings = serde_json::from_str(json).unwrap();
+        settings.sanitize_and_validate();
+
+        let defaults = WhisperSettings::default_settings();
+        assert_eq!(settings.ui_scale, defaults.ui_scale);
+        assert_eq!(settings.vad_thold, defaults.vad_thold);
+        assert_eq!(settings.vad_max_speech, defaults.vad_max_speech);
+        assert_eq!(settings.vad_overlap, defaults.vad_overlap);
+        assert_eq!(settings.temperature, defaults.temperature);
+        assert_eq!(settings.temperature_inc, defaults.temperature_inc);
+        assert_eq!(settings.word_thold, defaults.word_thold);
+        assert_eq!(settings.no_speech_thold, defaults.no_speech_thold);
+        assert_eq!(settings.entropy_thold, defaults.entropy_thold);
+        assert_eq!(settings.logprob_thold, defaults.logprob_thold);
+
+        let serialized = serde_json::to_string(&settings).unwrap();
+        assert!(!serialized.contains(":null"), "Sanitized finite floats must serialize without JSON null: {}", serialized);
     }
 }
 

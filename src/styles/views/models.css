@@ -759,6 +759,7 @@
   min-width: 0;
   max-width: 100%;
   user-select: text;
+  cursor: text;
 }
 
 .model-id-prefix {
@@ -789,6 +790,7 @@
   transition: color 0.15s ease;
   text-align: center;
   user-select: text;
+  cursor: text;
 }
 
 .model-data-row:hover .model-ctx-value {

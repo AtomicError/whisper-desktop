@@ -16,6 +16,9 @@ import {
   createModelRowElement,
   setActiveModelFromTable,
   fetchActiveProviderModels,
+  renderModelsRegistryTable,
+  saveActiveProviderModels,
+  testTranslationConnection,
   type ModelObject
 } from './translationProviders';
 import { setSettingsState, getSettingsState } from './settingsManager';
@@ -550,6 +553,128 @@ describe('translationProviders module', () => {
       const provB = updatedProviders.find((p: any) => p.name === 'ProviderB');
       expect(provA.models.map((m: any) => m.id)).toEqual(['a-fetched-model']);
       expect(provB.models.map((m: any) => m.id)).toEqual(['b-only-model']);
+    });
+
+    it('syncs CustomSelect widgets on onProviderChanged so #mgr-provider-format stays updated', () => {
+      const syncSpy = vi.fn();
+      (globalThis as any).window.syncCustomSelects = syncSpy;
+
+      const provSelect = makeEl('select', 'opt-translateAiProvider');
+      provSelect.value = 'Anthropic';
+      makeEl('select', 'opt-translateAiModel');
+      makeEl('div', 'provider-manager-card');
+      makeEl('input', 'mgr-provider-url');
+      const fmtSelect = makeEl('select', 'mgr-provider-format');
+      makeEl('input', 'mgr-provider-key');
+      makeEl('textarea', 'mgr-provider-prompt');
+
+      setSettingsState({
+        translateAiProvider: 'Anthropic',
+        translateAiModel: '',
+        translateAiProviders: JSON.stringify([
+          { name: 'Anthropic', baseUrl: 'https://api.anthropic.com', apiFormat: 'Anthropic messages', apiKey: 'sk', useKeyring: false, models: [] }
+        ])
+      });
+
+      onProviderChanged('general', true);
+      expect(fmtSelect.value).toBe('Anthropic messages');
+      expect(syncSpy).toHaveBeenCalledWith(false, true);
+      delete (globalThis as any).window.syncCustomSelects;
+    });
+
+    it('aborts testTranslationConnection when #mgr-provider-url is cleared instead of testing stale baseUrl', async () => {
+      const invokeSpy = vi.fn().mockResolvedValue(undefined);
+      (globalThis as any).window.__TAURI__ = { core: { invoke: invokeSpy } };
+
+      const provSelect = makeEl('select', 'opt-translateAiProvider');
+      provSelect.value = 'OpenAI';
+      const urlInput = makeEl('input', 'mgr-provider-url');
+      urlInput.value = '';
+      makeEl('select', 'mgr-provider-format').value = 'Chat completions';
+      makeEl('input', 'mgr-provider-key').value = 'sk-test';
+      const testBtn = makeEl('button', 'mgr-btn-test-connection');
+
+      setSettingsState({
+        translateAiProvider: 'OpenAI',
+        translateAiModel: 'gpt-4o',
+        translateAiProviders: JSON.stringify([
+          { name: 'OpenAI', baseUrl: 'https://stale.example/v1', apiKey: 'sk-test', useKeyring: false, models: [{ id: 'gpt-4o' }] }
+        ])
+      });
+
+      await testTranslationConnection();
+
+      expect(invokeSpy).not.toHaveBeenCalledWith('preview_translate_first_lines', expect.anything());
+      expect(testBtn.disabled).toBe(false);
+    });
+
+    it('preserves maxOutputTokens and vision across render, save, and fetch merges', async () => {
+      const invokeSpy = vi.fn().mockImplementation((cmd: string) => {
+        if (cmd === 'fetch_provider_models') {
+          return Promise.resolve([{ id: 'claude-sonnet', contextWindow: 200000 }]);
+        }
+        return Promise.resolve(undefined);
+      });
+      (globalThis as any).window.__TAURI__ = { core: { invoke: invokeSpy } };
+
+      const provSelect = makeEl('select', 'opt-translateAiProvider');
+      provSelect.value = 'Anthropic';
+      makeEl('select', 'opt-translateAiModel');
+      makeEl('input', 'mgr-provider-url').value = 'https://api.anthropic.com';
+      makeEl('select', 'mgr-provider-format').value = 'Anthropic messages';
+      makeEl('input', 'mgr-provider-key').value = 'sk-ant';
+      makeEl('button', 'mgr-btn-fetch-models');
+
+      const initialModel = {
+        id: 'claude-sonnet',
+        contextWindow: 200000,
+        maxOutputTokens: 8192,
+        vision: true,
+        reasoning: 'Medium',
+        supportsReasoning: true,
+        enabled: true
+      };
+      setSettingsState({
+        translateAiProvider: 'Anthropic',
+        translateAiModel: 'claude-sonnet',
+        translateAiProviders: JSON.stringify([
+          { name: 'Anthropic', baseUrl: 'https://api.anthropic.com', apiKey: 'sk-ant', useKeyring: false, models: [initialModel] }
+        ])
+      });
+
+      renderModelsRegistryTable({ name: 'Anthropic', models: [initialModel] });
+      expect(translationProviders.getModels()[0].maxOutputTokens).toBe(8192);
+      expect(translationProviders.getModels()[0].vision).toBe(true);
+
+      await saveActiveProviderModels(true, true, 'Anthropic');
+      let saved = JSON.parse(getSettingsState().translateAiProviders);
+      expect(saved[0].models[0].maxOutputTokens).toBe(8192);
+      expect(saved[0].models[0].vision).toBe(true);
+
+      await fetchActiveProviderModels();
+      saved = JSON.parse(getSettingsState().translateAiProviders);
+      expect(saved[0].models[0].maxOutputTokens).toBe(8192);
+      expect(saved[0].models[0].vision).toBe(true);
+    });
+
+    it('does not activate row when clicking inline-editable .model-id-display or .model-ctx-value', () => {
+      const modelA: ModelObject = { id: 'model-a', contextWindow: 128000, reasoning: 'None', enabled: true };
+      const modelB: ModelObject = { id: 'model-b', contextWindow: 128000, reasoning: 'None', enabled: true };
+      translationProviders.setModels([modelA, modelB]);
+      setSettingsState({
+        translateAiProvider: 'OpenAI',
+        translateAiModel: 'model-a',
+        translateAiProviders: JSON.stringify([
+          { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', apiKey: 'k', useKeyring: false, models: [modelA, modelB] }
+        ])
+      });
+
+      const rowB = createModelRowElement(modelB, false, 1);
+      (rowB as any).dispatchClick({ closest: (s: string) => (s === '.model-id-display' ? {} : null) });
+      expect(getSettingsState().translateAiModel).toBe('model-a');
+
+      (rowB as any).dispatchClick({ closest: (s: string) => (s === '.model-ctx-value' ? {} : null) });
+      expect(getSettingsState().translateAiModel).toBe('model-a');
     });
   });
 });

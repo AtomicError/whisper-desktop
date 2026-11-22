@@ -666,6 +666,9 @@ export async function applyUiZoom(scale: number | string, persist = true, showTo
 
   if (persist && (window as any).settingsState) {
     (window as any).settingsState.uiScale = numScale;
+    if (typeof (window as any).markSettingsDirty === 'function') {
+      (window as any).markSettingsDirty();
+    }
     if (zoomSaveTimeout) {
       clearTimeout(zoomSaveTimeout);
     }

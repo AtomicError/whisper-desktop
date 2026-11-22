@@ -224,6 +224,52 @@ pub fn supports_reasoning_of(item: &Value) -> bool {
     false
 }
 
+/// Builds the provider models-listing endpoint URL. Matches `translator::build_request_url`
+/// conventions per format so `/v1` and `/v1beta` handling stays aligned across both paths.
+pub(crate) fn build_models_url(
+    api_format: crate::translation::provider::ApiFormat,
+    base_url: &str,
+    api_key: &str,
+) -> String {
+    use crate::translation::provider::ApiFormat as Fmt;
+    let mut url = base_url.to_string();
+
+    match api_format {
+        Fmt::GeminiResponses => {
+            // Gemini: GET https://generativelanguage.googleapis.com/v1beta/models?key={api_key}
+            if !url.contains("/models") {
+                let clean_base = url.trim_end_matches('/');
+                if clean_base.ends_with("/v1beta") {
+                    url = format!("{}/models", clean_base);
+                } else {
+                    url = format!("{}/v1beta/models", clean_base);
+                }
+            }
+            if !api_key.is_empty() {
+                url = translator::append_query_param(&url, "key", api_key);
+            }
+        }
+        Fmt::AnthropicMessages => {
+            if !url.contains("/models") {
+                let clean_base = url.trim_end_matches('/');
+                if clean_base.ends_with("/v1") {
+                    url = format!("{}/models", clean_base);
+                } else {
+                    url = format!("{}/v1/models", clean_base);
+                }
+            }
+        }
+        Fmt::OpenAiCompatible => {
+            if !url.contains("/models") {
+                let clean_base = url.trim_end_matches('/');
+                url = format!("{}/models", clean_base);
+            }
+        }
+    }
+
+    url
+}
+
 #[tauri::command]
 pub async fn fetch_provider_models(
     base_url: String,
@@ -244,36 +290,7 @@ pub async fn fetch_provider_models(
         .build()
         .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
 
-    // Construct models endpoint URL based on base_url and format
-    let mut url = base_url.clone();
-
-    if fmt == crate::translation::provider::ApiFormat::GeminiResponses {
-        // Gemini: GET https://generativelanguage.googleapis.com/v1beta/models?key={api_key}
-        if !url.contains("/models") {
-            let clean_base = url.trim_end_matches('/');
-            if clean_base.ends_with("/v1beta") {
-                url = format!("{}/models", clean_base);
-            } else {
-                url = format!("{}/v1beta/models", clean_base);
-            }
-        }
-        // Key travels in the query string (Gemini convention). Percent-encode
-        // it and respect pre-existing query params — same rules as
-        // `build_request_url`, so the two paths cannot drift apart.
-        if !api_key.is_empty() {
-            url = translator::append_query_param(&url, "key", &api_key);
-        }
-    } else {
-        // OpenAI-compatible / Anthropic models list
-        // Typically GET base_url/models (or base_url/v1/models)
-        if !url.contains("/models") {
-            if url.ends_with('/') {
-                url.push_str("models");
-            } else {
-                url.push_str("/models");
-            }
-        }
-    }
+    let url = build_models_url(fmt, &base_url, &api_key);
 
     let mut req = client.get(&url);
     use crate::translation::provider::ApiFormat as Fmt;
@@ -567,5 +584,26 @@ mod tests {
         let serialized = serde_json::to_string(&model).unwrap();
         assert!(serialized.contains("\"supportsReasoning\":true"));
         assert!(serialized.contains("\"contextWindow\":128000"));
+    }
+
+    #[test]
+    fn test_build_models_url_per_format() {
+        use crate::translation::provider::ApiFormat as Fmt;
+        assert_eq!(
+            build_models_url(Fmt::AnthropicMessages, "https://api.anthropic.com", "sk-ant"),
+            "https://api.anthropic.com/v1/models"
+        );
+        assert_eq!(
+            build_models_url(Fmt::AnthropicMessages, "https://api.anthropic.com/v1/", "sk-ant"),
+            "https://api.anthropic.com/v1/models"
+        );
+        assert_eq!(
+            build_models_url(Fmt::OpenAiCompatible, "https://openrouter.ai/api/v1/", "sk-or"),
+            "https://openrouter.ai/api/v1/models"
+        );
+        assert_eq!(
+            build_models_url(Fmt::GeminiResponses, "https://generativelanguage.googleapis.com", "gem+key"),
+            "https://generativelanguage.googleapis.com/v1beta/models?key=gem%2Bkey"
+        );
     }
 }

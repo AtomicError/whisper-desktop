@@ -597,11 +597,6 @@ html:not([dir="rtl"]) #hardsub-search-input[dir="rtl"],
   unicode-bidi: plaintext !important;
 }
 
-html[dir="rtl"] .cat-match-badge {
-  margin-left: 0;
-  margin-right: auto;
-}
-
 /* ==========================================================================
    11. Hardsub Video Panel Custom Styles
    ========================================================================== */

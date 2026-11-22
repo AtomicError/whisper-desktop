@@ -122,7 +122,7 @@ export const invoke = async function(cmd: string, args: any = {}): Promise<any> 
       ovDevice: 'CPU',
       dtwEnabled: false,
       logScore: false,
-      deviceID: 0,
+      deviceId: 0,
       vad: false,
       vadModel: '',
       vadThold: 0.50,

@@ -19,15 +19,15 @@
 
             <div class="settings-layout">
               <div class="settings-sidebar">
-                <div class="settings-categories">
-                  <div class="settings-cat-btn active" id="cat-btn-app" onclick="switchSettingsCategory('app')" data-i18n="settings.catApp">App Preferences</div>
-                  <div class="settings-cat-btn" id="cat-btn-transcription" onclick="switchSettingsCategory('transcription')" data-i18n="settings.catTranscription">Core Transcription</div>
-                  <div class="settings-cat-btn" id="cat-btn-computation" onclick="switchSettingsCategory('computation')" data-i18n="settings.catComputation">Computation</div>
-                  <div class="settings-cat-btn" id="cat-btn-search" onclick="switchSettingsCategory('search')" data-i18n="settings.catSearch">Decoding Strategy</div>
-                  <div class="settings-cat-btn" id="cat-btn-outputs" onclick="switchSettingsCategory('outputs')" data-i18n="settings.catOutputs">Outputs</div>
-                  <div class="settings-cat-btn" id="cat-btn-gpu" onclick="switchSettingsCategory('gpu')" data-i18n="settings.catGpu">GPU Execution</div>
-                  <div class="settings-cat-btn" id="cat-btn-vad" onclick="switchSettingsCategory('vad')" data-i18n="settings.catVad">Silero VAD</div>
-                  <div class="settings-cat-btn" id="cat-btn-translation" onclick="switchSettingsCategory('translation')" data-i18n="settings.catTranslation">AI Translation</div>
+                <div class="settings-categories" role="tablist">
+                  <button type="button" role="tab" aria-selected="true" class="settings-cat-btn active" id="cat-btn-app" onclick="switchSettingsCategory('app')" data-i18n="settings.catApp">App Preferences</button>
+                  <button type="button" role="tab" aria-selected="false" class="settings-cat-btn" id="cat-btn-transcription" onclick="switchSettingsCategory('transcription')" data-i18n="settings.catTranscription">Core Transcription</button>
+                  <button type="button" role="tab" aria-selected="false" class="settings-cat-btn" id="cat-btn-computation" onclick="switchSettingsCategory('computation')" data-i18n="settings.catComputation">Computation</button>
+                  <button type="button" role="tab" aria-selected="false" class="settings-cat-btn" id="cat-btn-search" onclick="switchSettingsCategory('search')" data-i18n="settings.catSearch">Decoding Strategy</button>
+                  <button type="button" role="tab" aria-selected="false" class="settings-cat-btn" id="cat-btn-outputs" onclick="switchSettingsCategory('outputs')" data-i18n="settings.catOutputs">Outputs</button>
+                  <button type="button" role="tab" aria-selected="false" class="settings-cat-btn" id="cat-btn-gpu" onclick="switchSettingsCategory('gpu')" data-i18n="settings.catGpu">GPU Execution</button>
+                  <button type="button" role="tab" aria-selected="false" class="settings-cat-btn" id="cat-btn-vad" onclick="switchSettingsCategory('vad')" data-i18n="settings.catVad">Silero VAD</button>
+                  <button type="button" role="tab" aria-selected="false" class="settings-cat-btn" id="cat-btn-translation" onclick="switchSettingsCategory('translation')" data-i18n="settings.catTranslation">AI Translation</button>
                 </div>
                 <div class="settings-sidebar-footer">
                   <button type="button" class="btn-settings-reset-engine" id="btn-reset-whisper-engine" onclick="confirmResetWhisperEngine()">
@@ -1246,10 +1246,10 @@
                     </div>
                     <!-- Tab buttons -->
                     <div class="provider-tabs">
-                      <button class="provider-tab-btn active" onclick="switchProviderTab('auto')" id="tab-btn-auto" data-i18n="settings.tabAutoTranslate">Auto-Translate</button>
-                      <button class="provider-tab-btn" onclick="switchProviderTab('providers')" id="tab-btn-providers" data-i18n="settings.tabProviders">API Providers</button>
-                      <button class="provider-tab-btn" onclick="switchProviderTab('general')" id="tab-btn-general" data-i18n="settings.tabGeneral">Provider Configuration</button>
-                      <button class="provider-tab-btn" onclick="switchProviderTab('models')" id="tab-btn-models"><span data-i18n="settings.tabModels">Models</span> (<span id="provider-models-count">0</span>)</button>
+                      <button type="button" class="provider-tab-btn active" onclick="switchProviderTab('auto')" id="tab-btn-auto" data-i18n="settings.tabAutoTranslate">Auto-Translate</button>
+                      <button type="button" class="provider-tab-btn" onclick="switchProviderTab('providers')" id="tab-btn-providers" data-i18n="settings.tabProviders">API Providers</button>
+                      <button type="button" class="provider-tab-btn" onclick="switchProviderTab('general')" id="tab-btn-general" data-i18n="settings.tabGeneral">Provider Configuration</button>
+                      <button type="button" class="provider-tab-btn" onclick="switchProviderTab('models')" id="tab-btn-models"><span data-i18n="settings.tabModels">Models</span> (<span id="provider-models-count">0</span>)</button>
                     </div>
 
                     <!-- Tab 0 Content: Auto-Translate Automation Settings -->
@@ -1367,8 +1367,8 @@
                         </div>
 
                         <div class="provider-actions">
-                          <button class="btn-secondary btn-delete" onclick="deleteActiveProvider()" data-i18n="settings.deleteProvider">Delete Provider</button>
-                          <button class="btn-primary" id="mgr-btn-test-connection" onclick="testTranslationConnection()" data-i18n="settings.testConnBtn">Test Connection</button>
+                          <button type="button" class="btn-secondary btn-delete" onclick="deleteActiveProvider()" data-i18n="settings.deleteProvider">Delete Provider</button>
+                          <button type="button" class="btn-primary" id="mgr-btn-test-connection" onclick="testTranslationConnection()" data-i18n="settings.testConnBtn">Test Connection</button>
                         </div>
                       </div>
                     </div>
@@ -1402,13 +1402,13 @@
                             </button>
                           </div>
                           <div class="models-actions-group">
-                            <button class="btn-secondary btn-model-action" id="mgr-btn-fetch-models" onclick="fetchActiveProviderModels()">
+                            <button type="button" class="btn-secondary btn-model-action" id="mgr-btn-fetch-models" onclick="fetchActiveProviderModels()">
                               <svg class="btn-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
                               </svg>
                               <span data-i18n="settings.fetchModels">Fetch Models</span>
                             </button>
-                            <button class="btn-secondary btn-model-action" id="mgr-btn-add-custom-model">
+                            <button type="button" class="btn-secondary btn-model-action" id="mgr-btn-add-custom-model">
                               <svg class="btn-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <line x1="12" y1="5" x2="12" y2="19"></line>
                                 <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -1421,16 +1421,16 @@
                         <!-- Filters Quick Actions Bar (Single-line Chips) -->
                         <div class="models-header-bar">
                           <div class="models-filter-pills" id="models-filter-pills">
-                            <button class="btn-filter active" onclick="filterModelsStatus('all')" id="filter-models-all">
+                            <button type="button" class="btn-filter active" onclick="filterModelsStatus('all')" id="filter-models-all">
                               <span data-i18n="settings.allModels">All Models</span>
                               <span class="filter-badge" id="filter-count-all">0</span>
                             </button>
-                            <button class="btn-filter" onclick="filterModelsStatus('free')" id="filter-models-free">
+                            <button type="button" class="btn-filter" onclick="filterModelsStatus('free')" id="filter-models-free">
                               <span class="filter-dot-free"></span>
                               <span data-i18n="settings.freeTier">Free Tier</span>
                               <span class="filter-badge badge-free" id="filter-count-free">0</span>
                             </button>
-                            <button class="btn-filter" onclick="filterModelsStatus('reasoning')" id="filter-models-reasoning">
+                            <button type="button" class="btn-filter" onclick="filterModelsStatus('reasoning')" id="filter-models-reasoning">
                               <span class="filter-dot-reasoning"></span>
                               <span data-i18n="settings.reasoning">Reasoning</span>
                               <span class="filter-badge badge-reasoning" id="filter-count-reasoning">0</span>

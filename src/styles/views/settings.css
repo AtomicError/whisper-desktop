@@ -36,6 +36,11 @@
 
 .settings-cat-btn {
   position: relative;
+  width: 100%;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  text-align: start;
   padding: 10px 14px 10px 20px;
   min-height: 40px;
   border-radius: 8px;
@@ -48,6 +53,11 @@
   overflow: hidden;
   display: inline-flex;
   align-items: center;
+}
+
+.settings-cat-btn:focus-visible {
+  outline: 2px solid var(--color-royal-blue);
+  outline-offset: -2px;
 }
 
 .settings-cat-btn::before {
@@ -264,7 +274,7 @@
   background: rgba(var(--color-royal-blue-rgb), 0.2);
   color: var(--color-royal-blue);
   border-radius: 9px;
-  margin-left: auto;
+  margin-inline-start: auto;
 }
 
 .settings-cat-btn.search-dimmed {

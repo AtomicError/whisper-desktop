@@ -486,7 +486,7 @@ export async function browseModelsDirectory(): Promise<void> {
       const current = getSettingsState();
       if (current) {
         current.modelsDir = path;
-        await saveCurrentSettings();
+        await saveCurrentSettings(true);
         await scanAndPopulateModels();
       }
       if (typeof invalidateModelStatusesCache === 'function') {
@@ -503,6 +503,8 @@ export async function browseModelsDirectory(): Promise<void> {
   }
 }
 
+let _scanModelsSeq = 0;
+
 export async function scanAndPopulateModels(): Promise<void> {
   const win = getGlobal();
   if (win) {
@@ -511,11 +513,15 @@ export async function scanAndPopulateModels(): Promise<void> {
   const current = getSettingsState();
   if (!current) return;
 
+  const scanSeq = ++_scanModelsSeq;
+
   try {
     const res = await invoke('scan_models', {
       modelsDir: current.modelsDir,
       backend: current.selectedBackend
     });
+
+    if (scanSeq !== _scanModelsSeq) return;
 
     localScannedTransModels = res.transModels || [];
     setLocalScannedTransModels(localScannedTransModels);
@@ -626,22 +632,28 @@ export async function scanAndPopulateModels(): Promise<void> {
 
     if (vadSelect) {
       vadSelect.innerHTML = '';
-      validVadModels.forEach((m: string) => {
-        const opt = document.createElement('option');
-        opt.value = m;
-        opt.textContent = getBasename(m);
-        if (m === current.vadModel) {
-          opt.selected = true;
-          vadMatched = true;
-        }
-        vadSelect.appendChild(opt);
-      });
-      if (!vadMatched && validVadModels.length > 0) {
-        vadSelect.selectedIndex = 0;
-        vadSelect.value = validVadModels[0];
-        current.vadModel = validVadModels[0];
-      } else if (validVadModels.length === 0) {
+      if (validVadModels.length === 0) {
+        const emptyOpt = document.createElement('option');
+        emptyOpt.value = '';
+        emptyOpt.textContent = t('transcribe.noModelsFound') || 'No models found';
+        vadSelect.appendChild(emptyOpt);
         current.vadModel = '';
+      } else {
+        validVadModels.forEach((m: string) => {
+          const opt = document.createElement('option');
+          opt.value = m;
+          opt.textContent = getBasename(m);
+          if (m === current.vadModel) {
+            opt.selected = true;
+            vadMatched = true;
+          }
+          vadSelect.appendChild(opt);
+        });
+        if (!vadMatched) {
+          vadSelect.selectedIndex = 0;
+          vadSelect.value = validVadModels[0];
+          current.vadModel = validVadModels[0];
+        }
       }
       vadSelect.onchange = () => {
         current.vadModel = vadSelect.value;
@@ -695,6 +707,7 @@ export function switchSettingsCategory(catName: string): void {
     safeApplyDynamicDirection(searchInput);
     const clearBtn = document.getElementById('settings-search-clear');
     if (clearBtn) clearBtn.style.display = 'none';
+    _preSearchProviderTab = null;
   }
 
   activeSettingsCat = catName;
@@ -720,9 +733,11 @@ export function switchSettingsCategory(catName: string): void {
     tab.classList.remove('active', 'search-dimmed');
     const badge = tab.querySelector('.cat-match-badge');
     if (badge) badge.remove();
-    if (tab.id === `cat-btn-${catName}`) {
+    const isActive = tab.id === `cat-btn-${catName}`;
+    if (isActive) {
       tab.classList.add('active');
     }
+    tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
   });
 
   const groups = document.querySelectorAll('.settings-group');
@@ -842,11 +857,9 @@ export function executeFilterSettings(query: string): void {
       tab.classList.remove('search-dimmed');
       const badge = tab.querySelector('.cat-match-badge');
       if (badge) badge.remove();
-      if (tab.id === `cat-btn-${activeSettingsCat}`) {
-        tab.classList.add('active');
-      } else {
-        tab.classList.remove('active');
-      }
+      const isActive = tab.id === `cat-btn-${activeSettingsCat}`;
+      tab.classList.toggle('active', isActive);
+      tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
     });
 
     groups.forEach(group => {
@@ -891,6 +904,15 @@ export function executeFilterSettings(query: string): void {
     const cards = group.querySelectorAll('.setting-card');
 
     cards.forEach(card => {
+      if (card.id === 'output-dir-custom-card') {
+        const modeEl = document.getElementById('opt-outputDirMode') as HTMLSelectElement | null;
+        const isCustomMode = modeEl ? modeEl.value === 'custom' : (getSettingsState()?.outputDirMode === 'custom');
+        if (!isCustomMode) {
+          (card as HTMLElement).style.display = 'none';
+          return;
+        }
+      }
+
       const searchTags = (card.getAttribute('data-search-tags') || '').toLowerCase();
       const title = (card.querySelector('.setting-title')?.textContent || '').toLowerCase();
       const desc = (card.querySelector('.setting-desc')?.textContent || '').toLowerCase();
@@ -909,7 +931,7 @@ export function executeFilterSettings(query: string): void {
                       subCardsText.includes(q);
 
       if (matches) {
-        (card as HTMLElement).style.display = '';
+        (card as HTMLElement).style.display = card.id === 'output-dir-custom-card' ? 'flex' : '';
         groupMatches++;
         totalMatches++;
       } else {
@@ -1138,6 +1160,7 @@ export function bindSettingsToDOM(): void {
           }
 
           current[key] = chk.checked;
+          markSettingsDirty();
           if (key === 'autoTransferToTranslate' || key === 'translateAiEnabled') {
             current.autoTransferToTranslate = chk.checked;
             current.translateAiEnabled = chk.checked;
@@ -1745,8 +1768,11 @@ export async function saveCurrentSettings(immediate = false): Promise<void> {
   const doSave = async () => {
     hasUnsavedSettings = false;
     try {
+      const liveState = getSettingsState();
+      if (!liveState) return;
+      liveState.uiLanguage = getLanguage();
       updateTranscribeUIConfigs();
-      const cleanPayload = sanitizeSettingsPayload(current);
+      const cleanPayload = sanitizeSettingsPayload(liveState);
       await invoke('save_settings', { settings: cleanPayload });
     } catch (e) {
       console.error("Failed to save settings:", e);
@@ -1791,6 +1817,11 @@ export async function confirmResetWhisperEngine(): Promise<void> {
   if (resetIcon) resetIcon.classList.add('is-spinning');
 
   try {
+    if (saveSettingsDebounceTimer) {
+      clearTimeout(saveSettingsDebounceTimer);
+      saveSettingsDebounceTimer = null;
+    }
+    hasUnsavedSettings = false;
     const updated = await invoke('reset_whisper_core_settings');
     if (updated) {
       setSettingsState(updated);
@@ -2167,7 +2198,7 @@ export async function browseOutputDir(): Promise<void> {
       const current = getSettingsState();
       if (current) {
         current.outputDirPath = dir;
-        await saveCurrentSettings();
+        await saveCurrentSettings(true);
       }
       updateTranscribeOutputDirUI();
     }
@@ -2208,7 +2239,7 @@ export async function browseTranscribeOutputDir(): Promise<void> {
           optPath.value = dir;
           optPath.title = isolateLtr(dir);
         }
-        await saveCurrentSettings();
+        await saveCurrentSettings(true);
       }
       toggleOutputDirCustomField();
     }
@@ -2235,7 +2266,7 @@ export async function resetTranscribeOutputDir(): Promise<void> {
         optPath.value = '';
         optPath.removeAttribute('title');
       }
-      await saveCurrentSettings();
+      await saveCurrentSettings(true);
     }
     toggleOutputDirCustomField();
   } finally {
