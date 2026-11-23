@@ -166,6 +166,19 @@ pub fn build_wav_conversion_args<'a>(input: &'a str, output: &'a str, diarize: b
     ]
 }
 
+/// Resolves the `-l` language argument passed to `whisper-cli`.
+///
+/// `whisper-cli` defaults `-l` to `"en"` when omitted, so `"auto"` (and empty
+/// values) must explicitly pass `"auto"` to trigger language auto-detection.
+pub fn resolve_whisper_language_arg(language: &str) -> String {
+    let trimmed = language.trim();
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("auto") {
+        "auto".to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
 pub async fn convert_to_wav(
     app: AppHandle,
     logs: Arc<AppLogs>,
@@ -760,10 +773,8 @@ pub async fn run_transcription(
         staging_out_str.clone(),
     ];
     
-    if !settings.language.is_empty() && settings.language != "auto" {
-        args.push("-l".to_string());
-        args.push(settings.language.clone());
-    }
+    args.push("-l".to_string());
+    args.push(resolve_whisper_language_arg(&settings.language));
     
     if !settings.prompt.is_empty() {
         args.push("--prompt".to_string());
@@ -1855,6 +1866,16 @@ mod tests {
         // Unknown full duration with explicit slice duration
         assert_eq!(compute_effective_span_sec(0.0, 10_000, 40_000), 40.0);
         assert_eq!(compute_slice_progress(30.0, 0.0, 10_000, 40_000), Some(0.5));
+    }
+
+    #[test]
+    fn test_resolve_whisper_language_arg_explicitly_passes_auto() {
+        assert_eq!(resolve_whisper_language_arg("auto"), "auto");
+        assert_eq!(resolve_whisper_language_arg("AUTO"), "auto");
+        assert_eq!(resolve_whisper_language_arg(""), "auto");
+        assert_eq!(resolve_whisper_language_arg("   "), "auto");
+        assert_eq!(resolve_whisper_language_arg("fa"), "fa");
+        assert_eq!(resolve_whisper_language_arg(" en "), "en");
     }
 }
 
