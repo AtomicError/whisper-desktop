@@ -710,6 +710,7 @@ export const it: Translations = {
     emptyLocalTitle: 'Nessun modello scaricato',
     emptyLocalDesc: 'Scarica un modello di riconoscimento vocale o VAD da un\'altra categoria per gestirlo qui.',
     emptyClearSearch: 'Cancella Ricerca',
+    searchResultsBanner: 'Ricerca in tutti i modelli ({count} trovati)',
     loadErrorTitle: 'Impossibile caricare i modelli',
     loadErrorDesc: 'Impossibile controllare la cartella dei modelli. Verifica i permessi e riprova.',
     retryLoad: 'Riprova',

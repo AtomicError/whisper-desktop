@@ -278,6 +278,32 @@ export function renderFamilyHeaderBanner(category: string, counts = { all: 0, mu
   `;
 }
 
+function renderSearchResultsBanner(matchCount: number): string {
+  const summary = t('models.searchResultsBanner', { count: formatNumForLang(matchCount) });
+  return `
+    <div class="model-search-banner">
+      <div class="model-search-banner-info">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <span id="model-search-banner-title">${escapeHTML(summary)}</span>
+      </div>
+      <button type="button" class="btn-secondary model-search-banner-clear" data-action="clear-search">${escapeHTML(t('models.emptyClearSearch'))}</button>
+    </div>
+  `;
+}
+
+function syncCategorySidebarState(category: string, isSearching = false): void {
+  if (typeof document === 'undefined') return;
+  const buttons = document.querySelectorAll('#model-categories-sidebar .settings-cat-btn');
+  buttons.forEach(btn => {
+    if (typeof btn.closest === 'function' && btn.closest('#theme-wipe-overlay')) return;
+    const isCurrent = btn.id === `model-cat-${category}`;
+    const isActive = !isSearching && isCurrent;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    btn.setAttribute('tabindex', isCurrent ? '0' : '-1');
+  });
+}
+
 function cancelModelSearchDebounce(): void {
   if (_filterDebounceTimer !== null) {
     clearTimeout(_filterDebounceTimer);
@@ -298,37 +324,28 @@ export function switchModelCategory(category: string, clearSearch = true): void 
     cancelModelSearchDebounce();
   }
 
-  if (clearSearch && typeof document !== 'undefined') {
-    const searchInput = document.getElementById('model-search') as HTMLInputElement | null;
-    const win = getGlobal();
-    if (searchInput) {
-      searchInput.value = '';
-      if (win.applyDynamicDirection) win.applyDynamicDirection(searchInput);
-    }
-    const clearBtn = document.getElementById('model-search-clear');
-    if (clearBtn) clearBtn.style.display = 'none';
-  }
-
+  let hasRemainingQuery = false;
   if (typeof document !== 'undefined') {
-    const buttons = document.querySelectorAll('#model-categories-sidebar .settings-cat-btn');
-    buttons.forEach(btn => {
-      btn.classList.remove('active');
-      btn.setAttribute('aria-selected', 'false');
-      btn.setAttribute('tabindex', '-1');
-    });
-
-    const activeBtn = document.getElementById(`model-cat-${category}`);
-    if (activeBtn) {
-      activeBtn.classList.add('active');
-      activeBtn.setAttribute('aria-selected', 'true');
-      activeBtn.setAttribute('tabindex', '0');
+    const searchInput = document.getElementById('model-search') as HTMLInputElement | null;
+    if (clearSearch) {
+      const win = getGlobal();
+      if (searchInput) {
+        searchInput.value = '';
+        if (win.applyDynamicDirection) win.applyDynamicDirection(searchInput);
+      }
+      const clearBtn = document.getElementById('model-search-clear');
+      if (clearBtn) clearBtn.style.display = 'none';
+    } else {
+      hasRemainingQuery = Boolean(searchInput && searchInput.value.trim().length > 0);
     }
+
+    syncCategorySidebarState(category, hasRemainingQuery);
 
     const gridScroll = document.getElementById('models-list-scroll');
     if (gridScroll) {
       gridScroll.scrollTop = 0;
       if (typeof gridScroll.setAttribute === 'function') {
-        gridScroll.setAttribute('aria-labelledby', `model-cat-${category}`);
+        gridScroll.setAttribute('aria-labelledby', hasRemainingQuery ? 'model-search' : `model-cat-${category}`);
       }
     }
   }
@@ -348,6 +365,8 @@ export function clearModelSearch(): void {
     if (win.applyDynamicDirection) win.applyDynamicDirection(searchInput);
     searchInput.focus();
   }
+  const gridScroll = document.getElementById('models-list-scroll');
+  if (gridScroll) gridScroll.scrollTop = 0;
   loadModelStatusesGrid();
 }
 
@@ -679,6 +698,15 @@ function renderModelsEmptyState(grid: HTMLElement, query: string): void {
 }
 
 function renderModelsErrorState(grid: HTMLElement): void {
+  const searchInput = typeof document !== 'undefined'
+    ? (document.getElementById('model-search') as HTMLInputElement | null)
+    : null;
+  const isSearching = Boolean(searchInput && searchInput.value.trim().length > 0);
+  syncCategorySidebarState(currentCategoryFilter, isSearching);
+  if (typeof grid.setAttribute === 'function') {
+    grid.setAttribute('aria-labelledby', isSearching ? 'model-search' : `model-cat-${currentCategoryFilter}`);
+  }
+
   const focusSnap = captureGridFocus(grid);
   grid.innerHTML = '';
   attachModelGridDelegate(grid);
@@ -838,14 +866,25 @@ function renderModelHubGrid(
     syncQuickFilterWithCounts(counts);
   }
 
+  const isSearching = query.length > 0;
+  syncCategorySidebarState(currentCategoryFilter, isSearching);
+  if (typeof grid.setAttribute === 'function') {
+    const labelledBy = isSearching
+      ? (categoryModels.length > 0 ? 'model-search-banner-title' : 'model-search')
+      : `model-cat-${currentCategoryFilter}`;
+    grid.setAttribute('aria-labelledby', labelledBy);
+  }
+
   const focusSnap = captureGridFocus(grid);
   const prevScrollTop = grid.scrollTop;
   grid.innerHTML = '';
   attachModelGridDelegate(grid);
 
-  if (!query) {
+  if (!isSearching) {
     const bannerHtml = renderFamilyHeaderBanner(currentCategoryFilter, counts);
     if (bannerHtml) grid.insertAdjacentHTML('beforeend', bannerHtml);
+  } else if (categoryModels.length > 0) {
+    grid.insertAdjacentHTML('beforeend', renderSearchResultsBanner(categoryModels.length));
   }
 
   let renderedCount = 0;
@@ -893,8 +932,7 @@ export async function loadModelStatusesGrid(_isSilent = false, forceRefresh = fa
   try {
     const statuses = await fetchModelStatuses(invoke, modelsDir, forceRefresh, loadSeq);
     if (statuses === null) return;
-    const grid = document.getElementById('models-list-scroll') as (HTMLElement & { _modelDelegate?: boolean }) | null;
-    if (grid) renderModelHubGrid(grid, statuses || [], systemSpecs);
+    if (gridEl) renderModelHubGrid(gridEl, statuses || [], systemSpecs);
   } catch (err) {
     if (loadSeq !== _loadModelsSeq) return;
     console.error("Failed to load model statuses:", err);
@@ -916,6 +954,8 @@ export function filterModelsGrid(): void {
   cancelModelSearchDebounce();
   _filterDebounceTimer = setTimeout(() => {
     _filterDebounceTimer = null;
+    const gridScroll = document.getElementById('models-list-scroll');
+    if (gridScroll) gridScroll.scrollTop = 0;
     loadModelStatusesGrid();
   }, 250);
 }

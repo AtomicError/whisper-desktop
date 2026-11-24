@@ -874,5 +874,142 @@ describe('modelHub', () => {
       expect(descEl.innerHTML).toContain('864 KB');
       expect(descEl.innerHTML).not.toContain('1 MB');
     });
+
+    it('clears active category highlight and shows global search banner during search, then restores active tab on clear', async () => {
+      const { grid, searchInput } = setupMinimalModelHubDom();
+      const gridAttrs = new Map<string, string>();
+      grid.setAttribute = (k: string, v: string) => gridAttrs.set(k, v);
+
+      const makeTab = (id: string, active = false) => {
+        const classes = new Set<string>(['settings-cat-btn', ...(active ? ['active'] : [])]);
+        const tabAttrs = new Map<string, string>([
+          ['aria-selected', active ? 'true' : 'false'],
+          ['tabindex', active ? '0' : '-1']
+        ]);
+        return {
+          id,
+          classList: {
+            add: (c: string) => classes.add(c),
+            remove: (c: string) => classes.delete(c),
+            toggle: (c: string, force?: boolean) => {
+              if (force === undefined) {
+                if (classes.has(c)) classes.delete(c);
+                else classes.add(c);
+              } else if (force) {
+                classes.add(c);
+              } else {
+                classes.delete(c);
+              }
+            },
+            contains: (c: string) => classes.has(c)
+          },
+          setAttribute: (k: string, v: string) => tabAttrs.set(k, v),
+          getAttribute: (k: string) => tabAttrs.get(k) || null
+        };
+      };
+
+      const tinyTab = makeTab('model-cat-tiny', true);
+      const baseTab = makeTab('model-cat-base', false);
+      const origDoc = (globalThis as any).document;
+      (globalThis as any).document = {
+        ...origDoc,
+        getElementById: (id: string) => {
+          if (id === 'model-cat-tiny') return tinyTab;
+          if (id === 'model-cat-base') return baseTab;
+          return origDoc.getElementById(id);
+        },
+        querySelectorAll: (sel: string) => {
+          if (sel === '#model-categories-sidebar .settings-cat-btn') return [tinyTab, baseTab];
+          return [];
+        }
+      };
+
+      (globalThis as any).window.invoke = vi.fn().mockImplementation((cmd: string) => {
+        if (cmd === 'get_all_models_status') {
+          return Promise.resolve([
+            { name: 'tiny', sizeBytes: 77691713, downloadedBytes: 0, progress: 0, status: 'NotDownloaded' },
+            { name: 'large-v3', sizeBytes: 3095033483, downloadedBytes: 0, progress: 0, status: 'NotDownloaded' }
+          ]);
+        }
+        return Promise.resolve(null);
+      });
+
+      modelHub.setCategory('tiny', true);
+      await modelHub.loadStatuses(false, true);
+      expect(tinyTab.classList.contains('active')).toBe(true);
+      expect(tinyTab.getAttribute('aria-selected')).toBe('true');
+
+      // Activate global search
+      grid.scrollTop = 120;
+      searchInput.value = 'large';
+      await modelHub.loadStatuses(false, true);
+
+      expect(tinyTab.classList.contains('active')).toBe(false);
+      expect(tinyTab.getAttribute('aria-selected')).toBe('false');
+      expect(tinyTab.getAttribute('tabindex')).toBe('0');
+      expect(baseTab.classList.contains('active')).toBe(false);
+      expect(gridAttrs.get('aria-labelledby')).toBe('model-search-banner-title');
+      expect(grid.scrollTop).toBe(120);
+
+      const searchBanner = grid.children.find((c: any) => c.isBanner);
+      expect(searchBanner?.html).toContain('model-search-banner');
+      expect(searchBanner?.html).toContain('id="model-search-banner-title"');
+      expect(searchBanner?.html).toContain('1 found');
+      expect(searchBanner?.html).toContain('data-action="clear-search"');
+
+      // Clearing search resets scroll to top, restores the previously active sidebar tab and family banner
+      grid.scrollTop = 240;
+      modelHub.clearSearch();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(grid.scrollTop).toBe(0);
+      expect(tinyTab.classList.contains('active')).toBe(true);
+      expect(tinyTab.getAttribute('aria-selected')).toBe('true');
+      expect(gridAttrs.get('aria-labelledby')).toBe('model-cat-tiny');
+      const restoredBanner = grid.children.find((c: any) => c.isBanner);
+      expect(restoredBanner?.html).toContain('model-family-banner');
+    });
+
+    it('resets scrollTop when debounced filterModelsGrid runs and keeps sidebar unsynced-safe on error', async () => {
+      vi.useFakeTimers();
+      try {
+        const { grid, searchInput } = setupMinimalModelHubDom();
+        const gridAttrs = new Map<string, string>();
+        grid.setAttribute = (k: string, v: string) => gridAttrs.set(k, v);
+
+        const tinyTab = {
+          id: 'model-cat-tiny',
+          classList: {
+            add: vi.fn(),
+            remove: vi.fn(),
+            toggle: vi.fn(),
+            contains: () => false
+          },
+          setAttribute: vi.fn(),
+          getAttribute: () => null
+        };
+        const origDoc = (globalThis as any).document;
+        (globalThis as any).document = {
+          ...origDoc,
+          getElementById: (id: string) => (id === 'model-cat-tiny' ? tinyTab : origDoc.getElementById(id)),
+          querySelectorAll: (sel: string) => (sel === '#model-categories-sidebar .settings-cat-btn' ? [tinyTab] : [])
+        };
+
+        (globalThis as any).window.invoke = vi.fn().mockRejectedValue(new Error('Permission denied'));
+
+        grid.scrollTop = 320;
+        searchInput.value = 'tiny';
+        modelHub.filter();
+        await vi.advanceTimersByTimeAsync(260);
+
+        expect(grid.scrollTop).toBe(0);
+        expect(tinyTab.classList.toggle).toHaveBeenCalledWith('active', false);
+        expect(gridAttrs.get('aria-labelledby')).toBe('model-search');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 });

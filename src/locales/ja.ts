@@ -710,6 +710,7 @@ export const ja: Translations = {
     emptyLocalTitle: 'ダウンロード済みのモデルはありません',
     emptyLocalDesc: '他のカテゴリから音声認識モデルまたは VAD モデルをダウンロードすると、ここに表示されます。',
     emptyClearSearch: '検索をクリア',
+    searchResultsBanner: 'すべてのモデルを検索中（{count} 件見つかりました）',
     loadErrorTitle: 'モデルを読み込めませんでした',
     loadErrorDesc: 'モデルフォルダーを確認できませんでした。アクセス権限を確認して再試行してください。',
     retryLoad: '再試行',

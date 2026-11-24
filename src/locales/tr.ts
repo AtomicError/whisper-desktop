@@ -710,6 +710,7 @@ export const tr: Translations = {
     emptyLocalTitle: 'Henüz İndirilmiş Model Yok',
     emptyLocalDesc: 'Burada yönetmek için diğer kategorilerden bir konuşma tanıma veya VAD modeli indirin.',
     emptyClearSearch: 'Aramayı Temizle',
+    searchResultsBanner: 'Tüm modellerde aranıyor ({count} bulundu)',
     loadErrorTitle: 'Modeller Yüklenemedi',
     loadErrorDesc: 'Modeller klasörü denetlenemedi. Klasör izinlerini kontrol edip tekrar deneyin.',
     retryLoad: 'Yeniden Dene',

@@ -710,6 +710,7 @@ export const fa: Translations = {
     emptyLocalTitle: 'هنوز مدلی دانلود نشده است',
     emptyLocalDesc: 'برای مدیریت مدل‌ها در این بخش، ابتدا یک مدل تشخیص گفتار یا VAD را از دسته‌بندی‌های دیگر دانلود کنید.',
     emptyClearSearch: 'پاک کردن جستجو',
+    searchResultsBanner: 'جستجو در تمام مدل‌ها ({count} مورد یافت شد)',
     loadErrorTitle: 'خطا در بارگذاری فهرست مدل‌ها',
     loadErrorDesc: 'امکان بررسی پوشهٔ مدل‌ها وجود نداشت. دسترسی پوشه را بررسی کرده و دوباره تلاش کنید.',
     retryLoad: 'تلاش مجدد',

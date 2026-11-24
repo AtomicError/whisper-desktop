@@ -156,6 +156,8 @@ describe('locale consistency for speed presets', () => {
       expect(models.emptyLocalTitle.length).toBeGreaterThan(0);
       expect(typeof models.emptyLocalDesc).toBe('string');
       expect(models.emptyLocalDesc.length).toBeGreaterThan(0);
+      expect(typeof models.searchResultsBanner).toBe('string');
+      expect(models.searchResultsBanner).toContain('{count}');
     });
 
     it(`locale ${code} has all required model recommendation scenario and filter keys`, () => {

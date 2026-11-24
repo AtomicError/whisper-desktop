@@ -710,6 +710,7 @@ export const ar: Translations = {
     emptyLocalTitle: 'لا توجد نماذج منزّلة بعد',
     emptyLocalDesc: 'نزّل نموذجاً للتعرف على الكلام أو VAD من فئة أخرى لإدارته هنا.',
     emptyClearSearch: 'مسح البحث',
+    searchResultsBanner: 'البحث في جميع النماذج (تم العثور على {count})',
     loadErrorTitle: 'تعذّر تحميل النماذج',
     loadErrorDesc: 'تعذّر فحص مجلد النماذج. تحقّق من الأذونات وأعد المحاولة.',
     retryLoad: 'إعادة المحاولة',

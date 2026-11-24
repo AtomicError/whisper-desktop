@@ -710,6 +710,7 @@ export const ru: Translations = {
     emptyLocalTitle: 'Загруженных моделей пока нет',
     emptyLocalDesc: 'Загрузите модель распознавания речи или VAD из другой категории, чтобы управлять ею здесь.',
     emptyClearSearch: 'Сбросить поиск',
+    searchResultsBanner: 'Поиск по всем моделям (найдено: {count})',
     loadErrorTitle: 'Не удалось загрузить модели',
     loadErrorDesc: 'Не удалось проверить папку моделей. Проверьте права доступа и повторите попытку.',
     retryLoad: 'Повторить',

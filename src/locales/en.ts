@@ -708,6 +708,7 @@ export const en = {
     emptyLocalTitle: 'No Downloaded Models Yet',
     emptyLocalDesc: 'Download a speech recognition or VAD model from another category to manage it here.',
     emptyClearSearch: 'Clear Search',
+    searchResultsBanner: 'Searching across all models ({count} found)',
     loadErrorTitle: 'Unable to Load Models',
     loadErrorDesc: 'Could not inspect the models directory. Check folder permissions and try again.',
     retryLoad: 'Retry',

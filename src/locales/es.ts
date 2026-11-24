@@ -710,6 +710,7 @@ export const es: Translations = {
     emptyLocalTitle: 'Aún no hay modelos descargados',
     emptyLocalDesc: 'Descarga un modelo de reconocimiento de voz o VAD desde otra categoría para gestionarlo aquí.',
     emptyClearSearch: 'Limpiar Búsqueda',
+    searchResultsBanner: 'Buscando en todos los modelos ({count} encontrados)',
     loadErrorTitle: 'No se pudieron cargar los modelos',
     loadErrorDesc: 'No se pudo inspeccionar la carpeta de modelos. Verifica los permisos e inténtalo de nuevo.',
     retryLoad: 'Reintentar',

@@ -710,6 +710,7 @@ export const ko: Translations = {
     emptyLocalTitle: '다운로드된 모델이 아직 없습니다',
     emptyLocalDesc: '다른 카테고리에서 음성 인식 또는 VAD 모델을 다운로드하면 여기에서 관리할 수 있습니다.',
     emptyClearSearch: '검색 지우기',
+    searchResultsBanner: '전체 모델에서 검색 중 ({count}개 찾음)',
     loadErrorTitle: '모델을 불러올 수 없습니다',
     loadErrorDesc: '모델 폴더를 확인할 수 없습니다. 폴더 권한을 확인한 후 다시 시도하세요.',
     retryLoad: '다시 시도',

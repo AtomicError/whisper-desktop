@@ -710,6 +710,7 @@ export const pt: Translations = {
     emptyLocalTitle: 'Nenhum modelo baixado ainda',
     emptyLocalDesc: 'Baixe um modelo de reconhecimento de fala ou VAD de outra categoria para gerenciá-lo aqui.',
     emptyClearSearch: 'Limpar Pesquisa',
+    searchResultsBanner: 'Pesquisando em todos os modelos ({count} encontrados)',
     loadErrorTitle: 'Não foi possível carregar os modelos',
     loadErrorDesc: 'Não foi possível verificar a pasta de modelos. Verifique as permissões e tente novamente.',
     retryLoad: 'Tentar novamente',

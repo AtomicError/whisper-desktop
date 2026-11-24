@@ -710,6 +710,7 @@ export const fr: Translations = {
     emptyLocalTitle: 'Aucun modèle téléchargé',
     emptyLocalDesc: 'Téléchargez un modèle de reconnaissance vocale ou VAD depuis une autre catégorie pour le gérer ici.',
     emptyClearSearch: 'Effacer la Recherche',
+    searchResultsBanner: 'Recherche dans tous les modèles ({count} trouvés)',
     loadErrorTitle: 'Impossible de charger les modèles',
     loadErrorDesc: 'Impossible d\'analyser le dossier des modèles. Vérifiez les permissions et réessayez.',
     retryLoad: 'Réessayer',

@@ -314,6 +314,50 @@
   height: 14px;
 }
 
+/* Global Search Scope Banner */
+.model-search-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(var(--color-accent-rgb), 0.08);
+  border: 1px solid rgba(var(--color-accent-rgb), 0.22);
+  box-sizing: border-box;
+}
+
+.model-search-banner-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: var(--color-text-main);
+}
+
+.model-search-banner-info svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  color: var(--color-accent);
+}
+
+.model-search-banner-clear {
+  min-height: 30px;
+  padding: 4px 12px;
+  font-size: 0.78rem;
+  flex-shrink: 0;
+}
+
+.model-search-banner-clear:focus-visible {
+  outline: 2px solid var(--color-royal-blue);
+  outline-offset: 2px;
+}
+
 
 
 /* Model Hub Grid Container & Header Search Sizing (responsive override in responsive.css) */
@@ -462,6 +506,10 @@
   border-color: var(--color-cyan);
   color: #fff;
   box-shadow: 0 3px 12px rgba(var(--color-cyan-rgb), 0.3);
+}
+
+.model-btn-resume:active:not(:disabled) {
+  background: rgba(var(--color-cyan-rgb), 0.35);
 }
 
 .model-action-btn:disabled {

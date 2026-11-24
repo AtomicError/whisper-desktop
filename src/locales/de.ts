@@ -710,6 +710,7 @@ export const de: Translations = {
     emptyLocalTitle: 'Noch keine heruntergeladenen Modelle',
     emptyLocalDesc: 'Laden Sie ein Spracherkennungs- oder VAD-Modell aus einer anderen Kategorie herunter, um es hier zu verwalten.',
     emptyClearSearch: 'Suche Zurücksetzen',
+    searchResultsBanner: 'Suche in allen Modellen ({count} gefunden)',
     loadErrorTitle: 'Modelle konnten nicht geladen werden',
     loadErrorDesc: 'Der Modellordner konnte nicht geprüft werden. Bitte Berechtigungen prüfen und erneut versuchen.',
     retryLoad: 'Erneut versuchen',

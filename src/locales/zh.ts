@@ -710,6 +710,7 @@ export const zh: Translations = {
     emptyLocalTitle: '尚无已下载的模型',
     emptyLocalDesc: '从其他分类下载语音识别或 VAD 模型后，即可在此处管理。',
     emptyClearSearch: '清除搜索条件',
+    searchResultsBanner: '正在搜索全部模型（找到 {count} 个）',
     loadErrorTitle: '无法加载模型',
     loadErrorDesc: '无法读取模型目录。请检查文件夹权限后重试。',
     retryLoad: '重试',
