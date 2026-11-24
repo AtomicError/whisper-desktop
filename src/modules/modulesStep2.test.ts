@@ -1,4 +1,5 @@
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
+import { loadResolvedHtml } from '../testUtils';
 import {
   transcriptViewer,
   formatMsToTimestamp,
@@ -314,6 +315,173 @@ describe('modelHub', () => {
       expect(banner).toContain('model-family-banner');
       expect(banner).toContain('Base');
       expect(banner).toContain('model-segment-btn');
+    });
+  });
+
+  describe('Model Hub reliability, search, race guards, and accessibility', () => {
+    const origWindow = (globalThis as any).window;
+    const origDocument = (globalThis as any).document;
+
+    afterEach(() => {
+      (globalThis as any).window = origWindow;
+      (globalThis as any).document = origDocument;
+      invalidateModelStatusesCache();
+      vi.restoreAllMocks();
+    });
+
+    function setupMinimalModelHubDom(initialSearch = '') {
+      const children: any[] = [];
+      const attrs = new Map<string, string>();
+      const specsSubtitle = {
+        attributes: new Map<string, string>([['data-i18n', 'models.subtitle']]),
+        innerHTML: '',
+        removeAttribute(k: string) { this.attributes.delete(k); },
+        getAttribute(k: string) { return this.attributes.get(k) || null; }
+      };
+      const searchInput = { value: initialSearch, focus: vi.fn() };
+      const clearBtn = { style: { display: 'none' } };
+      const grid: any = {
+        scrollTop: 120,
+        children,
+        _modelDelegate: false,
+        set innerHTML(val: string) {
+          if (val === '') children.length = 0;
+        },
+        insertAdjacentHTML(_pos: string, html: string) {
+          children.push({ isBanner: true, html });
+        },
+        appendChild(el: any) {
+          children.push(el);
+          return el;
+        },
+        addEventListener: vi.fn()
+      };
+
+      const elements: Record<string, any> = {
+        'model-specs-subtitle': specsSubtitle,
+        'models-list-scroll': grid,
+        'model-search': searchInput,
+        'model-search-clear': clearBtn
+      };
+
+      const makeEl = () => ({
+        className: '',
+        dataset: {} as Record<string, string>,
+        innerHTML: '',
+        style: {} as Record<string, string>,
+        attrs: new Map<string, string>(),
+        setAttribute(k: string, v: string) { this.attrs.set(k, v); },
+        getAttribute(k: string) { return this.attrs.get(k) || null; }
+      });
+
+      (globalThis as any).document = {
+        getElementById: (id: string) => elements[id] || null,
+        querySelector: () => null,
+        querySelectorAll: () => [],
+        createElement: () => makeEl()
+      };
+
+      (globalThis as any).window = {
+        settingsState: { modelsDir: '/tmp/models' },
+        systemSpecs: { total_ram_gb: 16, cpu_cores: 8, gpu_type: 'unknown', gpu_name: 'CPU Only' },
+        invoke: vi.fn()
+      };
+
+      return { grid, searchInput, specsSubtitle, attrs };
+    }
+
+    it('ignores stale get_all_models_status responses when a newer refresh completes first', async () => {
+      const { grid, specsSubtitle } = setupMinimalModelHubDom();
+
+      let resolveStale!: (val: any) => void;
+      const stalePromise = new Promise(r => { resolveStale = r; });
+
+      let callCount = 0;
+      (globalThis as any).window.invoke = vi.fn().mockImplementation((cmd: string) => {
+        if (cmd === 'get_all_models_status') {
+          callCount++;
+          if (callCount === 1) return stalePromise;
+          return Promise.resolve([
+            { name: 'small', sizeBytes: 487601967, downloadedBytes: 1000, progress: 0.1, status: 'Paused' }
+          ]);
+        }
+        return Promise.resolve(null);
+      });
+
+      modelHub.setCategory('small', true);
+      const staleLoad = modelHub.loadStatuses(false, true);
+      const freshLoad = modelHub.loadStatuses(true, true);
+
+      await freshLoad;
+      expect(grid.children.some((c: any) => !c.isBanner && c.innerHTML.includes('badge-paused'))).toBe(true);
+
+      // Now resolve the older slow call with stale Downloading state
+      resolveStale([
+        { name: 'small', sizeBytes: 487601967, downloadedBytes: 1000, progress: 0.1, status: 'Downloading' }
+      ]);
+      await staleLoad;
+
+      // Grid must retain the newer Paused state, not revert to Downloading
+      const card = grid.children.find((c: any) => !c.isBanner);
+      expect(card.innerHTML).toContain('badge-paused');
+      expect(card.innerHTML).not.toContain('badge-downloading');
+      expect(specsSubtitle.getAttribute('data-i18n')).toBeNull();
+    });
+
+    it('searches globally across all categories (including local) and ignores hidden quick filters during search', async () => {
+      const { grid, searchInput } = setupMinimalModelHubDom();
+      (globalThis as any).window.invoke = vi.fn().mockImplementation((cmd: string) => {
+        if (cmd === 'get_all_models_status') {
+          return Promise.resolve([
+            { name: 'tiny', sizeBytes: 77691713, downloadedBytes: 77691713, progress: 1, status: 'Downloaded' },
+            { name: 'tiny.en', sizeBytes: 77704715, downloadedBytes: 0, progress: 0, status: 'NotDownloaded' },
+            { name: 'large-v3', sizeBytes: 3095033483, downloadedBytes: 0, progress: 0, status: 'NotDownloaded' }
+          ]);
+        }
+        return Promise.resolve(null);
+      });
+
+      // Activate 'tiny' category + 'en' quick filter, then type 'large-v3'
+      modelHub.setCategory('tiny', true);
+      modelHub.setQuickFilter('en');
+      searchInput.value = 'large-v3';
+      await modelHub.loadStatuses(false, true);
+
+      const cards1 = grid.children.filter((c: any) => !c.isBanner && c.attrs);
+      expect(cards1.length).toBe(1);
+      expect(cards1[0].getAttribute('data-model')).toBe('large-v3');
+
+      // Switch to 'local' category and search for non-downloaded 'large-v3'
+      modelHub.setCategory('local', false);
+      await modelHub.loadStatuses(false, true);
+      const cards2 = grid.children.filter((c: any) => !c.isBanner && c.attrs);
+      expect(cards2.length).toBe(1);
+      expect(cards2[0].getAttribute('data-model')).toBe('large-v3');
+    });
+
+    it('reloads model statuses grid when pause_download_model fails so card never stays stuck', async () => {
+      setupMinimalModelHubDom();
+      const notifySpy = vi.fn();
+      (globalThis as any).window.showNotification = notifySpy;
+      (globalThis as any).window.invoke = vi.fn().mockImplementation((cmd: string) => {
+        if (cmd === 'pause_download_model') return Promise.reject(new Error('No active download session'));
+        if (cmd === 'get_all_models_status') return Promise.resolve([]);
+        return Promise.resolve(null);
+      });
+
+      await modelHub.pause('small');
+      expect(notifySpy).toHaveBeenCalled();
+      expect((globalThis as any).window.invoke).toHaveBeenCalledWith('get_all_models_status', { modelsDir: '/tmp/models' });
+    });
+
+    it('uses accessible button tabs with role=tab in models.html category sidebar', () => {
+      const html = loadResolvedHtml();
+      const sidebarMatch = html.match(/id="model-categories-sidebar"[\s\S]*?<\/div>\s*<div class="settings-scroll-container"/);
+      expect(sidebarMatch).toBeTruthy();
+      const sidebarHtml = sidebarMatch![0];
+      expect(sidebarHtml).toContain('role="tablist"');
+      expect(sidebarHtml).toContain('<button type="button" role="tab"');
+      expect(sidebarHtml).not.toContain('<div class="settings-cat-btn');
     });
   });
 });

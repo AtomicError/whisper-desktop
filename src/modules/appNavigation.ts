@@ -243,24 +243,35 @@ function setupTablistKeyboardNavigation(
   const items = Array.from(document.querySelectorAll(selector)) as HTMLElement[];
   if (!items.length) return;
 
-  const getTargetIndex = (e: KeyboardEvent, item: HTMLElement): number => {
-    const idx = items.indexOf(item);
+  const getScopedItems = (item: HTMLElement): HTMLElement[] => {
+    if (typeof item.closest === 'function') {
+      const groupRoot = item.closest('[role="tablist"], .settings-categories, nav');
+      if (groupRoot) {
+        const scoped = items.filter(candidate => candidate.closest('[role="tablist"], .settings-categories, nav') === groupRoot);
+        if (scoped.length > 0) return scoped;
+      }
+    }
+    return items;
+  };
+
+  const getTargetIndex = (e: KeyboardEvent, item: HTMLElement, groupItems: HTMLElement[]): number => {
+    const idx = groupItems.indexOf(item);
     if (idx < 0) return -1;
 
     if (e.key === 'Home') return 0;
-    if (e.key === 'End') return items.length - 1;
+    if (e.key === 'End') return groupItems.length - 1;
 
     if (orientation === 'vertical') {
-      if (e.key === 'ArrowDown') return (idx + 1) % items.length;
-      if (e.key === 'ArrowUp') return (idx - 1 + items.length) % items.length;
+      if (e.key === 'ArrowDown') return (idx + 1) % groupItems.length;
+      if (e.key === 'ArrowUp') return (idx - 1 + groupItems.length) % groupItems.length;
       return -1;
     }
 
     const isRtl = typeof document !== 'undefined' && document.documentElement?.getAttribute('dir') === 'rtl';
     const nextKey = isRtl ? 'ArrowLeft' : 'ArrowRight';
     const prevKey = isRtl ? 'ArrowRight' : 'ArrowLeft';
-    if (e.key === nextKey) return (idx + 1) % items.length;
-    if (e.key === prevKey) return (idx - 1 + items.length) % items.length;
+    if (e.key === nextKey) return (idx + 1) % groupItems.length;
+    if (e.key === prevKey) return (idx - 1 + groupItems.length) % groupItems.length;
     return -1;
   };
 
@@ -274,11 +285,12 @@ function setupTablistKeyboardNavigation(
         return;
       }
 
-      const targetIndex = getTargetIndex(e, item);
-      if (targetIndex >= 0 && items[targetIndex]) {
+      const groupItems = getScopedItems(item);
+      const targetIndex = getTargetIndex(e, item, groupItems);
+      if (targetIndex >= 0 && groupItems[targetIndex]) {
         e.preventDefault();
-        items[targetIndex].focus();
-        items[targetIndex].click();
+        groupItems[targetIndex].focus();
+        groupItems[targetIndex].click();
       }
     });
   });

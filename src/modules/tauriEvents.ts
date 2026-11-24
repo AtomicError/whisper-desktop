@@ -2,7 +2,6 @@ import { t, isolateDirection } from '../i18n/index';
 import {
   logsController,
   stripAnsi,
-  escapeHTML,
   formatLogTimestamp,
   appendLogToViewport,
   scheduleUpdateLogsButtonsState
@@ -19,7 +18,6 @@ import {
 } from './nativeWindow';
 import { showNotification } from './appModal';
 import { scanAndPopulateModels } from './settingsManager';
-import { formatNumberForLang } from '../i18n/formatters';
 
 declare global {
   interface Window {
@@ -272,12 +270,32 @@ export function mapTranscribeStatusKey(payload: any): string | null {
 }
 
 let _unlistenFns: Array<() => void> = [];
+const _activeModelDownloads = new Map<string, number>();
+
+export function getActiveModelDownloadsCount(): number {
+  return _activeModelDownloads.size;
+}
+
+function getAggregateModelDownloadProgress(): number {
+  if (_activeModelDownloads.size === 0) return 0;
+  let total = 0;
+  _activeModelDownloads.forEach(p => {
+    total += p;
+  });
+  return total / _activeModelDownloads.size;
+}
 
 export function cleanupTauriListeners(): void {
   _unlistenFns.forEach(fn => {
     try { fn(); } catch (_) {}
   });
   _unlistenFns = [];
+  _activeModelDownloads.clear();
+  setIsDownloadingModelRunning(false);
+  if (typeof window !== 'undefined' && window._modelStallTimers) {
+    Object.values(window._modelStallTimers).forEach(timer => clearTimeout(timer));
+    window._modelStallTimers = {};
+  }
 }
 
 export function getUnlistenFns(): Array<() => void> {
@@ -411,11 +429,16 @@ export function setupTauriListeners(): void {
     if (!payload || !payload.modelName) return;
 
     if (payload.phase === 'starting' || payload.phase === 'downloading') {
+      const progressVal = Number.isFinite(Number(payload.progress)) ? Math.max(0, Math.min(1, Number(payload.progress))) : 0;
+      _activeModelDownloads.set(payload.modelName, progressVal);
       setIsDownloadingModelRunning(true);
-      updateTaskbarProgress(payload.progress, true);
+      updateTaskbarProgress(getAggregateModelDownloadProgress(), true);
 
       // CSS.escape prevents selector breakage from special chars in names
-      const card = document.querySelector(`[data-model="${CSS.escape(payload.modelName)}"]`) as HTMLElement | null;
+      const selectorName = typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
+        ? CSS.escape(payload.modelName)
+        : String(payload.modelName).replace(/["\\]/g, '\\$&');
+      const card = document.querySelector(`[data-model="${selectorName}"]`) as HTMLElement | null;
       if (!card) return;
 
       const pct = Math.min(100, Math.round((payload.progress || 0) * 100));
@@ -479,7 +502,7 @@ export function setupTauriListeners(): void {
         }
         if (!isConnecting && payload.phase === 'downloading') {
           window._modelStallTimers[payload.modelName] = setTimeout(() => {
-            const targetCard = document.querySelector(`[data-model="${CSS.escape(payload.modelName)}"]`) as any;
+            const targetCard = document.querySelector(`[data-model="${selectorName}"]`) as any;
             if (targetCard && targetCard.querySelector('.model-btn-pause')) {
               const statusEl = targetCard.querySelector('.model-progress-status');
               if (statusEl) {
@@ -520,39 +543,30 @@ export function setupTauriListeners(): void {
       // 3. Keep description metadata clean without dynamic metrics
       const descEl = card.querySelector('.setting-desc') as HTMLElement | null;
       if (descEl && (!descEl.querySelector('.badge-downloading') || descEl.querySelector('span[style*="var(--color-cyan)"]'))) {
-        const meta = modelHub.getMetaInfo(payload.modelName);
         const displayedSizeMB = totalKnown
           ? Math.max(1, Math.round(payload.totalBytes / 1048576))
           : (card.dataset.sizeMb || totalMB);
-        const formattedSize = typeof window !== 'undefined' && typeof window.formatNumberForLang === 'function'
-          ? window.formatNumberForLang(displayedSizeMB)
-          : formatNumberForLang(displayedSizeMB);
-
-        descEl.innerHTML = `
-          <span class="model-badge badge-downloading">${t('models.badgeDownloading')}</span>
-          <span style="color: rgba(255,255,255,0.1);">|</span>
-          <span>${t('models.expectedSize', { size: formattedSize })}</span>
-          ${meta.precisionText ? `
-            <span style="color: rgba(255,255,255,0.1);">|</span>
-            <span>${meta.precisionText}</span>
-          ` : ''}
-          <span style="color: rgba(255,255,255,0.1);">|</span>
-          <span>${meta.langText}</span>
-        `;
+        descEl.innerHTML = modelHub.buildDescriptionHtml(payload.modelName, 'Downloading', displayedSizeMB);
       }
 
       // 4. Ensure button is "Pause" in-place
       const ctrlEl = card.querySelector('.setting-control') as HTMLElement | null;
       if (ctrlEl && !ctrlEl.querySelector('[data-action="pause"]')) {
-        ctrlEl.innerHTML = `<button class="model-action-btn model-btn-pause" data-action="pause" aria-label="${t('models.ariaPauseDownload', { name: escapeHTML(payload.modelName) })}">${modelHub.ICONS.PAUSE}<span>${t('models.actionPause')}</span></button>`;
+        ctrlEl.innerHTML = modelHub.buildActionButtonsHtml(payload.modelName, 'Downloading');
       }
     } else {
       if (typeof window !== 'undefined' && window._modelStallTimers && window._modelStallTimers[payload.modelName]) {
         clearTimeout(window._modelStallTimers[payload.modelName]);
         delete window._modelStallTimers[payload.modelName];
       }
-      setIsDownloadingModelRunning(false);
-      updateTaskbarProgress(0, false, payload.phase === 'failed' ? 'error' : 'normal');
+      _activeModelDownloads.delete(payload.modelName);
+      const hasRemainingDownloads = _activeModelDownloads.size > 0;
+      setIsDownloadingModelRunning(hasRemainingDownloads);
+      if (hasRemainingDownloads) {
+        updateTaskbarProgress(getAggregateModelDownloadProgress(), true);
+      } else {
+        updateTaskbarProgress(0, false, payload.phase === 'failed' ? 'error' : 'normal');
+      }
 
       // Reload grid state once
       modelHub.invalidateCache();

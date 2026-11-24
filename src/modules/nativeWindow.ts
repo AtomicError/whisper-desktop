@@ -378,7 +378,14 @@ export function hasActiveBackgroundJob(): boolean {
   );
 }
 
+let _taskbarErrorResetTimer: ReturnType<typeof setTimeout> | null = null;
+
 export function updateTaskbarProgress(progressFraction: number, active: boolean, statusType = 'normal'): void {
+  if (_taskbarErrorResetTimer !== null) {
+    clearTimeout(_taskbarErrorResetTimer);
+    _taskbarErrorResetTimer = null;
+  }
+
   const win = getGlobal();
   if (win.__TAURI__ && win.__TAURI__.window) {
     try {
@@ -388,7 +395,8 @@ export function updateTaskbarProgress(progressFraction: number, active: boolean,
 
       if (statusType === 'error') {
         appWin.setProgressBar({ status: 'error', progress: 100 }).catch(() => {});
-        setTimeout(() => {
+        _taskbarErrorResetTimer = setTimeout(() => {
+          _taskbarErrorResetTimer = null;
           appWin.setProgressBar({ status: 'none' }).catch(() => {});
         }, 4000);
       } else if (active) {

@@ -307,9 +307,18 @@
     flex-direction: column !important;
     align-items: stretch !important;
   }
+  #panel-models .models-search-wrapper {
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    margin-top: 8px !important;
+  }
   #panel-models #model-search {
     width: 100% !important;
-    margin-top: 8px !important;
+    margin-top: 0 !important;
+  }
+  #panel-models .setting-info {
+    padding-inline-end: 0 !important;
   }
 }
 

@@ -11,6 +11,7 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Emitter, State};
 use tokio::io::{AsyncWriteExt, BufWriter};
+use tokio::sync::watch;
 
 const HF_WHISPER_BASE: &str = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main";
 const HF_VAD_BASE: &str = "https://huggingface.co/ggml-org/whisper-vad/resolve/main";
@@ -130,18 +131,88 @@ fn model_url(clean_name: &str) -> String {
 
 pub struct DownloadHandle {
     pub cancelled: AtomicBool,
+    cancel_tx: watch::Sender<bool>,
     /// Set by the owning task right after its terminal event, so file-bound
-    /// commands (delete) can wait until every file handle is released.
+    /// commands (pause/delete) can wait until every file handle is released.
     pub done: AtomicBool,
+    done_tx: watch::Sender<bool>,
 }
 
 impl DownloadHandle {
     fn new() -> Self {
+        let (cancel_tx, _) = watch::channel(false);
+        let (done_tx, _) = watch::channel(false);
         DownloadHandle {
             cancelled: AtomicBool::new(false),
+            cancel_tx,
             done: AtomicBool::new(false),
+            done_tx,
         }
     }
+
+    pub fn is_cancelled(&self) -> bool {
+        self.cancelled.load(Ordering::Acquire)
+    }
+
+    pub fn cancel(&self) {
+        self.cancelled.store(true, Ordering::Release);
+        let _ = self.cancel_tx.send(true);
+    }
+
+    pub fn mark_done(&self) {
+        self.done.store(true, Ordering::Release);
+        let _ = self.done_tx.send(true);
+    }
+
+    pub async fn wait_cancelled(&self) {
+        let mut rx = self.cancel_tx.subscribe();
+        if *rx.borrow_and_update() || self.is_cancelled() {
+            return;
+        }
+        while rx.changed().await.is_ok() {
+            if *rx.borrow() || self.is_cancelled() {
+                return;
+            }
+        }
+    }
+
+    pub async fn wait_done(&self, timeout: Duration) {
+        if self.done.load(Ordering::Acquire) {
+            return;
+        }
+        let mut rx = self.done_tx.subscribe();
+        if *rx.borrow_and_update() || self.done.load(Ordering::Acquire) {
+            return;
+        }
+        let _ = tokio::time::timeout(timeout, async {
+            while rx.changed().await.is_ok() {
+                if *rx.borrow() || self.done.load(Ordering::Acquire) {
+                    break;
+                }
+            }
+        })
+        .await;
+    }
+}
+
+async fn cancellable_await<F, T>(handle: &DownloadHandle, fut: F) -> Option<T>
+where
+    F: std::future::Future<Output = T>,
+{
+    if handle.is_cancelled() {
+        return None;
+    }
+    tokio::select! {
+        biased;
+        _ = handle.wait_cancelled() => None,
+        res = fut => Some(res),
+    }
+}
+
+async fn sleep_or_cancel(handle: &DownloadHandle, duration: Duration) -> bool {
+    cancellable_await(handle, tokio::time::sleep(duration))
+        .await
+        .is_some()
 }
 
 pub struct DownloadSession {
@@ -258,7 +329,7 @@ enum ModelState {
 impl ModelState {
     fn as_str(&self) -> &'static str {
         match self {
-            ModelState::NotDownloaded => "Not Downloaded",
+            ModelState::NotDownloaded => "NotDownloaded",
             ModelState::Downloading => "Downloading",
             ModelState::Paused => "Paused",
             ModelState::Downloaded => "Downloaded",
@@ -279,6 +350,11 @@ pub struct ModelStatus {
 // ---------------------------------------------------------------------------
 // Download pipeline with synchronous registration & robust background streaming
 // ---------------------------------------------------------------------------
+
+enum DownloadOutcome {
+    Completed(u64),
+    Cancelled(u64),
+}
 
 pub fn start_download(
     app: AppHandle,
@@ -318,23 +394,26 @@ pub fn start_download(
 
         unregister_if_owned(&download_state, &clean_name, &handle);
 
-        let was_cancelled = handle.cancelled.load(Ordering::Acquire);
-        let bytes_so_far = match &result {
-            Ok(n) => *n,
-            Err(_) => partial_bytes(Path::new(&models_dir), &clean_name),
-        };
-
-        let terminal = if was_cancelled {
-            make_payload(&clean_name, Phase::Paused, bytes_so_far, expected_size, 0.0, None)
-        } else {
-            match &result {
-                Ok(_) => make_payload(&clean_name, Phase::Completed, expected_size, expected_size, 0.0, None),
-                Err(e) => make_payload(&clean_name, Phase::Failed, bytes_so_far, expected_size, 0.0, Some(e.clone())),
+        let terminal = match &result {
+            Ok(DownloadOutcome::Completed(bytes_completed)) => {
+                let total = if expected_size > 0 { expected_size } else { *bytes_completed };
+                make_payload(&clean_name, Phase::Completed, total, total, 0.0, None)
+            }
+            Ok(DownloadOutcome::Cancelled(bytes_so_far)) => {
+                make_payload(&clean_name, Phase::Paused, *bytes_so_far, expected_size, 0.0, None)
+            }
+            Err(e) => {
+                let bytes_so_far = partial_bytes(Path::new(&models_dir), &clean_name);
+                if handle.is_cancelled() {
+                    make_payload(&clean_name, Phase::Paused, bytes_so_far, expected_size, 0.0, None)
+                } else {
+                    make_payload(&clean_name, Phase::Failed, bytes_so_far, expected_size, 0.0, Some(e.clone()))
+                }
             }
         };
         emit_progress(&app, terminal);
 
-        handle.done.store(true, Ordering::Release);
+        handle.mark_done();
     });
 
     Ok(())
@@ -347,7 +426,11 @@ async fn download_inner(
     clean_name: &str,
     expected_size: u64,
     expected_hash: &'static str,
-) -> Result<u64, String> {
+) -> Result<DownloadOutcome, String> {
+    if handle.is_cancelled() {
+        return Ok(DownloadOutcome::Cancelled(partial_bytes(models_dir, clean_name)));
+    }
+
     tokio::fs::create_dir_all(models_dir)
         .await
         .map_err(|e| format!("Failed to create models directory: {e}"))?;
@@ -366,7 +449,9 @@ async fn download_inner(
     let mut downloaded = len_of(&tmp_path);
 
     if expected_size > 0 && downloaded == expected_size {
-        return finalize(&tmp_path, &bin_path, expected_size, expected_hash).await;
+        return finalize(&tmp_path, &bin_path, expected_size, expected_hash)
+            .await
+            .map(DownloadOutcome::Completed);
     }
 
     let client = Client::builder()
@@ -382,6 +467,10 @@ async fn download_inner(
 
     let mut consecutive_failures: u32 = 0;
     loop {
+        if handle.is_cancelled() {
+            return Ok(DownloadOutcome::Cancelled(len_of(&tmp_path)));
+        }
+
         consecutive_failures += 1;
         downloaded = len_of(&tmp_path);
 
@@ -390,17 +479,25 @@ async fn download_inner(
             request = request.header(RANGE, format!("bytes={downloaded}-"));
         }
 
-        let response = match request.send().await {
-            Ok(r) => r,
-            Err(e) => {
-                if handle.cancelled.load(Ordering::Relaxed) {
-                    return Ok(downloaded);
+        let response = match cancellable_await(handle, request.send()).await {
+            None => return Ok(DownloadOutcome::Cancelled(downloaded)),
+            Some(Ok(r)) => {
+                if handle.is_cancelled() {
+                    return Ok(DownloadOutcome::Cancelled(downloaded));
+                }
+                r
+            }
+            Some(Err(e)) => {
+                if handle.is_cancelled() {
+                    return Ok(DownloadOutcome::Cancelled(downloaded));
                 }
                 if consecutive_failures >= MAX_RETRIES {
                     return Err(format!("Network connection failed after {consecutive_failures} attempts: {e}"));
                 }
                 emit_progress(app, make_payload(clean_name, Phase::Starting, downloaded, expected_size, 0.0, None));
-                tokio::time::sleep(RETRY_BASE_DELAY * consecutive_failures).await;
+                if !sleep_or_cancel(handle, RETRY_BASE_DELAY * consecutive_failures).await {
+                    return Ok(DownloadOutcome::Cancelled(downloaded));
+                }
                 continue;
             }
         };
@@ -421,7 +518,9 @@ async fn download_inner(
                     ));
                 }
                 emit_progress(app, make_payload(clean_name, Phase::Starting, 0, expected_size, 0.0, None));
-                tokio::time::sleep(RETRY_BASE_DELAY * consecutive_failures).await;
+                if !sleep_or_cancel(handle, RETRY_BASE_DELAY * consecutive_failures).await {
+                    return Ok(DownloadOutcome::Cancelled(0));
+                }
                 continue;
             }
             s => {
@@ -448,8 +547,8 @@ async fn download_inner(
         let mut smoothed_speed: f64 = 0.0;
         let mut network_error: Option<String> = None;
 
-        while let Some(item) = stream.next().await {
-            if handle.cancelled.load(Ordering::Relaxed) {
+        while let Some(item) = cancellable_await(handle, stream.next()).await.flatten() {
+            if handle.is_cancelled() {
                 break;
             }
             match item {
@@ -488,8 +587,8 @@ async fn download_inner(
 
         writer.flush().await.map_err(|e| format!("Failed to flush model data: {e}"))?;
 
-        if handle.cancelled.load(Ordering::Relaxed) {
-            return Ok(downloaded);
+        if handle.is_cancelled() {
+            return Ok(DownloadOutcome::Cancelled(downloaded));
         }
 
         if let Some(e) = network_error {
@@ -497,7 +596,9 @@ async fn download_inner(
                 return Err(format!("Network stream interrupted after {consecutive_failures} attempts: {e}"));
             }
             emit_progress(app, make_payload(clean_name, Phase::Starting, downloaded, total_bytes, 0.0, None));
-            tokio::time::sleep(RETRY_BASE_DELAY * consecutive_failures).await;
+            if !sleep_or_cancel(handle, RETRY_BASE_DELAY * consecutive_failures).await {
+                return Ok(DownloadOutcome::Cancelled(downloaded));
+            }
             continue;
         }
 
@@ -508,7 +609,9 @@ async fn download_inner(
         return Err(format!("Incomplete download: {downloaded}/{expected_size} bytes."));
     }
 
-    finalize(&tmp_path, &bin_path, expected_size, expected_hash).await
+    finalize(&tmp_path, &bin_path, expected_size, expected_hash)
+        .await
+        .map(DownloadOutcome::Completed)
 }
 
 async fn open_append(path: &Path) -> Result<tokio::fs::File, String> {
@@ -942,7 +1045,7 @@ fn get_all_models_status_sync(
 }
 
 #[tauri::command]
-pub fn pause_download_model(
+pub async fn pause_download_model(
     download_state: State<'_, DownloadState>,
     model_name: String,
 ) -> Result<(), String> {
@@ -953,7 +1056,8 @@ pub fn pause_download_model(
     };
     match handle {
         Some(h) => {
-            h.cancelled.store(true, Ordering::Release);
+            h.cancel();
+            h.wait_done(CANCEL_GRACE).await;
             Ok(())
         }
         None => Err("No active download session found to pause.".to_string()),
@@ -982,11 +1086,8 @@ pub async fn delete_model_file(
         lock.active.get(&clean_name).cloned()
     };
     if let Some(h) = handle {
-        h.cancelled.store(true, Ordering::Release);
-        let deadline = Instant::now() + CANCEL_GRACE;
-        while !h.done.load(Ordering::Acquire) && Instant::now() < deadline {
-            tokio::time::sleep(Duration::from_millis(25)).await;
-        }
+        h.cancel();
+        h.wait_done(CANCEL_GRACE).await;
     }
 
     let dir = Path::new(&models_dir);
@@ -1163,6 +1264,48 @@ mod tests {
         assert!(discovered.tmps.contains_key("small"));
 
         let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_model_state_strings_match_frontend_contract() {
+        assert_eq!(ModelState::NotDownloaded.as_str(), "NotDownloaded");
+        assert_eq!(ModelState::Downloading.as_str(), "Downloading");
+        assert_eq!(ModelState::Paused.as_str(), "Paused");
+        assert_eq!(ModelState::Downloaded.as_str(), "Downloaded");
+    }
+
+    #[tokio::test]
+    async fn test_download_handle_cancel_aborts_pending_sleep_and_await() {
+        let handle = Arc::new(DownloadHandle::new());
+        let h_clone = Arc::clone(&handle);
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+            h_clone.cancel();
+        });
+
+        let start = Instant::now();
+        let completed = sleep_or_cancel(&handle, Duration::from_secs(10)).await;
+        assert!(!completed, "sleep_or_cancel should abort immediately when cancelled");
+        assert!(start.elapsed() < Duration::from_secs(1));
+
+        // Pre-cancelled handle must return None immediately without awaiting
+        let immediate = cancellable_await(&handle, futures_util::future::pending::<()>()).await;
+        assert!(immediate.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_download_handle_wait_done_wakes_immediately_on_mark_done() {
+        let handle = Arc::new(DownloadHandle::new());
+        let h_clone = Arc::clone(&handle);
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+            h_clone.mark_done();
+        });
+
+        let start = Instant::now();
+        handle.wait_done(Duration::from_secs(5)).await;
+        assert!(handle.done.load(Ordering::Acquire));
+        assert!(start.elapsed() < Duration::from_secs(1));
     }
 }
 

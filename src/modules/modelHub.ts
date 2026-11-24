@@ -8,7 +8,7 @@ export interface ModelStatus {
   sizeBytes: number;
   downloadedBytes?: number;
   progress?: number;
-  status: 'Downloaded' | 'Downloading' | 'Paused' | 'NotDownloaded';
+  status: 'Downloaded' | 'Downloading' | 'Paused' | 'NotDownloaded' | 'Not Downloaded';
 }
 
 export interface ModelMetaInfo {
@@ -26,6 +26,7 @@ let currentCategoryFilter = 'recommended';
 let currentModelQuickFilter = 'all';
 let _cachedModelStatuses: ModelStatus[] | null = null;
 let _cachedModelStatusesTime = 0;
+let _loadModelsSeq = 0;
 const MODEL_STATUS_CACHE_TTL = 3500;
 const _modelActionsInProgress = new Set<string>();
 
@@ -284,6 +285,14 @@ export function renderFamilyHeaderBanner(category: string, counts = { all: 0, mu
   `;
 }
 
+function cancelModelSearchDebounce(): void {
+  const fn: any = filterModelsGrid;
+  if (fn._timer) {
+    clearTimeout(fn._timer);
+    fn._timer = null;
+  }
+}
+
 export function switchModelQuickFilter(filter: string): void {
   currentModelQuickFilter = filter;
   loadModelStatusesGrid(true);
@@ -292,10 +301,14 @@ export function switchModelQuickFilter(filter: string): void {
 export function switchModelCategory(category: string, clearSearch = true): void {
   currentCategoryFilter = category;
   currentModelQuickFilter = 'all';
-  
+
+  if (clearSearch) {
+    cancelModelSearchDebounce();
+  }
+
   if (clearSearch && typeof document !== 'undefined') {
     const searchInput = document.getElementById('model-search') as HTMLInputElement | null;
-    const win = typeof window !== 'undefined' ? (window as any) : (globalThis as any);
+    const win = getGlobal();
     if (searchInput) {
       searchInput.value = '';
       if (win.applyDynamicDirection) win.applyDynamicDirection(searchInput);
@@ -306,23 +319,32 @@ export function switchModelCategory(category: string, clearSearch = true): void 
 
   if (typeof document !== 'undefined') {
     const buttons = document.querySelectorAll('#model-categories-sidebar .settings-cat-btn');
-    buttons.forEach(btn => btn.classList.remove('active'));
-    
+    buttons.forEach(btn => {
+      btn.classList.remove('active');
+      btn.setAttribute('aria-selected', 'false');
+      btn.setAttribute('tabindex', '-1');
+    });
+
     const activeBtn = document.getElementById(`model-cat-${category}`);
-    if (activeBtn) activeBtn.classList.add('active');
+    if (activeBtn) {
+      activeBtn.classList.add('active');
+      activeBtn.setAttribute('aria-selected', 'true');
+      activeBtn.setAttribute('tabindex', '0');
+    }
 
     const gridScroll = document.getElementById('models-list-scroll');
     if (gridScroll) gridScroll.scrollTop = 0;
   }
-  
+
   loadModelStatusesGrid();
 }
 
 export function clearModelSearch(): void {
   if (typeof document === 'undefined') return;
+  cancelModelSearchDebounce();
   const searchInput = document.getElementById('model-search') as HTMLInputElement | null;
   const clearBtn = document.getElementById('model-search-clear');
-  const win = typeof window !== 'undefined' ? (window as any) : (globalThis as any);
+  const win = getGlobal();
   if (clearBtn) clearBtn.style.display = 'none';
   if (searchInput) {
     searchInput.value = '';
@@ -332,16 +354,263 @@ export function clearModelSearch(): void {
   loadModelStatusesGrid();
 }
 
-export async function loadModelStatusesGrid(isSilent = false, forceRefresh = false): Promise<void> {
+function formatNumForLang(value: number | string): string {
+  const win = getGlobal();
+  return typeof win.formatNumberForLang === 'function' ? win.formatNumberForLang(value) : String(value);
+}
+
+function escapeAttrSelector(value: string): string {
+  if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+    return CSS.escape(value);
+  }
+  return value.replace(/["\\]/g, '\\$&');
+}
+
+function updateSpecsSubtitle(systemSpecs: any): void {
+  const specsSubtitle = document.getElementById('model-specs-subtitle');
+  if (!specsSubtitle || !systemSpecs) return;
+
+  const gpuLabelMap: Record<string, string> = {
+    nvidia: t('models.gpuNvidia'),
+    amd: t('models.gpuAmd'),
+    intel: t('models.gpuIntel'),
+    apple_silicon: t('models.gpuAppleSilicon'),
+    unknown: t('models.gpuCpuOnly')
+  };
+  const hasDetailedGpuName = systemSpecs.gpu_name && systemSpecs.gpu_name !== 'CPU Only' && systemSpecs.gpu_name !== 'Unknown';
+  const gpuDisplayName = hasDetailedGpuName
+    ? systemSpecs.gpu_name
+    : (gpuLabelMap[systemSpecs.gpu_type] || systemSpecs.gpu_type || t('models.gpuUnknown'));
+  const ramVal = Number(systemSpecs.total_ram_gb) || 8;
+  const ramFormatted = ramVal % 1 === 0 ? ramVal.toFixed(0) : parseFloat(ramVal.toFixed(1)).toString();
+
+  // Detach data-i18n so language switches/translateDOM do not overwrite the dynamic hardware summary
+  specsSubtitle.removeAttribute('data-i18n');
+  specsSubtitle.innerHTML = t('models.systemSpecsDetected', {
+    ram: formatNumForLang(ramFormatted),
+    cores: formatNumForLang(systemSpecs.cpu_cores),
+    gpu: escapeHTML(gpuDisplayName)
+  });
+}
+
+function filterCategoryModels(
+  statuses: ModelStatus[],
+  query: string,
+  recResult: ReturnType<typeof recommendModelsForSystem> | null
+): ModelStatus[] {
+  const filtered = statuses.filter(m => {
+    if (query) {
+      const fullName = `ggml-${m.name}.bin`;
+      return `${m.name} ${fullName}`.toLowerCase().includes(query);
+    }
+    if (currentCategoryFilter === 'local') return m.status === 'Downloaded';
+    if (currentCategoryFilter === 'recommended') return recResult ? recResult.modelNames.includes(m.name) : false;
+    if (currentCategoryFilter === 'tiny') return m.name.startsWith('tiny');
+    if (currentCategoryFilter === 'base') return m.name.startsWith('base');
+    if (currentCategoryFilter === 'small') return m.name.startsWith('small');
+    if (currentCategoryFilter === 'medium') return m.name.startsWith('medium');
+    if (currentCategoryFilter === 'large') return m.name.startsWith('large');
+    if (currentCategoryFilter === 'vad') return m.name.startsWith('silero-');
+    return true;
+  });
+
+  if (currentCategoryFilter === 'recommended' && !query && recResult?.models) {
+    const order = [
+      recResult.models.balanced.modelName,
+      recResult.models.quality.modelName,
+      recResult.models.fast.modelName,
+      recResult.models.english.modelName,
+      recResult.models.quantized.modelName
+    ];
+    filtered.sort((a, b) => order.indexOf(a.name) - order.indexOf(b.name));
+  }
+
+  return filtered;
+}
+
+function matchesQuickFilter(modelName: string, query: string): boolean {
+  if (query || currentCategoryFilter === 'recommended') return true;
+  if (currentModelQuickFilter === 'multi') {
+    return !modelName.includes('.en') && !modelName.startsWith('silero-');
+  }
+  if (currentModelQuickFilter === 'en') {
+    return modelName.includes('.en');
+  }
+  if (currentModelQuickFilter === 'quant') {
+    return modelName.includes('-q5') || modelName.includes('-q8');
+  }
+  return true;
+}
+
+export function buildActionButtonsHtml(modelName: string, status: string): string {
+  const safeName = escapeHTML(modelName);
+  if (status === 'Downloaded') {
+    return `<button type="button" class="model-action-btn model-btn-delete" data-action="delete" aria-label="${t('models.ariaDeleteModel', { name: safeName })}">${MODEL_ICON_DELETE}<span>${t('models.actionDelete')}</span></button>`;
+  }
+  if (status === 'Downloading') {
+    return `<button type="button" class="model-action-btn model-btn-pause" data-action="pause" aria-label="${t('models.ariaPauseDownload', { name: safeName })}">${MODEL_ICON_PAUSE}<span>${t('models.actionPause')}</span></button>`;
+  }
+  if (status === 'Paused') {
+    return `
+      <button type="button" class="model-action-btn model-btn-resume" data-action="download" aria-label="${t('models.ariaResumeDownload', { name: safeName })}">${MODEL_ICON_RESUME}<span>${t('models.actionResume')}</span></button>
+      <button type="button" class="model-action-btn model-btn-delete" data-action="delete" aria-label="${t('models.ariaDiscardDownload', { name: safeName })}">${MODEL_ICON_DELETE}<span>${t('models.actionDiscard')}</span></button>
+    `;
+  }
+  return `<button type="button" class="model-action-btn model-btn-download" data-action="download" aria-label="${t('models.ariaDownloadModel', { name: safeName })}">${MODEL_ICON_DOWNLOAD}<span>${t('models.actionDownload')}</span></button>`;
+}
+
+export function buildModelDescriptionHtml(modelName: string, status: string, sizeMB: number | string): string {
+  const meta = getModelMetaInfo(modelName);
+  let statusBadge = '';
+  if (status === 'Downloaded') {
+    statusBadge = `<span class="model-badge badge-installed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span>${t('models.installedBadge')}</span></span>`;
+  } else if (status === 'Downloading') {
+    statusBadge = `<span class="model-badge badge-downloading">${t('models.badgeDownloading')}</span>`;
+  } else if (status === 'Paused') {
+    statusBadge = `<span class="model-badge badge-paused">${t('models.badgePaused')}</span>`;
+  }
+
+  const sizeText = status === 'Downloaded'
+    ? (t('models.installedSize', { size: formatNumForLang(sizeMB) }) || `${sizeMB} MB`)
+    : t('models.expectedSize', { size: formatNumForLang(sizeMB) });
+
+  return `
+    ${statusBadge}
+    ${statusBadge ? '<span style="color: rgba(255,255,255,0.1);">|</span>' : ''}
+    <span>${sizeText}</span>
+    ${meta.precisionText ? `
+      <span style="color: rgba(255,255,255,0.1);">|</span>
+      <span>${meta.precisionText}</span>
+    ` : ''}
+    <span style="color: rgba(255,255,255,0.1);">|</span>
+    <span>${meta.langText}</span>
+  `;
+}
+
+function buildRecBadgeHtml(recInfo: any): string {
+  if (!recInfo) return '';
+  const roleClass = `model-badge-rec-${recInfo.role}`;
+  const roleLabel = t(recInfo.badgeI18nKey) || recInfo.role;
+  const iconMap: Record<string, string> = {
+    balanced: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
+    quality: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>`,
+    fast: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`,
+    english: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`,
+    quantized: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>`
+  };
+  return `<span class="model-badge model-badge-rec ${roleClass}">${iconMap[recInfo.role] || ''}<span>${escapeHTML(roleLabel)}</span></span>`;
+}
+
+function buildModelCardElement(m: ModelStatus, recInfo: any, query: string): HTMLElement {
+  const card = document.createElement('div');
+  card.className = 'setting-card';
+  card.setAttribute('data-model', m.name);
+
+  const sizeMB = Math.max(1, Math.round((m.sizeBytes || 0) / 1048576));
+  card.dataset.sizeMb = String(sizeMB);
+
+  const dlBytes = m.downloadedBytes || 0;
+  const pct = Math.round((m.progress || 0) * 100);
+  const safeName = escapeHTML(m.name);
+  const showProgressBlock = m.status === 'Downloading' || m.status === 'Paused' ? 'block' : 'none';
+
+  const vadBadgeHtml = m.name.startsWith('silero-')
+    ? `<span class="model-badge model-badge-vad" title="${t('models.badgeVadTitle')}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg><span>${t('models.badgeVad')}</span></span>`
+    : '';
+
+  const recReasonHtml = recInfo && (currentCategoryFilter === 'recommended' || !query)
+    ? `<div class="model-rec-description">${escapeHTML(t(recInfo.reasonI18nKey) || recInfo.reasonFallback)}</div>`
+    : '';
+
+  let progressStatusHtml = '';
+  if (m.status === 'Downloading') {
+    progressStatusHtml = dlBytes <= 0
+      ? t('models.statusConnecting')
+      : `${formatModelDownloadProgress(dlBytes, m.sizeBytes, pct)} • ${(t('models.statusInProgress', { size: '', pct: '' }).split('•')[1] || t('models.statusConnecting')).trim()}`;
+  } else if (m.status === 'Paused') {
+    progressStatusHtml = dlBytes <= 0
+      ? t('models.badgePaused')
+      : `${formatModelDownloadProgress(dlBytes, m.sizeBytes, pct)} • ${(t('models.statusPaused', { size: '', pct: '' }).split('•')[1] || t('models.badgePaused')).trim()}`;
+  }
+
+  card.innerHTML = `
+    <div class="setting-info" style="flex-grow: 1; padding-inline-end: 20px;">
+      <div class="setting-label-row" style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap;">
+        <span class="setting-title" style="font-size: 1.05rem; font-weight: 600; color: #fff;">ggml-${safeName}.bin</span>
+        ${buildRecBadgeHtml(recInfo)}
+        ${vadBadgeHtml}
+      </div>
+      <div class="setting-desc" style="font-size: 0.82rem; color: var(--color-text-muted); line-height: 1.4; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+        ${buildModelDescriptionHtml(m.name, m.status, sizeMB)}
+      </div>
+      ${recReasonHtml}
+      <div class="model-progress-block" style="display: ${showProgressBlock};">
+        <div class="model-progress-status ${m.status === 'Paused' ? 'status-paused' : 'status-downloading'}">
+          ${progressStatusHtml}
+        </div>
+        <div class="progress-bar-container" style="height: 6px; border-radius: 3px; background: rgba(255,255,255,0.05); overflow: hidden; border: 1px solid rgba(255,255,255,0.02);">
+          <div class="progress-bar-fill" style="width: ${pct}%; height: 100%; background: ${m.status === 'Downloading' ? 'var(--color-cyan)' : 'var(--color-gold)'}; box-shadow: ${m.status === 'Downloading' ? 'var(--shadow-neon-cyan)' : 'var(--shadow-neon-gold)'}; transition: width 0.3s ease;"></div>
+        </div>
+      </div>
+    </div>
+    <div class="setting-control" style="display: flex; gap: 8px; align-items: center; justify-content: flex-end; flex-shrink: 0; min-width: 160px;">
+      ${buildActionButtonsHtml(m.name, m.status)}
+    </div>
+  `;
+  return card;
+}
+
+function attachModelGridDelegate(grid: any): void {
+  if (grid._modelDelegate) return;
+  grid.addEventListener('click', function(e: MouseEvent) {
+    const target = e.target as HTMLElement;
+    const btn = target.closest('button[data-action]') as HTMLButtonElement | null;
+    if (!btn) return;
+    const card = btn.closest('[data-model]') as HTMLElement | null;
+    if (!card) return;
+    const name = card.dataset.model;
+    if (!name) return;
+    switch (btn.dataset.action) {
+      case 'delete': deleteModelClick(name); break;
+      case 'pause':  pauseModelClick(name); break;
+      case 'download': downloadModelClick(name); break;
+    }
+  });
+  grid._modelDelegate = true;
+}
+
+function renderModelsEmptyState(grid: HTMLElement, query: string): void {
+  const emptyDiv = document.createElement('div');
+  emptyDiv.className = 'models-empty-state';
+  emptyDiv.style.padding = '48px 20px';
+  emptyDiv.innerHTML = `
+    <div class="models-empty-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="11" cy="11" r="8"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        <line x1="8" y1="11" x2="14" y2="11"></line>
+      </svg>
+    </div>
+    <div class="models-empty-title">${t('models.emptyTitle')}</div>
+    <div class="models-empty-desc">${query ? t('models.emptyDescQuery', { query: escapeHTML(query) }) : t('models.emptyDescCategory')}</div>
+    ${query ? `<button type="button" class="btn-secondary btn-sm" onclick="clearModelSearch()" style="margin-top: 8px;">${t('models.emptyClearSearch')}</button>` : ''}
+  `;
+  grid.appendChild(emptyDiv);
+}
+
+export async function loadModelStatusesGrid(_isSilent = false, forceRefresh = false): Promise<void> {
   if (typeof document === 'undefined') return;
-  const win = typeof window !== 'undefined' ? (window as any) : (globalThis as any);
+  const win = getGlobal();
   const invoke = getTauriInvoke();
   if (!invoke) return;
+
+  const loadSeq = ++_loadModelsSeq;
 
   let settingsState = win.settingsState;
   if (!settingsState) {
     try {
       settingsState = await invoke('load_settings');
+      if (loadSeq !== _loadModelsSeq) return;
       win.settingsState = settingsState;
     } catch (e) {
       console.error("Failed to load settings in loadModelStatusesGrid:", e);
@@ -356,91 +625,39 @@ export async function loadModelStatusesGrid(isSilent = false, forceRefresh = fal
   if (!systemSpecs) {
     try {
       systemSpecs = await invoke('get_system_specs');
-      win.systemSpecs = systemSpecs;
     } catch (e) {
       console.error("Failed to load system specs:", e);
       systemSpecs = { total_ram_gb: 8.0, cpu_cores: 4, gpu_type: 'unknown' };
-      win.systemSpecs = systemSpecs;
     }
+    if (loadSeq !== _loadModelsSeq) return;
+    win.systemSpecs = systemSpecs;
   }
 
-  const specsSubtitle = document.getElementById('model-specs-subtitle');
-  if (specsSubtitle && systemSpecs) {
-    const gpuLabelMap: Record<string, string> = {
-      'nvidia': t('models.gpuNvidia'),
-      'amd': t('models.gpuAmd'),
-      'intel': t('models.gpuIntel'),
-      'apple_silicon': t('models.gpuAppleSilicon'),
-      'unknown': t('models.gpuCpuOnly')
-    };
-    const hasDetailedGpuName = systemSpecs.gpu_name && systemSpecs.gpu_name !== 'CPU Only' && systemSpecs.gpu_name !== 'Unknown';
-    const gpuDisplayName = hasDetailedGpuName ? systemSpecs.gpu_name : (gpuLabelMap[systemSpecs.gpu_type] || systemSpecs.gpu_type || t('models.gpuUnknown'));
-    const ramVal = systemSpecs.total_ram_gb;
-    const ramFormatted = (ramVal % 1 === 0 ? ramVal.toFixed(0) : parseFloat(ramVal.toFixed(1)).toString());
-    const formatNum = (v: any) => typeof win.formatNumberForLang === 'function' ? win.formatNumberForLang(v) : String(v);
+  updateSpecsSubtitle(systemSpecs);
 
-    specsSubtitle.innerHTML = t('models.systemSpecsDetected', {
-      ram: formatNum(ramFormatted),
-      cores: formatNum(systemSpecs.cpu_cores),
-      gpu: escapeHTML(gpuDisplayName)
-    });
-  }
-  
   try {
     const now = Date.now();
     let statuses = _cachedModelStatuses;
     if (forceRefresh || !statuses || (now - _cachedModelStatusesTime > MODEL_STATUS_CACHE_TTL)) {
       statuses = await invoke('get_all_models_status', { modelsDir });
+      if (loadSeq !== _loadModelsSeq) return;
       _cachedModelStatuses = statuses;
-      _cachedModelStatusesTime = now;
+      _cachedModelStatusesTime = Date.now();
     }
 
-    const grid = document.getElementById('models-list-scroll') as any;
+    const grid = document.getElementById('models-list-scroll') as (HTMLElement & { _modelDelegate?: boolean }) | null;
     if (!grid) return;
-    
+
     const searchInput = document.getElementById('model-search') as HTMLInputElement | null;
     const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
-    
+
     const recResult = recommendModelsForSystem(systemSpecs);
-    const recMap = new Map();
-    if (recResult && recResult.models) {
-      recMap.set(recResult.models.balanced.modelName, recResult.models.balanced);
-      recMap.set(recResult.models.quality.modelName, recResult.models.quality);
-      recMap.set(recResult.models.fast.modelName, recResult.models.fast);
-      recMap.set(recResult.models.english.modelName, recResult.models.english);
-      recMap.set(recResult.models.quantized.modelName, recResult.models.quantized);
+    const recMap = new Map<string, any>();
+    if (recResult?.models) {
+      Object.values(recResult.models).forEach(rec => recMap.set(rec.modelName, rec));
     }
 
-    const categoryModels = (statuses || []).filter(m => {
-      if (query) {
-        const fullName = `ggml-${m.name}.bin`;
-        const searchTarget = `${m.name} ${fullName}`.toLowerCase();
-        if (!searchTarget.includes(query)) return false;
-      }
-      if (currentCategoryFilter === 'local') {
-        return m.status === 'Downloaded';
-      } else if (!query) {
-        if (currentCategoryFilter === 'recommended') return recResult ? recResult.modelNames.includes(m.name) : false;
-        if (currentCategoryFilter === 'tiny') return m.name.startsWith("tiny");
-        if (currentCategoryFilter === 'base') return m.name.startsWith("base");
-        if (currentCategoryFilter === 'small') return m.name.startsWith("small");
-        if (currentCategoryFilter === 'medium') return m.name.startsWith("medium");
-        if (currentCategoryFilter === 'large') return m.name.startsWith("large");
-        if (currentCategoryFilter === 'vad') return m.name.startsWith("silero-");
-      }
-      return true;
-    });
-
-    if (currentCategoryFilter === 'recommended' && !query && recResult && recResult.models) {
-      const order = [
-        recResult.models.balanced.modelName,
-        recResult.models.quality.modelName,
-        recResult.models.fast.modelName,
-        recResult.models.english.modelName,
-        recResult.models.quantized.modelName
-      ];
-      categoryModels.sort((a, b) => order.indexOf(a.name) - order.indexOf(b.name));
-    }
+    const categoryModels = filterCategoryModels(statuses || [], query, recResult);
 
     const counts = {
       all: categoryModels.length,
@@ -449,21 +666,19 @@ export async function loadModelStatusesGrid(isSilent = false, forceRefresh = fal
       quant: categoryModels.filter(m => m.name.includes('-q5') || m.name.includes('-q8')).length
     };
 
-    const showMulti = counts.multi > 0 && counts.multi < counts.all;
-    const showEn = counts.en > 0 && counts.en < counts.all;
-    const showQuant = counts.quant > 0 && counts.quant < counts.all;
-
     if (currentCategoryFilter !== 'recommended') {
-      if (currentModelQuickFilter === 'en' && !showEn) {
+      if (currentModelQuickFilter === 'en' && !(counts.en > 0 && counts.en < counts.all)) {
         currentModelQuickFilter = 'all';
-      } else if (currentModelQuickFilter === 'multi' && !showMulti) {
+      } else if (currentModelQuickFilter === 'multi' && !(counts.multi > 0 && counts.multi < counts.all)) {
         currentModelQuickFilter = 'all';
-      } else if (currentModelQuickFilter === 'quant' && !showQuant) {
+      } else if (currentModelQuickFilter === 'quant' && !(counts.quant > 0 && counts.quant < counts.all)) {
         currentModelQuickFilter = 'all';
       }
     }
 
+    const prevScrollTop = grid.scrollTop;
     grid.innerHTML = '';
+    attachModelGridDelegate(grid);
 
     if (!query) {
       const bannerHtml = renderFamilyHeaderBanner(currentCategoryFilter, counts);
@@ -472,174 +687,18 @@ export async function loadModelStatusesGrid(isSilent = false, forceRefresh = fal
       }
     }
 
-    if (!grid._modelDelegate) {
-      grid.addEventListener('click', function(e: MouseEvent) {
-        const target = e.target as HTMLElement;
-        const btn = target.closest('button[data-action]') as HTMLButtonElement | null;
-        if (!btn) return;
-        const card = btn.closest('[data-model]') as HTMLElement | null;
-        if (!card) return;
-        const name = card.dataset.model;
-        if (!name) return;
-        switch (btn.dataset.action) {
-          case 'delete': deleteModelClick(name); break;
-          case 'pause':  pauseModelClick(name); break;
-          case 'download': downloadModelClick(name); break;
-        }
-      });
-      grid._modelDelegate = true;
-    }
-    
     let renderedCount = 0;
-    const formatNum = (v: any) => typeof win.formatNumberForLang === 'function' ? win.formatNumberForLang(v) : String(v);
-
-    categoryModels.forEach(m => {
-      if (currentCategoryFilter !== 'recommended') {
-        if (currentModelQuickFilter === 'multi') {
-          if (m.name.includes('.en') || m.name.startsWith('silero-')) return;
-        } else if (currentModelQuickFilter === 'en') {
-          if (!m.name.includes('.en')) return;
-        } else if (currentModelQuickFilter === 'quant') {
-          if (!m.name.includes('-q5') && !m.name.includes('-q8')) return;
-        }
-      }
-
-      const card = document.createElement('div');
-      card.className = 'setting-card';
-      card.dataset.name = m.name;
-      card.setAttribute('data-model', m.name);
-      const sizeMB = Math.max(1, Math.round((m.sizeBytes || 0) / 1048576));
-      card.dataset.sizeMb = String(sizeMB);
-      const dlBytes = m.downloadedBytes || 0;
-      const pct = Math.round((m.progress || 0) * 100);
-      const safeName = escapeHTML(m.name);
-      const meta = getModelMetaInfo(m.name);
-
-      let actionButtons = '';
-      if (m.status === 'Downloaded') {
-        actionButtons = `
-          <button class="model-action-btn model-btn-delete" data-action="delete" aria-label="${t('models.ariaDeleteModel', { name: safeName })}">${MODEL_ICON_DELETE}<span>${t('models.actionDelete')}</span></button>
-        `;
-      } else if (m.status === 'Downloading') {
-        actionButtons = `
-          <button class="model-action-btn model-btn-pause" data-action="pause" aria-label="${t('models.ariaPauseDownload', { name: safeName })}">${MODEL_ICON_PAUSE}<span>${t('models.actionPause')}</span></button>
-        `;
-      } else if (m.status === 'Paused') {
-        actionButtons = `
-          <button class="model-action-btn model-btn-resume" data-action="download" aria-label="${t('models.ariaResumeDownload', { name: safeName })}">${MODEL_ICON_RESUME}<span>${t('models.actionResume')}</span></button>
-          <button class="model-action-btn model-btn-delete" data-action="delete" aria-label="${t('models.ariaDiscardDownload', { name: safeName })}">${MODEL_ICON_DELETE}<span>${t('models.actionDiscard')}</span></button>
-        `;
-      } else {
-        actionButtons = `
-          <button class="model-action-btn model-btn-download" data-action="download" aria-label="${t('models.ariaDownloadModel', { name: safeName })}">${MODEL_ICON_DOWNLOAD}<span>${t('models.actionDownload')}</span></button>
-        `;
-      }
-      
-      const showProgressBlock = m.status === 'Downloading' || m.status === 'Paused' ? 'block' : 'none';
-      
-      let badgeHtml = '';
-      if (m.name.startsWith('silero-')) {
-        badgeHtml = `<span class="model-badge model-badge-vad" title="${t('models.badgeVadTitle')}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg><span>${t('models.badgeVad')}</span></span>`;
-      }
-
-      let statusBadge = '';
-      if (m.status === 'Downloaded') {
-        statusBadge = `<span class="model-badge badge-installed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span>${t('models.installedBadge')}</span></span>`;
-      } else if (m.status === 'Downloading') {
-        statusBadge = `<span class="model-badge badge-downloading">${t('models.badgeDownloading')}</span>`;
-      } else if (m.status === 'Paused') {
-        statusBadge = `<span class="model-badge badge-paused">${t('models.badgePaused')}</span>`;
-      }
-
-      const recInfo = recMap.get(m.name);
-      let recBadgeHtml = '';
-      if (recInfo) {
-        const roleClass = `model-badge-rec-${recInfo.role}`;
-        const roleLabel = t(recInfo.badgeI18nKey) || recInfo.role;
-        let roleIcon = '';
-        if (recInfo.role === 'balanced') {
-          roleIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
-        } else if (recInfo.role === 'quality') {
-          roleIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>`;
-        } else if (recInfo.role === 'fast') {
-          roleIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`;
-        } else if (recInfo.role === 'english') {
-          roleIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`;
-        } else if (recInfo.role === 'quantized') {
-          roleIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>`;
-        }
-        recBadgeHtml = `<span class="model-badge model-badge-rec ${roleClass}">${roleIcon}<span>${escapeHTML(roleLabel)}</span></span>`;
-      }
-
-      let recReasonHtml = '';
-      if (recInfo && (currentCategoryFilter === 'recommended' || !query)) {
-        const reasonText = t(recInfo.reasonI18nKey) || recInfo.reasonFallback;
-        recReasonHtml = `<div class="model-rec-description">${escapeHTML(reasonText)}</div>`;
-      }
-
-      card.innerHTML = `
-        <div class="setting-info" style="flex-grow: 1; padding-inline-end: 20px;">
-          <div class="setting-label-row" style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap;">
-            <span class="setting-title" style="font-size: 1.05rem; font-weight: 600; color: #fff;">ggml-${safeName}.bin</span>
-            ${recBadgeHtml}
-            ${badgeHtml}
-          </div>
-          <div class="setting-desc" style="font-size: 0.82rem; color: var(--color-text-muted); line-height: 1.4; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-            ${statusBadge}
-            ${statusBadge ? '<span style="color: rgba(255,255,255,0.1);">|</span>' : ''}
-            <span>${m.status === 'Downloaded' ? (t('models.installedSize', { size: formatNum(sizeMB) }) || `${sizeMB} MB`) : t('models.expectedSize', { size: formatNum(sizeMB) })}</span>
-            ${meta.precisionText ? `
-              <span style="color: rgba(255,255,255,0.1);">|</span>
-              <span>${meta.precisionText}</span>
-            ` : ''}
-            <span style="color: rgba(255,255,255,0.1);">|</span>
-            <span>${meta.langText}</span>
-          </div>
-          ${recReasonHtml}
-          <div class="model-progress-block" style="display: ${showProgressBlock};">
-            <div class="model-progress-status ${m.status === 'Paused' ? 'status-paused' : 'status-downloading'}">
-              ${m.status === 'Downloading' ? (
-                dlBytes <= 0
-                  ? t('models.statusConnecting')
-                  : `${formatModelDownloadProgress(dlBytes, m.sizeBytes, pct)} • ${(t('models.statusInProgress', { size: '', pct: '' }).split('•')[1] || t('models.statusConnecting')).trim()}`
-              ) : ''}
-              ${m.status === 'Paused' ? (
-                dlBytes <= 0
-                  ? t('models.badgePaused')
-                  : `${formatModelDownloadProgress(dlBytes, m.sizeBytes, pct)} • ${(t('models.statusPaused', { size: '', pct: '' }).split('•')[1] || t('models.badgePaused')).trim()}`
-              ) : ''}
-            </div>
-            <div class="progress-bar-container" style="height: 6px; border-radius: 3px; background: rgba(255,255,255,0.05); overflow: hidden; border: 1px solid rgba(255,255,255,0.02);">
-              <div class="progress-bar-fill" style="width: ${pct}%; height: 100%; background: ${m.status === 'Downloading' ? 'var(--color-cyan)' : 'var(--color-gold)'}; box-shadow: ${m.status === 'Downloading' ? 'var(--shadow-neon-cyan)' : 'var(--shadow-neon-gold)'}; transition: width 0.3s ease;"></div>
-            </div>
-          </div>
-        </div>
-        <div class="setting-control" style="display: flex; gap: 8px; align-items: center; justify-content: flex-end; flex-shrink: 0; min-width: 160px;">
-          ${actionButtons}
-        </div>
-      `;
-      grid.appendChild(card);
+    for (const m of categoryModels) {
+      if (!matchesQuickFilter(m.name, query)) continue;
+      grid.appendChild(buildModelCardElement(m, recMap.get(m.name), query));
       renderedCount++;
-    });
+    }
 
     if (renderedCount === 0) {
-      const emptyDiv = document.createElement('div');
-      emptyDiv.className = 'models-empty-state';
-      emptyDiv.style.padding = '48px 20px';
-      emptyDiv.innerHTML = `
-        <div class="models-empty-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            <line x1="8" y1="11" x2="14" y2="11"></line>
-          </svg>
-        </div>
-        <div class="models-empty-title">${t('models.emptyTitle')}</div>
-        <div class="models-empty-desc">${query ? t('models.emptyDescQuery', { query: escapeHTML(query) }) : t('models.emptyDescCategory')}</div>
-        ${query ? `<button type="button" class="btn-secondary btn-sm" onclick="clearModelSearch()" style="margin-top: 8px;">${t('models.emptyClearSearch')}</button>` : ''}
-      `;
-      grid.appendChild(emptyDiv);
+      renderModelsEmptyState(grid, query);
     }
+
+    grid.scrollTop = prevScrollTop;
   } catch (err) {
     console.error("Failed to load model statuses:", err);
   }
@@ -648,7 +707,7 @@ export async function loadModelStatusesGrid(isSilent = false, forceRefresh = fal
 export function filterModelsGrid(): void {
   if (typeof document === 'undefined') return;
   const searchInput = document.getElementById('model-search') as HTMLInputElement | null;
-  const win = typeof window !== 'undefined' ? (window as any) : (globalThis as any);
+  const win = getGlobal();
   if (searchInput && win.applyDynamicDirection) {
     win.applyDynamicDirection(searchInput);
   }
@@ -665,7 +724,7 @@ export function filterModelsGrid(): void {
 }
 
 export async function downloadModelClick(name: string): Promise<void> {
-  const win = typeof window !== 'undefined' ? (window as any) : (globalThis as any);
+  const win = getGlobal();
   const invoke = getTauriInvoke();
   const showNotification = win.showNotification;
   const modelsDir = win.settingsState?.modelsDir || (typeof document !== 'undefined' ? (document.getElementById('opt-modelsDir') as HTMLInputElement)?.value : undefined);
@@ -675,11 +734,17 @@ export async function downloadModelClick(name: string): Promise<void> {
   try {
     _cachedModelStatuses = null;
 
-    const card = document.querySelector(`[data-model="${name}"]`);
+    const card = typeof document !== 'undefined'
+      ? (document.querySelector(`[data-model="${escapeAttrSelector(name)}"]`) as HTMLElement | null)
+      : null;
     if (card) {
       const ctrlEl = card.querySelector('.setting-control');
       if (ctrlEl) {
-        ctrlEl.innerHTML = `<button class="model-action-btn model-btn-pause" data-action="pause" aria-label="${t('models.ariaPauseDownload', { name: escapeHTML(name) })}">${MODEL_ICON_PAUSE}<span>${t('models.actionPause')}</span></button>`;
+        ctrlEl.innerHTML = buildActionButtonsHtml(name, 'Downloading');
+      }
+      const descEl = card.querySelector('.setting-desc');
+      if (descEl) {
+        descEl.innerHTML = buildModelDescriptionHtml(name, 'Downloading', card.dataset.sizeMb || 1);
       }
       const progressBlock = card.querySelector('.model-progress-block') as HTMLElement | null;
       if (progressBlock) progressBlock.style.display = 'block';
@@ -718,7 +783,7 @@ export async function downloadModelClick(name: string): Promise<void> {
 }
 
 export async function pauseModelClick(name: string): Promise<void> {
-  const win = typeof window !== 'undefined' ? (window as any) : (globalThis as any);
+  const win = getGlobal();
   const invoke = getTauriInvoke();
   const showNotification = win.showNotification;
   if (_modelActionsInProgress.has(name) || !invoke) return;
@@ -729,6 +794,8 @@ export async function pauseModelClick(name: string): Promise<void> {
     await loadModelStatusesGrid(false, true);
   } catch (err: any) {
     if (showNotification) showNotification(t('toasts.modelDownloadPauseError', { error: String(err) }), "error");
+    _cachedModelStatuses = null;
+    await loadModelStatusesGrid(false, true);
   } finally {
     _modelActionsInProgress.delete(name);
   }
@@ -800,6 +867,8 @@ export const modelHub = {
   formatProgress: formatModelDownloadProgress,
   formatRemainingTime,
   renderBanner: renderFamilyHeaderBanner,
+  buildActionButtonsHtml,
+  buildDescriptionHtml: buildModelDescriptionHtml,
   invalidateCache: invalidateModelStatusesCache,
   ICONS: {
     DOWNLOAD: MODEL_ICON_DOWNLOAD,

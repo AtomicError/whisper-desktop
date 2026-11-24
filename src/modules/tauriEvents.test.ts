@@ -6,9 +6,12 @@ import {
   cleanupTauriListeners,
   setupTauriListeners,
   getUnlistenFns,
+  getActiveModelDownloadsCount,
   setOriginalInvoke,
   setOriginalListen
 } from './tauriEvents';
+import { getIsDownloadingModelRunning } from './nativeWindow';
+import { modelHub } from './modelHub';
 import { transcriptViewer } from './transcriptViewer';
 import { logsController } from './logsController';
 
@@ -329,6 +332,60 @@ describe('tauriEvents module', () => {
 
       expect(logsController.allLogs.length).toBe(1);
       expect(viewport.children.length).toBe(1);
+    });
+
+    it('keeps isDownloadingModelRunning active across parallel model downloads until all finish', async () => {
+      const handlers: Record<string, (e: any) => void> = {};
+      setOriginalListen(vi.fn().mockImplementation((event: string, handler: (e: any) => void) => {
+        handlers[event] = handler;
+        return Promise.resolve(() => {});
+      }));
+
+      const setProgressBarMock = vi.fn().mockResolvedValue(undefined);
+      (globalThis as any).window.__TAURI__ = {
+        window: {
+          getCurrentWindow: () => ({ setProgressBar: setProgressBarMock })
+        }
+      };
+
+      const loadSpy = vi.spyOn(modelHub, 'loadStatuses').mockResolvedValue(undefined);
+      (globalThis as any).window.showNotification = vi.fn();
+
+      setupTauriListeners();
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      // Start two concurrent model downloads
+      handlers['model-download-status']({
+        payload: { modelName: 'small', phase: 'downloading', progress: 0.4, downloadedBytes: 400, totalBytes: 1000, speedBps: 100 }
+      });
+      handlers['model-download-status']({
+        payload: { modelName: 'base', phase: 'downloading', progress: 0.8, downloadedBytes: 800, totalBytes: 1000, speedBps: 100 }
+      });
+
+      expect(getActiveModelDownloadsCount()).toBe(2);
+      expect(getIsDownloadingModelRunning()).toBe(true);
+      expect(setProgressBarMock).toHaveBeenLastCalledWith({ status: 'normal', progress: 60 });
+
+      // Completing one model must NOT clear active download flag or taskbar progress while the second is still running
+      handlers['model-download-status']({
+        payload: { modelName: 'base', phase: 'completed', progress: 1, downloadedBytes: 1000, totalBytes: 1000, speedBps: 0 }
+      });
+
+      expect(getActiveModelDownloadsCount()).toBe(1);
+      expect(getIsDownloadingModelRunning()).toBe(true);
+      expect(setProgressBarMock).toHaveBeenLastCalledWith({ status: 'normal', progress: 40 });
+
+      // Pausing/completing the last remaining model clears both
+      handlers['model-download-status']({
+        payload: { modelName: 'small', phase: 'paused', progress: 0.4, downloadedBytes: 400, totalBytes: 1000, speedBps: 0 }
+      });
+
+      expect(getActiveModelDownloadsCount()).toBe(0);
+      expect(getIsDownloadingModelRunning()).toBe(false);
+      expect(setProgressBarMock).toHaveBeenLastCalledWith({ status: 'none' });
+
+      loadSpy.mockRestore();
+      delete (globalThis as any).window.__TAURI__;
     });
   });
 });
