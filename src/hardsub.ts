@@ -1,5 +1,5 @@
 import { t, getLanguage, isRtlLanguage, firstStrongDirection, applyTextDirection, applyContentDirection, clearContentDirection, isolateDirection, isolateLtr } from './i18n/index';
-import { spanOrigins, assRunOrder, protectRtlPunctuation, calculateSubtitleBoxGeometry, hasArabicScript, isArabicScriptFont, resolveEffectiveFont, toAssFontName } from './hardsubLayout';
+import { spanOrigins, assRunOrder, protectRtlPunctuation, calculateSubtitleLineLayout, calculateSubtitleBoxGeometry, hasArabicScript, isArabicScriptFont, resolveEffectiveFont, toAssFontName } from './hardsubLayout';
 import { formatTimecodeHTML, formatSpeedLabel } from './modules/companionPlayer';
 
 const invoke = async <T>(cmd: string, args: Record<string, any> = {}): Promise<T> => {
@@ -105,14 +105,29 @@ export interface SubtitleCue {
 }
 
 function parseTimeToMs(timeStr: string): number {
-  const parts = timeStr.trim().split(/[:,\.]/);
-  if (parts.length < 3) return 0;
-  const h = parseInt(parts[0], 10) || 0;
-  const m = parseInt(parts[1], 10) || 0;
-  const s = parseInt(parts[2], 10) || 0;
+  // Strip any trailing VTT cue settings (e.g. "00:05.500 align:start position:0%")
+  const token = timeStr.trim().split(/\s+/)[0] || '';
+  if (!token) return 0;
+
+  const [hmsPart, fracPart = ''] = token.split(/[,\.]/);
+  const timeParts = hmsPart.split(':');
+  if (timeParts.length < 2 || timeParts.length > 3) return 0;
+
+  const nums = timeParts.map((p) => parseInt(p, 10));
+  if (nums.some((n) => Number.isNaN(n) || n < 0)) return 0;
+
+  let h = 0;
+  let m = 0;
+  let s = 0;
+  if (timeParts.length === 3) {
+    [h, m, s] = nums;
+  } else {
+    [m, s] = nums;
+  }
+
   let ms = 0;
-  if (parts[3]) {
-    const rawMs = parts[3].padEnd(3, '0').substring(0, 3);
+  if (fracPart) {
+    const rawMs = fracPart.padEnd(3, '0').substring(0, 3);
     ms = parseInt(rawMs, 10) || 0;
   }
   return h * 3600000 + m * 60000 + s * 1000 + ms;
@@ -288,11 +303,12 @@ function formatSecondsToDisplay(seconds: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-function parseSubtitleContent(content: string, ext: string): SubtitleCue[] {
+export function parseSubtitleContent(content: string, ext: string): SubtitleCue[] {
   const cues: SubtitleCue[] = [];
-  const normalized = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const normalized = content.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const format = ext.toLowerCase();
 
-  if (ext === 'ass') {
+  if (format === 'ass' || format === 'ssa') {
     const lines = normalized.split('\n');
     let inEvents = false;
     let cueId = 1;
@@ -320,6 +336,97 @@ function parseSubtitleContent(content: string, ext: string): SubtitleCue[] {
         }
       }
     }
+  } else if (format === 'lrc') {
+    const lrcEntries: Array<{ startMs: number; timeStr: string; text: string }> = [];
+    const tagRegex = /\[(\d{1,3}:\d{2}(?:[.,]\d{1,3})?)\]/g;
+    for (const rawLine of normalized.split('\n')) {
+      const line = rawLine.trim();
+      if (!line) continue;
+      const matches = [...line.matchAll(tagRegex)];
+      if (matches.length === 0) continue;
+      const text = line.replace(tagRegex, '').trim();
+      for (const match of matches) {
+        const timeStr = match[1].replace(',', '.');
+        lrcEntries.push({
+          startMs: parseTimeToMs(timeStr),
+          timeStr,
+          text,
+        });
+      }
+    }
+    lrcEntries.sort((a, b) => a.startMs - b.startMs);
+    let cueId = 1;
+    for (let i = 0; i < lrcEntries.length; i++) {
+      const entry = lrcEntries[i];
+      if (!entry.text) continue;
+      let nextStartMs = entry.startMs + 3000;
+      for (let j = i + 1; j < lrcEntries.length; j++) {
+        if (lrcEntries[j].startMs > entry.startMs) {
+          nextStartMs = lrcEntries[j].startMs;
+          break;
+        }
+      }
+      const endMs = Math.max(entry.startMs + 500, nextStartMs);
+      cues.push({
+        id: cueId++,
+        startMs: entry.startMs,
+        endMs,
+        startTimeStr: entry.timeStr,
+        endTimeStr: msToSrtTime(endMs).replace(',', '.'),
+        text: entry.text,
+      });
+    }
+  } else if (format === 'sub') {
+    const lines = normalized.split('\n');
+    let fps = 25;
+    let cueId = 1;
+    let parsedMicroDvd = false;
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      const match = /^\{(\d+)\}\{(\d+)\}(.*)$/.exec(line);
+      if (!match) continue;
+      parsedMicroDvd = true;
+      const startFrame = parseInt(match[1], 10);
+      const endFrame = parseInt(match[2], 10);
+      const body = match[3].replace(/\{[^}]+\}/g, '').replace(/\|/g, '\n').trim();
+      if (startFrame <= 1 && endFrame <= 1 && /^\d+(?:\.\d+)?$/.test(body)) {
+        const parsedFps = parseFloat(body);
+        if (parsedFps > 0) fps = parsedFps;
+        continue;
+      }
+      if (!body) continue;
+      const startMs = Math.round((startFrame / fps) * 1000);
+      const endMs = Math.max(startMs + 500, Math.round((endFrame / fps) * 1000));
+      cues.push({
+        id: cueId++,
+        startMs,
+        endMs,
+        startTimeStr: msToSrtTime(startMs),
+        endTimeStr: msToSrtTime(endMs),
+        text: body,
+      });
+    }
+    if (!parsedMicroDvd) {
+      // SubViewer (.sub): HH:MM:SS.cc,HH:MM:SS.cc followed by cue lines
+      const blocks = normalized.split(/\n\n+/);
+      for (const block of blocks) {
+        const blockLines = block.trim().split('\n');
+        const timeMatch = /^(\d{1,2}:\d{2}:\d{2}[.,]\d{1,3})\s*,\s*(\d{1,2}:\d{2}:\d{2}[.,]\d{1,3})$/.exec(blockLines[0]?.trim() || '');
+        if (!timeMatch || blockLines.length < 2) continue;
+        const startMs = parseTimeToMs(timeMatch[1]);
+        const endMs = parseTimeToMs(timeMatch[2]);
+        const text = blockLines.slice(1).join('\n').replace(/\[br\]/gi, '\n').trim();
+        if (!text) continue;
+        cues.push({
+          id: cueId++,
+          startMs,
+          endMs,
+          startTimeStr: timeMatch[1],
+          endTimeStr: timeMatch[2],
+          text,
+        });
+      }
+    }
   } else {
     const blocks = normalized.split(/\n\n+/);
     let cueId = 1;
@@ -344,8 +451,8 @@ function parseSubtitleContent(content: string, ext: string): SubtitleCue[] {
             id: cueId++,
             startMs,
             endMs,
-            startTimeStr: startStr.split(' ')[0],
-            endTimeStr: endStr.split(' ')[0],
+            startTimeStr: startStr.split(/\s+/)[0],
+            endTimeStr: endStr.split(/\s+/)[0],
             text,
           });
         }
@@ -485,13 +592,13 @@ function parseLineToSpans(
         if (cmd.startsWith('an')) {
           const val = cmd.substring(2).trim();
           alignmentOverride = parseInt(val, 10) || null;
-        } else if (cmd.startsWith('i')) {
+        } else if (/^i[01]?$/.test(cmd)) {
           const val = cmd.substring(1).trim();
           italic = val === '1';
-        } else if (cmd.startsWith('b')) {
+        } else if (/^b[01]?$/.test(cmd)) {
           const val = cmd.substring(1).trim();
           bold = val === '1';
-        } else if (cmd.startsWith('u')) {
+        } else if (/^u[01]?$/.test(cmd)) {
           const val = cmd.substring(1).trim();
           underline = val === '1';
         } else if (cmd.startsWith('c&H') || cmd.startsWith('1c&H')) {
@@ -704,7 +811,6 @@ export class HardsubController {
   private formatSelect: HTMLSelectElement | null = null;
   private codecSelect: HTMLSelectElement | null = null;
   private hwSelect: HTMLSelectElement | null = null;
-  private alignmentButtons: NodeListOf<HTMLButtonElement> | null = null;
   private cancelBtn: HTMLButtonElement | null = null;
   private isCancelling: boolean = false;
 
@@ -802,6 +908,8 @@ export class HardsubController {
   private lblVideoPath: HTMLElement | null = null;
   private lblSubName: HTMLElement | null = null;
   private lblSubPath: HTMLElement | null = null;
+  private btnBrowseVideo: HTMLButtonElement | null = null;
+  private btnBrowseSub: HTMLButtonElement | null = null;
   private btnClearVideo: HTMLButtonElement | null = null;
   private btnClearSub: HTMLButtonElement | null = null;
   private btnResetAll: HTMLButtonElement | null = null;
@@ -964,6 +1072,7 @@ export class HardsubController {
     if (!active) {
       this.clearPlayerWork();
       this.videoElement?.pause();
+      this.exitPreviewFullscreen();
     } else {
       if (this.pendingLocalizationRefresh) {
         this.pendingLocalizationRefresh = false;
@@ -1231,7 +1340,6 @@ export class HardsubController {
     this.formatSelect = document.getElementById('hardsub-format') as HTMLSelectElement;
     this.codecSelect = document.getElementById('hardsub-codec') as HTMLSelectElement;
     this.hwSelect = document.getElementById('hardsub-hw') as HTMLSelectElement;
-    this.alignmentButtons = document.querySelectorAll('.align-btn');
     this.cancelBtn = document.getElementById('btn-cancel-hardsub') as HTMLButtonElement;
 
     // Export Tab Elements
@@ -1324,6 +1432,8 @@ export class HardsubController {
     this.lblVideoPath = document.getElementById('lbl-hardsub-video-path');
     this.lblSubName = document.getElementById('lbl-hardsub-sub-name');
     this.lblSubPath = document.getElementById('lbl-hardsub-sub-path');
+    this.btnBrowseVideo = document.getElementById('btn-browse-video') as HTMLButtonElement | null;
+    this.btnBrowseSub = document.getElementById('btn-browse-sub') as HTMLButtonElement | null;
     this.btnClearVideo = document.getElementById('btn-clear-hardsub-video') as HTMLButtonElement | null;
     this.btnClearSub = document.getElementById('btn-clear-hardsub-sub') as HTMLButtonElement | null;
 
@@ -1650,22 +1760,25 @@ export class HardsubController {
 
     // Clicking placeholder in player expands the accordion and triggers browse
     this.on(this.videoPlaceholder, 'click', () => {
+      if (this.isEncoding) return;
       this.toggleMediaAccordion(true);
-      document.getElementById('btn-browse-video')?.click();
+      (this.btnBrowseVideo ?? document.getElementById('btn-browse-video'))?.click();
     });
 
     // Browse Video File
-    this.on(document.getElementById('btn-browse-video'), 'click', async () => {
+    this.on(this.btnBrowseVideo ?? document.getElementById('btn-browse-video'), 'click', async () => {
+      if (this.isEncoding) return;
       const selected = await invoke<string | null>('select_file');
-      if (selected) {
+      if (selected && !this.isEncoding) {
         this.selectVideoSource(selected);
       }
     });
 
     // Browse Subtitle File
-    this.on(document.getElementById('btn-browse-sub'), 'click', async () => {
+    this.on(this.btnBrowseSub ?? document.getElementById('btn-browse-sub'), 'click', async () => {
+      if (this.isEncoding) return;
       const selected = await invoke<string | null>('select_subtitle_file');
-      if (selected) {
+      if (selected && !this.isEncoding) {
         if (this.subtitlePathInput) this.subtitlePathInput.value = selected;
         this.state.subtitlePath = selected;
         this.loadSubtitleFile(selected);
@@ -2105,63 +2218,59 @@ export class HardsubController {
     let min = 0;
     let max = 51;
 
+    const setQualityHintText = (text: string) => {
+      if (!this.qualityHint) return;
+      const hintSpan = typeof this.qualityHint.querySelector === 'function'
+        ? this.qualityHint.querySelector('span')
+        : null;
+      if (hintSpan) {
+        hintSpan.textContent = text;
+      } else {
+        this.qualityHint.textContent = text;
+      }
+    };
+
     if (hw === 'videotoolbox' && codec !== 'prores') {
       this.qualityParamLabel.textContent = t('hardsub.labelQualityApple');
       min = 1;
       max = 100;
-      if (this.qualityHint) {
-        this.qualityHint.textContent = t('hardsub.hintHigherQuality1100');
-      }
+      setQualityHintText(t('hardsub.hintHigherQuality1100'));
     } else if (hw === 'nvenc') {
       this.qualityParamLabel.textContent = t('hardsub.labelQualityNvenc');
       min = 1;
       max = 51;
-      if (this.qualityHint) {
-        this.qualityHint.textContent = t('hardsub.hintLowerQuality151');
-      }
+      setQualityHintText(t('hardsub.hintLowerQuality151'));
     } else if (hw === 'qsv') {
       this.qualityParamLabel.textContent = t('hardsub.labelQualityQsv');
       min = 1;
       max = 51;
-      if (this.qualityHint) {
-        this.qualityHint.textContent = t('hardsub.hintLowerQuality151');
-      }
+      setQualityHintText(t('hardsub.hintLowerQuality151'));
     } else if (hw === 'vaapi') {
       this.qualityParamLabel.textContent = t('hardsub.labelQualityVaapi');
       min = 1;
       max = 51;
-      if (this.qualityHint) {
-        this.qualityHint.textContent = t('hardsub.hintLowerQuality151');
-      }
+      setQualityHintText(t('hardsub.hintLowerQuality151'));
     } else if (codec === 'prores') {
       this.qualityParamLabel.textContent = t('hardsub.labelQualityProRes');
       min = 0;
       max = 5;
-      if (this.qualityHint) {
-        this.qualityHint.textContent = t('hardsub.hintProRes');
-      }
+      setQualityHintText(t('hardsub.hintProRes'));
     } else if (codec === 'av1') {
       this.qualityParamLabel.textContent = t('hardsub.labelQualityCrf', { encoder: 'libsvtav1' });
       min = 0;
       max = 63;
-      if (this.qualityHint) {
-        this.qualityHint.textContent = t('hardsub.hintLowerQuality063');
-      }
+      setQualityHintText(t('hardsub.hintLowerQuality063'));
     } else if (codec === 'vp9') {
       this.qualityParamLabel.textContent = t('hardsub.labelQualityCrf', { encoder: 'libvpx-vp9' });
       min = 0;
       max = 63;
-      if (this.qualityHint) {
-        this.qualityHint.textContent = t('hardsub.hintLowerQuality063');
-      }
+      setQualityHintText(t('hardsub.hintLowerQuality063'));
     } else {
       const encoderName = codec === 'h265' ? 'libx265' : 'libx264';
       this.qualityParamLabel.textContent = t('hardsub.labelQualityCrf', { encoder: encoderName });
       min = 0;
       max = 51;
-      if (this.qualityHint) {
-        this.qualityHint.textContent = t('hardsub.hintLowerQuality051');
-      }
+      setQualityHintText(t('hardsub.hintLowerQuality051'));
     }
 
     this.qualitySlider.min = String(min);
@@ -2595,7 +2704,6 @@ export class HardsubController {
       if (focus) tabButtons[tab]?.focus();
       if (this.currentStudioTab === tab) return;
 
-      const isForward = tabs.indexOf(tab) > tabs.indexOf(this.currentStudioTab);
       this.currentStudioTab = tab;
       syncTabStates();
 
@@ -2619,11 +2727,14 @@ export class HardsubController {
     this.on(tabsContainer, 'keydown', (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
     
+      const rtl = isRtlLanguage(getLanguage());
       let targetIdx = -1;
       if (e.key === 'ArrowRight') {
-        targetIdx = (tabs.indexOf(this.currentStudioTab) + 1) % tabs.length;
+        const step = rtl ? -1 : 1;
+        targetIdx = (tabs.indexOf(this.currentStudioTab) + step + tabs.length) % tabs.length;
       } else if (e.key === 'ArrowLeft') {
-        targetIdx = (tabs.indexOf(this.currentStudioTab) - 1 + tabs.length) % tabs.length;
+        const step = rtl ? 1 : -1;
+        targetIdx = (tabs.indexOf(this.currentStudioTab) + step + tabs.length) % tabs.length;
       } else if (e.key === 'Home') {
         targetIdx = 0;
       } else if (e.key === 'End') {
@@ -3204,7 +3315,7 @@ export class HardsubController {
     ]);
 
     const handleFiles = (files: string[]) => {
-      if (!this.pageActive || this.disposed) return;
+      if (!this.pageActive || this.disposed || this.isEncoding) return;
       const lastVideoIndex = files.findLastIndex((filePath) => {
         const lastDot = filePath.lastIndexOf('.');
         return SUPPORTED_VIDEO_EXTS.has(lastDot !== -1 ? filePath.substring(lastDot).toLowerCase() : '');
@@ -3236,7 +3347,7 @@ export class HardsubController {
       if (!zone) return;
 
       this.on(zone, 'dragover', (e) => {
-        if (!this.pageActive) return;
+        if (!this.pageActive || this.isEncoding) return;
         e.preventDefault();
         e.stopPropagation();
         zone.classList.add('drag-over');
@@ -3817,7 +3928,7 @@ export class HardsubController {
   }
 
   private selectVideoSource(videoPath: string, explicitSubProvided = false): void {
-    if (this.disposed) return;
+    if (this.disposed || this.isEncoding) return;
     this.state.videoPath = videoPath;
     this.lastExportedPath = null;
     this.lastStatusPayload = null;
@@ -4047,12 +4158,12 @@ export class HardsubController {
   }
 
   private async loadSubtitleFile(subPath: string) {
-    if (!subPath) return;
+    if (!subPath || this.disposed || this.isEncoding) return;
     this.isCompanionSubtitle = false;
     const serial = ++this.subtitleSerial;
     try {
       const content = await invoke<string>('read_text_file_content', { filePath: subPath });
-      if (this.disposed || serial !== this.subtitleSerial || this.state.subtitlePath !== subPath) return;
+      if (this.disposed || this.isEncoding || serial !== this.subtitleSerial || this.state.subtitlePath !== subPath) return;
       const lastDot = subPath.lastIndexOf('.');
       const ext = lastDot > 0 ? subPath.substring(lastDot + 1).toLowerCase() : 'srt';
       this.subtitleCues = parseSubtitleContent(content, ext);
@@ -4064,6 +4175,7 @@ export class HardsubController {
         }
       }
       await this.refreshFontRenderScale();
+      if (this.disposed || this.isEncoding || serial !== this.subtitleSerial || this.state.subtitlePath !== subPath) return;
       this.maxCueDuration = this.subtitleCues.reduce((max, c) => Math.max(max, c.endMs - c.startMs), 0);
       this.isSubtitlesModified = false;
       this._lastRenderKey = '';
@@ -4127,21 +4239,43 @@ export class HardsubController {
       card.id = `subtitle-cue-${cue.id}`;
       card.dataset.cueId = String(cue.id);
 
-      card.innerHTML = `
-        <div class="subtitle-cue-header">
-          <div style="display:flex; align-items:center; gap:6px;">
-            <span class="subtitle-cue-time">${cue.startTimeStr} → ${cue.endTimeStr}</span>
-            <span class="subtitle-cue-active-badge">${t('hardsub.cueActive')}</span>
-          </div>
-          <button type="button" class="pill-btn jump-cue-btn" style="padding: 2px 8px; font-size: 0.72rem; height: 22px;" title="${t('hardsub.cuePlayTooltip')}" aria-label="${t('hardsub.cuePlay')} #${cue.id}">
-            ▶ ${t('hardsub.cuePlay')}
-          </button>
-        </div>
-        <textarea class="subtitle-cue-textarea" data-cue-id="${cue.id}" aria-label="${t('hardsub.cueAriaLabel', { id: cue.id })}">${cue.text}</textarea>
-      `;
+      const header = document.createElement('div');
+      header.className = 'subtitle-cue-header';
 
-      const cueField = card.querySelector<HTMLTextAreaElement>('textarea.subtitle-cue-textarea');
-      if (cueField) applyTextDirection(cueField);
+      const metaGroup = document.createElement('div');
+      metaGroup.style.cssText = 'display:flex; align-items:center; gap:6px;';
+
+      const timeSpan = document.createElement('span');
+      timeSpan.className = 'subtitle-cue-time';
+      timeSpan.textContent = `${cue.startTimeStr} → ${cue.endTimeStr}`;
+
+      const activeBadge = document.createElement('span');
+      activeBadge.className = 'subtitle-cue-active-badge';
+      activeBadge.textContent = t('hardsub.cueActive');
+
+      metaGroup.appendChild(timeSpan);
+      metaGroup.appendChild(activeBadge);
+
+      const jumpBtn = document.createElement('button');
+      jumpBtn.type = 'button';
+      jumpBtn.className = 'pill-btn jump-cue-btn';
+      jumpBtn.style.cssText = 'padding: 2px 8px; font-size: 0.72rem; height: 22px;';
+      jumpBtn.title = t('hardsub.cuePlayTooltip');
+      jumpBtn.setAttribute('aria-label', `${t('hardsub.cuePlay')} #${cue.id}`);
+      jumpBtn.textContent = `▶ ${t('hardsub.cuePlay')}`;
+
+      header.appendChild(metaGroup);
+      header.appendChild(jumpBtn);
+
+      const cueField = document.createElement('textarea');
+      cueField.className = 'subtitle-cue-textarea';
+      cueField.dataset.cueId = String(cue.id);
+      cueField.setAttribute('aria-label', t('hardsub.cueAriaLabel', { id: cue.id }));
+      cueField.value = cue.text;
+      applyTextDirection(cueField);
+
+      card.appendChild(header);
+      card.appendChild(cueField);
 
       frag.appendChild(card);
     });
@@ -4235,6 +4369,7 @@ export class HardsubController {
   }
 
   public prefillFilePaths(videoPath: string, subPath: string) {
+    if (this.disposed || this.isEncoding) return;
     if (subPath) {
       if (this.subtitlePathInput) this.subtitlePathInput.value = subPath;
       this.state.subtitlePath = subPath;
@@ -4361,9 +4496,10 @@ export class HardsubController {
   }
 
   private autoSuggestSubtitleAndOutput(videoPath: string, explicitSubProvided = false): void {
+    const lastSlash = Math.max(videoPath.lastIndexOf('/'), videoPath.lastIndexOf('\\'));
     const lastDot = videoPath.lastIndexOf('.');
-    if (lastDot > 0) {
-      const basePath = videoPath.substring(0, lastDot);
+    const basePath = lastDot > lastSlash ? videoPath.substring(0, lastDot) : videoPath;
+    if (basePath) {
       if (!explicitSubProvided) {
         void this.detectAndLoadCompanionSubtitle(basePath, videoPath);
       }
@@ -4385,7 +4521,7 @@ export class HardsubController {
     for (const candidatePath of candidatePaths) {
       try {
         const content = await invoke<string>('read_text_file_content', { filePath: candidatePath });
-        if (this.disposed || serial !== this.subtitleSerial || this.state.videoPath !== videoPath) {
+        if (this.disposed || this.isEncoding || serial !== this.subtitleSerial || this.state.videoPath !== videoPath) {
           return false;
         }
         if (typeof content === 'string') {
@@ -4462,6 +4598,7 @@ export class HardsubController {
     this.isCompanionSubtitle = false;
     this.state.subtitlePath = '';
     this.lastExportedPath = null;
+    this.lastStatusPayload = null;
     if (this.subtitlePathInput) this.subtitlePathInput.value = '';
     this.subtitleCues = [];
     this.maxCueDuration = 0;
@@ -4615,23 +4752,27 @@ export class HardsubController {
 
     const activeAlignment = alignmentOverride ?? this.state.alignment;
 
+    const allCuesText = this.subtitleCues.length > 0
+      ? this.subtitleCues.map((c) => c.text).join(' ')
+      : text;
+    const effectiveFont = resolveEffectiveFont(this.state.fontName, allCuesText);
+
     const wrappedLines: TextSpan[][] = [];
     for (const parsed of parsedLines) {
-      const lineWrapped = wrapSpans(parsed.spans, maxTextWidth, ctx, this.state.fontName, renderedFontSize);
+      const lineWrapped = wrapSpans(parsed.spans, maxTextWidth, ctx, effectiveFont, renderedFontSize);
       wrappedLines.push(...lineWrapped);
     }
 
     // --- Compute alignment-based position (ASS numpad alignment) ---
     let anchorX: number; // horizontal anchor
-    let anchorY: number; // Y of the BOTTOM line's baseline
 
     const isTop = [7, 8, 9].includes(activeAlignment);
     const isMiddle = [4, 5, 6].includes(activeAlignment);
     const isLeft = [1, 4, 7].includes(activeAlignment);
     const isRight = [3, 6, 9].includes(activeAlignment);
-    const isCenter = [2, 5, 8].includes(activeAlignment);
 
     const textAlignmentStr = isLeft ? 'left' : isRight ? 'right' : 'center';
+    const verticalAlign: 'top' | 'middle' | 'bottom' = isTop ? 'top' : isMiddle ? 'middle' : 'bottom';
 
     // Horizontal alignment
     if (isLeft) {
@@ -4642,37 +4783,27 @@ export class HardsubController {
       anchorX = canvasW / 2;
     }
 
-    // Vertical position (7,8,9 = Top; 4,5,6 = Middle; 1,2,3 = Bottom)
-    if (isTop) {
-      anchorY = renderedMarginV + renderedFontSize;
-    } else if (isMiddle) {
-      anchorY = canvasH / 2;
-    } else {
-      anchorY = canvasH - renderedMarginV;
-    }
-
     // --- Draw one background around the entire caption block ---
-    const lineMetrics = wrappedLines.map((line) => measureSpansWidth(ctx, line, this.state.fontName, renderedFontSize));
+    const lineMetrics = wrappedLines.map((line) => measureSpansWidth(ctx, line, effectiveFont, renderedFontSize));
     const maxLineWidth = Math.max(...lineMetrics, 0);
     const totalFontHeight = renderedFontSize / this.fontMetrics.scale;
     const textAscent = totalFontHeight * this.fontMetrics.ascentRatio;
     const textDescent = totalFontHeight * this.fontMetrics.descentRatio;
 
-    const firstBaselineY = isTop
-      ? anchorY - textAscent
-      : isMiddle
-        ? anchorY - ((wrappedLines.length - 1) * lineHeight) / 2
-        : anchorY - ((wrappedLines.length - 1) * lineHeight) / 2;
-    const lastBaselineY = isTop
-      ? anchorY + ((wrappedLines.length - 1) * lineHeight) - textAscent
-      : isMiddle
-        ? anchorY + ((wrappedLines.length - 1) * lineHeight) / 2
-        : anchorY + ((wrappedLines.length - 1) * lineHeight) / 2;
+    const lineLayout = calculateSubtitleLineLayout({
+      lineCount: wrappedLines.length,
+      lineHeight,
+      verticalAlign,
+      marginV: renderedMarginV,
+      canvasHeight: canvasH,
+      textAscent,
+      textDescent,
+    });
 
     if (this.state.bgBox && maxLineWidth > 0) {
       const box = calculateSubtitleBoxGeometry({
-        firstBaselineY,
-        lastBaselineY,
+        firstBaselineY: lineLayout.firstBaselineY,
+        lastBaselineY: lineLayout.lastBaselineY,
         maxLineWidth,
         fontSize: renderedFontSize,
         anchorX,
@@ -4697,18 +4828,10 @@ export class HardsubController {
 
     for (let i = 0; i < wrappedLines.length; i++) {
       const lineSpans = wrappedLines[i];
-      let y: number;
-
-      if (isTop) {
-        y = anchorY + (i * lineHeight) - textAscent;
-      } else if (isMiddle) {
-        y = anchorY - ((wrappedLines.length - 1) * lineHeight) / 2 + (i * lineHeight);
-      } else {
-        y = anchorY - ((wrappedLines.length - 1) * lineHeight) / 2 + (i * lineHeight);
-      }
+      const y = lineLayout.baselineYs[i];
 
       // Calculate startX for this line based on alignment and width
-      const lineWidths = measureSpanWidths(ctx, lineSpans, this.state.fontName, renderedFontSize);
+      const lineWidths = measureSpanWidths(ctx, lineSpans, effectiveFont, renderedFontSize);
       const totalLineWidth = lineWidths.reduce((total, width) => total + width, 0);
       let startX: number;
       if (textAlignmentStr === 'left') {
@@ -4730,9 +4853,9 @@ export class HardsubController {
 
       ctx.textAlign = 'left';
 
-      for (let i = 0; i < lineSpans.length; i++) {
-        const span = lineSpans[i];
-        setSpanFont(ctx, this.state.fontName, renderedFontSize, span.bold, span.italic);
+      for (let sIdx = 0; sIdx < lineSpans.length; sIdx++) {
+        const span = lineSpans[sIdx];
+        setSpanFont(ctx, effectiveFont, renderedFontSize, span.bold, span.italic);
 
         // Let the run's own content pick the base direction instead of inheriting the
         // interface direction, then hint the same direction to the renderer.
@@ -4740,7 +4863,7 @@ export class HardsubController {
         ctx.direction = spanDirection;
         const formattedSpan = protectRtlPunctuation(span.text, spanDirection);
         const spanText = spanDirection === 'rtl' ? `\u202B${formattedSpan}\u202C` : span.text;
-        const x = spanX[i];
+        const x = spanX[sIdx];
 
         // --- Outline (matching ASS Outline with contour expansion) ---
         if (renderedOutline > 0) {
@@ -4759,7 +4882,7 @@ export class HardsubController {
 
         // --- Draw underline if requested ---
         if (span.underline) {
-          drawUnderline(ctx, lineWidths[i], renderedFontSize, x, y, span.color);
+          drawUnderline(ctx, lineWidths[sIdx], renderedFontSize, x, y, span.color);
         }
       }
     }
@@ -4846,6 +4969,12 @@ export class HardsubController {
     }
     if (this.btnResetDir) {
       this.btnResetDir.disabled = active;
+    }
+    if (this.btnBrowseVideo) {
+      this.btnBrowseVideo.disabled = active;
+    }
+    if (this.btnBrowseSub) {
+      this.btnBrowseSub.disabled = active;
     }
     if (this.btnClearVideo) {
       this.btnClearVideo.disabled = active;
@@ -4999,7 +5128,6 @@ export class HardsubController {
       const totalFontHeight = this.state.fontSize / this.fontMetrics.scale;
       const textAscent = totalFontHeight * this.fontMetrics.ascentRatio;
       const textDescent = totalFontHeight * this.fontMetrics.descentRatio;
-      const padding = 6 * scaleFactor;
 
       this.subtitleCues.forEach((cue) => {
         const startStr = msToAssTime(cue.startMs);
@@ -5025,6 +5153,7 @@ export class HardsubController {
         const cueIsMiddleAss = [4, 5, 6].includes(activeAlignment);
         const cueIsLeftAss = [1, 4, 7].includes(activeAlignment);
         const cueIsRightAss = [3, 6, 9].includes(activeAlignment);
+        const verticalAlign: 'top' | 'middle' | 'bottom' = cueIsTopAss ? 'top' : cueIsMiddleAss ? 'middle' : 'bottom';
 
         // Wrap spans to fit within maxTextWidth
         const wrappedLines: TextSpan[][] = [];
@@ -5045,30 +5174,21 @@ export class HardsubController {
           X = PLAY_RES_X / 2;
         }
 
-        let Y = 0;
-        if (cueIsTopAss) {
-          Y = this.state.positionY * scaleFactor;
-        } else if (cueIsMiddleAss) {
-          Y = PLAY_RES_Y / 2;
-        } else {
-          Y = PLAY_RES_Y - (this.state.positionY * scaleFactor);
-        }
-
-        const anchorY = cueIsTopAss ? Y + this.state.fontSize : Y;
-
-        const firstBaselineY = cueIsTopAss
-          ? anchorY - textAscent
-          : anchorY - ((wrappedLines.length - 1) * lineHeight) / 2;
-
-        const lastBaselineY = cueIsTopAss
-          ? anchorY + ((wrappedLines.length - 1) * lineHeight) - textAscent
-          : anchorY + ((wrappedLines.length - 1) * lineHeight) / 2;
+        const lineLayout = calculateSubtitleLineLayout({
+          lineCount: wrappedLines.length,
+          lineHeight,
+          verticalAlign,
+          marginV: this.state.positionY * scaleFactor,
+          canvasHeight: PLAY_RES_Y,
+          textAscent,
+          textDescent,
+        });
 
         if (this.state.bgBox && maxLineWidth > 0) {
           const alignmentStr = cueIsLeftAss ? 'left' : cueIsRightAss ? 'right' : 'center';
           const box = calculateSubtitleBoxGeometry({
-            firstBaselineY,
-            lastBaselineY,
+            firstBaselineY: lineLayout.firstBaselineY,
+            lastBaselineY: lineLayout.lastBaselineY,
             maxLineWidth,
             fontSize: this.state.fontSize,
             anchorX: X,
@@ -5093,12 +5213,7 @@ export class HardsubController {
         }
 
         wrappedLines.forEach((lineSpans, index) => {
-          let lineBaselineY = 0;
-          if (cueIsTopAss) {
-            lineBaselineY = anchorY + index * lineHeight - textAscent;
-          } else {
-            lineBaselineY = anchorY - ((wrappedLines.length - 1) * lineHeight) / 2 + index * lineHeight;
-          }
+          const lineBaselineY = lineLayout.baselineYs[index];
           const lineY = lineBaselineY - textAscent;
           let dialogueAlignment = 8;
           if (cueIsLeftAss) {
@@ -5138,7 +5253,9 @@ export class HardsubController {
             const cTag = `\\c&H${assColor}&`;
 
             const spanDirection = firstStrongDirection(span.text) ?? lineDirection;
-            const formattedText = protectRtlPunctuation(span.text, spanDirection);
+            const formattedText = protectRtlPunctuation(span.text, spanDirection)
+              .replace(/\{/g, '\\{')
+              .replace(/\}/g, '\\}');
             assLineText += `{${bTag}${iTag}${uTag}${cTag}}${formattedText}`;
           }
 
@@ -5302,8 +5419,10 @@ ${events}`;
       if (this.subtitleCues.length > 0) {
         try {
           const assContent = this.generateAssContent();
+          const lastSlash = Math.max(originalVideoPath.lastIndexOf('/'), originalVideoPath.lastIndexOf('\\'));
           const lastDot = originalVideoPath.lastIndexOf('.');
-          const primaryTempAssPath = (lastDot > 0 ? originalVideoPath.substring(0, lastDot) : originalVideoPath) + '.temp.ass';
+          const primaryBase = lastDot > lastSlash ? originalVideoPath.substring(0, lastDot) : originalVideoPath;
+          const primaryTempAssPath = `${primaryBase}.temp.ass`;
           let writtenTempAssPath: string | null = null;
           try {
             await invoke('write_text_file_content', {
@@ -5313,8 +5432,10 @@ ${events}`;
             writtenTempAssPath = primaryTempAssPath;
           } catch (writeErr) {
             if (this.state.outputPath && this.state.outputPath !== originalVideoPath) {
+              const outSlash = Math.max(this.state.outputPath.lastIndexOf('/'), this.state.outputPath.lastIndexOf('\\'));
               const outDot = this.state.outputPath.lastIndexOf('.');
-              const fallbackTempAssPath = (outDot > 0 ? this.state.outputPath.substring(0, outDot) : this.state.outputPath) + '.temp.ass';
+              const fallbackBase = outDot > outSlash ? this.state.outputPath.substring(0, outDot) : this.state.outputPath;
+              const fallbackTempAssPath = `${fallbackBase}.temp.ass`;
               await invoke('write_text_file_content', {
                 filePath: fallbackTempAssPath,
                 content: assContent,
@@ -5383,7 +5504,36 @@ ${events}`;
     }
   }
 
-  private formatHardsubErrorMessage(e: any): string {
+  private formatHardsubErrorMessage(e: unknown): string {
+    if (e instanceof Error) {
+      return e.message || t('hardsub.statusEncodingFailed');
+    }
+    if (e && typeof e === 'object') {
+      const errObj = e as { detail?: unknown; message?: unknown; code?: unknown };
+      if (typeof errObj.detail === 'string' && errObj.detail.trim()) {
+        return errObj.detail.trim();
+      }
+      if (typeof errObj.message === 'string' && errObj.message.trim()) {
+        return errObj.message.trim();
+      }
+      if (typeof errObj.code === 'string' && errObj.code.trim()) {
+        if (errObj.code === 'tools_unavailable' || errObj.code === 'encoder_unavailable') {
+          return t('hardsub.previewToolsUnavailable');
+        }
+        if (errObj.code === 'source_missing' || errObj.code === 'source_invalid' || errObj.code === 'probe_failed') {
+          return t('hardsub.errCorruptInput');
+        }
+        return errObj.code;
+      }
+      try {
+        const serialized = JSON.stringify(e);
+        if (serialized && serialized !== '{}') {
+          return serialized;
+        }
+      } catch {
+        // Ignore unserializable objects
+      }
+    }
     const raw = String(e || '').trim();
     try {
       const payload = JSON.parse(raw);

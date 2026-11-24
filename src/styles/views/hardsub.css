@@ -945,6 +945,11 @@ html:not([dir="rtl"]) #hardsub-search-input[dir="rtl"],
   box-shadow: 0 0 8px rgba(255, 255, 255, 0.15);
 }
 
+.color-picker-wrapper:has(:focus-visible) {
+  outline: 2px solid var(--accent-primary, #3b82f6);
+  outline-offset: 2px;
+}
+
 .control-disabled {
   opacity: 0.35 !important;
   pointer-events: none !important;
@@ -967,6 +972,11 @@ html:not([dir="rtl"]) #hardsub-search-input[dir="rtl"],
   transform: scale(1.3);
   border-color: #ffffff;
   box-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+}
+
+.color-preset-dot:focus-visible {
+  outline: 2px solid var(--accent-primary, #3b82f6);
+  outline-offset: 2px;
 }
 
 .swatch-card:hover {

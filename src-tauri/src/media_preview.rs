@@ -79,6 +79,7 @@ struct PreviewProgress {
 pub(crate) struct ProbedSource {
     pub source: SourceInfo,
     pub rotation_degrees: i32,
+    pub rotation_from_tag: bool,
     video_codec: String,
     profile: String,
     pixel_format: String,
@@ -404,8 +405,12 @@ fn parse_probe(bytes: &[u8]) -> Result<ProbedSource> {
     let width = uint(&video["width"]);
     let height = uint(&video["height"]);
     let sar = rational(&video["sample_aspect_ratio"]).unwrap_or(1.0);
-    let rotation = video["side_data_list"].as_array().and_then(|side| side.iter().find_map(|s| number(&s["rotation"])))
-        .or_else(|| number(&video["tags"]["rotate"])).unwrap_or(0.0);
+    let side_data_rotation = video["side_data_list"]
+        .as_array()
+        .and_then(|side| side.iter().find_map(|s| number(&s["rotation"])));
+    let tag_rotation = number(&video["tags"]["rotate"]).or_else(|| number(&video["tags"]["ROTATE"]));
+    let rotation = side_data_rotation.or(tag_rotation).unwrap_or(0.0);
+    let rotation_from_tag = side_data_rotation.is_none() && tag_rotation.is_some();
     let rotation_degrees = (rotation.round() as i32).rem_euclid(360);
     let angle = rotation.to_radians();
     let display_width = (width as f64 * sar * angle.cos().abs() + height as f64 * angle.sin().abs()).max(1.0);
@@ -427,7 +432,7 @@ fn parse_probe(bytes: &[u8]) -> Result<ProbedSource> {
     let audio_value = audio.unwrap_or(&empty);
     Ok(ProbedSource {
         source: SourceInfo { width, height, display_width, display_height, duration_sec, video_stream_index: uint(&video["index"]), audio_stream_index: audio.map(|s| uint(&s["index"])), start_time_sec },
-        rotation_degrees, video_codec: text(&video["codec_name"]), profile: text(&video["profile"]), pixel_format: text(&video["pix_fmt"]), level: uint(&video["level"]),
+        rotation_degrees, rotation_from_tag, video_codec: text(&video["codec_name"]), profile: text(&video["profile"]), pixel_format: text(&video["pix_fmt"]), level: uint(&video["level"]),
         transfer: text(&video["color_transfer"]), field_order: text(&video["field_order"]),
         frame_rate: rational(&video["avg_frame_rate"]).or_else(|| rational(&video["r_frame_rate"])),
         audio_codec: text(&audio_value["codec_name"]), audio_profile: text(&audio_value["profile"]), audio_channels: uint(&audio_value["channels"]), audio_sample_rate: uint(&audio_value["sample_rate"]),
@@ -689,6 +694,14 @@ fn conversion_arguments(input: &Path, output: &Path, stage: Stage, source: &Prob
         let width = ((s.display_width * factor / 2.0).floor() as u32 * 2).max(2);
         let height = ((s.display_height * factor / 2.0).floor() as u32 * 2).max(2);
         let mut filters = Vec::new();
+        if source.rotation_from_tag {
+            match source.rotation_degrees {
+                90 => filters.push("transpose=1".to_owned()),
+                180 => filters.push("transpose=1,transpose=1".to_owned()),
+                270 => filters.push("transpose=2".to_owned()),
+                _ => {}
+            }
+        }
         if !matches!(source.field_order.as_str(), "progressive" | "unknown" | "") { filters.push("bwdif=mode=send_frame:parity=auto:deint=interlaced".to_owned()); }
         if is_hdr(source) { filters.push("zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv".into()); }
         filters.push(format!("scale={width}:{height},setsar=1,format=yuv420p"));
@@ -761,6 +774,12 @@ mod tests {
         assert!((probe.source.display_width - 576.0).abs() < 0.001);
         assert!((probe.source.display_height - 768.0).abs() < 0.001);
         assert_eq!(probe.rotation_degrees, 90);
+        assert!(!probe.rotation_from_tag);
+        let tag_only = parse_probe(&serde_json::to_vec(&json!({"streams":[
+            {"index":0,"codec_type":"video","width":320,"height":240,"tags":{"ROTATE":"90"}}
+        ]})).unwrap()).unwrap();
+        assert_eq!(tag_only.rotation_degrees, 90);
+        assert!(tag_only.rotation_from_tag);
         assert_eq!(probe.source.duration_sec, None);
         assert_eq!(probe.source.start_time_sec, 1.25);
         assert_eq!(parse_probe(b"broken").unwrap_err().code, PreviewErrorCode::ProbeFailed);

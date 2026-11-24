@@ -256,7 +256,7 @@ fn read_font_metrics(path: &Path) -> Option<(u16, u32, u32)> {
         if win_ascent + win_descent != 0 {
             Some((win_ascent as u32, win_descent as u32))
         } else if fs_selection & 0x80 != 0 {
-            Some((typo_ascender as u32, typo_descender.unsigned_abs() as u32))
+            Some((typo_ascender.max(0) as u32, typo_descender.unsigned_abs() as u32))
         } else {
             None
         }
@@ -271,18 +271,18 @@ fn read_font_metrics(path: &Path) -> Option<(u16, u32, u32)> {
             }
             let ascender = read_i16(data, o + 4)?;
             let descender = read_i16(data, o + 6)?;
-            Some((ascender as u32, descender.unsigned_abs() as u32))
+            Some((ascender.max(0) as u32, descender.unsigned_abs() as u32))
         });
         if let Some(m) = hhea_metrics {
             m
         } else {
             let bbox_metrics = find_table(b"head").and_then(|(o, l)| {
-                if l < 42 {
+                if l < 44 {
                     return None;
                 }
                 let y_min = read_i16(data, o + 38)?;
                 let y_max = read_i16(data, o + 42)?;
-                Some((y_max as u32, y_min.unsigned_abs() as u32))
+                Some((y_max.max(0) as u32, y_min.unsigned_abs() as u32))
             });
             bbox_metrics?
         }
@@ -1081,6 +1081,9 @@ pub struct HardsubStreamInfo {
     pub video_stream_index: u32,
     pub audio_stream_index: Option<u32>,
     pub normalized_rotation: u32,
+    /// True when rotation came solely from legacy metadata tags (`rotate`/`ROTATE`)
+    /// rather than `Display Matrix` side data (which FFmpeg autorotates automatically).
+    pub rotation_from_tag: bool,
     /// Effective video display width after applying rotation normalization
     pub video_width: u32,
     /// Effective video display height after applying rotation normalization
@@ -1109,9 +1112,9 @@ pub fn build_hardsub_ffmpeg_args(
         }
     }
 
-    // Disable FFmpeg auto-rotation so that we can rotate manually at the start of the filtergraph.
-    // This ensures libass renders subtitles on the rotated vertical frame at the correct aspect ratio.
-    ffmpeg_args.push("-noautorotate".to_string());
+    // Let FFmpeg autorotate natively before applying the video filtergraph so
+    // Display Matrix side-data and rotation tags are oriented accurately and
+    // cleared from output streams without double-rotation.
     ffmpeg_args.push("-y".to_string());
     ffmpeg_args.push("-i".to_string());
     ffmpeg_args.push(settings.video_path.clone());
@@ -1127,12 +1130,15 @@ pub fn build_hardsub_ffmpeg_args(
 
     // 2. Video Filter
     let mut vf_filters = Vec::new();
-    if stream_info.normalized_rotation == 90 {
-        vf_filters.push("transpose=1".to_string());
-    } else if stream_info.normalized_rotation == 180 {
-        vf_filters.push("transpose=1,transpose=1".to_string());
-    } else if stream_info.normalized_rotation == 270 {
-        vf_filters.push("transpose=2".to_string());
+    // FFmpeg autorotate handles Display Matrix side data natively, but ignores legacy
+    // metadata-only `rotate`/`ROTATE` tags — transpose those explicitly first.
+    if stream_info.rotation_from_tag {
+        match stream_info.normalized_rotation {
+            90 => vf_filters.push("transpose=1".to_string()),
+            180 => vf_filters.push("transpose=1,transpose=1".to_string()),
+            270 => vf_filters.push("transpose=2".to_string()),
+            _ => {}
+        }
     }
     vf_filters.push(sub_filter.to_string());
 
@@ -1151,11 +1157,10 @@ pub fn build_hardsub_ffmpeg_args(
     ffmpeg_args.push("-vf".to_string());
     ffmpeg_args.push(vf_arg);
 
-    // After a manual transpose, clear the source rotation metadata: mp4 muxers
-    // drop it, but matroska copies the ROTATE tag into the output, which would
-    // rotate the already-transposed video a second time in players.
+    // Clear legacy rotate tags on rotated sources (e.g. Matroska ROTATE tags)
+    // so downstream players do not re-apply rotation after encoding.
     if stream_info.normalized_rotation != 0 {
-        ffmpeg_args.push("-metadata:s:v".to_string());
+        ffmpeg_args.push("-metadata:s:v:0".to_string());
         ffmpeg_args.push("rotate=0".to_string());
     }
 
@@ -1347,8 +1352,19 @@ mod tests {
         // Path with special characters
         assert_eq!(
             escape_ffmpeg_filter_path(r"C:\My [Videos] & Movies, Part 1\sub's.srt"),
-            "C\\:/My \\[Videos\\] & Movies\\, Part 1/sub'\\''s.srt"
+            r"C\:/My \[Videos\] & Movies\, Part 1/sub\'\''s.srt"
         );
+    }
+
+    #[test]
+    fn test_parse_ffmpeg_progress_time() {
+        assert_eq!(parse_ffmpeg_progress_time("out_time_us", "400000"), Some(0.4));
+        assert_eq!(parse_ffmpeg_progress_time("out_time_us", "1520000"), Some(1.52));
+        assert_eq!(parse_ffmpeg_progress_time("out_time_us", "-1500000"), None);
+        assert_eq!(parse_ffmpeg_progress_time("out_time_ms", "400000"), None);
+        assert_eq!(parse_ffmpeg_progress_time("out_time", "00:01:02.500"), Some(62.5));
+        assert_eq!(parse_ffmpeg_progress_time("out_time", "-00:00:01.500"), None);
+        assert_eq!(parse_ffmpeg_progress_time("out_time_us", "N/A"), None);
     }
 
     #[test]
@@ -1698,6 +1714,7 @@ mod tests {
             video_stream_index: 0,
             audio_stream_index: Some(1),
             normalized_rotation: 0,
+            rotation_from_tag: false,
             video_width: 1920,
             video_height: 1080,
         };
@@ -1711,7 +1728,7 @@ mod tests {
         assert_eq!(args[0], "-nostdin");
         assert_eq!(args[1], "-progress");
         assert_eq!(args[2], "pipe:1");
-        assert!(args.contains(&"-noautorotate".to_string()));
+        assert!(!args.contains(&"-noautorotate".to_string()));
         assert!(args.contains(&"-y".to_string()));
         assert!(args.contains(&"-i".to_string()));
         assert!(args.contains(&"input.mp4".to_string()));
@@ -1733,8 +1750,9 @@ mod tests {
             video_stream_index: 0,
             audio_stream_index: Some(1),
             normalized_rotation: 90,
-            video_width: 1920,
-            video_height: 1080,
+            rotation_from_tag: false,
+            video_width: 1080,
+            video_height: 1920,
         };
         let args = build_hardsub_ffmpeg_args(
             &settings,
@@ -1745,8 +1763,9 @@ mod tests {
 
         let vf_idx = args.iter().position(|a| a == "-vf").expect("must have -vf");
         let vf_val = &args[vf_idx + 1];
-        assert!(vf_val.starts_with("transpose=1,subtitles='sub.srt',scale="));
-        assert!(args.contains(&"-metadata:s:v".to_string()));
+        assert_eq!(vf_val, "subtitles='sub.srt',scale=-2:1280:flags=bicubic");
+        assert!(!args.contains(&"-noautorotate".to_string()));
+        assert!(args.contains(&"-metadata:s:v:0".to_string()));
         assert!(args.contains(&"rotate=0".to_string()));
     }
 
@@ -1760,6 +1779,7 @@ mod tests {
             video_stream_index: 0,
             audio_stream_index: Some(1),
             normalized_rotation: 0,
+            rotation_from_tag: false,
             video_width: 1920,
             video_height: 1080,
         };
@@ -1786,11 +1806,12 @@ mod tests {
     fn test_build_hardsub_ffmpeg_args_rotations_and_no_audio_stream() {
         let settings = dummy_hardsub_settings();
 
-        // 180 degree rotation without audio stream
+        // 180 degree Display Matrix rotation without audio stream
         let stream_info_180 = HardsubStreamInfo {
             video_stream_index: 0,
             audio_stream_index: None,
             normalized_rotation: 180,
+            rotation_from_tag: false,
             video_width: 1920,
             video_height: 1080,
         };
@@ -1801,14 +1822,17 @@ mod tests {
             None,
         );
         let vf_idx = args_180.iter().position(|a| a == "-vf").expect("must have -vf");
-        assert!(args_180[vf_idx + 1].starts_with("transpose=1,transpose=1,subtitles='sub.srt'"));
+        assert_eq!(args_180[vf_idx + 1], "subtitles='sub.srt'");
+        assert!(args_180.contains(&"-metadata:s:v:0".to_string()));
+        assert!(args_180.contains(&"rotate=0".to_string()));
         assert!(!args_180.contains(&"0:1".to_string()), "must not map audio when stream index is None");
 
-        // 270 degree rotation
+        // 270 degree Display Matrix rotation
         let stream_info_270 = HardsubStreamInfo {
             video_stream_index: 0,
             audio_stream_index: Some(2),
             normalized_rotation: 270,
+            rotation_from_tag: false,
             video_width: 1080,
             video_height: 1920,
         };
@@ -1819,8 +1843,26 @@ mod tests {
             None,
         );
         let vf_idx_270 = args_270.iter().position(|a| a == "-vf").expect("must have -vf");
-        assert!(args_270[vf_idx_270 + 1].starts_with("transpose=2,subtitles='sub.srt'"));
+        assert_eq!(args_270[vf_idx_270 + 1], "subtitles='sub.srt'");
         assert!(args_270.contains(&"0:2".to_string()));
+
+        // Legacy metadata-only tag rotation applies explicit transpose before subtitles
+        let stream_info_tag = HardsubStreamInfo {
+            video_stream_index: 0,
+            audio_stream_index: Some(1),
+            normalized_rotation: 90,
+            rotation_from_tag: true,
+            video_width: 1080,
+            video_height: 1920,
+        };
+        let args_tag = build_hardsub_ffmpeg_args(
+            &settings,
+            &stream_info_tag,
+            "subtitles='sub.srt'",
+            None,
+        );
+        let vf_idx_tag = args_tag.iter().position(|a| a == "-vf").expect("must have -vf");
+        assert_eq!(args_tag[vf_idx_tag + 1], "transpose=1,subtitles='sub.srt'");
     }
 
     #[test]
@@ -1832,6 +1874,7 @@ mod tests {
             video_stream_index: 0,
             audio_stream_index: Some(1),
             normalized_rotation: 0,
+            rotation_from_tag: false,
             video_width: 1920,
             video_height: 1080,
         };
@@ -1875,11 +1918,41 @@ fn escape_ffmpeg_filter_path(path: &str) -> String {
     clean
         .replace('\\', "/")
         .replace(':', "\\:")
-        .replace('\'', "'\\''")
+        .replace('\'', r"\'\''")
         .replace('[', "\\[")
         .replace(']', "\\]")
         .replace(',', "\\,")
         .replace(';', "\\;")
+}
+
+/// Parses FFmpeg `-progress pipe:1` time keys into seconds without magnitude guessing on `out_time_ms`.
+fn parse_ffmpeg_progress_time(key: &str, value: &str) -> Option<f64> {
+    if value.starts_with('-') {
+        return None;
+    }
+    match key {
+        "out_time_us" => value
+            .parse::<f64>()
+            .ok()
+            .map(|us| us / 1_000_000.0)
+            .filter(|sec| sec.is_finite() && *sec >= 0.0),
+        "out_time" => {
+            let parts: Vec<&str> = value.split(':').collect();
+            if parts.len() == 3 {
+                let h = parts[0].parse::<f64>().ok()?;
+                let m = parts[1].parse::<f64>().ok()?;
+                let s = parts[2].parse::<f64>().ok()?;
+                if h < 0.0 || m < 0.0 || s < 0.0 {
+                    return None;
+                }
+                let total = h * 3600.0 + m * 60.0 + s;
+                (total.is_finite() && total >= 0.0).then_some(total)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
 }
 
 /// Resolves a unique output path by appending (1), (2), etc. if the file already exists on disk
@@ -2128,6 +2201,7 @@ pub async fn run_hardsub_task(
         video_stream_index: source.video_stream_index,
         audio_stream_index: source.audio_stream_index,
         normalized_rotation,
+        rotation_from_tag: probed.rotation_from_tag,
         video_width,
         video_height,
     };
@@ -2224,18 +2298,6 @@ pub async fn run_hardsub_task(
     let mut last_emit_time = Instant::now() - std::time::Duration::from_secs(1);
     let mut last_emitted_percent: Option<u32> = None;
 
-    let parse_time_str = |time_str: &str| -> Option<f64> {
-        let parts: Vec<&str> = time_str.split(':').collect();
-        if parts.len() == 3 {
-            let h = parts[0].parse::<f64>().ok()?;
-            let m = parts[1].parse::<f64>().ok()?;
-            let s = parts[2].parse::<f64>().ok()?;
-            Some(h * 3600.0 + m * 60.0 + s)
-        } else {
-            None
-        }
-    };
-
     while !stdout_done || !stderr_done {
         if session.lock().map(|l| l.cancel_requested).unwrap_or(false) {
             let _ = child.kill().await;
@@ -2256,14 +2318,7 @@ pub async fn run_hardsub_task(
                             let k = k.trim();
                             let v = v.trim();
                             
-                            let parsed_sec: Option<f64> = match k {
-                                "out_time_us" => v.parse::<f64>().ok().map(|us| us / 1_000_000.0),
-                                "out_time_ms" => v.parse::<f64>().ok().map(|val| {
-                                    if val > 1_000_000.0 { val / 1_000_000.0 } else { val / 1000.0 }
-                                }),
-                                "out_time" => parse_time_str(v),
-                                _ => None,
-                            };
+                            let parsed_sec = parse_ffmpeg_progress_time(k, v);
 
                             if let Some(current_sec) = parsed_sec {
                                 if total_duration_sec > 0.0 {

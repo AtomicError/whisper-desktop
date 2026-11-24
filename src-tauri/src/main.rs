@@ -604,7 +604,7 @@ async fn verify_directory_writable(dir_path: String) -> Result<(), String> {
 #[tauri::command]
 fn read_text_file_content(file_path: String) -> Result<String, String> {
     let path = std::path::Path::new(&file_path);
-    let allowed_exts = ["txt", "srt", "vtt", "lrc", "ass", "ssa", "csv", "tsv"];
+    let allowed_exts = ["txt", "srt", "vtt", "lrc", "ass", "ssa", "sub", "csv", "tsv"];
     let ext = path
         .extension()
         .and_then(|e| e.to_str())
@@ -1786,6 +1786,12 @@ mod main_tests {
         let read_back = read_text_file_content(srt_str)
             .expect("Reading uppercase .SRT extension should succeed");
         assert_eq!(read_back, "Updated atomic content");
+
+        let sub_path = temp_dir.join("legacy.sub");
+        std::fs::write(&sub_path, "{1}{1}25\n{25}{75}Test").unwrap();
+        let sub_read = read_text_file_content(sub_path.to_string_lossy().to_string())
+            .expect("Reading .sub subtitle extension should succeed");
+        assert!(sub_read.contains("Test"));
 
         let disallowed_path = temp_dir.join("script.exe").to_string_lossy().to_string();
         assert!(write_text_file_content(disallowed_path, "bad".to_string()).is_err());

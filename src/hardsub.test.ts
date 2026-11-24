@@ -6,6 +6,7 @@ let formatHardsubStatusFn: typeof import('./hardsub').formatHardsubStatus;
 let getParentDirFn: typeof import('./hardsub').getParentDir;
 let joinPathFn: typeof import('./hardsub').joinPath;
 let findCueAtTimeBinaryFn: typeof import('./hardsub').findCueAtTimeBinary;
+let parseSubtitleContentFn: typeof import('./hardsub').parseSubtitleContent;
 const controllers: HardsubController[] = [];
 
 class ClassList {
@@ -23,11 +24,15 @@ class ClassList {
 
 class Control extends EventTarget {
   id = '';
+  tagName = '';
+  className = '';
+  isFragment = false;
   value = '0';
   disabled = false;
   textContent = '';
   title = '';
   style: Record<string, string> = {};
+  dataset: Record<string, string> = {};
   classList = new ClassList();
   children: Control[] = [];
   selectedIndex = 0;
@@ -40,7 +45,15 @@ class Control extends EventTarget {
   contains(_node: unknown): boolean { return false; }
   matches(_selector: string): boolean { return false; }
   removeAttribute(name: string) { this.attributes.delete(name); }
-  appendChild(child: Control) { this.children.push(child); return child; }
+  appendChild(child: Control) {
+    if (child.isFragment) {
+      this.children.push(...child.children);
+      child.children = [];
+    } else {
+      this.children.push(child);
+    }
+    return child;
+  }
   private _html = '';
   get innerHTML() { return this._html; }
   set innerHTML(v: string) { this._html = v; this.children = []; }
@@ -54,6 +67,9 @@ class Control extends EventTarget {
       return this.children.find(c => c.value === match[1]) ?? null;
     }
     return null;
+  }
+  querySelectorAll(_selector: string): Control[] {
+    return [];
   }
 }
 class Media extends Control {
@@ -103,8 +119,9 @@ class DocumentBoundary extends EventTarget {
   getElementById = (id: string) => this.elements.get(id) ?? null;
   querySelectorAll = () => [];
   fonts = { load: async () => [] };
-  createElement = (_tag: string) => {
+  createElement = (tag: string) => {
     const c = new Control();
+    c.tagName = tag.toUpperCase();
     (c as any).getContext = () => ({
       measureText: (text: string) => ({ width: text.length * 10 }),
       save: () => {},
@@ -113,6 +130,11 @@ class DocumentBoundary extends EventTarget {
       font: '',
     });
     return c;
+  };
+  createDocumentFragment = () => {
+    const frag = new Control();
+    frag.isFragment = true;
+    return frag;
   };
 }
 let doc: DocumentBoundary;
@@ -279,6 +301,7 @@ beforeAll(async () => {
   getParentDirFn = module.getParentDir;
   joinPathFn = module.joinPath;
   findCueAtTimeBinaryFn = module.findCueAtTimeBinary;
+  parseSubtitleContentFn = module.parseSubtitleContent;
   module.hardsubController.dispose();
 });
 beforeEach(() => {
@@ -1913,6 +1936,183 @@ describe('hardsub output directory management', () => {
       expect(volumeBtn.disabled).toBe(false);
       expect(volumeSlider.disabled).toBe(false);
       expect(fullscreenBtn.disabled).toBe(false);
+    });
+  });
+
+  describe('subtitle parsing, ASS layout safety, and encoding locks', () => {
+    it('parses MM:SS.mmm WebVTT timestamps with cue settings accurately', () => {
+      const vtt = [
+        'WEBVTT',
+        '',
+        '00:05.500 --> 00:08.200 align:start position:10%',
+        'First line',
+        '',
+        '01:02:03.450 --> 01:02:05.000',
+        'Second line',
+      ].join('\n');
+
+      const cues = parseSubtitleContentFn(vtt, 'vtt');
+      expect(cues).toHaveLength(2);
+      expect(cues[0].startMs).toBe(5500);
+      expect(cues[0].endMs).toBe(8200);
+      expect(cues[0].endTimeStr).toBe('00:08.200');
+      expect(cues[1].startMs).toBe(3723450);
+      expect(cues[1].endMs).toBe(3725000);
+    });
+
+    it('parses .ssa, .lrc, and .sub subtitle formats into cues', () => {
+      const ssa = '[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:01.00,0:00:03.50,Default,,0,0,0,,Hello\\NWorld';
+      const ssaCues = parseSubtitleContentFn(ssa, 'ssa');
+      expect(ssaCues).toHaveLength(1);
+      expect(ssaCues[0].startMs).toBe(1000);
+      expect(ssaCues[0].endMs).toBe(3500);
+      expect(ssaCues[0].text).toBe('Hello\nWorld');
+
+      const lrc = '[ti:Song]\n[00:02.50][00:10.00]Chorus\n[00:05.00]\n[00:12.00]Verse';
+      const lrcCues = parseSubtitleContentFn(lrc, 'lrc');
+      expect(lrcCues).toHaveLength(3);
+      expect(lrcCues[0].startMs).toBe(2500);
+      expect(lrcCues[0].endMs).toBe(5000);
+      expect(lrcCues[0].text).toBe('Chorus');
+      expect(lrcCues[1].startMs).toBe(10000);
+      expect(lrcCues[1].endMs).toBe(12000);
+      expect(lrcCues[2].startMs).toBe(12000);
+      expect(lrcCues[2].endMs).toBe(15000);
+
+      const microDvd = '{1}{1}25\n{25}{75}Line one|Line two';
+      const subCues = parseSubtitleContentFn(microDvd, 'sub');
+      expect(subCues).toHaveLength(1);
+      expect(subCues[0].startMs).toBe(1000);
+      expect(subCues[0].endMs).toBe(3000);
+      expect(subCues[0].text).toBe('Line one\nLine two');
+
+      const subViewer = '00:01:00.00,00:01:05.50\nFirst[br]Second';
+      const subViewerCues = parseSubtitleContentFn(subViewer, 'sub');
+      expect(subViewerCues).toHaveLength(1);
+      expect(subViewerCues[0].startMs).toBe(60000);
+      expect(subViewerCues[0].endMs).toBe(65500);
+      expect(subViewerCues[0].text).toBe('First\nSecond');
+    });
+
+    it('escapes literal braces in ASS output and keeps top/bottom lines inside frame bounds', () => {
+      const { internal } = fixture();
+      (internal as any).directSourceGeometry = { width: 1920, height: 1080 };
+      (internal as any).fontMetrics = { scale: 0.585, ascentRatio: 0.628, descentRatio: 0.372 };
+      internal.subtitleCues = [{ text: '{music} First line\nSecond line\nThird line', startMs: 0, endMs: 2000 }];
+
+      (internal.state as any).alignment = 2; // Bottom Center
+      (internal.state as any).positionY = 10;
+      const bottomAss = (internal as any).generateAssContent();
+      expect(bottomAss).toContain('\\{music\\}');
+      const bottomYMatches = [...bottomAss.matchAll(/\\pos\([^,]+,([-\d.]+)\)/g)].map(m => parseFloat(m[1]));
+      expect(bottomYMatches.length).toBe(3);
+      for (const y of bottomYMatches) {
+        expect(y).toBeGreaterThanOrEqual(0);
+        expect(y).toBeLessThan(288);
+      }
+
+      (internal.state as any).alignment = 8; // Top Center
+      (internal.state as any).positionY = 10;
+      const topAss = (internal as any).generateAssContent();
+      const topYMatches = [...topAss.matchAll(/\\pos\([^,]+,([-\d.]+)\)/g)].map(m => parseFloat(m[1]));
+      expect(topYMatches.length).toBe(3);
+      expect(topYMatches[0]).toBeGreaterThanOrEqual(10);
+    });
+
+    it('renders cue cards safely without raw innerHTML breakout on </textarea>', () => {
+      const { internal } = fixture();
+      const list = new Control();
+      (internal as any).subtitleListContainer = list;
+      internal.subtitleCues = [{
+        id: 1,
+        startMs: 0,
+        endMs: 1000,
+        startTimeStr: '00:00:00,000',
+        endTimeStr: '00:00:01,000',
+        text: 'Hello </textarea><img src=x onerror=alert(1)> &amp;',
+      } as any];
+
+      (internal as any).renderSubtitleCards();
+      expect(list.children).toHaveLength(1);
+      const card = list.children[0];
+      expect(card.innerHTML).toBe('');
+      const textarea = card.children[1];
+      expect(textarea.tagName).toBe('TEXTAREA');
+      expect(textarea.value).toBe('Hello </textarea><img src=x onerror=alert(1)> &amp;');
+    });
+
+    it('formats object errors like PreviewError cleanly instead of [object Object]', () => {
+      const { internal } = fixture();
+      const formatted = (internal as any).formatHardsubErrorMessage({
+        code: 'tools_unavailable',
+        detail: 'FFprobe binary not found',
+      });
+      expect(formatted).toBe('FFprobe binary not found');
+      expect(formatted).not.toContain('[object Object]');
+
+      const unknownObj = (internal as any).formatHardsubErrorMessage({ foo: 'bar' });
+      expect(unknownObj).toBe('{"foo":"bar"}');
+      expect(unknownObj).not.toContain('[object Object]');
+    });
+
+    it('locks browse buttons, prefillFilePaths, and loadSubtitleFile while encoding is active', async () => {
+      const { controller, internal } = fixture();
+      const browseVideo = new Control();
+      const browseSub = new Control();
+      doc.elements.set('btn-browse-video', browseVideo);
+      doc.elements.set('btn-browse-sub', browseSub);
+      (internal as any).btnBrowseVideo = browseVideo;
+      (internal as any).btnBrowseSub = browseSub;
+      (internal as any).setupEventListeners();
+
+      internal.state.videoPath = '/original.mp4';
+      internal.state.subtitlePath = '/original.srt';
+      internal.subtitleCues = [{ text: 'Original cue', startMs: 0, endMs: 1000 } as any];
+
+      internal.updateEncodingUIState(true);
+      expect(browseVideo.disabled).toBe(true);
+      expect(browseSub.disabled).toBe(true);
+
+      browseVideo.dispatchEvent(new Event('click'));
+      browseSub.dispatchEvent(new Event('click'));
+      expect(invoke).not.toHaveBeenCalledWith('select_file', expect.anything());
+      expect(invoke).not.toHaveBeenCalledWith('select_subtitle_file', expect.anything());
+
+      (internal as any).selectVideoSource('/replacement.mp4');
+      expect(internal.state.videoPath).toBe('/original.mp4');
+
+      controller.prefillFilePaths('/replacement.mp4', '/replacement.srt');
+      await (internal as any).loadSubtitleFile('/replacement.srt');
+      await flush();
+      expect(internal.state.videoPath).toBe('/original.mp4');
+      expect(internal.state.subtitlePath).toBe('/original.srt');
+      expect(internal.subtitleCues[0].text).toBe('Original cue');
+
+      internal.updateEncodingUIState(false);
+      expect(browseVideo.disabled).toBe(false);
+      expect(browseSub.disabled).toBe(false);
+    });
+
+    it('preserves quality hint icon span when updating slider hint text', () => {
+      const { internal } = fixture();
+      const hintBox = new Control();
+      const icon = new Control();
+      icon.tagName = 'svg';
+      const hintSpan = new Control();
+      hintSpan.tagName = 'SPAN';
+      hintBox.appendChild(icon);
+      hintBox.appendChild(hintSpan);
+      hintBox.querySelector = (sel: string) => sel === 'span' ? hintSpan : null;
+
+      const slider = new Control();
+      const label = new Control();
+      (internal as any).qualitySlider = slider;
+      (internal as any).qualityParamLabel = label;
+      (internal as any).qualityHint = hintBox;
+
+      (internal as any).updateQualitySliderConfig();
+      expect(hintBox.children).toContain(icon);
+      expect(hintSpan.textContent.length).toBeGreaterThan(0);
     });
   });
 });

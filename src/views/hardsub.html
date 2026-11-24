@@ -83,7 +83,7 @@
                             <span id="lbl-hardsub-fontsize" data-i18n="hardsub.fontSize">Font Size</span>
                             <div style="display: flex; align-items: center; gap: 6px;">
                               <span id="hardsub-fontsize-val" class="slider-val-badge">14px</span>
-                              <button class="reset-link-btn" id="reset-fontsize" title="Reset font size to 14px" style="display: none; padding: 2px;">
+                              <button class="reset-link-btn" id="reset-fontsize" type="button" aria-label="Reset font size to 14px" title="Reset font size to 14px" style="display: none; padding: 2px;">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:12px; height:12px; display:block;"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
                               </button>
                             </div>
@@ -100,14 +100,14 @@
                           <div style="display: flex; align-items: center; gap: 10px;">
                             <div class="color-picker-wrapper" title="Text Color">
                               <div id="hardsub-swatch-text" style="width:100%; height:100%; background: #FFFFFF;"></div>
-                              <input type="color" id="hardsub-color-text" value="#FFFFFF" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: none; padding: 0; margin: 0;" />
+                              <input type="color" id="hardsub-color-text" value="#FFFFFF" aria-label="Text Color" data-i18n-aria="hardsub.primaryColor" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: none; padding: 0; margin: 0;" />
                             </div>
                             <!-- Quick Presets -->
                             <div style="display: flex; gap: 5px;">
-                              <button class="color-preset-dot" data-target="text" data-color="#FFFFFF" style="background:#FFFFFF;" title="White"></button>
-                              <button class="color-preset-dot" data-target="text" data-color="#FFD700" style="background:#FFD700;" title="Yellow"></button>
-                              <button class="color-preset-dot" data-target="text" data-color="#2D7FFF" style="background:#2D7FFF;" title="Royal Blue"></button>
-                              <button class="color-preset-dot" data-target="text" data-color="#FF3B30" style="background:#FF3B30;" title="Red"></button>
+                              <button class="color-preset-dot" type="button" data-target="text" data-color="#FFFFFF" style="background:#FFFFFF;" title="White" aria-label="White"></button>
+                              <button class="color-preset-dot" type="button" data-target="text" data-color="#FFD700" style="background:#FFD700;" title="Yellow" aria-label="Yellow"></button>
+                              <button class="color-preset-dot" type="button" data-target="text" data-color="#2D7FFF" style="background:#2D7FFF;" title="Royal Blue" aria-label="Royal Blue"></button>
+                              <button class="color-preset-dot" type="button" data-target="text" data-color="#FF3B30" style="background:#FF3B30;" title="Red" aria-label="Red"></button>
                             </div>
                           </div>
                         </div>
@@ -129,7 +129,7 @@
                           <span id="lbl-hardsub-outline" style="font-weight: 500; color: var(--color-text-main);" data-i18n="hardsub.textOutlineStroke">Text Outline Stroke</span>
                           <div style="display: flex; align-items: center; gap: 6px;">
                             <span id="hardsub-outline-val" class="slider-val-badge">2px</span>
-                            <button class="reset-link-btn" id="reset-outline" title="Reset outline size to 2px" style="display: none; padding: 2px;">
+                            <button class="reset-link-btn" id="reset-outline" type="button" aria-label="Reset outline size to 2px" title="Reset outline size to 2px" style="display: none; padding: 2px;">
                               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:12px; height:12px; display:block;"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
                             </button>
                           </div>
@@ -137,7 +137,7 @@
                         <div style="display: flex; align-items: center; gap: 12px;">
                           <div id="hardsub-outline-picker-wrapper" class="color-picker-wrapper" title="Outline Color">
                             <div id="hardsub-swatch-outline" style="width:100%; height:100%; background: #000000;"></div>
-                            <input type="color" id="hardsub-color-outline" value="#000000" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: none; padding: 0; margin: 0;" />
+                            <input type="color" id="hardsub-color-outline" value="#000000" aria-label="Outline Color" data-i18n-aria="hardsub.outlineColor" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: none; padding: 0; margin: 0;" />
                           </div>
                           <input type="range" class="range-slider" id="hardsub-outline-size" min="0" max="8" value="2" aria-labelledby="lbl-hardsub-outline" style="flex:1;" />
                         </div>
@@ -157,13 +157,13 @@
                             <span id="hardsub-hex-bg" style="font-family: monospace; font-size: 0.78rem; color: var(--color-royal-blue); font-weight: 600;">#000000</span>
                             <div class="color-picker-wrapper" title="Box Fill Color">
                               <div id="hardsub-swatch-bg" style="width:100%; height:100%; background: #000000;"></div>
-                              <input type="color" id="hardsub-color-bg" value="#000000" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: none; padding: 0; margin: 0;" />
+                              <input type="color" id="hardsub-color-bg" value="#000000" aria-label="Box Fill Color" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: none; padding: 0; margin: 0;" />
                             </div>
                             <div style="display: flex; gap: 4px;">
-                              <button class="color-preset-dot" data-target="bg" data-color="#000000" style="background:#000000; border-color:rgba(255,255,255,0.4);" title="Black"></button>
-                              <button class="color-preset-dot" data-target="bg" data-color="#0B0E1B" style="background:#0B0E1B; border-color:rgba(255,255,255,0.4);" title="Dark Navy"></button>
-                              <button class="color-preset-dot" data-target="bg" data-color="#1E293B" style="background:#1E293B; border-color:rgba(255,255,255,0.4);" title="Slate"></button>
-                              <button class="color-preset-dot" data-target="bg" data-color="#2D7FFF" style="background:#2D7FFF;" title="Royal Blue"></button>
+                              <button class="color-preset-dot" type="button" data-target="bg" data-color="#000000" style="background:#000000; border-color:rgba(255,255,255,0.4);" title="Black" aria-label="Black"></button>
+                              <button class="color-preset-dot" type="button" data-target="bg" data-color="#0B0E1B" style="background:#0B0E1B; border-color:rgba(255,255,255,0.4);" title="Dark Navy" aria-label="Dark Navy"></button>
+                              <button class="color-preset-dot" type="button" data-target="bg" data-color="#1E293B" style="background:#1E293B; border-color:rgba(255,255,255,0.4);" title="Slate" aria-label="Slate"></button>
+                              <button class="color-preset-dot" type="button" data-target="bg" data-color="#2D7FFF" style="background:#2D7FFF;" title="Royal Blue" aria-label="Royal Blue"></button>
                             </div>
                           </div>
                         </div>
@@ -225,7 +225,7 @@
                           <span id="lbl-posy-title" title="Adjust subtitle vertical distance from edge" data-i18n="hardsub.vMarginOffset">Vertical Margin Offset</span>
                           <div style="display: flex; align-items: center; gap: 6px;">
                             <span id="hardsub-posy-val" class="slider-val-badge">30px</span>
-                            <button class="reset-link-btn" id="reset-posy" title="Reset vertical position to 30px" style="display: none; padding: 2px;">
+                            <button class="reset-link-btn" id="reset-posy" type="button" aria-label="Reset vertical position to 30px" title="Reset vertical position to 30px" style="display: none; padding: 2px;">
                               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:12px; height:12px; display:block;"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
                             </button>
                           </div>
@@ -439,7 +439,7 @@
 
                     <!-- 2. Primary Actions Row -->
                     <div class="hardsub-actions-bar">
-                      <button class="btn-primary btn-start-hardsub" id="btn-start-hardsub" disabled style="opacity: 0.5; cursor: not-allowed;" data-i18n-title="hardsub.selectVideoFirst" title="Please select a video file first.">
+                      <button class="btn-primary btn-start-hardsub" id="btn-start-hardsub" type="button" disabled style="opacity: 0.5; cursor: not-allowed;" data-i18n-title="hardsub.selectVideoFirst" title="Please select a video file first.">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="width: 18px; height: 18px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                         <span data-i18n="hardsub.exportHardsubVideo">Export Hardsub Video</span>
                       </button>
@@ -518,7 +518,7 @@
                           <p dir="auto" style="font-size:0.75rem; color:var(--color-text-muted); margin:0;" id="lbl-hardsub-video-path" data-i18n="hardsub.dropVideoPrompt">Drag & drop video (.mp4, .mkv, .mov)</p>
                         </div>
                         <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: center;">
-                          <button class="btn-secondary" id="btn-browse-video" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap;" data-i18n="hardsub.browseVideo" data-i18n-aria="hardsub.browseVideo" aria-label="Browse Video">Browse Video</button>
+                          <button class="btn-secondary" id="btn-browse-video" type="button" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap;" data-i18n="hardsub.browseVideo" data-i18n-aria="hardsub.browseVideo" aria-label="Browse Video">Browse Video</button>
                           <button class="btn-secondary btn-clear-sub" id="btn-clear-hardsub-video" type="button" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap; display: none;" data-i18n="hardsub.clearVideo" data-i18n-aria="hardsub.clearVideo" aria-label="Clear Video">Clear</button>
                         </div>
                         <input type="hidden" id="hardsub-video-path" />
@@ -536,7 +536,7 @@
                           <p dir="auto" style="font-size:0.75rem; color:var(--color-text-muted); margin:0;" id="lbl-hardsub-sub-path" data-i18n="hardsub.dropSubPrompt">Drag & drop subtitle (.srt, .vtt, .ass)</p>
                         </div>
                         <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: center;">
-                          <button class="btn-secondary" id="btn-browse-sub" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap;" data-i18n="hardsub.browseSub" data-i18n-aria="hardsub.browseSub" aria-label="Browse Subtitle">Browse Subtitle</button>
+                          <button class="btn-secondary" id="btn-browse-sub" type="button" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap;" data-i18n="hardsub.browseSub" data-i18n-aria="hardsub.browseSub" aria-label="Browse Subtitle">Browse Subtitle</button>
                           <button class="btn-secondary btn-clear-sub" id="btn-clear-hardsub-sub" type="button" style="padding:6px 12px; font-size: 0.82rem; white-space: nowrap; display: none;" data-i18n="hardsub.clearSub" data-i18n-aria="hardsub.clearSub" aria-label="Clear Subtitle">Clear</button>
                         </div>
                         <input type="hidden" id="hardsub-sub-path" />

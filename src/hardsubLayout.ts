@@ -102,6 +102,58 @@ export function protectRtlPunctuation(text: string, direction: 'rtl' | 'ltr'): s
   return res;
 }
 
+export interface SubtitleLineLayoutInput {
+  lineCount: number;
+  lineHeight: number;
+  verticalAlign: 'top' | 'middle' | 'bottom';
+  marginV: number;
+  canvasHeight: number;
+  textAscent: number;
+  textDescent: number;
+}
+
+export interface SubtitleLineLayout {
+  firstBaselineY: number;
+  lastBaselineY: number;
+  baselineYs: number[];
+}
+
+/**
+ * Computes baseline Y coordinates for each wrapped line of a subtitle cue so the
+ * Canvas preview and generated ASS script share identical vertical positioning.
+ *
+ * - Top (`7,8,9`): first line's visual top (`baseline - textAscent`) starts at `marginV`.
+ * - Middle (`4,5,6`): visual block midpoint (`[firstAscent..lastDescent]`) sits at `canvasHeight / 2`.
+ * - Bottom (`1,2,3`): last line's visual bottom (`baseline + textDescent`) rests at `canvasHeight - marginV`
+ *   and preceding lines stack upward.
+ */
+export function calculateSubtitleLineLayout(input: SubtitleLineLayoutInput): SubtitleLineLayout {
+  const count = Math.max(0, input.lineCount);
+  const span = Math.max(0, count - 1) * input.lineHeight;
+
+  let firstBaselineY: number;
+  if (input.verticalAlign === 'top') {
+    firstBaselineY = input.marginV + input.textAscent;
+  } else if (input.verticalAlign === 'middle') {
+    firstBaselineY = input.canvasHeight / 2 - span / 2 + (input.textAscent - input.textDescent) / 2;
+  } else {
+    const lastBaselineY = input.canvasHeight - input.marginV - input.textDescent;
+    firstBaselineY = lastBaselineY - span;
+  }
+
+  const baselineYs: number[] = [];
+  for (let i = 0; i < count; i++) {
+    baselineYs.push(firstBaselineY + i * input.lineHeight);
+  }
+  const lastBaselineY = count > 0 ? baselineYs[count - 1] : firstBaselineY;
+
+  return {
+    firstBaselineY,
+    lastBaselineY,
+    baselineYs,
+  };
+}
+
 export interface SubtitleBoxGeometry {
   boxX: number;
   boxY: number;

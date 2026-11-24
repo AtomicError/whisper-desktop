@@ -3,6 +3,7 @@ import {
   spanOrigins,
   assRunOrder,
   protectRtlPunctuation,
+  calculateSubtitleLineLayout,
   calculateSubtitleBoxGeometry,
   hasArabicScript,
   isArabicScriptFont,
@@ -320,6 +321,56 @@ describe('toAssFontName', () => {
   it('cleans invalid characters', () => {
     expect(toAssFontName('"Montserrat",')).toBe('Montserrat');
     expect(toAssFontName("'Inter'")).toBe('Inter 24pt');
+  });
+});
+
+describe('calculateSubtitleLineLayout', () => {
+  it('stacks multi-line bottom-aligned subtitles upward without overflowing bottom edge', () => {
+    const layout = calculateSubtitleLineLayout({
+      lineCount: 3,
+      lineHeight: 20,
+      verticalAlign: 'bottom',
+      marginV: 10,
+      canvasHeight: 288,
+      textAscent: 15,
+      textDescent: 5,
+    });
+
+    expect(layout.lastBaselineY + 5).toBe(278); // 288 - marginV(10)
+    expect(layout.baselineYs).toEqual([233, 253, 273]);
+    expect(layout.firstBaselineY).toBe(233);
+  });
+
+  it('keeps top-aligned subtitles inside the top edge even for tall fonts', () => {
+    const layout = calculateSubtitleLineLayout({
+      lineCount: 2,
+      lineHeight: 20,
+      verticalAlign: 'top',
+      marginV: 10,
+      canvasHeight: 288,
+      textAscent: 18,
+      textDescent: 6,
+    });
+
+    // Visual top of line 0 (baseline - textAscent) sits exactly at marginV
+    expect(layout.firstBaselineY - 18).toBe(10);
+    expect(layout.baselineYs).toEqual([28, 48]);
+  });
+
+  it('centers the visual text block vertically in middle alignment', () => {
+    const layout = calculateSubtitleLineLayout({
+      lineCount: 2,
+      lineHeight: 20,
+      verticalAlign: 'middle',
+      marginV: 30,
+      canvasHeight: 288,
+      textAscent: 15,
+      textDescent: 5,
+    });
+
+    const visualTop = layout.firstBaselineY - 15;
+    const visualBottom = layout.lastBaselineY + 5;
+    expect((visualTop + visualBottom) / 2).toBeCloseTo(144, 5);
   });
 });
 
