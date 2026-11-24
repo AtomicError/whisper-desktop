@@ -480,8 +480,83 @@ describe('modelHub', () => {
       expect(sidebarMatch).toBeTruthy();
       const sidebarHtml = sidebarMatch![0];
       expect(sidebarHtml).toContain('role="tablist"');
+      expect(sidebarHtml).toContain('aria-orientation="vertical"');
       expect(sidebarHtml).toContain('<button type="button" role="tab"');
+      expect(sidebarHtml).toContain('aria-controls="models-list-scroll"');
       expect(sidebarHtml).not.toContain('<div class="settings-cat-btn');
+    });
+
+    it('bypasses cache during active downloads so progress does not jump backward on quick-filter switch', async () => {
+      setupMinimalModelHubDom();
+      const invokeMock = vi.fn().mockImplementation((cmd: string) => {
+        if (cmd === 'get_all_models_status') {
+          return Promise.resolve([
+            { name: 'tiny', sizeBytes: 77691713, downloadedBytes: 10000000, progress: 0.13, status: 'Downloading' },
+            { name: 'tiny.en', sizeBytes: 77704715, downloadedBytes: 0, progress: 0, status: 'NotDownloaded' }
+          ]);
+        }
+        return Promise.resolve(null);
+      });
+      (globalThis as any).window.invoke = invokeMock;
+
+      modelHub.setCategory('tiny', true);
+      await modelHub.loadStatuses(false, true);
+      invokeMock.mockClear();
+
+      // Switching quick filter within cache TTL must re-fetch while a download is active
+      modelHub.setQuickFilter('multi');
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(invokeMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('renders accessible error state with retry action when get_all_models_status fails', async () => {
+      const { grid } = setupMinimalModelHubDom();
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      (globalThis as any).window.invoke = vi.fn().mockRejectedValue(new Error('Permission denied'));
+
+      await modelHub.loadStatuses(false, true);
+      expect(grid.children.length).toBe(1);
+      expect(grid.children[0].innerHTML).toContain('Unable to Load Models');
+      expect(grid.children[0].innerHTML).toContain('data-action="retry-load"');
+    });
+
+    it('renders accessible quick-filter tabs with roving tabindex and data-quick-filter', () => {
+      const banner = modelHub.renderBanner('tiny', { all: 6, multi: 3, en: 3, quant: 4 });
+      expect(banner).toContain('aria-orientation="horizontal"');
+      expect(banner).toContain('data-quick-filter="all"');
+      expect(banner).toContain('tabindex="0"');
+      expect(banner).toContain('tabindex="-1"');
+      expect(banner).not.toContain('onclick="switchModelQuickFilter');
+    });
+
+    it('uses discard copy when discarding a paused partial download', async () => {
+      setupMinimalModelHubDom();
+      const confirmSpy = vi.fn().mockResolvedValue(true);
+      const notifySpy = vi.fn();
+      (globalThis as any).window.showConfirmModal = confirmSpy;
+      (globalThis as any).window.showNotification = notifySpy;
+      (globalThis as any).window.invoke = vi.fn().mockImplementation((cmd: string) => {
+        if (cmd === 'get_all_models_status') {
+          return Promise.resolve([
+            { name: 'small', sizeBytes: 487601967, downloadedBytes: 1000, progress: 0.1, status: 'Paused' }
+          ]);
+        }
+        return Promise.resolve(null);
+      });
+
+      await modelHub.loadStatuses(false, true);
+      await modelHub.delete('small');
+
+      expect(confirmSpy).toHaveBeenCalledWith(
+        'Discard Partial Download',
+        expect.stringContaining('partial download'),
+        'Discard'
+      );
+      expect(notifySpy).toHaveBeenCalledWith(
+        expect.stringContaining('discarded'),
+        'success'
+      );
     });
   });
 });

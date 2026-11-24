@@ -387,5 +387,57 @@ describe('tauriEvents module', () => {
       loadSpy.mockRestore();
       delete (globalThis as any).window.__TAURI__;
     });
+
+    it('handles verifying phase without clearing active download protection', async () => {
+      const handlers: Record<string, (e: any) => void> = {};
+      setOriginalListen(vi.fn().mockImplementation((event: string, handler: (e: any) => void) => {
+        handlers[event] = handler;
+        return Promise.resolve(() => {});
+      }));
+
+      const barFill = new MockElement('DIV');
+      const statusEl = new MockElement('DIV') as MockElement & { innerHTML?: string };
+      statusEl.innerHTML = '';
+      const progressBlock = new MockElement('DIV');
+      const barContainer = new MockElement('DIV');
+      const card = new MockElement('DIV') as any;
+      card.dataset.model = 'large-v3';
+      card.querySelector = (sel: string) => {
+        if (sel === '.model-progress-block') return progressBlock;
+        if (sel === '.progress-bar-container') return barContainer;
+        if (sel === '.progress-bar-fill') return barFill;
+        if (sel === '.model-progress-status') return statusEl;
+        if (sel === '[data-action="pause"]') return new MockElement('BUTTON');
+        if (sel === '.badge-downloading') return new MockElement('SPAN');
+        return null;
+      };
+
+      const origQuerySelector = (globalThis as any).document.querySelector;
+      (globalThis as any).document.querySelector = (sel: string) => (sel.includes('large-v3') ? card : origQuerySelector(sel));
+
+      const loadSpy = vi.spyOn(modelHub, 'loadStatuses').mockResolvedValue(undefined);
+      (globalThis as any).window.showNotification = vi.fn();
+
+      setupTauriListeners();
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      handlers['model-download-status']({
+        payload: { modelName: 'large-v3', phase: 'verifying', progress: 1, downloadedBytes: 3095033483, totalBytes: 3095033483, speedBps: 0 }
+      });
+
+      expect(getActiveModelDownloadsCount()).toBe(1);
+      expect(getIsDownloadingModelRunning()).toBe(true);
+      expect(barFill.style.width).toBe('100%');
+      expect(statusEl.innerHTML).toBe('Verifying integrity...');
+
+      handlers['model-download-status']({
+        payload: { modelName: 'large-v3', phase: 'completed', progress: 1, downloadedBytes: 3095033483, totalBytes: 3095033483, speedBps: 0 }
+      });
+      expect(getActiveModelDownloadsCount()).toBe(0);
+      expect(getIsDownloadingModelRunning()).toBe(false);
+
+      loadSpy.mockRestore();
+      (globalThis as any).document.querySelector = origQuerySelector;
+    });
   });
 });

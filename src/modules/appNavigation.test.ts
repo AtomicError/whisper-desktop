@@ -12,6 +12,7 @@ import {
 import { customSelectsMap } from './customSelect';
 import { batchProcessor } from './batchProcessor';
 import * as transcribePipeline from './transcribePipeline';
+import { modelHub } from './modelHub';
 import { scrambleBatch, cancelActiveScramble } from '../i18n/textScramble';
 import { setLanguage, t } from '../i18n/index';
 
@@ -373,6 +374,42 @@ describe('appNavigation module', () => {
       mockDir = 'rtl';
       providerTabs[0].dispatchEvent({ key: 'ArrowLeft', type: 'keydown', preventDefault: vi.fn() });
       expect(provNextSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('preserves Model Hub state on switchView("models") by refreshing statuses without resetting category', () => {
+      const loadSpy = vi.spyOn(modelHub, 'loadStatuses').mockResolvedValue(undefined);
+      const setCatSpy = vi.spyOn(modelHub, 'setCategory');
+
+      switchView('models');
+
+      expect(loadSpy).toHaveBeenCalledWith(true);
+      expect(setCatSpy).not.toHaveBeenCalled();
+    });
+
+    it('switches .settings-categories keyboard orientation to horizontal on narrow viewports (<= 960px)', () => {
+      const catTabs = ['recommended', 'tiny', 'base'].map((name, i) => {
+        const el = new MockElement('BUTTON');
+        el.id = `model-cat-${name}`;
+        el.className = `settings-cat-btn${i === 0 ? ' active' : ''}`;
+        (el as any).closest = (sel: string) => (sel.includes('.settings-categories') ? { id: 'model-categories-sidebar' } : null);
+        return el;
+      });
+
+      const origQsa = (globalThis as any).document.querySelectorAll;
+      (globalThis as any).document.documentElement = {
+        getAttribute: (attr: string) => (attr === 'dir' ? 'ltr' : null)
+      };
+      (globalThis as any).document.querySelectorAll = (selector: string) => {
+        if (selector === '.settings-cat-btn') return catTabs;
+        return origQsa(selector);
+      };
+      (globalThis as any).window.matchMedia = (q: string) => ({ matches: q.includes('960px') });
+
+      setupVerticalTabKeyboardNavigation();
+
+      const nextClickSpy = vi.spyOn(catTabs[1], 'click');
+      catTabs[0].dispatchEvent({ key: 'ArrowRight', type: 'keydown', preventDefault: vi.fn() });
+      expect(nextClickSpy).toHaveBeenCalledTimes(1);
     });
   });
 });

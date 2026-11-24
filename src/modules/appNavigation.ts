@@ -155,7 +155,7 @@ export function switchView(viewName: string): void {
   }
 
   if (viewName === 'models') {
-    modelHub.setCategory('recommended', true);
+    modelHub.loadStatuses(true);
   }
 
   if (viewName === 'translate') {
@@ -222,7 +222,9 @@ export function setupHorizontalTabScroll(): void {
     const container = e.currentTarget as HTMLElement;
     const maxScroll = container.scrollWidth - container.clientWidth;
     if (maxScroll > 0) {
-      container.scrollLeft += (e.deltaY || e.deltaX);
+      const isRtl = typeof document !== 'undefined' && document.documentElement?.getAttribute('dir') === 'rtl';
+      const step = e.deltaY ? (isRtl ? -e.deltaY : e.deltaY) : e.deltaX;
+      container.scrollLeft += step;
       e.preventDefault();
     }
   };
@@ -261,7 +263,15 @@ function setupTablistKeyboardNavigation(
     if (e.key === 'Home') return 0;
     if (e.key === 'End') return groupItems.length - 1;
 
-    if (orientation === 'vertical') {
+    const isResponsiveHorizontal = orientation === 'vertical'
+      && typeof item.closest === 'function'
+      && Boolean(item.closest('.settings-categories'))
+      && typeof window !== 'undefined'
+      && typeof window.matchMedia === 'function'
+      && window.matchMedia('(max-width: 960px)').matches;
+    const effectiveOrientation = isResponsiveHorizontal ? 'horizontal' : orientation;
+
+    if (effectiveOrientation === 'vertical') {
       if (e.key === 'ArrowDown') return (idx + 1) % groupItems.length;
       if (e.key === 'ArrowUp') return (idx - 1 + groupItems.length) % groupItems.length;
       return -1;
@@ -323,8 +333,13 @@ export function setupSearchShortcuts(): void {
     modelSearchInput._hasSearchEscListener = true;
     modelSearchInput.addEventListener('keydown', (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (typeof window !== 'undefined' && typeof (window as any).clearModelSearch === 'function') {
-          (window as any).clearModelSearch();
+        if (modelSearchInput.value) {
+          e.preventDefault();
+          if (typeof window !== 'undefined' && typeof (window as any).clearModelSearch === 'function') {
+            (window as any).clearModelSearch();
+          }
+        } else {
+          modelSearchInput.blur();
         }
       }
     });

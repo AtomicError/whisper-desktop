@@ -98,6 +98,7 @@
 
 .settings-cat-icon {
   flex-shrink: 0;
+  margin-inline-end: 8px;
 }
 
 .settings-sidebar-footer,

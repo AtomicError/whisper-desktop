@@ -126,10 +126,12 @@ html[dir="rtl"] .settings-cat-btn {
   padding: 10px 20px 10px 14px;
 }
 
-html[dir="rtl"] .settings-cat-btn::before {
-  left: auto;
-  right: 0;
-  border-radius: 4px 0 0 4px;
+@media (min-width: 961px) {
+  html[dir="rtl"] .settings-cat-btn::before {
+    left: auto;
+    right: 0;
+    border-radius: 4px 0 0 4px;
+  }
 }
 
 html[dir="rtl"] .settings-cat-btn.active {

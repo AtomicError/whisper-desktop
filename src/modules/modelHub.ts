@@ -27,6 +27,7 @@ let currentModelQuickFilter = 'all';
 let _cachedModelStatuses: ModelStatus[] | null = null;
 let _cachedModelStatusesTime = 0;
 let _loadModelsSeq = 0;
+let _filterDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 const MODEL_STATUS_CACHE_TTL = 3500;
 const _modelActionsInProgress = new Set<string>();
 
@@ -227,6 +228,7 @@ export function renderFamilyHeaderBanner(category: string, counts = { all: 0, mu
     const isQuant = currentModelQuickFilter === 'quant' ? 'active' : '';
 
     const labelAll = t('models.filterAll');
+    const quickFilterAria = t('models.quickFilterLabel');
     const labelMulti = t('models.filterMulti');
     const labelEn = t('models.filterEn');
     const labelQuant = t('models.filterQuant');
@@ -239,25 +241,25 @@ export function renderFamilyHeaderBanner(category: string, counts = { all: 0, mu
 
     filterBarHtml = `
       <div class="model-banner-filters">
-        <div class="model-segmented-control" role="tablist" aria-label="${escapeHTML(labelAll)}">
-          <button type="button" class="model-segment-btn ${isAll}" role="tab" aria-selected="${isAll ? 'true' : 'false'}" onclick="switchModelQuickFilter('all')">
+        <div class="model-segmented-control" role="tablist" aria-orientation="horizontal" aria-label="${escapeHTML(quickFilterAria)}">
+          <button type="button" class="model-segment-btn ${isAll}" role="tab" aria-selected="${isAll ? 'true' : 'false'}" tabindex="${isAll ? '0' : '-1'}" data-quick-filter="all">
             <span>${escapeHTML(labelAll)}</span>
             <span class="segment-count">${formatNum(counts.all)}</span>
           </button>
           ${showMulti ? `
-            <button type="button" class="model-segment-btn ${isMulti}" role="tab" aria-selected="${isMulti ? 'true' : 'false'}" onclick="switchModelQuickFilter('multi')">
+            <button type="button" class="model-segment-btn ${isMulti}" role="tab" aria-selected="${isMulti ? 'true' : 'false'}" tabindex="${isMulti ? '0' : '-1'}" data-quick-filter="multi">
               <span>${escapeHTML(labelMulti)}</span>
               <span class="segment-count">${formatNum(counts.multi)}</span>
             </button>
           ` : ''}
           ${showEn ? `
-            <button type="button" class="model-segment-btn ${isEn}" role="tab" aria-selected="${isEn ? 'true' : 'false'}" onclick="switchModelQuickFilter('en')" title="${escapeHTML(enTooltip)}">
+            <button type="button" class="model-segment-btn ${isEn}" role="tab" aria-selected="${isEn ? 'true' : 'false'}" tabindex="${isEn ? '0' : '-1'}" data-quick-filter="en" title="${escapeHTML(enTooltip)}">
               <span>${escapeHTML(labelEn)}</span>
               <span class="segment-count">${formatNum(counts.en)}</span>
             </button>
           ` : ''}
           ${showQuant ? `
-            <button type="button" class="model-segment-btn ${isQuant}" role="tab" aria-selected="${isQuant ? 'true' : 'false'}" onclick="switchModelQuickFilter('quant')" title="${escapeHTML(quantTooltip)}">
+            <button type="button" class="model-segment-btn ${isQuant}" role="tab" aria-selected="${isQuant ? 'true' : 'false'}" tabindex="${isQuant ? '0' : '-1'}" data-quick-filter="quant" title="${escapeHTML(quantTooltip)}">
               <span>${escapeHTML(labelQuant)}</span>
               <span class="segment-count">${formatNum(counts.quant)}</span>
             </button>
@@ -286,10 +288,9 @@ export function renderFamilyHeaderBanner(category: string, counts = { all: 0, mu
 }
 
 function cancelModelSearchDebounce(): void {
-  const fn: any = filterModelsGrid;
-  if (fn._timer) {
-    clearTimeout(fn._timer);
-    fn._timer = null;
+  if (_filterDebounceTimer !== null) {
+    clearTimeout(_filterDebounceTimer);
+    _filterDebounceTimer = null;
   }
 }
 
@@ -501,10 +502,11 @@ function buildRecBadgeHtml(recInfo: any): string {
   return `<span class="model-badge model-badge-rec ${roleClass}">${iconMap[recInfo.role] || ''}<span>${escapeHTML(roleLabel)}</span></span>`;
 }
 
-function buildModelCardElement(m: ModelStatus, recInfo: any, query: string): HTMLElement {
+function buildModelCardElement(m: ModelStatus, recInfo: any): HTMLElement {
   const card = document.createElement('div');
   card.className = 'setting-card';
   card.setAttribute('data-model', m.name);
+  card.dataset.status = m.status;
 
   const sizeMB = Math.max(1, Math.round((m.sizeBytes || 0) / 1048576));
   card.dataset.sizeMb = String(sizeMB);
@@ -518,7 +520,7 @@ function buildModelCardElement(m: ModelStatus, recInfo: any, query: string): HTM
     ? `<span class="model-badge model-badge-vad" title="${t('models.badgeVadTitle')}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg><span>${t('models.badgeVad')}</span></span>`
     : '';
 
-  const recReasonHtml = recInfo && (currentCategoryFilter === 'recommended' || !query)
+  const recReasonHtml = recInfo
     ? `<div class="model-rec-description">${escapeHTML(t(recInfo.reasonI18nKey) || recInfo.reasonFallback)}</div>`
     : '';
 
@@ -564,8 +566,23 @@ function attachModelGridDelegate(grid: any): void {
   if (grid._modelDelegate) return;
   grid.addEventListener('click', function(e: MouseEvent) {
     const target = e.target as HTMLElement;
+    const quickFilterBtn = target.closest('button[data-quick-filter]') as HTMLButtonElement | null;
+    if (quickFilterBtn) {
+      const qf = quickFilterBtn.dataset.quickFilter;
+      if (qf) switchModelQuickFilter(qf);
+      return;
+    }
+
     const btn = target.closest('button[data-action]') as HTMLButtonElement | null;
     if (!btn) return;
+    if (btn.dataset.action === 'clear-search') {
+      clearModelSearch();
+      return;
+    }
+    if (btn.dataset.action === 'retry-load') {
+      loadModelStatusesGrid(false, true);
+      return;
+    }
     const card = btn.closest('[data-model]') as HTMLElement | null;
     if (!card) return;
     const name = card.dataset.model;
@@ -574,6 +591,37 @@ function attachModelGridDelegate(grid: any): void {
       case 'delete': deleteModelClick(name); break;
       case 'pause':  pauseModelClick(name); break;
       case 'download': downloadModelClick(name); break;
+    }
+  });
+
+  grid.addEventListener('keydown', function(e: KeyboardEvent) {
+    const target = e.target as HTMLElement | null;
+    const tabBtn = target?.closest?.('.model-segment-btn') as HTMLButtonElement | null;
+    if (!tabBtn) return;
+
+    const tablist = tabBtn.closest('.model-segmented-control');
+    if (!tablist) return;
+    const tabs = Array.from(tablist.querySelectorAll('.model-segment-btn')) as HTMLButtonElement[];
+    const idx = tabs.indexOf(tabBtn);
+    if (idx < 0 || tabs.length === 0) return;
+
+    const isRtl = typeof document !== 'undefined' && document.documentElement?.getAttribute('dir') === 'rtl';
+    const nextKey = isRtl ? 'ArrowLeft' : 'ArrowRight';
+    const prevKey = isRtl ? 'ArrowRight' : 'ArrowLeft';
+
+    let nextIdx = -1;
+    if (e.key === 'Home') nextIdx = 0;
+    else if (e.key === 'End') nextIdx = tabs.length - 1;
+    else if (e.key === nextKey) nextIdx = (idx + 1) % tabs.length;
+    else if (e.key === prevKey) nextIdx = (idx - 1 + tabs.length) % tabs.length;
+
+    if (nextIdx >= 0 && tabs[nextIdx]) {
+      e.preventDefault();
+      const targetFilter = tabs[nextIdx].dataset.quickFilter;
+      if (targetFilter) {
+        tabs[nextIdx].focus();
+        switchModelQuickFilter(targetFilter);
+      }
     }
   });
   grid._modelDelegate = true;
@@ -593,9 +641,74 @@ function renderModelsEmptyState(grid: HTMLElement, query: string): void {
     </div>
     <div class="models-empty-title">${t('models.emptyTitle')}</div>
     <div class="models-empty-desc">${query ? t('models.emptyDescQuery', { query: escapeHTML(query) }) : t('models.emptyDescCategory')}</div>
-    ${query ? `<button type="button" class="btn-secondary btn-sm" onclick="clearModelSearch()" style="margin-top: 8px;">${t('models.emptyClearSearch')}</button>` : ''}
+    ${query ? `<button type="button" class="btn-secondary btn-sm" data-action="clear-search" style="margin-top: 8px;">${t('models.emptyClearSearch')}</button>` : ''}
   `;
   grid.appendChild(emptyDiv);
+}
+
+function renderModelsErrorState(grid: HTMLElement): void {
+  grid.innerHTML = '';
+  attachModelGridDelegate(grid);
+  const errDiv = document.createElement('div');
+  errDiv.className = 'models-empty-state';
+  errDiv.style.padding = '48px 20px';
+  errDiv.innerHTML = `
+    <div class="models-empty-icon" style="color: var(--color-red);">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="8" x2="12" y2="12"></line>
+        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+      </svg>
+    </div>
+    <div class="models-empty-title">${escapeHTML(t('models.loadErrorTitle'))}</div>
+    <div class="models-empty-desc">${escapeHTML(t('models.loadErrorDesc'))}</div>
+    <button type="button" class="btn-secondary btn-sm" data-action="retry-load" style="margin-top: 8px;">${escapeHTML(t('models.retryLoad'))}</button>
+  `;
+  grid.appendChild(errDiv);
+}
+
+type GridFocusSnapshot =
+  | { kind: 'quickFilter'; filter: string }
+  | { kind: 'cardAction'; model: string; action: string }
+  | { kind: 'gridAction'; action: string }
+  | null;
+
+function captureGridFocus(grid: HTMLElement): GridFocusSnapshot {
+  const activeEl = typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null;
+  if (!activeEl || typeof activeEl.closest !== 'function' || activeEl.closest('#models-list-scroll') !== grid) {
+    return null;
+  }
+  const qf = activeEl.dataset?.quickFilter;
+  if (qf) return { kind: 'quickFilter', filter: qf };
+
+  const action = activeEl.dataset?.action;
+  const card = activeEl.closest('[data-model]') as HTMLElement | null;
+  if (action && card?.dataset?.model) {
+    return { kind: 'cardAction', model: card.dataset.model, action };
+  }
+  if (action) return { kind: 'gridAction', action };
+  return null;
+}
+
+function restoreGridFocus(grid: HTMLElement, snap: GridFocusSnapshot): void {
+  if (!snap || typeof grid.querySelector !== 'function') return;
+  let target: HTMLElement | null = null;
+  if (snap.kind === 'quickFilter') {
+    target = grid.querySelector(`button[data-quick-filter="${escapeAttrSelector(snap.filter)}"]`);
+  } else if (snap.kind === 'cardAction') {
+    const cardSel = `[data-model="${escapeAttrSelector(snap.model)}"]`;
+    target = grid.querySelector(`${cardSel} button[data-action="${escapeAttrSelector(snap.action)}"]`)
+      || grid.querySelector(`${cardSel} button[data-action]`);
+  } else if (snap.kind === 'gridAction') {
+    target = grid.querySelector(`button[data-action="${escapeAttrSelector(snap.action)}"]`);
+  }
+  if (target && typeof target.focus === 'function') {
+    try {
+      target.focus({ preventScroll: true });
+    } catch {
+      target.focus();
+    }
+  }
 }
 
 export async function loadModelStatusesGrid(_isSilent = false, forceRefresh = false): Promise<void> {
@@ -605,6 +718,7 @@ export async function loadModelStatusesGrid(_isSilent = false, forceRefresh = fa
   if (!invoke) return;
 
   const loadSeq = ++_loadModelsSeq;
+  const gridEl = document.getElementById('models-list-scroll') as (HTMLElement & { _modelDelegate?: boolean }) | null;
 
   let settingsState = win.settingsState;
   if (!settingsState) {
@@ -614,12 +728,16 @@ export async function loadModelStatusesGrid(_isSilent = false, forceRefresh = fa
       win.settingsState = settingsState;
     } catch (e) {
       console.error("Failed to load settings in loadModelStatusesGrid:", e);
+      if (gridEl) renderModelsErrorState(gridEl);
       return;
     }
   }
 
   const modelsDir = settingsState?.modelsDir || (document.getElementById('opt-modelsDir') as HTMLInputElement)?.value;
-  if (!modelsDir) return;
+  if (!modelsDir) {
+    if (gridEl) renderModelsErrorState(gridEl);
+    return;
+  }
 
   let systemSpecs = win.systemSpecs;
   if (!systemSpecs) {
@@ -638,7 +756,8 @@ export async function loadModelStatusesGrid(_isSilent = false, forceRefresh = fa
   try {
     const now = Date.now();
     let statuses = _cachedModelStatuses;
-    if (forceRefresh || !statuses || (now - _cachedModelStatusesTime > MODEL_STATUS_CACHE_TTL)) {
+    const hasCachedActive = Array.isArray(statuses) && statuses.some(m => m.status === 'Downloading');
+    if (forceRefresh || !statuses || hasCachedActive || (now - _cachedModelStatusesTime > MODEL_STATUS_CACHE_TTL)) {
       statuses = await invoke('get_all_models_status', { modelsDir });
       if (loadSeq !== _loadModelsSeq) return;
       _cachedModelStatuses = statuses;
@@ -676,6 +795,7 @@ export async function loadModelStatusesGrid(_isSilent = false, forceRefresh = fa
       }
     }
 
+    const focusSnap = captureGridFocus(grid);
     const prevScrollTop = grid.scrollTop;
     grid.innerHTML = '';
     attachModelGridDelegate(grid);
@@ -690,7 +810,7 @@ export async function loadModelStatusesGrid(_isSilent = false, forceRefresh = fa
     let renderedCount = 0;
     for (const m of categoryModels) {
       if (!matchesQuickFilter(m.name, query)) continue;
-      grid.appendChild(buildModelCardElement(m, recMap.get(m.name), query));
+      grid.appendChild(buildModelCardElement(m, recMap.get(m.name)));
       renderedCount++;
     }
 
@@ -699,8 +819,10 @@ export async function loadModelStatusesGrid(_isSilent = false, forceRefresh = fa
     }
 
     grid.scrollTop = prevScrollTop;
+    restoreGridFocus(grid, focusSnap);
   } catch (err) {
     console.error("Failed to load model statuses:", err);
+    if (gridEl) renderModelsErrorState(gridEl);
   }
 }
 
@@ -715,10 +837,9 @@ export function filterModelsGrid(): void {
   const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
   if (clearBtn) clearBtn.style.display = query ? 'flex' : 'none';
 
-  const fn: any = filterModelsGrid;
-  if (fn._timer) clearTimeout(fn._timer);
-  fn._timer = setTimeout(() => {
-    fn._timer = null;
+  cancelModelSearchDebounce();
+  _filterDebounceTimer = setTimeout(() => {
+    _filterDebounceTimer = null;
     loadModelStatusesGrid();
   }, 250);
 }
@@ -809,11 +930,17 @@ export async function deleteModelClick(name: string): Promise<void> {
   const modelsDir = win.settingsState?.modelsDir || (typeof document !== 'undefined' ? (document.getElementById('opt-modelsDir') as HTMLInputElement)?.value : undefined);
 
   if (_modelActionsInProgress.has(name) || !invoke || !modelsDir) return;
+  const card = typeof document !== 'undefined'
+    ? (document.querySelector(`[data-model="${escapeAttrSelector(name)}"]`) as HTMLElement | null)
+    : null;
+  const isDiscard = card?.dataset?.status === 'Paused'
+    || Boolean(_cachedModelStatuses?.some(m => m.name === name && m.status === 'Paused'));
+
   if (showConfirmModal) {
     const confirmed = await showConfirmModal(
-      t('modals.confirmDeleteModelTitle'),
-      t('modals.confirmDeleteModelDesc', { name }),
-      t('modals.deleteBtn')
+      t(isDiscard ? 'modals.confirmDiscardModelTitle' : 'modals.confirmDeleteModelTitle'),
+      t(isDiscard ? 'modals.confirmDiscardModelDesc' : 'modals.confirmDeleteModelDesc', { name }),
+      t(isDiscard ? 'modals.discardBtn' : 'modals.deleteBtn')
     );
     if (!confirmed) return;
   }
@@ -823,7 +950,9 @@ export async function deleteModelClick(name: string): Promise<void> {
       modelsDir,
       modelName: name
     });
-    if (showNotification) showNotification(t('toasts.modelDeleted', { name: `ggml-${name}.bin` }), "success");
+    if (showNotification) {
+      showNotification(t(isDiscard ? 'toasts.modelDiscarded' : 'toasts.modelDeleted', { name: `ggml-${name}.bin` }), "success");
+    }
     _cachedModelStatuses = null;
     await loadModelStatusesGrid(false, true);
     if (typeof win.scanAndPopulateModels === 'function') {

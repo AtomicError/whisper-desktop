@@ -253,6 +253,11 @@
   background: rgba(255, 255, 255, 0.06);
 }
 
+.model-segment-btn:focus-visible {
+  outline: 2px solid var(--color-royal-blue);
+  outline-offset: 2px;
+}
+
 .model-segment-btn.active {
   background: var(--color-accent);
   color: #fff;
@@ -309,9 +314,19 @@
 
 
 /* Model Hub Header Search Sizing (responsive override in responsive.css) */
+#panel-models .glass-card > div:first-child {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
 #panel-models .models-search-wrapper {
   flex: 0 0 260px;
   min-width: 240px;
+}
+
+#panel-models .setting-control {
+  flex-wrap: wrap;
+  max-width: 100%;
 }
 
 /* Model Row Action Buttons (Modern Tonal Glass with Vibrant Hover) */

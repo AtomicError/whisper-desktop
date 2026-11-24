@@ -25,6 +25,7 @@ const READ_TIMEOUT: Duration = Duration::from_secs(30);
 const EMIT_INTERVAL: Duration = Duration::from_millis(250);
 const MAX_RETRIES: u32 = 5;
 const RETRY_BASE_DELAY: Duration = Duration::from_secs(2);
+const MAX_RETRY_AFTER_SECS: u64 = 30;
 /// How long delete waits for an active task to observe cancellation and
 /// release its file handles (covers the post-download hash pass too).
 const CANCEL_GRACE: Duration = Duration::from_secs(5);
@@ -217,12 +218,23 @@ async fn sleep_or_cancel(handle: &DownloadHandle, duration: Duration) -> bool {
 
 pub struct DownloadSession {
     pub active: HashMap<String, Arc<DownloadHandle>>,
+    client: Client,
+}
+
+fn build_http_client() -> Client {
+    Client::builder()
+        .connect_timeout(CONNECT_TIMEOUT)
+        .read_timeout(READ_TIMEOUT)
+        .user_agent(USER_AGENT_VALUE)
+        .build()
+        .unwrap_or_else(|_| Client::new())
 }
 
 impl DownloadSession {
     pub fn new() -> Self {
         DownloadSession {
             active: HashMap::new(),
+            client: build_http_client(),
         }
     }
 }
@@ -236,14 +248,15 @@ fn lock_session(session: &Mutex<DownloadSession>) -> std::sync::MutexGuard<'_, D
 fn register_download(
     session: &Arc<Mutex<DownloadSession>>,
     name: &str,
-) -> Result<Arc<DownloadHandle>, String> {
+) -> Result<(Arc<DownloadHandle>, Client), String> {
     let mut lock = lock_session(session);
     if lock.active.contains_key(name) {
         return Err(format!("A download for '{name}' is already in progress."));
     }
     let handle = Arc::new(DownloadHandle::new());
+    let client = lock.client.clone();
     lock.active.insert(name.to_string(), handle.clone());
-    Ok(handle)
+    Ok((handle, client))
 }
 
 fn unregister_if_owned(
@@ -266,6 +279,7 @@ fn unregister_if_owned(
 pub enum Phase {
     Starting,
     Downloading,
+    Verifying,
     Paused,
     Completed,
     Failed,
@@ -356,6 +370,39 @@ enum DownloadOutcome {
     Cancelled(u64),
 }
 
+enum VerifyOutcome {
+    Verified(u64, String),
+    Cancelled(u64),
+}
+
+fn is_transient_http_status(status: StatusCode) -> bool {
+    status == StatusCode::TOO_MANY_REQUESTS
+        || status == StatusCode::REQUEST_TIMEOUT
+        || status.is_server_error()
+}
+
+fn parse_retry_after(headers: &reqwest::header::HeaderMap, attempt: u32) -> Duration {
+    if let Some(secs) = headers
+        .get(reqwest::header::RETRY_AFTER)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.trim().parse::<u64>().ok())
+    {
+        return Duration::from_secs(secs.clamp(1, MAX_RETRY_AFTER_SECS));
+    }
+    RETRY_BASE_DELAY * attempt.max(1)
+}
+
+async fn cleanup_empty_tmp_if_cancelled(tmp_path: &Path, downloaded: u64) {
+    if downloaded == 0
+        && tokio::fs::metadata(tmp_path)
+            .await
+            .map(|m| m.len() == 0)
+            .unwrap_or(false)
+    {
+        let _ = tokio::fs::remove_file(tmp_path).await;
+    }
+}
+
 pub fn start_download(
     app: AppHandle,
     download_state: Arc<Mutex<DownloadSession>>,
@@ -376,7 +423,7 @@ pub fn start_download(
     };
 
     // Synchronous registration before async task dispatch eliminates the spawn-vs-pause race window.
-    let handle = register_download(&download_state, &clean_name)?;
+    let (handle, client) = register_download(&download_state, &clean_name)?;
 
     // tauri::async_runtime provides the tokio context — plain tokio::spawn
     // panics inside sync commands because they run on the webview protocol
@@ -385,6 +432,7 @@ pub fn start_download(
         let result = download_inner(
             &app,
             &handle,
+            &client,
             Path::new(&models_dir),
             &clean_name,
             expected_size,
@@ -422,6 +470,7 @@ pub fn start_download(
 async fn download_inner(
     app: &AppHandle,
     handle: &Arc<DownloadHandle>,
+    client: &Client,
     models_dir: &Path,
     clean_name: &str,
     expected_size: u64,
@@ -449,17 +498,8 @@ async fn download_inner(
     let mut downloaded = len_of(&tmp_path);
 
     if expected_size > 0 && downloaded == expected_size {
-        return finalize(&tmp_path, &bin_path, expected_size, expected_hash)
-            .await
-            .map(DownloadOutcome::Completed);
+        return finalize(app, handle, clean_name, &tmp_path, &bin_path, expected_size, expected_hash).await;
     }
-
-    let client = Client::builder()
-        .connect_timeout(CONNECT_TIMEOUT)
-        .read_timeout(READ_TIMEOUT)
-        .user_agent(USER_AGENT_VALUE)
-        .build()
-        .map_err(|e| format!("Failed to build HTTP client: {e}"))?;
 
     let url = model_url(clean_name);
 
@@ -468,7 +508,9 @@ async fn download_inner(
     let mut consecutive_failures: u32 = 0;
     loop {
         if handle.is_cancelled() {
-            return Ok(DownloadOutcome::Cancelled(len_of(&tmp_path)));
+            let current = len_of(&tmp_path);
+            cleanup_empty_tmp_if_cancelled(&tmp_path, current).await;
+            return Ok(DownloadOutcome::Cancelled(current));
         }
 
         consecutive_failures += 1;
@@ -480,15 +522,20 @@ async fn download_inner(
         }
 
         let response = match cancellable_await(handle, request.send()).await {
-            None => return Ok(DownloadOutcome::Cancelled(downloaded)),
+            None => {
+                cleanup_empty_tmp_if_cancelled(&tmp_path, downloaded).await;
+                return Ok(DownloadOutcome::Cancelled(downloaded));
+            }
             Some(Ok(r)) => {
                 if handle.is_cancelled() {
+                    cleanup_empty_tmp_if_cancelled(&tmp_path, downloaded).await;
                     return Ok(DownloadOutcome::Cancelled(downloaded));
                 }
                 r
             }
             Some(Err(e)) => {
                 if handle.is_cancelled() {
+                    cleanup_empty_tmp_if_cancelled(&tmp_path, downloaded).await;
                     return Ok(DownloadOutcome::Cancelled(downloaded));
                 }
                 if consecutive_failures >= MAX_RETRIES {
@@ -496,6 +543,7 @@ async fn download_inner(
                 }
                 emit_progress(app, make_payload(clean_name, Phase::Starting, downloaded, expected_size, 0.0, None));
                 if !sleep_or_cancel(handle, RETRY_BASE_DELAY * consecutive_failures).await {
+                    cleanup_empty_tmp_if_cancelled(&tmp_path, downloaded).await;
                     return Ok(DownloadOutcome::Cancelled(downloaded));
                 }
                 continue;
@@ -523,12 +571,23 @@ async fn download_inner(
                 }
                 continue;
             }
+            s if is_transient_http_status(s) => {
+                if consecutive_failures >= MAX_RETRIES {
+                    return Err(format!(
+                        "HTTP {} from model server after {consecutive_failures} attempts — try again later",
+                        s.as_u16()
+                    ));
+                }
+                let delay = parse_retry_after(response.headers(), consecutive_failures);
+                emit_progress(app, make_payload(clean_name, Phase::Starting, downloaded, expected_size, 0.0, None));
+                if !sleep_or_cancel(handle, delay).await {
+                    cleanup_empty_tmp_if_cancelled(&tmp_path, downloaded).await;
+                    return Ok(DownloadOutcome::Cancelled(downloaded));
+                }
+                continue;
+            }
             s => {
-                return Err(format!(
-                    "HTTP {} from model server{}",
-                    s.as_u16(),
-                    if s.is_server_error() { " — try again later" } else { "" }
-                ));
+                return Err(format!("HTTP {} from model server", s.as_u16()));
             }
         };
 
@@ -585,9 +644,12 @@ async fn download_inner(
             }
         }
 
-        writer.flush().await.map_err(|e| format!("Failed to flush model data: {e}"))?;
+        let flush_res = writer.flush().await;
+        drop(writer);
+        flush_res.map_err(|e| format!("Failed to flush model data: {e}"))?;
 
         if handle.is_cancelled() {
+            cleanup_empty_tmp_if_cancelled(&tmp_path, downloaded).await;
             return Ok(DownloadOutcome::Cancelled(downloaded));
         }
 
@@ -596,7 +658,8 @@ async fn download_inner(
                 return Err(format!("Network stream interrupted after {consecutive_failures} attempts: {e}"));
             }
             emit_progress(app, make_payload(clean_name, Phase::Starting, downloaded, total_bytes, 0.0, None));
-            if !sleep_or_cancel(handle, RETRY_BASE_DELAY * consecutive_failures).await {
+            if !sleep_or_cancel(handle, RETRY_BASE_DELAY * consecutive_failures.max(1)).await {
+                cleanup_empty_tmp_if_cancelled(&tmp_path, downloaded).await;
                 return Ok(DownloadOutcome::Cancelled(downloaded));
             }
             continue;
@@ -609,9 +672,7 @@ async fn download_inner(
         return Err(format!("Incomplete download: {downloaded}/{expected_size} bytes."));
     }
 
-    finalize(&tmp_path, &bin_path, expected_size, expected_hash)
-        .await
-        .map(DownloadOutcome::Completed)
+    finalize(app, handle, clean_name, &tmp_path, &bin_path, expected_size, expected_hash).await
 }
 
 async fn open_append(path: &Path) -> Result<tokio::fs::File, String> {
@@ -634,19 +695,31 @@ async fn open_truncate(path: &Path) -> Result<tokio::fs::File, String> {
 }
 
 async fn finalize(
+    app: &AppHandle,
+    handle: &Arc<DownloadHandle>,
+    clean_name: &str,
     tmp_path: &Path,
     bin_path: &Path,
     expected_size: u64,
     expected_hash: &str,
-) -> Result<u64, String> {
-    let tmp_owned = tmp_path.to_path_buf();
-    let (actual_len, actual_hash) =
-        tokio::task::spawn_blocking(move || verify_file(&tmp_owned))
-            .await
-            .map_err(|e| format!("Verification task failed: {e}"))??;
+) -> Result<DownloadOutcome, String> {
+    let tmp_len = tokio::fs::metadata(tmp_path).await.map(|m| m.len()).unwrap_or(expected_size);
+    if handle.is_cancelled() {
+        return Ok(DownloadOutcome::Cancelled(tmp_len));
+    }
+
+    emit_progress(
+        app,
+        make_payload(clean_name, Phase::Verifying, tmp_len, expected_size, 0.0, None),
+    );
+
+    let (actual_len, actual_hash) = match finalize_verify_only(handle, tmp_path).await? {
+        VerifyOutcome::Verified(len, hash) => (len, hash),
+        VerifyOutcome::Cancelled(len) => return Ok(DownloadOutcome::Cancelled(len)),
+    };
 
     if actual_hash != expected_hash {
-        let _ = std::fs::remove_file(tmp_path);
+        let _ = tokio::fs::remove_file(tmp_path).await;
         return Err(format!(
             "Checksum mismatch for {} (corrupted download discarded). Please retry.",
             bin_path.display()
@@ -654,13 +727,33 @@ async fn finalize(
     }
 
     if expected_size > 0 && actual_len != expected_size {
-        let _ = std::fs::remove_file(tmp_path);
+        let _ = tokio::fs::remove_file(tmp_path).await;
         return Err(format!(
             "Size mismatch for {}: got {actual_len}, expected {expected_size}.",
             bin_path.display()
         ));
     }
 
+    if handle.is_cancelled() {
+        return Ok(DownloadOutcome::Cancelled(actual_len));
+    }
+
+    finalize_promote_file(tmp_path, bin_path).await?;
+    Ok(DownloadOutcome::Completed(actual_len))
+}
+
+async fn finalize_verify_only(
+    handle: &Arc<DownloadHandle>,
+    tmp_path: &Path,
+) -> Result<VerifyOutcome, String> {
+    let tmp_owned = tmp_path.to_path_buf();
+    let handle_clone = Arc::clone(handle);
+    tokio::task::spawn_blocking(move || verify_file(&tmp_owned, &handle_clone))
+        .await
+        .map_err(|e| format!("Verification task failed: {e}"))?
+}
+
+async fn finalize_promote_file(tmp_path: &Path, bin_path: &Path) -> Result<(), String> {
     // Windows compatibility: Remove destination if already existing before rename
     if bin_path.exists() {
         let _ = tokio::fs::remove_file(bin_path).await;
@@ -682,10 +775,10 @@ async fn finalize(
         }
     }
 
-    Ok(actual_len)
+    Ok(())
 }
 
-fn verify_file(path: &PathBuf) -> Result<(u64, String), String> {
+fn verify_file(path: &PathBuf, handle: &DownloadHandle) -> Result<VerifyOutcome, String> {
     use std::io::Read;
     let mut file =
         std::fs::File::open(path).map_err(|e| format!("Failed to open downloaded file: {e}"))?;
@@ -693,6 +786,9 @@ fn verify_file(path: &PathBuf) -> Result<(u64, String), String> {
     let mut hasher = Sha256::new();
     let mut buffer = [0u8; 256 * 1024];
     loop {
+        if handle.is_cancelled() {
+            return Ok(VerifyOutcome::Cancelled(len));
+        }
         let read = file
             .read(&mut buffer)
             .map_err(|e| format!("Failed to read downloaded file: {e}"))?;
@@ -702,7 +798,7 @@ fn verify_file(path: &PathBuf) -> Result<(u64, String), String> {
         hasher.update(&buffer[..read]);
     }
     let hex: String = hasher.finalize().iter().map(|b| format!("{b:02x}")).collect();
-    Ok((len, hex))
+    Ok(VerifyOutcome::Verified(len, hex))
 }
 
 const MAX_SEARCH_DEPTH: usize = 8;
@@ -1088,6 +1184,9 @@ pub async fn delete_model_file(
     if let Some(h) = handle {
         h.cancel();
         h.wait_done(CANCEL_GRACE).await;
+        if !h.done.load(Ordering::Acquire) {
+            return Err("Download task is still stopping; please try deleting again in a moment.".to_string());
+        }
     }
 
     let dir = Path::new(&models_dir);
@@ -1306,6 +1405,45 @@ mod tests {
         handle.wait_done(Duration::from_secs(5)).await;
         assert!(handle.done.load(Ordering::Acquire));
         assert!(start.elapsed() < Duration::from_secs(1));
+    }
+
+    #[test]
+    fn test_verify_file_aborts_immediately_when_cancelled() {
+        let temp_dir = std::env::temp_dir().join(format!("whisper_test_verify_cancel_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&temp_dir);
+        fs::create_dir_all(&temp_dir).unwrap();
+
+        let file_path = temp_dir.join("ggml-tiny.bin.tmp");
+        fs::write(&file_path, vec![0u8; 512 * 1024]).unwrap();
+
+        let handle = DownloadHandle::new();
+        handle.cancel();
+
+        let outcome = verify_file(&file_path, &handle).unwrap();
+        assert!(matches!(outcome, VerifyOutcome::Cancelled(524288)));
+        assert!(file_path.exists(), "cancelled verification must preserve partial file for resume");
+
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_transient_http_status_and_retry_after_parsing() {
+        assert!(is_transient_http_status(StatusCode::TOO_MANY_REQUESTS));
+        assert!(is_transient_http_status(StatusCode::REQUEST_TIMEOUT));
+        assert!(is_transient_http_status(StatusCode::BAD_GATEWAY));
+        assert!(is_transient_http_status(StatusCode::SERVICE_UNAVAILABLE));
+        assert!(is_transient_http_status(StatusCode::GATEWAY_TIMEOUT));
+        assert!(!is_transient_http_status(StatusCode::NOT_FOUND));
+        assert!(!is_transient_http_status(StatusCode::FORBIDDEN));
+
+        let mut headers = reqwest::header::HeaderMap::new();
+        assert_eq!(parse_retry_after(&headers, 2), RETRY_BASE_DELAY * 2);
+
+        headers.insert(reqwest::header::RETRY_AFTER, "7".parse().unwrap());
+        assert_eq!(parse_retry_after(&headers, 1), Duration::from_secs(7));
+
+        headers.insert(reqwest::header::RETRY_AFTER, "999".parse().unwrap());
+        assert_eq!(parse_retry_after(&headers, 1), Duration::from_secs(MAX_RETRY_AFTER_SECS));
     }
 }
 

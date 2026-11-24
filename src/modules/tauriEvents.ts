@@ -428,8 +428,10 @@ export function setupTauriListeners(): void {
     const payload = event?.payload;
     if (!payload || !payload.modelName) return;
 
-    if (payload.phase === 'starting' || payload.phase === 'downloading') {
-      const progressVal = Number.isFinite(Number(payload.progress)) ? Math.max(0, Math.min(1, Number(payload.progress))) : 0;
+    if (payload.phase === 'starting' || payload.phase === 'downloading' || payload.phase === 'verifying') {
+      const progressVal = payload.phase === 'verifying'
+        ? 1
+        : (Number.isFinite(Number(payload.progress)) ? Math.max(0, Math.min(1, Number(payload.progress))) : 0);
       _activeModelDownloads.set(payload.modelName, progressVal);
       setIsDownloadingModelRunning(true);
       updateTaskbarProgress(getAggregateModelDownloadProgress(), true);
@@ -441,7 +443,8 @@ export function setupTauriListeners(): void {
       const card = document.querySelector(`[data-model="${selectorName}"]`) as HTMLElement | null;
       if (!card) return;
 
-      const pct = Math.min(100, Math.round((payload.progress || 0) * 100));
+      const isVerifying = payload.phase === 'verifying';
+      const pct = isVerifying ? 100 : Math.min(100, Math.round((payload.progress || 0) * 100));
       const totalMB = ((payload.totalBytes || 0) / 1048576).toFixed(0);
       const totalKnown = payload.totalBytes > 0;
       const dlBytes = Math.max(0, payload.downloadedBytes || 0);
@@ -459,9 +462,9 @@ export function setupTauriListeners(): void {
       }
 
       // 2. Status text above progress bar (clean progress + smooth ETA without speed noise)
-      const isConnecting = payload.phase === 'starting' || payload.speedBps <= 0;
+      const isConnecting = !isVerifying && (payload.phase === 'starting' || payload.speedBps <= 0);
 
-      if (!isConnecting && totalKnown && dlBytes <= payload.totalBytes) {
+      if (!isVerifying && !isConnecting && totalKnown && dlBytes <= payload.totalBytes) {
         const rawSeconds = (payload.totalBytes - dlBytes) / payload.speedBps;
         if (rawSeconds > 0 && isFinite(rawSeconds)) {
           const cardAny = card as any;
@@ -476,7 +479,10 @@ export function setupTauriListeners(): void {
 
       let liveStatus = '';
       const cardAny = card as any;
-      if (dlBytes <= 0) {
+      if (isVerifying) {
+        cardAny._smoothedEtaSeconds = null;
+        liveStatus = t('models.statusVerifying');
+      } else if (dlBytes <= 0) {
         cardAny._smoothedEtaSeconds = null;
         liveStatus = payload.phase === 'starting' ? t('models.statusStarting') : t('models.statusConnecting');
       } else {
@@ -500,7 +506,7 @@ export function setupTauriListeners(): void {
           clearTimeout(window._modelStallTimers[payload.modelName]);
           delete window._modelStallTimers[payload.modelName];
         }
-        if (!isConnecting && payload.phase === 'downloading') {
+        if (!isVerifying && !isConnecting && payload.phase === 'downloading') {
           window._modelStallTimers[payload.modelName] = setTimeout(() => {
             const targetCard = document.querySelector(`[data-model="${selectorName}"]`) as any;
             if (targetCard && targetCard.querySelector('.model-btn-pause')) {
