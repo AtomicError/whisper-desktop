@@ -559,7 +559,7 @@ describe('modelHub', () => {
       );
     });
 
-    it('renders verifying status and 100% progress bar when backend reports verifying: true', async () => {
+    it('renders verifying status, 100% progress bar, and disabled pause button when verifying: true', async () => {
       const { grid } = setupMinimalModelHubDom();
       (globalThis as any).window.invoke = vi.fn().mockImplementation((cmd: string) => {
         if (cmd === 'get_all_models_status') {
@@ -577,6 +577,8 @@ describe('modelHub', () => {
       expect(card).toBeDefined();
       expect(card.innerHTML).toContain('Verifying integrity...');
       expect(card.innerHTML).toContain('width: 100%');
+      expect(card.innerHTML).toContain('disabled aria-disabled="true"');
+      expect(card.innerHTML).toContain('is-verifying');
     });
 
     it('omits redundant single-tab quick filter bar when no sub-filters apply', () => {
@@ -782,6 +784,95 @@ describe('modelHub', () => {
     it('resets #panel-models header title flex-basis on narrow <=600px viewports in responsive.css', () => {
       const responsiveCss = loadSourceFile('styles/base/responsive.css');
       expect(responsiveCss).toMatch(/#panel-models\s+\.glass-card\s*>\s*div:first-child\s*\{[^}]*flex:\s*0\s+0\s+auto\s*!important/);
+    });
+
+    it('formats sub-megabyte models in KB and renders dedicated empty state copy for local category', async () => {
+      const { grid } = setupMinimalModelHubDom();
+      (globalThis as any).window.invoke = vi.fn().mockImplementation((cmd: string) => {
+        if (cmd === 'get_all_models_status') {
+          return Promise.resolve([
+            { name: 'silero-v6.2.0', sizeBytes: 885098, downloadedBytes: 0, progress: 0, status: 'NotDownloaded' }
+          ]);
+        }
+        return Promise.resolve(null);
+      });
+
+      modelHub.setCategory('vad', true);
+      await modelHub.loadStatuses(false, true);
+      const vadCard = grid.children.find((c: any) => !c.isBanner);
+      expect(vadCard.innerHTML).toContain('864 KB');
+      expect(vadCard.innerHTML).not.toContain('1 MB');
+
+      modelHub.setCategory('local', true);
+      await modelHub.loadStatuses(false, true);
+      const banner = grid.children.find((c: any) => c.isBanner);
+      const empty = grid.children.find((c: any) => !c.isBanner);
+      expect(banner.html).toContain('offline transcription');
+      expect(empty.innerHTML).toContain('No Downloaded Models Yet');
+    });
+
+    it('treats whitespace-only modelsDir as invalid and passes modelsDir when pausing', async () => {
+      const { grid } = setupMinimalModelHubDom();
+      (globalThis as any).window.settingsState = { modelsDir: '   ' };
+      const invokeMock = vi.fn().mockResolvedValue(undefined);
+      (globalThis as any).window.invoke = invokeMock;
+
+      await modelHub.loadStatuses(false, true);
+      expect(invokeMock).not.toHaveBeenCalledWith('get_all_models_status', expect.anything());
+      expect(grid.children[0].innerHTML).toContain('Unable to Load Models');
+
+      (globalThis as any).window.settingsState = { modelsDir: '/tmp/models' };
+      const pauseBtn = { disabled: false, classList: { contains: () => false }, setAttribute: vi.fn(), removeAttribute: vi.fn() };
+      const replacementBtn = { focus: vi.fn() };
+      const card = { querySelector: (sel: string) => (sel === 'button[data-action="pause"]' ? pauseBtn : null) };
+      (globalThis as any).document.activeElement = pauseBtn;
+      (globalThis as any).document.querySelector = (sel: string) => {
+        if (sel.includes('button[data-action]')) return replacementBtn;
+        if (sel.includes('tiny')) return card;
+        return null;
+      };
+
+      await modelHub.pause('tiny');
+      expect(invokeMock).toHaveBeenCalledWith('pause_download_model', { modelName: 'tiny', modelsDir: '/tmp/models' });
+      expect(pauseBtn.disabled).toBe(false);
+      expect(pauseBtn.removeAttribute).toHaveBeenCalledWith('aria-busy');
+      expect(replacementBtn.focus).toHaveBeenCalled();
+
+      // When verifying arrives mid-pause, finally removes aria-busy but keeps disabled = true
+      const verifyingPauseBtn = { disabled: false, classList: { contains: (c: string) => c === 'is-verifying' }, setAttribute: vi.fn(), removeAttribute: vi.fn() };
+      const verifyingCard = { querySelector: (sel: string) => (sel === 'button[data-action="pause"]' ? verifyingPauseBtn : null) };
+      (globalThis as any).document.activeElement = null;
+      (globalThis as any).document.querySelector = (sel: string) => (sel.includes('tiny') ? verifyingCard : null);
+
+      await modelHub.pause('tiny');
+      expect(verifyingPauseBtn.removeAttribute).toHaveBeenCalledWith('aria-busy');
+      expect(verifyingPauseBtn.disabled).toBe(true);
+    });
+
+    it('formats downloaded sub-megabyte models in KB and preserves KB on optimistic download start', async () => {
+      setupMinimalModelHubDom();
+      const descEl = { innerHTML: '' };
+      const ctrlEl = { innerHTML: '' };
+      const card = {
+        dataset: { sizeMb: '1', sizeBytes: '885098' },
+        classList: { contains: () => false },
+        querySelector: (sel: string) => {
+          if (sel === '.setting-desc') return descEl;
+          if (sel === '.setting-control') return ctrlEl;
+          return null;
+        }
+      };
+      (globalThis as any).document.querySelector = (sel: string) => (sel.includes('silero-v6.2.0') ? card : null);
+      (globalThis as any).window.settingsState = { modelsDir: '/tmp/models' };
+      (globalThis as any).window.invoke = vi.fn().mockResolvedValue(undefined);
+
+      const installedHtml = modelHub.buildDescriptionHtml('silero-v6.2.0', 'Downloaded', 1, 885098);
+      expect(installedHtml).toContain('864 KB');
+      expect(installedHtml).not.toContain('1 MB');
+
+      await modelHub.download('silero-v6.2.0');
+      expect(descEl.innerHTML).toContain('864 KB');
+      expect(descEl.innerHTML).not.toContain('1 MB');
     });
   });
 });

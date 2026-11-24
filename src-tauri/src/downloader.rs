@@ -332,8 +332,10 @@ pub struct ModelDownloadProgress {
     pub error: Option<String>,
 }
 
-fn emit_progress(app: &AppHandle, payload: ModelDownloadProgress) {
-    let _ = app.emit("model-download-status", payload);
+fn emit_progress(app: Option<&AppHandle>, payload: ModelDownloadProgress) {
+    if let Some(app_handle) = app {
+        let _ = app_handle.emit("model-download-status", payload);
+    }
 }
 
 fn make_payload(
@@ -501,12 +503,61 @@ pub fn start_download(
                 }
             }
         };
-        emit_progress(&app, terminal);
+        emit_progress(Some(&app), terminal);
 
         handle.mark_done();
     });
 
     Ok(())
+}
+
+async fn file_len_async(path: &Path) -> u64 {
+    tokio::fs::metadata(path).await.map(|m| m.len()).unwrap_or(0)
+}
+
+fn is_valid_completed_bin(path: &Path, expected_bin_name: &str, expected_size: u64) -> bool {
+    path.file_name().is_some_and(|n| n == expected_bin_name)
+        && path.metadata().map(|m| m.len() == expected_size).unwrap_or(false)
+}
+
+async fn inspect_existing_model_files(
+    models_dir: &Path,
+    clean_name: &str,
+    expected_size: u64,
+) -> Result<(Option<PathBuf>, Option<PathBuf>), String> {
+    let dir_owned = models_dir.to_path_buf();
+    let name_owned = clean_name.to_string();
+    let expected_bin = format!("ggml-{clean_name}.bin");
+    let expected_tmp = format!("ggml-{clean_name}.bin.tmp");
+    tokio::task::spawn_blocking(move || {
+        let matches = find_all_matching_model_files(&dir_owned, &name_owned);
+        let valid_bin = matches
+            .iter()
+            .find(|p| is_valid_completed_bin(p, &expected_bin, expected_size))
+            .cloned();
+
+        // Preserve priority when selecting an existing partial file: direct root > legacy models/ > nested subfolder
+        let direct_tmp = dir_owned.join(&expected_tmp);
+        let legacy_tmp = dir_owned.join("models").join(&expected_tmp);
+        let mut tmp_matches = matches
+            .into_iter()
+            .filter(|p| p.file_name().is_some_and(|n| n == expected_tmp.as_str()) && p.is_file());
+        let first_tmp = tmp_matches.next();
+        let tmp = if first_tmp.as_ref().is_some_and(|p| *p == direct_tmp) {
+            first_tmp
+        } else {
+            let candidates: Vec<PathBuf> = first_tmp.into_iter().chain(tmp_matches).collect();
+            candidates
+                .iter()
+                .find(|p| **p == direct_tmp)
+                .or_else(|| candidates.iter().find(|p| **p == legacy_tmp))
+                .or_else(|| candidates.first())
+                .cloned()
+        };
+        (valid_bin, tmp)
+    })
+    .await
+    .map_err(|e| format!("Failed to inspect model directory: {e}"))
 }
 
 async fn download_inner(
@@ -518,8 +569,40 @@ async fn download_inner(
     expected_size: u64,
     expected_hash: &'static str,
 ) -> Result<DownloadOutcome, String> {
+    let url = model_url(clean_name);
+    download_from_url(
+        Some(app),
+        handle,
+        client,
+        models_dir,
+        clean_name,
+        expected_size,
+        expected_hash,
+        &url,
+        RETRY_BASE_DELAY,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn download_from_url(
+    app: Option<&AppHandle>,
+    handle: &Arc<DownloadHandle>,
+    client: &Client,
+    models_dir: &Path,
+    clean_name: &str,
+    expected_size: u64,
+    expected_hash: &str,
+    url: &str,
+    retry_base_delay: Duration,
+) -> Result<DownloadOutcome, String> {
     if handle.is_cancelled() {
-        return Ok(DownloadOutcome::Cancelled(partial_bytes(models_dir, clean_name)));
+        let dir_owned = models_dir.to_path_buf();
+        let name_owned = clean_name.to_string();
+        let bytes = tokio::task::spawn_blocking(move || partial_bytes(&dir_owned, &name_owned))
+            .await
+            .unwrap_or(0);
+        return Ok(DownloadOutcome::Cancelled(bytes));
     }
 
     tokio::fs::create_dir_all(models_dir)
@@ -527,38 +610,38 @@ async fn download_inner(
         .map_err(|e| format!("Failed to create models directory: {e}"))?;
 
     let bin_path = models_dir.join(format!("ggml-{clean_name}.bin"));
+    let (existing_valid, found_tmp) =
+        inspect_existing_model_files(models_dir, clean_name, expected_size).await?;
 
-    if let Some(existing) = find_model_path_in_dir(models_dir, clean_name) {
-        if existing.metadata().map(|m| m.len() == expected_size).unwrap_or(false) {
-            return Err(format!("Model ggml-{clean_name}.bin already exists locally at {}.", existing.display()));
-        }
+    if let Some(existing) = existing_valid {
+        return Err(format!(
+            "Model ggml-{clean_name}.bin already exists locally at {}.",
+            existing.display()
+        ));
     }
 
-    let len_of = |p: &Path| p.metadata().map(|m| m.len()).unwrap_or(0);
-    let tmp_path = find_model_tmp_in_dir(models_dir, clean_name)
-        .unwrap_or_else(|| models_dir.join(format!("ggml-{clean_name}.bin.tmp")));
-    let mut downloaded = len_of(&tmp_path);
+    let tmp_path = found_tmp.unwrap_or_else(|| models_dir.join(format!("ggml-{clean_name}.bin.tmp")));
+    let mut downloaded = file_len_async(&tmp_path).await;
 
     if expected_size > 0 && downloaded == expected_size {
         return finalize(app, handle, clean_name, &tmp_path, &bin_path, expected_size, expected_hash).await;
     }
 
-    let url = model_url(clean_name);
-
     emit_progress(app, make_payload(clean_name, Phase::Starting, downloaded, expected_size, 0.0, None));
 
     let mut consecutive_failures: u32 = 0;
+    let mut best_downloaded: u64 = downloaded;
     loop {
         if handle.is_cancelled() {
-            let current = len_of(&tmp_path);
+            let current = file_len_async(&tmp_path).await;
             cleanup_empty_tmp_if_cancelled(&tmp_path, current).await;
             return Ok(DownloadOutcome::Cancelled(current));
         }
 
         consecutive_failures += 1;
-        downloaded = len_of(&tmp_path);
+        downloaded = file_len_async(&tmp_path).await;
 
-        let mut request = client.get(&url).header(USER_AGENT, USER_AGENT_VALUE);
+        let mut request = client.get(url).header(USER_AGENT, USER_AGENT_VALUE);
         if downloaded > 0 && (expected_size == 0 || downloaded < expected_size) {
             request = request.header(RANGE, format!("bytes={downloaded}-"));
         }
@@ -584,7 +667,7 @@ async fn download_inner(
                     return Err(format!("Network connection failed after {consecutive_failures} attempts: {e}"));
                 }
                 emit_progress(app, make_payload(clean_name, Phase::Starting, downloaded, expected_size, 0.0, None));
-                if !sleep_or_cancel(handle, RETRY_BASE_DELAY * consecutive_failures).await {
+                if !sleep_or_cancel(handle, retry_base_delay * consecutive_failures).await {
                     cleanup_empty_tmp_if_cancelled(&tmp_path, downloaded).await;
                     return Ok(DownloadOutcome::Cancelled(downloaded));
                 }
@@ -608,7 +691,7 @@ async fn download_inner(
                     ));
                 }
                 emit_progress(app, make_payload(clean_name, Phase::Starting, 0, expected_size, 0.0, None));
-                if !sleep_or_cancel(handle, RETRY_BASE_DELAY * consecutive_failures).await {
+                if !sleep_or_cancel(handle, retry_base_delay * consecutive_failures).await {
                     return Ok(DownloadOutcome::Cancelled(0));
                 }
                 continue;
@@ -634,7 +717,7 @@ async fn download_inner(
         };
 
         let total_bytes = match (response.status(), response.content_length()) {
-            (StatusCode::PARTIAL_CONTENT, Some(len)) => len + downloaded,
+            (StatusCode::PARTIAL_CONTENT, Some(len)) => len.saturating_add(downloaded),
             (_, Some(len)) => len.max(downloaded),
             (_, None) => expected_size,
         };
@@ -654,14 +737,20 @@ async fn download_inner(
             }
             match item {
                 Ok(chunk) => {
-                    writer
-                        .write_all(&chunk)
-                        .await
-                        .map_err(|e| format!("Failed to write model data: {e}"))?;
-                    downloaded += chunk.len() as u64;
-                    window_bytes += chunk.len() as u64;
-                    // Reset consecutive failures counter whenever valid progress is actively made
-                    consecutive_failures = 0;
+                    if !chunk.is_empty() {
+                        writer
+                            .write_all(&chunk)
+                            .await
+                            .map_err(|e| format!("Failed to write model data: {e}"))?;
+                        let chunk_len = chunk.len() as u64;
+                        downloaded = downloaded.saturating_add(chunk_len);
+                        window_bytes = window_bytes.saturating_add(chunk_len);
+                        // Reset retries only when overall progress strictly advances past previous high-water mark
+                        if downloaded > best_downloaded {
+                            best_downloaded = downloaded;
+                            consecutive_failures = 0;
+                        }
+                    }
                 }
                 Err(e) => {
                     network_error = Some(e.to_string());
@@ -695,19 +784,27 @@ async fn download_inner(
             return Ok(DownloadOutcome::Cancelled(downloaded));
         }
 
+        // Treat premature clean EOF before expected_size as a retriable stream drop
+        if network_error.is_none() && expected_size > 0 && downloaded < expected_size {
+            network_error = Some(format!(
+                "Stream closed prematurely at {downloaded}/{expected_size} bytes"
+            ));
+        }
+
         if let Some(e) = network_error {
             if consecutive_failures >= MAX_RETRIES {
                 return Err(format!("Network stream interrupted after {consecutive_failures} attempts: {e}"));
             }
-            emit_progress(app, make_payload(clean_name, Phase::Starting, downloaded, total_bytes, 0.0, None));
-            if !sleep_or_cancel(handle, RETRY_BASE_DELAY * consecutive_failures.max(1)).await {
+            let emit_total = if expected_size > 0 { expected_size } else { total_bytes };
+            emit_progress(app, make_payload(clean_name, Phase::Starting, downloaded, emit_total, 0.0, None));
+            if !sleep_or_cancel(handle, retry_base_delay * consecutive_failures.max(1)).await {
                 cleanup_empty_tmp_if_cancelled(&tmp_path, downloaded).await;
                 return Ok(DownloadOutcome::Cancelled(downloaded));
             }
             continue;
         }
 
-        break; // Clean stream EOF
+        break; // Clean stream EOF with expected_size satisfied (or unspecified)
     }
 
     if expected_size > 0 && downloaded != expected_size {
@@ -737,7 +834,7 @@ async fn open_truncate(path: &Path) -> Result<tokio::fs::File, String> {
 }
 
 async fn finalize(
-    app: &AppHandle,
+    app: Option<&AppHandle>,
     handle: &Arc<DownloadHandle>,
     clean_name: &str,
     tmp_path: &Path,
@@ -815,7 +912,7 @@ async fn finalize_promote_file(
     expected_size: u64,
 ) -> Result<(), String> {
     // Windows compatibility: Remove destination if already existing before rename
-    if bin_path.exists() {
+    if tokio::fs::try_exists(bin_path).await.unwrap_or(false) {
         let _ = tokio::fs::remove_file(bin_path).await;
     }
 
@@ -830,27 +927,39 @@ async fn finalize_promote_file(
     // Clean up any remaining legacy temporary file or stale corrupted .bin duplicates in subdirectories
     if let Some(models_dir) = bin_path.parent() {
         let legacy_tmp = models_dir.join("models").join(tmp_path.file_name().unwrap_or_default());
-        if legacy_tmp != tmp_path && legacy_tmp.exists() {
+        if legacy_tmp != tmp_path && tokio::fs::try_exists(&legacy_tmp).await.unwrap_or(false) {
             let _ = tokio::fs::remove_file(legacy_tmp).await;
         }
 
-        let canon_bin = bin_path.canonicalize().ok();
-        let expected_bin_name = format!("ggml-{clean_name}.bin");
-        for candidate in find_all_matching_model_files(models_dir, clean_name) {
-            let is_bin_match = candidate.file_name().is_some_and(|n| n == expected_bin_name.as_str());
-            if !is_bin_match {
-                continue;
-            }
-            let is_promoted = canon_bin.as_ref().is_some_and(|b| candidate.canonicalize().ok().as_ref() == Some(b))
-                || candidate == bin_path;
-            if is_promoted {
-                continue;
-            }
-            let wrong_size = expected_size > 0
-                && candidate.metadata().map(|m| m.len() != expected_size).unwrap_or(false);
-            if wrong_size {
-                let _ = tokio::fs::remove_file(candidate).await;
-            }
+        let dir_owned = models_dir.to_path_buf();
+        let bin_owned = bin_path.to_path_buf();
+        let name_owned = clean_name.to_string();
+        let stale_bins = tokio::task::spawn_blocking(move || {
+            let canon_bin = bin_owned.canonicalize().ok();
+            let expected_bin_name = format!("ggml-{name_owned}.bin");
+            find_all_matching_model_files(&dir_owned, &name_owned)
+                .into_iter()
+                .filter(|candidate| {
+                    if !candidate.file_name().is_some_and(|n| n == expected_bin_name.as_str()) {
+                        return false;
+                    }
+                    let is_promoted = canon_bin
+                        .as_ref()
+                        .is_some_and(|b| candidate.canonicalize().ok().as_ref() == Some(b))
+                        || *candidate == bin_owned;
+                    if is_promoted {
+                        return false;
+                    }
+                    expected_size > 0
+                        && candidate.metadata().map(|m| m.len() != expected_size).unwrap_or(false)
+                })
+                .collect::<Vec<_>>()
+        })
+        .await
+        .unwrap_or_default();
+
+        for candidate in stale_bins {
+            let _ = tokio::fs::remove_file(candidate).await;
         }
     }
 
@@ -884,6 +993,7 @@ const MAX_SEARCH_DEPTH: usize = 8;
 
 /// Find any existing model file matching `ggml-{clean_name}.bin` within `models_dir` (including subfolders).
 /// Checks root and legacy `models/` first for fast response.
+#[cfg(test)]
 pub fn find_model_path_in_dir(models_dir: &Path, clean_name: &str) -> Option<PathBuf> {
     let direct = models_dir.join(format!("ggml-{clean_name}.bin"));
     if direct.is_file() {
@@ -1188,10 +1298,19 @@ fn get_all_models_status_sync(
 pub async fn pause_download_model(
     download_state: State<'_, DownloadState>,
     model_name: String,
+    models_dir: Option<String>,
 ) -> Result<(), String> {
-    let clean_name = normalize_model_name(&model_name);
+    pause_download_inner(&download_state.0, &model_name, models_dir.as_deref()).await
+}
+
+async fn pause_download_inner(
+    session: &Arc<Mutex<DownloadSession>>,
+    model_name: &str,
+    models_dir: Option<&str>,
+) -> Result<(), String> {
+    let clean_name = normalize_model_name(model_name);
     let handle = {
-        let lock = lock_session(&download_state.0);
+        let lock = lock_session(session);
         lock.active.get(&clean_name).cloned()
     };
     match handle {
@@ -1203,7 +1322,27 @@ pub async fn pause_download_model(
             }
             Ok(())
         }
-        None => Err("No active download session found to pause.".to_string()),
+        None => {
+            if let (Some(dir), Some((expected_size, _))) = (
+                models_dir.map(str::trim).filter(|s| !s.is_empty()),
+                model_catalog(&clean_name),
+            ) {
+                let dir_owned = dir.to_string();
+                let name_owned = clean_name.clone();
+                let expected_bin = format!("ggml-{clean_name}.bin");
+                let already_completed = tokio::task::spawn_blocking(move || {
+                    find_all_matching_model_files(Path::new(&dir_owned), &name_owned)
+                        .into_iter()
+                        .any(|p| is_valid_completed_bin(&p, &expected_bin, expected_size))
+                })
+                .await
+                .unwrap_or(false);
+                if already_completed {
+                    return Ok(());
+                }
+            }
+            Err("No active download session found to pause.".to_string())
+        }
     }
 }
 
@@ -1599,6 +1738,222 @@ mod tests {
         assert!(err.contains("not a directory"));
 
         let _ = fs::remove_dir_all(&base_tmp);
+    }
+
+    #[tokio::test]
+    async fn test_download_from_url_retries_premature_clean_eof_and_verifies() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use tokio::net::TcpListener;
+
+        let payload = b"whisper-premature-eof-recovery-payload".to_vec();
+        let expected_size = payload.len() as u64;
+        let expected_hash: String = Sha256::digest(&payload).iter().map(|b| format!("{b:02x}")).collect();
+        let split_at = 16usize;
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let payload_clone = payload.clone();
+        let server_task = tokio::spawn(async move {
+            // Request 1: send HTTP 200 without Content-Length and close after first slice (clean premature EOF)
+            let (mut sock1, _) = listener.accept().await.unwrap();
+            let mut req1 = [0u8; 1024];
+            let _ = sock1.read(&mut req1).await;
+            let header1 = "HTTP/1.1 200 OK\r\nConnection: close\r\n\r\n";
+            sock1.write_all(header1.as_bytes()).await.unwrap();
+            sock1.write_all(&payload_clone[..split_at]).await.unwrap();
+            sock1.shutdown().await.unwrap();
+            drop(sock1);
+
+            // Request 2: verify Range resume header and serve remainder with 206 Partial Content
+            let (mut sock2, _) = listener.accept().await.unwrap();
+            let mut req2 = [0u8; 1024];
+            let n = sock2.read(&mut req2).await.unwrap();
+            let req2_str = String::from_utf8_lossy(&req2[..n]).to_lowercase();
+            assert!(
+                req2_str.contains(&format!("range: bytes={split_at}-")),
+                "Expected Range header on retry, got: {req2_str}"
+            );
+            let rem = &payload_clone[split_at..];
+            let header2 = format!(
+                "HTTP/1.1 206 Partial Content\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                rem.len()
+            );
+            sock2.write_all(header2.as_bytes()).await.unwrap();
+            sock2.write_all(rem).await.unwrap();
+            sock2.shutdown().await.unwrap();
+        });
+
+        let temp_dir = std::env::temp_dir().join(format!("whisper_test_eof_retry_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&temp_dir);
+        fs::create_dir_all(&temp_dir).unwrap();
+
+        let handle = Arc::new(DownloadHandle::new());
+        let client = Client::builder().no_proxy().build().unwrap();
+        let url = format!("http://{addr}/ggml-tiny.bin");
+
+        let outcome = download_from_url(
+            None,
+            &handle,
+            &client,
+            &temp_dir,
+            "tiny",
+            expected_size,
+            &expected_hash,
+            &url,
+            Duration::from_millis(10),
+        )
+        .await
+        .unwrap();
+
+        assert!(matches!(outcome, DownloadOutcome::Completed(sz) if sz == expected_size));
+        assert_eq!(fs::read(temp_dir.join("ggml-tiny.bin")).unwrap(), payload);
+
+        server_task.await.unwrap();
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[tokio::test]
+    async fn test_download_from_url_fails_after_max_retries_on_empty_eof() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use tokio::net::TcpListener;
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let server_task = tokio::spawn(async move {
+            for _ in 0..MAX_RETRIES {
+                let (mut sock, _) = listener.accept().await.unwrap();
+                let mut req = [0u8; 1024];
+                let _ = sock.read(&mut req).await;
+                sock.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+                    .await
+                    .unwrap();
+                sock.shutdown().await.unwrap();
+            }
+        });
+
+        let temp_dir = std::env::temp_dir().join(format!("whisper_test_empty_eof_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&temp_dir);
+        fs::create_dir_all(&temp_dir).unwrap();
+
+        let handle = Arc::new(DownloadHandle::new());
+        let client = Client::builder().no_proxy().build().unwrap();
+        let url = format!("http://{addr}/ggml-tiny.bin");
+
+        let err = download_from_url(
+            None,
+            &handle,
+            &client,
+            &temp_dir,
+            "tiny",
+            100,
+            "0000",
+            &url,
+            Duration::from_millis(5),
+        )
+        .await
+        .err()
+        .expect("Expected error after MAX_RETRIES empty EOFs");
+
+        assert!(err.contains(&format!("after {MAX_RETRIES} attempts")), "Unexpected error: {err}");
+        server_task.await.unwrap();
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[tokio::test]
+    async fn test_pause_download_inner_treats_just_completed_model_as_ok() {
+        let session = Arc::new(Mutex::new(DownloadSession::new()));
+        let temp_dir = std::env::temp_dir().join(format!("whisper_test_pause_race_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&temp_dir);
+        fs::create_dir_all(&temp_dir).unwrap();
+
+        // Not downloaded & not active -> still returns Err
+        let err = pause_download_inner(&session, "silero-v5.1.2", temp_dir.to_str())
+            .await
+            .unwrap_err();
+        assert!(err.contains("No active download session"));
+
+        // Valid completed .bin present on disk (simulating completion right before pause arrived) -> Ok(())
+        let (expected_size, _) = model_catalog("silero-v5.1.2").unwrap();
+
+        // Wrong-sized .bin must NOT be treated as completed
+        File::create(temp_dir.join("ggml-silero-v5.1.2.bin"))
+            .unwrap()
+            .set_len(expected_size.saturating_sub(1))
+            .unwrap();
+        let wrong_size_err = pause_download_inner(&session, "silero-v5.1.2", temp_dir.to_str())
+            .await
+            .unwrap_err();
+        assert!(wrong_size_err.contains("No active download session"));
+
+        // models_dir = None must NOT skip active-handle error even if completed .bin exists
+        File::create(temp_dir.join("ggml-silero-v5.1.2.bin"))
+            .unwrap()
+            .set_len(expected_size)
+            .unwrap();
+        let none_dir_err = pause_download_inner(&session, "silero-v5.1.2", None)
+            .await
+            .unwrap_err();
+        assert!(none_dir_err.contains("No active download session"));
+
+        pause_download_inner(&session, "silero-v5.1.2", temp_dir.to_str())
+            .await
+            .expect("Pause racing right after completion should succeed silently");
+
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[tokio::test]
+    async fn test_download_from_url_fails_after_max_retries_on_repeated_truncated_200_ok() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use tokio::net::TcpListener;
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        // Simulate a broken proxy/server that ignores Range and repeatedly sends the same truncated 200 OK body
+        let server_task = tokio::spawn(async move {
+            for _ in 0..=MAX_RETRIES {
+                let (mut sock, _) = listener.accept().await.unwrap();
+                let mut req = [0u8; 1024];
+                let _ = sock.read(&mut req).await;
+                sock.write_all(
+                    b"HTTP/1.1 200 OK\r\nContent-Length: 10\r\nConnection: close\r\n\r\n0123456789",
+                )
+                .await
+                .unwrap();
+                sock.shutdown().await.unwrap();
+            }
+        });
+
+        let temp_dir =
+            std::env::temp_dir().join(format!("whisper_test_nonadvancing_200_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&temp_dir);
+        fs::create_dir_all(&temp_dir).unwrap();
+
+        let handle = Arc::new(DownloadHandle::new());
+        let client = Client::builder().no_proxy().build().unwrap();
+        let url = format!("http://{addr}/ggml-tiny.bin");
+
+        let err = download_from_url(
+            None,
+            &handle,
+            &client,
+            &temp_dir,
+            "tiny",
+            100,
+            "0000",
+            &url,
+            Duration::from_millis(5),
+        )
+        .await
+        .err()
+        .expect("Expected non-advancing truncated 200 OK loop to fail after MAX_RETRIES");
+
+        assert!(err.contains(&format!("after {MAX_RETRIES} attempts")), "Unexpected error: {err}");
+        server_task.await.unwrap();
+        let _ = fs::remove_dir_all(&temp_dir);
     }
 }
 

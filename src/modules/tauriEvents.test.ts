@@ -407,6 +407,10 @@ describe('tauriEvents module', () => {
       const barFill = new MockElement('DIV');
       const statusEl = new MockElement('DIV') as MockElement & { innerHTML?: string };
       statusEl.innerHTML = '';
+      const pauseBtn = new MockElement('BUTTON') as MockElement & { disabled?: boolean };
+      pauseBtn.disabled = false;
+      const ctrlEl = new MockElement('DIV');
+      ctrlEl.querySelector = (sel: string) => (sel === '[data-action="pause"]' ? pauseBtn : null);
       const progressBlock = new MockElement('DIV');
       const barContainer = new MockElement('DIV');
       const card = new MockElement('DIV') as any;
@@ -416,7 +420,8 @@ describe('tauriEvents module', () => {
         if (sel === '.progress-bar-container') return barContainer;
         if (sel === '.progress-bar-fill') return barFill;
         if (sel === '.model-progress-status') return statusEl;
-        if (sel === '[data-action="pause"]') return new MockElement('BUTTON');
+        if (sel === '.setting-control') return ctrlEl;
+        if (sel === '[data-action="pause"]') return pauseBtn;
         if (sel === '.badge-downloading') return new MockElement('SPAN');
         return null;
       };
@@ -437,7 +442,10 @@ describe('tauriEvents module', () => {
       expect(getActiveModelDownloadsCount()).toBe(1);
       expect(getIsDownloadingModelRunning()).toBe(true);
       expect(barFill.style.width).toBe('100%');
-      expect(statusEl.innerHTML).toBe('Verifying integrity...');
+      expect(statusEl.textContent).toBe('Verifying integrity...');
+      expect(pauseBtn.disabled).toBe(true);
+      expect(pauseBtn.getAttribute('aria-disabled')).toBe('true');
+      expect(pauseBtn.classList.contains('is-verifying')).toBe(true);
 
       handlers['model-download-status']({
         payload: { modelName: 'large-v3', phase: 'completed', progress: 1, downloadedBytes: 3095033483, totalBytes: 3095033483, speedBps: 0 }
@@ -507,6 +515,57 @@ describe('tauriEvents module', () => {
       setIsTranscriptionRunning(false);
       loadSpy.mockRestore();
       delete (globalThis as any).window.__TAURI__;
+    });
+
+    it('keeps Pause disabled on in-flight downloading event while aria-busy is set and formats sub-MB desc in KB', async () => {
+      const handlers: Record<string, (e: any) => void> = {};
+      setOriginalListen(vi.fn().mockImplementation((event: string, handler: (e: any) => void) => {
+        handlers[event] = handler;
+        return Promise.resolve(() => {});
+      }));
+
+      const barFill = new MockElement('DIV');
+      const statusEl = new MockElement('DIV');
+      const descEl = new MockElement('DIV') as MockElement & { innerHTML?: string };
+      descEl.innerHTML = '';
+      descEl.querySelector = () => null;
+      const pauseBtn = new MockElement('BUTTON') as MockElement & { disabled?: boolean };
+      pauseBtn.disabled = true;
+      pauseBtn.setAttribute('aria-busy', 'true');
+      const ctrlEl = new MockElement('DIV');
+      ctrlEl.querySelector = (sel: string) => (sel === '[data-action="pause"]' ? pauseBtn : null);
+      const progressBlock = new MockElement('DIV');
+      const barContainer = new MockElement('DIV');
+      const card = new MockElement('DIV') as any;
+      card.dataset.model = 'silero-v6.2.0';
+      card.dataset.sizeBytes = '885098';
+      card.dataset.sizeMb = '1';
+      card.querySelector = (sel: string) => {
+        if (sel === '.model-progress-block') return progressBlock;
+        if (sel === '.progress-bar-container') return barContainer;
+        if (sel === '.progress-bar-fill') return barFill;
+        if (sel === '.model-progress-status') return statusEl;
+        if (sel === '.setting-desc') return descEl;
+        if (sel === '.setting-control') return ctrlEl;
+        if (sel === '[data-action="pause"]') return pauseBtn;
+        return null;
+      };
+
+      const origQuerySelector = (globalThis as any).document.querySelector;
+      (globalThis as any).document.querySelector = (sel: string) => (sel.includes('silero-v6.2.0') ? card : origQuerySelector(sel));
+
+      setupTauriListeners();
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      handlers['model-download-status']({
+        payload: { modelName: 'silero-v6.2.0', phase: 'downloading', progress: 0.5, downloadedBytes: 442549, totalBytes: 885098, speedBps: 1024 }
+      });
+
+      expect(pauseBtn.disabled).toBe(true);
+      expect(descEl.innerHTML).toContain('864 KB');
+      expect(descEl.innerHTML).not.toContain('1 MB');
+
+      (globalThis as any).document.querySelector = origQuerySelector;
     });
   });
 });

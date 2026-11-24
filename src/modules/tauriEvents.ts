@@ -527,10 +527,10 @@ export function setupTauriListeners(): void {
             if (statusEl) {
               targetCard._smoothedEtaSeconds = null;
               if (dlBytes <= 0) {
-                statusEl.innerHTML = t('models.statusConnecting');
+                statusEl.textContent = t('models.statusConnecting');
               } else {
                 const prefix = modelHub.formatProgress(dlBytes, payload.totalBytes, pct);
-                statusEl.innerHTML = `${prefix} • ${t('models.statusConnecting')}`;
+                statusEl.textContent = `${prefix} • ${t('models.statusConnecting')}`;
               }
             }
           }
@@ -551,7 +551,7 @@ export function setupTauriListeners(): void {
         cardAny._lastPhase = payload.phase;
         cardAny._lastIsConnecting = isConnecting;
         if (statusEl) {
-          statusEl.innerHTML = liveStatus;
+          statusEl.textContent = liveStatus;
           statusEl.classList.remove('status-paused');
           statusEl.classList.add('status-downloading');
           statusEl.style.color = '';
@@ -561,16 +561,29 @@ export function setupTauriListeners(): void {
       // 3. Keep description metadata clean without dynamic metrics
       const descEl = card.querySelector('.setting-desc') as HTMLElement | null;
       if (descEl && !descEl.querySelector('.badge-downloading')) {
+        const totalBytesForDesc = Number(card.dataset.sizeBytes) || (totalKnown ? payload.totalBytes : 0);
         const displayedSizeMB = totalKnown
           ? Math.max(1, Math.round(payload.totalBytes / 1048576))
           : (card.dataset.sizeMb || 1);
-        descEl.innerHTML = modelHub.buildDescriptionHtml(payload.modelName, 'Downloading', displayedSizeMB);
+        descEl.innerHTML = modelHub.buildDescriptionHtml(payload.modelName, 'Downloading', displayedSizeMB, totalBytesForDesc);
       }
 
-      // 4. Ensure button is "Pause" in-place
+      // 4. Ensure button is "Pause" in-place and lock it during SHA-256 verification or in-flight pause
       const ctrlEl = card.querySelector('.setting-control') as HTMLElement | null;
-      if (ctrlEl && !ctrlEl.querySelector('[data-action="pause"]')) {
-        ctrlEl.innerHTML = modelHub.buildActionButtonsHtml(payload.modelName, 'Downloading');
+      if (ctrlEl) {
+        const existingPauseBtn = ctrlEl.querySelector('[data-action="pause"]') as HTMLButtonElement | null;
+        if (!existingPauseBtn) {
+          ctrlEl.innerHTML = modelHub.buildActionButtonsHtml(payload.modelName, 'Downloading', isVerifying);
+        } else {
+          const isPauseBusy = existingPauseBtn.getAttribute?.('aria-busy') === 'true';
+          existingPauseBtn.disabled = isVerifying || isPauseBusy;
+          existingPauseBtn.classList?.toggle?.('is-verifying', isVerifying);
+          if (isVerifying) {
+            existingPauseBtn.setAttribute('aria-disabled', 'true');
+          } else {
+            existingPauseBtn.removeAttribute('aria-disabled');
+          }
+        }
       }
     } else {
       if (typeof window !== 'undefined' && window._modelStallTimers && window._modelStallTimers[payload.modelName]) {

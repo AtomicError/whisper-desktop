@@ -146,6 +146,16 @@ describe('locale consistency for speed presets', () => {
         expect(typeof models[key]).toBe('string');
         expect(models[key].length).toBeGreaterThan(0);
       }
+      expect(typeof models.expectedSizeKB).toBe('string');
+      expect(models.expectedSizeKB).toContain('{size}');
+      expect(typeof models.installedSizeKB).toBe('string');
+      expect(models.installedSizeKB).toContain('{size}');
+      expect(typeof models.catLocalBody).toBe('string');
+      expect(models.catLocalBody.length).toBeGreaterThan(0);
+      expect(typeof models.emptyLocalTitle).toBe('string');
+      expect(models.emptyLocalTitle.length).toBeGreaterThan(0);
+      expect(typeof models.emptyLocalDesc).toBe('string');
+      expect(models.emptyLocalDesc.length).toBeGreaterThan(0);
     });
 
     it(`locale ${code} has all required model recommendation scenario and filter keys`, () => {

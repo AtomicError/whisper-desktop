@@ -1,5 +1,6 @@
 // Model Hub & Management Controller for Whisper Desktop
 import { t } from '../i18n/index';
+import { formatNumberForLang } from '../i18n/formatters';
 import { escapeHTML } from './logsController';
 import { recommendModelsForSystem } from '../modelRecommender';
 
@@ -18,10 +19,10 @@ export interface ModelMetaInfo {
   isVad: boolean;
 }
 
-export const MODEL_ICON_DOWNLOAD = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
-export const MODEL_ICON_DELETE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`;
-export const MODEL_ICON_PAUSE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
-export const MODEL_ICON_RESUME = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+export const MODEL_ICON_DOWNLOAD = `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+export const MODEL_ICON_DELETE = `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`;
+export const MODEL_ICON_PAUSE = `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
+export const MODEL_ICON_RESUME = `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
 
 let currentCategoryFilter = 'recommended';
 let currentModelQuickFilter = 'all';
@@ -86,12 +87,9 @@ export function formatModelDownloadProgress(downloadedBytes: any, totalBytes: an
     unitText = t('models.unitMB') || 'MB';
   }
 
-  const win = typeof window !== 'undefined' ? (window as any) : (globalThis as any);
-  const sizeFormatted = typeof win.formatNumberForLang === 'function'
-    ? win.formatNumberForLang(sizeNum)
-    : String(sizeNum);
+  const sizeFormatted = formatNumForLang(sizeNum);
   const pctFormatted = total > 0
-    ? (typeof win.formatNumberForLang === 'function' ? win.formatNumberForLang(Math.min(100, Math.round(progressPct || 0))) : String(Math.min(100, Math.round(progressPct || 0))))
+    ? formatNumForLang(Math.min(100, Math.round(progressPct || 0)))
     : '...';
 
   const liveTemplate = t('models.downloadLiveProgress', {
@@ -111,172 +109,162 @@ export function formatModelDownloadProgress(downloadedBytes: any, totalBytes: an
 
 export function formatRemainingTime(seconds: number): string {
   if (seconds <= 0 || !isFinite(seconds)) return t('models.timeUnknown');
-  const win = typeof window !== 'undefined' ? (window as any) : (globalThis as any);
   const totalSeconds = Math.round(seconds);
   if (totalSeconds < 60) {
-    return t('models.timeSec', { s: typeof win.formatNumberForLang === 'function' ? win.formatNumberForLang(Math.max(1, totalSeconds)) : String(Math.max(1, totalSeconds)) });
+    return t('models.timeSec', { s: formatNumForLang(Math.max(1, totalSeconds)) });
   }
 
   const totalMinutes = Math.round(totalSeconds / 60);
   if (totalMinutes < 60) {
-    return t('models.timeMin', { m: typeof win.formatNumberForLang === 'function' ? win.formatNumberForLang(Math.max(1, totalMinutes)) : String(Math.max(1, totalMinutes)) });
+    return t('models.timeMin', { m: formatNumForLang(Math.max(1, totalMinutes)) });
   }
 
   const hours = Math.floor(totalMinutes / 60);
   const remainingMinutes = totalMinutes % 60;
   if (remainingMinutes === 0) {
-    return t('models.timeHour', { h: typeof win.formatNumberForLang === 'function' ? win.formatNumberForLang(hours) : String(hours) });
+    return t('models.timeHour', { h: formatNumForLang(hours) });
   }
   return t('models.timeHourMin', {
-    h: typeof win.formatNumberForLang === 'function' ? win.formatNumberForLang(hours) : String(hours),
-    m: typeof win.formatNumberForLang === 'function' ? win.formatNumberForLang(remainingMinutes) : String(remainingMinutes),
+    h: formatNumForLang(hours),
+    m: formatNumForLang(remainingMinutes),
   });
 }
 
-export function renderFamilyHeaderBanner(category: string, counts = { all: 0, multi: 0, en: 0, quant: 0 }): string {
-  let iconSvg = '';
-  let title = '';
-  let subtitle = '';
-  let body = '';
-  let specs = '';
+interface FamilyBannerMeta {
+  iconSvg: string;
+  titleKey: string;
+  subtitleKey?: string;
+  bodyKey: string;
+  specsKey?: string;
+}
 
-  switch (category) {
-    case 'recommended': {
-      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
-      title = t('models.catRecommendedTitle');
-      body = t('models.catRecommendedBody');
-      specs = '';
-      break;
-    }
-    case 'tiny':
-      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`;
-      title = t('models.guideTinyTitle');
-      subtitle = t('models.guideTinySubtitle');
-      body = t('models.guideTinyBody');
-      specs = t('models.guideTinySpecs');
-      break;
-    case 'base':
-      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="15" x2="23" y2="15"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="15" x2="4" y2="15"/></svg>`;
-      title = t('models.guideBaseTitle');
-      subtitle = t('models.guideBaseSubtitle');
-      body = t('models.guideBaseBody');
-      specs = t('models.guideBaseSpecs');
-      break;
-    case 'small':
-      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>`;
-      title = t('models.guideSmallTitle');
-      subtitle = t('models.guideSmallSubtitle');
-      body = t('models.guideSmallBody');
-      specs = t('models.guideSmallSpecs');
-      break;
-    case 'medium':
-      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>`;
-      title = t('models.guideMediumTitle');
-      subtitle = t('models.guideMediumSubtitle');
-      body = t('models.guideMediumBody');
-      specs = t('models.guideMediumSpecs');
-      break;
-    case 'large':
-      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14v2H5z"/></svg>`;
-      title = t('models.guideLargeTitle');
-      subtitle = t('models.guideLargeSubtitle');
-      body = t('models.guideLargeBody');
-      specs = t('models.guideLargeSpecs');
-      break;
-    case 'vad':
-      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`;
-      title = t('models.badgeVadTitle');
-      subtitle = t('models.guideVadSubtitle');
-      body = t('models.guideVadBody');
-      specs = t('models.guideVadSpecs');
-      break;
-    case 'local':
-      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
-      title = t('models.catLocal');
-      subtitle = t('models.catLocalSubtitle');
-      body = t('models.subtitle');
-      break;
-    case 'all':
-    default:
-      iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`;
-      title = t('models.catAll');
-      subtitle = t('models.title');
-      body = t('models.subtitle');
-      break;
-  }
+const FAMILY_BANNER_META: Record<string, FamilyBannerMeta> = {
+  recommended: {
+    iconSvg: `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
+    titleKey: 'models.catRecommendedTitle',
+    bodyKey: 'models.catRecommendedBody',
+  },
+  tiny: {
+    iconSvg: `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`,
+    titleKey: 'models.guideTinyTitle',
+    subtitleKey: 'models.guideTinySubtitle',
+    bodyKey: 'models.guideTinyBody',
+    specsKey: 'models.guideTinySpecs',
+  },
+  base: {
+    iconSvg: `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="15" x2="23" y2="15"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="15" x2="4" y2="15"/></svg>`,
+    titleKey: 'models.guideBaseTitle',
+    subtitleKey: 'models.guideBaseSubtitle',
+    bodyKey: 'models.guideBaseBody',
+    specsKey: 'models.guideBaseSpecs',
+  },
+  small: {
+    iconSvg: `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>`,
+    titleKey: 'models.guideSmallTitle',
+    subtitleKey: 'models.guideSmallSubtitle',
+    bodyKey: 'models.guideSmallBody',
+    specsKey: 'models.guideSmallSpecs',
+  },
+  medium: {
+    iconSvg: `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>`,
+    titleKey: 'models.guideMediumTitle',
+    subtitleKey: 'models.guideMediumSubtitle',
+    bodyKey: 'models.guideMediumBody',
+    specsKey: 'models.guideMediumSpecs',
+  },
+  large: {
+    iconSvg: `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14v2H5z"/></svg>`,
+    titleKey: 'models.guideLargeTitle',
+    subtitleKey: 'models.guideLargeSubtitle',
+    bodyKey: 'models.guideLargeBody',
+    specsKey: 'models.guideLargeSpecs',
+  },
+  vad: {
+    iconSvg: `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>`,
+    titleKey: 'models.badgeVadTitle',
+    subtitleKey: 'models.guideVadSubtitle',
+    bodyKey: 'models.guideVadBody',
+    specsKey: 'models.guideVadSpecs',
+  },
+  local: {
+    iconSvg: `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
+    titleKey: 'models.catLocal',
+    subtitleKey: 'models.catLocalSubtitle',
+    bodyKey: 'models.catLocalBody',
+  },
+  all: {
+    iconSvg: `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`,
+    titleKey: 'models.catAll',
+    subtitleKey: 'models.title',
+    bodyKey: 'models.subtitle',
+  },
+};
 
-  const specsHtml = specs ? `<div class="model-family-specs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px; height:13px; opacity:0.85;"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><span>${escapeHTML(specs)}</span></div>` : '';
-
-  const win = typeof window !== 'undefined' ? (window as any) : (globalThis as any);
-  const formatNum = (n: number) => typeof win.formatNumberForLang === 'function' ? win.formatNumberForLang(n) : String(n);
-
-  let filterBarHtml = '';
+function renderQuickFilterBar(category: string, counts: { all: number; multi: number; en: number; quant: number }): string {
   if (category === 'vad') {
-    filterBarHtml = `
+    return `
       <div class="model-banner-filters">
         <div class="model-filter-info-pill">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>
-          <span>${escapeHTML(t('models.badgeVadTitle'))} (${formatNum(counts.all)})</span>
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>
+          <span>${escapeHTML(t('models.badgeVadTitle'))} (${formatNumForLang(counts.all)})</span>
         </div>
       </div>
     `;
-  } else if (category === 'recommended') {
-    filterBarHtml = '';
-  } else if (counts.all > 0) {
-    const isAll = currentModelQuickFilter === 'all' ? 'active' : '';
-    const isMulti = currentModelQuickFilter === 'multi' ? 'active' : '';
-    const isEn = currentModelQuickFilter === 'en' ? 'active' : '';
-    const isQuant = currentModelQuickFilter === 'quant' ? 'active' : '';
-
-    const labelAll = t('models.filterAll');
-    const quickFilterAria = t('models.quickFilterLabel');
-    const labelMulti = t('models.filterMulti');
-    const labelEn = t('models.filterEn');
-    const labelQuant = t('models.filterQuant');
-    const enTooltip = t('models.filterEnTooltip');
-    const quantTooltip = t('models.filterQuantTooltip');
-
-    const showMulti = counts.multi > 0 && counts.multi < counts.all;
-    const showEn = counts.en > 0 && counts.en < counts.all;
-    const showQuant = counts.quant > 0 && counts.quant < counts.all;
-
-    if (showMulti || showEn || showQuant) {
-      filterBarHtml = `
-        <div class="model-banner-filters">
-          <div class="model-segmented-control" role="tablist" aria-orientation="horizontal" aria-label="${escapeHTML(quickFilterAria)}">
-            <button type="button" class="model-segment-btn ${isAll}" role="tab" aria-selected="${isAll ? 'true' : 'false'}" tabindex="${isAll ? '0' : '-1'}" data-quick-filter="all">
-              <span>${escapeHTML(labelAll)}</span>
-              <span class="segment-count">${formatNum(counts.all)}</span>
-            </button>
-            ${showMulti ? `
-              <button type="button" class="model-segment-btn ${isMulti}" role="tab" aria-selected="${isMulti ? 'true' : 'false'}" tabindex="${isMulti ? '0' : '-1'}" data-quick-filter="multi">
-                <span>${escapeHTML(labelMulti)}</span>
-                <span class="segment-count">${formatNum(counts.multi)}</span>
-              </button>
-            ` : ''}
-            ${showEn ? `
-              <button type="button" class="model-segment-btn ${isEn}" role="tab" aria-selected="${isEn ? 'true' : 'false'}" tabindex="${isEn ? '0' : '-1'}" data-quick-filter="en" title="${escapeHTML(enTooltip)}">
-                <span>${escapeHTML(labelEn)}</span>
-                <span class="segment-count">${formatNum(counts.en)}</span>
-              </button>
-            ` : ''}
-            ${showQuant ? `
-              <button type="button" class="model-segment-btn ${isQuant}" role="tab" aria-selected="${isQuant ? 'true' : 'false'}" tabindex="${isQuant ? '0' : '-1'}" data-quick-filter="quant" title="${escapeHTML(quantTooltip)}">
-                <span>${escapeHTML(labelQuant)}</span>
-                <span class="segment-count">${formatNum(counts.quant)}</span>
-              </button>
-            ` : ''}
-          </div>
-        </div>
-      `;
-    }
   }
+  if (category === 'recommended' || counts.all <= 0) return '';
+
+  const showMulti = counts.multi > 0 && counts.multi < counts.all;
+  const showEn = counts.en > 0 && counts.en < counts.all;
+  const showQuant = counts.quant > 0 && counts.quant < counts.all;
+  if (!showMulti && !showEn && !showQuant) return '';
+
+  const tabs: Array<{ id: string; label: string; count: number; show: boolean; tooltip?: string }> = [
+    { id: 'all', label: t('models.filterAll'), count: counts.all, show: true },
+    { id: 'multi', label: t('models.filterMulti'), count: counts.multi, show: showMulti },
+    { id: 'en', label: t('models.filterEn'), count: counts.en, show: showEn, tooltip: t('models.filterEnTooltip') },
+    { id: 'quant', label: t('models.filterQuant'), count: counts.quant, show: showQuant, tooltip: t('models.filterQuantTooltip') },
+  ];
+
+  const tabsHtml = tabs
+    .filter(tab => tab.show)
+    .map(tab => {
+      const isActive = currentModelQuickFilter === tab.id;
+      const titleAttr = tab.tooltip ? ` title="${escapeHTML(tab.tooltip)}"` : '';
+      return `
+        <button type="button" class="model-segment-btn ${isActive ? 'active' : ''}" role="tab" aria-selected="${isActive ? 'true' : 'false'}" tabindex="${isActive ? '0' : '-1'}" data-quick-filter="${tab.id}"${titleAttr}>
+          <span>${escapeHTML(tab.label)}</span>
+          <span class="segment-count">${formatNumForLang(tab.count)}</span>
+        </button>
+      `;
+    })
+    .join('');
+
+  return `
+    <div class="model-banner-filters">
+      <div class="model-segmented-control" role="tablist" aria-orientation="horizontal" aria-label="${escapeHTML(t('models.quickFilterLabel'))}">
+        ${tabsHtml}
+      </div>
+    </div>
+  `;
+}
+
+export function renderFamilyHeaderBanner(category: string, counts = { all: 0, multi: 0, en: 0, quant: 0 }): string {
+  const meta = FAMILY_BANNER_META[category] || FAMILY_BANNER_META.all;
+  const title = t(meta.titleKey);
+  const subtitle = meta.subtitleKey ? t(meta.subtitleKey) : '';
+  const body = t(meta.bodyKey);
+  const specs = meta.specsKey ? t(meta.specsKey) : '';
+
+  const specsHtml = specs
+    ? `<div class="model-family-specs"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px; height:13px; opacity:0.85;"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><span>${escapeHTML(specs)}</span></div>`
+    : '';
+  const filterBarHtml = renderQuickFilterBar(category, counts);
 
   return `
     <div class="model-family-banner">
       <div class="model-family-banner-top">
         <div class="model-family-identity">
-          <div class="model-family-icon">${iconSvg}</div>
+          <div class="model-family-icon">${meta.iconSvg}</div>
           <div class="model-family-title-wrap">
             <span class="model-family-title">${escapeHTML(title)}</span>
             ${subtitle ? `<span class="model-family-subtitle">${escapeHTML(subtitle)}</span>` : ''}
@@ -365,7 +353,17 @@ export function clearModelSearch(): void {
 
 function formatNumForLang(value: number | string): string {
   const win = getGlobal();
-  return typeof win.formatNumberForLang === 'function' ? win.formatNumberForLang(value) : String(value);
+  return typeof win.formatNumberForLang === 'function' ? win.formatNumberForLang(value) : formatNumberForLang(value);
+}
+
+function getConfiguredModelsDir(win: any, settingsState?: any): string {
+  const fromState = settingsState?.modelsDir ?? win?.settingsState?.modelsDir;
+  const fromInput = typeof document !== 'undefined'
+    ? (document.getElementById('opt-modelsDir') as HTMLInputElement | null)?.value
+    : undefined;
+  const stateTrimmed = typeof fromState === 'string' ? fromState.trim() : '';
+  const inputTrimmed = typeof fromInput === 'string' ? fromInput.trim() : '';
+  return stateTrimmed || inputTrimmed;
 }
 
 function escapeAttrSelector(value: string): string {
@@ -451,13 +449,15 @@ function matchesQuickFilter(modelName: string, query: string): boolean {
   return true;
 }
 
-export function buildActionButtonsHtml(modelName: string, status: string): string {
+export function buildActionButtonsHtml(modelName: string, status: string, isVerifying = false): string {
   const safeName = escapeHTML(modelName);
   if (status === 'Downloaded') {
     return `<button type="button" class="model-action-btn model-btn-delete" data-action="delete" aria-label="${t('models.ariaDeleteModel', { name: safeName })}">${MODEL_ICON_DELETE}<span>${t('models.actionDelete')}</span></button>`;
   }
   if (status === 'Downloading') {
-    return `<button type="button" class="model-action-btn model-btn-pause" data-action="pause" aria-label="${t('models.ariaPauseDownload', { name: safeName })}">${MODEL_ICON_PAUSE}<span>${t('models.actionPause')}</span></button>`;
+    const verifyingAttrs = isVerifying ? ' disabled aria-disabled="true"' : '';
+    const verifyingClass = isVerifying ? ' is-verifying' : '';
+    return `<button type="button" class="model-action-btn model-btn-pause${verifyingClass}" data-action="pause"${verifyingAttrs} aria-label="${t('models.ariaPauseDownload', { name: safeName })}">${MODEL_ICON_PAUSE}<span>${t('models.actionPause')}</span></button>`;
   }
   if (status === 'Paused') {
     return `
@@ -468,20 +468,31 @@ export function buildActionButtonsHtml(modelName: string, status: string): strin
   return `<button type="button" class="model-action-btn model-btn-download" data-action="download" aria-label="${t('models.ariaDownloadModel', { name: safeName })}">${MODEL_ICON_DOWNLOAD}<span>${t('models.actionDownload')}</span></button>`;
 }
 
-export function buildModelDescriptionHtml(modelName: string, status: string, sizeMB: number | string): string {
+function formatModelCardSizeText(status: string, sizeMB: number | string, sizeBytes = 0): string {
+  const bytesNum = Number(sizeBytes) || 0;
+  if (bytesNum > 0 && bytesNum < 1048576) {
+    const sizeKB = Math.max(1, Math.round(bytesNum / 1024));
+    return status === 'Downloaded'
+      ? t('models.installedSizeKB', { size: formatNumForLang(sizeKB) })
+      : t('models.expectedSizeKB', { size: formatNumForLang(sizeKB) });
+  }
+  return status === 'Downloaded'
+    ? t('models.installedSize', { size: formatNumForLang(sizeMB) })
+    : t('models.expectedSize', { size: formatNumForLang(sizeMB) });
+}
+
+export function buildModelDescriptionHtml(modelName: string, status: string, sizeMB: number | string, sizeBytes = 0): string {
   const meta = getModelMetaInfo(modelName);
   let statusBadge = '';
   if (status === 'Downloaded') {
-    statusBadge = `<span class="model-badge badge-installed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span>${t('models.installedBadge')}</span></span>`;
+    statusBadge = `<span class="model-badge badge-installed"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span>${t('models.installedBadge')}</span></span>`;
   } else if (status === 'Downloading') {
     statusBadge = `<span class="model-badge badge-downloading">${t('models.badgeDownloading')}</span>`;
   } else if (status === 'Paused') {
     statusBadge = `<span class="model-badge badge-paused">${t('models.badgePaused')}</span>`;
   }
 
-  const sizeText = status === 'Downloaded'
-    ? (t('models.installedSize', { size: formatNumForLang(sizeMB) }) || `${sizeMB} MB`)
-    : t('models.expectedSize', { size: formatNumForLang(sizeMB) });
+  const sizeText = formatModelCardSizeText(status, sizeMB, sizeBytes);
 
   return `
     ${statusBadge}
@@ -501,11 +512,11 @@ function buildRecBadgeHtml(recInfo: any): string {
   const roleClass = `model-badge-rec-${recInfo.role}`;
   const roleLabel = t(recInfo.badgeI18nKey) || recInfo.role;
   const iconMap: Record<string, string> = {
-    balanced: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
-    quality: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>`,
-    fast: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`,
-    english: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`,
-    quantized: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>`
+    balanced: `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
+    quality: `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>`,
+    fast: `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`,
+    english: `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`,
+    quantized: `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>`
   };
   return `<span class="model-badge model-badge-rec ${roleClass}">${iconMap[recInfo.role] || ''}<span>${escapeHTML(roleLabel)}</span></span>`;
 }
@@ -533,6 +544,7 @@ function buildModelCardElement(m: ModelStatus, recInfo: any): HTMLElement {
 
   const sizeMB = Math.max(1, Math.round((m.sizeBytes || 0) / 1048576));
   card.dataset.sizeMb = String(sizeMB);
+  card.dataset.sizeBytes = String(m.sizeBytes || 0);
 
   const dlBytes = m.downloadedBytes || 0;
   const isVerifying = m.status === 'Downloading' && Boolean(m.verifying);
@@ -541,7 +553,7 @@ function buildModelCardElement(m: ModelStatus, recInfo: any): HTMLElement {
   const showProgressBlock = m.status === 'Downloading' || m.status === 'Paused' ? 'block' : 'none';
 
   const vadBadgeHtml = m.name.startsWith('silero-')
-    ? `<span class="model-badge model-badge-vad" title="${escapeHTML(t('models.badgeVadTitle'))}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg><span>${t('models.badgeVad')}</span></span>`
+    ? `<span class="model-badge model-badge-vad" title="${escapeHTML(t('models.badgeVadTitle'))}"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg><span>${t('models.badgeVad')}</span></span>`
     : '';
   const recReasonHtml = recInfo
     ? `<div class="model-rec-description">${escapeHTML(t(recInfo.reasonI18nKey) || recInfo.reasonFallback)}</div>`
@@ -558,7 +570,7 @@ function buildModelCardElement(m: ModelStatus, recInfo: any): HTMLElement {
         ${vadBadgeHtml}
       </div>
       <div class="setting-desc" style="font-size: 0.82rem; color: var(--color-text-muted); line-height: 1.4; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-        ${buildModelDescriptionHtml(m.name, m.status, sizeMB)}
+        ${buildModelDescriptionHtml(m.name, m.status, sizeMB, m.sizeBytes)}
       </div>
       ${recReasonHtml}
       <div class="model-progress-block" style="display: ${showProgressBlock};">
@@ -571,7 +583,7 @@ function buildModelCardElement(m: ModelStatus, recInfo: any): HTMLElement {
       </div>
     </div>
     <div class="setting-control">
-      ${buildActionButtonsHtml(m.name, m.status)}
+      ${buildActionButtonsHtml(m.name, m.status, isVerifying)}
     </div>
   `;
   return card;
@@ -589,7 +601,7 @@ function attachModelGridDelegate(grid: any): void {
     }
 
     const btn = target.closest('button[data-action]') as HTMLButtonElement | null;
-    if (!btn) return;
+    if (!btn || btn.disabled || btn.getAttribute?.('aria-disabled') === 'true') return;
     if (btn.dataset.action === 'clear-search') {
       clearModelSearch();
       return;
@@ -646,16 +658,21 @@ function renderModelsEmptyState(grid: HTMLElement, query: string): void {
   const emptyDiv = document.createElement('div');
   emptyDiv.className = 'models-empty-state';
   emptyDiv.style.padding = '48px 20px';
+  const isEmptyLocal = !query && currentCategoryFilter === 'local';
+  const emptyTitle = isEmptyLocal ? t('models.emptyLocalTitle') : t('models.emptyTitle');
+  const emptyDesc = query
+    ? t('models.emptyDescQuery', { query: escapeHTML(query) })
+    : (isEmptyLocal ? t('models.emptyLocalDesc') : t('models.emptyDescCategory'));
   emptyDiv.innerHTML = `
     <div class="models-empty-icon">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <circle cx="11" cy="11" r="8"></circle>
         <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
         <line x1="8" y1="11" x2="14" y2="11"></line>
       </svg>
     </div>
-    <div class="models-empty-title">${t('models.emptyTitle')}</div>
-    <div class="models-empty-desc">${query ? t('models.emptyDescQuery', { query: escapeHTML(query) }) : t('models.emptyDescCategory')}</div>
+    <div class="models-empty-title">${emptyTitle}</div>
+    <div class="models-empty-desc">${emptyDesc}</div>
     ${query ? `<button type="button" class="btn-secondary" data-action="clear-search">${t('models.emptyClearSearch')}</button>` : ''}
   `;
   grid.appendChild(emptyDiv);
@@ -670,7 +687,7 @@ function renderModelsErrorState(grid: HTMLElement): void {
   errDiv.style.padding = '48px 20px';
   errDiv.innerHTML = `
     <div class="models-empty-icon" style="color: var(--color-red);">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="10"></circle>
         <line x1="12" y1="8" x2="12" y2="12"></line>
         <line x1="12" y1="16" x2="12.01" y2="16"></line>
@@ -863,7 +880,7 @@ export async function loadModelStatusesGrid(_isSilent = false, forceRefresh = fa
     return;
   }
 
-  const modelsDir = settingsState?.modelsDir || (document.getElementById('opt-modelsDir') as HTMLInputElement)?.value;
+  const modelsDir = getConfiguredModelsDir(win, settingsState);
   if (!modelsDir) {
     if (gridEl) renderModelsErrorState(gridEl);
     return;
@@ -903,65 +920,62 @@ export function filterModelsGrid(): void {
   }, 250);
 }
 
+function applyOptimisticDownloadCardState(name: string): void {
+  if (typeof document === 'undefined') return;
+  const card = document.querySelector(`[data-model="${escapeAttrSelector(name)}"]`) as HTMLElement | null;
+  if (!card) return;
+
+  card.dataset.status = 'Downloading';
+  const ctrlEl = card.querySelector('.setting-control') as HTMLElement | null;
+  if (ctrlEl) {
+    const hadFocus = Boolean(
+      document.activeElement && typeof ctrlEl.contains === 'function' && ctrlEl.contains(document.activeElement)
+    );
+    ctrlEl.innerHTML = buildActionButtonsHtml(name, 'Downloading');
+    if (hadFocus && typeof ctrlEl.querySelector === 'function') {
+      const pauseBtn = ctrlEl.querySelector('button[data-action="pause"]') as HTMLElement | null;
+      focusWithoutScroll(pauseBtn);
+    }
+  }
+  const descEl = card.querySelector('.setting-desc');
+  if (descEl) {
+    descEl.innerHTML = buildModelDescriptionHtml(name, 'Downloading', card.dataset.sizeMb || 1, Number(card.dataset.sizeBytes) || 0);
+  }
+  const progressBlock = card.querySelector('.model-progress-block') as HTMLElement | null;
+  if (progressBlock) progressBlock.style.display = 'block';
+  const statusEl = card.querySelector('.model-progress-status') as HTMLElement | null;
+  if (statusEl) {
+    if (!statusEl.textContent?.trim()) {
+      statusEl.textContent = t('models.statusStarting');
+    } else if (statusEl.textContent.includes('•')) {
+      const parts = statusEl.textContent.split('•');
+      statusEl.textContent = `${parts[0].trim()} • ${t('models.statusConnecting')}`;
+    } else {
+      statusEl.textContent = t('models.statusStarting');
+    }
+    statusEl.classList.remove('status-paused');
+    statusEl.classList.add('status-downloading');
+    statusEl.style.color = '';
+  }
+  const barFill = card.querySelector('.progress-bar-fill') as HTMLElement | null;
+  if (barFill) {
+    barFill.style.background = 'var(--color-cyan)';
+    barFill.style.boxShadow = 'var(--shadow-neon-cyan)';
+  }
+}
+
 export async function downloadModelClick(name: string): Promise<void> {
   const win = getGlobal();
   const invoke = getTauriInvoke();
   const showNotification = win.showNotification;
-  const modelsDir = win.settingsState?.modelsDir || (typeof document !== 'undefined' ? (document.getElementById('opt-modelsDir') as HTMLInputElement)?.value : undefined);
+  const modelsDir = getConfiguredModelsDir(win);
 
   if (!modelsDir || _modelActionsInProgress.has(name) || !invoke) return;
   _modelActionsInProgress.add(name);
   try {
     _loadModelsSeq++;
     _cachedModelStatuses = null;
-
-    const card = typeof document !== 'undefined'
-      ? (document.querySelector(`[data-model="${escapeAttrSelector(name)}"]`) as HTMLElement | null)
-      : null;
-    if (card) {
-      card.dataset.status = 'Downloading';
-      const ctrlEl = card.querySelector('.setting-control') as HTMLElement | null;
-      if (ctrlEl) {
-        const hadFocus = typeof document !== 'undefined'
-          && Boolean(document.activeElement && typeof ctrlEl.contains === 'function' && ctrlEl.contains(document.activeElement));
-        ctrlEl.innerHTML = buildActionButtonsHtml(name, 'Downloading');
-        if (hadFocus && typeof ctrlEl.querySelector === 'function') {
-          const pauseBtn = ctrlEl.querySelector('button[data-action="pause"]') as HTMLElement | null;
-          if (pauseBtn && typeof pauseBtn.focus === 'function') {
-            try {
-              pauseBtn.focus({ preventScroll: true });
-            } catch {
-              pauseBtn.focus();
-            }
-          }
-        }
-      }
-      const descEl = card.querySelector('.setting-desc');
-      if (descEl) {
-        descEl.innerHTML = buildModelDescriptionHtml(name, 'Downloading', card.dataset.sizeMb || 1);
-      }
-      const progressBlock = card.querySelector('.model-progress-block') as HTMLElement | null;
-      if (progressBlock) progressBlock.style.display = 'block';
-      const statusEl = card.querySelector('.model-progress-status') as HTMLElement | null;
-      if (statusEl) {
-        if (!statusEl.textContent?.trim()) {
-          statusEl.textContent = t('models.statusStarting');
-        } else if (statusEl.textContent.includes('•')) {
-          const parts = statusEl.textContent.split('•');
-          statusEl.textContent = `${parts[0].trim()} • ${t('models.statusConnecting')}`;
-        } else {
-          statusEl.textContent = t('models.statusStarting');
-        }
-        statusEl.classList.remove('status-paused');
-        statusEl.classList.add('status-downloading');
-        statusEl.style.color = '';
-      }
-      const barFill = card.querySelector('.progress-bar-fill') as HTMLElement | null;
-      if (barFill) {
-        barFill.style.background = 'var(--color-cyan)';
-        barFill.style.boxShadow = 'var(--shadow-neon-cyan)';
-      }
-    }
+    applyOptimisticDownloadCardState(name);
 
     await invoke('start_download_model_task', {
       modelsDir,
@@ -982,25 +996,56 @@ export async function pauseModelClick(name: string): Promise<void> {
   const showNotification = win.showNotification;
   if (_modelActionsInProgress.has(name) || !invoke) return;
   _modelActionsInProgress.add(name);
+
+  const card = typeof document !== 'undefined'
+    ? (document.querySelector(`[data-model="${escapeAttrSelector(name)}"]`) as HTMLElement | null)
+    : null;
+  const pauseBtn = card?.querySelector?.('button[data-action="pause"]') as HTMLButtonElement | null;
+  const wasPauseFocused = Boolean(pauseBtn && typeof document !== 'undefined' && document.activeElement === pauseBtn);
+  if (pauseBtn) {
+    pauseBtn.disabled = true;
+    pauseBtn.setAttribute?.('aria-busy', 'true');
+  }
+
+  const restorePauseFocus = () => {
+    if (
+      wasPauseFocused
+      && typeof document !== 'undefined'
+      && (!document.activeElement || document.activeElement === document.body || document.activeElement === pauseBtn)
+    ) {
+      const replacementBtn = document.querySelector?.(`[data-model="${escapeAttrSelector(name)}"] button[data-action]`) as HTMLElement | null;
+      replacementBtn?.focus?.();
+    }
+  };
+
+  const modelsDir = getConfiguredModelsDir(win);
   try {
-    await invoke('pause_download_model', { modelName: name });
+    await invoke('pause_download_model', modelsDir ? { modelName: name, modelsDir } : { modelName: name });
     _cachedModelStatuses = null;
     await loadModelStatusesGrid(false, true);
+    restorePauseFocus();
   } catch (err: any) {
     if (showNotification) showNotification(t('toasts.modelDownloadPauseError', { error: String(err) }), "error");
     _cachedModelStatuses = null;
     await loadModelStatusesGrid(false, true);
+    restorePauseFocus();
   } finally {
+    if (pauseBtn) {
+      pauseBtn.removeAttribute?.('aria-busy');
+      if (!pauseBtn.classList?.contains?.('is-verifying')) {
+        pauseBtn.disabled = false;
+      }
+    }
     _modelActionsInProgress.delete(name);
   }
 }
 
 export async function deleteModelClick(name: string): Promise<void> {
-  const win = typeof window !== 'undefined' ? (window as any) : (globalThis as any);
+  const win = getGlobal();
   const invoke = getTauriInvoke();
   const showNotification = win.showNotification;
   const showConfirmModal = win.showConfirmModal;
-  const modelsDir = win.settingsState?.modelsDir || (typeof document !== 'undefined' ? (document.getElementById('opt-modelsDir') as HTMLInputElement)?.value : undefined);
+  const modelsDir = getConfiguredModelsDir(win);
 
   if (_modelActionsInProgress.has(name) || !invoke || !modelsDir) return;
   const card = typeof document !== 'undefined'
@@ -1015,7 +1060,7 @@ export async function deleteModelClick(name: string): Promise<void> {
       t(isDiscard ? 'modals.confirmDiscardModelDesc' : 'modals.confirmDeleteModelDesc', { name }),
       t(isDiscard ? 'modals.discardBtn' : 'modals.deleteBtn')
     );
-    if (!confirmed) return;
+    if (!confirmed || _modelActionsInProgress.has(name)) return;
   }
   _modelActionsInProgress.add(name);
   try {

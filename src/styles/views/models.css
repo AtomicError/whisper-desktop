@@ -464,6 +464,13 @@
   box-shadow: 0 3px 12px rgba(var(--color-cyan-rgb), 0.3);
 }
 
+.model-action-btn:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  filter: grayscale(0.4);
+  box-shadow: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .badge-downloading {
     animation: none;
