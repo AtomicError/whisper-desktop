@@ -1264,7 +1264,10 @@ export async function runBatchExtraction(): Promise<void> {
     const itemSettings: SettingsState = { ...runSettings, inputFile: item.path };
 
     try {
-      currentWavPath = await invoke('convert_media_file', { filePath: item.path });
+      currentWavPath = await invoke('convert_media_file', {
+        filePath: item.path,
+        diarize: Boolean(itemSettings.diarize)
+      });
 
       if (batchCancelActive) {
         item.status = 'aborted';

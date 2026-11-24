@@ -200,7 +200,10 @@ describe('transcribeConfigHelpers', () => {
       expect(clampIntSettingValue('offsetT', 3_000_000_000)).toBe(MAX_TIMECODE_MS);
       expect(clampIntSettingValue('duration', -500)).toBe(0);
       expect(clampIntSettingValue('threads', '۸')).toBe(8);
-      expect(clampIntSettingValue('threads', 9_999_999_999)).toBe(MAX_I32);
+      expect(clampIntSettingValue('threads', 9_999_999_999)).toBe(256);
+      expect(clampIntSettingValue('processors', 999)).toBe(64);
+      expect(clampIntSettingValue('audioCtx', 5000)).toBe(1500);
+      expect(clampIntSettingValue('maxContext', 9_999_999_999)).toBe(MAX_I32);
       expect(clampIntSettingValue('threads', 'not-a-number')).toBe(1);
       expect(clampIntSettingValue('maxContext', 'not-a-number')).toBe(-1);
       expect(clampIntSettingValue('beamSize', '۱۲')).toBe(8);

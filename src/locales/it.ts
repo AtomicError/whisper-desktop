@@ -867,6 +867,11 @@ export const it: Translations = {
     whisperSystem: "Di Sistema",
     engineNotBundledShort: 'Non incluso',
     engineMissingBadge: 'Non trovato',
+    engineReadyBadge: 'Pronto',
+    engineStatusError: 'Errore stato',
+    engineTooltipSource: 'Origine',
+    engineTooltipPath: 'Percorso',
+    engineTooltipBackends: 'Motori',
     trayTitle: 'Continua in background alla chiusura della finestra',
     trayDesc: 'Mantiene Whisper Desktop attivo nell\'area di notifica di sistema alla chiusura della finestra principale.',
     autoCheckUpdatesTitle: 'Controlla aggiornamenti all’avvio',
@@ -874,6 +879,11 @@ export const it: Translations = {
     uiScaleTitle: 'Scala e Zoom Interfaccia',
     uiScaleDesc: 'Regola la scala dell\'interfaccia per schermi ad alta densità di pixel (High-DPI).',
     uiScaleReset: 'Ripristina',
+    uiScaleZoomOut: 'Riduci zoom (Ctrl+-)',
+    uiScaleZoomIn: 'Aumenta zoom (Ctrl++)',
+    uiScaleResetTooltip: 'Ripristina scala al 100% (Ctrl+0)',
+    decreaseValue: 'Diminuisci valore',
+    increaseValue: 'Aumenta valore',
     langSpokenTitle: 'Lingua Parlata',
     langSpokenDesc: 'Lingua parlata nell\'audio. Scegli Rilevamento automatico per far sì che Whisper la rilevi automaticamente.',
     initialPromptTitle: 'Prompt di contesto iniziale',
@@ -904,7 +914,7 @@ export const it: Translations = {
     tokenTimestampsTitle: 'Timestamp per singola parola (Token)',
     tokenTimestampsDesc: 'Genera timestamp ad alta precisione in millisecondi per ciascuna parola.',
     audioCtxTitle: 'Finestra di analisi audio',
-    audioCtxDesc: 'Durata del frame di analisi acustica in millisecondi (0 = finestra standard di 30 secondi di Whisper).',
+    audioCtxDesc: 'Fotogrammi di contesto dell\'encoder audio (0–1500; 0 = finestra predefinita di 30s del modello, 1500 = 30s completi).',
     maxContextTitle: 'Limite di memoria del contesto precedente',
     maxContextDesc: 'Quantità massima di testo precedente mantenuta in memoria come contesto per il modello.',
     offsetTTitle: 'Punto di inizio della trascrizione (ms)',
@@ -1099,7 +1109,7 @@ export const it: Translations = {
     tinyDiarizePoints: '<span class="setting-desc-point"><strong>Requisito:</strong> Richiede modelli abilitati a <code>tdrz</code> (es. <code>small.en-tdrz</code>).</span>',
     bestOfPoints: '<span class="setting-desc-point"><strong>Predefinito:</strong> <code>5</code></span><span class="setting-desc-point"><strong>Consiglio:</strong> Valori più alti (<code>6–8</code>) aumentano la precisione; più bassi (<code>1–2</code>) velocizzano l\'esecuzione.</span>',
     beamSizePoints: '<span class="setting-desc-point"><strong>Predefinito:</strong> <code>5</code></span><span class="setting-desc-point"><strong>Compromesso:</strong> Valori più alti riducono errori e allucinazioni, ma aumentano i tempi di calcolo.</span>',
-    audioCtxPoints: '<span class="setting-desc-point"><strong>Predefinito:</strong> <code>0</code> (usa la finestra di contesto standard di 30s)</span><span class="setting-desc-point"><strong>Avanzato:</strong> Limita la finestra di attenzione per flussi di streaming personalizzati.</span>',
+    audioCtxPoints: '<span class="setting-desc-point"><strong>Predefinito:</strong> <code>0</code> (usa la finestra completa predefinita di 30s, equivalente a <code>1500</code> fotogrammi)</span><span class="setting-desc-point"><strong>Avanzato:</strong> Imposta tra <code>1</code> e <code>1500</code> fotogrammi per limitare l\'attenzione su clip più brevi.</span>',
     wordTholdPoints: '<span class="setting-desc-point"><strong>Predefinito:</strong> <code>0.01</code></span><span class="setting-desc-point"><strong>Quando modificare:</strong> Aumenta (<code>0.05–0.1</code>) se i timestamp delle parole deviano durante i silenzi.</span>',
     entropyTholdPoints: '<span class="setting-desc-point"><strong>Predefinito:</strong> <code>2.4</code></span><span class="setting-desc-point"><strong>Quando modificare:</strong> Abbassa a <code>2.2</code> se il modello produce testo ripetitivo privo di senso.</span>',
     logprobTholdPoints: '<span class="setting-desc-point"><strong>Predefinito:</strong> <code>-1</code></span><span class="setting-desc-point"><strong>Quando modificare:</strong> Abbassa a <code>-1.5</code> per audio rumoroso o con forti accenti per evitare nuovi tentativi inutili.</span>',
@@ -1126,7 +1136,12 @@ export const it: Translations = {
     polishPoints: '<span class="setting-desc-point"><strong>Consigliato:</strong> Abilitato per un flusso naturale dei sottotitoli, evitando traduzioni letterali rigide.</span>',
     modelsTip: 'Le modifiche ai modelli vengono salvate automaticamente. Fai clic su una riga per impostare il modello predefinito.',
     addReasoning: 'Configura Ragionamento',
-    noReasoning: 'Nessun Ragionamento'
+    noReasoning: 'Nessun Ragionamento',
+    toggleApiKeyVisibility: 'Mostra o nascondi chiave API',
+    removeModelRow: 'Rimuovi riga del modello',
+    modelIdentifierPlaceholder: 'es. gpt-4o-mini',
+    contextTokensTooltip: 'Finestra di contesto: {formatted} ({exact} token)',
+    tokensUnit: 'token'
   },
   logs: {
     title: 'Registri Attività',
@@ -1169,6 +1184,7 @@ export const it: Translations = {
     cancelBtn: 'Annulla',
     addProviderTitle: 'Aggiungi Provider API',
     providerName: 'Nome Provider',
+    providerNamePlaceholder: 'es. OpenRouter',
     apiFormat: 'Formato API',
     baseUrl: 'URL di Base',
     apiKey: 'Chiave API',
@@ -1307,6 +1323,8 @@ export const it: Translations = {
     providerAddedSuccess: 'Provider aggiunto con successo! Configura i relativi modelli di seguito.',
     noProviderToTest: 'Nessun provider attivo selezionato da testare.',
     modelsDirNotWritable: 'La cartella dei modelli selezionata non è scrivibile:\n{error}',
-    outputDirNotWritable: 'La cartella di output selezionata non è scrivibile:\n{error}'
+    outputDirNotWritable: 'La cartella di output selezionata non è scrivibile:\n{error}',
+    modelIdExists: 'Esiste già un modello con ID "{id}" per questo provider.',
+    providersJsonCorrupt: 'L\'elenco salvato dei provider IA non era valido e non può essere analizzato correttamente.'
   }
 };

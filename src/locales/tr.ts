@@ -867,6 +867,11 @@ export const tr: Translations = {
     whisperSystem: "Sistem",
     engineNotBundledShort: 'Dahil değil',
     engineMissingBadge: 'Bulunamadı',
+    engineReadyBadge: 'Hazır',
+    engineStatusError: 'Durum Hatası',
+    engineTooltipSource: 'Kaynak',
+    engineTooltipPath: 'Yol',
+    engineTooltipBackends: 'Motorlar',
     trayTitle: 'Pencere kapatıldığında arka planda çalışmaya devam et',
     trayDesc: 'Ana pencere kapatıldığında Whisper Desktop\'ın arka planda sistem tepsisinde çalışmaya devam etmesini sağlar.',
     autoCheckUpdatesTitle: 'Başlangıçta Güncellemeleri Denetle',
@@ -874,6 +879,11 @@ export const tr: Translations = {
     uiScaleTitle: 'Arayüz Ölçeği ve Yakınlaştırma',
     uiScaleDesc: 'Yüksek çözünürlüklü (High-DPI) ekranlar için arayüz ölçeğini ayarlayın.',
     uiScaleReset: 'Sıfırla',
+    uiScaleZoomOut: 'Uzaklaştır (Ctrl+-)',
+    uiScaleZoomIn: 'Yakınlaştır (Ctrl++)',
+    uiScaleResetTooltip: 'Ölçeği %100\'e sıfırla (Ctrl+0)',
+    decreaseValue: 'Değeri azalt',
+    increaseValue: 'Değeri artır',
     langSpokenTitle: 'Konuşulan Dil',
     langSpokenDesc: 'Sesteki konuşma dili. Whisper\'ın otomatik algılaması için Otomatik Algıla seçeneğini seçin.',
     initialPromptTitle: 'Başlangıç bağlam istemi (Prompt)',
@@ -904,7 +914,7 @@ export const tr: Translations = {
     tokenTimestampsTitle: 'Belirteç (Token) Düzeyinde Zaman Damgası',
     tokenTimestampsDesc: 'Her bir kelime için milisaniye hassasiyetinde zaman damgaları üretir.',
     audioCtxTitle: 'Ses işleme penceresi uzunluğu',
-    audioCtxDesc: 'Milisaniye cinsinden ses bağlam çerçeve uzunluğu (0 = Whisper standart 30 saniyelik penceresi).',
+    audioCtxDesc: 'Ses kodlayıcı bağlam kareleri (0–1500; 0 = modelin varsayılan 30 saniyelik penceresi, 1500 = tam 30 saniye).',
     maxContextTitle: 'Önceki bağlam bellek sınırı',
     maxContextDesc: 'Modele bağlam olarak sağlanan önceki cümlelerin maksimum geçmişi.',
     offsetTTitle: 'Deşifre başlangıç noktası (ms)',
@@ -1099,7 +1109,7 @@ export const tr: Translations = {
     tinyDiarizePoints: '<span class="setting-desc-point"><strong>Gereksinim:</strong> <code>tdrz</code> destekli modeller gerektirir (örn. <code>small.en-tdrz</code>).</span>',
     bestOfPoints: '<span class="setting-desc-point"><strong>Varsayılan:</strong> <code>5</code></span><span class="setting-desc-point"><strong>Öneri:</strong> Yüksek değerler (<code>6–8</code>) doğruluğu artırır; düşük değerler (<code>1–2</code>) daha hızlı çalışır.</span>',
     beamSizePoints: '<span class="setting-desc-point"><strong>Varsayılan:</strong> <code>5</code></span><span class="setting-desc-point"><strong>Denge:</strong> Yüksek değerler kelime hatalarını ve uydurmaları azaltır ancak süreyi uzatır.</span>',
-    audioCtxPoints: '<span class="setting-desc-point"><strong>Varsayılan:</strong> <code>0</code> (modelin varsayılan 30 saniyelik bağlam penceresini kullanır)</span><span class="setting-desc-point"><strong>İleri Düzey:</strong> Özel akış iş akışları için dikkat penceresini sınırlar.</span>',
+    audioCtxPoints: '<span class="setting-desc-point"><strong>Varsayılan:</strong> <code>0</code> (modelin tam varsayılan 30 saniyelik penceresini kullanır, <code>1500</code> kodlayıcı karesine eşittir)</span><span class="setting-desc-point"><strong>İleri Düzey:</strong> Daha kısa kliplerde dikkati sınırlandırmak için <code>1</code> ile <code>1500</code> kare arasında ayarlayın.</span>',
     wordTholdPoints: '<span class="setting-desc-point"><strong>Varsayılan:</strong> <code>0.01</code></span><span class="setting-desc-point"><strong>Ne zaman değiştirilmeli:</strong> Sessiz bölümlerde kelime zamanlamaları kayıyorsa artırın (<code>0.05–0.1</code>).</span>',
     entropyTholdPoints: '<span class="setting-desc-point"><strong>Varsayılan:</strong> <code>2.4</code></span><span class="setting-desc-point"><strong>Ne zaman değiştirilmeli:</strong> Model anlamsız ve tekrarlayan metinler üretiyorsa <code>2.2</code> değerine düşürün.</span>',
     logprobTholdPoints: '<span class="setting-desc-point"><strong>Varsayılan:</strong> <code>-1</code></span><span class="setting-desc-point"><strong>Ne zaman değiştirilmeli:</strong> Gürültülü veya aksanlı seslerde gereksiz tekrarları önlemek için <code>-1.5</code> değerine düşürün.</span>',
@@ -1126,7 +1136,12 @@ export const tr: Translations = {
     polishPoints: '<span class="setting-desc-point"><strong>Önerilen:</strong> Birebir kelime çevirilerinden kaçınarak doğal altyazı akışı sağlamak için etkinleştirin.</span>',
     modelsTip: 'Model değişiklikleri anında otomatik kaydedilir. Varsayılan çeviri modeli yapmak için herhangi bir model satırına tıklayın.',
     addReasoning: 'Akıl Yürütmeyi Yapılandır',
-    noReasoning: 'Akıl Yürütme Yok'
+    noReasoning: 'Akıl Yürütme Yok',
+    toggleApiKeyVisibility: 'API anahtarını göster veya gizle',
+    removeModelRow: 'Model satırını kaldır',
+    modelIdentifierPlaceholder: 'örn. gpt-4o-mini',
+    contextTokensTooltip: 'Bağlam Penceresi: {formatted} ({exact} belirteç)',
+    tokensUnit: 'belirteç'
   },
   logs: {
     title: 'Etkinlik Günlükleri',
@@ -1169,6 +1184,7 @@ export const tr: Translations = {
     cancelBtn: 'İptal',
     addProviderTitle: 'API Sağlayıcısı Ekle',
     providerName: 'Sağlayıcı Adı',
+    providerNamePlaceholder: 'örn. OpenRouter',
     apiFormat: 'API Biçimi',
     baseUrl: 'Temel URL (Base URL)',
     apiKey: 'API Anahtarı',
@@ -1307,6 +1323,8 @@ export const tr: Translations = {
     providerAddedSuccess: 'Sağlayıcı başarıyla eklendi! Aşağıdan modellerini yapılandırın.',
     noProviderToTest: 'Sınanacak etkin bir sağlayıcı seçilmedi.',
     modelsDirNotWritable: 'Seçilen model klasörü yazılabilir değil:\n{error}',
-    outputDirNotWritable: 'Seçilen çıktı klasörü yazılabilir değil:\n{error}'
+    outputDirNotWritable: 'Seçilen çıktı klasörü yazılabilir değil:\n{error}',
+    modelIdExists: 'Bu sağlayıcı için "{id}" kimliğine sahip bir model zaten mevcut.',
+    providersJsonCorrupt: 'Kaydedilen yapay zeka sağlayıcı listesi geçersizdi ve düzgün okunamadı.'
   }
 };

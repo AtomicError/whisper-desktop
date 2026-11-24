@@ -1219,5 +1219,47 @@ describe('transcribePipeline module', () => {
         resetQuickDeckState();
       }
     });
+
+    it('forwards live settings diarize flag to convert_media_file', async () => {
+      // Arrange
+      resetQuickDeckState();
+      setIsTranscribing(false);
+      setIsTranscriptionCancelActive(false);
+      setSelectedMediaFile('/media/stereo.mp4');
+      setWavPathForTranscription(null);
+      setProbedMetadata({ exists: true, durationSec: 30, format: 'Video' });
+      (globalThis as any).window.localScannedTransModels = ['ggml-base.bin'];
+      setSettingsState({
+        selectedBackend: 'Standard',
+        modelPath: 'ggml-base.bin',
+        inputFile: '/media/stereo.mp4',
+        diarize: true,
+        outputSrt: true
+      });
+
+      const invokeMock = vi.fn().mockImplementation((cmd: string) => {
+        if (cmd === 'convert_media_file') {
+          setIsTranscriptionCancelActive(true);
+          return Promise.resolve('/tmp/stereo.wav');
+        }
+        return Promise.resolve(null);
+      });
+      (globalThis as any).window.invoke = invokeMock;
+
+      try {
+        // Act
+        await runWhisperTranscription();
+
+        // Assert
+        expect(invokeMock).toHaveBeenCalledWith('convert_media_file', {
+          filePath: '/media/stereo.mp4',
+          diarize: true
+        });
+      } finally {
+        setIsTranscribing(false);
+        setIsTranscriptionCancelActive(false);
+        resetQuickDeckState();
+      }
+    });
   });
 });

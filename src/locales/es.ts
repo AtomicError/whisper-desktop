@@ -866,6 +866,11 @@ export const es: Translations = {
     whisperSystem: "Sistema",
     engineNotBundledShort: 'No incluido',
     engineMissingBadge: 'No encontrado',
+    engineReadyBadge: 'Listo',
+    engineStatusError: 'Error de estado',
+    engineTooltipSource: 'Origen',
+    engineTooltipPath: 'Ruta',
+    engineTooltipBackends: 'Motores',
     trayTitle: 'Seguir ejecutando en segundo plano al cerrar la ventana',
     trayDesc: 'Mantiene Whisper Desktop activo en segundo plano al cerrar la ventana principal.',
     autoCheckUpdatesTitle: 'Buscar actualizaciones al iniciar',
@@ -873,6 +878,11 @@ export const es: Translations = {
     uiScaleTitle: 'Escala y Zoom de Interfaz',
     uiScaleDesc: 'Ajusta el escalado de la interfaz para pantallas de alta densidad (HiDPI).',
     uiScaleReset: 'Restablecer',
+    uiScaleZoomOut: 'Alejar (Ctrl+-)',
+    uiScaleZoomIn: 'Acercar (Ctrl++)',
+    uiScaleResetTooltip: 'Restablecer escala al 100% (Ctrl+0)',
+    decreaseValue: 'Reducir valor',
+    increaseValue: 'Aumentar valor',
     langSpokenTitle: 'Idioma Hablado',
     langSpokenDesc: 'Idioma hablado en el audio. Elige Detección automática para que Whisper lo detecte automáticamente.',
     initialPromptTitle: 'Prompt de contexto inicial',
@@ -902,7 +912,7 @@ export const es: Translations = {
     tokenTimestampsTitle: 'Marcas de Tiempo a Nivel de Token',
     tokenTimestampsDesc: 'Genera marcas de tiempo precisas en milisegundos para cada palabra.',
     audioCtxTitle: 'Longitud de la ventana de análisis de audio',
-    audioCtxDesc: 'Longitud del fotograma de contexto en milisegundos (0 = ventana estándar de 30s).',
+    audioCtxDesc: 'Fotogramas de contexto del codificador de audio (0–1500; 0 = ventana predeterminada de 30s del modelo, 1500 = 30s completos).',
     maxContextTitle: 'Límite de memoria de contexto de tokens previos',
     maxContextDesc: 'Historial máximo de las frases anteriores proporcionado como contexto al modelo.',
     offsetTTitle: 'Punto de inicio de la transcripción (ms)',
@@ -1092,7 +1102,7 @@ export const es: Translations = {
     tinyDiarizePoints: '<span class="setting-desc-point"><strong>Requisito:</strong> Requiere modelos con soporte <code>tdrz</code> (ej. <code>small.en-tdrz</code>).</span>',
     bestOfPoints: '<span class="setting-desc-point"><strong>Predeterminado:</strong> <code>5</code></span><span class="setting-desc-point"><strong>Recomendación:</strong> Valores mayores (<code>6–8</code>) mejoran la precisión; menores (<code>1–2</code>) son más rápidos.</span>',
     beamSizePoints: '<span class="setting-desc-point"><strong>Predeterminado:</strong> <code>5</code></span><span class="setting-desc-point"><strong>Compromiso:</strong> Valores mayores reducen errores pero aumentan el tiempo de transcripción.</span>',
-    audioCtxPoints: '<span class="setting-desc-point"><strong>Predeterminado:</strong> <code>0</code> (ventana estándar de 30 segundos)</span><span class="setting-desc-point"><strong>Avanzado:</strong> Restringe la atención para flujos en tiempo real.</span>',
+    audioCtxPoints: '<span class="setting-desc-point"><strong>Predeterminado:</strong> <code>0</code> (usa la ventana estándar completa de 30s, equivalente a <code>1500</code> fotogramas)</span><span class="setting-desc-point"><strong>Avanzado:</strong> Configura entre <code>1</code> y <code>1500</code> fotogramas para restringir la atención en clips cortos.</span>',
     wordTholdPoints: '<span class="setting-desc-point"><strong>Predeterminado:</strong> <code>0.01</code></span><span class="setting-desc-point"><strong>Cuándo cambiar:</strong> Incrementar a (<code>0.05–0.1</code>) si las palabras se desincronizan en silencios.</span>',
     entropyTholdPoints: '<span class="setting-desc-point"><strong>Predeterminado:</strong> <code>2.4</code></span><span class="setting-desc-point"><strong>Cuándo cambiar:</strong> Bajar a <code>2.2</code> si el modelo genera texto incoherente y repetitivo.</span>',
     logprobTholdPoints: '<span class="setting-desc-point"><strong>Predeterminado:</strong> <code>-1</code></span><span class="setting-desc-point"><strong>Cuándo cambiar:</strong> Bajar a <code>-1.5</code> con audio ruidoso para evitar reintentos innecesarios.</span>',
@@ -1119,7 +1129,12 @@ export const es: Translations = {
     polishPoints: '<span class="setting-desc-point"><strong>Recomendado:</strong> Activado para subtítulos fluidos y naturales, evitando traducciones rígidas palabra por palabra.</span>',
     modelsTip: 'Los cambios en los modelos se guardan automáticamente en tiempo real. Haz clic en una fila para asignarlo como modelo predeterminado.',
     addReasoning: 'Configurar Razonamiento',
-    noReasoning: 'Sin Razonamiento'
+    noReasoning: 'Sin Razonamiento',
+    toggleApiKeyVisibility: 'Mostrar u ocultar clave de API',
+    removeModelRow: 'Eliminar fila del modelo',
+    modelIdentifierPlaceholder: 'p. ej. gpt-4o-mini',
+    contextTokensTooltip: 'Ventana de contexto: {formatted} ({exact} tokens)',
+    tokensUnit: 'tokens'
   },
   logs: {
     title: 'Registro de Actividad',
@@ -1162,6 +1177,7 @@ export const es: Translations = {
     cancelBtn: 'Cancelar',
     addProviderTitle: 'Añadir Proveedor de API',
     providerName: 'Nombre del Proveedor',
+    providerNamePlaceholder: 'p. ej. OpenRouter',
     apiFormat: 'Formato de API',
     baseUrl: 'URL Base',
     apiKey: 'Clave de API',
@@ -1300,6 +1316,8 @@ export const es: Translations = {
     providerAddedSuccess: '¡Proveedor añadido con éxito! Configura sus modelos abajo.',
     noProviderToTest: 'No hay ningún proveedor seleccionado para probar.',
     modelsDirNotWritable: 'El directorio de modelos seleccionado no tiene permisos de escritura:\n{error}',
-    outputDirNotWritable: 'El directorio de salida seleccionado no tiene permisos de escritura:\n{error}'
+    outputDirNotWritable: 'El directorio de salida seleccionado no tiene permisos de escritura:\n{error}',
+    modelIdExists: 'Ya existe un modelo con el identificador "{id}" para este proveedor.',
+    providersJsonCorrupt: 'La lista guardada de proveedores de IA no era válida y no pudo leerse.'
   }
 };

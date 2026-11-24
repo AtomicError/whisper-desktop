@@ -866,6 +866,11 @@ export const ru: Translations = {
     whisperSystem: "Системный",
     engineNotBundledShort: 'Не встроен',
     engineMissingBadge: 'Не найден',
+    engineReadyBadge: 'Готов',
+    engineStatusError: 'Ошибка статуса',
+    engineTooltipSource: 'Источник',
+    engineTooltipPath: 'Путь',
+    engineTooltipBackends: 'Бэкенды',
     trayTitle: 'Работать в фоновом режиме при закрытии окна',
     trayDesc: 'Продолжать работу приложения в фоновом режиме при закрытии окна.',
     autoCheckUpdatesTitle: 'Проверять обновления при запуске',
@@ -873,6 +878,11 @@ export const ru: Translations = {
     uiScaleTitle: 'Масштаб интерфейса',
     uiScaleDesc: 'Настройка масштабирования элементов для экранов высокой четкости (HiDPI / 4K).',
     uiScaleReset: 'Сброс',
+    uiScaleZoomOut: 'Уменьшить (Ctrl+-)',
+    uiScaleZoomIn: 'Увеличить (Ctrl++)',
+    uiScaleResetTooltip: 'Сбросить масштаб до 100% (Ctrl+0)',
+    decreaseValue: 'Уменьшить значение',
+    increaseValue: 'Увеличить значение',
     langSpokenTitle: 'Язык исходного аудио',
     langSpokenDesc: 'Язык речи в аудио. Выберите «Автоопределение», чтобы Whisper определил его автоматически.',
     initialPromptTitle: 'Начальный контекстный промпт',
@@ -903,7 +913,7 @@ export const ru: Translations = {
     tokenTimestampsTitle: 'Метки времени на уровне токенов',
     tokenTimestampsDesc: 'Генерирует точные миллисекундные метки для каждого произнесенного слова.',
     audioCtxTitle: 'Длина окна обработки аудио',
-    audioCtxDesc: 'Длина контекста в миллисекундах (0 = стандартное 30-секундное окно Whisper).',
+    audioCtxDesc: 'Кадры контекста аудиокодировщика (0–1500; 0 = стандартное 30-секундное окно модели, 1500 = полные 30 секунд).',
     maxContextTitle: 'Лимит токенов контекста из прошлых фраз',
     maxContextDesc: 'Максимальное число предшествующих токенов, передаваемых декодеру.',
     offsetTTitle: 'Точка начала транскрипции (мс)',
@@ -1097,7 +1107,7 @@ export const ru: Translations = {
     tinyDiarizePoints: '<span class="setting-desc-point"><strong>Требование:</strong> Нужны модели с поддержкой <code>tdrz</code> (напр. <code>small.en-tdrz</code>).</span>',
     bestOfPoints: '<span class="setting-desc-point"><strong>По умолчанию:</strong> <code>5</code></span><span class="setting-desc-point"><strong>Рекомендация:</strong> Больше (<code>6–8</code>) — выше точность; меньше (<code>1–2</code>) — быстрее.</span>',
     beamSizePoints: '<span class="setting-desc-point"><strong>По умолчанию:</strong> <code>5</code></span><span class="setting-desc-point"><strong>Компромисс:</strong> Выше значение — меньше ошибок, но дольше процесс.</span>',
-    audioCtxPoints: '<span class="setting-desc-point"><strong>По умолчанию:</strong> <code>0</code> (стандартное 30-секундное окно)</span><span class="setting-desc-point"><strong>Продвинутый:</strong> Ограничение окна внимания для потокового аудио.</span>',
+    audioCtxPoints: '<span class="setting-desc-point"><strong>По умолчанию:</strong> <code>0</code> (использует полное стандартное 30-секундное окно модели, что равно <code>1500</code> кадрам)</span><span class="setting-desc-point"><strong>Продвинутый:</strong> Укажите от <code>1</code> до <code>1500</code> кадров, чтобы ограничить внимание для коротких фрагментов.</span>',
     wordTholdPoints: '<span class="setting-desc-point"><strong>По умолчанию:</strong> <code>0.01</code></span><span class="setting-desc-point"><strong>Когда менять:</strong> Поднимите до <code>0.05–0.1</code> при сдвиге таймкодов на тихих участках.</span>',
     entropyTholdPoints: '<span class="setting-desc-point"><strong>По умолчанию:</strong> <code>2.4</code></span><span class="setting-desc-point"><strong>Когда менять:</strong> Снизьте до <code>2.2</code>, если модель повторяет бессмысленный набор слов.</span>',
     logprobTholdPoints: '<span class="setting-desc-point"><strong>По умолчанию:</strong> <code>-1</code></span><span class="setting-desc-point"><strong>Когда менять:</strong> Снизьте до <code>-1.5</code> для шумных аудио во избежание лишних повторов.</span>',
@@ -1124,7 +1134,12 @@ export const ru: Translations = {
     polishPoints: '<span class="setting-desc-point"><strong>Рекомендуется:</strong> Для живого и естественного диалогового ритма без механического подстрочника.</span>',
     modelsTip: 'Настройки моделей сохраняются мгновенно. Кликните по строке модели, чтобы назначить ее основной.',
     addReasoning: 'Настроить рассуждения',
-    noReasoning: 'Без рассуждений'
+    noReasoning: 'Без рассуждений',
+    toggleApiKeyVisibility: 'Показать или скрыть ключ API',
+    removeModelRow: 'Удалить строку модели',
+    modelIdentifierPlaceholder: 'напр., gpt-4o-mini',
+    contextTokensTooltip: 'Контекстное окно: {formatted} ({exact} токенов)',
+    tokensUnit: 'токенов'
   },
   logs: {
     title: 'Журнал активности',
@@ -1167,6 +1182,7 @@ export const ru: Translations = {
     cancelBtn: 'Отмена',
     addProviderTitle: 'Добавить провайдера API',
     providerName: 'Имя провайдера',
+    providerNamePlaceholder: 'напр., OpenRouter',
     apiFormat: 'Формат API',
     baseUrl: 'Базовый URL (Base URL)',
     apiKey: 'Ключ API',
@@ -1305,6 +1321,8 @@ export const ru: Translations = {
     providerAddedSuccess: 'Провайдер добавлен! Настройте его модели ниже.',
     noProviderToTest: 'Не выбран провайдер для тестирования.',
     modelsDirNotWritable: 'Папка моделей недоступна для записи:\n{error}',
-    outputDirNotWritable: 'Папка сохранения недоступна для записи:\n{error}'
+    outputDirNotWritable: 'Папка сохранения недоступна для записи:\n{error}',
+    modelIdExists: 'Модель с идентификатором "{id}" уже существует для этого провайдера.',
+    providersJsonCorrupt: 'Сохраненный список ИИ-провайдеров поврежден и не может быть корректно прочитан.'
   }
 };

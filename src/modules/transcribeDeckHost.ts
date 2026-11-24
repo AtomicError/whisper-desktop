@@ -1,5 +1,6 @@
 // Dependency-inversion host bridge for Transcribe Studio Quick Deck & Time Range controllers.
 // Breaks the circular import cycle between settingsManager, transcribeQuickDeck, and transcribeTimeRange.
+import { t } from '../i18n/index';
 
 export interface SettingsState {
   selectedBackend?: string;
@@ -104,8 +105,10 @@ export function getLatestWhisperEngineStatus(): EngineBinaryStatus | null {
 }
 
 export function formatWhisperEngineVersion(versionStr?: string | null): string {
+  const translatedReady = typeof t === 'function' ? t('settings.engineReadyBadge') : '';
+  const readyLabel = translatedReady && translatedReady !== 'settings.engineReadyBadge' ? translatedReady : 'Ready';
   if (!versionStr || versionStr === 'Unknown version' || versionStr === 'N/A') {
-    return 'Ready';
+    return readyLabel;
   }
   const match = versionStr.match(/version:\s*([^\s]+)/i) || versionStr.match(/version\s+([^\s]+)/i);
   const raw = match ? match[1] : versionStr.trim();
@@ -116,7 +119,7 @@ export function formatWhisperEngineVersion(versionStr?: string | null): string {
   if (semverMatch) {
     return `v${raw}`;
   }
-  return raw.length > 0 ? raw : 'Ready';
+  return raw.length > 0 ? raw : readyLabel;
 }
 
 export interface TranscribeDeckHost {

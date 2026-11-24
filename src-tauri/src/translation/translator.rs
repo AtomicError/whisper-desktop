@@ -584,18 +584,56 @@ fn estimate_max_output_tokens(prompt_chars: usize, model_override: Option<u32>) 
     raw.clamp(MIN_OUTPUT_TOKENS, cap.min(ABSOLUTE_MAX_OUTPUT_TOKENS))
 }
 
-/// Minimal percent-encoding for query parameter values (API keys).
-fn percent_encode(value: &str) -> String {
-    let mut out = String::with_capacity(value.len());
-    for b in value.bytes() {
-        match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                out.push(b as char)
+/// Redacts secret query parameters (such as `?key=`, `api_key=`, or `apikey=`)
+/// from URLs or formatted error strings as defense-in-depth against credential leaks.
+pub(crate) fn redact_url_secrets(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let bytes = input.as_bytes();
+    let lower = input.to_ascii_lowercase();
+    let lower_bytes = lower.as_bytes();
+    let mut i = 0;
+
+    while i < bytes.len() {
+        let rest = &lower[i..];
+        let matched_param_len = if (i == 0 || matches!(bytes[i - 1], b'?' | b'&'))
+            && rest.starts_with("api_key=")
+        {
+            Some("api_key=".len())
+        } else if (i == 0 || matches!(bytes[i - 1], b'?' | b'&'))
+            && rest.starts_with("apikey=")
+        {
+            Some("apikey=".len())
+        } else if (i == 0 || matches!(bytes[i - 1], b'?' | b'&'))
+            && rest.starts_with("key=")
+        {
+            Some("key=".len())
+        } else {
+            None
+        };
+
+        if let Some(plen) = matched_param_len {
+            out.push_str(&input[i..i + plen]);
+            out.push_str("<redacted>");
+            i += plen;
+            while i < bytes.len() {
+                let b = lower_bytes[i];
+                if b == b'&' || b.is_ascii_whitespace() || matches!(b, b')' | b'"' | b'\'' | b'>' | b'#') {
+                    break;
+                }
+                i += 1;
             }
-            _ => out.push_str(&format!("%{:02X}", b)),
+        } else {
+            let ch = input[i..].chars().next().unwrap();
+            out.push(ch);
+            i += ch.len_utf8();
         }
     }
     out
+}
+
+/// Strips request URLs from `reqwest::Error` and redacts any query secrets.
+pub(crate) fn sanitize_reqwest_error(err: reqwest::Error) -> String {
+    redact_url_secrets(&err.without_url().to_string())
 }
 
 /// Reads a subtitle file tolerating non-UTF-8 encodings.
@@ -646,20 +684,14 @@ pub(crate) fn read_subtitle_string(path: &Path) -> Result<String, String> {
     Ok(decoded_1252.into_owned())
 }
 
-pub(crate) fn append_query_param(url: &str, key: &str, value: &str) -> String {
-    let sep = if url.contains('?') { '&' } else { '?' };
-    format!("{}{}{}={}", url, sep, key, percent_encode(value))
-}
-
 /// Builds the final request URL from provider settings. Shared by
 /// `translate_files` and `preview_translate` so both paths cannot drift apart.
 fn build_request_url(
     api_format: ApiFormat,
     base_url: &str,
     model: &str,
-    api_key: &str,
 ) -> String {
-    let mut request_url = base_url.to_string();
+    let mut request_url = base_url.trim().to_string();
     match api_format {
         ApiFormat::AnthropicMessages => {
             if !request_url.contains("/messages") {
@@ -680,11 +712,6 @@ fn build_request_url(
                     request_url = format!("{}/v1beta/models/{}:generateContent", clean_base, model);
                 }
             }
-            // Key travels in the query string (Gemini convention). Encode it
-            // and respect pre-existing query parameters.
-            if !api_key.is_empty() {
-                request_url = append_query_param(&request_url, "key", api_key);
-            }
         }
         ApiFormat::OpenAiCompatible => {
             if !request_url.contains("/chat/completions") {
@@ -696,7 +723,7 @@ fn build_request_url(
     request_url
 }
 
-/// Applies auth headers. Gemini needs none (key lives in the URL).
+/// Applies auth headers across all formats (including `x-goog-api-key` for Gemini).
 fn apply_auth_headers(
     req: reqwest::RequestBuilder,
     api_format: ApiFormat,
@@ -718,7 +745,13 @@ fn apply_auth_headers(
                 req
             }
         }
-        ApiFormat::GeminiResponses => req,
+        ApiFormat::GeminiResponses => {
+            if !api_key.is_empty() {
+                req.header("x-goog-api-key", api_key)
+            } else {
+                req
+            }
+        }
     }
 }
 
@@ -780,7 +813,7 @@ async fn translate_chunk(
             max_output_override,
         ));
     }
-    let request_url = build_request_url(api_format, &provider.base_url, model, api_key);
+    let request_url = build_request_url(api_format, &provider.base_url, model);
 
     let mut attempt: u32 = 0;
     loop {
@@ -805,13 +838,14 @@ async fn translate_chunk(
         let res = match res {
             Ok(r) => r,
             Err(e) => {
+                let err_msg = sanitize_reqwest_error(e);
                 if attempt < MAX_TRANSIENT_RETRIES {
                     attempt += 1;
-                    logs.log(app, "Translate", &format!("Network error ({}), retry {}/{} in {}s", e, attempt, MAX_TRANSIENT_RETRIES, attempt));
+                    logs.log(app, "Translate", &format!("Network error ({}), retry {}/{} in {}s", err_msg, attempt, MAX_TRANSIENT_RETRIES, attempt));
                     tokio::time::sleep(std::time::Duration::from_secs(attempt as u64)).await;
                     continue;
                 }
-                return Err(format!("HTTP request to {} failed: {}", provider.name, e));
+                return Err(format!("HTTP request to {} failed: {}", provider.name, err_msg));
             }
         };
 
@@ -1701,7 +1735,6 @@ pub async fn preview_translate(
                 api_format,
                 &provider.base_url,
                 &model,
-                &api_key,
             );
             let req = apply_auth_headers(
                 client.post(&request_url).json(&request_body),
@@ -1713,18 +1746,20 @@ pub async fn preview_translate(
                 .send()
                 .await
                 .map_err(|e| {
-                    let err_str = e.to_string();
+                    let is_timeout = e.is_timeout();
+                    let is_connect = e.is_connect();
+                    let err_str = sanitize_reqwest_error(e);
                     let err_lower = err_str.to_lowercase();
-                    if e.is_timeout() {
+                    if is_timeout {
                         format!("Connection timed out after {} seconds. Check network connection or proxy/VPN. Note: If using a free-tier (:free) or heavy model, the provider's public queue may be busy; try selecting a lighter/faster model.", PREVIEW_TIMEOUT_SECS)
                     } else if err_lower.contains("certificate") || err_lower.contains("unknownissuer") {
-                        format!("SSL/TLS certificate verification failed ({}). The connection may be intercepted or blocked. Please verify your proxy or VPN.", e)
+                        format!("SSL/TLS certificate verification failed ({}). The connection may be intercepted or blocked. Please verify your proxy or VPN.", err_str)
                     } else if err_lower.contains("reset by peer") || err_lower.contains("broken pipe") {
-                        format!("Connection was reset by peer. The endpoint may be blocked or interrupted by network filtering. Please check your proxy/VPN: {}", e)
-                    } else if e.is_connect() {
-                        format!("Failed to connect to provider endpoint: {}. Please check your internet connection or proxy settings.", e)
+                        format!("Connection was reset by peer. The endpoint may be blocked or interrupted by network filtering. Please check your proxy/VPN: {}", err_str)
+                    } else if is_connect {
+                        format!("Failed to connect to provider endpoint: {}. Please check your internet connection or proxy settings.", err_str)
                     } else {
-                        format!("Request failed: {}", e)
+                        format!("Request failed: {}", err_str)
                     }
                 })?;
 
@@ -1747,7 +1782,7 @@ pub async fn preview_translate(
             let res_json: Value = res
                 .json()
                 .await
-                .map_err(|e| format!("Failed to parse JSON response: {}", e))?;
+                .map_err(|e| format!("Failed to parse JSON response: {}", sanitize_reqwest_error(e)))?;
 
             return parse_response_content(api_format, &res_json);
         }
@@ -2230,5 +2265,25 @@ mod alignment_tests {
         );
         assert_eq!(openai_opts.reasoning_effort, None);
         assert_eq!(openai_opts.max_output_tokens, None);
+    }
+
+    #[test]
+    fn gemini_request_url_never_embeds_api_key_and_redacts_secrets() {
+        let url = build_request_url(
+            ApiFormat::GeminiResponses,
+            "  https://generativelanguage.googleapis.com  ",
+            "gemini-2.5-flash",
+        );
+        assert_eq!(
+            url,
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+        );
+        assert!(!url.contains("key="));
+
+        let sanitized = redact_url_secrets(
+            "error sending request for url (https://generativelanguage.googleapis.com/v1beta/models?key=AIzaSecret123&foo=bar)",
+        );
+        assert!(!sanitized.contains("AIzaSecret123"));
+        assert!(sanitized.contains("?key=<redacted>&foo=bar"));
     }
 }

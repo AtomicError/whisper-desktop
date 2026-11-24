@@ -392,8 +392,8 @@ impl WhisperSettings {
         let clamped_conf = self.confidence_threshold.clamp(40, 95);
         self.confidence_threshold = (((clamped_conf + 2) / 5) * 5).clamp(40, 95);
 
-        self.threads = self.threads.max(1);
-        self.processors = self.processors.max(1);
+        self.threads = self.threads.clamp(1, 256);
+        self.processors = self.processors.clamp(1, 64);
 
         self.beam_size = self.beam_size.clamp(1, 8);
         self.best_of = self.best_of.clamp(1, 8);
@@ -404,7 +404,7 @@ impl WhisperSettings {
         if self.max_context < -1 {
             self.max_context = -1;
         }
-        self.audio_ctx = self.audio_ctx.max(0);
+        self.audio_ctx = self.audio_ctx.clamp(0, 1500);
         self.device_id = self.device_id.max(0);
 
         self.vad_thold = if self.vad_thold.is_finite() { self.vad_thold } else { defaults.vad_thold }.clamp(0.0, 1.0);
@@ -1408,6 +1408,28 @@ mod tests {
 
         let serialized = serde_json::to_string(&settings).unwrap();
         assert!(!serialized.contains(":null"), "Sanitized finite floats must serialize without JSON null: {}", serialized);
+    }
+
+    #[test]
+    fn test_sanitize_clamps_audio_ctx_threads_and_processors_upper_bounds() {
+        let mut settings = WhisperSettings::default_settings();
+        settings.audio_ctx = 15_000;
+        settings.threads = 9999;
+        settings.processors = 500;
+        settings.sanitize_and_validate();
+
+        assert_eq!(settings.audio_ctx, 1500);
+        assert_eq!(settings.threads, 256);
+        assert_eq!(settings.processors, 64);
+
+        settings.audio_ctx = -25;
+        settings.threads = 0;
+        settings.processors = 0;
+        settings.sanitize_and_validate();
+
+        assert_eq!(settings.audio_ctx, 0);
+        assert_eq!(settings.threads, 1);
+        assert_eq!(settings.processors, 1);
     }
 }
 

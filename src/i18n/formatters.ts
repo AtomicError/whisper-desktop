@@ -37,7 +37,7 @@ export function formatTokensShort(num: number | string | null | undefined): stri
     const val = n / 1000;
     return (val % 1 === 0 ? val.toFixed(0) : val.toFixed(1).replace(/\.0$/, '')) + 'K';
   }
-  return n.toLocaleString();
+  return formatNumberForLang(n);
 }
 
 export function parseTokensInput(val: unknown): number {
@@ -45,7 +45,11 @@ export function parseTokensInput(val: unknown): number {
     return !isNaN(val) && val > 0 ? Math.round(val) : 200000;
   }
   if (!val) return 200000;
-  const str = toEnglishDigits(String(val).trim().toUpperCase());
+  const str = toEnglishDigits(String(val))
+    .replace(/\u066B/g, '.')
+    .replace(/[\u066C\u060C]/g, ',')
+    .trim()
+    .toUpperCase();
   
   const matchM = str.match(/^(\d+(?:\.\d+)?)\s*(?:M|MILLION)(?:\s*TOKENS?)?$/);
   if (matchM) {

@@ -9,33 +9,20 @@ if (typeof window === 'undefined') {
   (globalThis as any).window = globalThis;
 }
 
-export interface ModelObject {
-  id: string;
-  contextWindow?: number;
-  context_window?: number;
-  maxOutputTokens?: number;
-  max_output_tokens?: number;
-  vision?: boolean;
-  reasoning?: string;
-  supportsReasoning?: boolean;
-  supports_reasoning?: boolean;
-  enabled?: boolean;
-}
+import {
+  type ModelObject,
+  type ProviderConfig,
+  POPULAR_PROVIDER_FILTERS,
+  readProviders,
+  writeProviders,
+  normalizeModelId,
+  isModelIdMatch,
+  hasDuplicateModelId,
+  normalizeProviderModel,
+  normalizeProviderModelsList
+} from './providerHelpers';
 
-export interface ProviderConfig {
-  name: string;
-  baseUrl?: string;
-  base_url?: string;
-  apiFormat?: string;
-  api_format?: string;
-  apiKey?: string;
-  api_key?: string;
-  useKeyring?: boolean;
-  use_keyring?: boolean;
-  models?: ModelObject[];
-  customPrompt?: string;
-  custom_prompt?: string;
-}
+export { type ModelObject, type ProviderConfig, POPULAR_PROVIDER_FILTERS };
 
 declare global {
   interface Window {
@@ -109,10 +96,10 @@ const invoke = async (cmd: string, args?: any): Promise<any> => {
   throw new Error(`Tauri invoke not available for ${cmd}`);
 };
 
-const saveSettings = async (): Promise<void> => {
+const saveSettings = async (immediate = false): Promise<void> => {
   const win = getGlobal();
   if (typeof win.saveCurrentSettings === 'function') {
-    await win.saveCurrentSettings();
+    await win.saveCurrentSettings(immediate);
   }
 };
 
@@ -123,51 +110,6 @@ const syncProviderCustomSelects = (): void => {
     fn(false, true);
   }
 };
-
-function normalizeProviderModel(
-  raw: any,
-  options?: {
-    idOverride?: string;
-    reasoningOverride?: string;
-    supportsReasoningOverride?: boolean;
-    enabledOverride?: boolean;
-    fallbackModel?: any;
-  }
-): ModelObject {
-  const fallback = options?.fallbackModel;
-  const resolvedId = options?.idOverride ?? (raw?.id || '');
-  const rawCtx = raw?.contextWindow ?? raw?.context_window ?? fallback?.contextWindow ?? fallback?.context_window ?? 200000;
-  const rawMaxOut = raw?.maxOutputTokens ?? raw?.max_output_tokens ?? fallback?.maxOutputTokens ?? fallback?.max_output_tokens;
-  const parsedMaxOut = typeof rawMaxOut === 'number' && Number.isFinite(rawMaxOut) && rawMaxOut > 0
-    ? Math.floor(rawMaxOut)
-    : undefined;
-  const vision = typeof raw?.vision === 'boolean'
-    ? raw.vision
-    : (typeof fallback?.vision === 'boolean' ? fallback.vision : undefined);
-
-  const supportsReasoning = options?.supportsReasoningOverride !== undefined
-    ? options.supportsReasoningOverride
-    : (typeof raw?.supportsReasoning === 'boolean'
-        ? raw.supportsReasoning
-        : (typeof raw?.supports_reasoning === 'boolean'
-            ? raw.supports_reasoning
-            : (raw?.reasoning && String(raw.reasoning).toLowerCase() !== 'none' ? true : undefined)));
-
-  const model: ModelObject = {
-    id: resolvedId,
-    contextWindow: parseTokensInput(rawCtx),
-    reasoning: options?.reasoningOverride ?? (raw?.reasoning || 'None'),
-    supportsReasoning,
-    enabled: options?.enabledOverride !== undefined ? options.enabledOverride : (raw?.enabled !== false)
-  };
-  if (parsedMaxOut !== undefined) {
-    model.maxOutputTokens = parsedMaxOut;
-  }
-  if (vision !== undefined) {
-    model.vision = vision;
-  }
-  return model;
-}
 
 const notify = (msg: string, type: 'info' | 'success' | 'error' = 'info'): void => {
   const win = getGlobal();
@@ -218,17 +160,17 @@ export {
 import { _trapModalFocus } from './appModal';
 export { _trapModalFocus };
 
-// ----------------- State & Helpers -----------------
-export const POPULAR_PROVIDER_FILTERS = [
-  { id: 'openai', label: 'OpenAI', test: (id: string) => id.includes('openai') || id.startsWith('gpt') || id.startsWith('o1') || id.startsWith('o3') },
-  { id: 'anthropic', label: 'Anthropic', test: (id: string) => id.includes('anthropic') || id.startsWith('claude') },
-  { id: 'google', label: 'Google', test: (id: string) => id.includes('google') || id.startsWith('gemini') },
-  { id: 'meta', label: 'Meta', test: (id: string) => id.includes('meta') || id.includes('llama') },
-  { id: 'deepseek', label: 'DeepSeek', test: (id: string) => id.includes('deepseek') },
-  { id: 'mistral', label: 'Mistral', test: (id: string) => id.includes('mistral') },
-  { id: 'amazon', label: 'Amazon', test: (id: string) => id.includes('amazon') || id.startsWith('nova') },
-  { id: 'qwen', label: 'Qwen', test: (id: string) => id.includes('qwen') }
-];
+let providersCorruptToastShown = false;
+
+function readProvidersSafe(settingsState: { translateAiProviders?: string } | null | undefined): ProviderConfig[] {
+  return readProviders(settingsState, (err) => {
+    console.error('Corrupt translateAiProviders JSON:', err);
+    if (!providersCorruptToastShown) {
+      providersCorruptToastShown = true;
+      notify(t('toasts.providersJsonCorrupt'), 'error');
+    }
+  });
+}
 
 let currentProviderModels: ModelObject[] = [];
 let currentModelsSortCol: string | null = null;
@@ -255,6 +197,34 @@ let previewTestId = 0;
 let _providerModalTrap: any = null;
 let _testModalTrap: any = null;
 let modelsFetchActiveProvider: string | null = null;
+let providerKeyLoadSeq = 0;
+let hasDirtyProviderGeneral = false;
+let inFlightProviderGeneralSave: Promise<boolean> | null = null;
+let providerModalCloseTimer: ReturnType<typeof setTimeout> | null = null;
+let isSavingProviderConfig = false;
+let isDeletingProvider = false;
+
+function dedupeLiveModels(models: ModelObject[]): ModelObject[] {
+  const seen = new Set<string>();
+  const result: ModelObject[] = [];
+  let hasBlankDraft = false;
+  for (const m of models) {
+    if (!m || typeof m !== 'object') continue;
+    const rawId = String(m.id || '').trim();
+    if (!rawId) {
+      if (!hasBlankDraft) {
+        hasBlankDraft = true;
+        result.push(m);
+      }
+      continue;
+    }
+    const key = normalizeModelId(rawId);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(m);
+  }
+  return result;
+}
 
 export function isReasoningSupportedModel(modelObj: any): boolean {
   if (!modelObj) return false;
@@ -272,19 +242,17 @@ export function isReasoningSupportedModel(modelObj: any): boolean {
   if (typeof modelObj === 'string') {
     let found = currentProviderModels.find(m => m && m.id === modelObj);
     if (!found) {
-      try {
-        const settings = getSettingsState();
-        const providers = JSON.parse((settings && settings.translateAiProviders) || '[]');
-        for (const p of providers) {
-          if (Array.isArray(p.models)) {
-            const m = p.models.find((mod: any) => mod && mod.id === modelObj);
-            if (m) {
-              found = m;
-              break;
-            }
+      const settings = getSettingsState();
+      const providers = readProvidersSafe(settings);
+      for (const p of providers) {
+        if (Array.isArray(p.models)) {
+          const m = p.models.find((mod: any) => mod && mod.id === modelObj);
+          if (m) {
+            found = m;
+            break;
           }
         }
-      } catch (e) {}
+      }
     }
     if (found) {
       return isReasoningSupportedModel(found);
@@ -352,19 +320,25 @@ function syncProviderModelDropdownOptions(
 
   if (modelSelect) {
     modelSelect.innerHTML = '';
+    const tokensLabel = t('settings.tokensUnit') || 'tokens';
     enabledModels.forEach(m => {
       const opt = document.createElement('option');
       opt.value = m.id;
-      opt.textContent = `${m.id} (${(m.contextWindow || m.context_window || 200000).toLocaleString()} tokens)`;
+      const formattedCtx = formatLocalizedNumber
+        ? formatLocalizedNumber(m.contextWindow || m.context_window || 200000, getLanguage(), 0)
+        : (m.contextWindow || m.context_window || 200000).toLocaleString();
+      opt.textContent = `${m.id} (${formattedCtx} ${tokensLabel})`;
       modelSelect.appendChild(opt);
     });
   }
 
   if (settingsState) {
-    const hasModel = enabledModels.some(m => m.id === settingsState.translateAiModel);
-    if (!hasModel && enabledModels.length > 0) {
+    const matchedModel = enabledModels.find(m => isModelIdMatch(m.id, settingsState.translateAiModel));
+    if (matchedModel) {
+      settingsState.translateAiModel = matchedModel.id;
+    } else if (enabledModels.length > 0) {
       settingsState.translateAiModel = enabledModels[0].id;
-    } else if (enabledModels.length === 0) {
+    } else {
       settingsState.translateAiModel = '';
     }
     if (modelSelect) {
@@ -383,22 +357,18 @@ export function flushPendingModelCatalogChanges(): boolean {
   const providerName = settingsState?.translateAiProvider || '';
   if (!settingsState || !providerName) return false;
 
-  let providers: ProviderConfig[] = [];
-  try {
-    providers = JSON.parse(settingsState.translateAiProviders || '[]');
-  } catch (_) {
-    return false;
-  }
+  const providers = readProvidersSafe(settingsState);
 
   const providerIdx = providers.findIndex(p => p.name === providerName);
   if (providerIdx === -1) return false;
 
   const validModels = normalizeProviderModelsList(currentProviderModels);
+  currentProviderModels = dedupeLiveModels(currentProviderModels);
   providers[providerIdx] = {
     ...providers[providerIdx],
     models: validModels
   };
-  settingsState.translateAiProviders = JSON.stringify(providers);
+  writeProviders(settingsState, providers);
 
   if (typeof document !== 'undefined') {
     const selectDOM = document.getElementById('opt-translateAiModel') as HTMLSelectElement | null;
@@ -454,12 +424,7 @@ export function populateProvidersDropdown(): void {
   select.innerHTML = '';
   
   const settingsState = getSettingsState();
-  let providers: ProviderConfig[] = [];
-  try {
-    providers = JSON.parse((settingsState && settingsState.translateAiProviders) || '[]');
-  } catch (e) {
-    console.error(e);
-  }
+  const providers = readProvidersSafe(settingsState);
   
   providers.forEach(p => {
     const opt = document.createElement('option');
@@ -508,12 +473,7 @@ export function renderProvidersGrid(providers: ProviderConfig[] | null = null): 
   grid.innerHTML = '';
   
   if (providers === null) {
-    try {
-      providers = JSON.parse((settingsState && settingsState.translateAiProviders) || '[]');
-    } catch (e) {
-      console.error(e);
-      providers = [];
-    }
+    providers = readProvidersSafe(settingsState);
   }
   
   const activeName = (settingsState && settingsState.translateAiProvider) || '';
@@ -644,14 +604,11 @@ export function onProviderChanged(keepCurrentTab: boolean | string = false, skip
   
   renderProvidersGrid();
   
-  let providers: ProviderConfig[] = [];
-  try {
-    providers = JSON.parse((settingsState && settingsState.translateAiProviders) || '[]');
-  } catch (e) {
-    console.error(e);
-  }
+  const providers = readProvidersSafe(settingsState);
   
   const provider = providers.find(p => p.name === providerName);
+  hasDirtyProviderGeneral = false;
+  const loadSeq = ++providerKeyLoadSeq;
   
   const genPlaceholder = document.getElementById('general-placeholder-overlay');
   const genFields = document.getElementById('general-config-fields');
@@ -691,15 +648,21 @@ export function onProviderChanged(keepCurrentTab: boolean | string = false, skip
       providerPromptEl.value = provider.customPrompt || provider.custom_prompt || '';
       applyDynamicDir(providerPromptEl);
     }
+
+    const useKeyringChk = document.getElementById('mgr-provider-use-keyring') as HTMLInputElement | null;
+    const providerUsesKeyring = provider.useKeyring !== false && provider.use_keyring !== false;
+    if (useKeyringChk) {
+      useKeyringChk.checked = providerUsesKeyring;
+    }
     
     const keyVal = provider.apiKey || provider.api_key || '';
     const keyInput = document.getElementById('mgr-provider-key') as HTMLInputElement | null;
     if (keyInput) {
-      keyInput.type = 'password';
       delete keyInput.dataset.keyringError;
+      delete keyInput.dataset.loadedKey;
       keyInput.removeAttribute('title');
       const eyeBtn = keyInput.nextElementSibling as HTMLElement | null;
-      if (eyeBtn) eyeBtn.style.color = 'var(--color-text-muted)';
+      setPasswordFieldMasked(keyInput, eyeBtn);
       
       if (keyVal === '__KEYRING__') {
         keyInput.value = '••••••••••••••••';
@@ -716,9 +679,9 @@ export function onProviderChanged(keepCurrentTab: boolean | string = false, skip
           try {
             const realKey = await invoke('get_keyring_credential', { providerName });
             const currentSelect = document.getElementById('opt-translateAiProvider') as HTMLSelectElement | null;
-            const userFocusedElsewhere = typeof document !== 'undefined' && document.activeElement === keyInput && userModifiedKey;
-            if (currentSelect && currentSelect.value === providerName && !userModifiedKey && !userFocusedElsewhere) {
+            if (loadSeq === providerKeyLoadSeq && currentSelect && currentSelect.value === providerName && !userModifiedKey) {
               keyInput.value = realKey;
+              keyInput.dataset.loadedKey = realKey;
               keyInput.dataset.isKeyring = 'false';
               delete keyInput.dataset.keyringError;
               keyInput.removeAttribute('title');
@@ -726,7 +689,7 @@ export function onProviderChanged(keepCurrentTab: boolean | string = false, skip
           } catch (e) {
             console.error("Background keyring credential fetch failed:", e);
             const currentSelect = document.getElementById('opt-translateAiProvider') as HTMLSelectElement | null;
-            if (currentSelect && currentSelect.value === providerName && !userModifiedKey) {
+            if (loadSeq === providerKeyLoadSeq && currentSelect && currentSelect.value === providerName && !userModifiedKey) {
               // Preserve the keyring placeholder and flag instead of clearing to '',
               // so edits to other provider fields do not silently delete the stored secret.
               keyInput.value = '••••••••••••••••';
@@ -789,7 +752,16 @@ export function onProviderChanged(keepCurrentTab: boolean | string = false, skip
     const promptEl = document.getElementById('mgr-provider-prompt') as HTMLTextAreaElement | null;
     if (promptEl) promptEl.value = '';
     const keyEl = document.getElementById('mgr-provider-key') as HTMLInputElement | null;
-    if (keyEl) keyEl.value = '';
+    if (keyEl) {
+      keyEl.value = '';
+      delete keyEl.dataset.loadedKey;
+      delete keyEl.dataset.keyringError;
+      keyEl.dataset.isKeyring = 'false';
+      keyEl.removeAttribute('title');
+      setPasswordFieldMasked(keyEl, keyEl.nextElementSibling as HTMLElement | null);
+    }
+    const useKeyringChk = document.getElementById('mgr-provider-use-keyring') as HTMLInputElement | null;
+    if (useKeyringChk) useKeyringChk.checked = true;
     const countEl = document.getElementById('provider-models-count');
     if (countEl) countEl.textContent = '0';
 
@@ -832,18 +804,36 @@ export async function togglePasswordVisibility(inputId: string, btn: HTMLElement
   
   if (input.type === 'password') {
     if (input.dataset.isKeyring === 'true' && providerSelect && providerSelect.value) {
+      const targetProvider = providerSelect.value;
+      const loadSeq = ++providerKeyLoadSeq;
+      let userModified = false;
+      const onInput = () => {
+        userModified = true;
+      };
+      if (typeof input.addEventListener === 'function') {
+        input.addEventListener('input', onInput, { once: true });
+      }
       (btn as HTMLButtonElement).disabled = true;
       try {
-        const realKey = await invoke('get_keyring_credential', { providerName: providerSelect.value });
+        const realKey = await invoke('get_keyring_credential', { providerName: targetProvider });
+        if (loadSeq !== providerKeyLoadSeq || (providerSelect.value && providerSelect.value !== targetProvider) || userModified) {
+          return;
+        }
         input.value = realKey;
+        input.dataset.loadedKey = realKey;
         input.dataset.isKeyring = 'false';
         delete input.dataset.keyringError;
         input.removeAttribute('title');
       } catch (e) {
-        input.dataset.keyringError = 'true';
-        notify(t('toasts.keyringLoadError', { error: String(e) }), "error");
+        if (loadSeq === providerKeyLoadSeq && providerSelect.value === targetProvider && !userModified) {
+          input.dataset.keyringError = 'true';
+          notify(t('toasts.keyringLoadError', { error: String(e) }), "error");
+        }
         return;
       } finally {
+        if (typeof input.removeEventListener === 'function') {
+          input.removeEventListener('input', onInput);
+        }
         (btn as HTMLButtonElement).disabled = false;
       }
     }
@@ -906,15 +896,11 @@ export function switchProviderTab(tab: string): void {
     
     const settingsState = getSettingsState();
     if (currentProviderModels.length === 0 && settingsState && settingsState.translateAiProvider) {
-      try {
-        const providers = JSON.parse(settingsState.translateAiProviders || '[]');
-        const curProv = providers.find((p: any) => p.name === settingsState.translateAiProvider);
-        if (curProv && curProv.models && curProv.models.length > 0) {
-          renderModelsRegistryTable(curProv);
-        } else {
-          applyModelsFilterAndRender(0);
-        }
-      } catch (e) {
+      const providers = readProvidersSafe(settingsState);
+      const curProv = providers.find((p: any) => p.name === settingsState.translateAiProvider);
+      if (curProv && curProv.models && curProv.models.length > 0) {
+        renderModelsRegistryTable(curProv);
+      } else {
         applyModelsFilterAndRender(0);
       }
     } else {
@@ -929,146 +915,238 @@ export function switchProviderTab(tab: string): void {
   }
 }
 
-export async function saveActiveProviderGeneral(silent = false): Promise<boolean> {
-  const providerSelect = document.getElementById('opt-translateAiProvider') as HTMLSelectElement | null;
-  if (!providerSelect) return false;
-  const providerName = providerSelect.value;
-  if (!providerName) return false;
+export function hasPendingProviderGeneralChanges(): boolean {
+  return hasDirtyProviderGeneral || inFlightProviderGeneralSave !== null;
+}
 
-  flushPendingModelCatalogChanges();
-  
-  const settingsState = getSettingsState();
-  let providers: ProviderConfig[] = [];
-  try {
-    providers = JSON.parse((settingsState && settingsState.translateAiProviders) || '[]');
-  } catch (e) {
-    console.error(e);
+export function flushPendingProviderGeneralChanges(): Promise<boolean> | null {
+  if (!hasDirtyProviderGeneral && !inFlightProviderGeneralSave) {
+    return null;
   }
-  
-  const providerIdx = providers.findIndex(p => p.name === providerName);
-  if (providerIdx === -1) return false;
-  
-  const provider = providers[providerIdx];
-  const urlEl = document.getElementById('mgr-provider-url') as HTMLInputElement | null;
-  const fmtEl = document.getElementById('mgr-provider-format') as HTMLSelectElement | null;
-  const keyEl = document.getElementById('mgr-provider-key') as HTMLInputElement | null;
-  const promptEl = document.getElementById('mgr-provider-prompt') as HTMLTextAreaElement | null;
-
-  const baseUrl = urlEl ? urlEl.value.trim() : '';
-  const apiFormat = fmtEl ? fmtEl.value : 'Chat completions';
-  const key = keyEl ? keyEl.value.trim() : '';
-  const customPrompt = promptEl ? promptEl.value.trim() : '';
-  
-  if (!baseUrl) {
-    if (!silent) notify(t('toasts.baseUrlRequired'), "info");
-    return false;
-  }
-  
-  let keyToSave = provider.apiKey || provider.api_key || '';
-  let useKeyring = provider.useKeyring !== false;
-  const hadKeyringError = keyEl?.dataset.keyringError === 'true';
-
-  if (key === '') {
-    if (!hadKeyringError) {
+  const run = async (): Promise<boolean> => {
+    if (inFlightProviderGeneralSave) {
       try {
-        await invoke('delete_keyring_credential', { providerName });
-      } catch (e) {}
-      keyToSave = '';
-      useKeyring = false;
+        await inFlightProviderGeneralSave;
+      } catch (_) {}
     }
-  } else if (key !== '••••••••••••••••') {
-    if (keyEl) {
-      delete keyEl.dataset.keyringError;
-      keyEl.removeAttribute('title');
+    if (!hasDirtyProviderGeneral) {
+      return true;
     }
-    try {
-      await invoke('store_keyring_credential', { providerName, key });
-      keyToSave = '__KEYRING__';
-      useKeyring = true;
-    } catch (e) {
-      console.warn("Failed to store API Key in system keyring, saving in file:", e);
+    return saveActiveProviderGeneral(true);
+  };
+  return run();
+}
+
+export function saveActiveProviderGeneral(silent = false): Promise<boolean> {
+  const task = (async (): Promise<boolean> => {
+    const providerSelect = document.getElementById('opt-translateAiProvider') as HTMLSelectElement | null;
+    if (!providerSelect) {
+      hasDirtyProviderGeneral = false;
+      return false;
+    }
+    const providerName = providerSelect.value;
+    if (!providerName) {
+      hasDirtyProviderGeneral = false;
+      return false;
+    }
+
+    flushPendingModelCatalogChanges();
+    
+    const settingsState = getSettingsState();
+    const providers = readProvidersSafe(settingsState);
+    
+    const providerIdx = providers.findIndex(p => p.name === providerName);
+    if (providerIdx === -1) {
+      hasDirtyProviderGeneral = false;
+      return false;
+    }
+    
+    const provider = providers[providerIdx];
+    const urlEl = document.getElementById('mgr-provider-url') as HTMLInputElement | null;
+    const fmtEl = document.getElementById('mgr-provider-format') as HTMLSelectElement | null;
+    const keyEl = document.getElementById('mgr-provider-key') as HTMLInputElement | null;
+    const promptEl = document.getElementById('mgr-provider-prompt') as HTMLTextAreaElement | null;
+    const keyringChk = document.getElementById('mgr-provider-use-keyring') as HTMLInputElement | null;
+
+    const baseUrl = urlEl ? urlEl.value.trim() : '';
+    const apiFormat = fmtEl ? fmtEl.value : 'Chat completions';
+    const key = keyEl ? keyEl.value.trim() : '';
+    const customPrompt = promptEl ? promptEl.value.trim() : '';
+    
+    if (!baseUrl) {
+      hasDirtyProviderGeneral = false;
+      if (!silent) notify(t('toasts.baseUrlRequired'), "info");
+      return false;
+    }
+    
+    let keyToSave = provider.apiKey || provider.api_key || '';
+    const wasUsingKeyring =
+      provider.useKeyring === true ||
+      provider.use_keyring === true ||
+      keyToSave === '__KEYRING__';
+    const existingUseKeyring = provider.useKeyring !== false && provider.use_keyring !== false;
+    const preferKeyring = keyringChk ? keyringChk.checked : existingUseKeyring;
+    let useKeyring = existingUseKeyring;
+    const hadKeyringError = keyEl?.dataset.keyringError === 'true';
+
+    if (key === '') {
+      if (!hadKeyringError) {
+        if (wasUsingKeyring) {
+          try {
+            await invoke('delete_keyring_credential', { providerName });
+          } catch (_) {}
+        }
+        keyToSave = '';
+        useKeyring = false;
+        if (keyEl) delete keyEl.dataset.loadedKey;
+      }
+    } else if (key === '••••••••••••••••') {
+      if (!preferKeyring && wasUsingKeyring && keyToSave === '__KEYRING__') {
+        try {
+          const retrievedKey = await invoke('get_keyring_credential', { providerName });
+          if (retrievedKey) {
+            try {
+              await invoke('delete_keyring_credential', { providerName });
+            } catch (_) {}
+            keyToSave = retrievedKey;
+            useKeyring = false;
+            if (keyEl) {
+              keyEl.value = retrievedKey;
+              keyEl.dataset.isKeyring = 'false';
+              delete keyEl.dataset.loadedKey;
+              delete keyEl.dataset.keyringError;
+              keyEl.removeAttribute('title');
+            }
+          }
+        } catch (e) {
+          if (keyringChk) keyringChk.checked = true;
+          useKeyring = true;
+          if (!silent) notify(t('toasts.keyringLoadError', { error: String(e) }), 'error');
+        }
+      }
+    } else if (preferKeyring) {
+      if (keyEl) {
+        delete keyEl.dataset.keyringError;
+        keyEl.removeAttribute('title');
+      }
+      if (keyEl?.dataset.loadedKey === key && keyToSave === '__KEYRING__' && wasUsingKeyring) {
+        keyToSave = '__KEYRING__';
+        useKeyring = true;
+      } else {
+        try {
+          await invoke('store_keyring_credential', { providerName, key });
+          keyToSave = '__KEYRING__';
+          useKeyring = true;
+          if (keyEl) keyEl.dataset.loadedKey = key;
+        } catch (e) {
+          console.warn("Failed to store API Key in system keyring, saving in file:", e);
+          keyToSave = key;
+          useKeyring = false;
+          if (keyEl) delete keyEl.dataset.loadedKey;
+          if (keyringChk) keyringChk.checked = false;
+        }
+      }
+    } else {
+      if (keyEl) {
+        delete keyEl.dataset.keyringError;
+        keyEl.removeAttribute('title');
+        delete keyEl.dataset.loadedKey;
+      }
+      if (wasUsingKeyring) {
+        try {
+          await invoke('delete_keyring_credential', { providerName });
+        } catch (_) {}
+      }
       keyToSave = key;
       useKeyring = false;
     }
-  }
-  
-  provider.baseUrl = baseUrl;
-  provider.apiFormat = apiFormat;
-  provider.apiKey = keyToSave;
-  provider.useKeyring = useKeyring;
-  provider.customPrompt = customPrompt;
-  
-  delete provider.base_url;
-  delete provider.api_format;
-  delete provider.api_key;
-  delete provider.use_keyring;
-  delete provider.custom_prompt;
-  
-  providers[providerIdx] = provider;
-  if (settingsState) {
-    settingsState.translateAiProviders = JSON.stringify(providers);
-  }
-  
-  await saveSettings();
-  
-  const select = document.getElementById('opt-translateAiProvider') as HTMLSelectElement | null;
-  if (select) select.value = providerName;
-  
-  if (!silent) {
-    notify(t('toasts.providerSettingsSaved'), "success");
-  }
-  return true;
+    
+    provider.baseUrl = baseUrl;
+    provider.apiFormat = apiFormat;
+    provider.apiKey = keyToSave;
+    provider.useKeyring = useKeyring;
+    provider.customPrompt = customPrompt;
+    
+    delete provider.base_url;
+    delete provider.api_format;
+    delete provider.api_key;
+    delete provider.use_keyring;
+    delete provider.custom_prompt;
+    
+    providers[providerIdx] = provider;
+    writeProviders(settingsState, providers);
+    hasDirtyProviderGeneral = false;
+    
+    await saveSettings(true);
+    
+    const select = document.getElementById('opt-translateAiProvider') as HTMLSelectElement | null;
+    if (select) select.value = providerName;
+    renderProvidersGrid(providers);
+    
+    if (!silent) {
+      notify(t('toasts.providerSettingsSaved'), "success");
+    }
+    return true;
+  })();
+
+  const tracked = task.finally(() => {
+    if (inFlightProviderGeneralSave === tracked) {
+      inFlightProviderGeneralSave = null;
+    }
+  });
+  inFlightProviderGeneralSave = tracked;
+  return tracked;
 }
 
 export async function deleteProviderByName(providerName: string): Promise<void> {
-  if (!providerName) return;
-  
-  const confirmed = await confirmModal(
-    t('modals.confirmDeleteProviderTitle'),
-    t('modals.confirmDeleteProviderDesc', { name: providerName }),
-    t('modals.deleteBtn')
-  );
-  if (!confirmed) return;
-  
-  const settingsState = getSettingsState();
-  if (modelSaveDebounceTimer) {
-    if (settingsState && settingsState.translateAiProvider === providerName) {
-      clearTimeout(modelSaveDebounceTimer);
-      modelSaveDebounceTimer = null;
-    } else {
-      flushPendingModelCatalogChanges();
-    }
-  }
-  let providers: ProviderConfig[] = [];
+  if (!providerName || isDeletingProvider) return;
+  isDeletingProvider = true;
+
   try {
-    providers = JSON.parse((settingsState && settingsState.translateAiProviders) || '[]');
-  } catch (e) {
-    console.error(e);
-  }
-  
-  const providerIdx = providers.findIndex(p => p.name === providerName);
-  if (providerIdx === -1) return;
-  
-  const provider = providers[providerIdx];
-  if (provider.useKeyring || provider.use_keyring || provider.apiKey === '__KEYRING__' || provider.api_key === '__KEYRING__') {
-    try {
-      await invoke('delete_keyring_credential', { providerName });
-    } catch(e) {}
-  }
-  
-  providers.splice(providerIdx, 1);
-  if (settingsState) {
-    settingsState.translateAiProviders = JSON.stringify(providers);
-    if (settingsState.translateAiProvider === providerName) {
-      settingsState.translateAiProvider = providers.length > 0 ? providers[0].name : '';
+    const confirmed = await confirmModal(
+      t('modals.confirmDeleteProviderTitle'),
+      t('modals.confirmDeleteProviderDesc', { name: providerName }),
+      t('modals.deleteBtn')
+    );
+    if (!confirmed) return;
+    
+    const settingsState = getSettingsState();
+    if (modelSaveDebounceTimer) {
+      if (settingsState && settingsState.translateAiProvider === providerName) {
+        clearTimeout(modelSaveDebounceTimer);
+        modelSaveDebounceTimer = null;
+      } else {
+        flushPendingModelCatalogChanges();
+      }
     }
+    const providers = readProvidersSafe(settingsState);
+    
+    const providerIdx = providers.findIndex(p => p.name === providerName);
+    if (providerIdx === -1) return;
+    
+    const provider = providers[providerIdx];
+    if (provider.useKeyring || provider.use_keyring || provider.apiKey === '__KEYRING__' || provider.api_key === '__KEYRING__') {
+      try {
+        await invoke('delete_keyring_credential', { providerName });
+      } catch(e) {}
+    }
+    
+    providers.splice(providerIdx, 1);
+    if (settingsState) {
+      writeProviders(settingsState, providers);
+      if (settingsState.translateAiProvider === providerName) {
+        settingsState.translateAiProvider = providers.length > 0 ? providers[0].name : '';
+      }
+    }
+    
+    await saveSettings(true);
+    populateProvidersDropdown();
+    onProviderChanged(true);
+    
+    notify(t('toasts.providerDeleted'), "info");
+  } finally {
+    isDeletingProvider = false;
   }
-  
-  await saveSettings();
-  populateProvidersDropdown();
-  onProviderChanged(true);
-  
-  notify(t('toasts.providerDeleted'), "info");
 }
 
 export async function deleteActiveProvider(): Promise<void> {
@@ -1237,10 +1315,11 @@ export async function setActiveModelFromTable(modelId: string): Promise<void> {
       row.setAttribute('aria-checked', 'true');
       const activeCell = row.querySelector('.td-active');
       if (activeCell) {
+        const badgeLabel = escapeHTML(t('settings.activeBadge'));
         activeCell.innerHTML = `
-          <div class="model-active-badge is-active" title="${t('settings.activeBadge')}">
+          <div class="model-active-badge is-active" title="${badgeLabel}">
             <span class="active-dot"></span>
-            <span class="badge-text">${t('settings.activeBadge')}</span>
+            <span class="badge-text">${badgeLabel}</span>
           </div>
         `;
       }
@@ -1252,16 +1331,18 @@ export async function setActiveModelFromTable(modelId: string): Promise<void> {
       row.setAttribute('aria-checked', 'false');
       const activeCell = row.querySelector('.td-active');
       if (activeCell) {
+        const setActiveLabel = escapeHTML(t('settings.setActiveBadge'));
         activeCell.innerHTML = `
-          <button type="button" class="model-radio-btn" role="radio" aria-checked="false" title="${t('settings.setActiveBadge')}" aria-label="${t('settings.setActiveBadge')}">
+          <button type="button" class="model-radio-btn" role="radio" aria-checked="false" title="${setActiveLabel}" aria-label="${setActiveLabel}">
             <span class="radio-circle"></span>
           </button>
         `;
       }
       const actionCell = row.querySelector('.td-action');
       if (actionCell) {
+        const removeLabel = escapeHTML(t('settings.removeModelRow') || 'Remove Model Row');
         actionCell.innerHTML = `
-          <button type="button" class="model-btn-trash" title="Remove Model Row" aria-label="Remove Model Row">
+          <button type="button" class="model-btn-trash" title="${removeLabel}" aria-label="${removeLabel}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="3 6 5 6 21 6"></polyline>
               <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -1337,8 +1418,8 @@ export function applyModelsFilterAndRender(delay = 0): void {
       
       filtered.sort((a, b) => {
         if (currentModelsSortCol === 'active') {
-          const aActive = (a.id === activeModelId) ? 1 : 0;
-          const bActive = (b.id === activeModelId) ? 1 : 0;
+          const aActive = isModelIdMatch(a.id, activeModelId) ? 1 : 0;
+          const bActive = isModelIdMatch(b.id, activeModelId) ? 1 : 0;
           return (aActive - bActive) * dir;
         } else if (currentModelsSortCol === 'id') {
           return a.id.localeCompare(b.id, undefined, { sensitivity: 'base' }) * dir;
@@ -1417,7 +1498,7 @@ export function applyModelsFilterAndRender(delay = 0): void {
       const activeModelId = (settings && settings.translateAiModel) || '';
       const frag = document.createDocumentFragment();
       pageItems.forEach((modelObj, idx) => {
-        const isActive = modelObj.id === activeModelId && !!activeModelId;
+        const isActive = isModelIdMatch(modelObj.id, activeModelId);
         const row = createModelRowElement(modelObj, isActive, startIndex + idx);
         frag.appendChild(row);
       });
@@ -1582,23 +1663,36 @@ export function createModelRowElement(modelObj: ModelObject, isActive: boolean, 
   }
 
   const isManualNew = !fullId;
+  const activeBadgeLabel = escapeHTML(t('settings.activeBadge'));
+  const setActiveLabel = escapeHTML(t('settings.setActiveBadge'));
+  const removeRowLabel = escapeHTML(t('settings.removeModelRow') || 'Remove Model Row');
+  const reasoningNotSupportedLabel = escapeHTML(t('settings.reasoningNotSupported'));
+  const modelIdTitle = escapeHTML(t('settings.thModelId') || 'Model Identifier');
+  const modelIdPlaceholder = escapeHTML(t('settings.modelIdentifierPlaceholder') || 'e.g. gpt-4o-mini');
+  const exactCtxTokens = formatLocalizedNumber
+    ? formatLocalizedNumber(Number(modelObj.contextWindow || 0), getLanguage(), 0)
+    : Number(modelObj.contextWindow || 0).toLocaleString();
+  const ctxTooltip = escapeHTML(
+    t('settings.contextTokensTooltip', { formatted: formattedCtx, exact: exactCtxTokens }) ||
+      `Context tokens: ${formattedCtx} (${exactCtxTokens})`
+  );
 
   row.innerHTML = `
     <div class="td-cell td-active" role="cell">
       ${isActive ? `
-        <div class="model-active-badge is-active" title="${t('settings.activeBadge')}">
+        <div class="model-active-badge is-active" title="${activeBadgeLabel}">
           <span class="active-dot"></span>
-          <span class="badge-text">${t('settings.activeBadge')}</span>
+          <span class="badge-text">${activeBadgeLabel}</span>
         </div>
       ` : `
-        <button type="button" class="model-radio-btn" role="radio" aria-checked="false" title="${t('settings.setActiveBadge')}" aria-label="${t('settings.setActiveBadge')}">
+        <button type="button" class="model-radio-btn" role="radio" aria-checked="false" title="${setActiveLabel}" aria-label="${setActiveLabel}">
           <span class="radio-circle"></span>
         </button>
       `}
     </div>
     <div class="td-cell td-id" role="cell">
       ${isManualNew ? `
-        <input type="text" class="model-cell-input model-id-input" value="" placeholder="e.g. gpt-4o-mini" title="Model Identifier" />
+        <input type="text" class="model-cell-input model-id-input" value="" placeholder="${modelIdPlaceholder}" title="${modelIdTitle}" aria-label="${modelIdTitle}" />
       ` : `
         <div class="model-id-wrapper" dir="ltr">
           <div class="model-id-display" title="${escapeHTML(fullId)}">${providerPrefix ? `<span class="model-id-prefix">${escapeHTML(providerPrefix)}</span>` : ''}<span class="model-id-name">${escapeHTML(modelName)}</span></div>
@@ -1608,14 +1702,14 @@ export function createModelRowElement(modelObj: ModelObject, isActive: boolean, 
     </div>
     <div class="td-cell td-ctx" role="cell">
       ${isManualNew ? `
-        <input type="text" class="model-cell-input model-ctx-input" value="${formattedCtx}" data-raw-tokens="${modelObj.contextWindow}" placeholder="128K" title="Context tokens: ${formattedCtx} (${Number(modelObj.contextWindow).toLocaleString()})" />
+        <input type="text" class="model-cell-input model-ctx-input" value="${formattedCtx}" data-raw-tokens="${modelObj.contextWindow}" placeholder="128K" title="${ctxTooltip}" aria-label="${ctxTooltip}" />
       ` : `
-        <span class="model-ctx-value" title="Context tokens: ${formattedCtx} (${Number(modelObj.contextWindow).toLocaleString()})">${formattedCtx}</span>
+        <span class="model-ctx-value" title="${ctxTooltip}">${formattedCtx}</span>
       `}
     </div>
     <div class="td-cell td-reasoning" role="cell">
       ${supportsReasoning ? `
-        <select id="${selectId}" class="select-control model-reasoning-select${isReasoningActive ? ' reasoning-active' : ''}">
+        <select id="${selectId}" class="select-control model-reasoning-select${isReasoningActive ? ' reasoning-active' : ''}" aria-label="${escapeHTML(t('settings.thReasoning') || 'Reasoning')}">
           <option value="None" ${curReasoningLower === 'none' ? 'selected' : ''}>None</option>
           <option value="Minimal" ${curReasoningLower === 'minimal' ? 'selected' : ''}>Minimal</option>
           <option value="Low" ${curReasoningLower === 'low' ? 'selected' : ''}>Low</option>
@@ -1626,12 +1720,12 @@ export function createModelRowElement(modelObj: ModelObject, isActive: boolean, 
           <option value="Ultra" ${curReasoningLower === 'ultra' ? 'selected' : ''}>Ultra</option>
         </select>
       ` : `
-        <span class="reasoning-none-dash" title="${t('settings.reasoningNotSupported')}" aria-label="${t('settings.reasoningNotSupported')}">—</span>
+        <span class="reasoning-none-dash" title="${reasoningNotSupportedLabel}" aria-label="${reasoningNotSupportedLabel}">—</span>
       `}
     </div>
     <div class="td-cell td-action" role="cell">
       ${isActive ? '' : `
-        <button type="button" class="model-btn-trash" title="Remove Model Row" aria-label="Remove Model Row">
+        <button type="button" class="model-btn-trash" title="${removeRowLabel}" aria-label="${removeRowLabel}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="3 6 5 6 21 6"></polyline>
             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -1645,9 +1739,8 @@ export function createModelRowElement(modelObj: ModelObject, isActive: boolean, 
 
   const isRowActive = (): boolean => {
     const settings = getSettingsState();
-    const activeId = ((settings && settings.translateAiModel) || '').trim().toLowerCase();
-    const thisId = (modelObj.id || '').trim().toLowerCase();
-    if (activeId) return Boolean(thisId && activeId === thisId);
+    const activeId = (settings && settings.translateAiModel) || '';
+    if ((activeId || '').trim()) return isModelIdMatch(modelObj.id, activeId);
     return row.classList.contains('active-model-row');
   };
 
@@ -1661,6 +1754,13 @@ export function createModelRowElement(modelObj: ModelObject, isActive: boolean, 
     }
   };
 
+  const findLiveModelIndex = (): number => {
+    const directIdx = currentProviderModels.indexOf(modelObj);
+    if (directIdx !== -1) return directIdx;
+    const trimmed = (modelObj.id || '').trim();
+    return trimmed ? currentProviderModels.findIndex(m => isModelIdMatch(m.id, trimmed)) : -1;
+  };
+
   row.addEventListener('click', (e: MouseEvent) => {
     const trashBtn = (e.target as HTMLElement).closest('.model-btn-trash');
     if (trashBtn) {
@@ -1669,7 +1769,7 @@ export function createModelRowElement(modelObj: ModelObject, isActive: boolean, 
         notify(t('toasts.cannotDeleteActiveModel'), "info");
         return;
       }
-      const idx = currentProviderModels.indexOf(modelObj);
+      const idx = findLiveModelIndex();
       if (idx !== -1) {
         currentProviderModels.splice(idx, 1);
       }
@@ -1761,9 +1861,14 @@ export function createModelRowElement(modelObj: ModelObject, isActive: boolean, 
         input.removeEventListener('blur', onBlur);
         const val = input.value.trim();
         if (val && val !== modelObj.id) {
+          if (hasDuplicateModelId(currentProviderModels, val, modelObj)) {
+            notify(t('toasts.modelIdExists', { id: val }), 'info');
+            applyModelsFilterAndRender(0);
+            return;
+          }
           const wasRowActive = isRowActive();
           modelObj.id = val;
-          row.dataset.modelId = val.toLowerCase();
+          row.dataset.modelId = normalizeModelId(val);
           if (wasRowActive) {
             const settings = getSettingsState();
             if (settings) {
@@ -1862,11 +1967,21 @@ export function createModelRowElement(modelObj: ModelObject, isActive: boolean, 
     idInput.addEventListener('input', () => {
       const val = idInput.value.trim();
       modelObj.id = val;
-      row.dataset.modelId = val.toLowerCase();
+      row.dataset.modelId = normalizeModelId(val);
     });
     idInput.addEventListener('blur', () => {
       const val = idInput.value.trim();
       if (val) {
+        if (hasDuplicateModelId(currentProviderModels, val, modelObj)) {
+          notify(t('toasts.modelIdExists', { id: val }), 'info');
+          const idx = currentProviderModels.indexOf(modelObj);
+          if (idx !== -1) {
+            currentProviderModels.splice(idx, 1);
+          }
+          updateFilterCounts();
+          applyModelsFilterAndRender(0);
+          return;
+        }
         updateFilterCounts();
         saveActiveProviderModelsDebounced();
         setTimeout(() => {
@@ -1963,19 +2078,6 @@ export function addManualModelRow(
 
 let modelsFetchSeq = 0;
 
-function normalizeProviderModelsList(models: ModelObject[]): ModelObject[] {
-  const validModels: ModelObject[] = [];
-  const seenIds = new Set<string>();
-  models.forEach(m => {
-    const trimmedId = (m.id || '').trim();
-    if (trimmedId && !seenIds.has(trimmedId)) {
-      seenIds.add(trimmedId);
-      validModels.push(normalizeProviderModel(m, { idOverride: trimmedId }));
-    }
-  });
-  return validModels;
-}
-
 export async function fetchActiveProviderModels(): Promise<void> {
   if (typeof document === 'undefined') return;
   const providerSelect = document.getElementById('opt-translateAiProvider') as HTMLSelectElement | null;
@@ -1983,12 +2085,7 @@ export async function fetchActiveProviderModels(): Promise<void> {
   const providerName = providerSelect.value;
   
   const settingsState = getSettingsState();
-  let providers: ProviderConfig[] = [];
-  try {
-    providers = JSON.parse((settingsState && settingsState.translateAiProviders) || '[]');
-  } catch (e) {
-    console.error(e);
-  }
+  const providers = readProvidersSafe(settingsState);
   
   const provider = providers.find(p => p.name === providerName);
   if (!provider) return;
@@ -2102,18 +2199,15 @@ export async function fetchActiveProviderModels(): Promise<void> {
     } else if (liveSettings) {
       // User switched providers mid-fetch: persist models onto the target provider
       // without clobbering the newly selected provider's active state or UI table.
-      let latestProviders: ProviderConfig[] = [];
-      try {
-        latestProviders = JSON.parse(liveSettings.translateAiProviders || '[]');
-      } catch (_) {}
+      const latestProviders = readProvidersSafe(liveSettings);
       const targetIdx = latestProviders.findIndex(p => p.name === providerName);
       if (targetIdx !== -1) {
         latestProviders[targetIdx] = {
           ...latestProviders[targetIdx],
           models: normalizeProviderModelsList(fetchedModels)
         };
-        liveSettings.translateAiProviders = JSON.stringify(latestProviders);
-        await saveSettings();
+        writeProviders(liveSettings, latestProviders);
+        await saveSettings(true);
         persistedForTarget = true;
       }
     }
@@ -2138,12 +2232,7 @@ export async function saveActiveProviderModels(
 ): Promise<void> {
   const settingsState = getSettingsState();
   const providerName = targetProviderName || (settingsState ? settingsState.translateAiProvider : '');
-  let providers: ProviderConfig[] = [];
-  try {
-    providers = JSON.parse((settingsState && settingsState.translateAiProviders) || '[]');
-  } catch (e) {
-    console.error(e);
-  }
+  const providers = readProvidersSafe(settingsState);
   
   const providerIdx = providers.findIndex(p => p.name === providerName);
   if (providerIdx === -1) return;
@@ -2151,13 +2240,15 @@ export async function saveActiveProviderModels(
   const provider = providers[providerIdx];
   const validModels = normalizeProviderModelsList(currentProviderModels);
 
-  provider.models = validModels;
-  providers[providerIdx] = provider;
-  if (settingsState) {
-    settingsState.translateAiProviders = JSON.stringify(providers);
+  const isCurrentActiveProvider = providerName === (settingsState ? settingsState.translateAiProvider : '');
+  if (isCurrentActiveProvider) {
+    currentProviderModels = dedupeLiveModels(currentProviderModels);
   }
 
-  const isCurrentActiveProvider = providerName === (settingsState ? settingsState.translateAiProvider : '');
+  provider.models = validModels;
+  providers[providerIdx] = provider;
+  writeProviders(settingsState, providers);
+
   if (isCurrentActiveProvider && settingsState) {
     const selectDOM = typeof document !== 'undefined'
       ? (document.getElementById('opt-translateAiModel') as HTMLSelectElement | null)
@@ -2211,16 +2302,29 @@ export function filterModelsStatus(status: string, delay = 0): void {
 // ----------------- Add Provider Modal -----------------
 export function openAddProviderModal(): void {
   if (typeof document === 'undefined') return;
+  if (providerModalCloseTimer !== null) {
+    clearTimeout(providerModalCloseTimer);
+    providerModalCloseTimer = null;
+  }
   if (_providerModalTrap) {
     _providerModalTrap.release();
     _providerModalTrap = null;
   }
   const nameEl = document.getElementById('provider-name') as HTMLInputElement | null;
+  const fmtEl = document.getElementById('provider-format') as HTMLSelectElement | null;
   const urlEl = document.getElementById('provider-url') as HTMLInputElement | null;
   const keyEl = document.getElementById('provider-key') as HTMLInputElement | null;
   const keyringEl = document.getElementById('provider-use-keyring') as HTMLInputElement | null;
 
   if (nameEl) nameEl.value = '';
+  if (fmtEl) {
+    fmtEl.value = 'Chat completions';
+    const win = getGlobal();
+    const fmtCs = win?.customSelectsMap?.get?.('provider-format') || customSelectsMap.get('provider-format');
+    if (fmtCs && typeof fmtCs.syncSelectedValue === 'function') {
+      fmtCs.syncSelectedValue(true);
+    }
+  }
   if (urlEl) urlEl.value = '';
   if (keyEl) {
     keyEl.value = '';
@@ -2246,22 +2350,32 @@ export function closeProviderModal(): void {
     _providerModalTrap.release();
     _providerModalTrap = null;
   }
+  if (providerModalCloseTimer !== null) {
+    clearTimeout(providerModalCloseTimer);
+    providerModalCloseTimer = null;
+  }
   if (typeof document !== 'undefined') {
     const modal = document.getElementById('translation-provider-modal');
     if (modal) {
       modal.classList.remove('show');
-      setTimeout(() => { modal.style.display = 'none'; }, 300);
+      providerModalCloseTimer = setTimeout(() => {
+        providerModalCloseTimer = null;
+        if (!modal.classList.contains('show')) {
+          modal.style.display = 'none';
+        }
+      }, 300);
     }
   }
 }
 
 export async function saveProviderConfig(): Promise<void> {
-  if (typeof document === 'undefined') return;
+  if (typeof document === 'undefined' || isSavingProviderConfig) return;
   const nameEl = document.getElementById('provider-name') as HTMLInputElement | null;
   const urlEl = document.getElementById('provider-url') as HTMLInputElement | null;
   const fmtEl = document.getElementById('provider-format') as HTMLSelectElement | null;
   const keyEl = document.getElementById('provider-key') as HTMLInputElement | null;
   const keyringEl = document.getElementById('provider-use-keyring') as HTMLInputElement | null;
+  const saveBtn = document.getElementById('provider-modal-save-btn') as HTMLButtonElement | null;
 
   const name = nameEl ? nameEl.value.trim() : '';
   const baseUrl = urlEl ? urlEl.value.trim() : '';
@@ -2275,55 +2389,64 @@ export async function saveProviderConfig(): Promise<void> {
   }
 
   const settingsState = getSettingsState();
-  let providers: ProviderConfig[] = [];
-  try {
-    providers = JSON.parse((settingsState && settingsState.translateAiProviders) || '[]');
-  } catch (e) {
-    console.error(e);
-  }
+  const initialProviders = readProvidersSafe(settingsState);
   
-  if (providers.some(p => p.name === name)) {
+  if (initialProviders.some(p => p.name === name)) {
     notify(t('toasts.providerNameExists', { name }), "error");
     return;
   }
-  
-  let keyToSave = key;
-  let useKeyring = false;
-  
-  if (key && preferKeyring) {
-    try {
-      await invoke('store_keyring_credential', { providerName: name, key });
-      keyToSave = '__KEYRING__';
-      useKeyring = true;
-    } catch (e) {
-      console.warn("Failed to store API Key in system keyring:", e);
-      keyToSave = key;
-      useKeyring = false;
+
+  isSavingProviderConfig = true;
+  if (saveBtn) saveBtn.disabled = true;
+
+  try {
+    let keyToSave = key;
+    let useKeyring = false;
+    
+    if (key && preferKeyring) {
+      try {
+        await invoke('store_keyring_credential', { providerName: name, key });
+        keyToSave = '__KEYRING__';
+        useKeyring = true;
+      } catch (e) {
+        console.warn("Failed to store API Key in system keyring:", e);
+        keyToSave = key;
+        useKeyring = false;
+      }
     }
+
+    const latestProviders = readProvidersSafe(settingsState);
+    if (latestProviders.some(p => p.name === name)) {
+      notify(t('toasts.providerNameExists', { name }), "error");
+      return;
+    }
+    
+    const providerData: ProviderConfig = {
+      name,
+      baseUrl: baseUrl,
+      apiKey: keyToSave,
+      apiFormat: apiFormat,
+      useKeyring: useKeyring,
+      models: [],
+      customPrompt: ""
+    };
+    
+    latestProviders.push(providerData);
+    if (settingsState) {
+      writeProviders(settingsState, latestProviders);
+      settingsState.translateAiProvider = name;
+    }
+    
+    await saveSettings(true);
+    populateProvidersDropdown();
+    onProviderChanged('general');
+    closeProviderModal();
+    
+    notify(t('toasts.providerAddedSuccess'), "success");
+  } finally {
+    isSavingProviderConfig = false;
+    if (saveBtn) saveBtn.disabled = false;
   }
-  
-  const providerData: ProviderConfig = {
-    name,
-    baseUrl: baseUrl,
-    apiKey: keyToSave,
-    apiFormat: apiFormat,
-    useKeyring: useKeyring,
-    models: [],
-    customPrompt: ""
-  };
-  
-  providers.push(providerData);
-  if (settingsState) {
-    settingsState.translateAiProviders = JSON.stringify(providers);
-    settingsState.translateAiProvider = name;
-  }
-  
-  await saveSettings();
-  populateProvidersDropdown();
-  onProviderChanged('general');
-  closeProviderModal();
-  
-  notify(t('toasts.providerAddedSuccess'), "success");
 }
 
 // ----------------- Batch Error Dialog (Delegated to appModal) -----------------
@@ -2336,17 +2459,38 @@ export function setupTranslationEventListeners(): void {
   const formatSelect = document.getElementById('mgr-provider-format');
   const keyInput = document.getElementById('mgr-provider-key');
   const promptTextarea = document.getElementById('mgr-provider-prompt') as HTMLTextAreaElement | null;
+  const keyringChk = document.getElementById('mgr-provider-use-keyring');
   
+  const markDirty = () => {
+    hasDirtyProviderGeneral = true;
+    const win = getGlobal();
+    if (typeof win.markSettingsDirty === 'function') {
+      win.markSettingsDirty();
+    }
+  };
+
   const triggerAutoSave = () => {
-    saveActiveProviderGeneral(true);
+    void saveActiveProviderGeneral(true);
   };
   
-  if (urlInput) urlInput.addEventListener('change', triggerAutoSave);
+  if (urlInput) {
+    urlInput.addEventListener('input', markDirty);
+    urlInput.addEventListener('change', triggerAutoSave);
+  }
   if (formatSelect) formatSelect.addEventListener('change', triggerAutoSave);
-  if (keyInput) keyInput.addEventListener('change', triggerAutoSave);
+  if (keyInput) {
+    keyInput.addEventListener('input', markDirty);
+    keyInput.addEventListener('change', triggerAutoSave);
+  }
+  if (keyringChk) {
+    keyringChk.addEventListener('change', triggerAutoSave);
+  }
   if (promptTextarea) {
     applyDynamicDir(promptTextarea);
-    promptTextarea.addEventListener('input', () => applyDynamicDir(promptTextarea));
+    promptTextarea.addEventListener('input', () => {
+      applyDynamicDir(promptTextarea);
+      markDirty();
+    });
     promptTextarea.addEventListener('change', triggerAutoSave);
   }
 
@@ -2551,14 +2695,11 @@ export async function testTranslationConnection(): Promise<void> {
     settingsState.translateAiProvider = providerName;
   }
 
-  let providers: ProviderConfig[] = [];
-  try {
-    providers = JSON.parse((settingsState && settingsState.translateAiProviders) || '[]');
-  } catch (e) {}
+  const providers = readProvidersSafe(settingsState);
   const p = providers.find(item => item.name === providerName);
   const models = (p && Array.isArray(p.models)) ? p.models : [];
   if (settingsState) {
-    const modelBelongsToProvider = models.some(m => m.id === settingsState.translateAiModel);
+    const modelBelongsToProvider = models.some(m => isModelIdMatch(m.id, settingsState.translateAiModel));
     if (!modelBelongsToProvider && models.length > 0) {
       const enabledModel = models.find(m => m.enabled !== false) || models[0];
       if (enabledModel) {
@@ -2702,6 +2843,8 @@ export function syncTranslationProvidersWindowBindings(): void {
   window.testTranslationConnection = testTranslationConnection;
   window.toggleTranslationSubSettingsVisibility = toggleTranslationSubSettingsVisibility;
   window.flushPendingModelCatalogChanges = flushPendingModelCatalogChanges;
+  (window as any).flushPendingProviderGeneralChanges = flushPendingProviderGeneralChanges;
+  (window as any).hasPendingProviderGeneralChanges = hasPendingProviderGeneralChanges;
 
   try {
     Object.defineProperty(window, 'currentProviderModels', {
@@ -2735,6 +2878,8 @@ export const translationProviders = {
   onChanged: onProviderChanged,
   switchTab: switchProviderTab,
   saveGeneral: saveActiveProviderGeneral,
+  hasPendingGeneralChanges: hasPendingProviderGeneralChanges,
+  flushPendingProviderGeneralChanges,
   deleteByName: deleteProviderByName,
   deleteActive: deleteActiveProvider,
   renderModelsTable: renderModelsRegistryTable,

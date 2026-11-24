@@ -865,6 +865,11 @@ export const en = {
     whisperSystem: 'System',
     engineNotBundledShort: 'Not bundled',
     engineMissingBadge: 'Not Found',
+    engineReadyBadge: 'Ready',
+    engineStatusError: 'Status Error',
+    engineTooltipSource: 'Source',
+    engineTooltipPath: 'Path',
+    engineTooltipBackends: 'Backends',
     trayTitle: 'Keep Running in Background on Close',
     trayDesc: 'Keeps Whisper Desktop active in the background system tray when the main window is closed.',
     autoCheckUpdatesTitle: 'Check for Updates on Startup',
@@ -872,6 +877,11 @@ export const en = {
     uiScaleTitle: 'UI Scale & Zoom',
     uiScaleDesc: 'Adjust the interface scaling to fit high-DPI displays.',
     uiScaleReset: 'Reset',
+    uiScaleZoomOut: 'Zoom Out (Ctrl+-)',
+    uiScaleZoomIn: 'Zoom In (Ctrl++)',
+    uiScaleResetTooltip: 'Reset UI Scale to 100% (Ctrl+0)',
+    decreaseValue: 'Decrease value',
+    increaseValue: 'Increase value',
     langSpokenTitle: 'Language Spoken',
     langSpokenDesc: 'Language spoken in the audio. Pick Auto Detect to let Whisper detect it automatically.',
     initialPromptTitle: 'Initial Prompt',
@@ -902,7 +912,7 @@ export const en = {
     tokenTimestampsTitle: 'Token-Level Timestamps',
     tokenTimestampsDesc: 'Generates high-precision millisecond timestamps per word.',
     audioCtxTitle: 'Audio Processing Window Length',
-    audioCtxDesc: 'Audio context frame length in milliseconds (0 = Whisper standard 30s window).',
+    audioCtxDesc: 'Audio encoder context frames (0–1500; 0 = model default 30-second window, 1500 = full 30 seconds).',
     maxContextTitle: 'Previous Context Memory Limit',
     maxContextDesc: 'Maximum history from previous sentences provided as context to the model.',
     offsetTTitle: 'Transcription Start Point (ms)',
@@ -1097,7 +1107,7 @@ export const en = {
     tinyDiarizePoints: '<span class="setting-desc-point"><strong>Requirement:</strong> Requires <code>tdrz</code>-enabled models (e.g. <code>small.en-tdrz</code>).</span>',
     bestOfPoints: '<span class="setting-desc-point"><strong>Default:</strong> <code>5</code></span><span class="setting-desc-point"><strong>Recommendation:</strong> Higher (<code>6–8</code>) boosts accuracy; lower (<code>1–2</code>) runs faster.</span>',
     beamSizePoints: '<span class="setting-desc-point"><strong>Default:</strong> <code>5</code></span><span class="setting-desc-point"><strong>Trade-off:</strong> Higher values reduce word errors and hallucinations, but increase transcription time.</span>',
-    audioCtxPoints: '<span class="setting-desc-point"><strong>Default:</strong> <code>0</code> (uses model default 30-second context window)</span><span class="setting-desc-point"><strong>Advanced:</strong> Restricts attention window for custom streaming workflows.</span>',
+    audioCtxPoints: '<span class="setting-desc-point"><strong>Default:</strong> <code>0</code> (uses full model default 30s window, equivalent to <code>1500</code> encoder frames)</span><span class="setting-desc-point"><strong>Advanced:</strong> Set between <code>1</code> and <code>1500</code> frames to restrict attention for shorter clips.</span>',
     wordTholdPoints: '<span class="setting-desc-point"><strong>Default:</strong> <code>0.01</code></span><span class="setting-desc-point"><strong>When to change:</strong> Increase (<code>0.05–0.1</code>) if word timings drift during silent parts.</span>',
     entropyTholdPoints: '<span class="setting-desc-point"><strong>Default:</strong> <code>2.4</code></span><span class="setting-desc-point"><strong>When to change:</strong> Lower to <code>2.2</code> if model produces repetitive gibberish.</span>',
     logprobTholdPoints: '<span class="setting-desc-point"><strong>Default:</strong> <code>-1</code></span><span class="setting-desc-point"><strong>When to change:</strong> Lower to <code>-1.5</code> for noisy or accented speech to prevent unnecessary retries.</span>',
@@ -1124,7 +1134,12 @@ export const en = {
     polishPoints: '<span class="setting-desc-point"><strong>Recommended:</strong> Enabled for natural subtitle flow, avoiding rigid word-for-word machine translations.</span>',
     modelsTip: 'Model edits auto-save in real time. Click any model row to set it as your default translation model.',
     addReasoning: 'Configure Reasoning',
-    noReasoning: 'No Reasoning'
+    noReasoning: 'No Reasoning',
+    toggleApiKeyVisibility: 'Toggle API key visibility',
+    removeModelRow: 'Remove Model Row',
+    modelIdentifierPlaceholder: 'e.g. gpt-4o-mini',
+    contextTokensTooltip: 'Context Window: {formatted} ({exact} tokens)',
+    tokensUnit: 'tokens'
   },
   logs: {
     title: 'Activity Logs',
@@ -1167,6 +1182,7 @@ export const en = {
     cancelBtn: 'Cancel',
     addProviderTitle: 'Add API Provider',
     providerName: 'Provider Name',
+    providerNamePlaceholder: 'e.g. OpenRouter',
     apiFormat: 'API Format',
     baseUrl: 'Base URL',
     apiKey: 'API Key',
@@ -1305,7 +1321,9 @@ export const en = {
     providerAddedSuccess: 'Provider added successfully! Configure its models below.',
     noProviderToTest: 'No active provider selected to test.',
     modelsDirNotWritable: 'Selected models directory is not writable:\n{error}',
-    outputDirNotWritable: 'Selected output directory is not writable:\n{error}'
+    outputDirNotWritable: 'Selected output directory is not writable:\n{error}',
+    modelIdExists: 'A model with ID "{id}" already exists for this provider.',
+    providersJsonCorrupt: 'Saved AI providers list was unreadable and could not be parsed cleanly.'
   }
 };
 

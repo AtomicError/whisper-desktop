@@ -1025,4 +1025,68 @@ describe('appModal & Feedback Module', () => {
       }
     });
   });
+
+  describe('Modal Close Race & CustomSelect Escape Guard', () => {
+    it('does not hide app modal when reopened within 300ms after closeAppModal', () => {
+      vi.useFakeTimers();
+      try {
+        const overlay = new MockNode('DIV');
+        overlay.id = 'app-modal-overlay';
+        const titleEl = new MockNode('DIV');
+        titleEl.id = 'app-modal-title';
+        const msgEl = new MockNode('DIV');
+        msgEl.id = 'app-modal-message';
+        const detailsEl = new MockNode('DIV');
+        detailsEl.id = 'app-modal-details';
+        body.appendChild(overlay);
+        body.appendChild(titleEl);
+        body.appendChild(msgEl);
+        body.appendChild(detailsEl);
+
+        showAppModal('First', 'Message 1');
+        expect(overlay.classList.contains('show')).toBe(true);
+        expect(overlay.style.display).toBe('flex');
+
+        closeAppModal();
+        expect(overlay.classList.contains('show')).toBe(false);
+
+        vi.advanceTimersByTime(100);
+        showAppModal('Second', 'Message 2');
+        expect(overlay.classList.contains('show')).toBe(true);
+        expect(overlay.style.display).toBe('flex');
+
+        vi.advanceTimersByTime(300);
+        expect(overlay.style.display).toBe('flex');
+        expect(overlay.classList.contains('show')).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('skips modal Escape close in _trapModalFocus while a CustomSelect dropdown is open', () => {
+      const modal = new MockNode('DIV');
+      body.appendChild(modal);
+      const closeCb = vi.fn();
+
+      const prevQs = (document as any).querySelector;
+      (document as any).querySelector = vi.fn().mockImplementation((sel: string) =>
+        sel === '.custom-select-options.open' ? new MockNode('DIV') : null
+      );
+
+      const trap = _trapModalFocus(modal as any, closeCb);
+      try {
+        const escOpen = { key: 'Escape', preventDefault: vi.fn(), stopPropagation: vi.fn() };
+        (document as any).dispatchEvent({ type: 'keydown', ...escOpen });
+        expect(closeCb).not.toHaveBeenCalled();
+
+        ((document as any).querySelector as any).mockReturnValue(null);
+        const escClosed = { key: 'Escape', preventDefault: vi.fn(), stopPropagation: vi.fn() };
+        (document as any).dispatchEvent({ type: 'keydown', ...escClosed });
+        expect(closeCb).toHaveBeenCalledTimes(1);
+      } finally {
+        trap.release();
+        (document as any).querySelector = prevQs;
+      }
+    });
+  });
 });

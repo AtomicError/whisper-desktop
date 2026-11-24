@@ -704,6 +704,20 @@ export function setupZoomKeyboardShortcuts(): void {
   if (typeof window === 'undefined') return;
   window.addEventListener('keydown', (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
+      if (e.defaultPrevented) return;
+      const openSelects = document.querySelectorAll('.custom-select-options.open');
+      if (openSelects.length > 0) {
+        const selectsMap = (window as any).customSelectsMap;
+        if (selectsMap && typeof selectsMap.forEach === 'function') {
+          selectsMap.forEach((cs: any) => {
+            if (cs && cs.isOpen && typeof cs.close === 'function') {
+              cs.close();
+            }
+          });
+        }
+        openSelects.forEach(el => el.classList.remove('open'));
+        return;
+      }
       const providerModal = document.getElementById('translation-provider-modal') as HTMLElement | null;
       if (providerModal && (providerModal.classList.contains('show') || providerModal.style.display === 'flex')) {
         if (typeof (window as any).closeProviderModal === 'function') {
@@ -724,9 +738,6 @@ export function setupZoomKeyboardShortcuts(): void {
           (window as any).closeAppModal();
         }
       }
-      document.querySelectorAll('.custom-select-options.open').forEach(el => {
-        el.classList.remove('open');
-      });
     }
 
     if (e.ctrlKey || e.metaKey) {

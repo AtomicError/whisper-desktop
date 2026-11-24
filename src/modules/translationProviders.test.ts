@@ -21,6 +21,11 @@ import {
   renderModelsRegistryTable,
   saveActiveProviderModels,
   testTranslationConnection,
+  closeProviderModal,
+  setupTranslationEventListeners,
+  hasPendingProviderGeneralChanges,
+  flushPendingProviderGeneralChanges,
+  addManualModelRow,
   type ModelObject
 } from './translationProviders';
 import { setSettingsState, getSettingsState } from './settingsManager';
@@ -289,6 +294,7 @@ describe('translationProviders module', () => {
           if (sel === '.td-active') return el._tdActive || null;
           if (sel === '.td-action') return el._tdAction || null;
           if (sel === '.model-id-display') return el._idDisplay || null;
+          if (sel === '.model-id-input') return el._idInput || null;
           if (sel === '.model-radio-btn') return el._radioBtn || null;
           if (sel === '.model-btn-trash') return el._trashBtn || null;
           if (sel === 'svg') return null;
@@ -312,6 +318,9 @@ describe('translationProviders module', () => {
             el._idDisplay.replaceWith = (inputNode: any) => {
               el._replacedInput = inputNode;
             };
+          }
+          if (v.includes('model-id-input')) {
+            el._idInput = makeEl('input');
           }
         }
       };
@@ -874,6 +883,245 @@ describe('translationProviders module', () => {
       expect(tile.innerHTML).toContain('type="button"');
       expect(addTile.getAttribute('role')).toBe('button');
       expect(addTile.tabIndex).toBe(0);
+    });
+
+    it('preserves useKeyring: false on edit and supports toggling #mgr-provider-use-keyring migration', async () => {
+      const invokeSpy = vi.fn().mockResolvedValue(undefined);
+      (globalThis as any).window.__TAURI__ = { core: { invoke: invokeSpy } };
+
+      const provSelect = makeEl('select', 'opt-translateAiProvider');
+      provSelect.value = 'CustomProvider';
+      const urlInput = makeEl('input', 'mgr-provider-url');
+      const fmtSelect = makeEl('select', 'mgr-provider-format');
+      const keyInput = makeEl('input', 'mgr-provider-key');
+      const keyringChk = makeEl('input', 'mgr-provider-use-keyring');
+      const promptInput = makeEl('textarea', 'mgr-provider-prompt');
+
+      setSettingsState({
+        translateAiProvider: 'CustomProvider',
+        translateAiProviders: JSON.stringify([
+          { name: 'CustomProvider', baseUrl: 'https://old.example/v1', apiFormat: 'Chat completions', apiKey: 'plain-key', useKeyring: false, models: [] }
+        ])
+      });
+
+      // Case 1: Editing URL with useKeyring unchecked preserves plaintext storage
+      urlInput.value = 'https://new.example/v1';
+      fmtSelect.value = 'Chat completions';
+      keyInput.value = 'plain-key';
+      keyringChk.checked = false;
+      promptInput.value = '';
+      await saveActiveProviderGeneral(true);
+
+      let saved = JSON.parse(getSettingsState().translateAiProviders)[0];
+      expect(saved.baseUrl).toBe('https://new.example/v1');
+      expect(saved.useKeyring).toBe(false);
+      expect(saved.apiKey).toBe('plain-key');
+      expect(invokeSpy).not.toHaveBeenCalledWith('store_keyring_credential', expect.anything());
+
+      // Case 2: Toggling #mgr-provider-use-keyring ON migrates key into OS keyring
+      keyringChk.checked = true;
+      await saveActiveProviderGeneral(true);
+      expect(invokeSpy).toHaveBeenCalledWith('store_keyring_credential', {
+        providerName: 'CustomProvider',
+        key: 'plain-key'
+      });
+      saved = JSON.parse(getSettingsState().translateAiProviders)[0];
+      expect(saved.useKeyring).toBe(true);
+      expect(saved.apiKey).toBe('__KEYRING__');
+
+      // Case 3: Toggling #mgr-provider-use-keyring OFF migrates back to plaintext and removes keyring secret
+      invokeSpy.mockClear();
+      invokeSpy.mockImplementation((cmd: string) => {
+        if (cmd === 'get_keyring_credential') return Promise.resolve('recovered-keyring-key');
+        return Promise.resolve(undefined);
+      });
+      keyInput.value = '••••••••••••••••';
+      keyInput.dataset.isKeyring = 'true';
+      keyringChk.checked = false;
+      await saveActiveProviderGeneral(true);
+      expect(invokeSpy).toHaveBeenCalledWith('delete_keyring_credential', { providerName: 'CustomProvider' });
+      saved = JSON.parse(getSettingsState().translateAiProviders)[0];
+      expect(saved.useKeyring).toBe(false);
+      expect(saved.apiKey).toBe('recovered-keyring-key');
+    });
+
+    it('guards togglePasswordVisibility against provider switches and resets eye state on onProviderChanged', async () => {
+      let resolveKeyring!: (val: string) => void;
+      const invokeSpy = vi.fn().mockImplementation((cmd: string) => {
+        if (cmd === 'get_keyring_credential') {
+          return new Promise<string>(res => {
+            resolveKeyring = res;
+          });
+        }
+        return Promise.resolve(undefined);
+      });
+      (globalThis as any).window.__TAURI__ = { core: { invoke: invokeSpy } };
+
+      const provSelect = makeEl('select', 'opt-translateAiProvider');
+      provSelect.value = 'ProvA';
+      makeEl('select', 'opt-translateAiModel');
+      makeEl('div', 'provider-manager-card');
+      makeEl('input', 'mgr-provider-url');
+      makeEl('select', 'mgr-provider-format');
+      const keyInput = makeEl('input', 'mgr-provider-key');
+      keyInput.type = 'password';
+      keyInput.value = '••••••••••••••••';
+      keyInput.dataset.isKeyring = 'true';
+      const svgEl = makeEl('svg');
+      const eyeBtn = makeEl('button');
+      eyeBtn.querySelector = (sel: string) => (sel === 'svg' ? svgEl : null);
+      keyInput.nextElementSibling = eyeBtn;
+      makeEl('textarea', 'mgr-provider-prompt');
+
+      setSettingsState({
+        translateAiProvider: 'ProvA',
+        translateAiProviders: JSON.stringify([
+          { name: 'ProvA', baseUrl: 'https://a.example/v1', apiKey: '__KEYRING__', useKeyring: true, models: [] },
+          { name: 'ProvB', baseUrl: 'https://b.example/v1', apiKey: 'b-plain-key', useKeyring: false, models: [] }
+        ])
+      });
+
+      // Reveal key for ProvA, then switch to ProvB before keyring resolves
+      const revealPromise = togglePasswordVisibility('mgr-provider-key', eyeBtn as any);
+      provSelect.value = 'ProvB';
+      getSettingsState().translateAiProvider = 'ProvB';
+      onProviderChanged('general', true);
+
+      resolveKeyring('secret-from-prov-a');
+      await revealPromise;
+
+      expect(keyInput.value).toBe('b-plain-key');
+      expect(keyInput.type).toBe('password');
+      expect(svgEl.innerHTML).toContain('M1 12s4-8 11-8');
+    });
+
+    it('rejects duplicate model IDs case-insensitively on inline rename and manual row blur', () => {
+      const m1: ModelObject = { id: 'gpt-4o', contextWindow: 128000, reasoning: 'None', enabled: true };
+      const m2: ModelObject = { id: 'claude-sonnet', contextWindow: 200000, reasoning: 'None', enabled: true };
+      translationProviders.setModels([m1, m2]);
+      setSettingsState({
+        translateAiProvider: 'OpenRouter',
+        translateAiModel: 'gpt-4o',
+        translateAiProviders: JSON.stringify([
+          { name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', apiKey: 'k', useKeyring: false, models: [m1, m2] }
+        ])
+      });
+
+      const row2 = createModelRowElement(m2, false, 1);
+      (row2 as any)._idDisplay.listeners.dblclick[0]({ stopPropagation: () => {} });
+      const renameInput = (row2 as any)._replacedInput;
+      renameInput.value = 'GPT-4O';
+      renameInput.listeners.keydown[0]({ key: 'Enter', preventDefault: () => {} });
+
+      // Duplicate rename must be ignored and original model ID preserved
+      expect(m2.id).toBe('claude-sonnet');
+      expect((globalThis as any).window.showNotification).toHaveBeenCalled();
+
+      // Manual blank row entering duplicate ID gets removed cleanly on blur
+      ((globalThis as any).window.showNotification as any).mockClear();
+      addManualModelRow('', 200000, 'None', false, false);
+      const draftRow = createModelRowElement(translationProviders.getModels()[0], false, 0);
+      const idInput = draftRow.querySelector('.model-id-input') as any;
+      idInput.value = 'GPT-4O';
+      idInput.listeners.input[0]();
+      idInput.listeners.blur[0]();
+
+      expect(translationProviders.getModels().map(m => m.id)).toEqual(['gpt-4o', 'claude-sonnet']);
+      expect((globalThis as any).window.showNotification).toHaveBeenCalled();
+    });
+
+    it('guards saveProviderConfig double-submits, resets #provider-format, and prevents closeProviderModal timeout race', async () => {
+      vi.useFakeTimers();
+      try {
+        let resolveKeyring!: () => void;
+        const invokeSpy = vi.fn().mockImplementation((cmd: string) => {
+          if (cmd === 'store_keyring_credential') {
+            return new Promise<void>(res => {
+              resolveKeyring = res;
+            });
+          }
+          return Promise.resolve(undefined);
+        });
+        (globalThis as any).window.__TAURI__ = { core: { invoke: invokeSpy } };
+
+        const modal = makeEl('div', 'translation-provider-modal');
+        modal.querySelectorAll = () => [];
+        const nameEl = makeEl('input', 'provider-name');
+        const urlEl = makeEl('input', 'provider-url');
+        const fmtEl = makeEl('select', 'provider-format');
+        const keyEl = makeEl('input', 'provider-key');
+        const keyringChk = makeEl('input', 'provider-use-keyring');
+        const saveBtn = makeEl('button', 'provider-modal-save-btn');
+
+        // Closing then quickly reopening must not hide modal after 300ms
+        openAddProviderModal();
+        closeProviderModal();
+        vi.advanceTimersByTime(100);
+        fmtEl.value = 'Responses';
+        openAddProviderModal();
+        expect(fmtEl.value).toBe('Chat completions');
+        vi.advanceTimersByTime(300);
+        expect(modal.style.display).toBe('flex');
+        expect(modal.classList.contains('show')).toBe(true);
+
+        // Concurrent double click while store_keyring_credential is in flight runs only once
+        setSettingsState({ translateAiProviders: '[]', translateAiProvider: '' });
+        nameEl.value = 'FastProvider';
+        urlEl.value = 'https://fast.example/v1';
+        keyEl.value = 'secret-1';
+        keyringChk.checked = true;
+
+        const firstSave = saveProviderConfig();
+        const secondSave = saveProviderConfig();
+        expect(saveBtn.disabled).toBe(true);
+
+        resolveKeyring();
+        await Promise.all([firstSave, secondSave]);
+
+        const saved = JSON.parse(getSettingsState().translateAiProviders);
+        expect(saved.length).toBe(1);
+        expect(saveBtn.disabled).toBe(false);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('tracks dirty provider general edits and flushes them via flushPendingProviderGeneralChanges', async () => {
+      const invokeSpy = vi.fn().mockResolvedValue(undefined);
+      (globalThis as any).window.__TAURI__ = { core: { invoke: invokeSpy } };
+
+      const provSelect = makeEl('select', 'opt-translateAiProvider');
+      provSelect.value = 'OpenAI';
+      const urlInput = makeEl('input', 'mgr-provider-url');
+      urlInput.value = 'https://api.openai.com/v1';
+      makeEl('select', 'mgr-provider-format').value = 'Chat completions';
+      const keyInput = makeEl('input', 'mgr-provider-key');
+      keyInput.value = 'sk-old';
+      makeEl('input', 'mgr-provider-use-keyring').checked = false;
+      makeEl('textarea', 'mgr-provider-prompt');
+
+      setSettingsState({
+        translateAiProvider: 'OpenAI',
+        translateAiProviders: JSON.stringify([
+          { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', apiKey: 'sk-old', useKeyring: false, models: [] }
+        ])
+      });
+
+      setupTranslationEventListeners();
+      expect(hasPendingProviderGeneralChanges()).toBe(false);
+      expect(flushPendingProviderGeneralChanges()).toBeNull();
+
+      urlInput.value = 'https://api.custom.openai.com/v1';
+      urlInput.listeners.input[0]();
+      expect(hasPendingProviderGeneralChanges()).toBe(true);
+
+      const flushPromise = flushPendingProviderGeneralChanges();
+      expect(flushPromise).not.toBeNull();
+      await flushPromise;
+
+      expect(hasPendingProviderGeneralChanges()).toBe(false);
+      const saved = JSON.parse(getSettingsState().translateAiProviders)[0];
+      expect(saved.baseUrl).toBe('https://api.custom.openai.com/v1');
     });
   });
 });

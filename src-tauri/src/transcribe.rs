@@ -184,6 +184,7 @@ pub async fn convert_to_wav(
     logs: Arc<AppLogs>,
     session: Arc<std::sync::Mutex<crate::TranscriptionSession>>,
     file_path: String,
+    diarize: Option<bool>,
 ) -> Result<String, String> {
     logs.log(&app, "FFmpeg", &format!("Starting conversion for: {}", file_path));
     
@@ -238,8 +239,8 @@ pub async fn convert_to_wav(
         return Err("WAV conversion was cancelled by the user.".to_string());
     }
 
-    let settings = crate::settings::load_settings_file();
-    let wav_args = build_wav_conversion_args(&safe_input, &tmp_wav_str, settings.diarize);
+    let use_diarize = diarize.unwrap_or_else(|| crate::settings::load_settings_file().diarize);
+    let wav_args = build_wav_conversion_args(&safe_input, &tmp_wav_str, use_diarize);
     let mut cmd = Command::new(&ffmpeg_bin);
     #[cfg(target_os = "windows")]
     cmd.creation_flags(0x08000000);
@@ -342,7 +343,7 @@ pub async fn convert_to_wav(
         lock.pending_wav_path = Some(tmp_wav.clone());
     }
     
-    let channel_desc = if settings.diarize { "Stereo" } else { "Mono" };
+    let channel_desc = if use_diarize { "Stereo" } else { "Mono" };
     logs.log(&app, "FFmpeg", &format!("WAV conversion finished successfully! Format: PCM 16-bit, 16kHz, {}.", channel_desc));
     let _ = app.emit("transcribe-status", TranscribeProgress {
         progress: 1.0,

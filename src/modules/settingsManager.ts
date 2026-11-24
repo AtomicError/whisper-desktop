@@ -152,7 +152,8 @@ declare global {
     renderProvidersGrid: (providers?: ProviderConfig[] | null) => void;
     applyModelsFilterAndRender: (delay?: number) => void;
     switchView: (view: string) => void;
-    isBatchTranscribing?: boolean;
+    flushPendingProviderGeneralChanges?: () => Promise<boolean> | null;
+    hasPendingProviderGeneralChanges?: () => boolean;
     updateTranscribeWorkflowButtons: () => void;
     renderMediaMetadata: (meta: any) => void;
     probedMetadata: ProbedMediaMetadata | null;
@@ -198,6 +199,9 @@ let ffmpegBundledAvailable: boolean | null = null;
 let whisperBundledAvailable: boolean | null = null;
 let latestFFmpegStatus: EngineBinaryStatus | null = null;
 let whisperEngineDetected = true;
+let _buildStatusSeq = 0;
+let _ffmpegStatusSeq = 0;
+let _whisperStatusSeq = 0;
 
 export function isFfmpegBundledAvailable(): boolean {
   return ffmpegBundledAvailable !== false;
@@ -344,6 +348,7 @@ export function selectBackend(backend: string, isInitialSelection = false): void
 
 export async function refreshBuildStatuses(): Promise<void> {
   if (typeof document === 'undefined') return;
+  const buildSeq = ++_buildStatusSeq;
 
   const allBackends = [
     { key: 'Standard', label: (typeof t === 'function' && t('transcribe.backendCpu')) || 'CPU' },
@@ -353,6 +358,7 @@ export async function refreshBuildStatuses(): Promise<void> {
   ];
 
   const availableBackends: Array<{ key: string; label: string }> = [];
+  const nextCompiledBackends: Record<string, boolean> = {};
   for (const b of allBackends) {
     let isCompiled = false;
     try {
@@ -360,11 +366,15 @@ export async function refreshBuildStatuses(): Promise<void> {
     } catch (e) {
       console.error(`Failed to check build for ${b.key}:`, e);
     }
-    compiledBackends[b.key] = isCompiled;
+    if (buildSeq !== _buildStatusSeq) return;
+    nextCompiledBackends[b.key] = isCompiled;
     if (isCompiled) {
       availableBackends.push(b);
     }
   }
+
+  Object.keys(compiledBackends).forEach(k => delete compiledBackends[k]);
+  Object.assign(compiledBackends, nextCompiledBackends);
 
   whisperEngineDetected = availableBackends.length > 0;
 
@@ -712,7 +722,10 @@ export function switchSettingsCategory(catName: string): void {
     safeApplyDynamicDirection(searchInput);
     const clearBtn = document.getElementById('settings-search-clear');
     if (clearBtn) clearBtn.style.display = 'none';
-    _preSearchProviderTab = null;
+    if (_preSearchProviderTab !== null) {
+      setSearchProviderTab(_preSearchProviderTab);
+      _preSearchProviderTab = null;
+    }
   }
 
   activeSettingsCat = catName;
@@ -950,6 +963,12 @@ export function executeFilterSettings(query: string): void {
       } else {
         const matchedSubTab = findMatchingProviderSubTab(q);
         if (matchedSubTab) {
+          const autoTabPane = document.getElementById('provider-tab-auto');
+          if (autoTabPane) {
+            autoTabPane.querySelectorAll('.setting-card').forEach(c => {
+              (c as HTMLElement).style.display = '';
+            });
+          }
           setSearchProviderTab(matchedSubTab);
           groupMatches++;
           totalMatches++;
@@ -1305,12 +1324,12 @@ export function bindSettingsToDOM(): void {
             void scanAndPopulateModels();
           }
           if (key === 'ffmpegSource') {
-            refreshFFmpegStatus(val, true);
+            void savePromise.then(() => refreshFFmpegStatus(val, true));
           }
           if (key === 'whisperSource') {
-            refreshWhisperStatus(val, true);
-            void savePromise.then(() => {
-              refreshBuildStatuses();
+            void savePromise.then(async () => {
+              await refreshWhisperStatus(val, true);
+              await refreshBuildStatuses();
             });
           }
           if (key === 'translateAiProvider' && typeof win.onProviderChanged === 'function') {
@@ -1415,8 +1434,10 @@ export function adjustConfidenceThresholdPreference(delta: number): number {
 
 // ----------------- FFmpeg Status & Version Formatting -----------------
 export function formatFFmpegVersion(versionStr?: string | null): string {
+  const translatedReady = typeof t === 'function' ? t('settings.engineReadyBadge') : '';
+  const readyLabel = translatedReady && translatedReady !== 'settings.engineReadyBadge' ? translatedReady : 'Ready';
   if (!versionStr || versionStr === 'Unknown version' || versionStr === 'N/A') {
-    return 'Ready';
+    return readyLabel;
   }
   const match = versionStr.match(/version\s+([^\s]+)/i);
   const raw = match ? match[1] : versionStr.trim();
@@ -1450,7 +1471,7 @@ export function formatFFmpegVersion(versionStr?: string | null): string {
     return `v${fallback}`;
   }
 
-  return 'Ready';
+  return readyLabel;
 }
 
 function escapeStatusText(text: string): string {
@@ -1656,11 +1677,13 @@ export async function refreshFFmpegStatus(
   const badgeEl = document.getElementById('ffmpeg-status-badge');
   if (!badgeEl) return;
 
+  const statusSeq = ++_ffmpegStatusSeq;
   const current = getSettingsState();
   const currentSource = sourceOverride || (current ? current.ffmpegSource : 'bundled');
 
   try {
     const info: EngineBinaryStatus = await invoke('get_ffmpeg_status', { source: currentSource });
+    if (statusSeq !== _ffmpegStatusSeq) return;
     latestFFmpegStatus = info;
     ffmpegBundledAvailable = info.bundledAvailable !== false;
     const switchedToSystem = syncEngineSourceControl(
@@ -1673,6 +1696,7 @@ export async function refreshFFmpegStatus(
 
     if (switchedToSystem && allowSystemFallbackRetry && info.configuredSource !== 'system') {
       await saveCurrentSettings(true);
+      if (statusSeq !== _ffmpegStatusSeq) return;
       await refreshFFmpegStatus('system', false, false);
       return;
     }
@@ -1681,9 +1705,11 @@ export async function refreshFFmpegStatus(
       const safeVer = escapeStatusText(formatFFmpegVersion(info.version));
       badgeEl.className = 'setting-status-pill ready';
       badgeEl.innerHTML = `<span class="ffmpeg-status-dot blue"></span> ${safeVer}`;
-      badgeEl.title = `Source: ${info.configuredSource}\nPath: ${isolateLtr(info.resolvedPath)}\n${info.version}`;
+      const srcLabel = t('settings.engineTooltipSource') || 'Source';
+      const pathLabel = t('settings.engineTooltipPath') || 'Path';
+      badgeEl.title = `${srcLabel}: ${info.configuredSource}\n${pathLabel}: ${isolateLtr(info.resolvedPath)}\n${info.version}`;
     } else {
-      renderEngineMissingBadge(badgeEl, info.errorMessage || 'FFmpeg binary was not found');
+      renderEngineMissingBadge(badgeEl, info.errorMessage || t('toasts.ffmpegNotFoundSystem') || 'FFmpeg binary was not found');
       const resolvedSource = info.configuredSource || currentSource;
       if (resolvedSource === 'system' && userInitiated) {
         const toastKey = info.bundledAvailable === false ? 'toasts.ffmpegNotFoundSystem' : 'toasts.ffmpegNotFound';
@@ -1691,10 +1717,12 @@ export async function refreshFFmpegStatus(
       }
     }
   } catch (err) {
+    if (statusSeq !== _ffmpegStatusSeq) return;
     console.warn("Failed to check FFmpeg status:", err);
     if (badgeEl) {
+      const errLabel = escapeStatusText(t('settings.engineStatusError') || 'Status Error');
       badgeEl.className = 'setting-status-pill error';
-      badgeEl.innerHTML = `<span class="ffmpeg-status-dot yellow"></span> Status Error`;
+      badgeEl.innerHTML = `<span class="ffmpeg-status-dot yellow"></span> ${errLabel}`;
     }
   }
 }
@@ -1711,11 +1739,13 @@ export async function refreshWhisperStatus(
   const badgeEl = document.getElementById('whisper-status-badge');
   if (!badgeEl) return;
 
+  const statusSeq = ++_whisperStatusSeq;
   const current = getSettingsState();
   const currentSource = sourceOverride || (current ? current.whisperSource : 'bundled');
 
   try {
     const info: EngineBinaryStatus = await invoke('get_whisper_status', { source: currentSource });
+    if (statusSeq !== _whisperStatusSeq) return;
     setLatestWhisperEngineStatus(info);
     whisperBundledAvailable = info.bundledAvailable !== false;
     const switchedToSystem = syncEngineSourceControl(
@@ -1728,6 +1758,7 @@ export async function refreshWhisperStatus(
 
     if (switchedToSystem && allowSystemFallbackRetry && info.configuredSource !== 'system') {
       await saveCurrentSettings(true);
+      if (statusSeq !== _whisperStatusSeq) return;
       await refreshWhisperStatus('system', false, false);
       await refreshBuildStatuses();
       return;
@@ -1737,12 +1768,15 @@ export async function refreshWhisperStatus(
       const safeVer = escapeStatusText(formatWhisperVersion(info.version));
       badgeEl.className = 'setting-status-pill ready';
       badgeEl.innerHTML = `<span class="ffmpeg-status-dot blue"></span> ${safeVer}`;
+      const srcLabel = t('settings.engineTooltipSource') || 'Source';
+      const pathLabel = t('settings.engineTooltipPath') || 'Path';
+      const backendsLabel = t('settings.engineTooltipBackends') || 'Backends';
       const backendsStr = info.availableBackends && info.availableBackends.length > 0
-        ? `\nBackends: ${info.availableBackends.join(', ')}`
+        ? `\n${backendsLabel}: ${info.availableBackends.join(', ')}`
         : '';
-      badgeEl.title = `Source: ${info.configuredSource}\nPath: ${isolateLtr(info.resolvedPath)}\n${info.version}${backendsStr}`;
+      badgeEl.title = `${srcLabel}: ${info.configuredSource}\n${pathLabel}: ${isolateLtr(info.resolvedPath)}\n${info.version}${backendsStr}`;
     } else {
-      renderEngineMissingBadge(badgeEl, info.errorMessage || 'System whisper-cli binary was not found');
+      renderEngineMissingBadge(badgeEl, info.errorMessage || t('toasts.whisperNotFoundSystem') || 'System whisper-cli binary was not found');
       const resolvedSource = info.configuredSource || currentSource;
       if (resolvedSource === 'system' && userInitiated) {
         const toastKey = info.bundledAvailable === false ? 'toasts.whisperNotFoundSystem' : 'toasts.whisperNotFound';
@@ -1755,10 +1789,12 @@ export async function refreshWhisperStatus(
       win.syncAppVersionUI();
     }
   } catch (err) {
+    if (statusSeq !== _whisperStatusSeq) return;
     console.warn("Failed to check Whisper status:", err);
     if (badgeEl) {
+      const errLabel = escapeStatusText(t('settings.engineStatusError') || 'Status Error');
       badgeEl.className = 'setting-status-pill error';
-      badgeEl.innerHTML = `<span class="ffmpeg-status-dot yellow"></span> Status Error`;
+      badgeEl.innerHTML = `<span class="ffmpeg-status-dot yellow"></span> ${errLabel}`;
     }
   }
 }
@@ -1845,6 +1881,7 @@ export async function saveCurrentSettings(immediate = false): Promise<void> {
       const cleanPayload = sanitizeSettingsPayload(liveState);
       await invoke('save_settings', { settings: cleanPayload });
     } catch (e) {
+      hasUnsavedSettings = true;
       console.error("Failed to save settings:", e);
       showNotification(t('toasts.settingsSaveError'), "error");
     }
@@ -1867,8 +1904,11 @@ export async function saveCurrentSettings(immediate = false): Promise<void> {
 export async function confirmResetWhisperEngine(): Promise<void> {
   if (typeof document === 'undefined') return;
   const win = getGlobal();
-  const cancelBtn = document.getElementById('btn-cancel-transcribe');
-  const isBusy = (cancelBtn && cancelBtn.style.display !== 'none' && cancelBtn.style.display !== '') || win.isBatchTranscribing;
+  const isBusy = Boolean(
+    win.isTranscribing ||
+    win.isBatchExtracting ||
+    win.batchProcessor?.getIsExtracting?.()
+  );
   if (isBusy) {
     showNotification(t('toasts.taskRunningWarning'), 'warning');
     return;
@@ -1896,7 +1936,7 @@ export async function confirmResetWhisperEngine(): Promise<void> {
     bindSettingsToDOM();
     updateTranscribeUIConfigs();
     if (typeof refreshBuildStatuses === 'function') {
-      refreshBuildStatuses();
+      await refreshBuildStatuses();
     }
     await scanAndPopulateModels();
     showNotification(t('toasts.engineSettingsReset'), 'success');
@@ -1923,8 +1963,12 @@ export function getStepperBounds(inputId: string): { min: number; max: number } 
   let min = -Infinity;
   let max = Infinity;
 
-  if (inputId === 'opt-threads' || inputId === 'opt-processors') {
+  if (inputId === 'opt-threads') {
     min = 1;
+    max = 256;
+  } else if (inputId === 'opt-processors') {
+    min = 1;
+    max = 64;
   } else if (inputId === 'opt-deviceId' || inputId === 'opt-maxLen') {
     min = 0;
   } else if (inputId === 'quick-adv-maxLen') {
@@ -2363,53 +2407,69 @@ export function updateTranscribeOutputDirUI(): void {
 
 // ----------------- Auto Unload / Disposal Event Listeners -----------------
 export function flushPendingSettingsOnUnload(): Promise<void> {
-  const current = getSettingsState();
   const win = getGlobal();
-  let hadPendingInputCommit = false;
+  const providerFlush =
+    typeof win?.flushPendingProviderGeneralChanges === 'function'
+      ? win.flushPendingProviderGeneralChanges()
+      : null;
 
-  if (typeof document !== 'undefined' && current) {
-    const activeEl = document.activeElement as HTMLInputElement | null;
-    if (
-      activeEl &&
-      activeEl.tagName === 'INPUT' &&
-      activeEl.type === 'number' &&
-      typeof activeEl.id === 'string' &&
-      activeEl.id.startsWith('opt-') &&
-      !activeEl.closest?.('.number-input-control')
-    ) {
-      const key = activeEl.id.slice(4);
-      const normalized = normalizeDigitsToAscii(activeEl.value).trim();
-      if (normalized && normalized !== '-' && normalized !== '.') {
-        if (INT_SETTING_KEYS.has(key)) {
-          current[key] = clampIntSettingValue(key, normalized);
-          hadPendingInputCommit = true;
-        } else if (FLOAT_SETTING_KEYS.has(key)) {
-          current[key] = clampFloatSettingValue(key, normalized);
-          hadPendingInputCommit = true;
+  const flushCore = (): Promise<void> => {
+    const current = getSettingsState();
+    let hadPendingInputCommit = false;
+
+    if (typeof document !== 'undefined' && current) {
+      const activeEl = document.activeElement as HTMLInputElement | null;
+      if (
+        activeEl &&
+        activeEl.tagName === 'INPUT' &&
+        activeEl.type === 'number' &&
+        typeof activeEl.id === 'string' &&
+        activeEl.id.startsWith('opt-') &&
+        !activeEl.closest?.('.number-input-control')
+      ) {
+        const key = activeEl.id.slice(4);
+        const normalized = normalizeDigitsToAscii(activeEl.value).trim();
+        if (normalized && normalized !== '-' && normalized !== '.') {
+          if (INT_SETTING_KEYS.has(key)) {
+            current[key] = clampIntSettingValue(key, normalized);
+            hadPendingInputCommit = true;
+          } else if (FLOAT_SETTING_KEYS.has(key)) {
+            current[key] = clampFloatSettingValue(key, normalized);
+            hadPendingInputCommit = true;
+          }
         }
       }
     }
-  }
 
-  const hadPendingToggle = clearPendingToggleSaveTimers();
-  const hadPendingZoom = clearPendingUiZoomSave();
-  const hadPendingModels =
-    typeof win?.flushPendingModelCatalogChanges === 'function'
-      ? Boolean(win.flushPendingModelCatalogChanges())
-      : false;
+    const hadPendingToggle = clearPendingToggleSaveTimers();
+    const hadPendingZoom = clearPendingUiZoomSave();
+    const hadPendingModels =
+      typeof win?.flushPendingModelCatalogChanges === 'function'
+        ? Boolean(win.flushPendingModelCatalogChanges())
+        : false;
 
-  if ((saveSettingsDebounceTimer || hasUnsavedSettings || hadPendingModels || hadPendingInputCommit || hadPendingToggle || hadPendingZoom) && current) {
-    if (saveSettingsDebounceTimer) {
-      clearTimeout(saveSettingsDebounceTimer);
-      saveSettingsDebounceTimer = null;
+    if ((saveSettingsDebounceTimer || hasUnsavedSettings || hadPendingModels || hadPendingInputCommit || hadPendingToggle || hadPendingZoom) && current) {
+      if (saveSettingsDebounceTimer) {
+        clearTimeout(saveSettingsDebounceTimer);
+        saveSettingsDebounceTimer = null;
+      }
+      hasUnsavedSettings = false;
+      try {
+        const cleanPayload = sanitizeSettingsPayload(current);
+        return Promise.resolve(invoke('save_settings', { settings: cleanPayload }))
+          .then(() => undefined)
+          .catch(() => {
+            hasUnsavedSettings = true;
+          });
+      } catch (_) {}
     }
-    hasUnsavedSettings = false;
-    try {
-      const cleanPayload = sanitizeSettingsPayload(current);
-      return Promise.resolve(invoke('save_settings', { settings: cleanPayload })).then(() => undefined).catch(() => undefined);
-    } catch (_) {}
+    return Promise.resolve();
+  };
+
+  if (providerFlush) {
+    return Promise.resolve(providerFlush).then(() => flushCore());
   }
-  return Promise.resolve();
+  return flushCore();
 }
 
 if (typeof window !== 'undefined') {

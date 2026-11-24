@@ -866,6 +866,11 @@ export const pt: Translations = {
     whisperSystem: "Sistema",
     engineNotBundledShort: 'Não incluído',
     engineMissingBadge: 'Não encontrado',
+    engineReadyBadge: 'Pronto',
+    engineStatusError: 'Erro de status',
+    engineTooltipSource: 'Origem',
+    engineTooltipPath: 'Caminho',
+    engineTooltipBackends: 'Backends',
     trayTitle: 'Continuar em segundo plano ao fechar a janela',
     trayDesc: 'Mantém o Whisper Desktop em execução na bandeja do sistema ao fechar a janela principal.',
     autoCheckUpdatesTitle: 'Verificar atualizações ao iniciar',
@@ -873,6 +878,11 @@ export const pt: Translations = {
     uiScaleTitle: 'Escala e Zoom da Interface',
     uiScaleDesc: 'Ajuste a proporção dos elementos para monitores de alta densidade (HiDPI).',
     uiScaleReset: 'Redefinir',
+    uiScaleZoomOut: 'Reduzir zoom (Ctrl+-)',
+    uiScaleZoomIn: 'Aumentar zoom (Ctrl++)',
+    uiScaleResetTooltip: 'Redefinir escala para 100% (Ctrl+0)',
+    decreaseValue: 'Diminuir valor',
+    increaseValue: 'Aumentar valor',
     langSpokenTitle: 'Idioma Falado no Áudio',
     langSpokenDesc: 'Idioma falado no áudio. Escolha Detecção automática para que o Whisper o detecte automaticamente.',
     initialPromptTitle: 'Prompt de contexto inicial',
@@ -902,7 +912,7 @@ export const pt: Translations = {
     tokenTimestampsTitle: 'Marcas de tempo por palavra (Tokens)',
     tokenTimestampsDesc: 'Gera marcações de tempo precisas em milissegundos para cada palavra individualmente.',
     audioCtxTitle: 'Janela de análise de áudio',
-    audioCtxDesc: 'Duração do quadro de análise acústica em milissegundos (0 = padrão de 30 segundos do Whisper).',
+    audioCtxDesc: 'Quadros de contexto do codificador de áudio (0–1500; 0 = janela padrão de 30s do modelo, 1500 = 30s completos).',
     maxContextTitle: 'Limite de memória de contexto anterior',
     maxContextDesc: 'Quantidade máxima de texto anterior mantida na memória como contexto para o modelo.',
     offsetTTitle: 'Ponto de início da transcrição (ms)',
@@ -1092,7 +1102,7 @@ export const pt: Translations = {
     tinyDiarizePoints: '<span class="setting-desc-point"><strong>Requisito:</strong> Requer modelos com suporte a <code>tdrz</code> (ex. <code>small.en-tdrz</code>).</span>',
     bestOfPoints: '<span class="setting-desc-point"><strong>Padrão:</strong> <code>5</code></span><span class="setting-desc-point"><strong>Recomendação:</strong> Valores maiores (<code>6–8</code>) aumentam a precisão; menores (<code>1–2</code>) são mais rápidos.</span>',
     beamSizePoints: '<span class="setting-desc-point"><strong>Padrão:</strong> <code>5</code></span><span class="setting-desc-point"><strong>Compromisso:</strong> Reduz alucinações e erros, mas aumenta o tempo de processamento.</span>',
-    audioCtxPoints: '<span class="setting-desc-point"><strong>Padrão:</strong> <code>0</code> (janela padrão de 30 segundos)</span><span class="setting-desc-point"><strong>Avançado:</strong> Restringe a atenção para transmissões em tempo real.</span>',
+    audioCtxPoints: '<span class="setting-desc-point"><strong>Padrão:</strong> <code>0</code> (usa a janela padrão completa de 30s do modelo, equivalente a <code>1500</code> quadros)</span><span class="setting-desc-point"><strong>Avançado:</strong> Defina entre <code>1</code> e <code>1500</code> quadros para restringir a atenção em clipes curtos.</span>',
     wordTholdPoints: '<span class="setting-desc-point"><strong>Padrão:</strong> <code>0.01</code></span><span class="setting-desc-point"><strong>Quando alterar:</strong> Aumente para <code>0.05–0.1</code> se as palavras desviarem no silêncio.</span>',
     entropyTholdPoints: '<span class="setting-desc-point"><strong>Padrão:</strong> <code>2.4</code></span><span class="setting-desc-point"><strong>Quando alterar:</strong> Reduza para <code>2.2</code> se o modelo repetir palavras sem sentido.</span>',
     logprobTholdPoints: '<span class="setting-desc-point"><strong>Padrão:</strong> <code>-1</code></span><span class="setting-desc-point"><strong>Quando alterar:</strong> Reduza para <code>-1.5</code> em áudios ruidosos para evitar retentativas desnecessárias.</span>',
@@ -1119,7 +1129,12 @@ export const pt: Translations = {
     polishPoints: '<span class="setting-desc-point"><strong>Recomendado:</strong> Ativado para legendas fluídas e naturais, evitando traduções mecânicas palavra por palavra.</span>',
     modelsTip: 'As configurações de modelo são salvas em tempo real. Clique em uma linha para defini-la como modelo padrão.',
     addReasoning: 'Configurar Raciocínio',
-    noReasoning: 'Sem Raciocínio (Padrão)'
+    noReasoning: 'Sem Raciocínio (Padrão)',
+    toggleApiKeyVisibility: 'Mostrar ou ocultar chave de API',
+    removeModelRow: 'Remover linha do modelo',
+    modelIdentifierPlaceholder: 'ex.: gpt-4o-mini',
+    contextTokensTooltip: 'Janela de contexto: {formatted} ({exact} tokens)',
+    tokensUnit: 'tokens'
   },
   logs: {
     title: 'Registros de Atividade',
@@ -1162,6 +1177,7 @@ export const pt: Translations = {
     cancelBtn: 'Cancelar',
     addProviderTitle: 'Adicionar Provedor de API',
     providerName: 'Nome do Provedor',
+    providerNamePlaceholder: 'ex.: OpenRouter',
     apiFormat: 'Formato da API',
     baseUrl: 'URL Base (Base URL)',
     apiKey: 'Chave de API',
@@ -1300,6 +1316,8 @@ export const pt: Translations = {
     providerAddedSuccess: 'Provedor adicionado com sucesso! Configure seus modelos abaixo.',
     noProviderToTest: 'Nenhum provedor ativo selecionado para teste.',
     modelsDirNotWritable: 'A pasta de modelos selecionada não possui permissão de escrita:\n{error}',
-    outputDirNotWritable: 'A pasta de saída selecionada não possui permissão de escrita:\n{error}'
+    outputDirNotWritable: 'A pasta de saída selecionada não possui permissão de escrita:\n{error}',
+    modelIdExists: 'Já existe um modelo com o identificador "{id}" para este provedor.',
+    providersJsonCorrupt: 'A lista salva de provedores de IA estava corrompida e não pôde ser lida.'
   }
 };

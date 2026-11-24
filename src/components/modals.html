@@ -41,7 +41,7 @@
           <div style="display: flex; flex-direction: column; gap: 14px; margin-bottom: 16px;">
             <div style="display: flex; flex-direction: column; gap: 6px;">
               <label for="provider-name" style="font-size: 0.85rem; color: var(--color-text-muted);" data-i18n="modals.providerName">Provider Name</label>
-              <input class="text-input" dir="auto" id="provider-name" type="text" placeholder="e.g. OpenRouter" style="width: 100%;" />
+              <input class="text-input" dir="auto" id="provider-name" type="text" placeholder="e.g. OpenRouter" data-i18n-placeholder="modals.providerNamePlaceholder" style="width: 100%;" />
             </div>
             
             <div style="display: flex; flex-direction: column; gap: 6px;">
@@ -56,14 +56,14 @@
 
           <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px;">
             <label for="provider-url" style="font-size: 0.85rem; color: var(--color-text-muted);" data-i18n="modals.baseUrl">Base URL</label>
-            <input class="text-input mono" id="provider-url" type="text" placeholder="https://openrouter.ai/api/v1" style="width: 100%;" />
+            <input class="text-input mono" dir="ltr" id="provider-url" type="text" placeholder="https://openrouter.ai/api/v1" style="width: 100%;" />
           </div>
 
           <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px;">
             <label for="provider-key" style="font-size: 0.85rem; color: var(--color-text-muted);" data-i18n="modals.apiKey">API Key</label>
             <div class="password-input-wrapper">
-              <input class="text-input mono" id="provider-key" type="password" placeholder="sk-..." style="width: 100%;" />
-              <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('provider-key', this)" aria-label="Toggle API key visibility">
+              <input class="text-input mono" dir="ltr" id="provider-key" type="password" placeholder="sk-..." style="width: 100%;" />
+              <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('provider-key', this)" aria-label="Toggle API key visibility" data-i18n-aria="settings.toggleApiKeyVisibility">
                 <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
                   <circle cx="12" cy="12" r="3"/>
@@ -82,7 +82,7 @@
         </div>
         <div class="modal-footer" style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 16px;">
           <button type="button" class="btn-secondary" onclick="closeProviderModal()" style="padding: 10px 20px; font-size: 0.9rem;" data-i18n="modals.cancel">Cancel</button>
-          <button type="button" class="btn-primary" onclick="saveProviderConfig()" style="padding: 10px 20px; font-size: 0.9rem;" data-i18n="modals.saveProvider">Save Provider</button>
+          <button type="button" class="btn-primary" id="provider-modal-save-btn" onclick="saveProviderConfig()" style="padding: 10px 20px; font-size: 0.9rem;" data-i18n="modals.saveProvider">Save Provider</button>
         </div>
       </div>
     </div>

@@ -867,6 +867,11 @@ export const ko: Translations = {
     whisperSystem: "시스템",
     engineNotBundledShort: '미포함',
     engineMissingBadge: '찾을 수 없음',
+    engineReadyBadge: '준비됨',
+    engineStatusError: '상태 오류',
+    engineTooltipSource: '소스',
+    engineTooltipPath: '경로',
+    engineTooltipBackends: '백엔드',
     trayTitle: '창을 닫아도 백그라운드에서 계속 실행',
     trayDesc: '창을 닫아도 백그라운드에서 작업을 계속 유지합니다.',
     autoCheckUpdatesTitle: '시작 시 업데이트 확인',
@@ -874,6 +879,11 @@ export const ko: Translations = {
     uiScaleTitle: 'UI 배율 및 확대/축소',
     uiScaleDesc: '고해상도(High-DPI) 디스플레이에 맞게 인터페이스 크기를 조정합니다.',
     uiScaleReset: '초기화',
+    uiScaleZoomOut: '축소 (Ctrl+-)',
+    uiScaleZoomIn: '확대 (Ctrl++)',
+    uiScaleResetTooltip: '배율을 100%로 초기화 (Ctrl+0)',
+    decreaseValue: '값 감소',
+    increaseValue: '값 증가',
     langSpokenTitle: '음성 언어',
     langSpokenDesc: '오디오의 음성 언어입니다. 자동 감지를 선택하면 Whisper가 자동으로 감지합니다.',
     initialPromptTitle: '초기 프롬프트',
@@ -904,7 +914,7 @@ export const ko: Translations = {
     tokenTimestampsTitle: '토큰 수준 타임스탬프',
     tokenTimestampsDesc: '각 단어마다 밀리초 단위의 고정밀 타임스탬프를 생성합니다.',
     audioCtxTitle: '오디오 처리 윈도우 길이',
-    audioCtxDesc: '밀리초 단위의 오디오 문맥 프레임 길이입니다 (0 = Whisper 표준 30초 윈도우).',
+    audioCtxDesc: '오디오 인코더 컨텍스트 프레임 수입니다 (0–1500; 0 = 모델 기본 30초 윈도우, 1500 = 전체 30초).',
     maxContextTitle: '이전 문맥 최대 토큰 보존 한도',
     maxContextDesc: '디코더에 전달되는 이전 토큰 히스토리의 최대 개수입니다.',
     offsetTTitle: '음성 변환 시작 위치 (ms)',
@@ -1099,7 +1109,7 @@ export const ko: Translations = {
     tinyDiarizePoints: '<span class="setting-desc-point"><strong>요구 사항:</strong> <code>tdrz</code> 지원 모델이 필요합니다 (예: <code>small.en-tdrz</code>).</span>',
     bestOfPoints: '<span class="setting-desc-point"><strong>기본값:</strong> <code>5</code></span><span class="setting-desc-point"><strong>권장:</strong> 높은 값(<code>6–8</code>)은 정확도를 높이고, 낮은 값(<code>1–2</code>)은 더 빠르게 실행됩니다.</span>',
     beamSizePoints: '<span class="setting-desc-point"><strong>기본값:</strong> <code>5</code></span><span class="setting-desc-point"><strong>장단점:</strong> 높은 값은 단어 오류와 환각을 줄이지만 처리 시간이 증가합니다.</span>',
-    audioCtxPoints: '<span class="setting-desc-point"><strong>기본값:</strong> <code>0</code> (모델 기본 30초 문맥 윈도우 사용)</span><span class="setting-desc-point"><strong>고급:</strong> 맞춤형 스트리밍 작업 흐름을 위해 주의 윈도우를 제한합니다.</span>',
+    audioCtxPoints: '<span class="setting-desc-point"><strong>기본값:</strong> <code>0</code> (모델 기본 30초 윈도우 전체 사용, <code>1500</code> 프레임에 해당)</span><span class="setting-desc-point"><strong>고급:</strong> 짧은 클립에서는 <code>1</code>~<code>1500</code> 프레임 사이로 설정하여 주의 범위를 제한합니다.</span>',
     wordTholdPoints: '<span class="setting-desc-point"><strong>기본값:</strong> <code>0.01</code></span><span class="setting-desc-point"><strong>변경 시점:</strong> 묵음 구간에서 단어 타이밍이 밀릴 경우 <code>0.05–0.1</code>로 올리세요.</span>',
     entropyTholdPoints: '<span class="setting-desc-point"><strong>기본값:</strong> <code>2.4</code></span><span class="setting-desc-point"><strong>변경 시점:</strong> 모델이 반복되는 무의미한 텍스트를 출력하면 <code>2.2</code>로 낮추세요.</span>',
     logprobTholdPoints: '<span class="setting-desc-point"><strong>기본값:</strong> <code>-1</code></span><span class="setting-desc-point"><strong>변경 시점:</strong> 소음이 많거나 억양이 강한 음성의 경우 불필요한 재시도를 막기 위해 <code>-1.5</code>로 낮추세요.</span>',
@@ -1126,7 +1136,12 @@ export const ko: Translations = {
     polishPoints: '<span class="setting-desc-point"><strong>권장:</strong> 직역 투의 어색함을 피하고 자연스러운 자막 호흡을 위해 활성화하세요.</span>',
     modelsTip: '모델 변경 사항은 실시간으로 자동 저장됩니다. 모델 행을 클릭하여 기본 번역 모델로 지정하세요.',
     addReasoning: '추론 구성',
-    noReasoning: '추론 없음'
+    noReasoning: '추론 없음',
+    toggleApiKeyVisibility: 'API 키 표시 또는 숨기기',
+    removeModelRow: '모델 행 삭제',
+    modelIdentifierPlaceholder: '예: gpt-4o-mini',
+    contextTokensTooltip: '컨텍스트 창: {formatted} ({exact} 토큰)',
+    tokensUnit: '토큰'
   },
   logs: {
     title: '활동 로그',
@@ -1169,6 +1184,7 @@ export const ko: Translations = {
     cancelBtn: '취소',
     addProviderTitle: 'API 제공자 추가',
     providerName: '제공자 이름',
+    providerNamePlaceholder: '예: OpenRouter',
     apiFormat: 'API 포맷',
     baseUrl: '기본 URL (Base URL)',
     apiKey: 'API 키',
@@ -1307,6 +1323,8 @@ export const ko: Translations = {
     providerAddedSuccess: '제공자가 추가되었습니다! 아래에서 해당 모델을 구성하세요.',
     noProviderToTest: '테스트할 활성 제공자가 선택되지 않았습니다.',
     modelsDirNotWritable: '선택한 모델 디렉터리에 쓰기 권한이 없습니다:\n{error}',
-    outputDirNotWritable: '선택한 출력 디렉터리에 쓰기 권한이 없습니다:\n{error}'
+    outputDirNotWritable: '선택한 출력 디렉터리에 쓰기 권한이 없습니다:\n{error}',
+    modelIdExists: '이 제공자에 ID "{id}"를 가진 모델이 이미 존재합니다.',
+    providersJsonCorrupt: '저장된 AI 제공자 목록이 잘못되어 올바르게 읽을 수 없습니다.'
   }
 };

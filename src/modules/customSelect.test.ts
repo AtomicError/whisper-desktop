@@ -1599,6 +1599,21 @@ describe('CustomSelect Module', () => {
       }
     });
 
+    it('stops Escape propagation in _globalEscapeHandler while dropdown is open so parent modals stay open', () => {
+      const selectEl = createTestSelect('modal-escape-sel');
+      const cs = new CustomSelect(selectEl);
+      cs.open();
+
+      const stopPropagation = vi.fn();
+      const preventDefault = vi.fn();
+      (cs as any)._globalEscapeHandler!({ key: 'Escape', stopPropagation, preventDefault } as any);
+
+      expect(cs.isOpen).toBe(false);
+      expect(stopPropagation).toHaveBeenCalledTimes(1);
+      expect(preventDefault).toHaveBeenCalledTimes(1);
+      cs.destroy();
+    });
+
     it('exposes global backwards compatibility shims and customSelect controller', () => {
       expect(customSelect.CustomSelect).toBe(CustomSelect);
       expect(customSelect.map).toBe(customSelectsMap);

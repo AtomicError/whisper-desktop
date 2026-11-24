@@ -866,6 +866,11 @@ export const fr: Translations = {
     whisperSystem: "Système",
     engineNotBundledShort: 'Non inclus',
     engineMissingBadge: 'Introuvable',
+    engineReadyBadge: 'Prêt',
+    engineStatusError: 'Erreur d\'état',
+    engineTooltipSource: 'Source',
+    engineTooltipPath: 'Chemin',
+    engineTooltipBackends: 'Moteurs',
     trayTitle: 'Continuer en arrière-plan à la fermeture',
     trayDesc: 'Garde Whisper Desktop actif en arrière-plan lorsque la fenêtre principale est fermée.',
     autoCheckUpdatesTitle: 'Vérifier les mises à jour au démarrage',
@@ -873,6 +878,11 @@ export const fr: Translations = {
     uiScaleTitle: 'Mise à l\'Échelle & Zoom de l\'Interface',
     uiScaleDesc: 'Ajuste la taille de l\'interface pour les écrans haute densité (HiDPI).',
     uiScaleReset: 'Réinitialiser',
+    uiScaleZoomOut: 'Zoom arrière (Ctrl+-)',
+    uiScaleZoomIn: 'Zoom avant (Ctrl++)',
+    uiScaleResetTooltip: 'Réinitialiser le zoom à 100 % (Ctrl+0)',
+    decreaseValue: 'Diminuer la valeur',
+    increaseValue: 'Augmenter la valeur',
     langSpokenTitle: 'Langue Parlée',
     langSpokenDesc: 'Langue parlée dans l\'audio. Choisissez Détection automatique pour que Whisper la détecte automatiquement.',
     initialPromptTitle: 'Prompt de contexte initial',
@@ -902,7 +912,7 @@ export const fr: Translations = {
     tokenTimestampsTitle: 'Horodatages au Niveau du Token',
     tokenTimestampsDesc: 'Génère des horodatages précis à la milliseconde pour chaque mot.',
     audioCtxTitle: 'Fenêtre d\'analyse audio',
-    audioCtxDesc: 'Longueur de trame de contexte en millisecondes (0 = fenêtre standard de 30s).',
+    audioCtxDesc: 'Trames de contexte de l\'encodeur audio (0–1500 ; 0 = fenêtre par défaut de 30s du modèle, 1500 = 30s complètes).',
     maxContextTitle: 'Mémoire de contexte maximale des tokens',
     maxContextDesc: 'Historique maximal des phrases précédentes fourni comme contexte au modèle.',
     offsetTTitle: 'Point de départ de la transcription (ms)',
@@ -1092,7 +1102,7 @@ export const fr: Translations = {
     tinyDiarizePoints: '<span class="setting-desc-point"><strong>Requis :</strong> Nécessite des modèles compatibles <code>tdrz</code> (ex. <code>small.en-tdrz</code>).</span>',
     bestOfPoints: '<span class="setting-desc-point"><strong>Par défaut :</strong> <code>5</code></span><span class="setting-desc-point"><strong>Recommandation :</strong> Plus élevé (<code>6–8</code>) augmente la précision ; plus bas (<code>1–2</code>) est plus rapide.</span>',
     beamSizePoints: '<span class="setting-desc-point"><strong>Par défaut :</strong> <code>5</code></span><span class="setting-desc-point"><strong>Compromis :</strong> Réduit les erreurs mais allonge le temps de transcription.</span>',
-    audioCtxPoints: '<span class="setting-desc-point"><strong>Par défaut :</strong> <code>0</code> (fenêtre standard de 30 secondes)</span><span class="setting-desc-point"><strong>Avancé :</strong> Restreint l\'attention pour les flux en direct.</span>',
+    audioCtxPoints: '<span class="setting-desc-point"><strong>Par défaut :</strong> <code>0</code> (utilise la fenêtre standard complète de 30s, équivalent à <code>1500</code> trames)</span><span class="setting-desc-point"><strong>Avancé :</strong> Réglez entre <code>1</code> et <code>1500</code> trames pour restreindre l\'attention sur des extraits courts.</span>',
     wordTholdPoints: '<span class="setting-desc-point"><strong>Par défaut :</strong> <code>0.01</code></span><span class="setting-desc-point"><strong>Quand modifier :</strong> Augmenter à <code>0.05–0.1</code> si le timing des mots dérive lors des silences.</span>',
     entropyTholdPoints: '<span class="setting-desc-point"><strong>Par défaut :</strong> <code>2.4</code></span><span class="setting-desc-point"><strong>Quand modifier :</strong> Réduire à <code>2.2</code> si le modèle génère du charabia répétitif.</span>',
     logprobTholdPoints: '<span class="setting-desc-point"><strong>Par défaut :</strong> <code>-1</code></span><span class="setting-desc-point"><strong>Quand modifier :</strong> Réduire à <code>-1.5</code> pour les audios bruités afin d\'éviter des relances inutiles.</span>',
@@ -1119,7 +1129,12 @@ export const fr: Translations = {
     polishPoints: '<span class="setting-desc-point"><strong>Recommandé :</strong> Activé pour une lecture naturelle et fluide, évitant les traductions mot à mot.</span>',
     modelsTip: 'Les modifications des modèles s\'enregistrent automatiquement. Cliquez sur une ligne pour la définir comme modèle par défaut.',
     addReasoning: 'Configurer le Raisonnement',
-    noReasoning: 'Sans Raisonnement'
+    noReasoning: 'Sans Raisonnement',
+    toggleApiKeyVisibility: 'Afficher ou masquer la clé API',
+    removeModelRow: 'Supprimer la ligne du modèle',
+    modelIdentifierPlaceholder: 'ex. gpt-4o-mini',
+    contextTokensTooltip: 'Fenêtre de contexte : {formatted} ({exact} jetons)',
+    tokensUnit: 'jetons'
   },
   logs: {
     title: 'Journal d\'Activité',
@@ -1162,6 +1177,7 @@ export const fr: Translations = {
     cancelBtn: 'Annuler',
     addProviderTitle: 'Ajouter un Fournisseur d\'API',
     providerName: 'Nom du Fournisseur',
+    providerNamePlaceholder: 'ex. OpenRouter',
     apiFormat: 'Format d\'API',
     baseUrl: 'URL de Base',
     apiKey: 'Clé API',
@@ -1300,6 +1316,8 @@ export const fr: Translations = {
     providerAddedSuccess: 'Fournisseur ajouté avec succès ! Configurez ses modèles ci-dessous.',
     noProviderToTest: 'Aucun fournisseur actif sélectionné pour le test.',
     modelsDirNotWritable: 'Le dossier de modèles n\'est pas accessible en écriture :\n{error}',
-    outputDirNotWritable: 'Le dossier de sortie n\'est pas accessible en écriture :\n{error}'
+    outputDirNotWritable: 'Le dossier de sortie n\'est pas accessible en écriture :\n{error}',
+    modelIdExists: 'Un modèle avec l\'identifiant "{id}" existe déjà pour ce fournisseur.',
+    providersJsonCorrupt: 'La liste enregistrée des fournisseurs d\'IA est invalide et n\'a pas pu être lue.'
   }
 };

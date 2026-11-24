@@ -10,7 +10,7 @@
                   <circle cx="11" cy="11" r="8"></circle>
                   <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                 </svg>
-                <input class="text-input settings-search-input" id="settings-search-input" type="text" placeholder="Search..." data-i18n-placeholder="settings.searchPlaceholder" oninput="filterSettings(this.value)" autocomplete="off" spellcheck="false" />
+                <input class="text-input settings-search-input" id="settings-search-input" type="text" placeholder="Search..." data-i18n-placeholder="settings.searchPlaceholder" aria-label="Search settings" data-i18n-aria="settings.searchPlaceholder" oninput="filterSettings(this.value)" autocomplete="off" spellcheck="false" />
                 <button type="button" class="settings-search-clear" id="settings-search-clear" onclick="clearSettingsSearch()" style="display: none;" title="Clear Search" data-i18n-title="settings.clearSearch" aria-label="Clear Search" data-i18n-aria="settings.clearSearch">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                 </button>
@@ -20,14 +20,14 @@
             <div class="settings-layout">
               <div class="settings-sidebar">
                 <div class="settings-categories" role="tablist">
-                  <button type="button" role="tab" aria-selected="true" class="settings-cat-btn active" id="cat-btn-app" onclick="switchSettingsCategory('app')" data-i18n="settings.catApp">App Preferences</button>
-                  <button type="button" role="tab" aria-selected="false" class="settings-cat-btn" id="cat-btn-transcription" onclick="switchSettingsCategory('transcription')" data-i18n="settings.catTranscription">Core Transcription</button>
-                  <button type="button" role="tab" aria-selected="false" class="settings-cat-btn" id="cat-btn-computation" onclick="switchSettingsCategory('computation')" data-i18n="settings.catComputation">Computation</button>
-                  <button type="button" role="tab" aria-selected="false" class="settings-cat-btn" id="cat-btn-search" onclick="switchSettingsCategory('search')" data-i18n="settings.catSearch">Decoding Strategy</button>
-                  <button type="button" role="tab" aria-selected="false" class="settings-cat-btn" id="cat-btn-outputs" onclick="switchSettingsCategory('outputs')" data-i18n="settings.catOutputs">Outputs</button>
-                  <button type="button" role="tab" aria-selected="false" class="settings-cat-btn" id="cat-btn-gpu" onclick="switchSettingsCategory('gpu')" data-i18n="settings.catGpu">GPU Execution</button>
-                  <button type="button" role="tab" aria-selected="false" class="settings-cat-btn" id="cat-btn-vad" onclick="switchSettingsCategory('vad')" data-i18n="settings.catVad">Silero VAD</button>
-                  <button type="button" role="tab" aria-selected="false" class="settings-cat-btn" id="cat-btn-translation" onclick="switchSettingsCategory('translation')" data-i18n="settings.catTranslation">AI Translation</button>
+                  <button type="button" role="tab" aria-selected="true" aria-controls="group-app" class="settings-cat-btn active" id="cat-btn-app" onclick="switchSettingsCategory('app')" data-i18n="settings.catApp">App Preferences</button>
+                  <button type="button" role="tab" aria-selected="false" aria-controls="group-transcription" class="settings-cat-btn" id="cat-btn-transcription" onclick="switchSettingsCategory('transcription')" data-i18n="settings.catTranscription">Core Transcription</button>
+                  <button type="button" role="tab" aria-selected="false" aria-controls="group-computation" class="settings-cat-btn" id="cat-btn-computation" onclick="switchSettingsCategory('computation')" data-i18n="settings.catComputation">Computation</button>
+                  <button type="button" role="tab" aria-selected="false" aria-controls="group-search" class="settings-cat-btn" id="cat-btn-search" onclick="switchSettingsCategory('search')" data-i18n="settings.catSearch">Decoding Strategy</button>
+                  <button type="button" role="tab" aria-selected="false" aria-controls="group-outputs" class="settings-cat-btn" id="cat-btn-outputs" onclick="switchSettingsCategory('outputs')" data-i18n="settings.catOutputs">Outputs</button>
+                  <button type="button" role="tab" aria-selected="false" aria-controls="group-gpu" class="settings-cat-btn" id="cat-btn-gpu" onclick="switchSettingsCategory('gpu')" data-i18n="settings.catGpu">GPU Execution</button>
+                  <button type="button" role="tab" aria-selected="false" aria-controls="group-vad" class="settings-cat-btn" id="cat-btn-vad" onclick="switchSettingsCategory('vad')" data-i18n="settings.catVad">Silero VAD</button>
+                  <button type="button" role="tab" aria-selected="false" aria-controls="group-translation" class="settings-cat-btn" id="cat-btn-translation" onclick="switchSettingsCategory('translation')" data-i18n="settings.catTranslation">AI Translation</button>
                 </div>
                 <div class="settings-sidebar-footer">
                   <button type="button" class="btn-settings-reset-engine" id="btn-reset-whisper-engine" onclick="confirmResetWhisperEngine()">
@@ -55,7 +55,7 @@
                 </div>
                 <!-- Settings Groups -->
                 <!-- Group: App Preferences -->
-                <div class="settings-group active" id="group-app">
+                <div class="settings-group active" id="group-app" role="tabpanel" aria-labelledby="cat-btn-app">
                   <!-- Application Theme Card -->
                   <div class="setting-card theme-setting-card" data-search-tags="theme color style dark skin mode ruby carbon royal blue fiery orange emerald پوسته رنگ تم قالب آبی سلطنتی قرمز یاقوتی کربن آتشین نارنجی زمردین سبز">
                     <div class="setting-info">
@@ -64,7 +64,7 @@
                       </div>
                       <div class="setting-desc" data-i18n="settings.themeDesc">Choose the visual theme for the entire application interface.</div>
                     </div>
-                    <div class="theme-picker-grid" role="radiogroup" aria-label="Application Theme">
+                    <div class="theme-picker-grid" role="radiogroup" aria-label="Application Theme" data-i18n-aria="settings.themeTitle">
                       <!-- 1. Royal Blue -->
                       <button class="theme-picker-card" id="theme-card-royal" type="button" role="radio" aria-checked="false" onclick="window.switchTheme('royal-blue')">
                         <div class="theme-card-header">
@@ -173,7 +173,7 @@
                     </div>
                     <div class="setting-control">
                       <label class="switch">
-                        <input type="checkbox" id="opt-monochromeCanvas" />
+                        <input type="checkbox" id="opt-monochromeCanvas" aria-label="Neutral Canvas" data-i18n-aria="settings.monochromeCanvasTitle" />
                         <span class="slider"></span>
                       </label>
                     </div>
@@ -188,7 +188,7 @@
                       <div class="setting-desc" data-i18n="settings.languageSettingDesc">Select the display language for the application interface and menus.</div>
                     </div>
                     <div class="setting-control">
-                      <select class="select-control" id="opt-uiLanguage">
+                      <select class="select-control" id="opt-uiLanguage" aria-label="Interface Language" data-i18n-aria="settings.languageSettingTitle">
                         <option value="en" data-i18n="settings.langEn">English</option>
                         <option value="fa" data-i18n="settings.langFa">فارسی</option>
                         <option value="es" data-i18n="settings.langEs">Español</option>
@@ -221,8 +221,8 @@
                       </div>
                     </div>
                     <div class="setting-control ui-scale-control-group">
-                      <button class="btn-secondary ui-scale-btn ui-scale-btn-icon" type="button" onclick="adjustUiZoom(-0.05)" title="Zoom Out (Ctrl+-)" aria-label="Zoom Out (Ctrl+-)">−</button>
-                      <select class="select-control" id="opt-uiScale" style="min-width:120px; width:120px;" onchange="setUiZoom(parseFloat(this.value))" aria-label="Select UI Scale">
+                      <button class="btn-secondary ui-scale-btn ui-scale-btn-icon" type="button" onclick="adjustUiZoom(-0.05)" title="Zoom Out (Ctrl+-)" data-i18n-title="settings.uiScaleZoomOut" aria-label="Zoom Out (Ctrl+-)" data-i18n-aria="settings.uiScaleZoomOut">−</button>
+                      <select class="select-control" id="opt-uiScale" style="min-width:120px; width:120px;" aria-label="UI Scale & Zoom" data-i18n-aria="settings.uiScaleTitle">
                         <option value="0.7">70%</option>
                         <option value="0.75">75%</option>
                         <option value="0.8">80%</option>
@@ -243,8 +243,8 @@
                         <option value="1.55">155%</option>
                         <option value="1.6">160%</option>
                       </select>
-                      <button class="btn-secondary ui-scale-btn ui-scale-btn-icon" type="button" onclick="adjustUiZoom(0.05)" title="Zoom In (Ctrl++)" aria-label="Zoom In (Ctrl++)">+</button>
-                      <button class="btn-secondary ui-scale-btn ui-scale-btn-text" type="button" onclick="setUiZoom(1.0)" title="Reset to 100% (Ctrl+0)" aria-label="Reset UI Scale to 100% (Ctrl+0)" data-i18n="settings.uiScaleReset">Reset</button>
+                      <button class="btn-secondary ui-scale-btn ui-scale-btn-icon" type="button" onclick="adjustUiZoom(0.05)" title="Zoom In (Ctrl++)" data-i18n-title="settings.uiScaleZoomIn" aria-label="Zoom In (Ctrl++)" data-i18n-aria="settings.uiScaleZoomIn">+</button>
+                      <button class="btn-secondary ui-scale-btn ui-scale-btn-text" type="button" onclick="setUiZoom(1.0)" title="Reset to 100% (Ctrl+0)" data-i18n-title="settings.uiScaleResetTooltip" aria-label="Reset to 100% (Ctrl+0)" data-i18n-aria="settings.uiScaleResetTooltip" data-i18n="settings.uiScaleReset">Reset</button>
                     </div>
                   </div>
 
@@ -297,7 +297,7 @@
                     </div>
                     <div class="setting-control">
                       <label class="switch">
-                        <input type="checkbox" id="opt-closeToTray" />
+                        <input type="checkbox" id="opt-closeToTray" aria-label="Keep Running in Background on Close" data-i18n-aria="settings.trayTitle" />
                         <span class="slider"></span>
                       </label>
                     </div>
@@ -317,7 +317,7 @@
                     </div>
                     <div class="setting-control">
                       <label class="switch">
-                        <input type="checkbox" id="opt-autoCheckUpdates" checked />
+                        <input type="checkbox" id="opt-autoCheckUpdates" checked aria-label="Check for Updates on Startup" data-i18n-aria="settings.autoCheckUpdatesTitle" />
                         <span class="slider"></span>
                       </label>
                     </div>
@@ -368,7 +368,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <select class="select-control" id="opt-ffmpegSource">
+                      <select class="select-control" id="opt-ffmpegSource" aria-label="FFmpeg Engine" data-i18n-aria="settings.ffmpegTitle">
                         <option value="bundled" data-i18n="settings.ffmpegInternal">Internal</option>
                         <option value="system" data-i18n="settings.ffmpegSystem">System</option>
                       </select>
@@ -390,7 +390,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <select class="select-control" id="opt-whisperSource" aria-label="Whisper Engine Execution Source">
+                      <select class="select-control" id="opt-whisperSource" aria-label="Whisper Engine" data-i18n-aria="settings.whisperSourceTitle">
                         <option value="bundled" data-i18n="settings.whisperInternal">Internal</option>
                         <option value="system" data-i18n="settings.whisperSystem">System</option>
                       </select>
@@ -399,7 +399,7 @@
                 </div>
 
                 <!-- Group: Core Transcription -->
-                <div class="settings-group" id="group-transcription">
+                <div class="settings-group" id="group-transcription" role="tabpanel" aria-labelledby="cat-btn-transcription">
                   <!-- Model Selection Card -->
                   <div class="setting-card" data-search-tags="-m --model">
                     <div class="setting-info">
@@ -414,7 +414,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <select class="select-control" id="opt-modelPath" data-searchable data-model-select></select>
+                      <select class="select-control" id="opt-modelPath" data-searchable data-model-select aria-label="Model Selection" data-i18n-aria="settings.modelSelectTitle"></select>
                     </div>
                   </div>
 
@@ -434,7 +434,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <select class="select-control" id="opt-selectedBackend">
+                      <select class="select-control" id="opt-selectedBackend" aria-label="Active Backend" data-i18n-aria="settings.backendTitle">
                         <option value="Standard">CPU</option>
                         <option value="Vulkan">Vulkan GPU</option>
                         <option value="OpenVINO">OpenVINO Intel</option>
@@ -457,7 +457,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <select class="select-control" id="opt-language" data-searchable data-language-select="spoken"></select>
+                      <select class="select-control" id="opt-language" data-searchable data-language-select="spoken" aria-label="Language Spoken" data-i18n-aria="settings.langSpokenTitle"></select>
                     </div>
                   </div>
 
@@ -475,7 +475,7 @@
                       </div>
                     </div>
                     <div class="setting-control prompt-setting-control">
-                      <textarea class="text-input textarea-control prompt-textarea" id="opt-prompt" rows="3" dir="auto" spellcheck="false"></textarea>
+                      <textarea class="text-input textarea-control prompt-textarea" id="opt-prompt" rows="3" dir="auto" spellcheck="false" aria-label="Initial Prompt" data-i18n-aria="settings.initialPromptTitle"></textarea>
                     </div>
                   </div>
 
@@ -493,7 +493,7 @@
                     </div>
                     <div class="setting-control">
                       <label class="switch">
-                        <input type="checkbox" id="opt-carryPrompt" />
+                        <input type="checkbox" id="opt-carryPrompt" aria-label="Carry Prompt Across All Segments" data-i18n-aria="settings.carryPromptTitle" />
                         <span class="slider"></span>
                       </label>
                     </div>
@@ -513,7 +513,7 @@
                     </div>
                     <div class="setting-control">
                       <label class="switch">
-                        <input type="checkbox" id="opt-translate" />
+                        <input type="checkbox" id="opt-translate" aria-label="Translate to English" data-i18n-aria="settings.translateTitle" />
                         <span class="slider"></span>
                       </label>
                     </div>
@@ -534,14 +534,14 @@
                     </div>
                     <div class="setting-control">
                       <label class="switch">
-                        <input type="checkbox" id="opt-dtwEnabled" />
+                        <input type="checkbox" id="opt-dtwEnabled" aria-label="High-Precision Word Sync (DTW)" data-i18n-aria="settings.dtwTitle" />
                         <span class="slider"></span>
                       </label>
                     </div>
                   </div>
                 </div>
 
-                <div class="settings-group" id="group-computation">
+                <div class="settings-group" id="group-computation" role="tabpanel" aria-labelledby="cat-btn-computation">
                   <div class="setting-card" data-search-tags="-t --threads">
                     <div class="setting-info">
                       <div class="setting-label-row">
@@ -557,9 +557,9 @@
                     <div class="setting-control setting-control--inline">
                       <button type="button" class="btn-secondary btn-sm setting-auto-btn" id="btn-auto-threads" onclick="applyRecommendedThreads()" data-i18n="settings.autoDetectThreads" data-i18n-title="settings.autoDetectThreadsDesc" title="Auto-detect optimal CPU threads">Auto</button>
                       <div class="number-input-control">
-                        <button onclick="decrementNumber('opt-threads', 1)" type="button" aria-label="Decrease Threads">-</button>
-                        <input type="text" id="opt-threads" value="4" inputmode="numeric" autocomplete="off" aria-label="Threads Count" />
-                        <button onclick="incrementNumber('opt-threads', 1)" type="button" aria-label="Increase Threads">+</button>
+                        <button onclick="decrementNumber('opt-threads', 1)" type="button" aria-label="Decrease value" data-i18n-aria="settings.decreaseValue">-</button>
+                        <input type="text" id="opt-threads" value="4" inputmode="numeric" autocomplete="off" aria-label="CPU Processing Threads" data-i18n-aria="settings.threadsTitle" />
+                        <button onclick="incrementNumber('opt-threads', 1)" type="button" aria-label="Increase value" data-i18n-aria="settings.increaseValue">+</button>
                       </div>
                     </div>
                   </div>
@@ -578,9 +578,9 @@
                     </div>
                     <div class="setting-control">
                       <div class="number-input-control">
-                        <button onclick="decrementNumber('opt-processors', 1)" type="button" aria-label="Decrease Processors">-</button>
-                        <input type="text" id="opt-processors" value="1" inputmode="numeric" autocomplete="off" aria-label="Processors Count" />
-                        <button onclick="incrementNumber('opt-processors', 1)" type="button" aria-label="Increase Processors">+</button>
+                        <button onclick="decrementNumber('opt-processors', 1)" type="button" aria-label="Decrease value" data-i18n-aria="settings.decreaseValue">-</button>
+                        <input type="text" id="opt-processors" value="1" inputmode="numeric" autocomplete="off" aria-label="Concurrent Batch Workers" data-i18n-aria="settings.processorsTitle" />
+                        <button onclick="incrementNumber('opt-processors', 1)" type="button" aria-label="Increase value" data-i18n-aria="settings.increaseValue">+</button>
                       </div>
                     </div>
                   </div>
@@ -599,9 +599,9 @@
                     </div>
                     <div class="setting-control">
                       <div class="number-input-control">
-                        <button onclick="decrementNumber('opt-maxContext', 1)" type="button" aria-label="Decrease Max Context">-</button>
-                        <input type="text" id="opt-maxContext" value="-1" inputmode="numeric" autocomplete="off" aria-label="Max Token Context" />
-                        <button onclick="incrementNumber('opt-maxContext', 1)" type="button" aria-label="Increase Max Context">+</button>
+                        <button onclick="decrementNumber('opt-maxContext', 1)" type="button" aria-label="Decrease value" data-i18n-aria="settings.decreaseValue">-</button>
+                        <input type="text" id="opt-maxContext" value="-1" inputmode="numeric" autocomplete="off" aria-label="Previous Context Memory Limit" data-i18n-aria="settings.maxContextTitle" />
+                        <button onclick="incrementNumber('opt-maxContext', 1)" type="button" aria-label="Increase value" data-i18n-aria="settings.increaseValue">+</button>
                       </div>
                     </div>
                   </div>
@@ -620,9 +620,9 @@
                     </div>
                     <div class="setting-control">
                       <div class="number-input-control">
-                        <button onclick="decrementNumber('opt-maxLen', 5)" type="button" aria-label="Decrease Max Length">-</button>
-                        <input type="text" id="opt-maxLen" value="0" inputmode="numeric" autocomplete="off" aria-label="Max Segment Length" />
-                        <button onclick="incrementNumber('opt-maxLen', 5)" type="button" aria-label="Increase Max Length">+</button>
+                        <button onclick="decrementNumber('opt-maxLen', 5)" type="button" aria-label="Decrease value" data-i18n-aria="settings.decreaseValue">-</button>
+                        <input type="text" id="opt-maxLen" value="0" inputmode="numeric" autocomplete="off" aria-label="Max Subtitle Line Length (Characters)" data-i18n-aria="settings.maxLenTitle" />
+                        <button onclick="incrementNumber('opt-maxLen', 5)" type="button" aria-label="Increase value" data-i18n-aria="settings.increaseValue">+</button>
                       </div>
                     </div>
                   </div>
@@ -640,7 +640,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" type="number" min="0" step="1000" id="opt-offsetT" />
+                      <input class="text-input" type="number" min="0" step="1000" id="opt-offsetT" aria-label="Transcription Start Point (ms)" data-i18n-aria="settings.offsetTTitle" />
                     </div>
                   </div>
 
@@ -657,7 +657,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" type="number" min="0" step="1000" id="opt-duration" />
+                      <input class="text-input" type="number" min="0" step="1000" id="opt-duration" aria-label="Processing Duration (ms)" data-i18n-aria="settings.durationTitle" />
                     </div>
                   </div>
 
@@ -674,7 +674,7 @@
                     </div>
                     <div class="setting-control">
                       <label class="switch">
-                        <input type="checkbox" id="opt-splitWord" />
+                        <input type="checkbox" id="opt-splitWord" aria-label="Split Subtitles on Word Boundaries" data-i18n-aria="settings.splitOnWordTitle" />
                         <span class="slider"></span>
                       </label>
                     </div>
@@ -694,7 +694,7 @@
                     </div>
                     <div class="setting-control">
                       <label class="switch">
-                        <input type="checkbox" id="opt-diarize" />
+                        <input type="checkbox" id="opt-diarize" aria-label="Stereo Channel Diarization (Multi-Track)" data-i18n-aria="settings.diarizeTitle" />
                         <span class="slider"></span>
                       </label>
                     </div>
@@ -713,14 +713,14 @@
                     </div>
                     <div class="setting-control">
                       <label class="switch">
-                        <input type="checkbox" id="opt-tinyDiarize" />
+                        <input type="checkbox" id="opt-tinyDiarize" aria-label="AI Speaker Diarization (Single-Track / TinyDiarize)" data-i18n-aria="settings.tinyDiarizeTitle" />
                         <span class="slider"></span>
                       </label>
                     </div>
                   </div>
                 </div>
 
-                <div class="settings-group" id="group-search">
+                <div class="settings-group" id="group-search" role="tabpanel" aria-labelledby="cat-btn-search">
                   <div class="setting-card" data-search-tags="-bo --best-of">
                     <div class="setting-info">
                       <div class="setting-label-row">
@@ -735,9 +735,9 @@
                     </div>
                     <div class="setting-control">
                       <div class="number-input-control">
-                        <button onclick="decrementNumber('opt-bestOf', 1)" type="button" aria-label="Decrease Best Candidates">-</button>
-                        <input type="text" id="opt-bestOf" value="5" inputmode="numeric" autocomplete="off" aria-label="Best Candidates Count" />
-                        <button onclick="incrementNumber('opt-bestOf', 1)" type="button" aria-label="Increase Best Candidates">+</button>
+                        <button onclick="decrementNumber('opt-bestOf', 1)" type="button" aria-label="Decrease value" data-i18n-aria="settings.decreaseValue">-</button>
+                        <input type="text" id="opt-bestOf" value="5" inputmode="numeric" autocomplete="off" aria-label="Candidate Variations (Best Of)" data-i18n-aria="settings.bestOfTitle" />
+                        <button onclick="incrementNumber('opt-bestOf', 1)" type="button" aria-label="Increase value" data-i18n-aria="settings.increaseValue">+</button>
                       </div>
                     </div>
                   </div>
@@ -756,9 +756,9 @@
                     </div>
                     <div class="setting-control">
                       <div class="number-input-control">
-                        <button onclick="decrementNumber('opt-beamSize', 1)" type="button" aria-label="Decrease Beam Size">-</button>
-                        <input type="text" id="opt-beamSize" value="5" inputmode="numeric" autocomplete="off" aria-label="Beam Search Size" />
-                        <button onclick="incrementNumber('opt-beamSize', 1)" type="button" aria-label="Increase Beam Size">+</button>
+                        <button onclick="decrementNumber('opt-beamSize', 1)" type="button" aria-label="Decrease value" data-i18n-aria="settings.decreaseValue">-</button>
+                        <input type="text" id="opt-beamSize" value="5" inputmode="numeric" autocomplete="off" aria-label="Beam Search (Candidate Paths)" data-i18n-aria="settings.beamSizeTitle" />
+                        <button onclick="incrementNumber('opt-beamSize', 1)" type="button" aria-label="Increase value" data-i18n-aria="settings.increaseValue">+</button>
                       </div>
                     </div>
                   </div>
@@ -768,15 +768,15 @@
                       <div class="setting-label-row">
                         <span class="setting-title" data-i18n="settings.audioCtxTitle">Audio Context Size</span>
                       </div>
-                      <div class="setting-desc"><span data-i18n="settings.audioCtxDesc">Audio frame context length in samples.</span>
+                      <div class="setting-desc"><span data-i18n="settings.audioCtxDesc">Audio encoder context frames (0–1500; 0 = model default 30-second window, 1500 = full 30 seconds).</span>
                         <div class="setting-desc-points" data-i18n-html="settings.audioCtxPoints">
-                          <span class="setting-desc-point"><strong>Default:</strong> <code>0</code> (uses model default 30-second context window)</span>
-                          <span class="setting-desc-point"><strong>Advanced:</strong> Restricts attention window for custom streaming workflows.</span>
+                          <span class="setting-desc-point"><strong>Default:</strong> <code>0</code> (uses full model default 30s window, equivalent to <code>1500</code> encoder frames)</span>
+                          <span class="setting-desc-point"><strong>Advanced:</strong> Set between <code>1</code> and <code>1500</code> frames to restrict attention for shorter clips.</span>
                         </div>
                       </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" type="number" min="0" step="1" id="opt-audioCtx" />
+                      <input class="text-input" type="number" min="0" max="1500" step="1" id="opt-audioCtx" aria-label="Audio Processing Window Length" data-i18n-aria="settings.audioCtxTitle" />
                     </div>
                   </div>
 
@@ -793,7 +793,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" type="number" min="0" max="1" step="0.01" id="opt-wordThold" />
+                      <input class="text-input" type="number" min="0" max="1" step="0.01" id="opt-wordThold" aria-label="Word Timestamp Confidence Threshold" data-i18n-aria="settings.wordTholdTitle" />
                     </div>
                   </div>
 
@@ -810,7 +810,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" type="number" min="0" step="0.1" id="opt-entropyThold" />
+                      <input class="text-input" type="number" min="0" step="0.1" id="opt-entropyThold" aria-label="Repetition & Confusion Filter (Entropy)" data-i18n-aria="settings.entropyTholdTitle" />
                     </div>
                   </div>
 
@@ -827,7 +827,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" type="number" max="0" step="0.1" id="opt-logprobThold" />
+                      <input class="text-input" type="number" max="0" step="0.1" id="opt-logprobThold" aria-label="Text Confidence Threshold (Logprob)" data-i18n-aria="settings.logprobTholdTitle" />
                     </div>
                   </div>
 
@@ -844,7 +844,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" type="number" min="0" max="1" step="0.05" id="opt-noSpeechThold" />
+                      <input class="text-input" type="number" min="0" max="1" step="0.05" id="opt-noSpeechThold" aria-label="Silence & Non-Speech Filter" data-i18n-aria="settings.noSpeechTholdTitle" />
                     </div>
                   </div>
 
@@ -861,7 +861,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" type="number" min="0" max="2" step="0.05" id="opt-temperature" />
+                      <input class="text-input" type="number" min="0" max="2" step="0.05" id="opt-temperature" aria-label="Sampling Temperature" data-i18n-aria="settings.temperatureTitle" />
                     </div>
                   </div>
 
@@ -878,7 +878,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" type="number" min="0" max="2" step="0.05" id="opt-temperatureInc" />
+                      <input class="text-input" type="number" min="0" max="2" step="0.05" id="opt-temperatureInc" aria-label="Temperature Increment" data-i18n-aria="settings.tempIncTitle" />
                     </div>
                   </div>
 
@@ -897,7 +897,7 @@
                     </div>
                     <div class="setting-control">
                       <label class="switch">
-                        <input type="checkbox" id="opt-noFallback" />
+                        <input type="checkbox" id="opt-noFallback" aria-label="Single-Pass Only (Skip Retry Fallback)" data-i18n-aria="settings.noFallbackTitle" />
                         <span class="slider"></span>
                       </label>
                     </div>
@@ -916,14 +916,14 @@
                     </div>
                     <div class="setting-control">
                       <label class="switch">
-                        <input type="checkbox" id="opt-logScore" />
+                        <input type="checkbox" id="opt-logScore" aria-label="Record Confidence Scores in Activity Log" data-i18n-aria="settings.logScoreTitle" />
                         <span class="slider"></span>
                       </label>
                     </div>
                   </div>
                 </div>
 
-                <div class="settings-group" id="group-outputs">
+                <div class="settings-group" id="group-outputs" role="tabpanel" aria-labelledby="cat-btn-outputs">
                   <!-- Output checklist -->
                   <div class="outputs-grid">
                     <div class="setting-card" data-search-tags="-otxt --output-txt">
@@ -932,7 +932,7 @@
                         </div>
                       <div class="setting-control">
                         <label class="switch">
-                          <input type="checkbox" id="opt-outputTxt" />
+                          <input type="checkbox" id="opt-outputTxt" aria-label="Plain Text Transcript (.txt)" data-i18n-aria="settings.txtFormatTitle" />
                           <span class="slider"></span>
                         </label>
                       </div>
@@ -944,7 +944,7 @@
                         </div>
                       <div class="setting-control">
                         <label class="switch">
-                          <input type="checkbox" id="opt-outputSrt" />
+                          <input type="checkbox" id="opt-outputSrt" aria-label="SubRip Subtitles (.srt)" data-i18n-aria="settings.srtFormatTitle" />
                           <span class="slider"></span>
                         </label>
                       </div>
@@ -956,7 +956,7 @@
                         </div>
                       <div class="setting-control">
                         <label class="switch">
-                          <input type="checkbox" id="opt-outputVtt" />
+                          <input type="checkbox" id="opt-outputVtt" aria-label="WebVTT Subtitles (.vtt)" data-i18n-aria="settings.vttFormatTitle" />
                           <span class="slider"></span>
                         </label>
                       </div>
@@ -968,7 +968,7 @@
                         </div>
                       <div class="setting-control">
                         <label class="switch">
-                          <input type="checkbox" id="opt-outputLrc" />
+                          <input type="checkbox" id="opt-outputLrc" aria-label="LRC Lyrics (.lrc)" data-i18n-aria="settings.lrcFormatTitle" />
                           <span class="slider"></span>
                         </label>
                       </div>
@@ -989,7 +989,7 @@
                     </div>
                     <div class="setting-control" style="width:300px;">
                       <div class="select-wrapper" style="width:100%;">
-                        <select class="select-control" id="opt-outputDirMode" onchange="toggleOutputDirCustomField()">
+                        <select class="select-control" id="opt-outputDirMode" onchange="toggleOutputDirCustomField()" aria-label="Output Files Save Location" data-i18n-aria="settings.outputDirModeTitle">
                           <option value="input_dir" data-i18n="settings.outputDirSameAsInput">Same as Input File Directory (Default)</option>
                           <option value="custom" data-i18n="settings.outputDirCustom">Custom Directory...</option>
                         </select>
@@ -1027,7 +1027,7 @@
                   </div>
                 </div>
 
-                <div class="settings-group" id="group-gpu">
+                <div class="settings-group" id="group-gpu" role="tabpanel" aria-labelledby="cat-btn-gpu">
 
                   <div class="setting-card">
                     <div class="setting-info">
@@ -1043,9 +1043,9 @@
                     </div>
                     <div class="setting-control">
                       <div class="number-input-control">
-                        <button onclick="decrementNumber('opt-deviceId', 1)" type="button" aria-label="Decrease Device ID">-</button>
-                        <input type="text" id="opt-deviceId" value="0" inputmode="numeric" autocomplete="off" aria-label="GPU Device ID" />
-                        <button onclick="incrementNumber('opt-deviceId', 1)" type="button" aria-label="Increase Device ID">+</button>
+                        <button onclick="decrementNumber('opt-deviceId', 1)" type="button" aria-label="Decrease value" data-i18n-aria="settings.decreaseValue">-</button>
+                        <input type="text" id="opt-deviceId" value="0" inputmode="numeric" autocomplete="off" aria-label="Select Active GPU Device" data-i18n-aria="settings.gpuDeviceTitle" />
+                        <button onclick="incrementNumber('opt-deviceId', 1)" type="button" aria-label="Increase value" data-i18n-aria="settings.increaseValue">+</button>
                       </div>
                     </div>
                   </div>
@@ -1063,7 +1063,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <select class="select-control" id="opt-ovDevice">
+                      <select class="select-control" id="opt-ovDevice" aria-label="Intel Acceleration Hardware (OpenVINO)" data-i18n-aria="settings.openvinoDeviceTitle">
                         <option value="CPU">CPU</option>
                         <option value="GPU">GPU</option>
                       </select>
@@ -1084,14 +1084,14 @@
                     </div>
                     <div class="setting-control">
                       <label class="switch">
-                        <input type="checkbox" id="opt-flashAttn" />
+                        <input type="checkbox" id="opt-flashAttn" aria-label="Fast Attention Acceleration (Flash Attention)" data-i18n-aria="settings.flashAttnTitle" />
                         <span class="slider"></span>
                       </label>
                     </div>
                   </div>
                 </div>
 
-                <div class="settings-group" id="group-vad">
+                <div class="settings-group" id="group-vad" role="tabpanel" aria-labelledby="cat-btn-vad">
                   <div class="setting-card" data-search-tags="--vad">
                     <div class="setting-info">
                       <div class="setting-label-row">
@@ -1106,7 +1106,7 @@
                     </div>
                     <div class="setting-control">
                       <label class="switch">
-                        <input type="checkbox" id="opt-vad" />
+                        <input type="checkbox" id="opt-vad" aria-label="Enable Silero VAD" data-i18n-aria="settings.vadEnableTitle" />
                         <span class="slider"></span>
                       </label>
                     </div>
@@ -1124,7 +1124,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <select class="select-control" id="opt-vadModel"></select>
+                      <select class="select-control" id="opt-vadModel" aria-label="Silero VAD Model" data-i18n-aria="settings.vadModelTitle"></select>
                     </div>
                   </div>
 
@@ -1142,7 +1142,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" type="number" min="0" max="1" step="0.05" id="opt-vadThold" />
+                      <input class="text-input" type="number" min="0" max="1" step="0.05" id="opt-vadThold" aria-label="Voice Detection Threshold (Strictness)" data-i18n-aria="settings.vadThresholdTitle" />
                     </div>
                   </div>
 
@@ -1159,7 +1159,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" type="number" min="0" step="10" id="opt-vadMinSpeech" />
+                      <input class="text-input" type="number" min="0" step="10" id="opt-vadMinSpeech" aria-label="Minimum Voice Duration (ms)" data-i18n-aria="settings.vadMinSpeechTitle" />
                     </div>
                   </div>
 
@@ -1176,7 +1176,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" type="number" min="0" step="10" id="opt-vadMinSil" />
+                      <input class="text-input" type="number" min="0" step="10" id="opt-vadMinSil" aria-label="Minimum Silence Between Sentences (ms)" data-i18n-aria="settings.vadMinSilenceTitle" />
                     </div>
                   </div>
 
@@ -1193,7 +1193,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" type="number" min="1" max="300" step="1" id="opt-vadMaxSpeech" />
+                      <input class="text-input" type="number" min="1" max="300" step="1" id="opt-vadMaxSpeech" aria-label="Maximum Continuous Speech Segment (s)" data-i18n-aria="settings.vadMaxSpeechTitle" />
                     </div>
                   </div>
 
@@ -1210,7 +1210,7 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" type="number" min="0" step="5" id="opt-vadSpeechPad" />
+                      <input class="text-input" type="number" min="0" step="5" id="opt-vadSpeechPad" aria-label="Speech Boundary Padding (ms)" data-i18n-aria="settings.vadSpeechPadTitle" />
                     </div>
                   </div>
 
@@ -1227,13 +1227,13 @@
                       </div>
                     </div>
                     <div class="setting-control">
-                      <input class="text-input" type="number" min="0" max="1" step="0.05" id="opt-vadOverlap" />
+                      <input class="text-input" type="number" min="0" max="1" step="0.05" id="opt-vadOverlap" aria-label="Audio Analysis Window Overlap" data-i18n-aria="settings.vadOverlapTitle" />
                     </div>
                   </div>
                 </div>
                 
                 <!-- AI Translation Settings Group -->
-                <div class="settings-group" id="group-translation">
+                <div class="settings-group" id="group-translation" role="tabpanel" aria-labelledby="cat-btn-translation">
                   <!-- Tabbed Provider Manager Card -->
                   <div class="provider-manager-card" id="provider-manager-card">
                     <!-- Active Model Banner -->
@@ -1249,11 +1249,11 @@
                       <button type="button" role="tab" aria-selected="true" aria-controls="provider-tab-auto" class="provider-tab-btn active" onclick="switchProviderTab('auto')" id="tab-btn-auto" data-i18n="settings.tabAutoTranslate">Auto-Translate</button>
                       <button type="button" role="tab" aria-selected="false" aria-controls="provider-tab-providers" class="provider-tab-btn" onclick="switchProviderTab('providers')" id="tab-btn-providers" data-i18n="settings.tabProviders">API Providers</button>
                       <button type="button" role="tab" aria-selected="false" aria-controls="provider-tab-general" class="provider-tab-btn" onclick="switchProviderTab('general')" id="tab-btn-general" data-i18n="settings.tabGeneral">Provider Configuration</button>
-                      <button type="button" role="tab" aria-selected="false" aria-controls="provider-tab-models" class="provider-tab-btn" onclick="switchProviderTab('models')" id="tab-btn-models"><span data-i18n="settings.tabModels">Models</span> (<span id="provider-models-count">0</span>)</button>
+                      <button type="button" role="tab" aria-selected="false" aria-controls="provider-tab-models" class="provider-tab-btn" onclick="switchProviderTab('models')" id="tab-btn-models" aria-label="Models" data-i18n-aria="settings.tabModels"><span data-i18n="settings.tabModels">Models</span> (<span id="provider-models-count">0</span>)</button>
                     </div>
 
                     <!-- Tab 0 Content: Auto-Translate Automation Settings -->
-                    <div class="provider-tab-content" id="provider-tab-auto">
+                    <div class="provider-tab-content" id="provider-tab-auto" role="tabpanel" aria-labelledby="tab-btn-auto">
                       <div class="setting-card">
                         <div class="setting-info">
                           <div class="setting-label-row">
@@ -1267,7 +1267,7 @@
                         </div>
                         <div class="setting-control">
                           <label class="switch">
-                            <input type="checkbox" id="opt-autoTransferToTranslate" />
+                            <input type="checkbox" id="opt-autoTransferToTranslate" aria-label="Auto-Transfer to Translation Studio" data-i18n-aria="settings.aiTranslateTitle" />
                             <span class="slider"></span>
                           </label>
                         </div>
@@ -1285,7 +1285,7 @@
                           </div>
                         </div>
                         <div class="setting-control setting-control-wide">
-                          <select class="select-control" id="opt-translateAiTargetLang" data-searchable data-language-select="translation" onchange="saveCurrentSettings()"></select>
+                          <select class="select-control" id="opt-translateAiTargetLang" data-searchable data-language-select="translation" aria-label="Target Language" data-i18n-aria="settings.targetLangTitle"></select>
                         </div>
                       </div>
 
@@ -1302,7 +1302,7 @@
                         </div>
                         <div class="setting-control">
                           <label class="switch">
-                            <input type="checkbox" id="opt-translateAiPolish" />
+                            <input type="checkbox" id="opt-translateAiPolish" aria-label="Natural Subtitle Flow & Polish" data-i18n-aria="settings.polishTitle" />
                             <span class="slider"></span>
                           </label>
                         </div>
@@ -1310,17 +1310,17 @@
                     </div>
 
                     <!-- Tab 1 Content: Providers Card Grid -->
-                    <div class="provider-tab-content" id="provider-tab-providers" style="display: none;">
+                    <div class="provider-tab-content" id="provider-tab-providers" role="tabpanel" aria-labelledby="tab-btn-providers" style="display: none;">
                       <!-- Hidden select boxes for bindSettingsToDOM mapping -->
-                      <select class="select-control" id="opt-translateAiProvider" style="display: none;"></select>
-                      <select class="select-control" id="opt-translateAiModel" style="display: none;"></select>
+                      <select class="select-control" id="opt-translateAiProvider" aria-hidden="true" tabindex="-1" style="display: none;"></select>
+                      <select class="select-control" id="opt-translateAiModel" aria-hidden="true" tabindex="-1" style="display: none;"></select>
                       <div class="provider-grid" id="providers-tiles-grid">
                         <!-- Populated dynamically in Javascript -->
                       </div>
                     </div>
 
                     <!-- Tab 1 Content: General Setup -->
-                    <div class="provider-tab-content" id="provider-tab-general" style="display: none;">
+                    <div class="provider-tab-content" id="provider-tab-general" role="tabpanel" aria-labelledby="tab-btn-general" style="display: none;">
                       <!-- Placeholder Empty State -->
                       <div class="provider-placeholder-overlay" id="general-placeholder-overlay">
                         <svg class="provider-placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1347,17 +1347,25 @@
                           </div>
                         </div>
 
-                        <div class="provider-field" style="margin-bottom: 20px;">
+                        <div class="provider-field" style="margin-bottom: 14px;">
                           <label for="mgr-provider-key" data-i18n="settings.apiKeyUpdate">API Key (Update)</label>
                           <div class="password-input-wrapper">
                             <input class="text-input mono" dir="ltr" id="mgr-provider-key" type="password" placeholder="••••••••••••••••" />
-                            <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('mgr-provider-key', this)" aria-label="Toggle API key visibility">
-                              <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('mgr-provider-key', this)" aria-label="Toggle API key visibility" data-i18n-aria="settings.toggleApiKeyVisibility">
+                              <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
                                 <circle cx="12" cy="12" r="3"/>
                               </svg>
                             </button>
                           </div>
+                        </div>
+
+                        <div class="provider-field" style="margin-bottom: 18px;">
+                          <label class="checkbox-container" for="mgr-provider-use-keyring">
+                            <input type="checkbox" id="mgr-provider-use-keyring" checked />
+                            <span class="custom-checkmark"></span>
+                            <span data-i18n="modals.storeKeyring">Store API Key securely in system keyring</span>
+                          </label>
                         </div>
 
                         <div class="provider-field" style="margin-bottom: 16px;">
@@ -1374,7 +1382,7 @@
                     </div>
 
                     <!-- Tab 2 Content: Models -->
-                    <div class="provider-tab-content" id="provider-tab-models" style="display: none;">
+                    <div class="provider-tab-content" id="provider-tab-models" role="tabpanel" aria-labelledby="tab-btn-models" style="display: none;">
                       <!-- Placeholder Empty State -->
                       <div class="provider-placeholder-overlay" id="models-placeholder-overlay">
                         <svg class="provider-placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

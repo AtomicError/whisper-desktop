@@ -866,6 +866,11 @@ export const de: Translations = {
     whisperSystem: "System",
     engineNotBundledShort: 'Nicht enthalten',
     engineMissingBadge: 'Nicht gefunden',
+    engineReadyBadge: 'Bereit',
+    engineStatusError: 'Statusfehler',
+    engineTooltipSource: 'Quelle',
+    engineTooltipPath: 'Pfad',
+    engineTooltipBackends: 'Backends',
     trayTitle: 'Beim Schließen im Hintergrund weiter ausführen',
     trayDesc: 'Hält die Anwendung beim Schließen des Fensters im Hintergrund aktiv.',
     autoCheckUpdatesTitle: 'Beim Start automatisch nach Updates suchen',
@@ -873,6 +878,11 @@ export const de: Translations = {
     uiScaleTitle: 'UI-Skalierung & Zoom',
     uiScaleDesc: 'Passen Sie die Skalierung der Oberfläche für hochauflösende Monitore an.',
     uiScaleReset: 'Zurücksetzen',
+    uiScaleZoomOut: 'Verkleinern (Strg+-)',
+    uiScaleZoomIn: 'Vergrößern (Strg++)',
+    uiScaleResetTooltip: 'Skalierung auf 100 % zurücksetzen (Strg+0)',
+    decreaseValue: 'Wert verringern',
+    increaseValue: 'Wert erhöhen',
     langSpokenTitle: 'Gesprochene Sprache',
     langSpokenDesc: 'Im Audio gesprochene Sprache. Wähle „Automatisch erkennen“, damit Whisper sie automatisch erkennt.',
     initialPromptTitle: 'Initialer Prompt',
@@ -903,7 +913,7 @@ export const de: Translations = {
     tokenTimestampsTitle: 'Token-Genaue Zeitstempel',
     tokenTimestampsDesc: 'Erzeugt millisekundengenaue Zeitstempel für jedes einzelne Wort.',
     audioCtxTitle: 'Länge des Audio-Verarbeitungsfensters',
-    audioCtxDesc: 'Kontext-Framelänge in Millisekunden (0 = standardmäßige 30-Sekunden-Fenster).',
+    audioCtxDesc: 'Audio-Encoder-Kontextframes (0–1500; 0 = Standard-30-Sekunden-Fenster des Modells, 1500 = volle 30 Sekunden).',
     maxContextTitle: 'Maximaler Token-Kontextspeicher',
     maxContextDesc: 'Maximale Anzahl an vorherigen Tokens, die an den Decoder übergeben werden.',
     offsetTTitle: 'Startposition der Transkription (ms)',
@@ -1097,7 +1107,7 @@ export const de: Translations = {
     tinyDiarizePoints: '<span class="setting-desc-point"><strong>Voraussetzung:</strong> Erfordert <code>tdrz</code>-fähige Modelle (z.B. <code>small.en-tdrz</code>).</span>',
     bestOfPoints: '<span class="setting-desc-point"><strong>Standard:</strong> <code>5</code></span><span class="setting-desc-point"><strong>Empfehlung:</strong> Höher (<code>6–8</code>) steigert Genauigkeit; niedriger (<code>1–2</code>) läuft schneller.</span>',
     beamSizePoints: '<span class="setting-desc-point"><strong>Standard:</strong> <code>5</code></span><span class="setting-desc-point"><strong>Kompromiss:</strong> Höhere Werte reduzieren Fehler, verlängern aber die Verarbeitungszeit.</span>',
-    audioCtxPoints: '<span class="setting-desc-point"><strong>Standard:</strong> <code>0</code> (nutzt standardmäßiges 30-Sekunden-Fenster)</span><span class="setting-desc-point"><strong>Erweitert:</strong> Schränkt Aufmerksamkeit für Streaming-Workflows ein.</span>',
+    audioCtxPoints: '<span class="setting-desc-point"><strong>Standard:</strong> <code>0</code> (nutzt das volle Standard-30-Sekunden-Fenster, entspricht <code>1500</code> Encoder-Frames)</span><span class="setting-desc-point"><strong>Erweitert:</strong> Zwischen <code>1</code> und <code>1500</code> Frames einstellen, um Aufmerksamkeit für kürzere Clips einzugrenzen.</span>',
     wordTholdPoints: '<span class="setting-desc-point"><strong>Standard:</strong> <code>0.01</code></span><span class="setting-desc-point"><strong>Wann anpassen:</strong> Auf <code>0.05–0.1</code> erhöhen, wenn Wort-Timings bei Stille abdriften.</span>',
     entropyTholdPoints: '<span class="setting-desc-point"><strong>Standard:</strong> <code>2.4</code></span><span class="setting-desc-point"><strong>Wann anpassen:</strong> Auf <code>2.2</code> senken, wenn das Modell sinnlosen Text wiederholt.</span>',
     logprobTholdPoints: '<span class="setting-desc-point"><strong>Standard:</strong> <code>-1</code></span><span class="setting-desc-point"><strong>Wann anpassen:</strong> Auf <code>-1.5</code> senken bei Audio mit Nebengeräuschen.</span>',
@@ -1124,7 +1134,12 @@ export const de: Translations = {
     polishPoints: '<span class="setting-desc-point"><strong>Empfohlen:</strong> Aktiviert für flüssige Untertitel ohne starre Wort-für-Wort-Übersetzung.</span>',
     modelsTip: 'Modelländerungen werden automatisch gespeichert. Klicken Sie auf eine Zeile, um sie als Standard festzulegen.',
     addReasoning: 'Reasoning Konfigurieren',
-    noReasoning: 'Kein Reasoning'
+    noReasoning: 'Kein Reasoning',
+    toggleApiKeyVisibility: 'API-Schlüssel ein- oder ausblenden',
+    removeModelRow: 'Modellzeile entfernen',
+    modelIdentifierPlaceholder: 'z. B. gpt-4o-mini',
+    contextTokensTooltip: 'Kontextfenster: {formatted} ({exact} Tokens)',
+    tokensUnit: 'Tokens'
   },
   logs: {
     title: 'Aktivitätsprotokolle',
@@ -1167,6 +1182,7 @@ export const de: Translations = {
     cancelBtn: 'Abbrechen',
     addProviderTitle: 'API-Provider Hinzufügen',
     providerName: 'Provider-Name',
+    providerNamePlaceholder: 'z. B. OpenRouter',
     apiFormat: 'API-Format',
     baseUrl: 'Basis-URL',
     apiKey: 'API-Schlüssel',
@@ -1305,6 +1321,8 @@ export const de: Translations = {
     providerAddedSuccess: 'Provider erfolgreich hinzugefügt! Konfigurieren Sie unten die Modelle.',
     noProviderToTest: 'Kein aktiver Provider zum Testen ausgewählt.',
     modelsDirNotWritable: 'Ausgewähltes Modellverzeichnis ist nicht beschreibbar:\n{error}',
-    outputDirNotWritable: 'Ausgewähltes Ausgabeverzeichnis ist nicht beschreibbar:\n{error}'
+    outputDirNotWritable: 'Ausgewähltes Ausgabeverzeichnis ist nicht beschreibbar:\n{error}',
+    modelIdExists: 'Ein Modell mit der ID "{id}" existiert für diesen Provider bereits.',
+    providersJsonCorrupt: 'Gespeicherte Liste der KI-Provider war ungültig und konnte nicht gelesen werden.'
   }
 };

@@ -866,6 +866,11 @@ export const zh: Translations = {
     whisperSystem: "系统",
     engineNotBundledShort: '未内置',
     engineMissingBadge: '未找到',
+    engineReadyBadge: '就绪',
+    engineStatusError: '状态错误',
+    engineTooltipSource: '来源',
+    engineTooltipPath: '路径',
+    engineTooltipBackends: '后端引擎',
     trayTitle: '关闭窗口时保持后台运行',
     trayDesc: '关闭界面后使 Whisper Desktop 驻留在系统后台托盘中继续服务。',
     autoCheckUpdatesTitle: '启动时自动检查更新',
@@ -873,6 +878,11 @@ export const zh: Translations = {
     uiScaleTitle: '界面全局缩放',
     uiScaleDesc: '针对高分屏 (HiDPI / 4K) 精细调整软件字号与控件尺寸。',
     uiScaleReset: '重置',
+    uiScaleZoomOut: '缩小 (Ctrl+-)',
+    uiScaleZoomIn: '放大 (Ctrl++)',
+    uiScaleResetTooltip: '重置缩放比例至 100% (Ctrl+0)',
+    decreaseValue: '减小数值',
+    increaseValue: '增大数值',
     langSpokenTitle: '输入音频语种',
     langSpokenDesc: '音频中的口语语言。选择“自动检测”可让 Whisper 自动识别。',
     initialPromptTitle: '初始提示词',
@@ -902,7 +912,7 @@ export const zh: Translations = {
     tokenTimestampsTitle: 'Token 词级微时间戳',
     tokenTimestampsDesc: '为每一个发音字词生成毫米级对齐的时间坐标，便于做卡拉OK字幕。',
     audioCtxTitle: '音频处理窗口时长',
-    audioCtxDesc: '音频特征上下文长度（设为 0 即采用 Whisper 标配的 30 秒大窗口）。',
+    audioCtxDesc: '音频编码器上下文帧数（0–1500；0 = 模型默认 30 秒窗口，1500 = 完整 30 秒）。',
     maxContextTitle: '前文上下文记忆上限',
     maxContextDesc: '提供给模型作为参考背景的上一句前文最大历史长度。',
     offsetTTitle: '转录起始时间点 (毫秒)',
@@ -1092,7 +1102,7 @@ export const zh: Translations = {
     tinyDiarizePoints: '<span class="setting-desc-point"><strong>先决条件：</strong> 需要带有 <code>tdrz</code> 标记的专属特调模型 (如 <code>small.en-tdrz</code>)。</span>',
     bestOfPoints: '<span class="setting-desc-point"><strong>默认数值：</strong> <code>5</code></span><span class="setting-desc-point"><strong>推荐配置：</strong> 提高 (<code>6–8</code>) 提升准确度；调低 (<code>1–2</code>) 换取极速。</span>',
     beamSizePoints: '<span class="setting-desc-point"><strong>默认数值：</strong> <code>5</code></span><span class="setting-desc-point"><strong>性能权衡：</strong> 较大的数值显著降低字词错漏与幻觉，但会延长处理时间。</span>',
-    audioCtxPoints: '<span class="setting-desc-point"><strong>默认数值：</strong> <code>0</code> (使用标准 30 秒特征窗)</span><span class="setting-desc-point"><strong>高级场景：</strong> 用于定制流式低延迟实时应用。</span>',
+    audioCtxPoints: '<span class="setting-desc-point"><strong>默认数值：</strong> <code>0</code> (使用模型完整的 30 秒默认窗口，相当于 <code>1500</code> 编码帧)</span><span class="setting-desc-point"><strong>高级场景：</strong> 设置在 <code>1</code> 到 <code>1500</code> 帧之间，可针对较短片段限制注意力窗口。</span>',
     wordTholdPoints: '<span class="setting-desc-point"><strong>默认数值：</strong> <code>0.01</code></span><span class="setting-desc-point"><strong>何时调整：</strong> 若在静音段单词时间轴发生漂移，可提高至 <code>0.05–0.1</code>。</span>',
     entropyTholdPoints: '<span class="setting-desc-point"><strong>默认数值：</strong> <code>2.4</code></span><span class="setting-desc-point"><strong>何时调整：</strong> 若模型偶发无意义胡言乱语，调低至 <code>2.2</code> 即可抑制。</span>',
     logprobTholdPoints: '<span class="setting-desc-point"><strong>默认数值：</strong> <code>-1</code></span><span class="setting-desc-point"><strong>何时调整：</strong> 处理重度方言口音或强底噪音频时降低至 <code>-1.5</code>，避免无效重试。</span>',
@@ -1119,7 +1129,12 @@ export const zh: Translations = {
     polishPoints: '<span class="setting-desc-point"><strong>强烈推荐：</strong> 开启后消除机翻味，字字珠玑，还原电影级字幕对白感。</span>',
     modelsTip: '模型参数的变动均会实时自动持久化。直接点击列表中的任意一行即可快速将其设为默认主力模型。',
     addReasoning: '配置深度推理模式',
-    noReasoning: '普通模式 (无推理)'
+    noReasoning: '普通模式 (无推理)',
+    toggleApiKeyVisibility: '显示或隐藏 API 密钥',
+    removeModelRow: '移除模型行',
+    modelIdentifierPlaceholder: '例如 gpt-4o-mini',
+    contextTokensTooltip: '上下文窗口: {formatted} ({exact} tokens)',
+    tokensUnit: 'tokens'
   },
   logs: {
     title: '系统运行日志',
@@ -1162,6 +1177,7 @@ export const zh: Translations = {
     cancelBtn: '取消',
     addProviderTitle: '添加 AI 服务商接口',
     providerName: '服务商名称',
+    providerNamePlaceholder: '例如 OpenRouter',
     apiFormat: 'API 协议格式',
     baseUrl: '基地址 Base URL',
     apiKey: 'API 授权 Key',
@@ -1300,6 +1316,8 @@ export const zh: Translations = {
     providerAddedSuccess: '服务商注册成功！请在下方为其添加可用模型。',
     noProviderToTest: '尚未选择待测试的目标服务商。',
     modelsDirNotWritable: '选定的模型存储目录无写入权限:\n{error}',
-    outputDirNotWritable: '选定的输出文件夹无写入权限:\n{error}'
+    outputDirNotWritable: '选定的输出文件夹无写入权限:\n{error}',
+    modelIdExists: '此服务商已存在 ID 为“{id}”的模型。',
+    providersJsonCorrupt: '已保存的 AI 服务商列表格式无效，无法正常解析。'
   }
 };

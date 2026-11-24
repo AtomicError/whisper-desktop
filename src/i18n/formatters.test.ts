@@ -36,10 +36,20 @@ describe('i18n Formatters Unit Tests', () => {
     });
 
     it('returns 0 or local formatted string for small/invalid inputs', () => {
-      expect(formatTokensShort(0)).toBe('0');
-      expect(formatTokensShort(-10)).toBe('0');
-      expect(formatTokensShort('invalid')).toBe('0');
-      expect(formatTokensShort(500)).toBe('500');
+      const win = (typeof window !== 'undefined' ? window : globalThis) as any;
+      const prevGetLang = win.getLanguage;
+      try {
+        win.getLanguage = () => 'en';
+        expect(formatTokensShort(0)).toBe('0');
+        expect(formatTokensShort(-10)).toBe('0');
+        expect(formatTokensShort('invalid')).toBe('0');
+        expect(formatTokensShort(500)).toBe('500');
+
+        win.getLanguage = () => 'fa';
+        expect(formatTokensShort(500)).toBe('۵۰۰');
+      } finally {
+        win.getLanguage = prevGetLang;
+      }
     });
   });
 
@@ -49,11 +59,13 @@ describe('i18n Formatters Unit Tests', () => {
       expect(parseTokensInput(0)).toBe(200000);
     });
 
-    it('parses token shorthand strings with M, K, and commas', () => {
+    it('parses token shorthand strings with M, K, commas, and Persian separators', () => {
       expect(parseTokensInput('2M')).toBe(2000000);
       expect(parseTokensInput('1.5M tokens')).toBe(1500000);
+      expect(parseTokensInput('۱٫۵M')).toBe(1500000);
       expect(parseTokensInput('128k')).toBe(128000);
       expect(parseTokensInput('32,000')).toBe(32000);
+      expect(parseTokensInput('۳۲٬۰۰۰')).toBe(32000);
       expect(parseTokensInput('۲M')).toBe(2000000);
     });
 

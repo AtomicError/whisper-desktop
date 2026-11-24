@@ -866,6 +866,11 @@ export const ar: Translations = {
     whisperSystem: 'النظام',
     engineNotBundledShort: 'غير مدمج',
     engineMissingBadge: 'غير موجود',
+    engineReadyBadge: 'جاهز',
+    engineStatusError: 'خطأ في الحالة',
+    engineTooltipSource: 'المصدر',
+    engineTooltipPath: 'المسار',
+    engineTooltipBackends: 'المحركات',
     trayTitle: 'التشغيل في الخلفية عند إغلاق النافذة',
     trayDesc: 'إبقاء البرنامج قيد التشغيل في الخلفية عند إغلاق النافذة الرئيسية.',
     autoCheckUpdatesTitle: 'التحقق من التحديثات تلقائيًا عند التشغيل',
@@ -873,6 +878,11 @@ export const ar: Translations = {
     uiScaleTitle: 'تكبير ومقياس الواجهة',
     uiScaleDesc: 'ضبط مقياس وحجم الخطوط للشاشات ذات الكثافة العالية (HiDPI / 4K).',
     uiScaleReset: 'إعادة تعيين',
+    uiScaleZoomOut: 'تصغير (Ctrl+-)',
+    uiScaleZoomIn: 'تكبير (Ctrl++)',
+    uiScaleResetTooltip: 'إعادة تعيين المقياس إلى 100% (Ctrl+0)',
+    decreaseValue: 'تقليل القيمة',
+    increaseValue: 'زيادة القيمة',
     langSpokenTitle: 'لغة الصوت المنطوق',
     langSpokenDesc: 'اللغة المنطوقة في الصوت. اختر «كشف تلقائي» للسماح لـ Whisper بكشفها تلقائياً.',
     initialPromptTitle: 'التوجيه الأولي',
@@ -903,7 +913,7 @@ export const ar: Translations = {
     tokenTimestampsTitle: 'توقيت زمني على مستوى الكلمة',
     tokenTimestampsDesc: 'توليد توقيتات دقيقة بالمللي ثانية لكل كلمة على حدة.',
     audioCtxTitle: 'طول نافذة معالجة الصوت',
-    audioCtxDesc: 'طول إطار سياق الصوت بالمللي ثانية (0 = نافذة 30 ثانية القياسية).',
+    audioCtxDesc: 'إطارات سياق مشفّر الصوت (0–1500؛ القيمة 0 تستخدم نافذة النموذج القياسية البالغة 30 ثانية و1500 تعادل 30 ثانية كاملة).',
     maxContextTitle: 'الحد الأقصى لذاكرة السياق السابق',
     maxContextDesc: 'الحد الأقصى لعدد الرموز السابقة المرسلة إلى مفكك الترميز.',
     offsetTTitle: 'نقطة بدء التفريغ (مللي ثانية)',
@@ -1097,7 +1107,7 @@ export const ar: Translations = {
     tinyDiarizePoints: '<span class="setting-desc-point"><strong>شرط:</strong> يتطلب نماذج متوافقة مع ميزة <code>tdrz</code> (مثل <code>small.en-tdrz</code>).</span>',
     bestOfPoints: '<span class="setting-desc-point"><strong>افتراضي:</strong> <code>5</code></span><span class="setting-desc-point"><strong>موصى به:</strong> أعلى (<code>6–8</code>) يرفع الدقة؛ أقل (<code>1–2</code>) أسرع.</span>',
     beamSizePoints: '<span class="setting-desc-point"><strong>افتراضي:</strong> <code>5</code></span><span class="setting-desc-point"><strong>توازن:</strong> قيم أعلى تقلل الأخطاء والهلوسة ولكنها تزيد وقت المعالجة.</span>',
-    audioCtxPoints: '<span class="setting-desc-point"><strong>افتراضي:</strong> <code>0</code> (النافذة القياسية 30 ثانية)</span><span class="setting-desc-point"><strong>متقدم:</strong> يحدد نافذة الانتباه لمعالجة البث الحي والمباشر.</span>',
+    audioCtxPoints: '<span class="setting-desc-point"><strong>افتراضي:</strong> <code>0</code> (يستخدم نافذة النموذج القياسية البالغة 30 ثانية، ما يعادل <code>1500</code> إطار تشفير)</span><span class="setting-desc-point"><strong>متقدم:</strong> اضبط بين <code>1</code> و<code>1500</code> إطار لتقييد الانتباه للمقاطع الأقصر.</span>',
     wordTholdPoints: '<span class="setting-desc-point"><strong>افتراضي:</strong> <code>0.01</code></span><span class="setting-desc-point"><strong>متى تعدله:</strong> ارفعه إلى <code>0.05–0.1</code> إذا انحرفت توقيتات الكلمات أثناء الصمت.</span>',
     entropyTholdPoints: '<span class="setting-desc-point"><strong>افتراضي:</strong> <code>2.4</code></span><span class="setting-desc-point"><strong>متى تعدله:</strong> خفضه إلى <code>2.2</code> إذا قام النموذج بتوليد كلام مكرر لا معنى له.</span>',
     logprobTholdPoints: '<span class="setting-desc-point"><strong>افتراضي:</strong> <code>-1</code></span><span class="setting-desc-point"><strong>متى تعدله:</strong> خفضه إلى <code>-1.5</code> للأصوات المشوشة لتجنب المحاولات المتكررة.</span>',
@@ -1124,7 +1134,12 @@ export const ar: Translations = {
     polishPoints: '<span class="setting-desc-point"><strong>موصى به:</strong> مفعل لترجمة حوارية طبيعية ومنع الترجمة الحرفية الجافة.</span>',
     modelsTip: 'يتم حفظ تعديلات النماذج تلقائياً في الوقت الفعلي. انقر فوق أي صف لتعيينه كنموذج افتراضي.',
     addReasoning: 'ضبط التفكير والاستدلال',
-    noReasoning: 'بدون تفكير (نمط قياسي)'
+    noReasoning: 'بدون تفكير (نمط قياسي)',
+    toggleApiKeyVisibility: 'إظهار أو إخفاء مفتاح API',
+    removeModelRow: 'حذف صف النموذج',
+    modelIdentifierPlaceholder: 'مثال: gpt-4o-mini',
+    contextTokensTooltip: 'نافذة السياق: {formatted} ({exact} رمز)',
+    tokensUnit: 'رمز'
   },
   logs: {
     title: 'سجل النشاط والتشخيص',
@@ -1167,6 +1182,7 @@ export const ar: Translations = {
     cancelBtn: 'إلغاء',
     addProviderTitle: 'إضافة مزود API',
     providerName: 'اسم المزود',
+    providerNamePlaceholder: 'مثال: OpenRouter',
     apiFormat: 'تنسيق API',
     baseUrl: 'رابط واجهة API الأساسي (Base URL)',
     apiKey: 'مفتاح API',
@@ -1305,6 +1321,8 @@ export const ar: Translations = {
     providerAddedSuccess: 'تمت إضافة المزود بنجاح! قم بضبط نماذجه في الأسفل.',
     noProviderToTest: 'لم يتم اختيار أي مزود لاختباره.',
     modelsDirNotWritable: 'مجلد تخزين النماذج المحدد غير قابل للكتابة:\n{error}',
-    outputDirNotWritable: 'مجلد المخرجات المحدد غير قابل للكتابة:\n{error}'
+    outputDirNotWritable: 'مجلد المخرجات المحدد غير قابل للكتابة:\n{error}',
+    modelIdExists: 'يوجد نموذج بالمعرف "{id}" مسبقًا لهذا المزود.',
+    providersJsonCorrupt: 'تعذر تحليل قائمة مزودي الذكاء الاصطناعي المحفوظة لأنها غير صالحة.'
   }
 };

@@ -1581,5 +1581,60 @@ describe('batchProcessor module', () => {
         (globalThis as any).document = prevDoc;
       }
     });
+
+    it('forwards live itemSettings.diarize flag to convert_media_file during batch extraction', async () => {
+      const prevDoc = (globalThis as any).document;
+      const prevInvoke = (window as any).invoke;
+      const prevSettings = (window as any).settingsState;
+      const prevModels = (window as any).localScannedTransModels;
+
+      (globalThis as any).document = {
+        getElementById: () => null,
+        querySelector: () => null,
+        querySelectorAll: () => []
+      };
+      (window as any).settingsState = {
+        selectedBackend: 'Standard',
+        modelPath: 'ggml-base.bin',
+        diarize: true,
+        outputDirMode: 'input_dir'
+      };
+      (window as any).localScannedTransModels = ['ggml-base.bin'];
+
+      const invokeSpy = vi.fn((cmd: string) => {
+        if (cmd === 'convert_media_file') return Promise.resolve('/media/two_speakers.wav');
+        if (cmd === 'start_transcription_task') {
+          return Promise.resolve({
+            internalJsonPath: null,
+            outputDir: '/media',
+            generatedFiles: ['two_speakers.srt'],
+            durationMs: 250,
+            speedFactor: 12.0
+          });
+        }
+        return Promise.resolve(null);
+      });
+      (window as any).invoke = invokeSpy;
+
+      try {
+        batchProcessor.setIsBatchMode(true);
+        batchProcessor.setItems([
+          { path: '/media/two_speakers.mp4', name: 'two_speakers.mp4', durationSec: 10, status: 'pending' }
+        ]);
+
+        await runBatchExtraction();
+
+        expect(invokeSpy).toHaveBeenCalledWith('convert_media_file', {
+          filePath: '/media/two_speakers.mp4',
+          diarize: true
+        });
+      } finally {
+        clearBatchQueue();
+        (window as any).localScannedTransModels = prevModels;
+        (window as any).settingsState = prevSettings;
+        (window as any).invoke = prevInvoke;
+        (globalThis as any).document = prevDoc;
+      }
+    });
   });
 });

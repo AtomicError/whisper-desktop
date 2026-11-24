@@ -278,6 +278,9 @@ export function _trapModalFocus(modalEl: HTMLElement, closeCallback: () => void)
 
   const keyHandler = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
+      if (typeof document !== 'undefined' && document.querySelector?.('.custom-select-options.open')) {
+        return;
+      }
       e.preventDefault();
       e.stopPropagation();
       closeCallback();
@@ -330,11 +333,16 @@ export function _trapModalFocus(modalEl: HTMLElement, closeCallback: () => void)
 }
 
 let _appModalTrap: { release: () => void } | null = null;
+let _appModalCloseTimer: ReturnType<typeof setTimeout> | null = null;
 let _confirmModalResolve: ((value: boolean) => void) | null = null;
 
 export function showAppModal(title: string, message: string, details = ''): void {
   if (typeof document === 'undefined') return;
 
+  if (_appModalCloseTimer !== null) {
+    clearTimeout(_appModalCloseTimer);
+    _appModalCloseTimer = null;
+  }
   if (_appModalTrap) {
     _appModalTrap.release();
     _appModalTrap = null;
@@ -389,6 +397,10 @@ export function showAppModal(title: string, message: string, details = ''): void
 export function closeAppModal(): void {
   if (typeof document === 'undefined') return;
 
+  if (_appModalCloseTimer !== null) {
+    clearTimeout(_appModalCloseTimer);
+    _appModalCloseTimer = null;
+  }
   if (_appModalTrap) {
     _appModalTrap.release();
     _appModalTrap = null;
@@ -403,12 +415,15 @@ export function closeAppModal(): void {
   const overlay = document.getElementById('app-modal-overlay');
   if (overlay) {
     overlay.classList.remove('show');
-    setTimeout(() => {
-      overlay.style.display = 'none';
-      const okFooter = document.getElementById('app-modal-ok-footer');
-      const confirmFooter = document.getElementById('app-modal-confirm-footer');
-      if (okFooter) okFooter.style.display = 'flex';
-      if (confirmFooter) confirmFooter.style.display = 'none';
+    _appModalCloseTimer = setTimeout(() => {
+      _appModalCloseTimer = null;
+      if (!overlay.classList.contains('show')) {
+        overlay.style.display = 'none';
+        const okFooter = document.getElementById('app-modal-ok-footer');
+        const confirmFooter = document.getElementById('app-modal-confirm-footer');
+        if (okFooter) okFooter.style.display = 'flex';
+        if (confirmFooter) confirmFooter.style.display = 'none';
+      }
     }, 300);
   }
 }
@@ -445,6 +460,10 @@ export function showConfirmModal(title: string, message: string, confirmButtonTe
     okFooter.style.display = 'none';
     confirmFooter.style.display = 'flex';
     
+    if (_appModalCloseTimer !== null) {
+      clearTimeout(_appModalCloseTimer);
+      _appModalCloseTimer = null;
+    }
     if (_appModalTrap) {
       _appModalTrap.release();
       _appModalTrap = null;

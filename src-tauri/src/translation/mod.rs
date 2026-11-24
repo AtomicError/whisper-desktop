@@ -224,50 +224,78 @@ pub fn supports_reasoning_of(item: &Value) -> bool {
     false
 }
 
-/// Builds the provider models-listing endpoint URL. Matches `translator::build_request_url`
-/// conventions per format so `/v1` and `/v1beta` handling stays aligned across both paths.
+/// Validates and trims a user-supplied provider Base URL.
+pub(crate) fn validate_provider_base_url(base_url: &str) -> Result<&str, String> {
+    let trimmed = base_url.trim();
+    if trimmed.is_empty() {
+        return Err("Provider Base URL cannot be empty.".to_string());
+    }
+    if !trimmed.starts_with("http://") && !trimmed.starts_with("https://") {
+        return Err(format!(
+            "Invalid Base URL '{}'. URL must begin with http:// or https://",
+            trimmed
+        ));
+    }
+    Ok(trimmed)
+}
+
+/// Extracts a model's input context window across OpenAI/OpenRouter and Gemini schemas.
+/// Deliberately excludes `max_tokens` / `outputTokenLimit`, which are output caps.
+pub(crate) fn context_window_of(item: &Value) -> Option<usize> {
+    item.get("max_model_len")
+        .or_else(|| item.get("context_length"))
+        .or_else(|| item.get("inputTokenLimit"))
+        .and_then(|v| v.as_u64())
+        .map(|v| v as usize)
+}
+
+/// Builds the provider models-listing endpoint URL. Normalizes full endpoint URLs
+/// accepted by `translator::build_request_url` (e.g. `/chat/completions`, `/messages`,
+/// `/models/gemini-*:generateContent`) and keeps Gemini API keys out of the URL.
 pub(crate) fn build_models_url(
     api_format: crate::translation::provider::ApiFormat,
     base_url: &str,
-    api_key: &str,
 ) -> String {
     use crate::translation::provider::ApiFormat as Fmt;
-    let mut url = base_url.to_string();
+    let trimmed = base_url.trim();
+    let base_no_frag = trimmed.split('#').next().unwrap_or(trimmed);
+    let path_only = base_no_frag.split('?').next().unwrap_or(base_no_frag);
+    let clean = path_only.trim_end_matches('/');
 
     match api_format {
         Fmt::GeminiResponses => {
-            // Gemini: GET https://generativelanguage.googleapis.com/v1beta/models?key={api_key}
-            if !url.contains("/models") {
-                let clean_base = url.trim_end_matches('/');
-                if clean_base.ends_with("/v1beta") {
-                    url = format!("{}/models", clean_base);
-                } else {
-                    url = format!("{}/v1beta/models", clean_base);
-                }
-            }
-            if !api_key.is_empty() {
-                url = translator::append_query_param(&url, "key", api_key);
+            if let Some(idx) = clean.find("/models/") {
+                clean[..idx + "/models".len()].to_string()
+            } else if clean.ends_with("/models") {
+                clean.to_string()
+            } else if clean.ends_with("/v1beta") {
+                format!("{}/models", clean)
+            } else {
+                format!("{}/v1beta/models", clean)
             }
         }
         Fmt::AnthropicMessages => {
-            if !url.contains("/models") {
-                let clean_base = url.trim_end_matches('/');
-                if clean_base.ends_with("/v1") {
-                    url = format!("{}/models", clean_base);
-                } else {
-                    url = format!("{}/v1/models", clean_base);
-                }
+            let stripped = clean.strip_suffix("/messages").unwrap_or(clean).trim_end_matches('/');
+            if stripped.ends_with("/models") {
+                stripped.to_string()
+            } else if stripped.ends_with("/v1") {
+                format!("{}/models", stripped)
+            } else {
+                format!("{}/v1/models", stripped)
             }
         }
         Fmt::OpenAiCompatible => {
-            if !url.contains("/models") {
-                let clean_base = url.trim_end_matches('/');
-                url = format!("{}/models", clean_base);
+            let stripped = clean
+                .strip_suffix("/chat/completions")
+                .unwrap_or(clean)
+                .trim_end_matches('/');
+            if stripped.ends_with("/models") {
+                stripped.to_string()
+            } else {
+                format!("{}/models", stripped)
             }
         }
     }
-
-    url
 }
 
 #[tauri::command]
@@ -279,6 +307,7 @@ pub async fn fetch_provider_models(
     // Single parse point for the wire protocol — unknown values are a loud
     // configuration error, never a silent fallback to another format.
     let fmt = crate::translation::provider::ApiFormat::parse(&api_format)?;
+    let trimmed_base_url = validate_provider_base_url(&base_url)?;
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(
@@ -288,9 +317,9 @@ pub async fn fetch_provider_models(
             translator::CONNECT_TIMEOUT_SECS,
         ))
         .build()
-        .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
+        .map_err(|e| format!("Failed to build HTTP client: {}", translator::sanitize_reqwest_error(e)))?;
 
-    let url = build_models_url(fmt, &base_url, &api_key);
+    let url = build_models_url(fmt, trimmed_base_url);
 
     let mut req = client.get(&url);
     use crate::translation::provider::ApiFormat as Fmt;
@@ -302,7 +331,9 @@ pub async fn fetch_provider_models(
             req = req.header("anthropic-version", crate::translation::provider::ANTHROPIC_VERSION);
         }
         Fmt::GeminiResponses => {
-            // Gemini key is in URL query param
+            if !api_key.is_empty() {
+                req = req.header("x-goog-api-key", &api_key);
+            }
         }
         Fmt::OpenAiCompatible => {
             if !api_key.is_empty() {
@@ -314,7 +345,12 @@ pub async fn fetch_provider_models(
     let res = req
         .send()
         .await
-        .map_err(|e| format!("Failed to connect to API models endpoint: {}", e))?;
+        .map_err(|e| {
+            format!(
+                "Failed to connect to API models endpoint: {}",
+                translator::sanitize_reqwest_error(e)
+            )
+        })?;
 
     if !res.status().is_success() {
         return Err(format!("API returned error status: {}", res.status()));
@@ -323,19 +359,14 @@ pub async fn fetch_provider_models(
     let json: Value = res
         .json()
         .await
-        .map_err(|e| format!("Failed to parse JSON response: {}", e))?;
+        .map_err(|e| {
+            format!(
+                "Failed to parse JSON response: {}",
+                translator::sanitize_reqwest_error(e)
+            )
+        })?;
 
     let mut models = Vec::new();
-
-    // Context-window extraction deliberately excludes `max_tokens`: that field
-    // is an OUTPUT cap, not a context window — using it as a proxy produced
-    // wrongly small chunk budgets.
-    fn context_window_of(item: &Value) -> Option<usize> {
-        item.get("max_model_len")
-            .or_else(|| item.get("context_length"))
-            .and_then(|v| v.as_u64())
-            .map(|v| v as usize)
-    }
 
     if let Some(arr) = json.get("data").and_then(|v| v.as_array()) {
         // OpenAI format: { "data": [ { "id": "gpt-4o" }, ... ] }
@@ -590,20 +621,52 @@ mod tests {
     fn test_build_models_url_per_format() {
         use crate::translation::provider::ApiFormat as Fmt;
         assert_eq!(
-            build_models_url(Fmt::AnthropicMessages, "https://api.anthropic.com", "sk-ant"),
+            build_models_url(Fmt::AnthropicMessages, "https://api.anthropic.com"),
             "https://api.anthropic.com/v1/models"
         );
         assert_eq!(
-            build_models_url(Fmt::AnthropicMessages, "https://api.anthropic.com/v1/", "sk-ant"),
+            build_models_url(Fmt::AnthropicMessages, "https://api.anthropic.com/v1/"),
             "https://api.anthropic.com/v1/models"
         );
         assert_eq!(
-            build_models_url(Fmt::OpenAiCompatible, "https://openrouter.ai/api/v1/", "sk-or"),
+            build_models_url(Fmt::AnthropicMessages, "https://api.anthropic.com/v1/messages"),
+            "https://api.anthropic.com/v1/models"
+        );
+        assert_eq!(
+            build_models_url(Fmt::OpenAiCompatible, "https://openrouter.ai/api/v1/"),
             "https://openrouter.ai/api/v1/models"
         );
         assert_eq!(
-            build_models_url(Fmt::GeminiResponses, "https://generativelanguage.googleapis.com", "gem+key"),
-            "https://generativelanguage.googleapis.com/v1beta/models?key=gem%2Bkey"
+            build_models_url(Fmt::OpenAiCompatible, "  https://api.openai.com/v1/chat/completions/ "),
+            "https://api.openai.com/v1/models"
         );
+        assert_eq!(
+            build_models_url(Fmt::GeminiResponses, "https://generativelanguage.googleapis.com"),
+            "https://generativelanguage.googleapis.com/v1beta/models"
+        );
+        assert_eq!(
+            build_models_url(
+                Fmt::GeminiResponses,
+                "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=secret"
+            ),
+            "https://generativelanguage.googleapis.com/v1beta/models"
+        );
+    }
+
+    #[test]
+    fn test_validate_provider_base_url_and_context_window() {
+        assert!(validate_provider_base_url("   ").is_err());
+        assert!(validate_provider_base_url("ftp://example.com").is_err());
+        assert_eq!(
+            validate_provider_base_url("  https://api.openai.com/v1  ").unwrap(),
+            "https://api.openai.com/v1"
+        );
+
+        let gemini_model = json!({
+            "name": "models/gemini-2.5-flash",
+            "inputTokenLimit": 1_048_576,
+            "outputTokenLimit": 65_536
+        });
+        assert_eq!(context_window_of(&gemini_model), Some(1_048_576));
     }
 }

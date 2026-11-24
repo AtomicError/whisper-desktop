@@ -136,10 +136,11 @@ async fn convert_media_file(
     state: State<'_, LogState>,
     session_state: State<'_, TranscriptionState>,
     file_path: String,
+    diarize: Option<bool>,
 ) -> Result<String, String> {
     let logs = state.0.clone();
     let session = session_state.0.clone();
-    convert_to_wav(app, logs, session, file_path).await
+    convert_to_wav(app, logs, session, file_path, diarize).await
 }
 
 #[tauri::command]

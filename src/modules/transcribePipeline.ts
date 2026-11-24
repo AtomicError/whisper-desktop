@@ -835,7 +835,10 @@ export async function runWhisperTranscription(): Promise<void> {
         pctEl.textContent = t('transcribe.convertingProgress');
       }
 
-      currentWav = await invoke('convert_media_file', { filePath: currentMedia });
+      currentWav = await invoke('convert_media_file', {
+        filePath: currentMedia,
+        diarize: Boolean(currentSettings?.diarize)
+      });
       setWavPathForTranscription(currentWav);
 
       if (fillBar) fillBar.classList.remove('indeterminate');

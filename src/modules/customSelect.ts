@@ -242,6 +242,7 @@ export class CustomSelect {
       } else if (e.key === 'Escape') {
         if (this.isOpen) {
           e.preventDefault();
+          e.stopPropagation();
           this.close();
         }
       } else if (e.key === 'Tab') {
@@ -308,6 +309,8 @@ export class CustomSelect {
 
     this._globalEscapeHandler = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && this.isOpen) {
+        e.preventDefault();
+        e.stopPropagation();
         this.close();
       }
     };
@@ -1334,7 +1337,7 @@ export class CustomSelect {
       document.addEventListener('pointerdown', this._documentPointerHandler as any, true);
     }
     if (this._globalEscapeHandler) {
-      document.addEventListener('keydown', this._globalEscapeHandler);
+      document.addEventListener('keydown', this._globalEscapeHandler, true);
     }
     if (this._scrollResizeHandler) {
       window.addEventListener('scroll', this._scrollResizeHandler, true);
@@ -1414,7 +1417,7 @@ export class CustomSelect {
       document.removeEventListener('pointerdown', this._documentPointerHandler as any, true);
     }
     if (this._globalEscapeHandler) {
-      document.removeEventListener('keydown', this._globalEscapeHandler);
+      document.removeEventListener('keydown', this._globalEscapeHandler, true);
     }
     if (this._scrollResizeHandler) {
       window.removeEventListener('scroll', this._scrollResizeHandler, true);
@@ -1484,7 +1487,7 @@ export class CustomSelect {
       document.removeEventListener('pointerdown', this._documentPointerHandler as any, true);
     }
     if (this._globalEscapeHandler) {
-      document.removeEventListener('keydown', this._globalEscapeHandler);
+      document.removeEventListener('keydown', this._globalEscapeHandler, true);
     }
     if (this._scrollResizeHandler) {
       window.removeEventListener('scroll', this._scrollResizeHandler, true);

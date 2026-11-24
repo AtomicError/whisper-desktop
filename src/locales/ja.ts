@@ -866,6 +866,11 @@ export const ja: Translations = {
     whisperSystem: "システム",
     engineNotBundledShort: '未同梱',
     engineMissingBadge: '未検出',
+    engineReadyBadge: '準備完了',
+    engineStatusError: '状態エラー',
+    engineTooltipSource: 'ソース',
+    engineTooltipPath: 'パス',
+    engineTooltipBackends: 'バックエンド',
     trayTitle: 'ウィンドウを閉じた後もバックグラウンドで実行',
     trayDesc: 'ウィンドウを閉じてもバックグラウンドで動作を継続します。',
     autoCheckUpdatesTitle: '起動時にアップデートを確認',
@@ -873,6 +878,11 @@ export const ja: Translations = {
     uiScaleTitle: 'UI スケールと拡大率',
     uiScaleDesc: '高解像度 (4K / HiDPI) ディスプレイに合わせて画面の大きさを調整します。',
     uiScaleReset: 'リセット',
+    uiScaleZoomOut: '縮小 (Ctrl+-)',
+    uiScaleZoomIn: '拡大 (Ctrl++)',
+    uiScaleResetTooltip: 'スケールを 100% にリセット (Ctrl+0)',
+    decreaseValue: '値を減らす',
+    increaseValue: '値を増やす',
     langSpokenTitle: '音声の言語コード',
     langSpokenDesc: '音声内の話されている言語。「自動検出」を選ぶと Whisper が自動的に判別します。',
     initialPromptTitle: '初期プロンプト',
@@ -903,7 +913,7 @@ export const ja: Translations = {
     tokenTimestampsTitle: 'トークンレベルの時間軸',
     tokenTimestampsDesc: '単語ごとにミリ秒単位の高精度なタイムスタンプを生成します。',
     audioCtxTitle: '音声処理ウィンドウ長',
-    audioCtxDesc: 'コンテキストフレーム長 (ミリ秒)。0 は Whisper 標準の 30 秒です。',
+    audioCtxDesc: '音声エンコーダのコンテキストフレーム数 (0–1500。0 = モデル標準の 30 秒ウィンドウ、1500 = 30 秒全体)。',
     maxContextTitle: '直前文脈の最大保持トークン数',
     maxContextDesc: 'デコーダーに渡される直前のトークン履歴の最大数。',
     offsetTTitle: '文字起こし開始位置 (ms)',
@@ -1097,7 +1107,7 @@ export const ja: Translations = {
     tinyDiarizePoints: '<span class="setting-desc-point"><strong>条件:</strong> <code>tdrz</code> 対応モデル (例: <code>small.en-tdrz</code>) が必要です。</span>',
     bestOfPoints: '<span class="setting-desc-point"><strong>デフォルト:</strong> <code>5</code></span><span class="setting-desc-point"><strong>推奨:</strong> 高い値 (<code>6〜8</code>) で精度向上、低い値 (<code>1〜2</code>) で高速化します。</span>',
     beamSizePoints: '<span class="setting-desc-point"><strong>デフォルト:</strong> <code>5</code></span><span class="setting-desc-point"><strong>トレードオフ:</strong> 値を上げると誤認識や幻覚が減りますが、処理時間が増加します。</span>',
-    audioCtxPoints: '<span class="setting-desc-point"><strong>デフォルト:</strong> <code>0</code> (標準の 30 秒ウィンドウ)</span><span class="setting-desc-point"><strong>高度な設定:</strong> ストリーミング等で注意窓を制限したい場合に使用します。</span>',
+    audioCtxPoints: '<span class="setting-desc-point"><strong>デフォルト:</strong> <code>0</code> (モデル標準の 30 秒ウィンドウ全体を使用、<code>1500</code> フレーム相当)</span><span class="setting-desc-point"><strong>高度な設定:</strong> 短いクリップでは <code>1</code>〜<code>1500</code> フレームの間で指定して注意範囲を制限できます。</span>',
     wordTholdPoints: '<span class="setting-desc-point"><strong>デフォルト:</strong> <code>0.01</code></span><span class="setting-desc-point"><strong>変更目安:</strong> 無音部で単語の時間軸がズレる場合は <code>0.05〜0.1</code> に上げてください。</span>',
     entropyTholdPoints: '<span class="setting-desc-point"><strong>デフォルト:</strong> <code>2.4</code></span><span class="setting-desc-point"><strong>変更目安:</strong> 無意味な繰り返しが発生する場合は <code>2.2</code> に下げてください。</span>',
     logprobTholdPoints: '<span class="setting-desc-point"><strong>デフォルト:</strong> <code>-1</code></span><span class="setting-desc-point"><strong>変更目安:</strong> 雑音の多い音声で不要な再試行を防ぐには <code>-1.5</code> に下げてください。</span>',
@@ -1124,7 +1134,12 @@ export const ja: Translations = {
     polishPoints: '<span class="setting-desc-point"><strong>推奨:</strong> 機械翻訳特有の硬さを無くし、自然な字幕にするため有効化を推奨します。</span>',
     modelsTip: 'モデル設定の変更はリアルタイムで自動保存されます。行をクリックするとデフォルトモデルとして設定されます。',
     addReasoning: '推論レベルを設定',
-    noReasoning: '推論なし (通常モード)'
+    noReasoning: '推論なし (通常モード)',
+    toggleApiKeyVisibility: 'API キーの表示 / 非表示を切り替え',
+    removeModelRow: 'モデル行を削除',
+    modelIdentifierPlaceholder: '例: gpt-4o-mini',
+    contextTokensTooltip: 'コンテキストウィンドウ: {formatted} ({exact} トークン)',
+    tokensUnit: 'トークン'
   },
   logs: {
     title: '動作ログ',
@@ -1167,6 +1182,7 @@ export const ja: Translations = {
     cancelBtn: 'キャンセル',
     addProviderTitle: 'API プロバイダーを追加',
     providerName: 'プロバイダー名',
+    providerNamePlaceholder: '例: OpenRouter',
     apiFormat: 'API 規格形式',
     baseUrl: 'ベース URL',
     apiKey: 'API キー',
@@ -1305,6 +1321,8 @@ export const ja: Translations = {
     providerAddedSuccess: 'プロバイダーを追加しました！下でモデルを設定してください。',
     noProviderToTest: 'テスト対象のプロバイダーが選択されていません。',
     modelsDirNotWritable: '選択されたモデルフォルダに書き込み権限がありません:\n{error}',
-    outputDirNotWritable: '選択された出力フォルダに書き込み権限がありません:\n{error}'
+    outputDirNotWritable: '選択された出力フォルダに書き込み権限がありません:\n{error}',
+    modelIdExists: 'このプロバイダーには ID「{id}」のモデルが既に存在します。',
+    providersJsonCorrupt: '保存された AI プロバイダー一覧が無効であり、正しく読み込めませんでした。'
   }
 };

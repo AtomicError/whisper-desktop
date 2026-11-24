@@ -814,8 +814,10 @@ describe('settingsManager module', () => {
 
   describe('Stepper Bounds & Clamping', () => {
     it('returns correct bounds for threads and processors', () => {
-      expect(getStepperBounds('opt-threads')).toEqual({ min: 1, max: Infinity });
-      expect(getStepperBounds('opt-processors')).toEqual({ min: 1, max: Infinity });
+      expect(getStepperBounds('opt-threads')).toEqual({ min: 1, max: 256 });
+      expect(getStepperBounds('opt-processors')).toEqual({ min: 1, max: 64 });
+      expect(clampNumberSetting('opt-threads', 500)).toBe(256);
+      expect(clampNumberSetting('opt-processors', 500)).toBe(64);
     });
 
     it('returns correct bounds for maxContext and deviceId', () => {
@@ -2867,6 +2869,168 @@ describe('settingsManager module', () => {
         expect(appGroup.classList.contains('active')).toBe(false);
       } finally {
         vi.useRealTimers();
+      }
+    });
+
+    it('blocks confirmResetWhisperEngine when batch extraction is active via flag or batchProcessor', async () => {
+      const confirmSpy = vi.mocked(showConfirmModal);
+      confirmSpy.mockClear();
+      const invokeMock = vi.fn().mockResolvedValue(undefined);
+      (globalThis as any).__TAURI__.core.invoke = invokeMock;
+
+      const win = globalThis as any;
+      const prevBatchExtracting = win.isBatchExtracting;
+      const prevBatchProcessor = win.batchProcessor;
+      try {
+        win.isBatchExtracting = true;
+        await confirmResetWhisperEngine();
+        expect(confirmSpy).not.toHaveBeenCalled();
+        expect(invokeMock).not.toHaveBeenCalledWith('reset_whisper_core_settings', expect.anything());
+
+        win.isBatchExtracting = false;
+        win.batchProcessor = { getIsExtracting: () => true };
+        await confirmResetWhisperEngine();
+        expect(confirmSpy).not.toHaveBeenCalled();
+        expect(invokeMock).not.toHaveBeenCalledWith('reset_whisper_core_settings', expect.anything());
+      } finally {
+        win.isBatchExtracting = prevBatchExtracting;
+        win.batchProcessor = prevBatchProcessor;
+      }
+    });
+
+    it('discards stale FFmpeg, Whisper, and build status responses resolved out of order', async () => {
+      const prevSettings = getSettingsState();
+      const ffBadge = new MockElement('SPAN');
+      const wBadge = new MockElement('SPAN');
+      const backendSel = new MockElement('SELECT');
+      const optCpu = new MockElement('OPTION');
+      optCpu.value = 'Standard';
+      optCpu.textContent = 'CPU';
+      const optVulkan = new MockElement('OPTION');
+      optVulkan.value = 'Vulkan';
+      optVulkan.textContent = 'Vulkan GPU';
+      backendSel.appendChild(optCpu);
+      backendSel.appendChild(optVulkan);
+
+      elementRegistry.set('ffmpeg-status-badge', ffBadge);
+      elementRegistry.set('whisper-status-badge', wBadge);
+      elementRegistry.set('opt-selectedBackend', backendSel);
+      setSettingsState({ ffmpegSource: 'bundled', whisperSource: 'bundled', selectedBackend: 'Standard' });
+
+      let resolveFf1!: (v: any) => void;
+      let resolveFf2!: (v: any) => void;
+      let resolveWh1!: (v: any) => void;
+      let resolveWh2!: (v: any) => void;
+      let resolveBld1!: (v: boolean) => void;
+      let resolveBld2!: (v: boolean) => void;
+      let ffCalls = 0;
+      let whCalls = 0;
+      let bldCalls = 0;
+
+      (globalThis as any).__TAURI__.core.invoke = vi.fn((cmd: string, args?: any) => {
+        if (cmd === 'get_ffmpeg_status') {
+          return new Promise(res => {
+            if (++ffCalls === 1) resolveFf1 = res;
+            else resolveFf2 = res;
+          });
+        }
+        if (cmd === 'get_whisper_status') {
+          return new Promise(res => {
+            if (++whCalls === 1) resolveWh1 = res;
+            else resolveWh2 = res;
+          });
+        }
+        if (cmd === 'check_build') {
+          if (args?.backend === 'Vulkan') {
+            return new Promise<boolean>(res => {
+              if (++bldCalls === 1) resolveBld1 = res;
+              else resolveBld2 = res;
+            });
+          }
+          return Promise.resolve(args?.backend === 'Standard');
+        }
+        return Promise.resolve({});
+      });
+
+      try {
+        const ffP1 = refreshFFmpegStatus('system', false, false);
+        const ffP2 = refreshFFmpegStatus('bundled', false, false);
+        const whP1 = refreshWhisperStatus('system', false, false);
+        const whP2 = refreshWhisperStatus('bundled', false, false);
+
+        const bldP1 = refreshBuildStatuses();
+        await vi.waitFor(() => expect(typeof resolveBld1).toBe('function'));
+        const bldP2 = refreshBuildStatuses();
+        await vi.waitFor(() => expect(typeof resolveBld2).toBe('function'));
+
+        resolveFf2({ configuredSource: 'bundled', resolvedPath: '/b/ff', isAvailable: true, bundledAvailable: true, version: '7.1', errorMessage: null });
+        resolveWh2({ configuredSource: 'bundled', resolvedPath: '/b/wh', isAvailable: true, bundledAvailable: true, version: '1.9.5', availableBackends: ['Standard'], errorMessage: null });
+        resolveBld2(true);
+        await Promise.all([ffP2, whP2, bldP2]);
+
+        resolveFf1({ configuredSource: 'system', resolvedPath: '/old', isAvailable: false, bundledAvailable: true, version: 'N/A', errorMessage: 'Missing' });
+        resolveWh1({ configuredSource: 'system', resolvedPath: '/old', isAvailable: false, bundledAvailable: true, version: 'N/A', availableBackends: [], errorMessage: 'Missing' });
+        resolveBld1(false);
+        await Promise.all([ffP1, whP1, bldP1]);
+
+        expect(ffBadge.innerHTML).toContain('v7.1');
+        expect(wBadge.innerHTML).toContain('v1.9.5');
+        expect(optVulkan.disabled).toBe(false);
+      } finally {
+        setSettingsState(prevSettings);
+      }
+    });
+
+    it('restores hasUnsavedSettings on save failure and handles dirty provider flush in flushPendingSettingsOnUnload', async () => {
+      const prevSettings = getSettingsState();
+      const prevFlushProv = (globalThis as any).window.flushPendingProviderGeneralChanges;
+      const invokeMock = vi.fn().mockRejectedValueOnce(new Error('Disk full')).mockResolvedValue(true);
+      (globalThis as any).__TAURI__.core.invoke = invokeMock;
+      setSettingsState({ theme: 'royal-blue', outputSrt: true });
+
+      try {
+        // Immediate save failure must keep dirty state so unload flushes later
+        await saveCurrentSettings(true);
+        expect(invokeMock).toHaveBeenCalledTimes(1);
+
+        const dirtyFlushSpy = vi.fn().mockResolvedValue(true);
+        (globalThis as any).window.flushPendingProviderGeneralChanges = dirtyFlushSpy;
+        await flushPendingSettingsOnUnload();
+
+        expect(dirtyFlushSpy).toHaveBeenCalledTimes(1);
+        expect(invokeMock).toHaveBeenCalledTimes(2);
+      } finally {
+        (globalThis as any).window.flushPendingProviderGeneralChanges = prevFlushProv;
+        setSettingsState(prevSettings);
+      }
+    });
+
+    it('restores hidden #provider-tab-auto setting cards when switching to translation category after sub-tab search', () => {
+      const autoCard = new MockElement('DIV');
+      autoCard.className = 'setting-card';
+      autoCard.style.display = 'none';
+
+      const transTab = new MockElement('BUTTON');
+      transTab.id = 'cat-btn-translation';
+      transTab.className = 'settings-cat-btn';
+      const transGroup = new MockElement('DIV');
+      transGroup.id = 'group-translation';
+      transGroup.className = 'settings-group';
+      transGroup.appendChild(autoCard);
+      elementRegistry.set('cat-btn-translation', transTab);
+      elementRegistry.set('group-translation', transGroup);
+
+      const origQsa = (globalThis as any).document.querySelectorAll;
+      (globalThis as any).document.querySelectorAll = vi.fn((sel: string) => {
+        if (sel === '#provider-tab-auto .setting-card') return [autoCard];
+        return origQsa(sel);
+      });
+
+      try {
+        switchSettingsCategory('translation');
+        expect(autoCard.style.display).toBe('');
+      } finally {
+        (globalThis as any).document.querySelectorAll = origQsa;
       }
     });
   });

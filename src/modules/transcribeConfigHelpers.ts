@@ -115,15 +115,20 @@ export function clampIntSettingValue(key: string, raw: unknown): number {
   if (key === 'offsetT' || key === 'duration') {
     return Math.max(0, Math.min(MAX_TIMECODE_MS, parsed));
   }
-  if (key === 'threads' || key === 'processors') {
-    return Math.max(1, Math.min(MAX_I32, parsed));
+  if (key === 'threads') {
+    return Math.max(1, Math.min(256, parsed));
+  }
+  if (key === 'processors') {
+    return Math.max(1, Math.min(64, parsed));
+  }
+  if (key === 'audioCtx') {
+    return Math.max(0, Math.min(1500, parsed));
   }
   if (key === 'maxContext') {
     return Math.max(-1, Math.min(MAX_I32, parsed));
   }
   if (
     key === 'maxLen' ||
-    key === 'audioCtx' ||
     key === 'deviceId' ||
     key === 'vadMinSpeech' ||
     key === 'vadMinSil' ||
