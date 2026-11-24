@@ -381,6 +381,12 @@
   margin: 0;
 }
 
+.model-action-btn span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .model-action-btn svg {
   width: 14px;
   height: 14px;

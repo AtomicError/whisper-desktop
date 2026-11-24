@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
-import { loadResolvedHtml } from '../testUtils';
+import { loadResolvedHtml, loadSourceFile } from '../testUtils';
 import {
   transcriptViewer,
   formatMsToTimestamp,
@@ -687,6 +687,101 @@ describe('modelHub', () => {
       await modelHub.loadStatuses(false, true);
 
       expect(nextBtn.focus).toHaveBeenCalledWith({ preventScroll: true });
+    });
+
+    it('ignores stale loadModelStatusesGrid rejections after a newer refresh succeeds', async () => {
+      const { grid } = setupMinimalModelHubDom();
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      let rejectStale!: (err: Error) => void;
+      const stalePromise = new Promise((_, reject) => { rejectStale = reject; });
+
+      let callCount = 0;
+      (globalThis as any).window.invoke = vi.fn().mockImplementation((cmd: string) => {
+        if (cmd === 'get_all_models_status') {
+          callCount++;
+          if (callCount === 1) return stalePromise;
+          return Promise.resolve([
+            { name: 'tiny', sizeBytes: 77691713, downloadedBytes: 0, progress: 0, status: 'NotDownloaded' }
+          ]);
+        }
+        return Promise.resolve(null);
+      });
+
+      modelHub.setCategory('tiny', true);
+      const staleLoad = modelHub.loadStatuses(false, true);
+      const freshLoad = modelHub.loadStatuses(true, true);
+
+      await freshLoad;
+      expect(grid.children.some((c: any) => !c.isBanner && c.innerHTML.includes('ggml-tiny.bin'))).toBe(true);
+
+      rejectStale(new Error('Transient failure'));
+      await staleLoad;
+
+      expect(grid.children.some((c: any) => !c.isBanner && c.innerHTML.includes('ggml-tiny.bin'))).toBe(true);
+      expect(grid.children.some((c: any) => c.innerHTML && c.innerHTML.includes('Unable to Load Models'))).toBe(false);
+    });
+
+    it('invalidates in-flight loadModelStatusesGrid responses when downloadModelClick starts a download', async () => {
+      const { grid } = setupMinimalModelHubDom();
+
+      let resolveStale!: (val: any) => void;
+      const stalePromise = new Promise(r => { resolveStale = r; });
+
+      (globalThis as any).window.invoke = vi.fn().mockImplementation((cmd: string) => {
+        if (cmd === 'get_all_models_status') return stalePromise;
+        return Promise.resolve(undefined);
+      });
+
+      modelHub.setCategory('tiny', true);
+      const inFlightLoad = modelHub.loadStatuses(false, true);
+      await Promise.resolve();
+
+      await modelHub.download('tiny');
+
+      resolveStale([
+        { name: 'tiny', sizeBytes: 77691713, downloadedBytes: 0, progress: 0, status: 'NotDownloaded' }
+      ]);
+      await inFlightLoad;
+
+      expect(grid.children.some((c: any) => !c.isBanner && c.innerHTML.includes('ggml-tiny.bin'))).toBe(false);
+    });
+
+    it('preserves quick filter selection across global search and clear', async () => {
+      const { grid, searchInput } = setupMinimalModelHubDom();
+      (globalThis as any).window.invoke = vi.fn().mockImplementation((cmd: string) => {
+        if (cmd === 'get_all_models_status') {
+          return Promise.resolve([
+            { name: 'tiny', sizeBytes: 77691713, downloadedBytes: 0, progress: 0, status: 'NotDownloaded' },
+            { name: 'tiny.en', sizeBytes: 77704715, downloadedBytes: 0, progress: 0, status: 'NotDownloaded' },
+            { name: 'silero-v6.2.0', sizeBytes: 885098, downloadedBytes: 0, progress: 0, status: 'NotDownloaded' }
+          ]);
+        }
+        return Promise.resolve(null);
+      });
+
+      modelHub.setCategory('tiny', true);
+      modelHub.setQuickFilter('en');
+      await modelHub.loadStatuses(false, true);
+
+      // Search for silero (zero .en matches)
+      searchInput.value = 'silero';
+      await modelHub.loadStatuses(false, true);
+      expect(grid.children.filter((c: any) => !c.isBanner).length).toBe(1);
+
+      // Clear search and verify 'en' quick filter is still active for Tiny Family
+      modelHub.clearSearch();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      const cardsAfterClear = grid.children.filter((c: any) => !c.isBanner && c.attrs);
+      expect(cardsAfterClear.length).toBe(1);
+      expect(cardsAfterClear[0].getAttribute('data-model')).toBe('tiny.en');
+    });
+
+    it('resets #panel-models header title flex-basis on narrow <=600px viewports in responsive.css', () => {
+      const responsiveCss = loadSourceFile('styles/base/responsive.css');
+      expect(responsiveCss).toMatch(/#panel-models\s+\.glass-card\s*>\s*div:first-child\s*\{[^}]*flex:\s*0\s+0\s+auto\s*!important/);
     });
   });
 });

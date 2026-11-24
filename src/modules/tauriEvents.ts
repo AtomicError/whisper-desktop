@@ -14,7 +14,11 @@ import {
   updateTaskbarProgress,
   setIsTranscriptionRunning,
   setIsTranslationRunning,
-  setIsDownloadingModelRunning
+  setIsDownloadingModelRunning,
+  getIsTranscriptionRunning,
+  getIsTranscribingActive,
+  getIsTranslationRunning,
+  getIsHardsubRunning
 } from './nativeWindow';
 import { showNotification } from './appModal';
 import { scanAndPopulateModels } from './settingsManager';
@@ -518,7 +522,7 @@ export function setupTauriListeners(): void {
       if (typeof window !== 'undefined' && !isVerifying && !isConnecting && payload.phase === 'downloading') {
         window._modelStallTimers![payload.modelName] = setTimeout(() => {
           const targetCard = document.querySelector(`[data-model="${selectorName}"]`) as any;
-          if (targetCard && targetCard.querySelector('.model-btn-pause')) {
+          if (targetCard && targetCard === card && targetCard.querySelector('.model-btn-pause')) {
             const statusEl = targetCard.querySelector('.model-progress-status');
             if (statusEl) {
               targetCard._smoothedEtaSeconds = null;
@@ -579,7 +583,14 @@ export function setupTauriListeners(): void {
       if (hasRemainingDownloads) {
         updateTaskbarProgress(getAggregateModelDownloadProgress(), true);
       } else {
-        updateTaskbarProgress(0, false, payload.phase === 'failed' ? 'error' : 'normal');
+        const hasOtherActiveJob =
+          getIsTranscriptionRunning() ||
+          getIsTranscribingActive() ||
+          getIsTranslationRunning() ||
+          getIsHardsubRunning();
+        if (!hasOtherActiveJob) {
+          updateTaskbarProgress(0, false, payload.phase === 'failed' ? 'error' : 'normal');
+        }
       }
 
       // Reload grid state once

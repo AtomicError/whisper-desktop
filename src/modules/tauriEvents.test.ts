@@ -11,7 +11,12 @@ import {
   setOriginalInvoke,
   setOriginalListen
 } from './tauriEvents';
-import { getIsDownloadingModelRunning } from './nativeWindow';
+import {
+  getIsDownloadingModelRunning,
+  setIsTranscriptionRunning,
+  setIsTranslationRunning,
+  setIsHardsubRunning
+} from './nativeWindow';
 import { modelHub } from './modelHub';
 import { transcriptViewer } from './transcriptViewer';
 import { logsController } from './logsController';
@@ -120,6 +125,9 @@ describe('tauriEvents module', () => {
 
   afterEach(() => {
     cleanupTauriListeners();
+    setIsTranscriptionRunning(false);
+    setIsTranslationRunning(false);
+    setIsHardsubRunning(false);
     vi.restoreAllMocks();
   });
 
@@ -461,6 +469,44 @@ describe('tauriEvents module', () => {
 
       expect(getActiveModelDownloadNames()).toEqual(['tiny']);
       expect((globalThis as any).window._modelStallTimers.tiny).toBeUndefined();
+    });
+
+    it('preserves taskbar progress when a model download finishes while transcription is still active', async () => {
+      const handlers: Record<string, (e: any) => void> = {};
+      setOriginalListen(vi.fn().mockImplementation((event: string, handler: (e: any) => void) => {
+        handlers[event] = handler;
+        return Promise.resolve(() => {});
+      }));
+
+      const setProgressBarMock = vi.fn().mockResolvedValue(undefined);
+      (globalThis as any).window.__TAURI__ = {
+        window: {
+          getCurrentWindow: () => ({ setProgressBar: setProgressBarMock })
+        }
+      };
+
+      const loadSpy = vi.spyOn(modelHub, 'loadStatuses').mockResolvedValue(undefined);
+      (globalThis as any).window.showNotification = vi.fn();
+
+      setupTauriListeners();
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      setIsTranscriptionRunning(true);
+      handlers['model-download-status']({
+        payload: { modelName: 'tiny', phase: 'downloading', progress: 0.5, downloadedBytes: 500, totalBytes: 1000, speedBps: 100 }
+      });
+      setProgressBarMock.mockClear();
+
+      handlers['model-download-status']({
+        payload: { modelName: 'tiny', phase: 'completed', progress: 1, downloadedBytes: 1000, totalBytes: 1000, speedBps: 0 }
+      });
+
+      expect(getIsDownloadingModelRunning()).toBe(false);
+      expect(setProgressBarMock).not.toHaveBeenCalledWith({ status: 'none' });
+
+      setIsTranscriptionRunning(false);
+      loadSpy.mockRestore();
+      delete (globalThis as any).window.__TAURI__;
     });
   });
 });

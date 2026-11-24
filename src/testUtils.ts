@@ -23,3 +23,7 @@ export function loadResolvedHtml(htmlFile: string = resolve(__dirname, 'index.ht
   }
   return content;
 }
+
+export function loadSourceFile(relPathFromSrc: string): string {
+  return readFileSync(resolve(__dirname, relPathFromSrc), 'utf-8');
+}

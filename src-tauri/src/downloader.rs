@@ -386,7 +386,7 @@ impl ModelState {
     }
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelStatus {
     pub name: String,
@@ -1038,80 +1038,47 @@ struct DiscoveredModels {
 }
 
 fn scan_models_dir_single_pass(models_dir: &Path) -> DiscoveredModels {
-    let mut bins = std::collections::HashMap::new();
-    let mut tmps = std::collections::HashMap::new();
+    let mut bins: std::collections::HashMap<String, Vec<PathBuf>> = std::collections::HashMap::new();
+    let mut tmps: std::collections::HashMap<String, Vec<PathBuf>> = std::collections::HashMap::new();
     let root_canonical = models_dir.canonicalize().ok();
     let mut visited = std::collections::HashSet::new();
 
-    collect_models_single_pass(
+    let _ = walk_matching_files_recursive(
         models_dir,
         0,
         root_canonical.as_ref(),
         &mut visited,
-        &mut bins,
-        &mut tmps,
+        &mut |path, name_os| {
+            let name = name_os.to_string_lossy();
+            if name.starts_with("ggml-") {
+                if name.ends_with(".bin") {
+                    let clean = normalize_model_name(&name);
+                    bins.entry(clean).or_default().push(path);
+                } else if name.ends_with(".bin.tmp") {
+                    let base_name = name.strip_suffix(".tmp").unwrap_or(&name);
+                    let clean = normalize_model_name(base_name);
+                    tmps.entry(clean).or_default().push(path);
+                }
+            }
+            std::ops::ControlFlow::Continue(())
+        },
     );
 
     DiscoveredModels { bins, tmps }
 }
 
-fn collect_models_single_pass(
-    dir: &Path,
-    depth: usize,
-    root_canonical: Option<&PathBuf>,
-    visited: &mut std::collections::HashSet<PathBuf>,
-    bins: &mut std::collections::HashMap<String, Vec<PathBuf>>,
-    tmps: &mut std::collections::HashMap<String, Vec<PathBuf>>,
-) {
-    if depth > MAX_SEARCH_DEPTH {
-        return;
-    }
-    if let Ok(canonical) = dir.canonicalize() {
-        if !visited.insert(canonical) {
-            return;
-        }
-    }
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            let file_type = match entry.file_type() {
-                Ok(ft) => ft,
-                Err(_) => continue,
-            };
-            let is_file = file_type.is_file() || (file_type.is_symlink() && path.is_file());
-            let is_dir = if file_type.is_dir() {
-                true
-            } else if file_type.is_symlink() && path.is_dir() {
-                if let (Ok(canon_path), Some(canon_root)) = (path.canonicalize(), root_canonical) {
-                    canon_path.starts_with(canon_root)
-                } else {
-                    false
-                }
-            } else {
-                false
-            };
-
-            if is_file {
-                if let Some(name_os) = path.file_name() {
-                    let name = name_os.to_string_lossy();
-                    if name.starts_with("ggml-") {
-                        if name.ends_with(".bin") {
-                            let clean = normalize_model_name(&name);
-                            bins.entry(clean).or_default().push(path);
-                        } else if name.ends_with(".bin.tmp") {
-                            let base_name = name.strip_suffix(".tmp").unwrap_or(&name);
-                            let clean = normalize_model_name(base_name);
-                            tmps.entry(clean).or_default().push(path);
-                        }
-                    }
-                }
-            } else if is_dir {
-                let dir_name = path.file_name().unwrap_or_default().to_string_lossy();
-                if !dir_name.starts_with('.') && dir_name != "node_modules" && dir_name != "target" && dir_name != "build" {
-                    collect_models_single_pass(&path, depth + 1, root_canonical, visited, bins, tmps);
-                }
+fn ensure_models_dir_readable(dir: &Path) -> Result<(), String> {
+    match std::fs::metadata(dir) {
+        Ok(meta) => {
+            if !meta.is_dir() {
+                return Err(format!("Models path '{}' is not a directory.", dir.display()));
             }
+            std::fs::read_dir(dir)
+                .map(|_| ())
+                .map_err(|e| format!("Cannot read models directory '{}': {e}", dir.display()))
         }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(format!("Cannot access models directory '{}': {e}", dir.display())),
     }
 }
 
@@ -1143,6 +1110,7 @@ fn get_all_models_status_sync(
     models_dir: &str,
 ) -> Result<Vec<ModelStatus>, String> {
     let dir = Path::new(models_dir);
+    ensure_models_dir_readable(dir)?;
     let (active_models, verifying_models): (std::collections::HashSet<String>, std::collections::HashSet<String>) = {
         let lock = lock_session(download_state);
         let active = lock.active.keys().cloned().collect();
@@ -1230,6 +1198,9 @@ pub async fn pause_download_model(
         Some(h) => {
             h.cancel();
             h.wait_done(CANCEL_GRACE).await;
+            if !h.done.load(Ordering::Acquire) {
+                return Err("Download task is still pausing; please try again in a moment.".to_string());
+            }
             Ok(())
         }
         None => Err("No active download session found to pause.".to_string()),
@@ -1265,24 +1236,30 @@ pub async fn delete_model_file(
         }
     }
 
-    let dir = Path::new(&models_dir);
-    let Ok(canon_dir) = dir.canonicalize() else {
-        return Err(format!("Cannot verify models directory path '{}'.", models_dir));
-    };
-
-    let candidates = find_all_matching_model_files(dir, &clean_name);
+    let dir_owned = models_dir.clone();
+    let name_owned = clean_name.clone();
+    let safe_candidates = tokio::task::spawn_blocking(move || -> Result<Vec<PathBuf>, String> {
+        let dir = Path::new(&dir_owned);
+        let Ok(canon_dir) = dir.canonicalize() else {
+            return Err(format!("Cannot verify models directory path '{dir_owned}'."));
+        };
+        let candidates = find_all_matching_model_files(dir, &name_owned);
+        Ok(candidates
+            .into_iter()
+            .filter(|path| {
+                // Enforce path traversal safety: parent directory must reside inside models_dir
+                path.parent()
+                    .and_then(|p| p.canonicalize().ok())
+                    .map(|canon_parent| canon_parent.starts_with(&canon_dir))
+                    .unwrap_or(false)
+            })
+            .collect())
+    })
+    .await
+    .map_err(|e| format!("Failed to inspect model files for deletion: {e}"))??;
 
     let mut last_error = None;
-    for path in candidates {
-        // Enforce path traversal safety: parent directory must reside inside models_dir
-        let parent_is_safe = path.parent()
-            .and_then(|p| p.canonicalize().ok())
-            .map(|canon_parent| canon_parent.starts_with(&canon_dir))
-            .unwrap_or(false);
-
-        if !parent_is_safe {
-            continue;
-        }
+    for path in safe_candidates {
         match tokio::fs::remove_file(&path).await {
             Ok(()) => {}
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
@@ -1600,6 +1577,28 @@ mod tests {
         assert!(h2.is_cancelled());
         assert!(h1.done.load(Ordering::Acquire));
         assert!(h2.done.load(Ordering::Acquire));
+    }
+
+    #[test]
+    fn test_get_all_models_status_handles_missing_and_invalid_models_dir() {
+        let session = Arc::new(Mutex::new(DownloadSession::new()));
+        let base_tmp = std::env::temp_dir().join(format!("whisper_test_dir_check_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base_tmp);
+        fs::create_dir_all(&base_tmp).unwrap();
+
+        // Missing directory (fresh install) returns Ok with NotDownloaded entries
+        let missing_dir = base_tmp.join("does_not_exist_yet");
+        let ok_statuses = get_all_models_status_sync(&session, missing_dir.to_str().unwrap()).unwrap();
+        assert!(!ok_statuses.is_empty());
+        assert!(ok_statuses.iter().all(|s| s.status == "NotDownloaded"));
+
+        // Non-directory path returns Err so the UI can show the error state
+        let file_path = base_tmp.join("not_a_directory");
+        File::create(&file_path).unwrap();
+        let err = get_all_models_status_sync(&session, file_path.to_str().unwrap()).unwrap_err();
+        assert!(err.contains("not a directory"));
+
+        let _ = fs::remove_dir_all(&base_tmp);
     }
 }
 

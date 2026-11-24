@@ -541,7 +541,7 @@ function buildModelCardElement(m: ModelStatus, recInfo: any): HTMLElement {
   const showProgressBlock = m.status === 'Downloading' || m.status === 'Paused' ? 'block' : 'none';
 
   const vadBadgeHtml = m.name.startsWith('silero-')
-    ? `<span class="model-badge model-badge-vad" title="${t('models.badgeVadTitle')}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg><span>${t('models.badgeVad')}</span></span>`
+    ? `<span class="model-badge model-badge-vad" title="${escapeHTML(t('models.badgeVadTitle'))}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg><span>${t('models.badgeVad')}</span></span>`
     : '';
   const recReasonHtml = recInfo
     ? `<div class="model-rec-description">${escapeHTML(t(recInfo.reasonI18nKey) || recInfo.reasonFallback)}</div>`
@@ -817,7 +817,9 @@ function renderModelHubGrid(
     en: categoryModels.filter(m => m.name.includes('.en')).length,
     quant: categoryModels.filter(m => m.name.includes('-q5') || m.name.includes('-q8')).length
   };
-  syncQuickFilterWithCounts(counts);
+  if (!query) {
+    syncQuickFilterWithCounts(counts);
+  }
 
   const focusSnap = captureGridFocus(grid);
   const prevScrollTop = grid.scrollTop;
@@ -855,6 +857,7 @@ export async function loadModelStatusesGrid(_isSilent = false, forceRefresh = fa
     settingsState = await resolveModelHubSettings(win, invoke, loadSeq);
     if (!settingsState) return;
   } catch (e) {
+    if (loadSeq !== _loadModelsSeq) return;
     console.error("Failed to load settings in loadModelStatusesGrid:", e);
     if (gridEl) renderModelsErrorState(gridEl);
     return;
@@ -876,6 +879,7 @@ export async function loadModelStatusesGrid(_isSilent = false, forceRefresh = fa
     const grid = document.getElementById('models-list-scroll') as (HTMLElement & { _modelDelegate?: boolean }) | null;
     if (grid) renderModelHubGrid(grid, statuses || [], systemSpecs);
   } catch (err) {
+    if (loadSeq !== _loadModelsSeq) return;
     console.error("Failed to load model statuses:", err);
     if (gridEl) renderModelsErrorState(gridEl);
   }
@@ -908,6 +912,7 @@ export async function downloadModelClick(name: string): Promise<void> {
   if (!modelsDir || _modelActionsInProgress.has(name) || !invoke) return;
   _modelActionsInProgress.add(name);
   try {
+    _loadModelsSeq++;
     _cachedModelStatuses = null;
 
     const card = typeof document !== 'undefined'
