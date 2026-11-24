@@ -358,6 +358,8 @@ export const fr: Translations = {
     noSubGeneratedYet: 'Aucun sous-titre généré pour le moment',
     noOutputDirYet: 'Aucun dossier de sortie disponible pour le moment',
     outputFormats: 'Formats de sortie',
+    saveLocationSameAsInput: 'Dossier source',
+    saveLocationCustom: 'Dossier personnalisé',
     timeRange: 'Plage horaire',
     rangeFullMedia: 'Fichier entier',
     rangeCustomSlice: 'Extrait personnalisé',

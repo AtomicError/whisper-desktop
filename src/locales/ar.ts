@@ -358,6 +358,8 @@ export const ar: Translations = {
     noSubGeneratedYet: 'لم يتم استخراج ملف ترجمة بعد',
     noOutputDirYet: 'مجلد الإخراج غير متوفر بعد',
     outputFormats: 'صيغ الإخراج',
+    saveLocationSameAsInput: 'نفس مجلد المصدر',
+    saveLocationCustom: 'مجلد مخصص',
     timeRange: 'النطاق الزمني',
     rangeFullMedia: 'الملف بالكامل',
     rangeCustomSlice: 'نطاق مخصص',

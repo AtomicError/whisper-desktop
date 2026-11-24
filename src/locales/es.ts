@@ -358,6 +358,8 @@ export const es: Translations = {
     noSubGeneratedYet: 'Aún no se ha generado ningún subtítulo',
     noOutputDirYet: 'Aún no hay carpeta de salida disponible',
     outputFormats: 'Formatos de salida',
+    saveLocationSameAsInput: 'Igual que entrada',
+    saveLocationCustom: 'Carpeta propia',
     timeRange: 'Rango de tiempo',
     rangeFullMedia: 'Archivo completo',
     rangeCustomSlice: 'Rango personalizado',

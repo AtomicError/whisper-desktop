@@ -358,6 +358,8 @@ export const zh: Translations = {
     noSubGeneratedYet: '尚未生成字幕文件',
     noOutputDirYet: '输出文件夹尚不可用',
     outputFormats: '输出格式',
+    saveLocationSameAsInput: '与输入同目录',
+    saveLocationCustom: '自定义目录',
     timeRange: '时间范围',
     rangeFullMedia: '完整文件',
     rangeCustomSlice: '自定义片段',

@@ -358,6 +358,8 @@ export const ru: Translations = {
     noSubGeneratedYet: 'Субтитры еще не сгенерированы',
     noOutputDirYet: 'Папка вывода пока недоступна',
     outputFormats: 'Форматы вывода',
+    saveLocationSameAsInput: 'Как исходный файл',
+    saveLocationCustom: 'Другая папка',
     timeRange: 'Временной интервал',
     rangeFullMedia: 'Весь файл',
     rangeCustomSlice: 'Свой отрезок',

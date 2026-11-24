@@ -112,11 +112,24 @@ describe('Transcription Studio Unified Deck DOM Structure', () => {
     expect(html).toContain('id="btn-cancel-batch"');
   });
 
-  it('contains output folder picker row in the unified deck', () => {
+  it('contains Output Files Save Location controls directly below Output Formats in the unified deck', () => {
+    const formatsIdx = html.indexOf('id="quick-output-formats-group"');
+    const saveLocIdx = html.indexOf('id="quick-output-location-group"');
+    const vadIdx = html.indexOf('id="quick-toggle-vad"');
+
+    expect(formatsIdx).toBeGreaterThan(-1);
+    expect(saveLocIdx).toBeGreaterThan(formatsIdx);
+    expect(vadIdx).toBeGreaterThan(saveLocIdx);
+
+    expect(html).toContain('data-i18n="settings.outputDirModeTitle"');
+    expect(html).toContain('id="quick-output-location-modes"');
+    expect(html).toContain('id="quick-output-mode-input"');
+    expect(html).toContain('id="quick-output-mode-custom"');
+    expect(html).toContain('id="transcribe-output-custom-row"');
     expect(html).toContain('transcribe-output-row');
     expect(html).toContain('id="transcribe-output-dir-text"');
+    expect(html).toContain('id="btn-open-transcribe-dir"');
     expect(html).toContain('id="btn-browse-transcribe-dir"');
-    expect(html).toContain('id="btn-reset-transcribe-dir"');
   });
 
   it('contains telemetry HUD in the left deck actions section and not in the right panel', () => {
@@ -542,41 +555,48 @@ describe('Transcription Studio Output Directory & Workflow Logic', () => {
   interface OutputDirUiState {
     text: string;
     hasCustomPath: boolean;
-    resetBtnDisplay: string;
+    customRowDisplay: string;
+    openBtnDisabled: boolean;
     title: string | null;
   }
 
   function simulateUpdateOutputDirUI(settings: { outputDirMode: string; outputDirPath: string } | null, defaultLabel: string): OutputDirUiState {
-    const isCustom = settings && settings.outputDirMode === 'custom' && Boolean(settings.outputDirPath);
-    if (isCustom) {
+    const isCustomMode = Boolean(settings && settings.outputDirMode === 'custom');
+    const customPath = String(settings?.outputDirPath || '').trim();
+    const hasCustomPath = Boolean(customPath);
+    if (hasCustomPath) {
       return {
-        text: settings!.outputDirPath,
+        text: customPath,
         hasCustomPath: true,
-        resetBtnDisplay: 'inline-flex',
-        title: settings!.outputDirPath
+        customRowDisplay: isCustomMode ? 'block' : 'none',
+        openBtnDisabled: false,
+        title: customPath
       };
     }
     return {
-      text: defaultLabel,
+      text: isCustomMode ? 'Select output folder...' : defaultLabel,
       hasCustomPath: false,
-      resetBtnDisplay: 'none',
+      customRowDisplay: isCustomMode ? 'block' : 'none',
+      openBtnDisabled: true,
       title: null
     };
   }
 
-  it('updates output dir display correctly for source mode and custom mode', () => {
-    // Default source mode
-    const sourceState = simulateUpdateOutputDirUI({ outputDirMode: 'source', outputDirPath: '' }, 'Same as source file folder');
+  it('updates output dir display correctly for input_dir mode and custom mode', () => {
+    // Default input_dir mode
+    const sourceState = simulateUpdateOutputDirUI({ outputDirMode: 'input_dir', outputDirPath: '' }, 'Same as source file folder');
     expect(sourceState.text).toBe('Same as source file folder');
     expect(sourceState.hasCustomPath).toBe(false);
-    expect(sourceState.resetBtnDisplay).toBe('none');
+    expect(sourceState.customRowDisplay).toBe('none');
+    expect(sourceState.openBtnDisabled).toBe(true);
     expect(sourceState.title).toBeNull();
 
     // Custom output directory selected
     const customState = simulateUpdateOutputDirUI({ outputDirMode: 'custom', outputDirPath: '/home/user/Transcripts' }, 'Same as source file folder');
     expect(customState.text).toBe('/home/user/Transcripts');
     expect(customState.hasCustomPath).toBe(true);
-    expect(customState.resetBtnDisplay).toBe('inline-flex');
+    expect(customState.customRowDisplay).toBe('block');
+    expect(customState.openBtnDisabled).toBe(false);
     expect(customState.title).toBe('/home/user/Transcripts');
   });
 

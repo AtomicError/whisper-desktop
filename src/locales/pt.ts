@@ -358,6 +358,8 @@ export const pt: Translations = {
     noSubGeneratedYet: 'Nenhuma legenda gerada ainda',
     noOutputDirYet: 'Nenhuma pasta de saída disponível ainda',
     outputFormats: 'Formatos de saída',
+    saveLocationSameAsInput: 'Igual à origem',
+    saveLocationCustom: 'Pasta personalizada',
     timeRange: 'Intervalo de tempo',
     rangeFullMedia: 'Arquivo completo',
     rangeCustomSlice: 'Trecho personalizado',

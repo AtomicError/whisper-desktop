@@ -59,7 +59,8 @@ import {
   updateTranscribeUIConfigs,
   setupNumberInputControls,
   setupQuickConfigDeckEventListeners,
-  resetTranscribeOutputDir,
+  setTranscribeOutputDirMode,
+  browseTranscribeOutputDir,
   syncSettingsManagerWindowBindings,
   markSettingsDirty,
   flushPendingSettingsOnUnload,
@@ -1003,26 +1004,61 @@ describe('settingsManager module', () => {
       expect(wrap.style.display).toBe('none');
     });
 
-    it('updateTranscribeOutputDirUI displays custom directory path and reset button', () => {
+    it('updateTranscribeOutputDirUI syncs mode pills, roving tabindex, custom path row, and open-folder button across all states', () => {
+      const inputModeBtn = new MockElement('BUTTON');
+      inputModeBtn.id = 'quick-output-mode-input';
+      const customModeBtn = new MockElement('BUTTON');
+      customModeBtn.id = 'quick-output-mode-custom';
+      const customRow = new MockElement('DIV');
+      customRow.id = 'transcribe-output-custom-row';
       const dirText = new MockElement('DIV');
       dirText.id = 'transcribe-output-dir-text';
+      const openBtn = new MockElement('BUTTON');
+      openBtn.id = 'btn-open-transcribe-dir';
 
-      const resetBtn = new MockElement('BUTTON');
-      resetBtn.id = 'btn-reset-transcribe-dir';
-
+      elementRegistry.set('quick-output-mode-input', inputModeBtn);
+      elementRegistry.set('quick-output-mode-custom', customModeBtn);
+      elementRegistry.set('transcribe-output-custom-row', customRow);
       elementRegistry.set('transcribe-output-dir-text', dirText);
-      elementRegistry.set('btn-reset-transcribe-dir', resetBtn);
+      elementRegistry.set('btn-open-transcribe-dir', openBtn);
 
+      // 1. Custom mode with selected path
       setSettingsState({ outputDirMode: 'custom', outputDirPath: '/custom/output' });
       updateTranscribeOutputDirUI();
 
+      expect(inputModeBtn.classList.contains('active')).toBe(false);
+      expect(inputModeBtn.getAttribute('aria-checked')).toBe('false');
+      expect(inputModeBtn.getAttribute('tabindex')).toBe('-1');
+      expect(customModeBtn.classList.contains('active')).toBe(true);
+      expect(customModeBtn.getAttribute('aria-checked')).toBe('true');
+      expect(customModeBtn.getAttribute('tabindex')).toBe('0');
+      expect(customRow.style.display).toBe('block');
       expect(dirText.textContent).toBe('/custom/output');
-      expect(resetBtn.style.display).toBe('inline-flex');
+      expect(dirText.classList.contains('has-custom-path')).toBe(true);
+      expect(dirText.getAttribute('data-i18n')).toBeNull();
+      expect(openBtn.disabled).toBe(false);
 
-      setSettingsState({ outputDirMode: 'source', outputDirPath: '' });
+      // 2. Custom mode selected in Settings before picking a path (empty path)
+      setSettingsState({ outputDirMode: 'custom', outputDirPath: '' });
       updateTranscribeOutputDirUI();
 
-      expect(resetBtn.style.display).toBe('none');
+      expect(customModeBtn.classList.contains('active')).toBe(true);
+      expect(customModeBtn.getAttribute('tabindex')).toBe('0');
+      expect(customRow.style.display).toBe('block');
+      expect(dirText.classList.contains('has-custom-path')).toBe(false);
+      expect(dirText.getAttribute('data-i18n')).toBe('settings.outputDirSelectPlaceholder');
+      expect(openBtn.disabled).toBe(true);
+
+      // 3. Default input_dir mode
+      setSettingsState({ outputDirMode: 'input_dir', outputDirPath: '/custom/output' });
+      updateTranscribeOutputDirUI();
+
+      expect(inputModeBtn.classList.contains('active')).toBe(true);
+      expect(inputModeBtn.getAttribute('aria-checked')).toBe('true');
+      expect(inputModeBtn.getAttribute('tabindex')).toBe('0');
+      expect(customModeBtn.classList.contains('active')).toBe(false);
+      expect(customModeBtn.getAttribute('tabindex')).toBe('-1');
+      expect(customRow.style.display).toBe('none');
     });
   });
 
@@ -1509,15 +1545,16 @@ describe('settingsManager module', () => {
       win.window.batchItems = [];
     });
 
-    it('resets transcribe outputDirMode to input_dir matching Settings options', async () => {
+    it('switches transcribe outputDirMode to input_dir matching Settings options while preserving custom path', async () => {
       const optMode = new MockElement('SELECT');
       optMode.id = 'opt-outputDirMode';
       optMode.value = 'custom';
       elementRegistry.set('opt-outputDirMode', optMode);
       setSettingsState({ outputDirMode: 'custom', outputDirPath: '/tmp/out' });
 
-      await resetTranscribeOutputDir();
+      await setTranscribeOutputDirMode('input_dir');
       expect(getSettingsState()?.outputDirMode).toBe('input_dir');
+      expect(getSettingsState()?.outputDirPath).toBe('/tmp/out');
       expect(optMode.value).toBe('input_dir');
     });
 
@@ -1906,7 +1943,7 @@ describe('settingsManager module', () => {
       }
     });
 
-    it('syncs Settings #output-dir-custom-card visibility and Custom Select trigger when resetting output folder from Quick Deck', async () => {
+    it('syncs Settings #output-dir-custom-card visibility and Custom Select trigger when switching output mode to input_dir from Quick Deck', async () => {
       const optMode = new MockElement('SELECT');
       optMode.id = 'opt-outputDirMode';
       optMode.value = 'custom';
@@ -1922,7 +1959,7 @@ describe('settingsManager module', () => {
 
       try {
         setSettingsState({ outputDirMode: 'custom', outputDirPath: '/tmp/out' });
-        await resetTranscribeOutputDir();
+        await setTranscribeOutputDirMode('input_dir');
 
         expect(optMode.value).toBe('input_dir');
         expect(customCard.style.display).toBe('none');
@@ -1930,6 +1967,177 @@ describe('settingsManager module', () => {
       } finally {
         (globalThis as any).window.syncCustomSelects = prevSync;
       }
+    });
+
+    it('setTranscribeOutputDirMode switches modes, preserves custom path, and keeps Settings in sync', async () => {
+      const optMode = new MockElement('SELECT');
+      optMode.id = 'opt-outputDirMode';
+      optMode.value = 'custom';
+      const optPath = new MockElement('INPUT');
+      optPath.id = 'opt-outputDirPath';
+      optPath.value = '/saved/subs';
+      const customCard = new MockElement('DIV');
+      customCard.id = 'output-dir-custom-card';
+      const customRow = new MockElement('DIV');
+      customRow.id = 'transcribe-output-custom-row';
+      const dirText = new MockElement('DIV');
+      dirText.id = 'transcribe-output-dir-text';
+
+      elementRegistry.set(optMode.id, optMode);
+      elementRegistry.set(optPath.id, optPath);
+      elementRegistry.set(customCard.id, customCard);
+      elementRegistry.set(customRow.id, customRow);
+      elementRegistry.set(dirText.id, dirText);
+
+      setSettingsState({ outputDirMode: 'custom', outputDirPath: '/saved/subs' });
+
+      await setTranscribeOutputDirMode('input_dir');
+      expect(getSettingsState()?.outputDirMode).toBe('input_dir');
+      expect(getSettingsState()?.outputDirPath).toBe('/saved/subs');
+      expect(optMode.value).toBe('input_dir');
+      expect(customCard.style.display).toBe('none');
+      expect(customRow.style.display).toBe('none');
+
+      // Switching back to custom reuses the remembered path without invoking select_directory
+      const invokeSpy = (globalThis as any).__TAURI__.core.invoke as ReturnType<typeof vi.fn>;
+      invokeSpy.mockClear();
+
+      await setTranscribeOutputDirMode('custom');
+      expect(invokeSpy).not.toHaveBeenCalledWith('select_directory');
+      expect(getSettingsState()?.outputDirMode).toBe('custom');
+      expect(optMode.value).toBe('custom');
+      expect(customCard.style.display).toBe('flex');
+      expect(customRow.style.display).toBe('block');
+      expect(dirText.textContent).toBe('/saved/subs');
+    });
+
+    it('setTranscribeOutputDirMode(custom) opens directory picker when path is empty and stays input_dir if cancelled', async () => {
+      const optMode = new MockElement('SELECT');
+      optMode.id = 'opt-outputDirMode';
+      optMode.value = 'input_dir';
+      const optPath = new MockElement('INPUT');
+      optPath.id = 'opt-outputDirPath';
+      const customCard = new MockElement('DIV');
+      customCard.id = 'output-dir-custom-card';
+      const customRow = new MockElement('DIV');
+      customRow.id = 'transcribe-output-custom-row';
+
+      elementRegistry.set(optMode.id, optMode);
+      elementRegistry.set(optPath.id, optPath);
+      elementRegistry.set(customCard.id, customCard);
+      elementRegistry.set(customRow.id, customRow);
+
+      const invokeSpy = (globalThis as any).__TAURI__.core.invoke as ReturnType<typeof vi.fn>;
+      invokeSpy.mockImplementation(async (cmd: string) => {
+        if (cmd === 'select_directory') return null;
+        return {};
+      });
+
+      setSettingsState({ outputDirMode: 'input_dir', outputDirPath: '' });
+      await setTranscribeOutputDirMode('custom');
+
+      expect(invokeSpy).toHaveBeenCalledWith('select_directory', undefined);
+      expect(getSettingsState()?.outputDirMode).toBe('input_dir');
+      expect(optMode.value).toBe('input_dir');
+
+      // Non-writable directory keeps input_dir unchanged
+      invokeSpy.mockImplementation(async (cmd: string) => {
+        if (cmd === 'select_directory') return '/readonly/dir';
+        if (cmd === 'verify_directory_writable') throw new Error('Permission denied');
+        return {};
+      });
+      await browseTranscribeOutputDir();
+      expect(getSettingsState()?.outputDirMode).toBe('input_dir');
+      expect(getSettingsState()?.outputDirPath).toBe('');
+
+      // Now simulate choosing a writable directory
+      invokeSpy.mockImplementation(async (cmd: string) => {
+        if (cmd === 'select_directory') return '/picked/dir';
+        return {};
+      });
+
+      await setTranscribeOutputDirMode('custom');
+      expect(invokeSpy).toHaveBeenCalledWith('verify_directory_writable', { dirPath: '/picked/dir' });
+      expect(getSettingsState()?.outputDirMode).toBe('custom');
+      expect(getSettingsState()?.outputDirPath).toBe('/picked/dir');
+      expect(optMode.value).toBe('custom');
+      expect(optPath.value).toBe('/picked/dir');
+      expect(customCard.style.display).toBe('flex');
+      expect(customRow.style.display).toBe('block');
+    });
+
+    it('supports ArrowLeft/ArrowRight keyboard switching on #quick-output-location-modes radiogroup', async () => {
+      const modeGroup = new MockElement('DIV');
+      modeGroup.id = 'quick-output-location-modes';
+      const inputBtn = new MockElement('BUTTON');
+      inputBtn.id = 'quick-output-mode-input';
+      const customBtn = new MockElement('BUTTON');
+      customBtn.id = 'quick-output-mode-custom';
+      const optMode = new MockElement('SELECT');
+      optMode.id = 'opt-outputDirMode';
+      const customRow = new MockElement('DIV');
+      customRow.id = 'transcribe-output-custom-row';
+      modeGroup.appendChild(inputBtn);
+      modeGroup.appendChild(customBtn);
+
+      elementRegistry.set(modeGroup.id, modeGroup);
+      elementRegistry.set(inputBtn.id, inputBtn);
+      elementRegistry.set(customBtn.id, customBtn);
+      elementRegistry.set(optMode.id, optMode);
+      elementRegistry.set(customRow.id, customRow);
+
+      setSettingsState({ outputDirMode: 'input_dir', outputDirPath: '/saved/dir' });
+      setupQuickConfigDeckEventListeners();
+
+      modeGroup.dispatchEvent({
+        type: 'keydown',
+        key: 'ArrowRight',
+        target: inputBtn,
+        preventDefault: vi.fn()
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(customBtn.isFocused).toBe(true);
+      expect(getSettingsState()?.outputDirMode).toBe('custom');
+      expect(optMode.value).toBe('custom');
+      expect(customRow.style.display).toBe('block');
+
+      modeGroup.dispatchEvent({
+        type: 'keydown',
+        key: 'ArrowLeft',
+        target: customBtn,
+        preventDefault: vi.fn()
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(inputBtn.isFocused).toBe(true);
+      expect(getSettingsState()?.outputDirMode).toBe('input_dir');
+      expect(optMode.value).toBe('input_dir');
+      expect(customRow.style.display).toBe('none');
+
+      // Cancelling empty-path directory picker restores focus to the checked input_dir radio button
+      const invokeSpy = (globalThis as any).__TAURI__.core.invoke as ReturnType<typeof vi.fn>;
+      invokeSpy.mockImplementation(async (cmd: string) => {
+        if (cmd === 'select_directory') return null;
+        return {};
+      });
+      setSettingsState({ outputDirMode: 'input_dir', outputDirPath: '' });
+      inputBtn.isFocused = false;
+      customBtn.isFocused = false;
+
+      modeGroup.dispatchEvent({
+        type: 'keydown',
+        key: 'ArrowRight',
+        target: inputBtn,
+        preventDefault: vi.fn()
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(getSettingsState()?.outputDirMode).toBe('input_dir');
+      expect(inputBtn.isFocused).toBe(true);
+      expect(inputBtn.getAttribute('aria-checked')).toBe('true');
+      expect(customBtn.getAttribute('aria-checked')).toBe('false');
     });
 
     it('accepts Persian and Arabic digits in Settings number steppers and preserves untouched maxLen > 500 on Quick Deck blur', () => {

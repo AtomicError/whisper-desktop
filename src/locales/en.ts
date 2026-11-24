@@ -356,6 +356,8 @@ export const en = {
     noSubGeneratedYet: 'No generated subtitle yet',
     noOutputDirYet: 'No output folder available yet',
     outputFormats: 'Output Formats',
+    saveLocationSameAsInput: 'Same as Input',
+    saveLocationCustom: 'Custom Folder',
     timeRange: 'Time Range',
     rangeFullMedia: 'Full File',
     rangeCustomSlice: 'Custom Slice',

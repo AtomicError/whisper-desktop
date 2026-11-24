@@ -358,6 +358,8 @@ export const fa: Translations = {
     noSubGeneratedYet: 'هنوز زیرنویسی استخراج نشده است',
     noOutputDirYet: 'هنوز پوشه خروجی در دسترس نیست',
     outputFormats: 'فرمت‌های خروجی',
+    saveLocationSameAsInput: 'پوشه فایل ورودی',
+    saveLocationCustom: 'پوشه سفارشی',
     timeRange: 'بازهٔ زمانی',
     rangeFullMedia: 'کل فایل',
     rangeCustomSlice: 'بازهٔ دلخواه',

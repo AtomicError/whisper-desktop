@@ -358,6 +358,8 @@ export const de: Translations = {
     noSubGeneratedYet: 'Noch keine Untertiteldatei generiert',
     noOutputDirYet: 'Noch kein Ausgabeordner verfügbar',
     outputFormats: 'Ausgabeformate',
+    saveLocationSameAsInput: 'Wie Eingabedatei',
+    saveLocationCustom: 'Eigener Ordner',
     timeRange: 'Zeitbereich',
     rangeFullMedia: 'Gesamte Datei',
     rangeCustomSlice: 'Bereich wählen',

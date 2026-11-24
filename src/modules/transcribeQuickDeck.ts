@@ -653,7 +653,7 @@ function bindDeckScrollCueObserver(): void {
     const ro = new ResizeObserver(updateDeckScrollCue);
     ro.observe(deckBody);
     if (batchTableWrapper) ro.observe(batchTableWrapper);
-    ['transcribe-drop-zone', 'batch-queue-container', 'batch-queue-body', 'quick-range-inputs', 'quick-maxlen-custom-row', 'quick-adv-prompt'].forEach(childId => {
+    ['transcribe-drop-zone', 'batch-queue-container', 'batch-queue-body', 'transcribe-output-custom-row', 'quick-range-inputs', 'quick-maxlen-custom-row', 'quick-adv-prompt'].forEach(childId => {
       const child = document.getElementById(childId);
       if (child) ro.observe(child);
     });
@@ -664,9 +664,50 @@ function bindDeckScrollCueObserver(): void {
   updateDeckScrollCue();
 }
 
+function bindQuickOutputLocationKeyboard(): void {
+  const modeGroup = document.getElementById('quick-output-location-modes');
+  if (!modeGroup || (modeGroup as any)._quickBound || typeof modeGroup.addEventListener !== 'function') return;
+  (modeGroup as any)._quickBound = true;
+  modeGroup.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'ArrowUp' && e.key !== 'ArrowDown') {
+      return;
+    }
+    const target = e.target as HTMLElement | null;
+    if (!target) return;
+    const isInputBtn = target.id === 'quick-output-mode-input';
+    const isCustomBtn = target.id === 'quick-output-mode-custom';
+    if (!isInputBtn && !isCustomBtn) return;
+
+    e.preventDefault();
+    const nextMode: 'input_dir' | 'custom' = isInputBtn ? 'custom' : 'input_dir';
+    const nextBtn = document.getElementById(
+      nextMode === 'custom' ? 'quick-output-mode-custom' : 'quick-output-mode-input'
+    ) as HTMLButtonElement | null;
+    if (nextBtn && typeof nextBtn.focus === 'function') {
+      nextBtn.focus();
+    }
+
+    const result = getTranscribeDeckHost().setTranscribeOutputDirMode?.(nextMode);
+    void Promise.resolve(result).then(() => {
+      const activeMode = getSettingsState()?.outputDirMode === 'custom' ? 'custom' : 'input_dir';
+      if (activeMode === nextMode) return;
+      const activeEl = typeof document !== 'undefined' ? document.activeElement : null;
+      const focusStillInGroup = !activeEl || activeEl === nextBtn || activeEl === target;
+      if (!focusStillInGroup) return;
+      const activeBtn = document.getElementById(
+        activeMode === 'custom' ? 'quick-output-mode-custom' : 'quick-output-mode-input'
+      ) as HTMLButtonElement | null;
+      if (activeBtn && typeof activeBtn.focus === 'function') {
+        activeBtn.focus();
+      }
+    });
+  });
+}
+
 export function setupQuickConfigDeckEventListeners(): void {
   if (typeof document === 'undefined') return;
   bindQuickSelectListeners();
+  bindQuickOutputLocationKeyboard();
   bindQuickTimeRangeListeners();
   bindQuickPromptListener();
   bindQuickCustomMaxLenControl();

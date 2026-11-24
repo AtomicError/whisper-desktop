@@ -358,6 +358,8 @@ export const it: Translations = {
     noSubGeneratedYet: 'Nessun sottotitolo ancora generato',
     noOutputDirYet: 'Nessuna cartella di destinazione ancora disponibile',
     outputFormats: 'Formati di uscita',
+    saveLocationSameAsInput: 'Come sorgente',
+    saveLocationCustom: 'Cartella personalizzata',
     timeRange: 'Intervallo di tempo',
     rangeFullMedia: 'File intero',
     rangeCustomSlice: 'Intervallo personalizzato',

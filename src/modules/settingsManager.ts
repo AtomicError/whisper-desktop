@@ -116,8 +116,8 @@ declare global {
     toggleOutputDirCustomField: () => void;
     openCustomOutputDir: () => Promise<void>;
     browseOutputDir: () => Promise<void>;
+    setTranscribeOutputDirMode: (mode: 'input_dir' | 'custom') => Promise<void>;
     browseTranscribeOutputDir: () => Promise<void>;
-    resetTranscribeOutputDir: () => Promise<void>;
     updateTranscribeOutputDirUI: () => void;
     updateTranscribeUIConfigs: () => void;
     openTranscriptionSettings: () => void;
@@ -2251,7 +2251,11 @@ export async function openCustomOutputDir(): Promise<void> {
   _isOpeningOutputDir = true;
 
   const current = getSettingsState();
-  const dirPath = (current && current.outputDirPath) || (document.getElementById('opt-outputDirPath') as HTMLInputElement | null)?.value;
+  const rawDirPath =
+    (current && current.outputDirPath) ||
+    (document.getElementById('opt-outputDirPath') as HTMLInputElement | null)?.value ||
+    '';
+  const dirPath = String(rawDirPath).trim();
   if (!dirPath) {
     _isOpeningOutputDir = false;
     showNotification(t('toasts.noOutputDirFound'), "info");
@@ -2277,6 +2281,43 @@ export async function openCustomOutputDir(): Promise<void> {
   }
 }
 
+async function applySelectedCustomOutputDir(dir: string, setCustomMode: boolean): Promise<boolean> {
+  try {
+    await invoke('verify_directory_writable', { dirPath: dir });
+  } catch (permErr) {
+    showNotification(t('toasts.outputDirNotWritable', { error: String(permErr) }), "error");
+    return false;
+  }
+
+  const optPath = document.getElementById('opt-outputDirPath') as HTMLInputElement | null;
+  if (optPath) {
+    optPath.value = dir;
+    const isolated = isolateLtr(dir);
+    optPath.title = isolated;
+    if (optPath.parentElement) {
+      optPath.parentElement.title = isolated;
+    }
+  }
+
+  const current = getSettingsState();
+  if (current) {
+    if (setCustomMode) {
+      current.outputDirMode = 'custom';
+      const optMode = document.getElementById('opt-outputDirMode') as HTMLSelectElement | null;
+      if (optMode) optMode.value = 'custom';
+    }
+    current.outputDirPath = dir;
+    await saveCurrentSettings(true);
+  }
+
+  if (setCustomMode) {
+    toggleOutputDirCustomField();
+  } else {
+    updateTranscribeOutputDirUI();
+  }
+  return true;
+}
+
 export async function browseOutputDir(): Promise<void> {
   if (_isBrowsingOutputDir) return;
   _isBrowsingOutputDir = true;
@@ -2291,26 +2332,7 @@ export async function browseOutputDir(): Promise<void> {
   try {
     const dir = await invoke('select_directory');
     if (dir) {
-      try {
-        await invoke('verify_directory_writable', { dirPath: dir });
-      } catch (permErr) {
-        showNotification(t('toasts.outputDirNotWritable', { error: String(permErr) }), "error");
-        return;
-      }
-
-      if (inputEl) {
-        inputEl.value = dir;
-        inputEl.title = isolateLtr(dir);
-        if (inputEl.parentElement) {
-          inputEl.parentElement.title = isolateLtr(dir);
-        }
-      }
-      const current = getSettingsState();
-      if (current) {
-        current.outputDirPath = dir;
-        await saveCurrentSettings(true);
-      }
-      updateTranscribeOutputDirUI();
+      await applySelectedCustomOutputDir(dir, false);
     }
   } catch (err) {
     console.error('Failed to select output directory:', err);
@@ -2332,26 +2354,7 @@ export async function browseTranscribeOutputDir(): Promise<void> {
   try {
     const dir = await invoke('select_directory');
     if (dir) {
-      try {
-        await invoke('verify_directory_writable', { dirPath: dir });
-      } catch (permErr) {
-        showNotification(t('toasts.outputDirNotWritable', { error: String(permErr) }), "error");
-        return;
-      }
-      const current = getSettingsState();
-      if (current) {
-        current.outputDirMode = 'custom';
-        current.outputDirPath = dir;
-        const optMode = document.getElementById('opt-outputDirMode') as HTMLSelectElement | null;
-        if (optMode) optMode.value = 'custom';
-        const optPath = document.getElementById('opt-outputDirPath') as HTMLInputElement | null;
-        if (optPath) {
-          optPath.value = dir;
-          optPath.title = isolateLtr(dir);
-        }
-        await saveCurrentSettings(true);
-      }
-      toggleOutputDirCustomField();
+      await applySelectedCustomOutputDir(dir, true);
     }
   } catch (err) {
     console.error('Failed to select transcribe output directory:', err);
@@ -2361,47 +2364,106 @@ export async function browseTranscribeOutputDir(): Promise<void> {
   }
 }
 
-export async function resetTranscribeOutputDir(): Promise<void> {
-  const resetBtn = document.getElementById('btn-reset-transcribe-dir') as HTMLButtonElement | null;
-  if (resetBtn) resetBtn.disabled = true;
-  try {
-    const current = getSettingsState();
-    if (current) {
-      current.outputDirMode = 'input_dir';
-      current.outputDirPath = '';
-      const optMode = document.getElementById('opt-outputDirMode') as HTMLSelectElement | null;
-      if (optMode) optMode.value = 'input_dir';
-      const optPath = document.getElementById('opt-outputDirPath') as HTMLInputElement | null;
-      if (optPath) {
-        optPath.value = '';
-        optPath.removeAttribute('title');
-      }
-      await saveCurrentSettings(true);
+/**
+ * Switches output save location mode from Transcription Setup while keeping Settings in sync
+ * and preserving any previously configured custom path when returning to `input_dir`.
+ */
+export async function setTranscribeOutputDirMode(mode: 'input_dir' | 'custom'): Promise<void> {
+  const current = getSettingsState();
+  if (!current) return;
+
+  if (mode === 'custom') {
+    const existingPath = String(current.outputDirPath || '').trim();
+    if (!existingPath) {
+      await browseTranscribeOutputDir();
+      return;
     }
-    toggleOutputDirCustomField();
-  } finally {
-    if (resetBtn) resetBtn.disabled = false;
+    if (current.outputDirMode === 'custom') {
+      updateTranscribeOutputDirUI();
+      return;
+    }
+    current.outputDirMode = 'custom';
+  } else {
+    if (current.outputDirMode === 'input_dir') {
+      updateTranscribeOutputDirUI();
+      return;
+    }
+    current.outputDirMode = 'input_dir';
   }
+
+  const optMode = document.getElementById('opt-outputDirMode') as HTMLSelectElement | null;
+  if (optMode) optMode.value = current.outputDirMode;
+
+  await saveCurrentSettings(true);
+  toggleOutputDirCustomField();
 }
 
 export function updateTranscribeOutputDirUI(): void {
   if (typeof document === 'undefined') return;
-  const dirTextEl = document.getElementById('transcribe-output-dir-text');
-  const resetBtn = document.getElementById('btn-reset-transcribe-dir');
-  if (!dirTextEl || !resetBtn) return;
-
   const current = getSettingsState();
-  const isCustom = current && current.outputDirMode === 'custom' && current.outputDirPath;
-  if (isCustom) {
-    dirTextEl.textContent = current.outputDirPath;
-    dirTextEl.title = isolateLtr(current.outputDirPath);
-    dirTextEl.classList.add('has-custom-path');
-    resetBtn.style.display = 'inline-flex';
-  } else {
-    dirTextEl.textContent = t('transcribe.sameAsSource') || t('translate.sameAsSource') || 'Same as source file folder';
-    dirTextEl.removeAttribute('title');
-    dirTextEl.classList.remove('has-custom-path');
-    resetBtn.style.display = 'none';
+  const isCustomMode = Boolean(current && current.outputDirMode === 'custom');
+  const customPath = String(current?.outputDirPath || '').trim();
+  const hasCustomPath = Boolean(customPath);
+
+  const inputModeBtn = document.getElementById('quick-output-mode-input');
+  const customModeBtn = document.getElementById('quick-output-mode-custom');
+  if (inputModeBtn) {
+    inputModeBtn.classList.toggle('active', !isCustomMode);
+    if (typeof inputModeBtn.setAttribute === 'function') {
+      inputModeBtn.setAttribute('aria-checked', !isCustomMode ? 'true' : 'false');
+      inputModeBtn.setAttribute('tabindex', !isCustomMode ? '0' : '-1');
+    }
+  }
+  if (customModeBtn) {
+    customModeBtn.classList.toggle('active', isCustomMode);
+    if (typeof customModeBtn.setAttribute === 'function') {
+      customModeBtn.setAttribute('aria-checked', isCustomMode ? 'true' : 'false');
+      customModeBtn.setAttribute('tabindex', isCustomMode ? '0' : '-1');
+    }
+  }
+
+  const customRow = document.getElementById('transcribe-output-custom-row');
+  if (customRow) {
+    customRow.style.display = isCustomMode ? 'block' : 'none';
+  }
+
+  const dirTextEl = document.getElementById('transcribe-output-dir-text');
+  if (dirTextEl) {
+    if (hasCustomPath) {
+      if (typeof dirTextEl.removeAttribute === 'function') {
+        dirTextEl.removeAttribute('data-i18n');
+      }
+      dirTextEl.textContent = customPath;
+      dirTextEl.title = isolateLtr(customPath);
+      dirTextEl.classList.add('has-custom-path');
+    } else if (isCustomMode) {
+      if (typeof dirTextEl.setAttribute === 'function') {
+        dirTextEl.setAttribute('data-i18n', 'settings.outputDirSelectPlaceholder');
+      }
+      dirTextEl.textContent = t('settings.outputDirSelectPlaceholder') || 'Select output folder...';
+      if (typeof dirTextEl.removeAttribute === 'function') {
+        dirTextEl.removeAttribute('title');
+      }
+      dirTextEl.classList.remove('has-custom-path');
+    } else {
+      if (typeof dirTextEl.setAttribute === 'function') {
+        dirTextEl.setAttribute('data-i18n', 'transcribe.sameAsSource');
+      }
+      dirTextEl.textContent = t('transcribe.sameAsSource') || t('translate.sameAsSource') || 'Same as source file folder';
+      if (typeof dirTextEl.removeAttribute === 'function') {
+        dirTextEl.removeAttribute('title');
+      }
+      dirTextEl.classList.remove('has-custom-path');
+    }
+  }
+
+  const openBtn = document.getElementById('btn-open-transcribe-dir') as HTMLButtonElement | null;
+  if (openBtn) {
+    openBtn.disabled = !hasCustomPath;
+  }
+
+  if (typeof updateDeckScrollCue === 'function') {
+    updateDeckScrollCue();
   }
 }
 
@@ -2508,8 +2570,8 @@ export function syncSettingsManagerWindowBindings(): void {
   win.toggleOutputDirCustomField = toggleOutputDirCustomField;
   win.openCustomOutputDir = openCustomOutputDir;
   win.browseOutputDir = browseOutputDir;
+  win.setTranscribeOutputDirMode = setTranscribeOutputDirMode;
   win.browseTranscribeOutputDir = browseTranscribeOutputDir;
-  win.resetTranscribeOutputDir = resetTranscribeOutputDir;
   win.updateTranscribeOutputDirUI = updateTranscribeOutputDirUI;
   win.updateTranscribeUIConfigs = updateTranscribeUIConfigs;
   win.openTranscriptionSettings = openTranscriptionSettings;
@@ -2605,7 +2667,8 @@ registerTranscribeDeckHost({
   updateTranscribeOutputDirUI,
   safeApplyDynamicDirection,
   updateStepperButtonStates,
-  notifyDeckScrollCue: updateDeckScrollCue
+  notifyDeckScrollCue: updateDeckScrollCue,
+  setTranscribeOutputDirMode
 });
 
 if (typeof window !== 'undefined') {
@@ -2665,8 +2728,8 @@ export const settingsManager = {
   toggleOutputDirCustomField,
   openCustomOutputDir,
   browseOutputDir,
+  setTranscribeOutputDirMode,
   browseTranscribeOutputDir,
-  resetTranscribeOutputDir,
   updateTranscribeOutputDirUI,
   updateTranscribeUIConfigs,
   openTranscriptionSettings,

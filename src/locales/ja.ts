@@ -358,6 +358,8 @@ export const ja: Translations = {
     noSubGeneratedYet: '生成された字幕がまだありません',
     noOutputDirYet: '出力フォルダーがまだ利用できません',
     outputFormats: '出力形式',
+    saveLocationSameAsInput: '入力元と同じ',
+    saveLocationCustom: 'カスタムフォルダ',
     timeRange: '時間範囲',
     rangeFullMedia: 'ファイル全体',
     rangeCustomSlice: '範囲指定',

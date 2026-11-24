@@ -358,6 +358,8 @@ export const tr: Translations = {
     noSubGeneratedYet: 'Henüz altyazı oluşturulmadı',
     noOutputDirYet: 'Henüz çıktı klasörü mevcut değil',
     outputFormats: 'Çıktı Formatları',
+    saveLocationSameAsInput: 'Girdiyle Aynı',
+    saveLocationCustom: 'Özel Klasör',
     timeRange: 'Zaman Aralığı',
     rangeFullMedia: 'Tüm Dosya',
     rangeCustomSlice: 'Özel Aralık',

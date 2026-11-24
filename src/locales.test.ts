@@ -81,6 +81,10 @@ describe('locale consistency for speed presets', () => {
       expect(typeof transcribe.durationSeconds).toBe('string');
       expect(typeof transcribe.timecodeTooltip).toBe('string');
       expect(transcribe.timecodeTooltip).toContain('{timecode}');
+      expect(typeof transcribe.saveLocationSameAsInput).toBe('string');
+      expect(transcribe.saveLocationSameAsInput.length).toBeGreaterThan(0);
+      expect(typeof transcribe.saveLocationCustom).toBe('string');
+      expect(transcribe.saveLocationCustom.length).toBeGreaterThan(0);
     });
 
     it(`locale ${code} has all required transcribe progress and status keys`, () => {

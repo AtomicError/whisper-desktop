@@ -138,6 +138,7 @@ export interface TranscribeDeckHost {
   hasActiveMedia: () => boolean;
   getCompanionCurrentTimeSec: () => number;
   notifyDeckScrollCue: () => void;
+  setTranscribeOutputDirMode?: (mode: 'input_dir' | 'custom') => Promise<void> | void;
 }
 
 export type TranscribeDeckHostRegistration = Pick<
@@ -161,6 +162,7 @@ export type TranscribeDeckHostRegistration = Pick<
       | 'hasActiveMedia'
       | 'getCompanionCurrentTimeSec'
       | 'notifyDeckScrollCue'
+      | 'setTranscribeOutputDirMode'
     >
   >;
 
@@ -174,6 +176,7 @@ function createAmbientRuntimeAccessors(): Pick<
   | 'hasActiveMedia'
   | 'getCompanionCurrentTimeSec'
   | 'notifyDeckScrollCue'
+  | 'setTranscribeOutputDirMode'
 > {
   return {
     isBatchRangeMode: () => {
@@ -214,6 +217,10 @@ function createAmbientRuntimeAccessors(): Pick<
       if (typeof win?.updateDeckScrollCue === 'function') {
         win.updateDeckScrollCue();
       }
+    },
+    setTranscribeOutputDirMode: (mode: 'input_dir' | 'custom') => {
+      const win = getAmbientWindow();
+      return win?.setTranscribeOutputDirMode?.(mode);
     }
   };
 }

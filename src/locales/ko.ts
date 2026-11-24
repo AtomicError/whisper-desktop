@@ -358,6 +358,8 @@ export const ko: Translations = {
     noSubGeneratedYet: '아직 생성된 자막이 없습니다',
     noOutputDirYet: '사용 가능한 출력 폴더가 아직 없습니다',
     outputFormats: '출력 형식',
+    saveLocationSameAsInput: '원본 폴더와 동일',
+    saveLocationCustom: '사용자 지정',
     timeRange: '시간 범위',
     rangeFullMedia: '전체 파일',
     rangeCustomSlice: '구간 지정',
