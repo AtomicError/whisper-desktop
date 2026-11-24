@@ -337,7 +337,12 @@ export function switchModelCategory(category: string, clearSearch = true): void 
     }
 
     const gridScroll = document.getElementById('models-list-scroll');
-    if (gridScroll) gridScroll.scrollTop = 0;
+    if (gridScroll) {
+      gridScroll.scrollTop = 0;
+      if (typeof gridScroll.setAttribute === 'function') {
+        gridScroll.setAttribute('aria-labelledby', `model-cat-${category}`);
+      }
+    }
   }
 
   loadModelStatusesGrid();
@@ -505,6 +510,21 @@ function buildRecBadgeHtml(recInfo: any): string {
   return `<span class="model-badge model-badge-rec ${roleClass}">${iconMap[recInfo.role] || ''}<span>${escapeHTML(roleLabel)}</span></span>`;
 }
 
+function formatCardProgressStatus(m: ModelStatus, dlBytes: number, pct: number, isVerifying: boolean): string {
+  if (m.status === 'Downloading') {
+    if (isVerifying) return t('models.statusVerifying');
+    if (dlBytes <= 0) return t('models.statusConnecting');
+    const suffix = (t('models.statusInProgress', { size: '', pct: '' }).split('•')[1] || t('models.statusConnecting')).trim();
+    return `${formatModelDownloadProgress(dlBytes, m.sizeBytes, pct)} • ${suffix}`;
+  }
+  if (m.status === 'Paused') {
+    if (dlBytes <= 0) return t('models.badgePaused');
+    const suffix = (t('models.statusPaused', { size: '', pct: '' }).split('•')[1] || t('models.badgePaused')).trim();
+    return `${formatModelDownloadProgress(dlBytes, m.sizeBytes, pct)} • ${suffix}`;
+  }
+  return '';
+}
+
 function buildModelCardElement(m: ModelStatus, recInfo: any): HTMLElement {
   const card = document.createElement('div');
   card.className = 'setting-card';
@@ -523,30 +543,17 @@ function buildModelCardElement(m: ModelStatus, recInfo: any): HTMLElement {
   const vadBadgeHtml = m.name.startsWith('silero-')
     ? `<span class="model-badge model-badge-vad" title="${t('models.badgeVadTitle')}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg><span>${t('models.badgeVad')}</span></span>`
     : '';
-
   const recReasonHtml = recInfo
     ? `<div class="model-rec-description">${escapeHTML(t(recInfo.reasonI18nKey) || recInfo.reasonFallback)}</div>`
     : '';
-
-  let progressStatusHtml = '';
-  if (m.status === 'Downloading') {
-    if (isVerifying) {
-      progressStatusHtml = t('models.statusVerifying');
-    } else {
-      progressStatusHtml = dlBytes <= 0
-        ? t('models.statusConnecting')
-        : `${formatModelDownloadProgress(dlBytes, m.sizeBytes, pct)} • ${(t('models.statusInProgress', { size: '', pct: '' }).split('•')[1] || t('models.statusConnecting')).trim()}`;
-    }
-  } else if (m.status === 'Paused') {
-    progressStatusHtml = dlBytes <= 0
-      ? t('models.badgePaused')
-      : `${formatModelDownloadProgress(dlBytes, m.sizeBytes, pct)} • ${(t('models.statusPaused', { size: '', pct: '' }).split('•')[1] || t('models.badgePaused')).trim()}`;
-  }
+  const progressStatusHtml = formatCardProgressStatus(m, dlBytes, pct, isVerifying);
+  const barBg = m.status === 'Downloading' ? 'var(--color-cyan)' : 'var(--color-gold)';
+  const barShadow = m.status === 'Downloading' ? 'var(--shadow-neon-cyan)' : 'var(--shadow-neon-gold)';
 
   card.innerHTML = `
     <div class="setting-info">
       <div class="setting-label-row" style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap;">
-        <span class="setting-title" style="font-size: 1.05rem; font-weight: 600; color: #fff;">ggml-${safeName}.bin</span>
+        <span class="setting-title" dir="ltr" style="font-size: 1.05rem; font-weight: 600; color: #fff;">ggml-${safeName}.bin</span>
         ${buildRecBadgeHtml(recInfo)}
         ${vadBadgeHtml}
       </div>
@@ -559,7 +566,7 @@ function buildModelCardElement(m: ModelStatus, recInfo: any): HTMLElement {
           ${progressStatusHtml}
         </div>
         <div class="progress-bar-container" style="height: 6px; border-radius: 3px; background: rgba(255,255,255,0.05); overflow: hidden; border: 1px solid rgba(255,255,255,0.02);">
-          <div class="progress-bar-fill" style="width: ${pct}%; height: 100%; background: ${m.status === 'Downloading' ? 'var(--color-cyan)' : 'var(--color-gold)'}; box-shadow: ${m.status === 'Downloading' ? 'var(--shadow-neon-cyan)' : 'var(--shadow-neon-gold)'}; transition: width 0.3s ease;"></div>
+          <div class="progress-bar-fill" style="width: ${pct}%; height: 100%; background: ${barBg}; box-shadow: ${barShadow}; transition: width 0.3s ease;"></div>
         </div>
       </div>
     </div>
@@ -679,9 +686,18 @@ function renderModelsErrorState(grid: HTMLElement): void {
 
 type GridFocusSnapshot =
   | { kind: 'quickFilter'; filter: string }
-  | { kind: 'cardAction'; model: string; action: string }
+  | { kind: 'cardAction'; model: string; action: string; cardIndex: number }
   | { kind: 'gridAction'; action: string }
   | null;
+
+function focusWithoutScroll(el: HTMLElement | null): void {
+  if (!el || typeof el.focus !== 'function') return;
+  try {
+    el.focus({ preventScroll: true });
+  } catch {
+    el.focus();
+  }
+}
 
 function captureGridFocus(grid: HTMLElement): GridFocusSnapshot {
   const activeEl = typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null;
@@ -694,7 +710,11 @@ function captureGridFocus(grid: HTMLElement): GridFocusSnapshot {
   const action = activeEl.dataset?.action;
   const card = activeEl.closest('[data-model]') as HTMLElement | null;
   if (action && card?.dataset?.model) {
-    return { kind: 'cardAction', model: card.dataset.model, action };
+    const cards = typeof grid.querySelectorAll === 'function'
+      ? Array.from(grid.querySelectorAll('[data-model]'))
+      : [];
+    const cardIndex = Math.max(0, cards.indexOf(card));
+    return { kind: 'cardAction', model: card.dataset.model, action, cardIndex };
   }
   if (action) return { kind: 'gridAction', action };
   return null;
@@ -709,16 +729,116 @@ function restoreGridFocus(grid: HTMLElement, snap: GridFocusSnapshot): void {
     const cardSel = `[data-model="${escapeAttrSelector(snap.model)}"]`;
     target = grid.querySelector(`${cardSel} button[data-action="${escapeAttrSelector(snap.action)}"]`)
       || grid.querySelector(`${cardSel} button[data-action]`);
+    if (!target && typeof grid.querySelectorAll === 'function') {
+      const remainingCards = Array.from(grid.querySelectorAll('[data-model]')) as HTMLElement[];
+      if (remainingCards.length > 0) {
+        const fallbackCard = remainingCards[Math.min(snap.cardIndex, remainingCards.length - 1)];
+        target = fallbackCard?.querySelector('button[data-action]') as HTMLElement | null;
+      } else {
+        target = grid.querySelector('button[data-action="clear-search"]')
+          || (typeof document !== 'undefined' ? document.getElementById(`model-cat-${currentCategoryFilter}`) : null);
+      }
+    }
   } else if (snap.kind === 'gridAction') {
     target = grid.querySelector(`button[data-action="${escapeAttrSelector(snap.action)}"]`);
   }
-  if (target && typeof target.focus === 'function') {
-    try {
-      target.focus({ preventScroll: true });
-    } catch {
-      target.focus();
-    }
+  focusWithoutScroll(target);
+}
+
+async function resolveModelHubSettings(win: any, invoke: any, loadSeq: number): Promise<any | null> {
+  if (win.settingsState) return win.settingsState;
+  const loaded = await invoke('load_settings');
+  if (loadSeq !== _loadModelsSeq) return null;
+  win.settingsState = loaded;
+  return loaded;
+}
+
+async function resolveModelHubSpecs(win: any, invoke: any, loadSeq: number): Promise<any | null> {
+  if (win.systemSpecs) return win.systemSpecs;
+  let specs: any;
+  try {
+    specs = await invoke('get_system_specs');
+  } catch (e) {
+    console.error("Failed to load system specs:", e);
+    specs = { total_ram_gb: 8.0, cpu_cores: 4, gpu_type: 'unknown' };
   }
+  if (loadSeq !== _loadModelsSeq) return null;
+  win.systemSpecs = specs;
+  return specs;
+}
+
+async function fetchModelStatuses(
+  invoke: any,
+  modelsDir: string,
+  forceRefresh: boolean,
+  loadSeq: number
+): Promise<ModelStatus[] | null> {
+  const now = Date.now();
+  const cached = _cachedModelStatuses;
+  const hasCachedActive = Array.isArray(cached) && cached.some(m => m.status === 'Downloading');
+  if (!forceRefresh && cached && !hasCachedActive && (now - _cachedModelStatusesTime <= MODEL_STATUS_CACHE_TTL)) {
+    return cached;
+  }
+  const fresh = await invoke('get_all_models_status', { modelsDir });
+  if (loadSeq !== _loadModelsSeq) return null;
+  _cachedModelStatuses = fresh;
+  _cachedModelStatusesTime = Date.now();
+  return fresh;
+}
+
+function syncQuickFilterWithCounts(counts: { all: number; multi: number; en: number; quant: number }): void {
+  if (currentCategoryFilter === 'recommended') return;
+  if (currentModelQuickFilter === 'en' && !(counts.en > 0 && counts.en < counts.all)) {
+    currentModelQuickFilter = 'all';
+  } else if (currentModelQuickFilter === 'multi' && !(counts.multi > 0 && counts.multi < counts.all)) {
+    currentModelQuickFilter = 'all';
+  } else if (currentModelQuickFilter === 'quant' && !(counts.quant > 0 && counts.quant < counts.all)) {
+    currentModelQuickFilter = 'all';
+  }
+}
+
+function renderModelHubGrid(
+  grid: HTMLElement & { _modelDelegate?: boolean },
+  statuses: ModelStatus[],
+  systemSpecs: any
+): void {
+  const searchInput = document.getElementById('model-search') as HTMLInputElement | null;
+  const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+  const recResult = recommendModelsForSystem(systemSpecs);
+  const recMap = new Map<string, any>();
+  if (recResult?.models) {
+    Object.values(recResult.models).forEach(rec => recMap.set(rec.modelName, rec));
+  }
+
+  const categoryModels = filterCategoryModels(statuses, query, recResult);
+  const counts = {
+    all: categoryModels.length,
+    multi: categoryModels.filter(m => !m.name.includes('.en') && !m.name.startsWith('silero-')).length,
+    en: categoryModels.filter(m => m.name.includes('.en')).length,
+    quant: categoryModels.filter(m => m.name.includes('-q5') || m.name.includes('-q8')).length
+  };
+  syncQuickFilterWithCounts(counts);
+
+  const focusSnap = captureGridFocus(grid);
+  const prevScrollTop = grid.scrollTop;
+  grid.innerHTML = '';
+  attachModelGridDelegate(grid);
+
+  if (!query) {
+    const bannerHtml = renderFamilyHeaderBanner(currentCategoryFilter, counts);
+    if (bannerHtml) grid.insertAdjacentHTML('beforeend', bannerHtml);
+  }
+
+  let renderedCount = 0;
+  for (const m of categoryModels) {
+    if (!matchesQuickFilter(m.name, query)) continue;
+    grid.appendChild(buildModelCardElement(m, recMap.get(m.name)));
+    renderedCount++;
+  }
+  if (renderedCount === 0) renderModelsEmptyState(grid, query);
+
+  grid.scrollTop = prevScrollTop;
+  restoreGridFocus(grid, focusSnap);
 }
 
 export async function loadModelStatusesGrid(_isSilent = false, forceRefresh = false): Promise<void> {
@@ -730,17 +850,14 @@ export async function loadModelStatusesGrid(_isSilent = false, forceRefresh = fa
   const loadSeq = ++_loadModelsSeq;
   const gridEl = document.getElementById('models-list-scroll') as (HTMLElement & { _modelDelegate?: boolean }) | null;
 
-  let settingsState = win.settingsState;
-  if (!settingsState) {
-    try {
-      settingsState = await invoke('load_settings');
-      if (loadSeq !== _loadModelsSeq) return;
-      win.settingsState = settingsState;
-    } catch (e) {
-      console.error("Failed to load settings in loadModelStatusesGrid:", e);
-      if (gridEl) renderModelsErrorState(gridEl);
-      return;
-    }
+  let settingsState: any;
+  try {
+    settingsState = await resolveModelHubSettings(win, invoke, loadSeq);
+    if (!settingsState) return;
+  } catch (e) {
+    console.error("Failed to load settings in loadModelStatusesGrid:", e);
+    if (gridEl) renderModelsErrorState(gridEl);
+    return;
   }
 
   const modelsDir = settingsState?.modelsDir || (document.getElementById('opt-modelsDir') as HTMLInputElement)?.value;
@@ -749,87 +866,15 @@ export async function loadModelStatusesGrid(_isSilent = false, forceRefresh = fa
     return;
   }
 
-  let systemSpecs = win.systemSpecs;
-  if (!systemSpecs) {
-    try {
-      systemSpecs = await invoke('get_system_specs');
-    } catch (e) {
-      console.error("Failed to load system specs:", e);
-      systemSpecs = { total_ram_gb: 8.0, cpu_cores: 4, gpu_type: 'unknown' };
-    }
-    if (loadSeq !== _loadModelsSeq) return;
-    win.systemSpecs = systemSpecs;
-  }
-
+  const systemSpecs = await resolveModelHubSpecs(win, invoke, loadSeq);
+  if (!systemSpecs) return;
   updateSpecsSubtitle(systemSpecs);
 
   try {
-    const now = Date.now();
-    let statuses = _cachedModelStatuses;
-    const hasCachedActive = Array.isArray(statuses) && statuses.some(m => m.status === 'Downloading');
-    if (forceRefresh || !statuses || hasCachedActive || (now - _cachedModelStatusesTime > MODEL_STATUS_CACHE_TTL)) {
-      statuses = await invoke('get_all_models_status', { modelsDir });
-      if (loadSeq !== _loadModelsSeq) return;
-      _cachedModelStatuses = statuses;
-      _cachedModelStatusesTime = Date.now();
-    }
-
+    const statuses = await fetchModelStatuses(invoke, modelsDir, forceRefresh, loadSeq);
+    if (statuses === null) return;
     const grid = document.getElementById('models-list-scroll') as (HTMLElement & { _modelDelegate?: boolean }) | null;
-    if (!grid) return;
-
-    const searchInput = document.getElementById('model-search') as HTMLInputElement | null;
-    const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
-
-    const recResult = recommendModelsForSystem(systemSpecs);
-    const recMap = new Map<string, any>();
-    if (recResult?.models) {
-      Object.values(recResult.models).forEach(rec => recMap.set(rec.modelName, rec));
-    }
-
-    const categoryModels = filterCategoryModels(statuses || [], query, recResult);
-
-    const counts = {
-      all: categoryModels.length,
-      multi: categoryModels.filter(m => !m.name.includes('.en') && !m.name.startsWith('silero-')).length,
-      en: categoryModels.filter(m => m.name.includes('.en')).length,
-      quant: categoryModels.filter(m => m.name.includes('-q5') || m.name.includes('-q8')).length
-    };
-
-    if (currentCategoryFilter !== 'recommended') {
-      if (currentModelQuickFilter === 'en' && !(counts.en > 0 && counts.en < counts.all)) {
-        currentModelQuickFilter = 'all';
-      } else if (currentModelQuickFilter === 'multi' && !(counts.multi > 0 && counts.multi < counts.all)) {
-        currentModelQuickFilter = 'all';
-      } else if (currentModelQuickFilter === 'quant' && !(counts.quant > 0 && counts.quant < counts.all)) {
-        currentModelQuickFilter = 'all';
-      }
-    }
-
-    const focusSnap = captureGridFocus(grid);
-    const prevScrollTop = grid.scrollTop;
-    grid.innerHTML = '';
-    attachModelGridDelegate(grid);
-
-    if (!query) {
-      const bannerHtml = renderFamilyHeaderBanner(currentCategoryFilter, counts);
-      if (bannerHtml) {
-        grid.insertAdjacentHTML('beforeend', bannerHtml);
-      }
-    }
-
-    let renderedCount = 0;
-    for (const m of categoryModels) {
-      if (!matchesQuickFilter(m.name, query)) continue;
-      grid.appendChild(buildModelCardElement(m, recMap.get(m.name)));
-      renderedCount++;
-    }
-
-    if (renderedCount === 0) {
-      renderModelsEmptyState(grid, query);
-    }
-
-    grid.scrollTop = prevScrollTop;
-    restoreGridFocus(grid, focusSnap);
+    if (grid) renderModelHubGrid(grid, statuses || [], systemSpecs);
   } catch (err) {
     console.error("Failed to load model statuses:", err);
     if (gridEl) renderModelsErrorState(gridEl);
@@ -844,8 +889,8 @@ export function filterModelsGrid(): void {
     win.applyDynamicDirection(searchInput);
   }
   const clearBtn = document.getElementById('model-search-clear');
-  const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
-  if (clearBtn) clearBtn.style.display = query ? 'flex' : 'none';
+  const hasInput = Boolean(searchInput && searchInput.value.length > 0);
+  if (clearBtn) clearBtn.style.display = hasInput ? 'flex' : 'none';
 
   cancelModelSearchDebounce();
   _filterDebounceTimer = setTimeout(() => {

@@ -6,6 +6,7 @@ import {
   applyDynamicDirection,
   refreshDynamicDirectionInputs,
   setupDynamicDirectionInputs,
+  setupResponsiveMenuFadeIn,
   setupVerticalTabKeyboardNavigation,
   getCurrentSourceMediaFile
 } from './appNavigation';
@@ -410,6 +411,29 @@ describe('appNavigation module', () => {
       const nextClickSpy = vi.spyOn(catTabs[1], 'click');
       catTabs[0].dispatchEvent({ key: 'ArrowRight', type: 'keydown', preventDefault: vi.fn() });
       expect(nextClickSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('syncs aria-orientation on .settings-categories[role="tablist"] at the 960px breakpoint', () => {
+      const tablist = new MockElement('DIV');
+      tablist.id = 'model-categories-sidebar';
+      tablist.setAttribute('aria-orientation', 'vertical');
+
+      let changeHandler: ((e: any) => void) | null = null;
+      const origQsa = (globalThis as any).document.querySelectorAll;
+      (globalThis as any).document.querySelectorAll = (selector: string) => {
+        if (selector === '.settings-categories[role="tablist"]') return [tablist];
+        return origQsa(selector);
+      };
+      (globalThis as any).window.matchMedia = () => ({
+        matches: true,
+        addEventListener: (_ev: string, cb: (e: any) => void) => { changeHandler = cb; }
+      });
+
+      setupResponsiveMenuFadeIn();
+      expect(tablist.getAttribute('aria-orientation')).toBe('horizontal');
+
+      changeHandler?.({ matches: false });
+      expect(tablist.getAttribute('aria-orientation')).toBe('vertical');
     });
   });
 });

@@ -1597,6 +1597,7 @@ fn main() {
             let app = app.clone();
             let exit_state = exit_state.clone();
             tauri::async_runtime::spawn(async move {
+                downloader::shutdown_downloads(&app.state::<DownloadState>().0).await;
                 app.state::<media_preview::PreviewState>().shutdown().await;
                 app.state::<Arc<video_server::MediaServer>>().shutdown().await;
                 cleanup_transcript_cache(&app);

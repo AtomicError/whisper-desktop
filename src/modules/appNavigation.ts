@@ -191,6 +191,11 @@ export function setupResponsiveMenuFadeIn(): void {
   const sidebarMql = window.matchMedia('(max-width: 960px)');
 
   const handler = (e: MediaQueryList | MediaQueryListEvent) => {
+    const tablists = document.querySelectorAll('.settings-categories[role="tablist"]');
+    tablists.forEach(tl => {
+      tl.setAttribute('aria-orientation', e.matches ? 'horizontal' : 'vertical');
+    });
+
     const sidebar = document.querySelector('sidebar');
     if (!sidebar) return;
 

@@ -29,6 +29,8 @@ const MAX_RETRY_AFTER_SECS: u64 = 30;
 /// How long delete waits for an active task to observe cancellation and
 /// release its file handles (covers the post-download hash pass too).
 const CANCEL_GRACE: Duration = Duration::from_secs(5);
+/// Bounded grace period for cancelling and flushing active downloads on app exit.
+const EXIT_DRAIN_TIMEOUT: Duration = Duration::from_secs(2);
 
 // ---------------------------------------------------------------------------
 // Model catalog — sizes and SHA-256 digests verified against the Hugging Face
@@ -282,6 +284,27 @@ fn unregister_if_owned(
     }
 }
 
+/// Cancels all active model downloads and waits briefly for them to flush
+/// buffered bytes and release file handles before application exit.
+pub async fn shutdown_downloads(session: &Arc<Mutex<DownloadSession>>) {
+    let handles: Vec<Arc<DownloadHandle>> = {
+        let lock = lock_session(session);
+        lock.active.values().cloned().collect()
+    };
+    if handles.is_empty() {
+        return;
+    }
+    for h in &handles {
+        h.cancel();
+    }
+    futures_util::future::join_all(
+        handles
+            .into_iter()
+            .map(|h| async move { h.wait_done(EXIT_DRAIN_TIMEOUT).await }),
+    )
+    .await;
+}
+
 // ---------------------------------------------------------------------------
 // Event payloads
 // ---------------------------------------------------------------------------
@@ -464,7 +487,13 @@ pub fn start_download(
                 make_payload(&clean_name, Phase::Paused, *bytes_so_far, expected_size, 0.0, None)
             }
             Err(e) => {
-                let bytes_so_far = partial_bytes(Path::new(&models_dir), &clean_name);
+                let dir_owned = models_dir.clone();
+                let name_owned = clean_name.clone();
+                let bytes_so_far = tokio::task::spawn_blocking(move || {
+                    partial_bytes(Path::new(&dir_owned), &name_owned)
+                })
+                .await
+                .unwrap_or(0);
                 if handle.is_cancelled() {
                     make_payload(&clean_name, Phase::Paused, bytes_so_far, expected_size, 0.0, None)
                 } else {
@@ -920,51 +949,16 @@ fn find_file_recursive(
     root_canonical: Option<&PathBuf>,
     visited: &mut std::collections::HashSet<PathBuf>,
 ) -> Option<PathBuf> {
-    if depth > MAX_SEARCH_DEPTH {
-        return None;
-    }
-    if let Ok(canonical) = dir.canonicalize() {
-        if !visited.insert(canonical) {
-            return None;
+    let mut found = None;
+    let _ = walk_matching_files_recursive(dir, depth, root_canonical, visited, &mut |path, name| {
+        if name == target_name {
+            found = Some(path);
+            std::ops::ControlFlow::Break(())
+        } else {
+            std::ops::ControlFlow::Continue(())
         }
-    }
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            let file_type = match entry.file_type() {
-                Ok(ft) => ft,
-                Err(_) => continue,
-            };
-            let is_file = file_type.is_file() || (file_type.is_symlink() && path.is_file());
-            let is_dir = if file_type.is_dir() {
-                true
-            } else if file_type.is_symlink() && path.is_dir() {
-                if let (Ok(canon_path), Some(canon_root)) = (path.canonicalize(), root_canonical) {
-                    canon_path.starts_with(canon_root)
-                } else {
-                    false
-                }
-            } else {
-                false
-            };
-
-            if is_file {
-                if let Some(name) = path.file_name() {
-                    if name == target_name {
-                        return Some(path);
-                    }
-                }
-            } else if is_dir {
-                let dir_name = path.file_name().unwrap_or_default().to_string_lossy();
-                if !dir_name.starts_with('.') && dir_name != "node_modules" && dir_name != "target" && dir_name != "build" {
-                    if let Some(found) = find_file_recursive(&path, target_name, depth + 1, root_canonical, visited) {
-                        return Some(found);
-                    }
-                }
-            }
-        }
-    }
-    None
+    });
+    found
 }
 
 fn collect_files_recursive(
@@ -976,12 +970,27 @@ fn collect_files_recursive(
     visited: &mut std::collections::HashSet<PathBuf>,
     matches: &mut Vec<PathBuf>,
 ) {
+    let _ = walk_matching_files_recursive(dir, depth, root_canonical, visited, &mut |path, name| {
+        if name == target_bin || name == target_tmp {
+            matches.push(path);
+        }
+        std::ops::ControlFlow::Continue(())
+    });
+}
+
+fn walk_matching_files_recursive(
+    dir: &Path,
+    depth: usize,
+    root_canonical: Option<&PathBuf>,
+    visited: &mut std::collections::HashSet<PathBuf>,
+    on_file: &mut impl FnMut(PathBuf, &std::ffi::OsStr) -> std::ops::ControlFlow<()>,
+) -> std::ops::ControlFlow<()> {
     if depth > MAX_SEARCH_DEPTH {
-        return;
+        return std::ops::ControlFlow::Continue(());
     }
     if let Ok(canonical) = dir.canonicalize() {
         if !visited.insert(canonical) {
-            return;
+            return std::ops::ControlFlow::Continue(());
         }
     }
     if let Ok(entries) = std::fs::read_dir(dir) {
@@ -1005,19 +1014,22 @@ fn collect_files_recursive(
             };
 
             if is_file {
-                if let Some(name) = path.file_name() {
-                    if name == target_bin || name == target_tmp {
-                        matches.push(path);
+                if let Some(name) = path.file_name().map(|n| n.to_os_string()) {
+                    if on_file(path, &name).is_break() {
+                        return std::ops::ControlFlow::Break(());
                     }
                 }
             } else if is_dir {
                 let dir_name = path.file_name().unwrap_or_default().to_string_lossy();
                 if !dir_name.starts_with('.') && dir_name != "node_modules" && dir_name != "target" && dir_name != "build" {
-                    collect_files_recursive(&path, target_bin, target_tmp, depth + 1, root_canonical, visited, matches);
+                    if walk_matching_files_recursive(&path, depth + 1, root_canonical, visited, on_file).is_break() {
+                        return std::ops::ControlFlow::Break(());
+                    }
                 }
             }
         }
     }
+    std::ops::ControlFlow::Continue(())
 }
 
 struct DiscoveredModels {
@@ -1558,6 +1570,36 @@ mod tests {
         assert!(!corrupted_sub.exists());
 
         let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[tokio::test]
+    async fn test_shutdown_downloads_cancels_and_waits_for_active_tasks() {
+        let session = Arc::new(Mutex::new(DownloadSession::new()));
+        let h1 = Arc::new(DownloadHandle::new());
+        let h2 = Arc::new(DownloadHandle::new());
+        {
+            let mut lock = session.lock().unwrap();
+            lock.active.insert("tiny".to_string(), Arc::clone(&h1));
+            lock.active.insert("base".to_string(), Arc::clone(&h2));
+        }
+
+        let h1_clone = Arc::clone(&h1);
+        let h2_clone = Arc::clone(&h2);
+        tokio::spawn(async move {
+            h1_clone.wait_cancelled().await;
+            h1_clone.mark_done();
+        });
+        tokio::spawn(async move {
+            h2_clone.wait_cancelled().await;
+            h2_clone.mark_done();
+        });
+
+        shutdown_downloads(&session).await;
+
+        assert!(h1.is_cancelled());
+        assert!(h2.is_cancelled());
+        assert!(h1.done.load(Ordering::Acquire));
+        assert!(h2.done.load(Ordering::Acquire));
     }
 }
 

@@ -318,6 +318,7 @@
     margin-top: 0 !important;
   }
   #panel-models .setting-info {
+    flex: 1 1 auto !important;
     padding-inline-end: 0 !important;
   }
 }

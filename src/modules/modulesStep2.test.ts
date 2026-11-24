@@ -615,6 +615,78 @@ describe('modelHub', () => {
       expect(clearMatch).toBeTruthy();
       expect(clearMatch![0]).toContain('data-i18n-title="models.emptyClearSearch"');
       expect(clearMatch![0]).toContain('data-i18n-aria="models.emptyClearSearch"');
+
+      const searchMatch = html.match(/id="model-search"[^>]*>/);
+      expect(searchMatch).toBeTruthy();
+      expect(searchMatch![0]).toContain('data-i18n-aria="models.searchPlaceholder"');
+
+      const scrollMatch = html.match(/id="models-list-scroll"[^>]*>/);
+      expect(scrollMatch).toBeTruthy();
+      expect(scrollMatch![0]).toContain('role="tabpanel"');
+      expect(scrollMatch![0]).toContain('aria-labelledby="model-cat-recommended"');
+    });
+
+    it('renders model filename title with dir="ltr" and updates tabpanel aria-labelledby on category switch', async () => {
+      const { grid } = setupMinimalModelHubDom();
+      const gridAttrs = new Map<string, string>();
+      grid.setAttribute = (k: string, v: string) => gridAttrs.set(k, v);
+      grid.getAttribute = (k: string) => gridAttrs.get(k) || null;
+
+      (globalThis as any).window.invoke = vi.fn().mockImplementation((cmd: string) => {
+        if (cmd === 'get_all_models_status') {
+          return Promise.resolve([
+            { name: 'tiny', sizeBytes: 77691713, downloadedBytes: 0, progress: 0, status: 'NotDownloaded' }
+          ]);
+        }
+        return Promise.resolve(null);
+      });
+
+      modelHub.setCategory('tiny', true);
+      await modelHub.loadStatuses(false, true);
+
+      expect(grid.getAttribute('aria-labelledby')).toBe('model-cat-tiny');
+      const card = grid.children.find((c: any) => !c.isBanner);
+      expect(card.innerHTML).toContain('<span class="setting-title" dir="ltr"');
+    });
+
+    it('restores keyboard focus to the next card or category tab when a deleted model disappears from local list', async () => {
+      const { grid } = setupMinimalModelHubDom();
+      const nextBtn = { focus: vi.fn() };
+      const tinyCard = { dataset: { model: 'tiny' } };
+      const activeDelBtn = {
+        dataset: { action: 'delete' },
+        closest: (sel: string) => {
+          if (sel === '#models-list-scroll') return grid;
+          if (sel === '[data-model]') return tinyCard;
+          return null;
+        }
+      };
+
+      const remainingCard = {
+        dataset: { model: 'base' },
+        querySelector: (sel: string) => (sel === 'button[data-action]' ? nextBtn : null)
+      };
+
+      grid.querySelectorAll = (sel: string) => {
+        if (sel === '[data-model]') return grid.children.length === 0 ? [tinyCard] : [remainingCard];
+        return [];
+      };
+      grid.querySelector = () => null;
+
+      (globalThis as any).document.activeElement = activeDelBtn;
+      (globalThis as any).window.invoke = vi.fn().mockImplementation((cmd: string) => {
+        if (cmd === 'get_all_models_status') {
+          return Promise.resolve([
+            { name: 'base', sizeBytes: 147951465, downloadedBytes: 147951465, progress: 1, status: 'Downloaded' }
+          ]);
+        }
+        return Promise.resolve(null);
+      });
+
+      modelHub.setCategory('local', true);
+      await modelHub.loadStatuses(false, true);
+
+      expect(nextBtn.focus).toHaveBeenCalledWith({ preventScroll: true });
     });
   });
 });
