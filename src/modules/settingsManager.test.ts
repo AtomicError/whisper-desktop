@@ -3241,5 +3241,46 @@ describe('settingsManager module', () => {
         (globalThis as any).document.querySelectorAll = origQsa;
       }
     });
+
+    it('prompts and pauses active model downloads before switching modelsDir in browseModelsDirectory', async () => {
+      const prevSettings = settingsManager.getSettingsState();
+      const prevGetActive = (globalThis as any).window.getActiveModelDownloadNames;
+
+      const modelsInput = new MockElement('INPUT');
+      modelsInput.id = 'opt-modelsDir';
+      modelsInput.value = '/old/models';
+      elementRegistry.set('opt-modelsDir', modelsInput);
+
+      setSettingsState({ selectedBackend: 'Standard', modelsDir: '/old/models' });
+      (globalThis as any).window.getActiveModelDownloadNames = vi.fn(() => ['small']);
+
+      const invokeSpy = vi.fn().mockImplementation((cmd: string) => {
+        if (cmd === 'select_directory') return Promise.resolve('/new/models');
+        if (cmd === 'verify_directory_writable') return Promise.resolve(true);
+        if (cmd === 'pause_download_model') return Promise.resolve(undefined);
+        if (cmd === 'scan_models') return Promise.resolve({ transModels: [], vadModels: [] });
+        return Promise.resolve(undefined);
+      });
+      (globalThis as any).__TAURI__.core.invoke = invokeSpy;
+      const confirmSpy = vi.mocked(showConfirmModal);
+
+      try {
+        // Case 1: User cancels modal -> directory must NOT change and download must NOT pause
+        confirmSpy.mockResolvedValueOnce(false);
+        await settingsManager.browseModelsDirectory();
+        expect(settingsManager.getSettingsState()?.modelsDir).toBe('/old/models');
+        expect(invokeSpy).not.toHaveBeenCalledWith('pause_download_model', expect.anything());
+
+        // Case 2: User confirms -> active downloads pause, then directory updates
+        confirmSpy.mockResolvedValueOnce(true);
+        await settingsManager.browseModelsDirectory();
+        expect(invokeSpy).toHaveBeenCalledWith('pause_download_model', { modelName: 'small' });
+        expect(settingsManager.getSettingsState()?.modelsDir).toBe('/new/models');
+        expect(modelsInput.value).toBe('/new/models');
+      } finally {
+        (globalThis as any).window.getActiveModelDownloadNames = prevGetActive;
+        setSettingsState(prevSettings);
+      }
+    });
   });
 });

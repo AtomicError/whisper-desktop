@@ -133,6 +133,9 @@ fn model_url(clean_name: &str) -> String {
 pub struct DownloadHandle {
     pub cancelled: AtomicBool,
     cancel_tx: watch::Sender<bool>,
+    /// Set while SHA-256 verification/promotion runs so status polling keeps
+    /// showing the verifying state across category or view switches.
+    pub verifying: AtomicBool,
     /// Set by the owning task right after its terminal event, so file-bound
     /// commands (pause/delete) can wait until every file handle is released.
     pub done: AtomicBool,
@@ -146,9 +149,18 @@ impl DownloadHandle {
         DownloadHandle {
             cancelled: AtomicBool::new(false),
             cancel_tx,
+            verifying: AtomicBool::new(false),
             done: AtomicBool::new(false),
             done_tx,
         }
+    }
+
+    pub fn is_verifying(&self) -> bool {
+        self.verifying.load(Ordering::Acquire)
+    }
+
+    pub fn set_verifying(&self, val: bool) {
+        self.verifying.store(val, Ordering::Release);
     }
 
     pub fn is_cancelled(&self) -> bool {
@@ -359,6 +371,7 @@ pub struct ModelStatus {
     pub size_bytes: u64,
     pub downloaded_bytes: u64,
     pub progress: f64,
+    pub verifying: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -708,17 +721,26 @@ async fn finalize(
         return Ok(DownloadOutcome::Cancelled(tmp_len));
     }
 
+    handle.set_verifying(true);
     emit_progress(
         app,
         make_payload(clean_name, Phase::Verifying, tmp_len, expected_size, 0.0, None),
     );
 
-    let (actual_len, actual_hash) = match finalize_verify_only(handle, tmp_path).await? {
-        VerifyOutcome::Verified(len, hash) => (len, hash),
-        VerifyOutcome::Cancelled(len) => return Ok(DownloadOutcome::Cancelled(len)),
+    let (actual_len, actual_hash) = match finalize_verify_only(handle, tmp_path).await {
+        Ok(VerifyOutcome::Verified(len, hash)) => (len, hash),
+        Ok(VerifyOutcome::Cancelled(len)) => {
+            handle.set_verifying(false);
+            return Ok(DownloadOutcome::Cancelled(len));
+        }
+        Err(e) => {
+            handle.set_verifying(false);
+            return Err(e);
+        }
     };
 
     if actual_hash != expected_hash {
+        handle.set_verifying(false);
         let _ = tokio::fs::remove_file(tmp_path).await;
         return Err(format!(
             "Checksum mismatch for {} (corrupted download discarded). Please retry.",
@@ -727,6 +749,7 @@ async fn finalize(
     }
 
     if expected_size > 0 && actual_len != expected_size {
+        handle.set_verifying(false);
         let _ = tokio::fs::remove_file(tmp_path).await;
         return Err(format!(
             "Size mismatch for {}: got {actual_len}, expected {expected_size}.",
@@ -735,10 +758,13 @@ async fn finalize(
     }
 
     if handle.is_cancelled() {
+        handle.set_verifying(false);
         return Ok(DownloadOutcome::Cancelled(actual_len));
     }
 
-    finalize_promote_file(tmp_path, bin_path).await?;
+    let promote_res = finalize_promote_file(tmp_path, bin_path, clean_name, expected_size).await;
+    handle.set_verifying(false);
+    promote_res?;
     Ok(DownloadOutcome::Completed(actual_len))
 }
 
@@ -753,7 +779,12 @@ async fn finalize_verify_only(
         .map_err(|e| format!("Verification task failed: {e}"))?
 }
 
-async fn finalize_promote_file(tmp_path: &Path, bin_path: &Path) -> Result<(), String> {
+async fn finalize_promote_file(
+    tmp_path: &Path,
+    bin_path: &Path,
+    clean_name: &str,
+    expected_size: u64,
+) -> Result<(), String> {
     // Windows compatibility: Remove destination if already existing before rename
     if bin_path.exists() {
         let _ = tokio::fs::remove_file(bin_path).await;
@@ -767,11 +798,30 @@ async fn finalize_promote_file(tmp_path: &Path, bin_path: &Path) -> Result<(), S
         let _ = tokio::fs::remove_file(tmp_path).await;
     }
 
-    // Clean up any remaining legacy temporary file
-    let legacy_tmp = bin_path.parent().map(|p| p.join("models").join(tmp_path.file_name().unwrap_or_default()));
-    if let Some(leg) = legacy_tmp {
-        if leg != tmp_path && leg.exists() {
-            let _ = tokio::fs::remove_file(leg).await;
+    // Clean up any remaining legacy temporary file or stale corrupted .bin duplicates in subdirectories
+    if let Some(models_dir) = bin_path.parent() {
+        let legacy_tmp = models_dir.join("models").join(tmp_path.file_name().unwrap_or_default());
+        if legacy_tmp != tmp_path && legacy_tmp.exists() {
+            let _ = tokio::fs::remove_file(legacy_tmp).await;
+        }
+
+        let canon_bin = bin_path.canonicalize().ok();
+        let expected_bin_name = format!("ggml-{clean_name}.bin");
+        for candidate in find_all_matching_model_files(models_dir, clean_name) {
+            let is_bin_match = candidate.file_name().is_some_and(|n| n == expected_bin_name.as_str());
+            if !is_bin_match {
+                continue;
+            }
+            let is_promoted = canon_bin.as_ref().is_some_and(|b| candidate.canonicalize().ok().as_ref() == Some(b))
+                || candidate == bin_path;
+            if is_promoted {
+                continue;
+            }
+            let wrong_size = expected_size > 0
+                && candidate.metadata().map(|m| m.len() != expected_size).unwrap_or(false);
+            if wrong_size {
+                let _ = tokio::fs::remove_file(candidate).await;
+            }
         }
     }
 
@@ -1081,9 +1131,16 @@ fn get_all_models_status_sync(
     models_dir: &str,
 ) -> Result<Vec<ModelStatus>, String> {
     let dir = Path::new(models_dir);
-    let active_models: std::collections::HashSet<String> = match download_state.lock() {
-        Ok(lock) => lock.active.keys().cloned().collect(),
-        Err(poisoned) => poisoned.into_inner().active.keys().cloned().collect(),
+    let (active_models, verifying_models): (std::collections::HashSet<String>, std::collections::HashSet<String>) = {
+        let lock = lock_session(download_state);
+        let active = lock.active.keys().cloned().collect();
+        let verifying = lock
+            .active
+            .iter()
+            .filter(|(_, h)| h.is_verifying())
+            .map(|(k, _)| k.clone())
+            .collect();
+        (active, verifying)
     };
 
     let is_valid_bin = |p: &Path, expected: u64| -> bool {
@@ -1121,12 +1178,18 @@ fn get_all_models_status_sync(
             (ModelState::NotDownloaded, 0)
         };
 
+        let is_verifying = state == ModelState::Downloading && verifying_models.contains(m);
         let progress = match state {
             ModelState::Downloaded => 1.0,
+            _ if is_verifying => 1.0,
             _ if expected_size > 0 => downloaded_bytes as f64 / expected_size as f64,
             _ => 0.0,
         };
-        let progress = progress.min(if state == ModelState::Downloading || state == ModelState::Paused { 0.99 } else { 1.0 });
+        let progress = if is_verifying {
+            1.0
+        } else {
+            progress.min(if state == ModelState::Downloading || state == ModelState::Paused { 0.99 } else { 1.0 })
+        };
 
         result.push(ModelStatus {
             name: m.to_string(),
@@ -1134,6 +1197,7 @@ fn get_all_models_status_sync(
             size_bytes: expected_size,
             downloaded_bytes,
             progress,
+            verifying: is_verifying,
         });
     }
 
@@ -1444,6 +1508,56 @@ mod tests {
 
         headers.insert(reqwest::header::RETRY_AFTER, "999".parse().unwrap());
         assert_eq!(parse_retry_after(&headers, 1), Duration::from_secs(MAX_RETRY_AFTER_SECS));
+    }
+
+    #[test]
+    fn test_get_all_models_status_reports_verifying_state() {
+        let temp_dir = std::env::temp_dir().join(format!("whisper_test_verifying_status_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&temp_dir);
+        fs::create_dir_all(&temp_dir).unwrap();
+
+        let (expected_size, _) = model_catalog("tiny").unwrap();
+        let tmp_path = temp_dir.join("ggml-tiny.bin.tmp");
+        File::create(&tmp_path).unwrap().set_len(expected_size).unwrap();
+
+        let session = Arc::new(Mutex::new(DownloadSession::new()));
+        let handle = Arc::new(DownloadHandle::new());
+        handle.set_verifying(true);
+        session.lock().unwrap().active.insert("tiny".to_string(), handle);
+
+        let statuses = get_all_models_status_sync(&session, temp_dir.to_str().unwrap()).unwrap();
+        let tiny = statuses.into_iter().find(|s| s.name == "tiny").unwrap();
+        assert_eq!(tiny.status, "Downloading");
+        assert!(tiny.verifying);
+        assert_eq!(tiny.progress, 1.0);
+
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[tokio::test]
+    async fn test_finalize_promote_file_cleans_corrupted_subdir_duplicate() {
+        let temp_dir = std::env::temp_dir().join(format!("whisper_test_promote_clean_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&temp_dir);
+        let sub_dir = temp_dir.join("stale");
+        fs::create_dir_all(&sub_dir).unwrap();
+
+        let (expected_size, _) = model_catalog("silero-v5.1.2").unwrap();
+        let corrupted_sub = sub_dir.join("ggml-silero-v5.1.2.bin");
+        fs::write(&corrupted_sub, b"corrupted").unwrap();
+
+        let tmp_path = temp_dir.join("ggml-silero-v5.1.2.bin.tmp");
+        File::create(&tmp_path).unwrap().set_len(expected_size).unwrap();
+        let bin_path = temp_dir.join("ggml-silero-v5.1.2.bin");
+
+        finalize_promote_file(&tmp_path, &bin_path, "silero-v5.1.2", expected_size)
+            .await
+            .unwrap();
+
+        assert!(bin_path.exists());
+        assert!(!tmp_path.exists());
+        assert!(!corrupted_sub.exists());
+
+        let _ = fs::remove_dir_all(&temp_dir);
     }
 }
 

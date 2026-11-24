@@ -136,6 +136,7 @@ html[dir="rtl"] .settings-cat-btn {
 
 html[dir="rtl"] .settings-cat-btn.active {
   background: linear-gradient(270deg, rgba(var(--color-royal-blue-rgb), 0.1) 0%, transparent 100%);
+  box-shadow: 4px 0 10px rgba(var(--color-royal-blue-rgb), 0.06);
 }
 
 html[dir="rtl"] .settings-cat-icon {

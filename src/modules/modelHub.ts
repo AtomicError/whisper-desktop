@@ -8,6 +8,7 @@ export interface ModelStatus {
   sizeBytes: number;
   downloadedBytes?: number;
   progress?: number;
+  verifying?: boolean;
   status: 'Downloaded' | 'Downloading' | 'Paused' | 'NotDownloaded' | 'Not Downloaded';
 }
 
@@ -239,34 +240,36 @@ export function renderFamilyHeaderBanner(category: string, counts = { all: 0, mu
     const showEn = counts.en > 0 && counts.en < counts.all;
     const showQuant = counts.quant > 0 && counts.quant < counts.all;
 
-    filterBarHtml = `
-      <div class="model-banner-filters">
-        <div class="model-segmented-control" role="tablist" aria-orientation="horizontal" aria-label="${escapeHTML(quickFilterAria)}">
-          <button type="button" class="model-segment-btn ${isAll}" role="tab" aria-selected="${isAll ? 'true' : 'false'}" tabindex="${isAll ? '0' : '-1'}" data-quick-filter="all">
-            <span>${escapeHTML(labelAll)}</span>
-            <span class="segment-count">${formatNum(counts.all)}</span>
-          </button>
-          ${showMulti ? `
-            <button type="button" class="model-segment-btn ${isMulti}" role="tab" aria-selected="${isMulti ? 'true' : 'false'}" tabindex="${isMulti ? '0' : '-1'}" data-quick-filter="multi">
-              <span>${escapeHTML(labelMulti)}</span>
-              <span class="segment-count">${formatNum(counts.multi)}</span>
+    if (showMulti || showEn || showQuant) {
+      filterBarHtml = `
+        <div class="model-banner-filters">
+          <div class="model-segmented-control" role="tablist" aria-orientation="horizontal" aria-label="${escapeHTML(quickFilterAria)}">
+            <button type="button" class="model-segment-btn ${isAll}" role="tab" aria-selected="${isAll ? 'true' : 'false'}" tabindex="${isAll ? '0' : '-1'}" data-quick-filter="all">
+              <span>${escapeHTML(labelAll)}</span>
+              <span class="segment-count">${formatNum(counts.all)}</span>
             </button>
-          ` : ''}
-          ${showEn ? `
-            <button type="button" class="model-segment-btn ${isEn}" role="tab" aria-selected="${isEn ? 'true' : 'false'}" tabindex="${isEn ? '0' : '-1'}" data-quick-filter="en" title="${escapeHTML(enTooltip)}">
-              <span>${escapeHTML(labelEn)}</span>
-              <span class="segment-count">${formatNum(counts.en)}</span>
-            </button>
-          ` : ''}
-          ${showQuant ? `
-            <button type="button" class="model-segment-btn ${isQuant}" role="tab" aria-selected="${isQuant ? 'true' : 'false'}" tabindex="${isQuant ? '0' : '-1'}" data-quick-filter="quant" title="${escapeHTML(quantTooltip)}">
-              <span>${escapeHTML(labelQuant)}</span>
-              <span class="segment-count">${formatNum(counts.quant)}</span>
-            </button>
-          ` : ''}
+            ${showMulti ? `
+              <button type="button" class="model-segment-btn ${isMulti}" role="tab" aria-selected="${isMulti ? 'true' : 'false'}" tabindex="${isMulti ? '0' : '-1'}" data-quick-filter="multi">
+                <span>${escapeHTML(labelMulti)}</span>
+                <span class="segment-count">${formatNum(counts.multi)}</span>
+              </button>
+            ` : ''}
+            ${showEn ? `
+              <button type="button" class="model-segment-btn ${isEn}" role="tab" aria-selected="${isEn ? 'true' : 'false'}" tabindex="${isEn ? '0' : '-1'}" data-quick-filter="en" title="${escapeHTML(enTooltip)}">
+                <span>${escapeHTML(labelEn)}</span>
+                <span class="segment-count">${formatNum(counts.en)}</span>
+              </button>
+            ` : ''}
+            ${showQuant ? `
+              <button type="button" class="model-segment-btn ${isQuant}" role="tab" aria-selected="${isQuant ? 'true' : 'false'}" tabindex="${isQuant ? '0' : '-1'}" data-quick-filter="quant" title="${escapeHTML(quantTooltip)}">
+                <span>${escapeHTML(labelQuant)}</span>
+                <span class="segment-count">${formatNum(counts.quant)}</span>
+              </button>
+            ` : ''}
+          </div>
         </div>
-      </div>
-    `;
+      `;
+    }
   }
 
   return `
@@ -512,7 +515,8 @@ function buildModelCardElement(m: ModelStatus, recInfo: any): HTMLElement {
   card.dataset.sizeMb = String(sizeMB);
 
   const dlBytes = m.downloadedBytes || 0;
-  const pct = Math.round((m.progress || 0) * 100);
+  const isVerifying = m.status === 'Downloading' && Boolean(m.verifying);
+  const pct = isVerifying ? 100 : Math.round((m.progress || 0) * 100);
   const safeName = escapeHTML(m.name);
   const showProgressBlock = m.status === 'Downloading' || m.status === 'Paused' ? 'block' : 'none';
 
@@ -526,9 +530,13 @@ function buildModelCardElement(m: ModelStatus, recInfo: any): HTMLElement {
 
   let progressStatusHtml = '';
   if (m.status === 'Downloading') {
-    progressStatusHtml = dlBytes <= 0
-      ? t('models.statusConnecting')
-      : `${formatModelDownloadProgress(dlBytes, m.sizeBytes, pct)} • ${(t('models.statusInProgress', { size: '', pct: '' }).split('•')[1] || t('models.statusConnecting')).trim()}`;
+    if (isVerifying) {
+      progressStatusHtml = t('models.statusVerifying');
+    } else {
+      progressStatusHtml = dlBytes <= 0
+        ? t('models.statusConnecting')
+        : `${formatModelDownloadProgress(dlBytes, m.sizeBytes, pct)} • ${(t('models.statusInProgress', { size: '', pct: '' }).split('•')[1] || t('models.statusConnecting')).trim()}`;
+    }
   } else if (m.status === 'Paused') {
     progressStatusHtml = dlBytes <= 0
       ? t('models.badgePaused')
@@ -536,7 +544,7 @@ function buildModelCardElement(m: ModelStatus, recInfo: any): HTMLElement {
   }
 
   card.innerHTML = `
-    <div class="setting-info" style="flex-grow: 1; padding-inline-end: 20px;">
+    <div class="setting-info">
       <div class="setting-label-row" style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap;">
         <span class="setting-title" style="font-size: 1.05rem; font-weight: 600; color: #fff;">ggml-${safeName}.bin</span>
         ${buildRecBadgeHtml(recInfo)}
@@ -555,7 +563,7 @@ function buildModelCardElement(m: ModelStatus, recInfo: any): HTMLElement {
         </div>
       </div>
     </div>
-    <div class="setting-control" style="display: flex; gap: 8px; align-items: center; justify-content: flex-end; flex-shrink: 0; min-width: 160px;">
+    <div class="setting-control">
       ${buildActionButtonsHtml(m.name, m.status)}
     </div>
   `;
@@ -641,12 +649,13 @@ function renderModelsEmptyState(grid: HTMLElement, query: string): void {
     </div>
     <div class="models-empty-title">${t('models.emptyTitle')}</div>
     <div class="models-empty-desc">${query ? t('models.emptyDescQuery', { query: escapeHTML(query) }) : t('models.emptyDescCategory')}</div>
-    ${query ? `<button type="button" class="btn-secondary btn-sm" data-action="clear-search" style="margin-top: 8px;">${t('models.emptyClearSearch')}</button>` : ''}
+    ${query ? `<button type="button" class="btn-secondary" data-action="clear-search">${t('models.emptyClearSearch')}</button>` : ''}
   `;
   grid.appendChild(emptyDiv);
 }
 
 function renderModelsErrorState(grid: HTMLElement): void {
+  const focusSnap = captureGridFocus(grid);
   grid.innerHTML = '';
   attachModelGridDelegate(grid);
   const errDiv = document.createElement('div');
@@ -662,9 +671,10 @@ function renderModelsErrorState(grid: HTMLElement): void {
     </div>
     <div class="models-empty-title">${escapeHTML(t('models.loadErrorTitle'))}</div>
     <div class="models-empty-desc">${escapeHTML(t('models.loadErrorDesc'))}</div>
-    <button type="button" class="btn-secondary btn-sm" data-action="retry-load" style="margin-top: 8px;">${escapeHTML(t('models.retryLoad'))}</button>
+    <button type="button" class="btn-secondary" data-action="retry-load">${escapeHTML(t('models.retryLoad'))}</button>
   `;
   grid.appendChild(errDiv);
+  restoreGridFocus(grid, focusSnap);
 }
 
 type GridFocusSnapshot =
@@ -859,9 +869,22 @@ export async function downloadModelClick(name: string): Promise<void> {
       ? (document.querySelector(`[data-model="${escapeAttrSelector(name)}"]`) as HTMLElement | null)
       : null;
     if (card) {
-      const ctrlEl = card.querySelector('.setting-control');
+      card.dataset.status = 'Downloading';
+      const ctrlEl = card.querySelector('.setting-control') as HTMLElement | null;
       if (ctrlEl) {
+        const hadFocus = typeof document !== 'undefined'
+          && Boolean(document.activeElement && typeof ctrlEl.contains === 'function' && ctrlEl.contains(document.activeElement));
         ctrlEl.innerHTML = buildActionButtonsHtml(name, 'Downloading');
+        if (hadFocus && typeof ctrlEl.querySelector === 'function') {
+          const pauseBtn = ctrlEl.querySelector('button[data-action="pause"]') as HTMLElement | null;
+          if (pauseBtn && typeof pauseBtn.focus === 'function') {
+            try {
+              pauseBtn.focus({ preventScroll: true });
+            } catch {
+              pauseBtn.focus();
+            }
+          }
+        }
       }
       const descEl = card.querySelector('.setting-desc');
       if (descEl) {

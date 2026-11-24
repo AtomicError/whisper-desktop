@@ -276,6 +276,14 @@ export function getActiveModelDownloadsCount(): number {
   return _activeModelDownloads.size;
 }
 
+export function getActiveModelDownloadNames(): string[] {
+  return Array.from(_activeModelDownloads.keys());
+}
+
+if (typeof window !== 'undefined') {
+  (window as any).getActiveModelDownloadNames = getActiveModelDownloadNames;
+}
+
 function getAggregateModelDownloadProgress(): number {
   if (_activeModelDownloads.size === 0) return 0;
   let total = 0;
@@ -436,18 +444,27 @@ export function setupTauriListeners(): void {
       setIsDownloadingModelRunning(true);
       updateTaskbarProgress(getAggregateModelDownloadProgress(), true);
 
+      const isVerifying = payload.phase === 'verifying';
+      const pct = isVerifying ? 100 : Math.min(100, Math.round((payload.progress || 0) * 100));
+      const totalKnown = payload.totalBytes > 0;
+      const dlBytes = Math.max(0, payload.downloadedBytes || 0);
+      const isConnecting = !isVerifying && (payload.phase === 'starting' || payload.speedBps <= 0);
+
+      // Always cancel any prior stall watchdog before short-circuiting if the card is off-screen
+      if (typeof window !== 'undefined') {
+        window._modelStallTimers = window._modelStallTimers || {};
+        if (window._modelStallTimers[payload.modelName]) {
+          clearTimeout(window._modelStallTimers[payload.modelName]);
+          delete window._modelStallTimers[payload.modelName];
+        }
+      }
+
       // CSS.escape prevents selector breakage from special chars in names
       const selectorName = typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
         ? CSS.escape(payload.modelName)
         : String(payload.modelName).replace(/["\\]/g, '\\$&');
       const card = document.querySelector(`[data-model="${selectorName}"]`) as HTMLElement | null;
       if (!card) return;
-
-      const isVerifying = payload.phase === 'verifying';
-      const pct = isVerifying ? 100 : Math.min(100, Math.round((payload.progress || 0) * 100));
-      const totalMB = ((payload.totalBytes || 0) / 1048576).toFixed(0);
-      const totalKnown = payload.totalBytes > 0;
-      const dlBytes = Math.max(0, payload.downloadedBytes || 0);
 
       // 1. Progress bar & status display in-place
       const progressBlock = card.querySelector('.model-progress-block') as HTMLElement | null;
@@ -462,8 +479,6 @@ export function setupTauriListeners(): void {
       }
 
       // 2. Status text above progress bar (clean progress + smooth ETA without speed noise)
-      const isConnecting = !isVerifying && (payload.phase === 'starting' || payload.speedBps <= 0);
-
       if (!isVerifying && !isConnecting && totalKnown && dlBytes <= payload.totalBytes) {
         const rawSeconds = (payload.totalBytes - dlBytes) / payload.speedBps;
         if (rawSeconds > 0 && isFinite(rawSeconds)) {
@@ -500,29 +515,22 @@ export function setupTauriListeners(): void {
       }
 
       // Manage stall detection watchdog (switches to connecting state if stream stalls for >= 3s)
-      if (typeof window !== 'undefined') {
-        window._modelStallTimers = window._modelStallTimers || {};
-        if (window._modelStallTimers[payload.modelName]) {
-          clearTimeout(window._modelStallTimers[payload.modelName]);
-          delete window._modelStallTimers[payload.modelName];
-        }
-        if (!isVerifying && !isConnecting && payload.phase === 'downloading') {
-          window._modelStallTimers[payload.modelName] = setTimeout(() => {
-            const targetCard = document.querySelector(`[data-model="${selectorName}"]`) as any;
-            if (targetCard && targetCard.querySelector('.model-btn-pause')) {
-              const statusEl = targetCard.querySelector('.model-progress-status');
-              if (statusEl) {
-                targetCard._smoothedEtaSeconds = null;
-                if (dlBytes <= 0) {
-                  statusEl.innerHTML = t('models.statusConnecting');
-                } else {
-                  const prefix = modelHub.formatProgress(dlBytes, payload.totalBytes, pct);
-                  statusEl.innerHTML = `${prefix} • ${t('models.statusConnecting')}`;
-                }
+      if (typeof window !== 'undefined' && !isVerifying && !isConnecting && payload.phase === 'downloading') {
+        window._modelStallTimers![payload.modelName] = setTimeout(() => {
+          const targetCard = document.querySelector(`[data-model="${selectorName}"]`) as any;
+          if (targetCard && targetCard.querySelector('.model-btn-pause')) {
+            const statusEl = targetCard.querySelector('.model-progress-status');
+            if (statusEl) {
+              targetCard._smoothedEtaSeconds = null;
+              if (dlBytes <= 0) {
+                statusEl.innerHTML = t('models.statusConnecting');
+              } else {
+                const prefix = modelHub.formatProgress(dlBytes, payload.totalBytes, pct);
+                statusEl.innerHTML = `${prefix} • ${t('models.statusConnecting')}`;
               }
             }
-          }, 3000);
-        }
+          }
+        }, 3000);
       }
 
       let statusEl = card.querySelector('.model-progress-status') as HTMLElement | null;
@@ -548,10 +556,10 @@ export function setupTauriListeners(): void {
 
       // 3. Keep description metadata clean without dynamic metrics
       const descEl = card.querySelector('.setting-desc') as HTMLElement | null;
-      if (descEl && (!descEl.querySelector('.badge-downloading') || descEl.querySelector('span[style*="var(--color-cyan)"]'))) {
+      if (descEl && !descEl.querySelector('.badge-downloading')) {
         const displayedSizeMB = totalKnown
           ? Math.max(1, Math.round(payload.totalBytes / 1048576))
-          : (card.dataset.sizeMb || totalMB);
+          : (card.dataset.sizeMb || 1);
         descEl.innerHTML = modelHub.buildDescriptionHtml(payload.modelName, 'Downloading', displayedSizeMB);
       }
 

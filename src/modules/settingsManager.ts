@@ -487,6 +487,26 @@ export async function browseModelsDirectory(): Promise<void> {
         return;
       }
 
+      const current = getSettingsState();
+      const win = getGlobal();
+      const activeDownloads: string[] = typeof win?.getActiveModelDownloadNames === 'function'
+        ? win.getActiveModelDownloadNames()
+        : [];
+
+      if (activeDownloads.length > 0 && path !== current?.modelsDir) {
+        const confirmed = await showConfirmModal(
+          t('modals.confirmChangeModelsDirTitle'),
+          t('modals.confirmChangeModelsDirDesc'),
+          t('modals.pauseAndSwitchBtn')
+        );
+        if (!confirmed) {
+          return;
+        }
+        await Promise.allSettled(
+          activeDownloads.map((modelName: string) => invoke('pause_download_model', { modelName }))
+        );
+      }
+
       if (inputEl) {
         inputEl.value = path;
         inputEl.title = isolateLtr(path);
@@ -494,7 +514,6 @@ export async function browseModelsDirectory(): Promise<void> {
           inputEl.parentElement.title = isolateLtr(path);
         }
       }
-      const current = getSettingsState();
       if (current) {
         current.modelsDir = path;
         await saveCurrentSettings(true);

@@ -7,6 +7,7 @@ import {
   setupTauriListeners,
   getUnlistenFns,
   getActiveModelDownloadsCount,
+  getActiveModelDownloadNames,
   setOriginalInvoke,
   setOriginalListen
 } from './tauriEvents';
@@ -438,6 +439,28 @@ describe('tauriEvents module', () => {
 
       loadSpy.mockRestore();
       (globalThis as any).document.querySelector = origQuerySelector;
+    });
+
+    it('exposes active model download names and clears stall timer even when card is off-screen', async () => {
+      const handlers: Record<string, (e: any) => void> = {};
+      setOriginalListen(vi.fn().mockImplementation((event: string, handler: (e: any) => void) => {
+        handlers[event] = handler;
+        return Promise.resolve(() => {});
+      }));
+
+      setupTauriListeners();
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      (globalThis as any).window._modelStallTimers = {
+        tiny: setTimeout(() => {}, 10000)
+      };
+
+      handlers['model-download-status']({
+        payload: { modelName: 'tiny', phase: 'downloading', progress: 0.5, downloadedBytes: 1000, totalBytes: 2000, speedBps: 500 }
+      });
+
+      expect(getActiveModelDownloadNames()).toEqual(['tiny']);
+      expect((globalThis as any).window._modelStallTimers.tiny).toBeUndefined();
     });
   });
 });

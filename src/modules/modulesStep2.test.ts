@@ -558,5 +558,63 @@ describe('modelHub', () => {
         'success'
       );
     });
+
+    it('renders verifying status and 100% progress bar when backend reports verifying: true', async () => {
+      const { grid } = setupMinimalModelHubDom();
+      (globalThis as any).window.invoke = vi.fn().mockImplementation((cmd: string) => {
+        if (cmd === 'get_all_models_status') {
+          return Promise.resolve([
+            { name: 'large-v3', sizeBytes: 3095033483, downloadedBytes: 3095033483, progress: 1, verifying: true, status: 'Downloading' }
+          ]);
+        }
+        return Promise.resolve(null);
+      });
+
+      modelHub.setCategory('large', true);
+      await modelHub.loadStatuses(false, true);
+
+      const card = grid.children.find((c: any) => !c.isBanner);
+      expect(card).toBeDefined();
+      expect(card.innerHTML).toContain('Verifying integrity...');
+      expect(card.innerHTML).toContain('width: 100%');
+    });
+
+    it('omits redundant single-tab quick filter bar when no sub-filters apply', () => {
+      const banner = modelHub.renderBanner('local', { all: 2, multi: 2, en: 0, quant: 0 });
+      expect(banner).not.toContain('model-segmented-control');
+      expect(banner).not.toContain('model-segment-btn');
+    });
+
+    it('preserves keyboard focus onto pause button and updates dataset.status on downloadModelClick', async () => {
+      setupMinimalModelHubDom();
+      const pauseBtn = { focus: vi.fn() };
+      const downloadBtn = { id: 'btn-dl' };
+      const ctrlEl = {
+        innerHTML: '',
+        contains: (el: any) => el === downloadBtn,
+        querySelector: (sel: string) => (sel === 'button[data-action="pause"]' ? pauseBtn : null)
+      };
+      const card: any = {
+        dataset: { model: 'small', status: 'NotDownloaded', sizeMb: '465' },
+        querySelector: (sel: string) => (sel === '.setting-control' ? ctrlEl : null)
+      };
+      (globalThis as any).document.activeElement = downloadBtn;
+      (globalThis as any).document.querySelector = (sel: string) => (sel.includes('small') ? card : null);
+      (globalThis as any).window.invoke = vi.fn().mockResolvedValue(undefined);
+
+      await modelHub.download('small');
+
+      expect(card.dataset.status).toBe('Downloading');
+      expect(ctrlEl.innerHTML).toContain('data-action="pause"');
+      expect(pauseBtn.focus).toHaveBeenCalledWith({ preventScroll: true });
+    });
+
+    it('localizes #model-search-clear tooltip and aria-label in models.html', () => {
+      const html = loadResolvedHtml();
+      const clearMatch = html.match(/id="model-search-clear"[^>]*>/);
+      expect(clearMatch).toBeTruthy();
+      expect(clearMatch![0]).toContain('data-i18n-title="models.emptyClearSearch"');
+      expect(clearMatch![0]).toContain('data-i18n-aria="models.emptyClearSearch"');
+    });
   });
 });

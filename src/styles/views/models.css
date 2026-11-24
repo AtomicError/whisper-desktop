@@ -220,8 +220,11 @@
 
 .model-segmented-control {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
+  max-width: 100%;
+  box-sizing: border-box;
   background: rgba(255, 255, 255, 0.035);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 9px;
@@ -313,7 +316,18 @@
 
 
 
-/* Model Hub Header Search Sizing (responsive override in responsive.css) */
+/* Model Hub Grid Container & Header Search Sizing (responsive override in responsive.css) */
+#models-list-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex-grow: 1;
+  min-height: 0;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
 #panel-models .glass-card > div:first-child {
   flex: 1 1 280px;
   min-width: 0;
@@ -324,7 +338,20 @@
   min-width: 240px;
 }
 
+#panel-models .setting-info {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-inline-end: 20px;
+}
+
 #panel-models .setting-control {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  width: auto;
+  min-width: 160px;
   flex-wrap: wrap;
   max-width: 100%;
 }
@@ -1294,6 +1321,13 @@ select.pagination-size-select {
   max-width: 340px;
   line-height: 1.45;
   margin-bottom: 6px;
+}
+
+.models-empty-state .btn-secondary {
+  margin-top: 8px;
+  min-height: 34px;
+  padding: 6px 14px;
+  font-size: 0.84rem;
 }
 
 /* Models Table Footer Tip */
