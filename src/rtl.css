@@ -429,6 +429,10 @@ html[dir="rtl"] .about-update-subtext {
    interface whose icon is on the right. The meta badge used to need a rule here too,
    back when it forced its own direction; it now follows the interface and carries its
    isolation with the rest of its definition in styles.css. */
+html[dir="rtl"] #translate-drop-zone.translate-dropzone-card.has-file .translate-sub-name {
+  text-align: right;
+}
+
 html[dir="rtl"] .transcribe-switch-info {
   text-align: right;
 }

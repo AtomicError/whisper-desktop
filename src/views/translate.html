@@ -92,7 +92,7 @@
                           <span class="translate-switch-desc" data-i18n="settings.polishDesc">Refines phrasing for natural subtitle flow and reading rhythm</span>
                         </div>
                         <label class="switch">
-                          <input type="checkbox" id="translate-polish-toggle" checked data-i18n-aria="translate.polishPass" aria-label="Conversational Polish Pass" />
+                          <input type="checkbox" id="translate-polish-toggle" data-i18n-aria="translate.polishPass" aria-label="Conversational Polish Pass" />
                           <span class="slider"></span>
                         </label>
                       </div>
@@ -100,15 +100,15 @@
 
                     <!-- 4. Output Folder Row -->
                     <div class="translate-field-group">
-                      <label>
+                      <div class="translate-field-label" id="lbl-translate-output-folder">
                         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                         </svg>
                         <span data-i18n="translate.outputFolder">Output Folder</span>
-                      </label>
+                      </div>
                       <div class="translate-output-row">
                         <div class="translate-output-display" id="translate-output-dir-text" data-i18n="translate.sameAsSource">Same as source file folder</div>
-                        <button class="btn-secondary btn-sm" id="btn-browse-translate-dir" data-i18n="translate.changeFolder" type="button">Change...</button>
+                        <button class="btn-secondary btn-sm" id="btn-browse-translate-dir" data-i18n="translate.changeFolder" type="button" aria-describedby="translate-output-dir-text">Change...</button>
                         <button class="btn-secondary btn-sm" id="btn-reset-translate-dir" data-i18n="translate.resetFolder" type="button" style="display:none;">Reset</button>
                       </div>
                     </div>
@@ -131,7 +131,7 @@
                       </div>
 
                       <!-- Telemetry HUD -->
-                      <div class="translate-telemetry" id="translate-telemetry-box" style="display:none;">
+                      <div class="translate-telemetry" id="translate-telemetry-box" role="status" aria-live="polite" style="display:none;">
                         <div class="translate-telemetry-header">
                           <div class="translate-telemetry-status">
                             <span class="translate-status-badge" id="translate-status-badge" data-i18n="translate.statusReady">Ready</span>
@@ -139,7 +139,7 @@
                           </div>
                           <div class="translate-telemetry-pct" id="lbl-translate-pct">0%</div>
                         </div>
-                        <div class="translate-linear-track">
+                        <div class="translate-linear-track" id="translate-progress-track" role="progressbar" aria-labelledby="translate-status-badge" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
                           <div class="translate-linear-fill" id="translate-progress-fill" style="width:0%;"></div>
                         </div>
                         <div class="translate-telemetry-msg" id="lbl-translate-msg"></div>
@@ -194,7 +194,7 @@
                           <span class="translate-count-badge" id="translate-source-count">0</span>
                         </div>
                       </div>
-                      <div class="translate-cues-list" id="translate-source-cues-list" role="list">
+                      <div class="translate-cues-list" id="translate-source-cues-list">
                         <div class="translate-empty-pane">
                           <svg class="translate-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -217,7 +217,7 @@
                           <span class="translate-count-badge" id="translate-target-count">0</span>
                         </div>
                       </div>
-                      <div class="translate-cues-list" id="translate-target-cues-list" role="list">
+                      <div class="translate-cues-list" id="translate-target-cues-list">
                         <div class="translate-empty-pane">
                           <svg class="translate-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
                             <path d="m5 8 6 6"/>

@@ -25,6 +25,7 @@ import {
   setupTranslationEventListeners,
   hasPendingProviderGeneralChanges,
   flushPendingProviderGeneralChanges,
+  syncProviderModelsFromSettings,
   addManualModelRow,
   type ModelObject
 } from './translationProviders';
@@ -1122,6 +1123,130 @@ describe('translationProviders module', () => {
       expect(hasPendingProviderGeneralChanges()).toBe(false);
       const saved = JSON.parse(getSettingsState().translateAiProviders)[0];
       expect(saved.baseUrl).toBe('https://api.custom.openai.com/v1');
+    });
+
+    it('does not overwrite newly selected provider models after onProviderChanged(..., true) followed by switchProviderTab("models")', async () => {
+      makeEl('div', 'provider-manager-card');
+      const provSelect = makeEl('select', 'opt-translateAiProvider');
+      const modelSelect = makeEl('select', 'opt-translateAiModel');
+      makeEl('div', 'providers-tiles-grid');
+      makeEl('div', 'general-placeholder-overlay');
+      makeEl('div', 'general-config-fields');
+      makeEl('div', 'models-placeholder-overlay');
+      makeEl('div', 'models-catalog-fields');
+      makeEl('div', 'models-table-body');
+      makeEl('span', 'provider-models-count');
+      makeEl('div', 'provider-tab-auto');
+      makeEl('div', 'provider-tab-providers');
+      makeEl('div', 'provider-tab-general');
+      makeEl('div', 'provider-tab-models');
+
+      setSettingsState({
+        translateAiProvider: 'OpenAI',
+        translateAiModel: 'gpt-4o',
+        translateAiProviders: JSON.stringify([
+          {
+            name: 'OpenAI',
+            baseUrl: 'https://api.openai.com/v1',
+            apiKey: 'sk-1',
+            useKeyring: false,
+            models: [{ id: 'gpt-4o', contextWindow: 128000, enabled: true }]
+          },
+          {
+            name: 'Anthropic',
+            baseUrl: 'https://api.anthropic.com',
+            apiKey: 'sk-2',
+            useKeyring: false,
+            models: [{ id: 'claude-sonnet-4', contextWindow: 200000, enabled: true }]
+          }
+        ])
+      });
+
+      // Initial load renders OpenAI into currentProviderModels
+      provSelect.value = 'OpenAI';
+      onProviderChanged('general', false);
+      expect(translationProviders.getModels().map(m => m.id)).toEqual(['gpt-4o']);
+
+      // Simulate Translation Studio switching provider with skipTableRender=true
+      provSelect.value = 'Anthropic';
+      onProviderChanged(true, true);
+      expect(translationProviders.getModels().map(m => m.id)).toEqual(['claude-sonnet-4']);
+
+      // Opening the Models tab in Settings must render & save Anthropic's models, never OpenAI's
+      switchProviderTab('models');
+      await saveActiveProviderModels(true, true);
+
+      const savedProviders = JSON.parse(getSettingsState().translateAiProviders);
+      const anthropic = savedProviders.find((p: any) => p.name === 'Anthropic');
+      const openai = savedProviders.find((p: any) => p.name === 'OpenAI');
+      expect(anthropic.models.map((m: any) => m.id)).toEqual(['claude-sonnet-4']);
+      expect(openai.models.map((m: any) => m.id)).toEqual(['gpt-4o']);
+      expect(modelSelect.value).toBe('claude-sonnet-4');
+    });
+
+    it('syncProviderModelsFromSettings refreshes cached currentProviderModels without calling saveCurrentSettings', async () => {
+      makeEl('div', 'provider-manager-card');
+      const provSelect = makeEl('select', 'opt-translateAiProvider');
+      const modelSelect = makeEl('select', 'opt-translateAiModel');
+      makeEl('div', 'providers-tiles-grid');
+      makeEl('div', 'general-placeholder-overlay');
+      makeEl('div', 'general-config-fields');
+      makeEl('div', 'models-placeholder-overlay');
+      makeEl('div', 'models-catalog-fields');
+      makeEl('div', 'models-table-body');
+      makeEl('span', 'provider-models-count');
+      makeEl('div', 'provider-tab-auto');
+      makeEl('div', 'provider-tab-providers');
+      makeEl('div', 'provider-tab-general');
+      makeEl('div', 'provider-tab-models');
+
+      setSettingsState({
+        translateAiProvider: 'OpenAI',
+        translateAiModel: 'gpt-4o',
+        translateAiProviders: JSON.stringify([
+          {
+            name: 'OpenAI',
+            baseUrl: 'https://api.openai.com/v1',
+            apiKey: 'sk-1',
+            useKeyring: false,
+            models: [{ id: 'gpt-4o', contextWindow: 128000, enabled: true }]
+          }
+        ])
+      });
+
+      provSelect.value = 'OpenAI';
+      onProviderChanged('general', false);
+      expect(translationProviders.getModels()[0].contextWindow).toBe(128000);
+
+      // Simulate backend translation-model-limits-updated mutating settingsState.translateAiProviders
+      const prevSave = (globalThis as any).window.saveCurrentSettings;
+      const saveSpy = vi.fn();
+      (globalThis as any).window.saveCurrentSettings = saveSpy;
+      try {
+        getSettingsState().translateAiProviders = JSON.stringify([
+          {
+            name: 'OpenAI',
+            baseUrl: 'https://api.openai.com/v1',
+            apiKey: 'sk-1',
+            useKeyring: false,
+            models: [{ id: 'gpt-4o', contextWindow: 32768, maxOutputTokens: 8192, enabled: true }]
+          }
+        ]);
+
+        syncProviderModelsFromSettings();
+        expect(saveSpy).not.toHaveBeenCalled();
+        expect(translationProviders.getModels()[0].contextWindow).toBe(32768);
+        expect(translationProviders.getModels()[0].maxOutputTokens).toBe(8192);
+        expect(modelSelect.value).toBe('gpt-4o');
+
+        // Subsequent saveActiveProviderModels must preserve the reactively learned limits
+        await saveActiveProviderModels(true, true);
+        const saved = JSON.parse(getSettingsState().translateAiProviders)[0];
+        expect(saved.models[0].contextWindow).toBe(32768);
+        expect(saved.models[0].maxOutputTokens).toBe(8192);
+      } finally {
+        (globalThis as any).window.saveCurrentSettings = prevSave;
+      }
     });
   });
 });

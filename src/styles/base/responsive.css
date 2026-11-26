@@ -372,18 +372,26 @@
   .batch-table-wrapper {
     max-height: 360px;
   }
-  .translate-right-panel,
+  .translate-right-panel {
+    height: 540px;
+    max-height: 70vh;
+    min-height: 420px;
+    overflow: hidden;
+  }
   .transcribe-right-panel {
     height: auto;
     min-height: 480px;
   }
-  .translate-preview-card,
+  .translate-preview-card {
+    height: 100%;
+    min-height: 0;
+  }
   .transcript-viewer-card {
     height: 100%;
     min-height: 480px;
   }
   .translate-preview-grid {
-    min-height: 380px;
+    min-height: 0;
   }
 }
 

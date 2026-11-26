@@ -65,6 +65,7 @@ declare global {
     closeTestModal: () => void;
     testTranslationConnection: () => Promise<void>;
     toggleTranslationSubSettingsVisibility: () => void;
+    syncProviderModelsFromSettings: () => void;
     translationStudioController?: any;
     settingsState: SettingsState | null;
     saveCurrentSettings: (immediate?: boolean) => any;
@@ -173,6 +174,7 @@ function readProvidersSafe(settingsState: { translateAiProviders?: string } | nu
 }
 
 let currentProviderModels: ModelObject[] = [];
+let currentModelsProviderName = '';
 let currentModelsSortCol: string | null = null;
 let currentModelsSortDir: 'asc' | 'desc' | 'none' = 'none';
 let currentModelsPage = 1;
@@ -376,6 +378,41 @@ export function flushPendingModelCatalogChanges(): boolean {
   }
 
   return true;
+}
+
+export function syncProviderModelsFromSettings(): void {
+  const settingsState = getSettingsState();
+  if (!settingsState) return;
+
+  const providers = readProvidersSafe(settingsState);
+  const activeName = settingsState.translateAiProvider || '';
+  const provider = providers.find(p => p.name === activeName);
+
+  if (!provider) {
+    currentProviderModels = [];
+    currentModelsProviderName = '';
+    return;
+  }
+
+  currentProviderModels = buildLiveModelsForProvider(provider);
+  currentModelsProviderName = '';
+
+  if (typeof document !== 'undefined') {
+    const modelSelect = document.getElementById('opt-translateAiModel') as HTMLSelectElement | null;
+    if (modelSelect) {
+      syncProviderModelDropdownOptions(modelSelect, provider.models || [], settingsState);
+      syncProviderCustomSelects();
+    }
+    const settingsPanel = document.getElementById('panel-settings');
+    const modelsTab = document.getElementById('provider-tab-models');
+    if (
+      settingsPanel?.classList?.contains('active') &&
+      modelsTab &&
+      modelsTab.style.display !== 'none'
+    ) {
+      renderModelsRegistryTable(provider);
+    }
+  }
 }
 
 function saveActiveProviderModelsDebounced(): void {
@@ -713,6 +750,9 @@ export function onProviderChanged(keepCurrentTab: boolean | string = false, skip
     
     if (!skipTableRender) {
       renderModelsRegistryTable(provider);
+    } else {
+      currentProviderModels = buildLiveModelsForProvider(provider);
+      currentModelsProviderName = '';
     }
   } else {
     if (genPlaceholder) genPlaceholder.style.display = 'flex';
@@ -766,6 +806,7 @@ export function onProviderChanged(keepCurrentTab: boolean | string = false, skip
     if (countEl) countEl.textContent = '0';
 
     currentProviderModels = [];
+    currentModelsProviderName = '';
     currentModelsPage = 1;
     currentModelStatusFilter = 'all';
     currentModelsSortCol = null;
@@ -895,12 +936,20 @@ export function switchProviderTab(tab: string): void {
     if (divMod) { divMod.style.display = 'block'; activeDiv = divMod; }
     
     const settingsState = getSettingsState();
-    if (currentProviderModels.length === 0 && settingsState && settingsState.translateAiProvider) {
+    if (
+      settingsState &&
+      settingsState.translateAiProvider &&
+      (currentModelsProviderName !== settingsState.translateAiProvider || currentProviderModels.length === 0)
+    ) {
       const providers = readProvidersSafe(settingsState);
       const curProv = providers.find((p: any) => p.name === settingsState.translateAiProvider);
       if (curProv && curProv.models && curProv.models.length > 0) {
         renderModelsRegistryTable(curProv);
       } else {
+        if (curProv) {
+          currentProviderModels = [];
+          currentModelsProviderName = curProv.name;
+        }
         applyModelsFilterAndRender(0);
       }
     } else {
@@ -1251,8 +1300,8 @@ export function clearModelsSearch(): void {
   if (searchInput) searchInput.focus();
 }
 
-export function renderModelsRegistryTable(provider: ProviderConfig): void {
-  currentProviderModels = (provider && provider.models ? provider.models : []).map(m => {
+function buildLiveModelsForProvider(provider: ProviderConfig): ModelObject[] {
+  return (provider && provider.models ? provider.models : []).map(m => {
     const isReasoning = isReasoningSupportedModel(m);
     const reasoningVal = isReasoning
       ? ((m.reasoning !== undefined && m.reasoning !== null && m.reasoning !== '') ? m.reasoning : 'Medium')
@@ -1265,6 +1314,11 @@ export function renderModelsRegistryTable(provider: ProviderConfig): void {
       supportsReasoningOverride: supportsReasoning
     });
   });
+}
+
+export function renderModelsRegistryTable(provider: ProviderConfig): void {
+  currentProviderModels = buildLiveModelsForProvider(provider);
+  currentModelsProviderName = provider?.name || '';
   
   currentModelsPage = 1;
   currentModelsSortCol = null;
@@ -2185,6 +2239,7 @@ export async function fetchActiveProviderModels(): Promise<void> {
     let persistedForTarget = false;
     if (activeProviderName === providerName) {
       currentProviderModels = fetchedModels;
+      currentModelsProviderName = providerName;
       const currentActive = liveSettings ? liveSettings.translateAiModel : '';
       if (!currentActive && currentProviderModels.length > 0 && liveSettings) {
         liveSettings.translateAiModel = currentProviderModels[0].id;
@@ -2842,6 +2897,7 @@ export function syncTranslationProvidersWindowBindings(): void {
   window.closeTestModal = closeTestModal;
   window.testTranslationConnection = testTranslationConnection;
   window.toggleTranslationSubSettingsVisibility = toggleTranslationSubSettingsVisibility;
+  window.syncProviderModelsFromSettings = syncProviderModelsFromSettings;
   window.flushPendingModelCatalogChanges = flushPendingModelCatalogChanges;
   (window as any).flushPendingProviderGeneralChanges = flushPendingProviderGeneralChanges;
   (window as any).hasPendingProviderGeneralChanges = hasPendingProviderGeneralChanges;
@@ -2888,6 +2944,7 @@ export const translationProviders = {
   setActiveModel: setActiveModelFromTable,
   testConnection: testTranslationConnection,
   setupEventListeners: setupTranslationEventListeners,
+  syncModelsFromSettings: syncProviderModelsFromSettings,
   flushPendingModelCatalogChanges,
   syncWindowBindings: syncTranslationProvidersWindowBindings
 };

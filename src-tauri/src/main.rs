@@ -571,6 +571,26 @@ fn get_file_size(file_path: String) -> Result<u64, String> {
 }
 
 #[tauri::command]
+fn find_existing_video_file(candidates: Vec<String>) -> Option<String> {
+    for candidate in candidates {
+        let trimmed = candidate.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let path = Path::new(trimmed);
+        let ext = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.to_ascii_lowercase())
+            .unwrap_or_default();
+        if VIDEO_EXTENSIONS.contains(&ext.as_str()) && path.is_file() {
+            return Some(trimmed.to_string());
+        }
+    }
+    None
+}
+
+#[tauri::command]
 fn write_text_file_content(file_path: String, content: String) -> Result<(), String> {
     let path = std::path::Path::new(&file_path);
     let allowed_exts = ["txt", "srt", "vtt", "lrc", "ass", "ssa", "csv", "tsv"];
@@ -1491,6 +1511,7 @@ fn main() {
             verify_directory_writable,
             read_text_file_content,
             get_file_size,
+            find_existing_video_file,
             write_text_file_content,
             start_download_model_task,
             get_all_models_status,

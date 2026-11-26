@@ -16,7 +16,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 /// Checkpoints written by older builds without this field or matching version are rejected.
-const CHECKPOINT_VERSION: u32 = 2;
+const CHECKPOINT_VERSION: u32 = 3;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -32,6 +32,9 @@ pub struct TranslationCheckpoint {
     pub provider: String,
     /// Active AI model ID.
     pub model: String,
+    /// Deterministic SHA-256 fingerprint of the effective system prompt
+    /// (covering custom prompt, target language, and polish pass toggle).
+    pub prompt_fingerprint: String,
     /// Deterministic cryptographic SHA-256 integrity stamp of the source content.
     /// If the source changed since the checkpoint was written, it is stale
     /// and must be discarded instead of splicing mismatched translations.
@@ -41,12 +44,14 @@ pub struct TranslationCheckpoint {
 }
 
 impl TranslationCheckpoint {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         source_file: &str,
         lang_code: &str,
         format: &str,
         provider: &str,
         model: &str,
+        system_prompt: &str,
         content: &str,
         translations: HashMap<usize, String>,
     ) -> Self {
@@ -57,6 +62,7 @@ impl TranslationCheckpoint {
             format: format.to_string(),
             provider: provider.to_string(),
             model: model.to_string(),
+            prompt_fingerprint: fingerprint(system_prompt),
             source_fingerprint: fingerprint(content),
             translations,
         }
@@ -66,7 +72,8 @@ impl TranslationCheckpoint {
         parent_dir.join(format!("{output_file_name}.ckpt.json"))
     }
 
-    /// Validates identity (version/source/lang/format/provider/model/content) before use.
+    /// Validates identity (version/source/lang/format/provider/model/prompt/content) before use.
+    #[allow(clippy::too_many_arguments)]
     fn matches(
         &self,
         source_file: &str,
@@ -74,6 +81,7 @@ impl TranslationCheckpoint {
         format: &str,
         provider: &str,
         model: &str,
+        prompt_fingerprint: &str,
         fingerprint: &str,
     ) -> bool {
         self.version == CHECKPOINT_VERSION
@@ -82,6 +90,7 @@ impl TranslationCheckpoint {
             && self.format == format
             && self.provider == provider
             && self.model == model
+            && self.prompt_fingerprint == prompt_fingerprint
             && self.source_fingerprint == fingerprint
     }
 }
@@ -113,7 +122,7 @@ fn fingerprint(content: &str) -> String {
     format!("{:x}", hasher.finalize())
 }
 
-/// Loads a valid checkpoint for this exact (source, lang, format, provider, model, content)
+/// Loads a valid checkpoint for this exact (source, lang, format, provider, model, prompt, content)
 /// combination. Any mismatch, corruption, or legacy file yields `None` and
 /// the stale file is left on disk (it gets overwritten by the first save).
 #[allow(clippy::too_many_arguments)]
@@ -125,6 +134,7 @@ pub fn load(
     format: &str,
     provider: &str,
     model: &str,
+    system_prompt: &str,
     content: &str,
 ) -> Option<TranslationCheckpoint> {
     let path = TranslationCheckpoint::path_for(parent_dir, output_file_name);
@@ -136,6 +146,7 @@ pub fn load(
         format,
         provider,
         model,
+        &fingerprint(system_prompt),
         &fingerprint(content),
     ) {
         Some(ckpt)
@@ -204,19 +215,19 @@ mod tests {
         let mut map = HashMap::new();
         map.insert(1usize, "سلام".to_string());
         map.insert(2, "دنیا".to_string());
-        let ckpt = TranslationCheckpoint::new("movie.srt", "fa", "srt", "OpenAI", "gpt-4o", "CONTENT", map);
+        let ckpt = TranslationCheckpoint::new("movie.srt", "fa", "srt", "OpenAI", "gpt-4o", "PROMPT", "CONTENT", map);
 
         save(&dir, "movie.fa.srt", &ckpt).unwrap();
         assert!(!dir.join("movie.fa.srt").exists()); // tmp cleaned up via rename
 
         let loaded =
-            load(&dir, "movie.fa.srt", "movie.srt", "fa", "srt", "OpenAI", "gpt-4o", "CONTENT").unwrap();
+            load(&dir, "movie.fa.srt", "movie.srt", "fa", "srt", "OpenAI", "gpt-4o", "PROMPT", "CONTENT").unwrap();
         assert_eq!(loaded.translations.get(&1).unwrap(), "سلام");
         assert_eq!(loaded.translations.len(), 2);
 
         remove(&dir, "movie.fa.srt");
         assert!(
-            load(&dir, "movie.fa.srt", "movie.srt", "fa", "srt", "OpenAI", "gpt-4o", "CONTENT").is_none()
+            load(&dir, "movie.fa.srt", "movie.srt", "fa", "srt", "OpenAI", "gpt-4o", "PROMPT", "CONTENT").is_none()
         );
         let _ = fs::remove_dir_all(&dir);
     }
@@ -226,34 +237,35 @@ mod tests {
         let dir = tmpdir();
         let mut map = HashMap::new();
         map.insert(1, "old".to_string());
-        let ckpt = TranslationCheckpoint::new("a.srt", "fa", "srt", "OpenAI", "gpt-4o", "OLD CONTENT", map);
+        let ckpt = TranslationCheckpoint::new("a.srt", "fa", "srt", "OpenAI", "gpt-4o", "PROMPT", "OLD CONTENT", map);
         save(&dir, "a.fa.srt", &ckpt).unwrap();
 
-        assert!(load(&dir, "a.fa.srt", "a.srt", "fa", "srt", "OpenAI", "gpt-4o", "NEW CONTENT").is_none());
+        assert!(load(&dir, "a.fa.srt", "a.srt", "fa", "srt", "OpenAI", "gpt-4o", "PROMPT", "NEW CONTENT").is_none());
         let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
-    fn rejects_wrong_lang_or_format_or_source_or_model() {
+    fn rejects_wrong_lang_or_format_or_source_or_model_or_prompt() {
         let dir = tmpdir();
         let mut map = HashMap::new();
         map.insert(1, "x".to_string());
-        let ckpt = TranslationCheckpoint::new("a.srt", "fa", "srt", "OpenAI", "gpt-4o", "C", map);
+        let ckpt = TranslationCheckpoint::new("a.srt", "fa", "srt", "OpenAI", "gpt-4o", "PROMPT-A", "C", map);
         save(&dir, "a.fa.srt", &ckpt).unwrap();
 
-        assert!(load(&dir, "a.fa.srt", "a.srt", "en", "srt", "OpenAI", "gpt-4o", "C").is_none());
-        assert!(load(&dir, "a.fa.srt", "a.srt", "fa", "vtt", "OpenAI", "gpt-4o", "C").is_none());
-        assert!(load(&dir, "a.fa.srt", "b.srt", "fa", "srt", "OpenAI", "gpt-4o", "C").is_none());
-        assert!(load(&dir, "a.fa.srt", "a.srt", "fa", "srt", "Anthropic", "gpt-4o", "C").is_none());
-        assert!(load(&dir, "a.fa.srt", "a.srt", "fa", "srt", "OpenAI", "claude-3-5", "C").is_none());
+        assert!(load(&dir, "a.fa.srt", "a.srt", "en", "srt", "OpenAI", "gpt-4o", "PROMPT-A", "C").is_none());
+        assert!(load(&dir, "a.fa.srt", "a.srt", "fa", "vtt", "OpenAI", "gpt-4o", "PROMPT-A", "C").is_none());
+        assert!(load(&dir, "a.fa.srt", "b.srt", "fa", "srt", "OpenAI", "gpt-4o", "PROMPT-A", "C").is_none());
+        assert!(load(&dir, "a.fa.srt", "a.srt", "fa", "srt", "Anthropic", "gpt-4o", "PROMPT-A", "C").is_none());
+        assert!(load(&dir, "a.fa.srt", "a.srt", "fa", "srt", "OpenAI", "claude-3-5", "PROMPT-A", "C").is_none());
+        assert!(load(&dir, "a.fa.srt", "a.srt", "fa", "srt", "OpenAI", "gpt-4o", "PROMPT-B", "C").is_none());
         let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn corrupted_checkpoint_is_none_not_panic() {
         let dir = tmpdir();
-        fs::write(dir.join("a.fa.srt.ckpt.json"), "{\"version\":2,\"trans").unwrap();
-        assert!(load(&dir, "a.fa.srt", "a.srt", "fa", "srt", "OpenAI", "gpt-4o", "C").is_none());
+        fs::write(dir.join("a.fa.srt.ckpt.json"), "{\"version\":3,\"trans").unwrap();
+        assert!(load(&dir, "a.fa.srt", "a.srt", "fa", "srt", "OpenAI", "gpt-4o", "P", "C").is_none());
         let _ = fs::remove_dir_all(&dir);
     }
 
@@ -262,10 +274,10 @@ mod tests {
         let dir = tmpdir();
         let mut map = HashMap::new();
         map.insert(1, "x".to_string());
-        let mut ckpt = TranslationCheckpoint::new("a.srt", "fa", "srt", "OpenAI", "gpt-4o", "C", map);
+        let mut ckpt = TranslationCheckpoint::new("a.srt", "fa", "srt", "OpenAI", "gpt-4o", "P", "C", map);
         ckpt.version = 999;
         save(&dir, "a.fa.srt", &ckpt).unwrap();
-        assert!(load(&dir, "a.fa.srt", "a.srt", "fa", "srt", "OpenAI", "gpt-4o", "C").is_none());
+        assert!(load(&dir, "a.fa.srt", "a.srt", "fa", "srt", "OpenAI", "gpt-4o", "P", "C").is_none());
         let _ = fs::remove_dir_all(&dir);
     }
 
@@ -275,11 +287,11 @@ mod tests {
         let mut map = HashMap::new();
         map.insert(1, "x".to_string());
         // Saved with CRLF content
-        let ckpt = TranslationCheckpoint::new("a.srt", "fa", "srt", "OpenAI", "gpt-4o", "line1\r\nline2\r\n", map);
+        let ckpt = TranslationCheckpoint::new("a.srt", "fa", "srt", "OpenAI", "gpt-4o", "P", "line1\r\nline2\r\n", map);
         save(&dir, "a.fa.srt", &ckpt).unwrap();
 
         // Loaded with LF content -> must match and succeed
-        let loaded = load(&dir, "a.fa.srt", "a.srt", "fa", "srt", "OpenAI", "gpt-4o", "line1\nline2\n");
+        let loaded = load(&dir, "a.fa.srt", "a.srt", "fa", "srt", "OpenAI", "gpt-4o", "P", "line1\nline2\n");
         assert!(loaded.is_some(), "CRLF and LF differences must not invalidate checkpoint");
         let _ = fs::remove_dir_all(&dir);
     }

@@ -27,6 +27,7 @@ allow = [
   "start_hardsub_task",
   "read_text_file_content",
   "get_file_size",
+  "find_existing_video_file",
   "start_download_model_task",
   "get_all_models_status",
   "pause_download_model",

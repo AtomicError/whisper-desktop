@@ -272,7 +272,7 @@ impl AiProvider {
                             }
                             let r = m.reasoning.trim().to_lowercase();
                             if r == "minimal" || r == "low" || r == "medium" || r == "high" || r == "xhigh" || r == "max" || r == "ultra" {
-                                Some(m.reasoning.as_str())
+                                Some(m.reasoning.trim())
                             } else {
                                 None
                             }
@@ -280,7 +280,7 @@ impl AiProvider {
                     });
 
                     if let Some(r) = effort {
-                        map.insert("reasoning_effort".to_string(), serde_json::json!(r.to_lowercase()));
+                        map.insert("reasoning_effort".to_string(), serde_json::json!(r.trim().to_lowercase()));
                     }
                 }
 
@@ -438,5 +438,32 @@ mod tests {
             .format_request_body_ext("reasoning-model", "sys", "usr", &opts)
             .unwrap();
         assert!(body.get("reasoning_effort").is_none());
+    }
+
+    #[test]
+    fn padded_reasoning_effort_is_trimmed_and_lowercased() {
+        let provider = AiProvider {
+            name: "Custom".to_string(),
+            base_url: "https://api.example.com/v1".to_string(),
+            api_key: "sk-test".to_string(),
+            api_format: "Chat completions".to_string(),
+            use_keyring: false,
+            models: vec![AiModel {
+                id: "reasoning-model".to_string(),
+                context_window: 128000,
+                max_output_tokens: None,
+                reasoning: "  Low  ".to_string(),
+                supports_reasoning: Some(true),
+                vision: false,
+                enabled: true,
+            }],
+            custom_prompt: "".to_string(),
+        };
+
+        let opts = RequestOptions::default();
+        let body = provider
+            .format_request_body_ext("reasoning-model", "sys", "usr", &opts)
+            .unwrap();
+        assert_eq!(body.get("reasoning_effort").and_then(|v| v.as_str()), Some("low"));
     }
 }

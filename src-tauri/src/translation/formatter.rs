@@ -6,6 +6,15 @@ static LRC_TS_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^\[(\d{1,3}:\d{2}(?:[.:]\d{2,3})?)\]").expect("valid lrc timestamp regex")
 });
 
+static SUBTITLE_TIMELINE_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^\s*(?:\d{1,3}:)?\d{2}:\d{2}[.,]\d{1,3}\s*-->\s*(?:\d{1,3}:)?\d{2}:\d{2}[.,]\d{1,3}(?:\s|$)")
+        .expect("valid subtitle timeline regex")
+});
+
+fn is_subtitle_timeline(line: &str) -> bool {
+    SUBTITLE_TIMELINE_RE.is_match(line)
+}
+
 /// Determines if a text line contains meaningful translatable content.
 /// Pure separators ("---", "***") and music markers ("♪ ♪") carry no
 /// translatable content and only pollute the prompt. Meaningful subtitles
@@ -31,6 +40,23 @@ fn is_translatable_text(text: &str) -> bool {
     }
     // Retain anything with alphanumeric characters or standard sentence punctuation
     trimmed.chars().any(|c| c.is_alphanumeric())
+}
+
+fn is_vtt_metadata_block_header(line: &str) -> bool {
+    let trimmed = line.trim_start();
+    trimmed == "NOTE"
+        || trimmed.starts_with("NOTE ")
+        || trimmed.starts_with("NOTE\t")
+        || trimmed.trim_end() == "STYLE"
+        || trimmed.trim_end() == "REGION"
+}
+
+fn flatten_single_line(text: &str) -> String {
+    text.lines()
+        .map(|l| l.trim())
+        .filter(|l| !l.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 #[derive(Clone, Debug)]
@@ -79,23 +105,17 @@ impl ParsedSubtitle {
                 // VTT metadata blocks (NOTE/STYLE/REGION) may legally contain
                 // "-->" inside their text; consume the whole block verbatim
                 // instead of misparsing a note as a cue timeline.
-                if format_lower == "vtt" {
-                    let trimmed_tag = line.trim_start();
-                    if trimmed_tag.starts_with("NOTE")
-                        || trimmed_tag.starts_with("STYLE")
-                        || trimmed_tag.starts_with("REGION")
-                    {
-                        file_lines.push(FileLine::Other(line.clone()));
+                if format_lower == "vtt" && is_vtt_metadata_block_header(line) {
+                    file_lines.push(FileLine::Other(line.clone()));
+                    i += 1;
+                    while i < lines.len() && !lines[i].trim().is_empty() {
+                        file_lines.push(FileLine::Other(lines[i].clone()));
                         i += 1;
-                        while i < lines.len() && !lines[i].trim().is_empty() {
-                            file_lines.push(FileLine::Other(lines[i].clone()));
-                            i += 1;
-                        }
-                        continue;
                     }
+                    continue;
                 }
 
-                if line.contains("-->") {
+                if is_subtitle_timeline(line) {
                     let timeline = line.clone();
                     let mut cue_id = None;
 
@@ -108,8 +128,8 @@ impl ParsedSubtitle {
                             && if format_lower == "srt" {
                                 trimmed.chars().all(|c| c.is_ascii_digit())
                             } else {
-                                !trimmed.contains("-->")
-                                    && !trimmed.starts_with("NOTE")
+                                !is_subtitle_timeline(trimmed)
+                                    && !is_vtt_metadata_block_header(trimmed)
                                     && !trimmed.starts_with("WEBVTT")
                             };
                         if is_valid_cue_id {
@@ -123,12 +143,12 @@ impl ParsedSubtitle {
                     i += 1;
                     while i < lines.len()
                         && !lines[i].trim().is_empty()
-                        && !lines[i].contains("-->")
+                        && !is_subtitle_timeline(&lines[i])
                     {
                         // If it is a sequence number and the NEXT line is a timeline, then this line is actually the start of the next cue
                         if lines[i].trim().chars().all(|c| c.is_ascii_digit())
                             && i + 1 < lines.len()
-                            && lines[i + 1].contains("-->")
+                            && is_subtitle_timeline(&lines[i + 1])
                         {
                             break;
                         }
@@ -241,14 +261,20 @@ impl ParsedSubtitle {
                                 output_lines.push(text.clone());
                             }
                         } else if self.format == "lrc" {
-                            if text.is_empty() {
+                            let single_line = flatten_single_line(text);
+                            if single_line.is_empty() {
                                 output_lines.push(cue.timeline.clone());
                             } else {
-                                output_lines.push(format!("{} {}", cue.timeline, text));
+                                output_lines.push(format!("{} {}", cue.timeline, single_line));
                             }
                         } else {
                             // TXT
-                            output_lines.push(text.clone());
+                            let single_line = flatten_single_line(text);
+                            output_lines.push(if single_line.is_empty() {
+                                text.clone()
+                            } else {
+                                single_line
+                            });
                         }
                     }
                 }
@@ -423,5 +449,46 @@ mod tests {
             out,
             "1\n00:00:01,000 --> 00:00:02,000\nسلام\n\n2\n00:00:03,000 --> 00:00:04,000\n\n3\n00:00:05,000 --> 00:00:06,000\nدنیا\n"
         );
+    }
+
+    #[test]
+    fn lrc_and_txt_flatten_multiline_translations_to_single_line() {
+        let lrc = parse("[00:10.00]First line\n[00:20.00]Second line\n", "lrc");
+        let lrc_out = lrc.reconstruct(&map(&[(1, "خط اول\nادامه خط اول"), (2, "خط دوم")]));
+        assert_eq!(lrc_out, "[00:10.00] خط اول ادامه خط اول\n[00:20.00] خط دوم\n");
+
+        let txt = parse("Line one\nLine two\n", "txt");
+        let txt_out = txt.reconstruct(&map(&[(1, "خط یک\nادامه"), (2, "خط دو")]));
+        assert_eq!(txt_out, "خط یک ادامه\nخط دو\n");
+    }
+
+    #[test]
+    fn vtt_cue_ids_with_note_style_region_prefixes_are_not_dropped() {
+        let content = "WEBVTT\n\nNOTE_1\n00:00:01.000 --> 00:00:02.000\nFirst\n\nSTYLE_2\n00:00:03.000 --> 00:00:04.000\nSecond\n\nREGION-A\n00:00:05.000 --> 00:00:06.000\nThird\n";
+        let p = parse(content, "vtt");
+        assert_eq!(p.cues.len(), 3);
+        assert_eq!(p.cues[0].cue_id.as_deref(), Some("NOTE_1"));
+        assert_eq!(p.cues[1].cue_id.as_deref(), Some("STYLE_2"));
+        assert_eq!(p.cues[2].cue_id.as_deref(), Some("REGION-A"));
+    }
+
+    #[test]
+    fn srt_and_vtt_dialogue_containing_arrow_is_preserved_as_text() {
+        let srt = "1\n00:00:01,000 --> 00:00:04,000\nInput --> Output\nNext line\n";
+        let p_srt = parse(srt, "srt");
+        assert_eq!(p_srt.cues.len(), 1);
+        assert_eq!(p_srt.cues[0].text, "Input --> Output\nNext line");
+        let out_srt = p_srt.reconstruct(&map(&[(1, "ورودی --> خروجی\nخط بعدی")]));
+        assert_eq!(
+            out_srt,
+            "1\n00:00:01,000 --> 00:00:04,000\nورودی --> خروجی\nخط بعدی\n"
+        );
+
+        let vtt = "WEBVTT\n\n00:00:01.000 --> 00:00:04.000\nA --> B\n";
+        let p_vtt = parse(vtt, "vtt");
+        assert_eq!(p_vtt.cues.len(), 1);
+        assert_eq!(p_vtt.cues[0].text, "A --> B");
+        let out_vtt = p_vtt.reconstruct(&map(&[(1, "الف --> ب")]));
+        assert_eq!(out_vtt, "WEBVTT\n\n00:00:01.000 --> 00:00:04.000\nالف --> ب\n");
     }
 }

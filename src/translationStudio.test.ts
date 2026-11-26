@@ -74,21 +74,24 @@ describe('subtitle loading', () => {
   });
 
   it.each([true, false])('ignores a stale companion probe after clearing (success: %s)', async success => {
-    const probe = deferred<unknown>();
+    const probe = deferred<string | null>();
     invoke.mockImplementation(cmd => {
       if (cmd === 'read_text_file_content') return Promise.resolve('AAA');
       if (cmd === 'get_file_size') return Promise.resolve(3);
-      return probe.promise;
+      if (cmd === 'find_existing_video_file') return probe.promise;
+      return Promise.resolve(null);
     });
     const controller = new TranslationStudioController();
     await controller.loadSubtitleFile('/A.txt');
-    expect(invoke).toHaveBeenCalledWith('probe_media_file', { filePath: '/A.mp4' });
+    expect(invoke).toHaveBeenCalledWith('find_existing_video_file', {
+      candidates: expect.arrayContaining(['/A.mp4']),
+    });
     controller.clearLoadedSubtitle();
-    if (success) probe.resolve({ exists: true });
-    else probe.resolve({ exists: false });
+    if (success) probe.resolve('/A.mp4');
+    else probe.resolve(null);
     await new Promise(resolve => setTimeout(resolve, 0));
     expect(controller.state.companionVideoPath).toBeNull();
-    expect(invoke.mock.calls.filter(([cmd]) => cmd === 'probe_media_file')).toHaveLength(1);
+    expect(invoke.mock.calls.filter(([cmd]) => cmd === 'find_existing_video_file')).toHaveLength(1);
   });
 
   it.each([12, null])('uses disk bytes or UTF-8 fallback for Persian text (size: %s)', async size => {
@@ -137,12 +140,13 @@ describe('subtitle loading', () => {
     expect(notifySpy).toHaveBeenCalledWith(expect.stringContaining('Clipboard unavailable'), 'error');
   });
 
-  it('detectCompanionVideo ignores exists:false probes and finds existing video or active media fallback', async () => {
+  it('detectCompanionVideo uses fast find_existing_video_file, falls back to probe_media_file, and does not overwrite explicit setCompanionVideo', async () => {
     invoke.mockImplementation((cmd: string, args: any) => {
       if (cmd === 'read_text_file_content') return Promise.resolve('1\n00:00:01,000 --> 00:00:02,000\nHi');
       if (cmd === 'get_file_size') return Promise.resolve(40);
-      if (cmd === 'probe_media_file') {
-        return Promise.resolve({ exists: args.filePath === '/videos/movie.mkv' });
+      if (cmd === 'find_existing_video_file') {
+        const match = (args.candidates as string[]).find(c => c === '/videos/movie.mkv');
+        return Promise.resolve(match || null);
       }
       return Promise.resolve(null);
     });
@@ -151,12 +155,13 @@ describe('subtitle loading', () => {
     await controller.loadSubtitleFile('/videos/movie.en.srt');
     await vi.waitFor(() => expect(controller.state.companionVideoPath).toBe('/videos/movie.mkv'));
 
-    // Fallback to active Transcribe media when no sibling exists
+    // Fallback to active Transcribe media + probe_media_file when find_existing_video_file is unavailable
     const origGetMedia = (globalThis as any).window.getCurrentSourceMediaFile;
     (globalThis as any).window.getCurrentSourceMediaFile = () => '/active/clip.ts';
     invoke.mockImplementation((cmd: string, args: any) => {
       if (cmd === 'read_text_file_content') return Promise.resolve('1\n00:00:01,000 --> 00:00:02,000\nHi');
       if (cmd === 'get_file_size') return Promise.resolve(40);
+      if (cmd === 'find_existing_video_file') return Promise.reject(new Error('Unsupported'));
       if (cmd === 'probe_media_file') {
         return Promise.resolve({ exists: args.filePath === '/active/clip.ts' });
       }
@@ -168,6 +173,20 @@ describe('subtitle loading', () => {
     } finally {
       (globalThis as any).window.getCurrentSourceMediaFile = origGetMedia;
     }
+
+    // Explicit setCompanionVideo (e.g. from workflowBridge) is not overwritten by an in-flight probe
+    const delayedProbe = deferred<string | null>();
+    invoke.mockImplementation((cmd: string) => {
+      if (cmd === 'read_text_file_content') return Promise.resolve('1\n00:00:01,000 --> 00:00:02,000\nHi');
+      if (cmd === 'get_file_size') return Promise.resolve(40);
+      if (cmd === 'find_existing_video_file') return delayedProbe.promise;
+      return Promise.resolve(null);
+    });
+    await controller.loadSubtitleFile('/race/sub.srt');
+    controller.setCompanionVideo('/explicit/source.mp4');
+    delayedProbe.resolve('/race/sub.mkv');
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(controller.state.companionVideoPath).toBe('/explicit/source.mp4');
   });
 
   it('updates start button disabled state and tooltip title based on subtitle, model, and translating readiness', () => {
@@ -1252,6 +1271,662 @@ describe('translation studio bugfixes and edge cases', () => {
       expect(targetDomList.children).toHaveLength(1);
     } finally {
       (globalThis as any).document = origDoc;
+    }
+  });
+
+  it('handles Nothing to translate without 100% complete contradiction, displays preflight error in telemetry, keeps btnOpenFolder enabled for empty-cue files, and updates aria-valuenow', async () => {
+    const tauriListeners: Record<string, (e: any) => void> = {};
+    const origDoc = (globalThis as any).document;
+    const origWin = (globalThis as any).window;
+
+    let invokeHandler!: (cmd: string, args?: any) => Promise<any>;
+    const invokeLocal = vi.fn((cmd: string, args?: any) => invokeHandler(cmd, args));
+
+    const makeEl = () => {
+      const attrs: Record<string, string> = {};
+      return {
+        textContent: '',
+        title: '',
+        className: '',
+        innerHTML: '',
+        dataset: {} as Record<string, string>,
+        style: {} as Record<string, string>,
+        disabled: false,
+        setAttribute(k: string, v: string) { attrs[k] = v; },
+        removeAttribute(k: string) { delete attrs[k]; },
+        getAttribute(k: string) { return attrs[k] ?? null; },
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      };
+    };
+
+    const statusBadge = makeEl();
+    const lblMsg = makeEl();
+    const lblPct = makeEl();
+    const progressFill = makeEl();
+    const progressTrack = makeEl();
+    const btnOpenFolder = makeEl();
+    const btnCopy = makeEl();
+    const btnSendToHardsub = makeEl();
+
+    (globalThis as any).document = {
+      readyState: 'loading',
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    };
+    (globalThis as any).window = {
+      ...origWin,
+      __TAURI__: {
+        core: { invoke: invokeLocal },
+        event: {
+          listen: vi.fn((ev: string, cb: (e: any) => void) => {
+            tauriListeners[ev] = cb;
+            return Promise.resolve(() => {});
+          }),
+        },
+      },
+      settingsState: { translateAiProviders: '[]' },
+      showNotification: vi.fn(),
+    };
+
+    try {
+      const controller = new TranslationStudioController();
+      (controller as any).statusBadge = statusBadge;
+      (controller as any).lblMsg = lblMsg;
+      (controller as any).lblLines = makeEl();
+      (controller as any).lblPct = lblPct;
+      (controller as any).progressFill = progressFill;
+      (controller as any).progressTrack = progressTrack;
+      (controller as any).telemetryBox = makeEl();
+      (controller as any).btnStart = makeEl();
+      (controller as any).btnStartText = makeEl();
+      (controller as any).btnCancel = makeEl();
+      (controller as any).btnOpenFolder = btnOpenFolder;
+      (controller as any).btnCopy = btnCopy;
+      (controller as any).btnSendToHardsub = btnSendToHardsub;
+
+      (controller as any).listenToProgressEvents();
+      await Promise.resolve();
+
+      // Nothing to translate must reset progress to 0% and never report complete
+      tauriListeners['translation-status']?.({
+        payload: { active: false, progress: 1.0, message: 'Nothing to translate' },
+      });
+      expect(progressFill.style.width).toBe('0%');
+      expect(lblPct.textContent).toBe('0%');
+      expect(progressTrack.getAttribute('aria-valuenow')).toBe('0');
+      expect(statusBadge.getAttribute('data-i18n')).toBe('translate.statusReady');
+      expect(lblMsg.textContent).toBe('No Translation Yet');
+
+      // Empty translatedFiles return resets telemetry cleanly with failed status
+      controller.state.subtitlePath = '/dir/sub.srt';
+      controller.state.subtitleName = 'sub.srt';
+      controller.state.subtitleExt = 'srt';
+      controller.state.activeProvider = 'OpenAI';
+      controller.state.activeModel = 'gpt-4o';
+      invokeHandler = vi.fn().mockResolvedValue([]);
+      await controller.startTranslation();
+      expect(statusBadge.getAttribute('data-i18n')).toBe('translate.statusFailed');
+      expect(progressFill.style.width).toBe('0%');
+      expect(lblPct.textContent).toBe('0%');
+      expect(lblMsg.textContent).toContain('No translated subtitle was produced');
+
+      // Pre-flight error (before any translation-status event) populates lblMsg
+      invokeHandler = vi.fn().mockRejectedValue('Output directory is not writable');
+      await controller.startTranslation();
+      expect(statusBadge.getAttribute('data-i18n')).toBe('translate.statusFailed');
+      expect(lblMsg.textContent).toContain('Output directory is not writable');
+
+      // syncFromGlobalSettings is a no-op while translating
+      controller.state.activeModel = 'gpt-4o';
+      controller.state.isTranslating = true;
+      (globalThis as any).window.settingsState = { translateAiTargetLang: 'French' };
+      controller.syncFromGlobalSettings();
+      expect(controller.state.targetLang).not.toBe('French');
+      controller.state.isTranslating = false;
+
+      // btnOpenFolder is enabled when translatedPath exists even if translatedCues is empty
+      controller.state.translatedPath = '/dir/empty.fa.srt';
+      controller.state.translatedCues = [];
+      (controller as any).updateActionButtons();
+      expect(btnOpenFolder.disabled).toBe(false);
+      expect(btnCopy.disabled).toBe(true);
+      expect(btnSendToHardsub.disabled).toBe(true);
+    } finally {
+      (globalThis as any).document = origDoc;
+      (globalThis as any).window = origWin;
+    }
+  });
+
+  it('clears .highlighted on mouseout during scroll throttling, deduplicates DOM IDs for duplicate SRT cue numbers, parses VTT NOTE_1/REGION-A cues, and handles Tauri drag-over/leave/drop feedback', async () => {
+    const { parseSubtitleContent } = await import('./translationStudio');
+    const vttCues = parseSubtitleContent(
+      'WEBVTT\n\nNOTE_1\n00:00:01.000 --> 00:00:02.000\nFirst\n\nNOTE This is a comment\n00:00:03.000 --> 00:00:04.000\n\nREGION-A\n00:00:05.000 --> 00:00:06.000\nSecond\n',
+      'vtt'
+    );
+    expect(vttCues).toHaveLength(2);
+    expect(vttCues[0].text).toBe('First');
+    expect(vttCues[1].text).toBe('Second');
+
+    const tauriListeners: Record<string, (e: any) => void> = {};
+    const listListeners: Record<string, Record<string, (e: any) => void>> = {
+      source: {},
+      target: {},
+    };
+    const origDoc = (globalThis as any).document;
+    const origWin = (globalThis as any).window;
+
+    const makeDomNode = (tag: string, id = '') => {
+      const classes = new Set<string>();
+      const attrs: Record<string, string> = {};
+      const node: any = {
+        tagName: tag.toUpperCase(),
+        id,
+        className: '',
+        tabIndex: 0,
+        textContent: '',
+        innerHTML: '',
+        dataset: {} as Record<string, string>,
+        children: [] as any[],
+        classList: {
+          add: (c: string) => classes.add(c),
+          remove: (c: string) => classes.delete(c),
+          contains: (c: string) => classes.has(c),
+        },
+        setAttribute(k: string, v: string) { attrs[k] = v; },
+        removeAttribute(k: string) { delete attrs[k]; },
+        getAttribute(k: string) { return attrs[k] ?? null; },
+        appendChild(c: any) { this.children.push(c); return c; },
+        replaceChildren(...nodes: any[]) { this.children = nodes; },
+        closest(sel: string) {
+          if (sel === '.translate-cue-item' && (classes.has('translate-cue-item') || this.className.includes('translate-cue-item'))) {
+            return node;
+          }
+          return null;
+        },
+      };
+      return node;
+    };
+
+    const domNodesById = new Map<string, any>();
+    const dropZone = makeDomNode('div', 'translate-drop-zone');
+    dropZone.addEventListener = vi.fn();
+    const sourceList = makeDomNode('div', 'translate-source-cues-list');
+    sourceList.addEventListener = vi.fn((evt: string, cb: any) => { listListeners.source[evt] = cb; });
+    const targetList = makeDomNode('div', 'translate-target-cues-list');
+    targetList.addEventListener = vi.fn((evt: string, cb: any) => { listListeners.target[evt] = cb; });
+
+    (globalThis as any).document = {
+      readyState: 'loading',
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      createElement: (tag: string) => makeDomNode(tag),
+      createDocumentFragment: () => makeDomNode('fragment'),
+      getElementById: vi.fn((id: string) => domNodesById.get(id) ?? null),
+      querySelector: vi.fn((sel: string) => (sel === '.view-panel.active' ? { id: 'panel-translate' } : null)),
+    };
+    (globalThis as any).window = {
+      ...origWin,
+      __TAURI__: {
+        core: { invoke: vi.fn() },
+        event: {
+          listen: vi.fn((ev: string, cb: (e: any) => void) => {
+            tauriListeners[ev] = cb;
+            return Promise.resolve(() => {});
+          }),
+        },
+      },
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      showNotification: vi.fn(),
+    };
+
+    try {
+      const controller = new TranslationStudioController();
+      (controller as any).dropZone = dropZone;
+      (controller as any).sourceList = sourceList;
+      (controller as any).targetList = targetList;
+      (controller as any).sourceCountBadge = makeDomNode('span');
+      (controller as any).targetCountBadge = makeDomNode('span');
+      (controller as any).setupDropZone();
+      (controller as any).setupSynchronizedHighlighting();
+      await Promise.resolve();
+
+      // Duplicate SRT cue numbers (#1, #1) render with distinct DOM IDs (1, 2)
+      controller.state.sourceCues = [
+        { id: 1, startMs: 0, endMs: 1000, startTimeStr: '00:00:00,000', endTimeStr: '00:00:01,000', text: 'First' },
+        { id: 1, startMs: 1000, endMs: 2000, startTimeStr: '00:00:01,000', endTimeStr: '00:00:02,000', text: 'Second' },
+      ];
+      controller.state.translatedCues = [
+        { id: 1, startMs: 0, endMs: 1000, startTimeStr: '00:00:00,000', endTimeStr: '00:00:01,000', text: 'اول' },
+        { id: 1, startMs: 1000, endMs: 2000, startTimeStr: '00:00:01,000', endTimeStr: '00:00:02,000', text: 'دوم' },
+      ];
+      (controller as any).renderSourceCues();
+      (controller as any).renderTargetCues();
+      const srcItems = sourceList.children[0].children;
+      const tgtItems = targetList.children[0].children;
+      expect(srcItems[0].id).toBe('translate-source-cue-1');
+      expect(srcItems[1].id).toBe('translate-source-cue-2');
+      expect(tgtItems[1].id).toBe('translate-target-cue-2');
+
+      domNodesById.set(srcItems[1].id, srcItems[1]);
+      domNodesById.set(tgtItems[1].id, tgtItems[1]);
+
+      // Hover highlights both; mouseout clears even when isScrollingThrottled is true
+      listListeners.source.mouseover({ target: srcItems[1] });
+      expect(srcItems[1].classList.contains('highlighted')).toBe(true);
+      expect(tgtItems[1].classList.contains('highlighted')).toBe(true);
+      (controller as any).isScrollingThrottled = true;
+      listListeners.source.mouseout({ target: srcItems[1], relatedTarget: null });
+      expect(srcItems[1].classList.contains('highlighted')).toBe(false);
+      expect(tgtItems[1].classList.contains('highlighted')).toBe(false);
+
+      // Tauri drag-over/leave and unsupported extension error feedback on drop
+      tauriListeners['tauri://drag-over']?.({ payload: {} });
+      expect(dropZone.classList.contains('drag-over')).toBe(true);
+      tauriListeners['tauri://drag-leave']?.({ payload: {} });
+      expect(dropZone.classList.contains('drag-over')).toBe(false);
+
+      await tauriListeners['tauri://drag-drop']?.({ payload: { paths: ['/tmp/video.mp4'] } });
+      expect((globalThis as any).window.showNotification).toHaveBeenCalledWith(
+        expect.stringContaining('Unsupported subtitle format'),
+        'error'
+      );
+
+      controller.dispose();
+    } finally {
+      (globalThis as any).document = origDoc;
+      (globalThis as any).window = origWin;
+    }
+  });
+
+  it('preserves SRT/VTT dialogue lines containing -->, syncs learned model limits, guards loadSubtitleFile vs startTranslation race, handles post-translation read errors and API cancelled errors, matches model case-insensitively, and flushes provider switch cleanly', async () => {
+    const { parseSubtitleContent } = await import('./translationStudio');
+
+    const srtWithArrow = parseSubtitleContent(
+      '1\n00:00:01,000 --> 00:00:04,000\nInput --> Output\nNext line\n',
+      'srt'
+    );
+    expect(srtWithArrow).toHaveLength(1);
+    expect(srtWithArrow[0].text).toBe('Input --> Output\nNext line');
+
+    const vttWithArrow = parseSubtitleContent(
+      'WEBVTT\n\n00:00:01.000 --> 00:00:04.000\nA --> B\n',
+      'vtt'
+    );
+    expect(vttWithArrow).toHaveLength(1);
+    expect(vttWithArrow[0].text).toBe('A --> B');
+
+    const tauriListeners: Record<string, (e: any) => void> = {};
+    const origDoc = (globalThis as any).document;
+    const origWin = (globalThis as any).window;
+    const saveCurrentSettingsSpy = vi.fn();
+    const showNotificationSpy = vi.fn();
+    let globalProviderValue = 'OpenAI';
+    let providerChangeHandler: (() => void) | null = null;
+    const onProviderChangedSpy = vi.fn(() => {
+      // Simulate translationProviders.ts reading old settingsState.translateAiProvider before updating to new one
+      expect((globalThis as any).window.settingsState.translateAiProvider).toBe('OpenAI');
+      expect(globalProviderValue).toBe('Anthropic');
+      (globalThis as any).window.settingsState.translateAiProvider = globalProviderValue;
+    });
+
+    const makeEl = () => {
+      const attrs: Record<string, string> = {};
+      return {
+        value: '',
+        textContent: '',
+        title: '',
+        className: '',
+        innerHTML: '',
+        dataset: {} as Record<string, string>,
+        style: {} as Record<string, string>,
+        disabled: false,
+        children: [] as any[],
+        appendChild(c: any) { this.children.push(c); return c; },
+        setAttribute(k: string, v: string) { attrs[k] = v; },
+        removeAttribute(k: string) { delete attrs[k]; },
+        getAttribute(k: string) { return attrs[k] ?? null; },
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      };
+    };
+
+    const statusBadge = makeEl();
+    const lblMsg = makeEl();
+    const providerSelect = makeEl();
+    providerSelect.addEventListener = vi.fn((evt: string, h: any) => {
+      if (evt === 'change') providerChangeHandler = h;
+    });
+    const modelSelect = makeEl();
+    const globalProviderEl: any = { value: 'OpenAI' };
+    Object.defineProperty(globalProviderEl, 'value', {
+      get: () => globalProviderValue,
+      set: (v: string) => { globalProviderValue = v; },
+    });
+
+    let invokeImpl!: (cmd: string, args?: any) => Promise<any>;
+    const invokeLocal = vi.fn((cmd: string, args?: any) => invokeImpl(cmd, args));
+
+    (globalThis as any).document = {
+      readyState: 'loading',
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      createElement: vi.fn(() => ({ value: '', textContent: '' })),
+      getElementById: vi.fn((id: string) => {
+        if (id === 'opt-translateAiProvider') return globalProviderEl;
+        return null;
+      }),
+    };
+    (globalThis as any).window = {
+      ...origWin,
+      __TAURI__: {
+        core: { invoke: invokeLocal },
+        event: {
+          listen: vi.fn((ev: string, cb: (e: any) => void) => {
+            tauriListeners[ev] = cb;
+            return Promise.resolve(() => {});
+          }),
+        },
+      },
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      saveCurrentSettings: saveCurrentSettingsSpy,
+      onProviderChanged: onProviderChangedSpy,
+      showNotification: showNotificationSpy,
+      settingsState: {
+        translateAiProviders: JSON.stringify([
+          { name: 'OpenAI', models: [{ id: 'GPT-4o', enabled: true, contextWindow: 128000 }] },
+          { name: 'Anthropic', models: [{ id: 'claude-3-7', enabled: true }] },
+        ]),
+        translateAiProvider: 'OpenAI',
+        translateAiModel: 'gpt-4o',
+      },
+    };
+
+    try {
+      const controller = new TranslationStudioController();
+      (controller as any).statusBadge = statusBadge;
+      (controller as any).lblMsg = lblMsg;
+      (controller as any).lblLines = makeEl();
+      (controller as any).lblPct = makeEl();
+      (controller as any).progressFill = makeEl();
+      (controller as any).progressTrack = makeEl();
+      (controller as any).telemetryBox = makeEl();
+      (controller as any).btnStart = makeEl();
+      (controller as any).btnStartText = makeEl();
+      (controller as any).btnCancel = makeEl();
+      (controller as any).providerSelect = providerSelect;
+      (controller as any).modelSelect = modelSelect;
+      (controller as any).setupEventListeners();
+      (controller as any).listenToProgressEvents();
+      await Promise.resolve();
+
+      // Case-insensitive model matching
+      controller.refreshProviderOptions();
+      expect(controller.state.activeModel).toBe('GPT-4o');
+      expect(modelSelect.value).toBe('GPT-4o');
+
+      // Provider switch calls onProviderChanged before mutating settingsState.translateAiProvider
+      providerSelect.value = 'Anthropic';
+      providerChangeHandler!();
+      expect(onProviderChangedSpy).toHaveBeenCalledWith(true, true);
+
+      // translation-model-limits-updated updates settingsState and syncs provider cache without calling saveCurrentSettings
+      const syncProviderModelsSpy = vi.fn();
+      (globalThis as any).window.syncProviderModelsFromSettings = syncProviderModelsSpy;
+      const updatedJson = JSON.stringify([
+        { name: 'OpenAI', models: [{ id: 'GPT-4o', enabled: true, contextWindow: 32000 }] },
+      ]);
+      tauriListeners['translation-model-limits-updated']?.({
+        payload: { translateAiProviders: updatedJson },
+      });
+      expect((globalThis as any).window.settingsState.translateAiProviders).toBe(updatedJson);
+      expect(syncProviderModelsSpy).toHaveBeenCalledTimes(1);
+      expect(saveCurrentSettingsSpy).not.toHaveBeenCalled();
+
+      // In-flight loadSubtitleFile is ignored once startTranslation starts
+      controller.state.subtitlePath = '/dir/subA.srt';
+      controller.state.subtitleName = 'subA.srt';
+      controller.state.subtitleExt = 'srt';
+      controller.state.sourceCues = [
+        { id: 1, startMs: 0, endMs: 1000, startTimeStr: '00:00:00,000', endTimeStr: '00:00:01,000', text: 'Alpha' },
+      ];
+      const slowRead = deferred<string>();
+      const translationDeferred = deferred<string[]>();
+      invokeImpl = (cmd: string, args: any) => {
+        if (cmd === 'read_text_file_content' && args.filePath === '/dir/subB.srt') return slowRead.promise;
+        if (cmd === 'translate_transcription_files') return translationDeferred.promise;
+        return Promise.resolve(null);
+      };
+
+      const pendingLoad = controller.loadSubtitleFile('/dir/subB.srt');
+      const runningTranslate = controller.startTranslation();
+      slowRead.resolve('1\n00:00:00,000 --> 00:00:01,000\nBeta');
+      await pendingLoad;
+      expect(controller.state.subtitlePath).toBe('/dir/subA.srt');
+      expect(controller.state.sourceCues[0].text).toBe('Alpha');
+
+      // Upstream API error containing "cancelled" is reported as failure, not user cancellation
+      translationDeferred.reject('API returned error status (402): Subscription cancelled');
+      await runningTranslate;
+      expect(statusBadge.getAttribute('data-i18n')).toBe('translate.statusFailed');
+      expect(lblMsg.textContent).toContain('Subscription cancelled');
+
+      // Post-translation read_text_file_content failure clears completion state and shows error in lblMsg
+      invokeImpl = (cmd: string) => {
+        if (cmd === 'translate_transcription_files') {
+          tauriListeners['translation-status']?.({
+            payload: { active: false, progress: 1.0, currentLine: 1, totalLines: 1, message: 'AI translation complete' },
+          });
+          return Promise.resolve(['subA.fa.srt']);
+        }
+        if (cmd === 'read_text_file_content') {
+          return Promise.reject(new Error('File locked by antivirus'));
+        }
+        return Promise.resolve(null);
+      };
+      await controller.startTranslation();
+      expect(controller.state.translatedPath).toBe('');
+      expect((controller as any).lastProgressIsComplete).toBe(false);
+      expect(statusBadge.getAttribute('data-i18n')).toBe('translate.statusFailed');
+      expect(lblMsg.textContent).toContain('File locked by antivirus');
+
+      controller.dispose();
+    } finally {
+      (globalThis as any).document = origDoc;
+      (globalThis as any).window = origWin;
+    }
+  });
+
+  it('preserves detailed error when late Translation failed event arrives after catch, blocks deleted inputFile fallback in sendToHardsubStudio, prevents over-stripping movie names in detectCompanionVideo, toggles role="list", and cleans up listeners in dispose()', async () => {
+    const tauriListeners: Record<string, (e: any) => void> = {};
+    const origDoc = (globalThis as any).document;
+    const origWin = (globalThis as any).window;
+    const { hardsubController } = await import('./hardsub');
+    const prevPrefill = (hardsubController as any).prefillFilePaths;
+    const prefillSpy = vi.fn();
+    (hardsubController as any).prefillFilePaths = prefillSpy;
+
+    const makeEl = (id = '') => {
+      const attrs: Record<string, string> = {};
+      const classes = new Set<string>();
+      const listeners: Record<string, Array<{ cb: Function; opts?: any }>> = {};
+      return {
+        id,
+        value: '',
+        textContent: '',
+        title: '',
+        className: '',
+        innerHTML: '',
+        dataset: {} as Record<string, string>,
+        style: {} as Record<string, string>,
+        disabled: false,
+        children: [] as any[],
+        listeners,
+        classList: {
+          add: (c: string) => classes.add(c),
+          remove: (c: string) => classes.delete(c),
+          contains: (c: string) => classes.has(c),
+        },
+        appendChild(c: any) { this.children.push(c); return c; },
+        replaceChildren(...nodes: any[]) { this.children = nodes; },
+        setAttribute(k: string, v: string) { attrs[k] = v; },
+        removeAttribute(k: string) { delete attrs[k]; },
+        getAttribute(k: string) { return attrs[k] ?? null; },
+        addEventListener: vi.fn((evt: string, cb: Function, opts?: any) => {
+          listeners[evt] = listeners[evt] || [];
+          listeners[evt].push({ cb, opts });
+        }),
+        removeEventListener: vi.fn((evt: string, cb: Function) => {
+          if (!listeners[evt]) return;
+          listeners[evt] = listeners[evt].filter(entry => entry.cb !== cb);
+        }),
+      };
+    };
+
+    const dropZone = makeEl('translate-drop-zone');
+    const btnBrowseSub = makeEl('btn-browse-translate-sub');
+    const btnStart = makeEl('btn-start-translation');
+    const btnCancel = makeEl('btn-cancel-translation');
+    const sourceList = makeEl('translate-source-cues-list');
+    const targetList = makeEl('translate-target-cues-list');
+    const sourceCountBadge = makeEl('translate-source-count');
+    const targetCountBadge = makeEl('translate-target-count');
+    const lblMsg = makeEl('lbl-translate-msg');
+    const statusBadge = makeEl('translate-status-badge');
+    const progressFill = makeEl('translate-progress-fill');
+    const progressTrack = makeEl('translate-progress-track');
+    const lblPct = makeEl('lbl-translate-pct');
+    const lblLines = makeEl('lbl-translate-lines');
+    const telemetryBox = makeEl('translate-telemetry-box');
+
+    const seenCandidates: string[][] = [];
+    const invokeLocal = vi.fn((cmd: string, args: any) => {
+      if (cmd === 'read_text_file_content') {
+        return Promise.resolve('1\n00:00:01,000 --> 00:00:02,000\nHello');
+      }
+      if (cmd === 'get_file_size') return Promise.resolve(40);
+      if (cmd === 'find_existing_video_file') {
+        seenCandidates.push(args.candidates);
+        return Promise.resolve(args.candidates.find((c: string) => c === '/videos/movie.mp4') || null);
+      }
+      if (cmd === 'translate_transcription_files') {
+        return Promise.reject('API returned error status (401): Invalid API key');
+      }
+      return Promise.resolve(null);
+    });
+
+    (globalThis as any).document = {
+      readyState: 'loading',
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      createElement: () => makeEl(),
+      createDocumentFragment: () => makeEl(),
+      getElementById: vi.fn(() => null),
+      querySelector: vi.fn(() => null),
+    };
+    (globalThis as any).window = {
+      ...origWin,
+      __TAURI__: {
+        core: { invoke: invokeLocal },
+        event: {
+          listen: vi.fn((ev: string, cb: (e: any) => void) => {
+            tauriListeners[ev] = cb;
+            return Promise.resolve(() => {});
+          }),
+        },
+      },
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      showNotification: vi.fn(),
+      switchView: vi.fn(),
+      getCurrentSourceMediaFile: () => '/deleted/stale-video.mp4',
+      settingsState: {
+        translateAiProviders: JSON.stringify([{ name: 'OpenAI', models: [{ id: 'gpt-4o', enabled: true }] }]),
+        translateAiProvider: 'OpenAI',
+        translateAiModel: 'gpt-4o',
+      },
+    };
+
+    try {
+      const controller = new TranslationStudioController();
+      (controller as any).dropZone = dropZone;
+      (controller as any).btnBrowseSub = btnBrowseSub;
+      (controller as any).btnStart = btnStart;
+      (controller as any).btnCancel = btnCancel;
+      (controller as any).sourceList = sourceList;
+      (controller as any).targetList = targetList;
+      (controller as any).sourceCountBadge = sourceCountBadge;
+      (controller as any).targetCountBadge = targetCountBadge;
+      (controller as any).lblMsg = lblMsg;
+      (controller as any).statusBadge = statusBadge;
+      (controller as any).progressFill = progressFill;
+      (controller as any).progressTrack = progressTrack;
+      (controller as any).lblPct = lblPct;
+      (controller as any).lblLines = lblLines;
+      (controller as any).telemetryBox = telemetryBox;
+      (controller as any).setupEventListeners();
+      (controller as any).setupDropZone();
+      (controller as any).listenToProgressEvents();
+      await Promise.resolve();
+
+      // 1. Late "Translation failed" event must NOT erase detailed error from catch block
+      controller.state.subtitlePath = '/videos/alien.srt';
+      controller.state.subtitleName = 'alien.srt';
+      controller.state.subtitleExt = 'srt';
+      controller.state.activeModel = 'gpt-4o';
+      controller.state.sourceCues = [
+        { id: 1, startMs: 0, endMs: 1000, startTimeStr: '00:00:00,000', endTimeStr: '00:00:01,000', text: 'Hi' },
+      ];
+      await controller.startTranslation();
+      expect(lblMsg.textContent).toContain('Invalid API key');
+      expect(lblMsg.title).toContain('Invalid API key');
+
+      tauriListeners['translation-status']?.({
+        payload: { active: false, progress: 0, message: 'Translation failed' },
+      });
+      expect(lblMsg.textContent).toContain('Invalid API key');
+      expect(lblMsg.title).toContain('Invalid API key');
+      controller.refreshLocalization();
+      expect(lblMsg.textContent).toContain('Invalid API key');
+
+      // 2. detectCompanionVideo does not strip non-separated suffixes from movie names like alien.srt / avatar.srt / frozen.srt
+      await controller.loadSubtitleFile('/videos/alien.srt');
+      await vi.waitFor(() => expect(seenCandidates.length).toBe(1));
+      expect(seenCandidates[0]).not.toContain('/videos/ali.mp4');
+      expect(seenCandidates[0]).toContain('/videos/alien.mp4');
+      expect(controller.state.companionVideoPath).toBeNull();
+
+      // Completed null probe blocks resurrecting deleted getCurrentSourceMediaFile() in sendToHardsubStudio()
+      controller.state.translatedPath = '/videos/alien.fa.srt';
+      controller.sendToHardsubStudio();
+      expect(prefillSpy).toHaveBeenCalledWith('', '/videos/alien.fa.srt');
+
+      // Separated language/translation suffixes still match companion video
+      await controller.loadSubtitleFile('/videos/movie_translated.en.srt');
+      await vi.waitFor(() => expect(controller.state.companionVideoPath).toBe('/videos/movie.mp4'));
+
+      // 3. renderCueList removes role="list" when empty and sets role="list" when populated
+      expect(sourceList.getAttribute('role')).toBe('list');
+      expect(targetList.getAttribute('role')).toBeNull();
+
+      // 4. dispose() cleans up DOM listeners registered in setupEventListeners & setupDropZone
+      expect(dropZone.listeners.click?.length).toBe(1);
+      expect(dropZone.listeners.drop?.length).toBe(1);
+      expect(btnBrowseSub.listeners.click?.length).toBe(1);
+      controller.dispose();
+      expect(dropZone.listeners.click?.length).toBe(0);
+      expect(dropZone.listeners.drop?.length).toBe(0);
+      expect(btnBrowseSub.listeners.click?.length).toBe(0);
+    } finally {
+      if (prevPrefill === undefined) {
+        delete (hardsubController as any).prefillFilePaths;
+      } else {
+        (hardsubController as any).prefillFilePaths = prevPrefill;
+      }
+      (globalThis as any).document = origDoc;
+      (globalThis as any).window = origWin;
     }
   });
 });

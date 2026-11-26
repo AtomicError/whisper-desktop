@@ -85,10 +85,23 @@ fn numbered_line_re() -> &'static regex::Regex {
 /// sequence order instead of trusting the capture blindly.
 fn looks_like_numbered_timecode(line: &str) -> bool {
     static RE: OnceLock<regex::Regex> = OnceLock::new();
+    let normalized = normalize_digits(line);
     RE.get_or_init(|| {
         regex::Regex::new(r"^\d{1,3}\s*[:：]\s*\d{1,2}\s*[:：]").expect("static regex")
     })
-    .is_match(line)
+    .is_match(&normalized)
+}
+
+/// Detects bare clock times without a cue-separator space (e.g. `9:00 صبح است`,
+/// `12:30`, `۹:۰۰`, `12:30:45`) so continuation dialogue starting with a clock
+/// time cannot hijack a future cue slot inside the same chunk.
+fn looks_like_bare_clock_time(line: &str) -> bool {
+    static RE: OnceLock<regex::Regex> = OnceLock::new();
+    let normalized = normalize_digits(line);
+    RE.get_or_init(|| {
+        regex::Regex::new(r"^(?:[01]?\d|2[0-3])[:：][0-5]\d(?:$|[^\d])").expect("static regex")
+    })
+    .is_match(&normalized)
 }
 
 /// Maps Persian/Arabic-Indic digits to ASCII so model responses that ignore
@@ -174,17 +187,24 @@ impl Drop for TranslationStatusGuard {
 
 fn resolve_next_output_cap(
     current_override: Option<u32>,
+    sent_tokens: Option<u32>,
     exact_cap: Option<u32>,
 ) -> Result<u32, String> {
-    let current = current_override.unwrap_or_else(|| estimate_max_output_tokens(0, None));
+    let current = match (current_override, sent_tokens) {
+        (Some(o), Some(s)) => o.min(s),
+        (Some(o), None) => o,
+        (None, Some(s)) => s,
+        (None, None) => DEFAULT_MAX_OUTPUT_TOKENS,
+    };
     if current <= MIN_OUTPUT_TOKENS && exact_cap.is_none() {
         return Err(format!(
             "Model rejected every output cap down to {} tokens; its max_tokens limit could not be satisfied.",
             MIN_OUTPUT_TOKENS
         ));
     }
+    let ceiling = current_override.map(|o| o.min(current)).unwrap_or(u32::MAX);
     let new_cap = exact_cap
-        .filter(|&cap| cap < current_override.unwrap_or(u32::MAX))
+        .filter(|&cap| cap < ceiling)
         .unwrap_or_else(|| (current / 2).max(MIN_OUTPUT_TOKENS));
     if new_cap < MIN_OUTPUT_TOKENS || (current_override.is_some() && new_cap >= current) {
         return Err(format!(
@@ -236,28 +256,33 @@ fn emit_cancelled(app: &AppHandle, last_progress: f64) {
     emit_status(app, last_progress, "Translation cancelled", false, None);
 }
 
-/// Maps common target languages to their standard ISO 2-letter codes.
-/// Falls back to the lowercase language name if not found.
+/// Maps common target languages to their standard ISO / BCP-47 codes.
+/// Aligned with `TRANSLATION_TARGET_LANGUAGES` in `src/languages.ts`.
+/// Falls back to a sanitized lowercase language name if not found.
 pub fn get_language_code(lang: &str) -> String {
-    match lang.to_lowercase().as_str() {
+    match lang.trim().to_lowercase().as_str() {
         "persian" | "farsi" => "fa".to_string(),
+        "dari" => "fa-AF".to_string(),
         "spanish" => "es".to_string(),
         "french" => "fr".to_string(),
         "german" => "de".to_string(),
         "italian" => "it".to_string(),
         "russian" => "ru".to_string(),
-        "chinese" | "chinese (simplified)" => "zh".to_string(),
-        "chinese (traditional)" => "zh-TW".to_string(),
+        "chinese" | "chinese (simplified)" | "simplified chinese" => "zh".to_string(),
+        "chinese (traditional)" | "traditional chinese" => "zh-TW".to_string(),
+        "cantonese" => "yue".to_string(),
         "arabic" => "ar".to_string(),
         "turkish" => "tr".to_string(),
         "portuguese" => "pt".to_string(),
+        "portuguese (brazil)" => "pt-BR".to_string(),
+        "portuguese (portugal)" => "pt-PT".to_string(),
         "japanese" => "ja".to_string(),
         "korean" => "ko".to_string(),
         "english" => "en".to_string(),
         "dutch" => "nl".to_string(),
         "polish" => "pl".to_string(),
         "swedish" => "sv".to_string(),
-        "norwegian" => "no".to_string(),
+        "norwegian" | "norwegian bokmål" | "norwegian bokmal" => "nb".to_string(),
         "danish" => "da".to_string(),
         "finnish" => "fi".to_string(),
         "greek" => "el".to_string(),
@@ -274,12 +299,92 @@ pub fn get_language_code(lang: &str) -> String {
         "vietnamese" => "vi".to_string(),
         "thai" => "th".to_string(),
         "kurdish" => "ku".to_string(),
+        "central kurdish" => "ckb".to_string(),
+        "northern kurdish" => "kmr".to_string(),
         "pashto" => "ps".to_string(),
         "azerbaijani" => "az".to_string(),
         "uzbek" => "uz".to_string(),
         "kazakh" => "kk".to_string(),
         "tagalog" | "filipino" => "tl".to_string(),
         "swahili" => "sw".to_string(),
+        "catalan" => "ca".to_string(),
+        "serbian" => "sr".to_string(),
+        "bulgarian" => "bg".to_string(),
+        "armenian" => "hy".to_string(),
+        "albanian" => "sq".to_string(),
+        "slovak" => "sk".to_string(),
+        "croatian" => "hr".to_string(),
+        "belarusian" => "be".to_string(),
+        "sicilian" => "scn".to_string(),
+        "georgian" => "ka".to_string(),
+        "lombard" => "lmo".to_string(),
+        "lithuanian" => "lt".to_string(),
+        "galician" => "gl".to_string(),
+        "bosnian" => "bs".to_string(),
+        "slovenian" => "sl".to_string(),
+        "macedonian" => "mk".to_string(),
+        "latvian" => "lv".to_string(),
+        "estonian" => "et".to_string(),
+        "icelandic" => "is".to_string(),
+        "maltese" => "mt".to_string(),
+        "welsh" => "cy".to_string(),
+        "irish" => "ga".to_string(),
+        "breton" => "br".to_string(),
+        "basque" => "eu".to_string(),
+        "yiddish" => "yi".to_string(),
+        "luxembourgish" => "lb".to_string(),
+        "occitan" => "oc".to_string(),
+        "aragonese" => "an".to_string(),
+        "latin" => "la".to_string(),
+        "esperanto" => "eo".to_string(),
+        "kyrgyz" => "ky".to_string(),
+        "turkmen" => "tk".to_string(),
+        "tajik" => "tg".to_string(),
+        "mongolian" => "mn".to_string(),
+        "bashkir" => "ba".to_string(),
+        "tatar" => "tt".to_string(),
+        "uyghur" => "ug".to_string(),
+        "marathi" => "mr".to_string(),
+        "telugu" => "te".to_string(),
+        "tamil" => "ta".to_string(),
+        "gujarati" => "gu".to_string(),
+        "kannada" => "kn".to_string(),
+        "punjabi" => "pa".to_string(),
+        "malayalam" => "ml".to_string(),
+        "bhojpuri" => "bho".to_string(),
+        "maithili" => "mai".to_string(),
+        "nepali" => "ne".to_string(),
+        "sinhala" => "si".to_string(),
+        "assamese" => "as".to_string(),
+        "konkani" => "kok".to_string(),
+        "sanskrit" => "sa".to_string(),
+        "lao" => "lo".to_string(),
+        "burmese" => "my".to_string(),
+        "khmer" => "km".to_string(),
+        "javanese" => "jv".to_string(),
+        "sundanese" => "su".to_string(),
+        "acehnese" => "ace".to_string(),
+        "pangasinan" => "pag".to_string(),
+        "pampangan" => "pam".to_string(),
+        "cebuano" => "ceb".to_string(),
+        "hausa" => "ha".to_string(),
+        "amharic" => "am".to_string(),
+        "igbo" => "ig".to_string(),
+        "wolof" => "wo".to_string(),
+        "xhosa" => "xh".to_string(),
+        "zulu" => "zu".to_string(),
+        "afrikaans" => "af".to_string(),
+        "oromo" => "om".to_string(),
+        "southern sotho" => "st".to_string(),
+        "tswana" => "tn".to_string(),
+        "tsonga" => "ts".to_string(),
+        "malagasy" => "mg".to_string(),
+        "lingala" => "ln".to_string(),
+        "haitian creole" => "ht".to_string(),
+        "quechua" => "qu".to_string(),
+        "aymara" => "ay".to_string(),
+        "guarani" => "gn".to_string(),
+        "maori" => "mi".to_string(),
         _ => sanitize_filename_code(lang),
     }
 }
@@ -404,33 +509,66 @@ fn parse_translated_lines(
             if let (Some(num_cap), Some(val_cap)) = (caps.get(1), caps.get(2)) {
                 let normalized = normalize_digits(num_cap.as_str());
                 if let Ok(idx) = normalized.parse::<usize>() {
-                    // Disambiguation: "12:30 نیمه‌شب" where 12 was NOT the
-                    // cue we were waiting for and is not an allowed cue is
-                    // dialogue starting with a time. If it IS an allowed future
-                    // cue and has dialogue text, accept it.
                     let next_expected = expected_order.get(expect_pos).copied();
-                    let is_expected_ahead = expected_order.get(expect_pos..)
-                        .map(|slice| slice.contains(&idx))
+                    let is_bare_clock = looks_like_bare_clock_time(trimmed);
+                    let has_separator_space = trimmed
+                        .find([':', '：'])
+                        .and_then(|pos| {
+                            let sep_len = trimmed[pos..].chars().next()?.len_utf8();
+                            Some(trimmed[pos + sep_len..].starts_with(char::is_whitespace))
+                        })
                         .unwrap_or(false);
-                    let is_timecode_like = looks_like_numbered_timecode(trimmed);
+                    let normalized_val = normalize_digits(val_cap.as_str());
+                    let is_compact_numeric = !has_separator_space
+                        && normalized_val.chars().next().is_some_and(|c| c.is_ascii_digit());
+                    let matched_pos = expected_order.iter().position(|&e| e == idx);
+                    let is_behind_duplicate =
+                        matched_pos.is_some_and(|pos| pos < expect_pos) && map.contains_key(&idx);
 
-                    let should_accept = Some(idx) == next_expected
-                        || (!is_timecode_like && in_allowed(idx))
-                        || (is_expected_ahead && in_allowed(idx) && !val_cap.as_str().trim().is_empty());
+                    // If a line looks like a bare clock time, a compact N:M numeric ratio/time
+                    // without a separator space, or an already-translated behind-cursor number
+                    // inside an active cue and does not match the next expected cue number, treat
+                    // it as continuation dialogue rather than overwriting an earlier cue or
+                    // hijacking a future slot.
+                    if current_idx.is_some()
+                        && Some(idx) != next_expected
+                        && (is_bare_clock || is_compact_numeric || is_behind_duplicate)
+                    {
+                        // Fall through to continuation below
+                    } else if !in_allowed(idx) {
+                        // Out-of-range numbered lines (e.g. echoed [Previous Context]
+                        // or hallucinated extra cues) must be dropped cleanly and must
+                        // not bleed into the previously accepted cue.
+                        current_idx = None;
+                        continue;
+                    } else {
+                        // Disambiguation: "12:30 نیمه‌شب" or "9:00 صبح بود" is
+                        // handled as bare clock time above. If a two-colon timecode
+                        // follows an explicit cue separator (e.g. "7: 10:30 شب بود"),
+                        // accept it only when it is next expected or explicitly
+                        // separated as an upcoming cue in expected_order.
+                        let is_expected_ahead = expected_order.get(expect_pos..)
+                            .map(|slice| slice.contains(&idx))
+                            .unwrap_or(false);
+                        let is_timecode_like = looks_like_numbered_timecode(trimmed);
 
-                    if should_accept {
-                        if !in_allowed(idx) {
+                        let should_accept = Some(idx) == next_expected
+                            || !is_timecode_like
+                            || (is_expected_ahead
+                                && has_separator_space
+                                && !val_cap.as_str().trim().is_empty());
+
+                        if should_accept {
+                            if let Some(pos) = matched_pos {
+                                expect_pos = expect_pos.max(pos + 1);
+                            }
+                            let text = val_cap.as_str().trim().to_string();
+                            if !text.is_empty() {
+                                map.insert(idx, text);
+                            }
+                            current_idx = Some(idx);
                             continue;
                         }
-                        if let Some(pos) = expected_order.iter().position(|&e| e == idx) {
-                            expect_pos = pos + 1;
-                        }
-                        let text = val_cap.as_str().trim().to_string();
-                        if !text.is_empty() {
-                            map.insert(idx, text);
-                        }
-                        current_idx = Some(idx);
-                        continue;
                     }
                 }
             }
@@ -780,36 +918,49 @@ fn build_request_url(
     base_url: &str,
     model: &str,
 ) -> String {
-    let mut request_url = base_url.trim().to_string();
-    match api_format {
+    let trimmed = base_url.trim();
+    let base_no_frag = trimmed.split('#').next().unwrap_or(trimmed);
+    let (path_part, query_part) = match base_no_frag.split_once('?') {
+        Some((p, q)) => (p.trim_end_matches('/'), Some(q)),
+        None => (base_no_frag.trim_end_matches('/'), None),
+    };
+
+    let endpoint = match api_format {
         ApiFormat::AnthropicMessages => {
-            if !request_url.contains("/messages") {
-                let clean_base = request_url.trim_end_matches('/');
-                if clean_base.ends_with("/v1") {
-                    request_url = format!("{}/messages", clean_base);
-                } else {
-                    request_url = format!("{}/v1/messages", clean_base);
-                }
+            if path_part.ends_with("/messages") {
+                path_part.to_string()
+            } else if path_part.ends_with("/v1") {
+                format!("{}/messages", path_part)
+            } else {
+                format!("{}/v1/messages", path_part)
             }
         }
         ApiFormat::GeminiResponses => {
-            if !request_url.contains("/models/") {
-                let clean_base = request_url.trim_end_matches('/');
-                if clean_base.ends_with("/v1beta") {
-                    request_url = format!("{}/models/{}:generateContent", clean_base, model);
-                } else {
-                    request_url = format!("{}/v1beta/models/{}:generateContent", clean_base, model);
-                }
+            if path_part.contains(":generateContent") {
+                path_part.to_string()
+            } else if path_part.ends_with("/models") {
+                format!("{}/{}:generateContent", path_part, model)
+            } else if path_part.contains("/models/") {
+                format!("{}:generateContent", path_part)
+            } else if path_part.ends_with("/v1beta") || path_part.ends_with("/v1") {
+                format!("{}/models/{}:generateContent", path_part, model)
+            } else {
+                format!("{}/v1beta/models/{}:generateContent", path_part, model)
             }
         }
         ApiFormat::OpenAiCompatible => {
-            if !request_url.contains("/chat/completions") {
-                let clean_base = request_url.trim_end_matches('/');
-                request_url = format!("{}/chat/completions", clean_base);
+            if path_part.ends_with("/chat/completions") {
+                path_part.to_string()
+            } else {
+                format!("{}/chat/completions", path_part)
             }
         }
+    };
+
+    match query_part {
+        Some(q) if !q.is_empty() => format!("{}?{}", endpoint, q),
+        _ => endpoint,
     }
-    request_url
 }
 
 /// Applies auth headers across all formats (including `x-goog-api-key` for Gemini).
@@ -888,18 +1039,19 @@ fn classify_non_success_error(
     err_text: &str,
     options: &mut crate::translation::provider::RequestOptions,
 ) -> NonSuccessAction {
-    // 1. Reactive context-limit recovery: report back so the caller can shrink
-    // the window and re-chunk.
-    if let Some(exact) = parse_context_limit_from_error(err_text) {
-        return NonSuccessAction::Outcome(ChunkOutcome::ContextLimitExceeded(Some(exact)));
-    }
-    if is_context_length_error(err_text) {
-        return NonSuccessAction::Outcome(ChunkOutcome::ContextLimitExceeded(None));
+    // Only client payload/limit errors (400 / 413 / 422) may trigger reactive
+    // output-cap, context-window shrinking, or parameter negotiation.
+    // Rate limits (429), auth errors (401/403), and server errors (5xx) must
+    // never shrink and persist the model's context_window.
+    if !matches!(status_code, 400 | 413 | 422) {
+        return NonSuccessAction::CheckTransientOrFail;
     }
 
-    // 2. Reactive output-cap recovery: check BEFORE generic parameter negotiation
-    // so Anthropic 400s like "invalid_request_error: max_tokens: 100000 > 64000
-    // (maximum allowed)" are learned and persisted rather than masked.
+    // 1. Reactive output-cap recovery: check BEFORE context-limit and generic
+    // parameter negotiation so Anthropic/OpenAI 400s like
+    // "max_tokens: 16384 exceeds the maximum of 8192" or
+    // "invalid_request_error: max_tokens: 100000 > 64000 (maximum allowed)"
+    // are learned and persisted as output caps rather than context limits.
     if status_code == 400 && options.max_output_tokens.is_some() {
         if let Some(cap) = parse_output_cap_from_error(err_text) {
             return NonSuccessAction::Outcome(ChunkOutcome::OutputCapExceeded(Some(cap)));
@@ -907,6 +1059,15 @@ fn classify_non_success_error(
         if is_max_tokens_error(err_text) {
             return NonSuccessAction::Outcome(ChunkOutcome::OutputCapExceeded(None));
         }
+    }
+
+    // 2. Reactive context-limit recovery: report back so the caller can shrink
+    // the window and re-chunk.
+    if let Some(exact) = parse_context_limit_from_error(err_text) {
+        return NonSuccessAction::Outcome(ChunkOutcome::ContextLimitExceeded(Some(exact)));
+    }
+    if is_context_length_error(err_text) {
+        return NonSuccessAction::Outcome(ChunkOutcome::ContextLimitExceeded(None));
     }
 
     // 3. Universal Parameter Negotiation: If the API rejected a parameter,
@@ -1105,7 +1266,7 @@ async fn translate_chunk(
             return Err(format!(
                 "API returned error status ({}): {}",
                 status,
-                safe_truncate(&err_text, 600)
+                redact_url_secrets(&safe_truncate(&err_text, 600))
             ));
         }
 
@@ -1115,7 +1276,7 @@ async fn translate_chunk(
                 emit_cancelled(app, last_progress);
                 return Err(TRANSLATION_CANCELLED_MSG.to_string());
             }
-            json_res = res.json() => json_res.map_err(|e| format!("Failed to parse response JSON: {}", e))?,
+            json_res = res.json() => json_res.map_err(|e| format!("Failed to parse response JSON: {}", sanitize_reqwest_error(e)))?,
         };
 
         let response_text = parse_response_content(api_format, &res_json)?;
@@ -1147,8 +1308,6 @@ pub async fn translate_files(
         _ => parent_dir.clone(),
     };
 
-    ensure_output_dir_writable(Path::new(&target_dir))?;
-
     if settings.translate_ai_model.trim().is_empty() {
         return Err("No active translation model is selected. Please configure and select a model under your active provider first.".to_string());
     }
@@ -1167,22 +1326,51 @@ pub async fn translate_files(
             )
         })?;
 
-    if provider.base_url.trim().is_empty() {
-        return Err(format!(
-            "Provider '{}' has no Base URL configured.",
-            provider.name
-        ));
-    }
+    crate::translation::validate_provider_base_url(&provider.base_url)?;
 
     // Validate the wire protocol ONCE, up front: an unknown format string is
     // a configuration error and must fail loudly instead of silently
     // degrading to the OpenAI-compatible request shape.
     let api_format = ApiFormat::parse(&provider.api_format)?;
 
-    // Fetch API Key (Keyring or plaintext)
+    // Mark the session as translating and install a guard BEFORE blocking on
+    // the OS keyring so a cancel request during a keyring prompt is honoured
+    // immediately instead of failing with "No active transcription or translation session".
+    let mut session_busy = false;
+    with_session(&session, |s| {
+        if s.phase != crate::SessionPhase::Idle {
+            session_busy = true;
+        } else {
+            s.phase = crate::SessionPhase::Translating;
+        }
+    });
+    if session_busy {
+        return Err(
+            "Another transcription or translation task is already active. Wait for it to finish or cancel it first."
+                .to_string(),
+        );
+    }
+    let _guard = TranslationSessionGuard {
+        session: session.clone(),
+    };
+
+    ensure_output_dir_writable(Path::new(&target_dir))?;
+
+    // Fetch API Key (Keyring or plaintext) raced against cancellation.
     let api_key = if provider.use_keyring {
-        get_keyring_key(&provider.name)
-            .map_err(|e| format!("Could not retrieve key from system keyring: {}", e))?
+        let pname = provider.name.clone();
+        let keyring_fut = tokio::task::spawn_blocking(move || get_keyring_key(&pname));
+        tokio::select! {
+            biased;
+            _ = cancellation_poller(session.clone()) => {
+                emit_cancelled(&app, 0.0);
+                return Err(TRANSLATION_CANCELLED_MSG.to_string());
+            }
+            res = keyring_fut => {
+                res.map_err(|e| format!("Keyring task failed: {}", e))?
+                    .map_err(|e| format!("Could not retrieve key from system keyring: {}", e))?
+            }
+        }
     } else {
         provider.api_key.clone()
     };
@@ -1203,32 +1391,14 @@ pub async fn translate_files(
     let mut max_output_override = active_model.and_then(|m| m.max_output_tokens).filter(|&t| t >= MIN_OUTPUT_TOKENS);
 
     let mut request_options = build_initial_request_options(api_format, active_model, 0);
+    let system_prompt = build_system_prompt(
+        &provider.custom_prompt,
+        &settings.translate_ai_target_lang,
+        settings.translate_ai_polish,
+    );
 
     let lang_code = get_language_code(&settings.translate_ai_target_lang);
     let mut successfully_translated = Vec::new();
-
-    // Mark the session as translating and install a guard that resets the
-    // state (phase + cancel flag) no matter how this function exits.
-    // Refuses to clobber an ACTIVE session: unlike transcription paths this
-    // check was historically missing, letting a parallel translation reset
-    // a running transcription's phase to Idle mid-flight.
-    let mut session_busy = false;
-    with_session(&session, |s| {
-        if s.phase != crate::SessionPhase::Idle {
-            session_busy = true;
-        } else {
-            s.phase = crate::SessionPhase::Translating;
-        }
-    });
-    if session_busy {
-        return Err(
-            "Another transcription or translation task is already active. Wait for it to finish or cancel it first."
-                .to_string(),
-        );
-    }
-    let _guard = TranslationSessionGuard {
-        session: session.clone(),
-    };
 
     let mut status_guard = TranslationStatusGuard::new(app.clone());
     if !generated_files.is_empty() {
@@ -1312,6 +1482,7 @@ pub async fn translate_files(
             &ext,
             &settings.translate_ai_provider,
             &settings.translate_ai_model,
+            &system_prompt,
             &content,
         ).or_else(|| {
             if target_dir != parent_dir {
@@ -1323,6 +1494,7 @@ pub async fn translate_files(
                     &ext,
                     &settings.translate_ai_provider,
                     &settings.translate_ai_model,
+                    &system_prompt,
                     &content,
                 )
             } else {
@@ -1441,12 +1613,6 @@ pub async fn translate_files(
             last_progress = global_progress;
             status_guard.set_progress(last_progress);
 
-            let system_prompt = build_system_prompt(
-                &provider.custom_prompt,
-                &settings.translate_ai_target_lang,
-                settings.translate_ai_polish,
-            );
-
             // Previous context (up to 3 preceding lines) for narrative continuity.
             // Prefer our own translations when available so the model sees the
             // terminology it already chose.
@@ -1531,26 +1697,52 @@ pub async fn translate_files(
                         ));
                     }
                     context_window = new_limit;
-                    let _ = update_model_limits(
+                    if let Ok(Some(updated_providers)) = update_model_limits(
                         &settings.translate_ai_provider,
                         &settings.translate_ai_model,
                         Some(new_limit),
                         None,
-                    );
+                    ) {
+                        let _ = app.emit(
+                            "translation-model-limits-updated",
+                            serde_json::json!({
+                                "provider": settings.translate_ai_provider,
+                                "model": settings.translate_ai_model,
+                                "contextWindow": new_limit,
+                                "maxOutputTokens": serde_json::Value::Null,
+                                "translateAiProviders": updated_providers,
+                            }),
+                        );
+                    }
                     continue 'chunk_loop;
                 }
                 ChunkOutcome::OutputCapExceeded(exact_cap) => {
                     // Anthropic rejected max_tokens as too large. Use the
                     // exact cap when the error named it, otherwise halve —
                     // then persist so future runs start correct.
-                    let new_cap = resolve_next_output_cap(max_output_override, exact_cap)?;
+                    let new_cap = resolve_next_output_cap(
+                        max_output_override,
+                        request_options.max_output_tokens,
+                        exact_cap,
+                    )?;
                     max_output_override = Some(new_cap);
-                    let _ = update_model_limits(
+                    if let Ok(Some(updated_providers)) = update_model_limits(
                         &settings.translate_ai_provider,
                         &settings.translate_ai_model,
                         None,
                         Some(new_cap),
-                    );
+                    ) {
+                        let _ = app.emit(
+                            "translation-model-limits-updated",
+                            serde_json::json!({
+                                "provider": settings.translate_ai_provider,
+                                "model": settings.translate_ai_model,
+                                "contextWindow": serde_json::Value::Null,
+                                "maxOutputTokens": new_cap,
+                                "translateAiProviders": updated_providers,
+                            }),
+                        );
+                    }
                     continue 'chunk_loop;
                 }
                 ChunkOutcome::Translated(chunk_translations) => {
@@ -1591,6 +1783,7 @@ pub async fn translate_files(
                             &ext,
                             &settings.translate_ai_provider,
                             &settings.translate_ai_model,
+                            &system_prompt,
                             &content,
                             translations_map.clone(),
                         );
@@ -1652,36 +1845,6 @@ pub async fn translate_files(
             status_guard.disarm();
             emit_cancelled(&app, last_progress);
             return Err(TRANSLATION_CANCELLED_MSG.to_string());
-        }
-
-        // Report any cues that could not be translated (they fall back to the
-        // original text at reconstruction time) instead of hiding the gap.
-        let untranslated = original_entries
-            .iter()
-            .filter(|(idx, _)| !translations_map.contains_key(idx))
-            .count();
-        if untranslated > 0 {
-            logs.log(&app, "Translate", &format!(
-                "Warning: {} line(s) in '{}' could not be translated and were kept in the original language.",
-                untranslated, file_name
-            ));
-            let untranslated_extras = Some((
-                total_lines - untranslated,
-                total_lines,
-                file_idx + 1,
-                total_files,
-            ));
-            emit_status(
-                &app,
-                last_progress,
-                &format!(
-                    "{} line(s) could not be translated and were kept in the original language.",
-                    untranslated
-                ),
-                true,
-                untranslated_extras,
-            );
-            last_extras = untranslated_extras;
         }
 
         // Reconstruct and save atomically
@@ -1952,7 +2115,7 @@ pub async fn preview_translate(
                 return Err(format!(
                     "API returned error status ({}): {}",
                     status,
-                    safe_truncate(&err_text, 600)
+                    redact_url_secrets(&safe_truncate(&err_text, 600))
                 ));
             }
 
@@ -2023,17 +2186,33 @@ fn context_limit_patterns() -> &'static [regex::Regex] {
         vec![
             regex::Regex::new(r"max_model_len\s*(?:is\s*)?[:=(]?\s*(\d{4,})").expect("static regex"),
             regex::Regex::new(r"maximum model length\s*(?:is\s*)?[:=(]?\s*(\d{4,})").expect("static regex"),
-            regex::Regex::new(r"(?:max(?:imum)?|limit)\s*(?:context\s*)?(?:length|size|window)?\s*(?:is|of|:)?\s*(\d{4,})").expect("static regex"),
+            regex::Regex::new(r"(?:max(?:imum)?|limit)\s+context\s*(?:length|size|window)?\s*(?:is|of|:)?\s*(\d{4,})").expect("static regex"),
             regex::Regex::new(r"context\s*(?:length|size|window)\s*(?:is|of|:)?\s*(\d{4,})").expect("static regex"),
-            regex::Regex::new(r"(\d{4,})\s*(?:token)?\s*(?:context|limit)").expect("static regex"),
-            regex::Regex::new(r">\s*(\d{4,})\s*(?:max|limit|token)").expect("static regex"),
-            regex::Regex::new(r"(\d{4,})\s*(?:max(?:imum)?)\b").expect("static regex"),
+            regex::Regex::new(r"(\d{4,})\s*(?:tokens?\s*)?context").expect("static regex"),
+            regex::Regex::new(r"(?:input|prompt)\s*(?:length|size|tokens?)\s*(?:exceeds?|limit|maximum|max)\s*(?:is|of|:)?\s*(\d{4,})").expect("static regex"),
+            // Anthropic: "prompt is too long: 205000 tokens > 200000 maximum"
+            regex::Regex::new(r"prompt\s+is\s+too\s+long[^\n]{0,60}?>\s*(\d{4,})").expect("static regex"),
+            // Gemini: "The input token count (1200000) exceeds the maximum number of tokens allowed (1048576)."
+            regex::Regex::new(r"input\s+token\s+count[^\n]{0,80}?(?:maximum|max|allowed)[^\n]{0,30}?\(?\s*(\d{4,})\s*\)?").expect("static regex"),
         ]
     })
 }
 
+fn is_rate_limit_or_quota_error(error_lower: &str) -> bool {
+    error_lower.contains("rate limit")
+        || error_lower.contains("rate_limit")
+        || error_lower.contains("tokens per min")
+        || error_lower.contains("requests per min")
+        || error_lower.contains("tpm")
+        || error_lower.contains("rpm")
+        || error_lower.contains("quota")
+}
+
 fn parse_context_limit_from_error(error_msg: &str) -> Option<usize> {
     let error_lower = error_msg.to_lowercase();
+    if is_rate_limit_or_quota_error(&error_lower) {
+        return None;
+    }
     for re in context_limit_patterns() {
         if let Some(caps) = re.captures(&error_lower) {
             if let Some(num_match) = caps.get(1) {
@@ -2050,12 +2229,21 @@ fn parse_context_limit_from_error(error_msg: &str) -> Option<usize> {
 
 fn is_context_length_error(error_msg: &str) -> bool {
     let error_lower = error_msg.to_lowercase();
-    error_lower.contains("context")
+    if is_rate_limit_or_quota_error(&error_lower) {
+        return false;
+    }
+    let has_context_phrase = error_lower.contains("context")
         && (error_lower.contains("exceed")
             || error_lower.contains("too long")
             || error_lower.contains("too large")
             || error_lower.contains("overflow")
-            || error_lower.contains("limit"))
+            || error_lower.contains("limit"));
+    let has_anthropic_prompt_limit = error_lower.contains("prompt is too long");
+    let has_gemini_input_limit = error_lower.contains("input token")
+        && (error_lower.contains("exceed")
+            || error_lower.contains("maximum")
+            || error_lower.contains("limit"));
+    has_context_phrase || has_anthropic_prompt_limit || has_gemini_input_limit
 }
 
 fn output_cap_patterns() -> &'static [regex::Regex] {
@@ -2064,6 +2252,7 @@ fn output_cap_patterns() -> &'static [regex::Regex] {
         vec![
             // Anthropic: "max_tokens: 100000 > 64000 (maximum allowed)"
             regex::Regex::new(r"maximum\s+(?:allowed|permitted)\s*(?:is|:)?\s*(\d{3,})").expect("static regex"),
+            regex::Regex::new(r"(?:max_tokens|max tokens|max_output_tokens|max_completion_tokens)[^\n]{0,80}?(?:maximum|max)\s*(?:allowed|permitted|value|of|is|:)?\s*(\d{3,})").expect("static regex"),
             regex::Regex::new(r"max_tokens[^\n]{0,80}?(\d{3,})\s*\([^)]*maximum").expect("static regex"),
             regex::Regex::new(r"(\d{3,})\s*(?:is\s*)?the\s*(?:maximum|max)\s*(?:allowed|value)").expect("static regex"),
         ]
@@ -2092,10 +2281,13 @@ fn parse_output_cap_from_error(error_msg: &str) -> Option<u32> {
 /// when the exact number cannot be parsed. Halving recovers in O(log n).
 fn is_max_tokens_error(error_msg: &str) -> bool {
     let e = error_msg.to_lowercase();
-    (e.contains("max_tokens") || e.contains("max tokens"))
+    (e.contains("max_tokens")
+        || e.contains("max tokens")
+        || e.contains("max_output_tokens")
+        || e.contains("max_completion_tokens"))
         && (e.contains("exceed") || e.contains("too large") || e.contains("too big")
             || e.contains("invalid") || e.contains("greater than")
-            || e.contains("above") || e.contains("over"))
+            || e.contains("above") || e.contains("over") || e.contains("maximum"))
 }
 
 /// Persists reactively-discovered per-model limits. Best-effort: the settings
@@ -2107,7 +2299,7 @@ fn update_model_limits(
     model_id: &str,
     context_window: Option<usize>,
     max_output_tokens: Option<u32>,
-) -> Result<(), String> {
+) -> Result<Option<String>, String> {
     // Runs under the global settings write lock so a concurrent frontend
     // save cannot silently drop this update between our read and write.
     crate::settings::update_settings_locked(|settings| {
@@ -2122,11 +2314,13 @@ fn update_model_limits(
                 if let Some(t) = max_output_tokens {
                     model.max_output_tokens = Some(t);
                 }
-                settings.translate_ai_providers = serde_json::to_string(&providers)
+                let updated_json = serde_json::to_string(&providers)
                     .map_err(|e| format!("Failed to serialize providers: {}", e))?;
+                settings.translate_ai_providers = updated_json.clone();
+                return Ok::<Option<String>, String>(Some(updated_json));
             }
         }
-        Ok::<(), String>(())
+        Ok::<Option<String>, String>(None)
     })
 }
 
@@ -2466,14 +2660,19 @@ mod alignment_tests {
 
     #[test]
     fn resolve_next_output_cap_terminates_without_infinite_loop() {
+        // Auto mode (None override) with rejected 4096 halves cleanly to 2048 instead of failing immediately
+        assert_eq!(resolve_next_output_cap(None, Some(4096), None).unwrap(), 2048);
+        assert!(resolve_next_output_cap(None, Some(1024), None).is_err());
+        // High override with smaller sent chunk halves from the actual sent cap
+        assert_eq!(resolve_next_output_cap(Some(65_536), Some(3000), None).unwrap(), 1500);
         // First hit with exact cap >= default stores override
-        assert_eq!(resolve_next_output_cap(None, Some(4096)).unwrap(), 4096);
+        assert_eq!(resolve_next_output_cap(None, Some(8192), Some(4096)).unwrap(), 4096);
         // Repeated rejection with same exact cap halves monotonically down to MIN_OUTPUT_TOKENS
-        assert_eq!(resolve_next_output_cap(Some(4096), Some(4096)).unwrap(), 2048);
-        assert_eq!(resolve_next_output_cap(Some(2048), Some(4096)).unwrap(), 1024);
+        assert_eq!(resolve_next_output_cap(Some(4096), Some(4096), Some(4096)).unwrap(), 2048);
+        assert_eq!(resolve_next_output_cap(Some(2048), Some(2048), Some(4096)).unwrap(), 1024);
         // At MIN_OUTPUT_TOKENS, even with Some(exact_cap), it must fail instead of looping forever
-        assert!(resolve_next_output_cap(Some(1024), Some(4096)).is_err());
-        assert!(resolve_next_output_cap(Some(1024), None).is_err());
+        assert!(resolve_next_output_cap(Some(1024), Some(1024), Some(4096)).is_err());
+        assert!(resolve_next_output_cap(Some(1024), Some(1024), None).is_err());
     }
 
     #[test]
@@ -2603,5 +2802,164 @@ mod alignment_tests {
         );
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn http_429_rate_limit_tpm_is_never_classified_as_context_limit() {
+        let mut opts = RequestOptions::default();
+        let err = "Rate limit reached for gpt-4o in organization org-xyz on tokens per min (TPM): Limit 30000, Used 29500, Requested 1200";
+        let action = classify_non_success_error(ApiFormat::OpenAiCompatible, 429, err, &mut opts);
+        assert!(matches!(action, NonSuccessAction::CheckTransientOrFail));
+        assert_eq!(parse_context_limit_from_error(err), None);
+        assert!(!is_context_length_error(err));
+    }
+
+    #[test]
+    fn max_tokens_exceeds_maximum_of_is_classified_as_output_cap_not_context_limit() {
+        let mut opts = RequestOptions {
+            max_output_tokens: Some(16_384),
+            ..RequestOptions::default()
+        };
+        let err = "max_tokens: 16384 exceeds the maximum of 8192";
+        let action = classify_non_success_error(ApiFormat::AnthropicMessages, 400, err, &mut opts);
+        assert!(matches!(
+            action,
+            NonSuccessAction::Outcome(ChunkOutcome::OutputCapExceeded(Some(8192)))
+        ));
+    }
+
+    #[test]
+    fn bare_clock_time_inside_chunk_stays_continuation_and_does_not_hijack_slot() {
+        let order: Vec<usize> = (1..=30).collect();
+        let response = "5: جلسه ساعت\n9:00 صبح است\n6: باشه میام\n9: عالیه\n";
+        let map = parse_translated_lines(response, &order);
+        assert_eq!(map.get(&5).unwrap(), "جلسه ساعت\n9:00 صبح است");
+        assert_eq!(map.get(&6).unwrap(), "باشه میام");
+        assert_eq!(map.get(&9).unwrap(), "عالیه");
+
+        let persian_time_resp = "5: قرار ما\n۹:۰۰ صبح\n9: حتما\n";
+        let map_fa = parse_translated_lines(persian_time_resp, &order);
+        assert_eq!(map_fa.get(&5).unwrap(), "قرار ما\n۹:۰۰ صبح");
+        assert_eq!(map_fa.get(&9).unwrap(), "حتما");
+    }
+
+    #[test]
+    fn build_request_url_handles_models_endpoint_and_proxies_cleanly() {
+        assert_eq!(
+            build_request_url(
+                ApiFormat::GeminiResponses,
+                "https://generativelanguage.googleapis.com/v1beta/models",
+                "gemini-2.5-flash"
+            ),
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+        );
+        assert_eq!(
+            build_request_url(
+                ApiFormat::GeminiResponses,
+                "https://generativelanguage.googleapis.com/v1beta/models/",
+                "gemini-2.5-flash"
+            ),
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+        );
+        assert_eq!(
+            build_request_url(
+                ApiFormat::AnthropicMessages,
+                "https://proxy.example.com/messages-proxy/v1",
+                "claude-sonnet-4"
+            ),
+            "https://proxy.example.com/messages-proxy/v1/messages"
+        );
+    }
+
+    #[test]
+    fn get_language_code_matches_all_frontend_target_variants() {
+        assert_eq!(get_language_code("Simplified Chinese"), "zh");
+        assert_eq!(get_language_code("Traditional Chinese"), "zh-TW");
+        assert_eq!(get_language_code("Portuguese (Brazil)"), "pt-BR");
+        assert_eq!(get_language_code("Portuguese (Portugal)"), "pt-PT");
+        assert_eq!(get_language_code("Norwegian Bokmål"), "nb");
+        assert_eq!(get_language_code("Dari"), "fa-AF");
+        assert_eq!(get_language_code("Central Kurdish"), "ckb");
+        assert_eq!(get_language_code("Northern Kurdish"), "kmr");
+        assert_eq!(get_language_code("Cantonese"), "yue");
+    }
+
+    #[test]
+    fn out_of_range_numbered_lines_do_not_bleed_into_previous_cue() {
+        let order: Vec<usize> = vec![10, 11, 12];
+        let response = "10: دهم\n11: یازدهم\n12: دوازدهم\n13: خط اضافه\nادامه خط اضافه\n7: خط قبلی\nادامه خط قبلی\n";
+        let map = parse_translated_lines(response, &order);
+        assert_eq!(map.get(&10).unwrap(), "دهم");
+        assert_eq!(map.get(&11).unwrap(), "یازدهم");
+        assert_eq!(map.get(&12).unwrap(), "دوازدهم");
+        assert!(!map.contains_key(&13));
+        assert!(!map.contains_key(&7));
+    }
+
+    #[test]
+    fn compact_numbered_cues_without_space_are_not_dropped_as_clock_times() {
+        let order: Vec<usize> = vec![1, 2, 3, 5];
+        let response = "1：10分钟后\n2：30块钱\n3:20 دلار\n5:99 درصد\n";
+        let map = parse_translated_lines(response, &order);
+        assert_eq!(map.get(&1).unwrap(), "10分钟后");
+        assert_eq!(map.get(&2).unwrap(), "30块钱");
+        assert_eq!(map.get(&3).unwrap(), "20 دلار");
+        assert_eq!(map.get(&5).unwrap(), "99 درصد");
+    }
+
+    #[test]
+    fn compact_ratio_and_behind_cursor_numbers_stay_continuations_without_overwriting() {
+        let order: Vec<usize> = (1..=10).collect();
+        let response = "\
+1: خط اول
+2: بازی تموم شد
+8: نتیجه شد
+2:1 به نفع تیم ما شد
+24:00 بسته می‌شود
+9: خط نهم";
+        let map = parse_translated_lines(response, &order);
+        assert_eq!(map.get(&1).unwrap(), "خط اول");
+        assert_eq!(map.get(&2).unwrap(), "بازی تموم شد");
+        assert_eq!(
+            map.get(&8).unwrap(),
+            "نتیجه شد\n2:1 به نفع تیم ما شد\n24:00 بسته می‌شود"
+        );
+        assert_eq!(map.get(&9).unwrap(), "خط نهم");
+    }
+
+    #[test]
+    fn anthropic_and_gemini_context_limit_errors_are_classified_and_parsed() {
+        let mut opts = RequestOptions::default();
+
+        let anthropic_err = "prompt is too long: 205000 tokens > 200000 maximum";
+        let anthropic_action =
+            classify_non_success_error(ApiFormat::AnthropicMessages, 400, anthropic_err, &mut opts);
+        assert!(matches!(
+            anthropic_action,
+            NonSuccessAction::Outcome(ChunkOutcome::ContextLimitExceeded(Some(200_000)))
+        ));
+
+        let gemini_err =
+            "The input token count (1200000) exceeds the maximum number of tokens allowed (1048576).";
+        let gemini_action =
+            classify_non_success_error(ApiFormat::GeminiResponses, 400, gemini_err, &mut opts);
+        assert!(matches!(
+            gemini_action,
+            NonSuccessAction::Outcome(ChunkOutcome::ContextLimitExceeded(Some(1_048_576)))
+        ));
+
+        let tpm_err = "Rate limit reached on tokens per min (TPM): prompt is too long for 100000 TPM";
+        let tpm_action =
+            classify_non_success_error(ApiFormat::AnthropicMessages, 429, tpm_err, &mut opts);
+        assert!(matches!(tpm_action, NonSuccessAction::CheckTransientOrFail));
+        assert!(!is_context_length_error(tpm_err));
+    }
+
+    #[test]
+    fn redact_url_secrets_masks_query_keys_in_error_bodies() {
+        let raw = "Upstream failed calling https://generativelanguage.googleapis.com/v1beta/models?key=AIzaTopSecret999&alt=json";
+        let sanitized = redact_url_secrets(&safe_truncate(raw, 600));
+        assert!(!sanitized.contains("AIzaTopSecret999"));
+        assert!(sanitized.contains("?key=<redacted>&alt=json"));
     }
 }

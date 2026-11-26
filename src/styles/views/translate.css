@@ -91,7 +91,8 @@
   min-width: 0;
 }
 
-.translate-field-group label {
+.translate-field-group label,
+.translate-field-group .translate-field-label {
   font-size: 0.76rem;
   font-weight: 700;
   color: var(--color-text-muted);
@@ -107,7 +108,8 @@
   user-select: none;
 }
 
-.translate-field-group label svg {
+.translate-field-group label svg,
+.translate-field-group .translate-field-label svg {
   flex-shrink: 0;
 }
 
@@ -257,7 +259,7 @@
 }
 
 #translate-drop-zone.translate-dropzone-card.has-file .translate-sub-name {
-  text-align: start;
+  text-align: left;
 }
 
 #translate-drop-zone.translate-dropzone-card.has-file .btn-sub-browse {
@@ -419,6 +421,8 @@
   color: var(--color-text);
   direction: ltr;
   text-align: left;
+  unicode-bidi: isolate;
+  font-family: var(--font-mono);
 }
 
 .translate-output-row .btn-secondary,
@@ -515,13 +519,18 @@
   transition: all 0.15s ease;
 }
 
-.btn-cancel-translation:hover {
+.btn-cancel-translation:hover:not(:disabled) {
   background: rgba(239, 68, 68, 0.12);
   border-color: #ef4444;
 }
 
-.btn-cancel-translation:active {
+.btn-cancel-translation:active:not(:disabled) {
   background: rgba(239, 68, 68, 0.2);
+}
+
+.btn-cancel-translation:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .translate-telemetry {
