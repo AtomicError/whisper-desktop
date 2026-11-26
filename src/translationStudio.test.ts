@@ -2679,5 +2679,226 @@ describe('translation studio regression fixes', () => {
       (globalThis as any).window = origWin;
     }
   });
+
+  it('syncs CustomSelects and settingsState on provider/model reconciliation, preserves cancel data-i18n before status events, and resets cue list scrollTop on load and clear', async () => {
+    const tauriListeners: Record<string, (e: any) => void> = {};
+    const origDoc = (globalThis as any).document;
+    const origWin = (globalThis as any).window;
+
+    let invokeHandler: (cmd: string, args?: any) => Promise<any> = async () => null;
+    const invokeLocal = vi.fn((cmd: string, args?: any) => invokeHandler(cmd, args));
+    const syncCustomSelects = vi.fn();
+    const showNotification = vi.fn();
+
+    const makeSelect = () => {
+      const el: any = {
+        value: '',
+        disabled: false,
+        children: [] as any[],
+        handlers: {} as Record<string, Function[]>,
+        set innerHTML(v: string) {
+          if (v === '') this.children = [];
+        },
+        appendChild(child: any) {
+          this.children.push(child);
+          if (child.selected) this.value = child.value;
+        },
+        addEventListener(ev: string, cb: Function) {
+          (this.handlers[ev] ||= []).push(cb);
+        },
+        removeEventListener: vi.fn(),
+      };
+      return el;
+    };
+
+    const makeEl = () => {
+      const attrs: Record<string, string> = {};
+      return {
+        textContent: '',
+        title: '',
+        className: '',
+        innerHTML: '',
+        scrollTop: 0,
+        dataset: {} as Record<string, string>,
+        style: {} as Record<string, string>,
+        disabled: false,
+        classList: { add: vi.fn(), remove: vi.fn(), contains: () => false },
+        setAttribute(k: string, v: string) { attrs[k] = v; },
+        removeAttribute(k: string) { delete attrs[k]; },
+        getAttribute(k: string) { return attrs[k] ?? null; },
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      };
+    };
+
+    const providerSelect = makeSelect();
+    const modelSelect = makeSelect();
+    const lblMsg = makeEl();
+    const statusBadge = makeEl();
+    const progressFill = makeEl();
+    const progressTrack = makeEl();
+    const lblPct = makeEl();
+    const lblLines = makeEl();
+    const telemetryBox = makeEl();
+    const sourceList = makeEl();
+    const targetList = makeEl();
+    const sourceCountBadge = makeEl();
+    const targetCountBadge = makeEl();
+
+    (globalThis as any).document = {
+      readyState: 'loading',
+      title: '',
+      documentElement: {
+        setAttribute: vi.fn(),
+        getAttribute: () => null,
+        classList: { add: vi.fn(), remove: vi.fn() },
+      },
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      getElementById: () => null,
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      createElement: () => ({
+        value: '',
+        textContent: '',
+        disabled: false,
+        selected: false,
+        className: '',
+        dataset: {},
+        style: {},
+        setAttribute: vi.fn(),
+        appendChild: vi.fn(),
+      }),
+    };
+    (globalThis as any).window = {
+      ...origWin,
+      __TAURI__: {
+        core: { invoke: invokeLocal },
+        event: {
+          listen: vi.fn((ev: string, cb: (e: any) => void) => {
+            tauriListeners[ev] = cb;
+            return Promise.resolve(() => {});
+          }),
+        },
+      },
+      syncCustomSelects,
+      showNotification,
+      settingsState: {
+        translateAiProviders: JSON.stringify([
+          { name: 'OpenAI', models: [{ id: 'gpt-4o', enabled: true }] },
+          { name: 'Anthropic', models: [{ id: 'claude-sonnet', enabled: true }] },
+        ]),
+        translateAiProvider: 'OpenAI',
+        translateAiModel: 'gpt-4o',
+        translateAiTargetLang: 'Persian',
+      },
+    };
+
+    try {
+      const controller = new TranslationStudioController();
+      (controller as any).providerSelect = providerSelect;
+      (controller as any).modelSelect = modelSelect;
+      (controller as any).lblMsg = lblMsg;
+      (controller as any).statusBadge = statusBadge;
+      (controller as any).progressFill = progressFill;
+      (controller as any).progressTrack = progressTrack;
+      (controller as any).lblPct = lblPct;
+      (controller as any).lblLines = lblLines;
+      (controller as any).telemetryBox = telemetryBox;
+      (controller as any).sourceList = sourceList;
+      (controller as any).targetList = targetList;
+      (controller as any).sourceCountBadge = sourceCountBadge;
+      (controller as any).targetCountBadge = targetCountBadge;
+      (controller as any).setupEventListeners();
+      (controller as any).listenToProgressEvents();
+      await Promise.resolve();
+
+      controller.refreshProviderOptions();
+      syncCustomSelects.mockClear();
+
+      // 1. Scroll position resets on loadSubtitleFile and clearLoadedSubtitle
+      sourceList.scrollTop = 240;
+      targetList.scrollTop = 180;
+      invokeHandler = async (cmd: string) => {
+        if (cmd === 'read_text_file_content') {
+          return '1\n00:00:01,000 --> 00:00:02,000\nHello\n';
+        }
+        return null;
+      };
+      await controller.loadSubtitleFile('/dir/movie.srt');
+      expect(sourceList.scrollTop).toBe(0);
+      expect(targetList.scrollTop).toBe(0);
+
+      sourceList.scrollTop = 120;
+      targetList.scrollTop = 90;
+      controller.clearLoadedSubtitle();
+      expect(sourceList.scrollTop).toBe(0);
+      expect(targetList.scrollTop).toBe(0);
+
+      // Load subtitle again for translation tests
+      await controller.loadSubtitleFile('/dir/movie.srt');
+
+      // 2. When flush disables all models of active provider, abort AND rebuild modelSelect + syncCustomSelects
+      (globalThis as any).window.flushPendingModelCatalogChanges = () => {
+        (globalThis as any).window.settingsState.translateAiProviders = JSON.stringify([
+          { name: 'OpenAI', models: [{ id: 'gpt-4o', enabled: false }] },
+        ]);
+      };
+      await controller.startTranslation();
+      expect(invokeLocal).not.toHaveBeenCalledWith('translate_transcription_files', expect.anything());
+      expect(modelSelect.children).toHaveLength(1);
+      expect(modelSelect.children[0].value).toBe('');
+      expect(modelSelect.children[0].disabled).toBe(true);
+      expect(syncCustomSelects).toHaveBeenCalled();
+
+      // 3. When flush replaces active provider/model with another enabled option, reconcile UI + settingsState + CustomSelects
+      (globalThis as any).window.settingsState.translateAiProviders = JSON.stringify([
+        { name: 'OpenAI', models: [{ id: 'gpt-4o', enabled: true }] },
+      ]);
+      controller.refreshProviderOptions();
+      syncCustomSelects.mockClear();
+
+      (globalThis as any).window.flushPendingModelCatalogChanges = () => {
+        (globalThis as any).window.settingsState.translateAiProviders = JSON.stringify([
+          { name: 'Anthropic', models: [{ id: 'claude-sonnet', enabled: true }] },
+        ]);
+        (globalThis as any).window.settingsState.translateAiProvider = 'Anthropic';
+        (globalThis as any).window.settingsState.translateAiModel = 'claude-sonnet';
+      };
+
+      const pending = deferred<string[]>();
+      invokeHandler = (cmd: string) => {
+        if (cmd === 'translate_transcription_files') return pending.promise;
+        return Promise.resolve(null);
+      };
+
+      const runPromise = controller.startTranslation();
+      await vi.waitFor(() => expect(invokeLocal).toHaveBeenCalledWith('translate_transcription_files', expect.anything()));
+      expect(controller.state.activeProvider).toBe('Anthropic');
+      expect(controller.state.activeModel).toBe('claude-sonnet');
+      expect(providerSelect.value).toBe('Anthropic');
+      expect(modelSelect.value).toBe('claude-sonnet');
+      expect(syncCustomSelects).toHaveBeenCalled();
+
+      // 4. Cancel before any translation-status event preserves data-i18n on lblMsg for refreshLocalization()
+      (globalThis as any).window.flushPendingModelCatalogChanges = undefined;
+      await controller.cancelTranslation();
+      pending.reject(new Error('Translation cancelled by user'));
+      await runPromise;
+
+      expect(lblMsg.getAttribute('data-i18n')).toBe('translate.statusCancelled');
+      expect(lblMsg.textContent).toBe('Translation Cancelled');
+
+      const { setLanguage } = await import('./i18n/index');
+      setLanguage('fa', false);
+      controller.refreshLocalization();
+      expect(lblMsg.getAttribute('data-i18n')).toBe('translate.statusCancelled');
+      expect(lblMsg.textContent).toBe('ترجمه لغو شد');
+      setLanguage('en', false);
+    } finally {
+      (globalThis as any).document = origDoc;
+      (globalThis as any).window = origWin;
+    }
+  });
 });
 

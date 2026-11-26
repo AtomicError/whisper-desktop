@@ -496,19 +496,19 @@ fn parse_translated_lines(
     // advanced whenever a capture is accepted as a genuine numbered line.
     let mut expect_pos: usize = 0;
 
-    // Tracks a cue slot tentatively populated by a bare-clock or compact
-    // numeric line (`N:MM ...` with no space after the colon) while inside
-    // another active cue. If a genuine cue `N: ...` (with explicit separator
-    // space) arrives immediately afterward, we restore the tentative clock/ratio
-    // text as a continuation line of `prev_owner` and place the genuine cue
-    // into `map[N]`.
+    // Tracks a stack of cue slots tentatively populated by bare-clock or compact
+    // numeric lines (`N:MM ...` with no space after the colon) while inside
+    // another active cue. If a genuine cue `N: ...` arrives afterward, we
+    // restore the tentative clock/ratio text (and any subsequent stacked
+    // tentative slots) as continuation lines of the original `prev_owner` and
+    // place the genuine cue into `map[N]`.
     struct TentativeCompact {
         idx: usize,
         prev_owner: usize,
         raw_line: String,
         extra_lines: Vec<String>,
     }
-    let mut tentative_compact: Option<TentativeCompact> = None;
+    let mut tentative_stack: Vec<TentativeCompact> = Vec::new();
 
     for line in response_text.lines() {
         let trimmed = line.trim();
@@ -539,34 +539,35 @@ fn parse_translated_lines(
                     let is_behind_duplicate =
                         matched_pos.is_some_and(|pos| pos < expect_pos) && map.contains_key(&idx);
 
-                    let reclaims_tentative = tentative_compact
-                        .as_ref()
-                        .is_some_and(|t| t.idx == idx)
-                        && has_separator_space
+                    let reclaim_pos = tentative_stack.iter().rposition(|t| t.idx == idx);
+                    let is_genuine_cue_shape =
+                        has_separator_space || (!is_bare_clock && !is_compact_numeric);
+                    let reclaims_tentative = reclaim_pos.is_some()
+                        && is_genuine_cue_shape
                         && !val_cap.as_str().trim().is_empty();
 
                     if reclaims_tentative {
-                        if let Some(t) = tentative_compact.take() {
-                            map.entry(t.prev_owner)
+                        if let Some(stack_idx) = reclaim_pos {
+                            let drained: Vec<TentativeCompact> =
+                                tentative_stack.drain(stack_idx..).collect();
+                            let target_owner = drained[0].prev_owner;
+                            let mut restored_lines = Vec::new();
+                            for entry in drained {
+                                map.remove(&entry.idx);
+                                restored_lines.push(entry.raw_line);
+                                restored_lines.extend(entry.extra_lines);
+                            }
+                            map.entry(target_owner)
                                 .and_modify(|existing: &mut String| {
-                                    existing.push('\n');
-                                    existing.push_str(&t.raw_line);
-                                    for extra in &t.extra_lines {
+                                    for restored in &restored_lines {
                                         existing.push('\n');
-                                        existing.push_str(extra);
+                                        existing.push_str(restored);
                                     }
                                 })
-                                .or_insert_with(|| {
-                                    let mut combined = t.raw_line.clone();
-                                    for extra in &t.extra_lines {
-                                        combined.push('\n');
-                                        combined.push_str(extra);
-                                    }
-                                    combined
-                                });
+                                .or_insert_with(|| restored_lines.join("\n"));
                             map.insert(idx, val_cap.as_str().trim().to_string());
                             if let Some(pos) = matched_pos {
-                                expect_pos = expect_pos.max(pos + 1);
+                                expect_pos = pos + 1;
                             }
                             current_idx = Some(idx);
                             continue;
@@ -588,7 +589,7 @@ fn parse_translated_lines(
                         // or hallucinated extra cues) must be dropped cleanly and must
                         // not bleed into the previously accepted cue.
                         current_idx = None;
-                        tentative_compact = None;
+                        tentative_stack.clear();
                         continue;
                     } else {
                         // Disambiguation: "12:30 نیمه‌شب" or "9:00 صبح بود" is
@@ -622,23 +623,23 @@ fn parse_translated_lines(
                                 {
                                     if let Some(prev) = prev_owner {
                                         if prev != idx && in_allowed(prev) {
-                                            tentative_compact = Some(TentativeCompact {
+                                            tentative_stack.push(TentativeCompact {
                                                 idx,
                                                 prev_owner: prev,
                                                 raw_line: trimmed.to_string(),
                                                 extra_lines: Vec::new(),
                                             });
                                         } else {
-                                            tentative_compact = None;
+                                            tentative_stack.clear();
                                         }
                                     } else {
-                                        tentative_compact = None;
+                                        tentative_stack.clear();
                                     }
                                 } else {
-                                    tentative_compact = None;
+                                    tentative_stack.clear();
                                 }
                             } else {
-                                tentative_compact = None;
+                                tentative_stack.clear();
                             }
                             current_idx = Some(idx);
                             continue;
@@ -658,9 +659,9 @@ fn parse_translated_lines(
                         existing.push_str(trimmed);
                     })
                     .or_insert_with(|| trimmed.to_string());
-                if let Some(ref mut t) = tentative_compact {
-                    if t.idx == idx {
-                        t.extra_lines.push(trimmed.to_string());
+                if let Some(top) = tentative_stack.last_mut() {
+                    if top.idx == idx {
+                        top.extra_lines.push(trimmed.to_string());
                     }
                 }
             }
@@ -1122,6 +1123,7 @@ fn apply_auth_headers(
     api_format: ApiFormat,
     api_key: &str,
 ) -> reqwest::RequestBuilder {
+    let api_key = api_key.trim();
     match api_format {
         ApiFormat::AnthropicMessages => {
             let req = if !api_key.is_empty() {
@@ -1492,7 +1494,8 @@ pub async fn translate_files(
         _ => parent_dir.clone(),
     };
 
-    if settings.translate_ai_model.trim().is_empty() {
+    let model_id = settings.translate_ai_model.trim();
+    if model_id.is_empty() {
         return Err("No active translation model is selected. Please configure and select a model under your active provider first.".to_string());
     }
 
@@ -1526,6 +1529,7 @@ pub async fn translate_files(
             session_busy = true;
         } else {
             s.phase = crate::SessionPhase::Translating;
+            s.cancel_requested = false;
         }
     });
     if session_busy {
@@ -1565,7 +1569,7 @@ pub async fn translate_files(
     let active_model = provider
         .models
         .iter()
-        .find(|m| m.id == settings.translate_ai_model);
+        .find(|m| m.id == model_id);
     let mut context_window = active_model
         .map(|m| m.context_window)
         .filter(|&w| w > 0)
@@ -1584,7 +1588,6 @@ pub async fn translate_files(
     let lang_code = get_language_code(&settings.translate_ai_target_lang);
     let mut successfully_translated = Vec::new();
     let mut skipped_reasons: Vec<String> = Vec::new();
-    let mut effective_max_items: usize = MAX_ITEMS_PER_CHUNK;
 
     let mut status_guard = TranslationStatusGuard::new(app.clone());
     if !generated_files.is_empty() {
@@ -1594,7 +1597,7 @@ pub async fn translate_files(
             generated_files.len(),
             settings.translate_ai_target_lang,
             provider.name,
-            settings.translate_ai_model,
+            model_id,
             context_window,
             match max_output_override { Some(t) => t.to_string(), None => "auto".to_string() }
         ));
@@ -1670,7 +1673,7 @@ pub async fn translate_files(
             &lang_code,
             &ext,
             &settings.translate_ai_provider,
-            &settings.translate_ai_model,
+            model_id,
             &system_prompt,
             &content,
         ).or_else(|| {
@@ -1682,7 +1685,7 @@ pub async fn translate_files(
                     &lang_code,
                     &ext,
                     &settings.translate_ai_provider,
-                    &settings.translate_ai_model,
+                    model_id,
                     &system_prompt,
                     &content,
                 )
@@ -1752,6 +1755,7 @@ pub async fn translate_files(
 
         let mut stall_rounds: usize = 0;
         let mut is_first_resumed_chunk = resumed_lines > 0;
+        let mut effective_max_items: usize = MAX_ITEMS_PER_CHUNK;
 
         'chunk_loop: while !remaining_entries.is_empty() {
             // Honour a cancel request between chunks.
@@ -1852,7 +1856,7 @@ pub async fn translate_files(
                 provider,
                 api_format,
                 &api_key,
-                &settings.translate_ai_model,
+                model_id,
                 &system_prompt,
                 &user_content,
                 &chunk,
@@ -1893,7 +1897,7 @@ pub async fn translate_files(
                     if let Some(persisted_limit) = persist_window {
                         if let Ok(Some(updated_providers)) = update_model_limits(
                             &settings.translate_ai_provider,
-                            &settings.translate_ai_model,
+                            model_id,
                             Some(persisted_limit),
                             None,
                         ) {
@@ -1901,7 +1905,7 @@ pub async fn translate_files(
                                 "translation-model-limits-updated",
                                 serde_json::json!({
                                     "provider": settings.translate_ai_provider,
-                                    "model": settings.translate_ai_model,
+                                    "model": model_id,
                                     "contextWindow": persisted_limit,
                                     "maxOutputTokens": serde_json::Value::Null,
                                     "translateAiProviders": updated_providers,
@@ -1923,7 +1927,7 @@ pub async fn translate_files(
                     max_output_override = Some(new_cap);
                     if let Ok(Some(updated_providers)) = update_model_limits(
                         &settings.translate_ai_provider,
-                        &settings.translate_ai_model,
+                        model_id,
                         None,
                         Some(new_cap),
                     ) {
@@ -1931,7 +1935,7 @@ pub async fn translate_files(
                             "translation-model-limits-updated",
                             serde_json::json!({
                                 "provider": settings.translate_ai_provider,
-                                "model": settings.translate_ai_model,
+                                "model": model_id,
                                 "contextWindow": serde_json::Value::Null,
                                 "maxOutputTokens": new_cap,
                                 "translateAiProviders": updated_providers,
@@ -1977,7 +1981,7 @@ pub async fn translate_files(
                             &lang_code,
                             &ext,
                             &settings.translate_ai_provider,
-                            &settings.translate_ai_model,
+                            model_id,
                             &system_prompt,
                             &content,
                             translations_map.clone(),
@@ -3500,6 +3504,96 @@ mod alignment_tests {
                 "models/gemini-2.5-flash"
             ),
             expected
+        );
+    }
+
+    #[test]
+    fn parse_translated_lines_reclaims_stacked_consecutive_clock_times_and_compact_cues() {
+        // Two consecutive bare clock times inside cue 2, followed by genuine cues 3 and 4.
+        let order: Vec<usize> = vec![1, 2, 3, 4];
+        let stacked_resp = "\
+1: سلام
+2: جلسه از ساعت
+3:30 بعدازظهر تا
+4:00 عصر ادامه دارد.
+3: حتماً شرکت می‌کنم.
+4: خداحافظ.";
+        let map = parse_translated_lines(stacked_resp, &order);
+        assert_eq!(map.get(&1).map(String::as_str), Some("سلام"));
+        assert_eq!(
+            map.get(&2).map(String::as_str),
+            Some("جلسه از ساعت\n3:30 بعدازظهر تا\n4:00 عصر ادامه دارد.")
+        );
+        assert_eq!(map.get(&3).map(String::as_str), Some("حتماً شرکت می‌کنم."));
+        assert_eq!(map.get(&4).map(String::as_str), Some("خداحافظ."));
+
+        // Compact non-spaced genuine cue (`3：متوجه شدم` / `3:متوجه شدم`) reclaims tentative clock line.
+        let compact_fullwidth = "\
+1: سلام
+2: قرارمون
+3:30 بعدازظهر
+3：متوجه شدم
+4: خداحافظ";
+        let map_fw = parse_translated_lines(compact_fullwidth, &order);
+        assert_eq!(
+            map_fw.get(&2).map(String::as_str),
+            Some("قرارمون\n3:30 بعدازظهر")
+        );
+        assert_eq!(map_fw.get(&3).map(String::as_str), Some("متوجه شدم"));
+        assert_eq!(map_fw.get(&4).map(String::as_str), Some("خداحافظ"));
+
+        let compact_ascii = "\
+1: سلام
+2: قرارمون
+3:30 بعدازظهر
+3:متوجه شدم
+4: خداحافظ";
+        let map_ascii = parse_translated_lines(compact_ascii, &order);
+        assert_eq!(
+            map_ascii.get(&2).map(String::as_str),
+            Some("قرارمون\n3:30 بعدازظهر")
+        );
+        assert_eq!(map_ascii.get(&3).map(String::as_str), Some("متوجه شدم"));
+        assert_eq!(map_ascii.get(&4).map(String::as_str), Some("خداحافظ"));
+    }
+
+    #[test]
+    fn apply_auth_headers_trims_api_key_whitespace_and_newlines() {
+        let client = reqwest::Client::new();
+        let req_openai = apply_auth_headers(
+            client.post("https://example.com/v1/chat/completions"),
+            ApiFormat::OpenAiCompatible,
+            "  sk-test-123\n ",
+        )
+        .build()
+        .expect("OpenAI header must build cleanly with trimmed key");
+        assert_eq!(
+            req_openai.headers().get("authorization").and_then(|v| v.to_str().ok()),
+            Some("Bearer sk-test-123")
+        );
+
+        let req_anthropic = apply_auth_headers(
+            client.post("https://example.com/v1/messages"),
+            ApiFormat::AnthropicMessages,
+            "\tsk-ant-456\r\n",
+        )
+        .build()
+        .expect("Anthropic header must build cleanly with trimmed key");
+        assert_eq!(
+            req_anthropic.headers().get("x-api-key").and_then(|v| v.to_str().ok()),
+            Some("sk-ant-456")
+        );
+
+        let req_gemini = apply_auth_headers(
+            client.post("https://example.com/v1beta/models/gemini:generateContent"),
+            ApiFormat::GeminiResponses,
+            " AIzaTest789 \n",
+        )
+        .build()
+        .expect("Gemini header must build cleanly with trimmed key");
+        assert_eq!(
+            req_gemini.headers().get("x-goog-api-key").and_then(|v| v.to_str().ok()),
+            Some("AIzaTest789")
         );
     }
 }

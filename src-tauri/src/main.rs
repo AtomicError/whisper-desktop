@@ -562,29 +562,63 @@ async fn read_text_file_content(file_path: String) -> Result<String, String> {
     .map_err(|e| format!("Failed to read file: {e}"))?
 }
 
-#[tauri::command]
-async fn find_existing_video_file(candidates: Vec<String>) -> Option<String> {
-    tokio::task::spawn_blocking(move || {
-        for candidate in candidates {
-            let trimmed = candidate.trim();
-            if trimmed.is_empty() {
-                continue;
+fn find_existing_video_file_sync(candidates: &[String]) -> Option<String> {
+    let mut dir_cache: std::collections::HashMap<std::path::PathBuf, Vec<(String, std::path::PathBuf)>> =
+        std::collections::HashMap::new();
+
+    for candidate in candidates {
+        let trimmed = candidate.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let path = Path::new(trimmed);
+        let ext = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.to_ascii_lowercase())
+            .unwrap_or_default();
+        if !VIDEO_EXTENSIONS.contains(&ext.as_str()) {
+            continue;
+        }
+        if path.is_file() {
+            return Some(trimmed.to_string());
+        }
+
+        // Fallback for case-sensitive filesystems (e.g. Linux) when a video file
+        // uses uppercase or mixed-case extensions like `Movie.MP4` or `Clip.MKV`.
+        let (Some(parent), Some(target_name)) = (path.parent(), path.file_name()) else {
+            continue;
+        };
+        let target_lower = target_name.to_string_lossy().to_ascii_lowercase();
+        let entries = dir_cache.entry(parent.to_path_buf()).or_insert_with(|| {
+            let mut list = Vec::new();
+            if let Ok(read_dir) = std::fs::read_dir(parent) {
+                for entry in read_dir.flatten() {
+                    let entry_path = entry.path();
+                    if entry_path.is_file() {
+                        let name_lower = entry.file_name().to_string_lossy().to_ascii_lowercase();
+                        list.push((name_lower, entry_path));
+                    }
+                }
             }
-            let path = Path::new(trimmed);
-            let ext = path
-                .extension()
-                .and_then(|e| e.to_str())
-                .map(|e| e.to_ascii_lowercase())
-                .unwrap_or_default();
-            if VIDEO_EXTENSIONS.contains(&ext.as_str()) && path.is_file() {
-                return Some(trimmed.to_string());
+            list
+        });
+
+        if let Some((_, matched_path)) = entries.iter().find(|(name_lower, _)| *name_lower == target_lower) {
+            if matched_path.is_file() {
+                return Some(matched_path.to_string_lossy().to_string());
             }
         }
-        None
-    })
-    .await
-    .ok()
-    .flatten()
+    }
+    None
+}
+
+#[tauri::command]
+async fn find_existing_video_file(candidates: Vec<String>) -> Option<String> {
+    tokio::task::spawn_blocking(move || find_existing_video_file_sync(&candidates))
+        .await
+        .ok()
+        .flatten()
 }
 
 #[tauri::command]
@@ -1810,6 +1844,34 @@ mod main_tests {
         let res_lossy = get_transcript_session_data(Some(lossy_json_path.to_string_lossy().to_string()));
         assert!(res_lossy.is_ok());
         assert!(res_lossy.unwrap().contains(char::REPLACEMENT_CHARACTER));
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_find_existing_video_file_matches_uppercase_extension_case_insensitively() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let temp_dir = std::env::temp_dir().join(format!("whisper_video_lookup_{}_{}", std::process::id(), nonce));
+        std::fs::create_dir_all(&temp_dir).unwrap();
+
+        let video_path = temp_dir.join("Movie.MP4");
+        std::fs::write(&video_path, b"video").unwrap();
+        let non_video_path = temp_dir.join("notes.TXT");
+        std::fs::write(&non_video_path, b"text").unwrap();
+
+        let candidates = vec![
+            temp_dir.join("Movie.mkv").to_string_lossy().to_string(),
+            temp_dir.join("Movie.mp4").to_string_lossy().to_string(),
+        ];
+        let matched = find_existing_video_file_sync(&candidates);
+        assert_eq!(matched.as_deref(), Some(video_path.to_string_lossy().as_ref()));
+
+        // Non-video extensions are never matched even if present
+        let non_video_candidates = vec![temp_dir.join("notes.txt").to_string_lossy().to_string()];
+        assert_eq!(find_existing_video_file_sync(&non_video_candidates), None);
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }

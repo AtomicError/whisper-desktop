@@ -322,6 +322,7 @@ pub async fn fetch_provider_models(
     let url = build_models_url(fmt, trimmed_base_url);
 
     let mut req = client.get(&url);
+    let api_key = api_key.trim().to_string();
     use crate::translation::provider::ApiFormat as Fmt;
     match fmt {
         Fmt::AnthropicMessages => {

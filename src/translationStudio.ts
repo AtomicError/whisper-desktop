@@ -1193,6 +1193,8 @@ export class TranslationStudioController {
       this.updateSubtitleInfoUI();
       this.renderSourceCues();
       this.renderTargetCues();
+      if (this.sourceList) this.sourceList.scrollTop = 0;
+      if (this.targetList) this.targetList.scrollTop = 0;
       this.updateActionButtons();
       void this.detectCompanionVideo(filePath, loadId);
       return true;
@@ -1248,6 +1250,8 @@ export class TranslationStudioController {
     this.updateSubtitleInfoUI();
     this.renderSourceCues();
     this.renderTargetCues();
+    if (this.sourceList) this.sourceList.scrollTop = 0;
+    if (this.targetList) this.targetList.scrollTop = 0;
     this.updateActionButtons();
   }
 
@@ -1439,8 +1443,8 @@ export class TranslationStudioController {
     }
   }
 
-  public syncFromGlobalSettings() {
-    if (this.state.isTranslating || this.isStartingTranslation) {
+  public syncFromGlobalSettings(force = false) {
+    if (!force && (this.state.isTranslating || this.isStartingTranslation)) {
       this.pendingSettingsSyncAfterTranslation = true;
       return;
     }
@@ -1460,16 +1464,16 @@ export class TranslationStudioController {
       if (this.polishToggle) this.polishToggle.checked = this.state.polishPass;
     }
 
-    this.refreshProviderOptions();
+    this.refreshProviderOptions(force);
 
     if (typeof win.syncCustomSelects === 'function') {
       win.syncCustomSelects();
     }
   }
 
-  public refreshProviderOptions() {
+  public refreshProviderOptions(force = false) {
     if (!this.providerSelect) return;
-    if (this.state.isTranslating || this.isStartingTranslation) {
+    if (!force && (this.state.isTranslating || this.isStartingTranslation)) {
       this.pendingSettingsSyncAfterTranslation = true;
       return;
     }
@@ -1494,7 +1498,7 @@ export class TranslationStudioController {
       this.providerSelect.appendChild(opt);
       this.state.activeProvider = '';
       this.providerSelect.value = '';
-      this.refreshModelOptions();
+      this.refreshModelOptions(force);
       return;
     }
 
@@ -1511,12 +1515,12 @@ export class TranslationStudioController {
     this.state.activeProvider = activeName;
     this.providerSelect.value = activeName;
 
-    this.refreshModelOptions();
+    this.refreshModelOptions(force);
   }
 
-  public refreshModelOptions() {
+  public refreshModelOptions(force = false) {
     if (!this.modelSelect) return;
-    if (this.state.isTranslating || this.isStartingTranslation) {
+    if (!force && (this.state.isTranslating || this.isStartingTranslation)) {
       this.pendingSettingsSyncAfterTranslation = true;
       return;
     }
@@ -2015,13 +2019,21 @@ export class TranslationStudioController {
           parsedValid = false;
         }
         if (parsedValid) {
+          let providerOrModelReconciled = false;
           if (flushedProviders.length > 0) {
             const resolvedProvider =
               flushedProviders.find((p: any) => p?.name === this.state.activeProvider) ||
               flushedProviders.find((p: any) => p?.name === globalSettings.translateAiProvider) ||
               flushedProviders[0];
             if (resolvedProvider && typeof resolvedProvider.name === 'string') {
+              if (
+                resolvedProvider.name !== this.state.activeProvider ||
+                globalSettings.translateAiProvider !== resolvedProvider.name
+              ) {
+                providerOrModelReconciled = true;
+              }
               this.state.activeProvider = resolvedProvider.name;
+              globalSettings.translateAiProvider = resolvedProvider.name;
               if (this.providerSelect) {
                 this.providerSelect.value = this.state.activeProvider;
               }
@@ -2031,9 +2043,11 @@ export class TranslationStudioController {
               : [];
             if (enabledModels.length === 0) {
               this.state.activeModel = '';
+              globalSettings.translateAiModel = '';
               if (this.modelSelect) {
                 this.modelSelect.value = '';
               }
+              this.pendingSettingsSyncAfterTranslation = true;
               this.notify(t('translate.noModelError'), 'error');
               return;
             }
@@ -2048,12 +2062,26 @@ export class TranslationStudioController {
                 this.modelSelect.value = this.state.activeModel;
               }
               globalSettings.translateAiModel = this.state.activeModel;
+              providerOrModelReconciled = true;
+            }
+            if (providerOrModelReconciled) {
+              this.refreshProviderOptions(true);
+              const globalProviderSelect = document.getElementById('opt-translateAiProvider') as HTMLSelectElement | null;
+              if (globalProviderSelect) globalProviderSelect.value = this.state.activeProvider;
+              const globalModelSelect = document.getElementById('opt-translateAiModel') as HTMLSelectElement | null;
+              if (globalModelSelect) globalModelSelect.value = this.state.activeModel;
+              if (typeof win.syncCustomSelects === 'function') {
+                win.syncCustomSelects();
+              }
             }
           } else if (hadProviderListBeforeFlush) {
             this.state.activeProvider = '';
             this.state.activeModel = '';
+            globalSettings.translateAiProvider = '';
+            globalSettings.translateAiModel = '';
             if (this.providerSelect) this.providerSelect.value = '';
             if (this.modelSelect) this.modelSelect.value = '';
+            this.pendingSettingsSyncAfterTranslation = true;
             this.notify(t('translate.noModelError'), 'error');
             return;
           }
@@ -2263,7 +2291,7 @@ export class TranslationStudioController {
         this.lastProgressIsCancelled = true;
         this.lastPreflightError = '';
         if (this.lblMsg) {
-          this.lblMsg.removeAttribute?.('data-i18n');
+          this.lblMsg.setAttribute?.('data-i18n', 'translate.statusCancelled');
           this.lblMsg.removeAttribute?.('title');
           this.lblMsg.title = '';
           this.lblMsg.textContent = t('translate.statusCancelled');
@@ -2531,6 +2559,8 @@ export class TranslationStudioController {
     this.updateSubtitleInfoUI();
     this.renderSourceCues();
     this.renderTargetCues();
+    if (this.sourceList) this.sourceList.scrollTop = 0;
+    if (this.targetList) this.targetList.scrollTop = 0;
     this.updateActionButtons();
     this.restoreStatusBadge();
     if (this.lblMsg) {
@@ -2543,8 +2573,11 @@ export class TranslationStudioController {
         );
       } else if (this.lastPreflightError) {
         this.lblMsg.textContent = isolateDirection(this.lastPreflightError);
-      } else if (this.lblMsg.getAttribute?.('data-i18n') === 'translate.emptyTranslationError') {
-        this.lblMsg.textContent = t('translate.emptyTranslationError');
+      } else {
+        const msgI18nKey = this.lblMsg.getAttribute?.('data-i18n');
+        if (msgI18nKey) {
+          this.lblMsg.textContent = t(msgI18nKey);
+        }
       }
     }
     if (!this.state.isTranslating && !this.isStartingTranslation && (this.providerSelect?.value === '' || this.modelSelect?.value === '')) {
