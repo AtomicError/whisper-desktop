@@ -30,6 +30,7 @@ describe('subtitle loading', () => {
     invoke.mockImplementation((cmd, { filePath }) => {
       if (cmd === 'read_text_file_content') return filePath === '/A.txt' ? firstRead.promise : Promise.resolve('BBBB');
       if (cmd === 'get_file_size') return Promise.resolve(4);
+      if (cmd === 'probe_media_file') return Promise.resolve({ exists: false });
       return Promise.reject(new Error('Not found'));
     });
     const controller = new TranslationStudioController();
@@ -46,6 +47,7 @@ describe('subtitle loading', () => {
     invoke.mockImplementation((cmd, { filePath }) => {
       if (cmd === 'read_text_file_content') return Promise.resolve(filePath === '/A.txt' ? 'AAA' : 'BBBB');
       if (cmd === 'get_file_size') return filePath === '/A.txt' ? firstSize.promise : Promise.resolve(4);
+      if (cmd === 'probe_media_file') return Promise.resolve({ exists: false });
       return Promise.reject(new Error('Not found'));
     });
     const controller = new TranslationStudioController();
@@ -82,8 +84,8 @@ describe('subtitle loading', () => {
     await controller.loadSubtitleFile('/A.txt');
     expect(invoke).toHaveBeenCalledWith('probe_media_file', { filePath: '/A.mp4' });
     controller.clearLoadedSubtitle();
-    if (success) probe.resolve({});
-    else probe.reject(new Error('Not found'));
+    if (success) probe.resolve({ exists: true });
+    else probe.resolve({ exists: false });
     await new Promise(resolve => setTimeout(resolve, 0));
     expect(controller.state.companionVideoPath).toBeNull();
     expect(invoke.mock.calls.filter(([cmd]) => cmd === 'probe_media_file')).toHaveLength(1);
@@ -113,11 +115,11 @@ describe('subtitle loading', () => {
     expect((controller as any).syncScrollRaf).toBeNull();
   });
 
-  it('copies pure subtitle text without timestamps or line numbers', async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    vi.stubGlobal('navigator', { clipboard: { writeText } });
+  it('copies pure subtitle text via copyToClipboard without timestamps or line numbers and notifies on failure', async () => {
+    invoke.mockResolvedValueOnce(undefined);
     const controller = new TranslationStudioController();
-    (controller as any).notify = vi.fn();
+    const notifySpy = vi.fn();
+    (controller as any).notify = notifySpy;
     controller.state.translatedPath = '/output.srt';
     controller.state.translatedRawText = '1\n00:00:01,000 --> 00:00:02,000\nHello World\n\n2\n00:00:02,000 --> 00:00:04,000\nSecond line';
     controller.state.translatedCues = [
@@ -125,48 +127,47 @@ describe('subtitle loading', () => {
       { id: 2, startMs: 2000, endMs: 4000, startTimeStr: '00:00:02,000', endTimeStr: '00:00:04,000', text: 'Second line' },
     ];
     await controller.copyTranslatedText();
-    expect(writeText).toHaveBeenCalledWith('Hello World\nSecond line');
+    expect(invoke).toHaveBeenCalledWith('copy_to_clipboard', { text: 'Hello World\nSecond line' });
+    expect(notifySpy).toHaveBeenCalledWith('Translated subtitles copied to clipboard!', 'success');
+
+    // All clipboard providers fail -> notifies user with error
+    invoke.mockRejectedValue(new Error('Clipboard unavailable'));
+    notifySpy.mockClear();
+    await controller.copyTranslatedText();
+    expect(notifySpy).toHaveBeenCalledWith(expect.stringContaining('Clipboard unavailable'), 'error');
   });
 
-  it('attaches video on companion chip click only for valid video extensions', async () => {
-    invoke.mockImplementation((cmd, args) => {
-      if (cmd === 'select_file') return Promise.resolve('/videos/movie.mp4');
-      if (cmd === 'probe_media_file') return Promise.resolve({ duration_sec: 120 });
+  it('detectCompanionVideo ignores exists:false probes and finds existing video or active media fallback', async () => {
+    invoke.mockImplementation((cmd: string, args: any) => {
+      if (cmd === 'read_text_file_content') return Promise.resolve('1\n00:00:01,000 --> 00:00:02,000\nHi');
+      if (cmd === 'get_file_size') return Promise.resolve(40);
+      if (cmd === 'probe_media_file') {
+        return Promise.resolve({ exists: args.filePath === '/videos/movie.mkv' });
+      }
       return Promise.resolve(null);
     });
-    const controller = new TranslationStudioController();
-    const setCompanionSpy = vi.spyOn(controller, 'setCompanionVideo');
-    await controller.promptAndAttachCompanionVideo();
-    expect(invoke).toHaveBeenCalledWith('select_file', {});
-    expect(invoke).toHaveBeenCalledWith('probe_media_file', { filePath: '/videos/movie.mp4' });
-    expect(setCompanionSpy).toHaveBeenCalledWith('/videos/movie.mp4');
-  });
 
-  it('ignores non-video file on companion chip click', async () => {
-    invoke.mockImplementation((cmd) => {
-      if (cmd === 'select_file') return Promise.resolve('/audios/track.mp3');
-      return Promise.resolve(null);
-    });
     const controller = new TranslationStudioController();
-    const setCompanionSpy = vi.spyOn(controller, 'setCompanionVideo');
-    await controller.promptAndAttachCompanionVideo();
-    expect(invoke).toHaveBeenCalledWith('select_file', {});
-    expect(invoke).not.toHaveBeenCalledWith('probe_media_file', expect.anything());
-    expect(setCompanionSpy).not.toHaveBeenCalled();
-  });
+    await controller.loadSubtitleFile('/videos/movie.en.srt');
+    await vi.waitFor(() => expect(controller.state.companionVideoPath).toBe('/videos/movie.mkv'));
 
-  it('accepts extended video formats (.ts, .wmv, .flv, .mpeg) as valid companion videos', async () => {
-    invoke.mockImplementation((cmd, args) => {
-      if (cmd === 'select_file') return Promise.resolve('/videos/broadcast.ts');
-      if (cmd === 'probe_media_file') return Promise.resolve({ duration_sec: 45 });
+    // Fallback to active Transcribe media when no sibling exists
+    const origGetMedia = (globalThis as any).window.getCurrentSourceMediaFile;
+    (globalThis as any).window.getCurrentSourceMediaFile = () => '/active/clip.ts';
+    invoke.mockImplementation((cmd: string, args: any) => {
+      if (cmd === 'read_text_file_content') return Promise.resolve('1\n00:00:01,000 --> 00:00:02,000\nHi');
+      if (cmd === 'get_file_size') return Promise.resolve(40);
+      if (cmd === 'probe_media_file') {
+        return Promise.resolve({ exists: args.filePath === '/active/clip.ts' });
+      }
       return Promise.resolve(null);
     });
-    const controller = new TranslationStudioController();
-    const setCompanionSpy = vi.spyOn(controller, 'setCompanionVideo');
-    await controller.promptAndAttachCompanionVideo();
-    expect(invoke).toHaveBeenCalledWith('select_file', {});
-    expect(invoke).toHaveBeenCalledWith('probe_media_file', { filePath: '/videos/broadcast.ts' });
-    expect(setCompanionSpy).toHaveBeenCalledWith('/videos/broadcast.ts');
+    try {
+      await controller.loadSubtitleFile('/other/sub.srt');
+      await vi.waitFor(() => expect(controller.state.companionVideoPath).toBe('/active/clip.ts'));
+    } finally {
+      (globalThis as any).window.getCurrentSourceMediaFile = origGetMedia;
+    }
   });
 
   it('updates start button disabled state and tooltip title based on subtitle, model, and translating readiness', () => {
@@ -227,7 +228,7 @@ describe('subtitle loading', () => {
     expect(btnSend.disabled).toBe(true);
     expect(btnSend.setAttribute).toHaveBeenCalledWith('data-i18n-title', 'translate.emptyTargetTitle');
 
-    // With translated path and cues
+    // With translated .srt path and cues
     controller.state.translatedPath = '/output.srt';
     controller.state.translatedCues = [{ id: 1, startMs: 0, endMs: 1000, startTimeStr: '00:00:00,000', endTimeStr: '00:00:01,000', text: 'Trans' }];
     (controller as any).updateActionButtons();
@@ -237,6 +238,14 @@ describe('subtitle loading', () => {
     expect(btnOpen.setAttribute).toHaveBeenCalledWith('data-i18n-title', 'translate.openOutputFolder');
     expect(btnSend.disabled).toBe(false);
     expect(btnSend.setAttribute).toHaveBeenCalledWith('data-i18n-title', 'translate.sendToHardsub');
+
+    // With translated .txt path: copy/open enabled, Send to Hardsub disabled with timed-sub tooltip
+    controller.state.translatedPath = '/output.fa.txt';
+    (controller as any).updateActionButtons();
+    expect(btnCopy.disabled).toBe(false);
+    expect(btnOpen.disabled).toBe(false);
+    expect(btnSend.disabled).toBe(true);
+    expect(btnSend.setAttribute).toHaveBeenCalledWith('data-i18n-title', 'transcribe.hardsubRequiresTimedSub');
   });
 
   it('clears loaded subtitle and notifies error when reading subtitle file fails', async () => {
@@ -263,10 +272,12 @@ describe('subtitle loading', () => {
     await controller.openOutputFolder();
     expect(invoke).toHaveBeenCalledWith('show_in_folder', { filePath: '/output/movie_persian.srt' });
 
-    // Test fallback to open_file_in_editor when show_in_folder fails
+    // Test fallback to open_file_in_editor when show_in_folder and opener reveal fail
     invoke.mockReset();
     invoke.mockImplementation((cmd) => {
-      if (cmd === 'show_in_folder') return Promise.reject(new Error('Show failed'));
+      if (cmd === 'show_in_folder' || cmd === 'plugin:opener|reveal_item_in_dir') {
+        return Promise.reject(new Error('Show failed'));
+      }
       return Promise.resolve(null);
     });
 
@@ -780,6 +791,7 @@ describe('translation studio bugfixes and edge cases', () => {
     await controller.loadSubtitleFile('/notes.txt');
     expect(controller.state.sourceCues).toHaveLength(1);
     expect(controller.state.sourceCues[0].text).toBe('Actual spoken sentence');
+    controller.dispose();
   });
 
   it('passes translation subtitle extension filter and guards concurrent/busy directory browse', async () => {
@@ -975,13 +987,25 @@ describe('translation studio bugfixes and edge cases', () => {
         { id: 1, startMs: 0, endMs: 2000, startTimeStr: '00:00:00,000', endTimeStr: '00:00:02,000', text: 'سلام' },
       ];
       (controller as any).setStatusBadge('translate.statusComplete', 'complete');
+      controller.state.progress = 1;
+      controller.state.currentLine = 1;
+      controller.state.totalLines = 1;
+      (controller as any).lastProgressIsComplete = true;
+      (controller as any).progressFill.style.width = '100%';
+      (controller as any).lblPct.textContent = '100%';
+      (controller as any).lblLines.textContent = '1 / 1';
+      lblMsg.textContent = 'AI translation completed successfully!';
 
-      // Busy session error restores prior translated output and complete status
+      // Busy session error restores prior translated output, complete status, and telemetry DOM
       invokeHandler = vi.fn().mockRejectedValue('Another transcription or translation task is already active');
       await controller.startTranslation();
       expect(controller.state.translatedPath).toBe('/dir/sub_fa.srt');
       expect(controller.state.translatedCues).toHaveLength(1);
       expect(statusBadge.getAttribute('data-i18n')).toBe('translate.statusComplete');
+      expect((controller as any).progressFill.style.width).toBe('100%');
+      expect((controller as any).lblPct.textContent).toBe('100%');
+      expect((controller as any).lblLines.textContent).toBe('1 / 1');
+      expect(lblMsg.textContent).toBe('AI translation completed successfully!');
       expect(btnBrowseSub.disabled).toBe(false);
       expect(targetLangSelect.disabled).toBe(false);
 
@@ -1078,6 +1102,156 @@ describe('translation studio bugfixes and edge cases', () => {
     } finally {
       (globalThis as any).document = origDoc;
       (globalThis as any).window = origWin;
+    }
+  });
+
+  it('guards extensionless files, HTML5 drop without path, .txt Hardsub transfer, cancel button state, data-i18n hygiene, and math angle brackets', async () => {
+    const { parseSubtitleContent } = await import('./translationStudio');
+    const parsed = parseSubtitleContent(
+      '1\n00:00:01,000 --> 00:00:03,000\n<i>x < 5</i>\nand y > 2\n',
+      'srt'
+    );
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0].text).toBe('x < 5\nand y > 2');
+
+    const controller = new TranslationStudioController();
+    const notifySpy = vi.fn();
+    (controller as any).notify = notifySpy;
+
+    // Extensionless file named "srt" must be rejected without invoking backend
+    await controller.loadSubtitleFile('/tmp/srt');
+    expect(invoke).not.toHaveBeenCalled();
+    expect(notifySpy).toHaveBeenCalledWith(expect.any(String), 'error');
+
+    // Sending .txt output to Hardsub is blocked
+    controller.state.translatedPath = '/tmp/notes.fa.txt';
+    notifySpy.mockClear();
+    controller.sendToHardsubStudio();
+    expect(notifySpy).toHaveBeenCalledWith(expect.any(String), 'error');
+
+    // btnCancel stays disabled across view mode switches while cancellation is in flight
+    const btnCancel: any = { disabled: false, style: {} };
+    (controller as any).btnCancel = btnCancel;
+    controller.state.isTranslating = true;
+    invoke.mockResolvedValueOnce(undefined);
+    await controller.cancelTranslation();
+    controller.setViewMode('source');
+    expect(btnCancel.disabled).toBe(true);
+
+    // Dynamic data-i18n / data-i18n-title hygiene on subtitle card and output dir
+    const makeAttrEl = () => {
+      const attrs: Record<string, string> = {};
+      return {
+        textContent: '',
+        title: '',
+        style: {} as Record<string, string>,
+        classList: { add: vi.fn(), remove: vi.fn() },
+        setAttribute(k: string, v: string) { attrs[k] = v; },
+        removeAttribute(k: string) { delete attrs[k]; },
+        getAttribute(k: string) { return attrs[k] ?? null; },
+      };
+    };
+    const dropZone = makeAttrEl();
+    const lblSubName = makeAttrEl();
+    const lblSubPath = makeAttrEl();
+    const outputDirText = makeAttrEl();
+    (controller as any).dropZone = dropZone;
+    (controller as any).lblSubName = lblSubName;
+    (controller as any).lblSubPath = lblSubPath;
+    (controller as any).lblSubMeta = makeAttrEl();
+    (controller as any).btnClearSub = makeAttrEl();
+    (controller as any).outputDirText = outputDirText;
+    (controller as any).btnResetDir = makeAttrEl();
+
+    controller.state.subtitlePath = '/dir/movie.srt';
+    controller.state.subtitleName = 'movie.srt';
+    controller.state.subtitleExt = 'srt';
+    controller.state.outputDir = '/custom/out';
+    (controller as any).updateSubtitleInfoUI();
+    expect(lblSubName.getAttribute('data-i18n')).toBeNull();
+    expect(lblSubPath.getAttribute('data-i18n')).toBeNull();
+    expect(dropZone.getAttribute('data-i18n-title')).toBeNull();
+    expect(outputDirText.getAttribute('data-i18n')).toBeNull();
+
+    controller.state.isTranslating = false;
+    controller.state.outputDir = '';
+    controller.clearLoadedSubtitle();
+    expect(lblSubName.getAttribute('data-i18n')).toBe('translate.noSubLoaded');
+    expect(lblSubPath.getAttribute('data-i18n')).toBe('translate.dropSubPrompt');
+    expect(dropZone.getAttribute('data-i18n-title')).toBe('translate.dropSubPrompt');
+    expect(outputDirText.getAttribute('data-i18n')).toBe('translate.sameAsSource');
+
+    // HTML5 drop without file.path does not clear or load
+    const dropHandlers: Record<string, (e: any) => any> = {};
+    const dropZoneMock: any = {
+      addEventListener: vi.fn((evt: string, h: any) => { dropHandlers[evt] = h; }),
+      classList: { add: vi.fn(), remove: vi.fn() },
+    };
+    (controller as any).dropZone = dropZoneMock;
+    const origWin = (globalThis as any).window;
+    (globalThis as any).window = { ...origWin, __TAURI__: { core: { invoke } } };
+    try {
+      (controller as any).setupDropZone();
+      const loadSpy = vi.spyOn(controller, 'loadSubtitleFile');
+      await dropHandlers['drop']({
+        preventDefault: vi.fn(),
+        stopPropagation: vi.fn(),
+        dataTransfer: { files: [{ name: 'missing-path.srt' }] },
+      });
+      expect(loadSpy).not.toHaveBeenCalled();
+    } finally {
+      (globalThis as any).window = origWin;
+    }
+
+    // DOM-based cue rendering safely uses textContent without injecting HTML
+    const origDoc = (globalThis as any).document;
+    const makeDomNode = (tag: string) => {
+      const node: any = {
+        tagName: tag.toUpperCase(),
+        className: '',
+        id: '',
+        tabIndex: 0,
+        textContent: '',
+        innerHTML: '',
+        dataset: {} as Record<string, string>,
+        attrs: {} as Record<string, string>,
+        children: [] as any[],
+        setAttribute(k: string, v: string) { this.attrs[k] = v; },
+        removeAttribute(k: string) { delete this.attrs[k]; },
+        getAttribute(k: string) { return this.attrs[k] ?? null; },
+        appendChild(c: any) { this.children.push(c); return c; },
+        replaceChildren(...nodes: any[]) { this.children = nodes; },
+      };
+      return node;
+    };
+    const sourceDomList = makeDomNode('div');
+    const targetDomList = makeDomNode('div');
+    (globalThis as any).document = {
+      ...origDoc,
+      createElement: (tag: string) => makeDomNode(tag),
+      createDocumentFragment: () => makeDomNode('fragment'),
+    };
+    try {
+      (controller as any).sourceList = sourceDomList;
+      (controller as any).targetList = targetDomList;
+      (controller as any).sourceCountBadge = makeDomNode('span');
+      (controller as any).targetCountBadge = makeDomNode('span');
+      controller.state.sourceCues = [
+        { id: 1, startMs: 0, endMs: 1000, startTimeStr: '00:00:00,000', endTimeStr: '00:00:01,000', text: '<img src=x onerror=alert(1)>' },
+      ];
+      controller.state.translatedCues = [
+        { id: 1, startMs: 0, endMs: 1000, startTimeStr: '00:00:00,000', endTimeStr: '00:00:01,000', text: 'سلام' },
+      ];
+      (controller as any).renderSourceCues();
+      (controller as any).renderTargetCues();
+      expect(sourceDomList.children).toHaveLength(1);
+      const srcCard = sourceDomList.children[0].children ? sourceDomList.children[0] : null;
+      const renderedSrc = srcCard?.tagName === 'FRAGMENT' ? srcCard.children[0] : srcCard;
+      expect(renderedSrc.children[1].textContent).toBe('<img src=x onerror=alert(1)>');
+      expect(renderedSrc.children[1].innerHTML).toBe('');
+      expect(targetDomList.children).toHaveLength(1);
+    } finally {
+      (globalThis as any).document = origDoc;
     }
   });
 });

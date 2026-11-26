@@ -440,6 +440,7 @@ export const zh: Translations = {
     viewSplit: '左右分屏对照',
     viewSource: '仅看原文',
     viewTarget: '仅看译文',
+    viewModeAriaLabel: '字幕视图模式',
     progressLines: '正在翻译: {current}/{total} 行 ({file})',
     progressBatchLines: '正在翻译 [{fileIdx}/{totalFiles}]: {current}/{total} 行 ({file})',
     resumingLines: '恢复翻译: 已完成 {current}/{total} 行 ({file})',

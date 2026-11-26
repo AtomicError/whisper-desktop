@@ -392,50 +392,6 @@ export function setupTauriListeners(): void {
     if (!payload) return;
     setIsTranslationRunning(!!payload.active);
     updateTaskbarProgress(payload.progress, payload.active);
-
-    const fillBar = document.getElementById('progress-linear-fill');
-    const pctEl = document.getElementById('lbl-radial-pct');
-    const msgEl = document.getElementById('lbl-radial-msg');
-    const pulseDot = document.getElementById('hud-pulse-dot');
-
-    const progressVal = (payload && typeof payload.progress === 'number') ? payload.progress : 0;
-    const pct = Math.min(100, Math.max(0, Math.round(progressVal * 100)));
-
-    if (fillBar) fillBar.style.width = payload.active ? `${pct}%` : (progressVal >= 1 ? '100%' : '0%');
-    if (pctEl) {
-      pctEl.removeAttribute('data-i18n');
-      pctEl.textContent = payload.active ? `${pct}%` : (progressVal >= 1 ? '100%' : '0%');
-    }
-    if (msgEl && payload.message) {
-      const msg = payload.message;
-      delete msgEl.dataset.batchSummarySuccess;
-      delete msgEl.dataset.batchSummaryTotal;
-      delete msgEl.dataset.batchSummarySkipped;
-      if (msg.includes('Translating with AI') || msg.includes('Translating AI:') || msg.includes('Resuming translation')) {
-        msgEl.setAttribute('data-i18n', 'transcribe.aiTranslating');
-        msgEl.textContent = t('transcribe.aiTranslating');
-      } else if (msg.includes('AI translation complete')) {
-        msgEl.setAttribute('data-i18n', 'translate.statusComplete');
-        msgEl.textContent = t('translate.statusComplete');
-      } else if (msg.includes('Translation cancelled')) {
-        msgEl.setAttribute('data-i18n', 'translate.statusCancelled');
-        msgEl.textContent = t('translate.statusCancelled');
-      } else if (msg.includes('Translation failed')) {
-        msgEl.setAttribute('data-i18n', 'translate.statusFailed');
-        msgEl.textContent = t('translate.statusFailed');
-      } else {
-        msgEl.removeAttribute('data-i18n');
-        msgEl.textContent = isolateDirection(payload.message);
-      }
-    }
-
-    if (pulseDot) {
-      if (payload.active) {
-        pulseDot.classList.add('active');
-      } else {
-        pulseDot.classList.remove('active');
-      }
-    }
   });
 
   // 3. Model Download Progress Event Listener

@@ -105,6 +105,7 @@ pub struct RequestOptions {
     pub max_output_tokens: Option<u32>,
     pub use_max_completion_tokens: bool,
     pub system_in_user: bool,
+    pub include_reasoning_effort: bool,
     pub reasoning_effort: Option<String>,
 }
 
@@ -116,6 +117,7 @@ impl Default for RequestOptions {
             max_output_tokens: None,
             use_max_completion_tokens: false,
             system_in_user: false,
+            include_reasoning_effort: true,
             reasoning_effort: None,
         }
     }
@@ -260,23 +262,26 @@ impl AiProvider {
                     map.insert("max_tokens".to_string(), serde_json::json!(t));
                 }
 
-                // Reasoning effort: forward if configured for model or in options
-                let effort = options.reasoning_effort.as_deref().or_else(|| {
-                    self.models.iter().find(|m| m.id == model).and_then(|m| {
-                        if m.supports_reasoning == Some(false) {
-                            return None;
-                        }
-                        let r = m.reasoning.trim().to_lowercase();
-                        if r == "minimal" || r == "low" || r == "medium" || r == "high" || r == "xhigh" || r == "max" || r == "ultra" {
-                            Some(m.reasoning.as_str())
-                        } else {
-                            None
-                        }
-                    })
-                });
+                // Reasoning effort: forward if configured for model or in options,
+                // unless parameter negotiation explicitly disabled it.
+                if options.include_reasoning_effort {
+                    let effort = options.reasoning_effort.as_deref().or_else(|| {
+                        self.models.iter().find(|m| m.id == model).and_then(|m| {
+                            if m.supports_reasoning == Some(false) {
+                                return None;
+                            }
+                            let r = m.reasoning.trim().to_lowercase();
+                            if r == "minimal" || r == "low" || r == "medium" || r == "high" || r == "xhigh" || r == "max" || r == "ultra" {
+                                Some(m.reasoning.as_str())
+                            } else {
+                                None
+                            }
+                        })
+                    });
 
-                if let Some(r) = effort {
-                    map.insert("reasoning_effort".to_string(), serde_json::json!(r.to_lowercase()));
+                    if let Some(r) = effort {
+                        map.insert("reasoning_effort".to_string(), serde_json::json!(r.to_lowercase()));
+                    }
                 }
 
                 serde_json::Value::Object(map)
@@ -401,5 +406,37 @@ mod tests {
         assert_eq!(messages.len(), 1);
         assert_eq!(messages[0].get("role").and_then(|v| v.as_str()), Some("user"));
         assert!(messages[0].get("content").and_then(|v| v.as_str()).unwrap().contains("system instruction"));
+    }
+
+    #[test]
+    fn include_reasoning_effort_false_omits_field_even_when_model_configures_it() {
+        let provider = AiProvider {
+            name: "Custom".to_string(),
+            base_url: "https://api.example.com/v1".to_string(),
+            api_key: "sk-test".to_string(),
+            api_format: "Chat completions".to_string(),
+            use_keyring: false,
+            models: vec![AiModel {
+                id: "reasoning-model".to_string(),
+                context_window: 128000,
+                max_output_tokens: None,
+                reasoning: "low".to_string(),
+                supports_reasoning: Some(true),
+                vision: false,
+                enabled: true,
+            }],
+            custom_prompt: "".to_string(),
+        };
+
+        let opts = RequestOptions {
+            include_reasoning_effort: false,
+            reasoning_effort: None,
+            ..RequestOptions::default()
+        };
+
+        let body = provider
+            .format_request_body_ext("reasoning-model", "sys", "usr", &opts)
+            .unwrap();
+        assert!(body.get("reasoning_effort").is_none());
     }
 }

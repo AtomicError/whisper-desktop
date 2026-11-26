@@ -440,6 +440,7 @@ export const es: Translations = {
     viewSplit: 'Vista Dividida',
     viewSource: 'Solo Original',
     viewTarget: 'Solo Traducido',
+    viewModeAriaLabel: 'Modo de vista de subtítulos',
     progressLines: 'Traduciendo: {current}/{total} líneas ({file})',
     progressBatchLines: 'Traduciendo [{fileIdx}/{totalFiles}]: {current}/{total} líneas ({file})',
     resumingLines: 'Reanudando: {current}/{total} líneas completadas ({file})',

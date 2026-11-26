@@ -440,6 +440,7 @@ export const ru: Translations = {
     viewSplit: 'Раздельный вид',
     viewSource: 'Только оригинал',
     viewTarget: 'Только перевод',
+    viewModeAriaLabel: 'Режим просмотра субтитров',
     progressLines: 'Перевод: {current}/{total} строк ({file})',
     progressBatchLines: 'Перевод [{fileIdx}/{totalFiles}]: {current}/{total} строк ({file})',
     resumingLines: 'Продолжение: {current}/{total} строк готово ({file})',

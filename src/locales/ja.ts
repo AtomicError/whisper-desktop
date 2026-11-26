@@ -440,6 +440,7 @@ export const ja: Translations = {
     viewSplit: '左右分割表示',
     viewSource: '原文のみ',
     viewTarget: '訳文のみ',
+    viewModeAriaLabel: '字幕表示モード',
     progressLines: '翻訳中: {current}/{total} 行 ({file})',
     progressBatchLines: '翻訳中 [{fileIdx}/{totalFiles}]: {current}/{total} 行 ({file})',
     resumingLines: '翻訳を再開中: {current}/{total} 行完了 ({file})',

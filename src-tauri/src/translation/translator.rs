@@ -301,26 +301,63 @@ fn sanitize_filename_code(lang: &str) -> String {
 }
 
 /// Parses the response JSON based on the provider's wire protocol.
+/// Handles multi-part responses (e.g. Gemini thinking parts with `thought: true`
+/// and Anthropic `content` arrays starting with `type: "thinking"` blocks).
 fn parse_response_content(api_format: ApiFormat, response_val: &Value) -> Result<String, String> {
     let trunc = |v: &Value| safe_truncate(&format!("{:?}", v), 500);
     match api_format {
-        ApiFormat::AnthropicMessages => response_val["content"][0]["text"]
-            .as_str()
-            .map(|s| s.to_string())
-            .ok_or_else(|| format!("Invalid Anthropic response format: {}", trunc(response_val))),
+        ApiFormat::AnthropicMessages => {
+            if let Some(parts) = response_val["content"].as_array() {
+                let texts: Vec<&str> = parts
+                    .iter()
+                    .filter(|part| {
+                        part.get("type")
+                            .and_then(|v| v.as_str())
+                            .map(|t| t == "text")
+                            .unwrap_or(true)
+                    })
+                    .filter_map(|part| part.get("text").and_then(|v| v.as_str()))
+                    .collect();
+                if !texts.is_empty() {
+                    return Ok(texts.join("\n"));
+                }
+            }
+            Err(format!("Invalid Anthropic response format: {}", trunc(response_val)))
+        }
         ApiFormat::GeminiResponses => {
-            // Gemini
-            response_val["candidates"][0]["content"]["parts"][0]["text"]
-                .as_str()
-                .map(|s| s.to_string())
-                .ok_or_else(|| format!("Invalid Gemini response format: {}", trunc(response_val)))
+            if let Some(parts) = response_val["candidates"][0]["content"]["parts"].as_array() {
+                let texts: Vec<&str> = parts
+                    .iter()
+                    .filter(|part| part.get("thought").and_then(|v| v.as_bool()) != Some(true))
+                    .filter_map(|part| part.get("text").and_then(|v| v.as_str()))
+                    .collect();
+                if !texts.is_empty() {
+                    return Ok(texts.join("\n"));
+                }
+            }
+            Err(format!("Invalid Gemini response format: {}", trunc(response_val)))
         }
         ApiFormat::OpenAiCompatible => {
-            // OpenAI compatible
-            response_val["choices"][0]["message"]["content"]
-                .as_str()
-                .map(|s| s.to_string())
-                .ok_or_else(|| format!("Invalid OpenAI response format: {}", trunc(response_val)))
+            let content = &response_val["choices"][0]["message"]["content"];
+            if let Some(s) = content.as_str() {
+                return Ok(s.to_string());
+            }
+            if let Some(parts) = content.as_array() {
+                let texts: Vec<&str> = parts
+                    .iter()
+                    .filter(|part| {
+                        part.get("type")
+                            .and_then(|v| v.as_str())
+                            .map(|t| t == "text")
+                            .unwrap_or(true)
+                    })
+                    .filter_map(|part| part.get("text").and_then(|v| v.as_str()))
+                    .collect();
+                if !texts.is_empty() {
+                    return Ok(texts.join("\n"));
+                }
+            }
+            Err(format!("Invalid OpenAI response format: {}", trunc(response_val)))
         }
     }
 }
@@ -486,64 +523,57 @@ pub fn is_unsupported_system_role_error(err_msg: &str) -> bool {
     mentions_role && mentions_unsupported
 }
 
+fn negotiate_parameter_error_step(
+    api_format: ApiFormat,
+    err_text: &str,
+    options: &mut crate::translation::provider::RequestOptions,
+) -> Option<&'static str> {
+    if options.include_temperature && is_unsupported_parameter_error(err_text, "temperature") {
+        options.include_temperature = false;
+        return Some("API rejected 'temperature'; disabling temperature and retrying immediately");
+    }
+
+    if is_unsupported_parameter_error(err_text, "max_tokens") {
+        let lower = err_text.to_lowercase();
+        if api_format == ApiFormat::OpenAiCompatible
+            && lower.contains("max_completion_tokens")
+            && !options.use_max_completion_tokens
+        {
+            options.use_max_completion_tokens = true;
+            return Some("API requires 'max_completion_tokens' instead of 'max_tokens'; switching and retrying");
+        } else if api_format != ApiFormat::AnthropicMessages && options.max_output_tokens.is_some() {
+            options.max_output_tokens = None;
+            return Some("API rejected 'max_tokens'; omitting parameter and retrying");
+        }
+    }
+
+    if options.include_reasoning_effort && is_unsupported_parameter_error(err_text, "reasoning_effort") {
+        options.include_reasoning_effort = false;
+        options.reasoning_effort = None;
+        return Some("API rejected 'reasoning_effort'; omitting parameter and retrying");
+    }
+
+    if !options.system_in_user && is_unsupported_system_role_error(err_text) {
+        options.system_in_user = true;
+        return Some("API rejected 'system' message role; merging system prompt into user message and retrying");
+    }
+
+    None
+}
+
 pub fn negotiate_parameter_error(
+    api_format: ApiFormat,
     err_text: &str,
     options: &mut crate::translation::provider::RequestOptions,
     app: &AppHandle,
     logs: &AppLogs,
 ) -> bool {
-    if options.include_temperature && is_unsupported_parameter_error(err_text, "temperature") {
-        logs.log(
-            app,
-            "Translate",
-            "API rejected 'temperature'; disabling temperature and retrying immediately",
-        );
-        options.include_temperature = false;
-        return true;
+    if let Some(log_msg) = negotiate_parameter_error_step(api_format, err_text, options) {
+        logs.log(app, "Translate", log_msg);
+        true
+    } else {
+        false
     }
-
-    if is_unsupported_parameter_error(err_text, "max_tokens") {
-        let lower = err_text.to_lowercase();
-        if lower.contains("max_completion_tokens") && !options.use_max_completion_tokens {
-            logs.log(
-                app,
-                "Translate",
-                "API requires 'max_completion_tokens' instead of 'max_tokens'; switching and retrying",
-            );
-            options.use_max_completion_tokens = true;
-            return true;
-        } else if options.max_output_tokens.is_some() {
-            logs.log(
-                app,
-                "Translate",
-                "API rejected 'max_tokens'; omitting parameter and retrying",
-            );
-            options.max_output_tokens = None;
-            return true;
-        }
-    }
-
-    if options.reasoning_effort.is_some() && is_unsupported_parameter_error(err_text, "reasoning_effort") {
-        logs.log(
-            app,
-            "Translate",
-            "API rejected 'reasoning_effort'; omitting parameter and retrying",
-        );
-        options.reasoning_effort = None;
-        return true;
-    }
-
-    if !options.system_in_user && is_unsupported_system_role_error(err_text) {
-        logs.log(
-            app,
-            "Translate",
-            "API rejected 'system' message role; merging system prompt into user message and retrying",
-        );
-        options.system_in_user = true;
-        return true;
-    }
-
-    false
 }
 
 /// Aligns translations to chunk entries. Only genuinely parsed lines are
@@ -846,6 +876,98 @@ enum ChunkOutcome {
     OutputCapExceeded(Option<u32>),
 }
 
+enum NonSuccessAction {
+    Outcome(ChunkOutcome),
+    NegotiateRetry(&'static str),
+    CheckTransientOrFail,
+}
+
+fn classify_non_success_error(
+    api_format: ApiFormat,
+    status_code: u16,
+    err_text: &str,
+    options: &mut crate::translation::provider::RequestOptions,
+) -> NonSuccessAction {
+    // 1. Reactive context-limit recovery: report back so the caller can shrink
+    // the window and re-chunk.
+    if let Some(exact) = parse_context_limit_from_error(err_text) {
+        return NonSuccessAction::Outcome(ChunkOutcome::ContextLimitExceeded(Some(exact)));
+    }
+    if is_context_length_error(err_text) {
+        return NonSuccessAction::Outcome(ChunkOutcome::ContextLimitExceeded(None));
+    }
+
+    // 2. Reactive output-cap recovery: check BEFORE generic parameter negotiation
+    // so Anthropic 400s like "invalid_request_error: max_tokens: 100000 > 64000
+    // (maximum allowed)" are learned and persisted rather than masked.
+    if status_code == 400 && options.max_output_tokens.is_some() {
+        if let Some(cap) = parse_output_cap_from_error(err_text) {
+            return NonSuccessAction::Outcome(ChunkOutcome::OutputCapExceeded(Some(cap)));
+        }
+        if is_max_tokens_error(err_text) {
+            return NonSuccessAction::Outcome(ChunkOutcome::OutputCapExceeded(None));
+        }
+    }
+
+    // 3. Universal Parameter Negotiation: If the API rejected a parameter,
+    // adapt options in-place and retry immediately.
+    if status_code == 400 || status_code == 422 {
+        if let Some(msg) = negotiate_parameter_error_step(api_format, err_text, options) {
+            return NonSuccessAction::NegotiateRetry(msg);
+        }
+    }
+
+    NonSuccessAction::CheckTransientOrFail
+}
+
+fn extract_translatable_entries(parsed: &ParsedSubtitle) -> Vec<(usize, String)> {
+    parsed
+        .cues
+        .iter()
+        .filter(|c| !c.text.trim().is_empty())
+        .map(|c| (c.index, c.text.clone()))
+        .collect()
+}
+
+fn ensure_output_dir_writable(dir: &Path) -> Result<(), String> {
+    fs::create_dir_all(dir)
+        .map_err(|e| format!("Failed to create output directory '{}': {}", dir.display(), e))?;
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let probe_path = dir.join(format!(
+        ".whisper_translate_perm_{}_{}",
+        std::process::id(),
+        nanos
+    ));
+    fs::write(&probe_path, b"ok")
+        .map_err(|e| format!("Output directory '{}' is not writable: {}", dir.display(), e))?;
+    let _ = fs::remove_file(&probe_path);
+    Ok(())
+}
+
+fn write_output_file_atomic(path: &Path, content: &str) -> Result<(), String> {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let tmp_path = path.with_file_name({
+        let mut name = path.file_name().unwrap_or_default().to_os_string();
+        name.push(format!(".tmp.{}_{}", std::process::id(), nanos));
+        name
+    });
+    fs::write(&tmp_path, content)
+        .map_err(|e| format!("Failed to write temp translated file {}: {}", tmp_path.display(), e))?;
+    match crate::settings::atomic_replace_file(&tmp_path, path) {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            let _ = fs::remove_file(&tmp_path);
+            Err(format!("Failed to write output translated file {}: {}", path.display(), e))
+        }
+    }
+}
+
 /// Sends one chunk to the LLM with transport-level retries, cancellation
 /// racing, and reactive context-limit / output-cap / parameter negotiation detection.
 #[allow(clippy::too_many_arguments)]
@@ -933,38 +1055,30 @@ async fn translate_chunk(
                 text_res = res.text() => text_res.unwrap_or_default(),
             };
 
-            // 1. Universal Parameter Negotiation: If the API rejected any parameter,
-            // adapt options in-place and retry immediately.
-            if (status.as_u16() == 400 || status.as_u16() == 422)
-                && negotiate_parameter_error(&err_text, options, app, logs)
-            {
-                continue;
-            }
-
-            // 2. Reactive context-limit recovery: report back so the caller can
-            // shrink the window and re-chunk.
-            if let Some(exact) = parse_context_limit_from_error(&err_text) {
-                logs.log(app, "Translate", &format!("Context limit hit; API reported exact window: {} tokens", exact));
-                return Ok(ChunkOutcome::ContextLimitExceeded(Some(exact)));
-            }
-            if is_context_length_error(&err_text) {
-                logs.log(app, "Translate", "Context limit hit; no exact number in error, will halve the window");
-                return Ok(ChunkOutcome::ContextLimitExceeded(None));
-            }
-
-            // 3. Reactive output-cap recovery: only applies when we actually sent
-            // a `max_tokens` cap (e.g. Anthropic requires `max_tokens` and rejects
-            // oversized values with 400 + the exact allowed value). Learn it once,
-            // persist it, and every later request is right from the start.
-            if status.as_u16() == 400 && options.max_output_tokens.is_some() {
-                if let Some(cap) = parse_output_cap_from_error(&err_text) {
-                    logs.log(app, "Translate", &format!("max_tokens rejected; learned exact output cap: {} tokens", cap));
-                    return Ok(ChunkOutcome::OutputCapExceeded(Some(cap)));
+            match classify_non_success_error(api_format, status.as_u16(), &err_text, options) {
+                NonSuccessAction::Outcome(outcome) => {
+                    match &outcome {
+                        ChunkOutcome::ContextLimitExceeded(Some(exact)) => {
+                            logs.log(app, "Translate", &format!("Context limit hit; API reported exact window: {} tokens", exact));
+                        }
+                        ChunkOutcome::ContextLimitExceeded(None) => {
+                            logs.log(app, "Translate", "Context limit hit; no exact number in error, will halve the window");
+                        }
+                        ChunkOutcome::OutputCapExceeded(Some(cap)) => {
+                            logs.log(app, "Translate", &format!("max_tokens rejected; learned exact output cap: {} tokens", cap));
+                        }
+                        ChunkOutcome::OutputCapExceeded(None) => {
+                            logs.log(app, "Translate", "max_tokens rejected; no exact number in error, will halve the cap");
+                        }
+                        ChunkOutcome::Translated(_) => {}
+                    }
+                    return Ok(outcome);
                 }
-                if is_max_tokens_error(&err_text) {
-                    logs.log(app, "Translate", "max_tokens rejected; no exact number in error, will halve the cap");
-                    return Ok(ChunkOutcome::OutputCapExceeded(None));
+                NonSuccessAction::NegotiateRetry(msg) => {
+                    logs.log(app, "Translate", msg);
+                    continue;
                 }
+                NonSuccessAction::CheckTransientOrFail => {}
             }
 
             // 4. Transient server-side failures are worth another try. When the
@@ -990,7 +1104,8 @@ async fn translate_chunk(
 
             return Err(format!(
                 "API returned error status ({}): {}",
-                status, err_text
+                status,
+                safe_truncate(&err_text, 600)
             ));
         }
 
@@ -1032,16 +1147,7 @@ pub async fn translate_files(
         _ => parent_dir.clone(),
     };
 
-    if let Err(e) = fs::create_dir_all(&target_dir) {
-        logs.log(
-            &app,
-            "Translate",
-            &format!(
-                "Warning: failed to ensure output directory '{}': {}",
-                target_dir, e
-            ),
-        );
-    }
+    ensure_output_dir_writable(Path::new(&target_dir))?;
 
     if settings.translate_ai_model.trim().is_empty() {
         return Err("No active translation model is selected. Please configure and select a model under your active provider first.".to_string());
@@ -1180,17 +1286,12 @@ pub async fn translate_files(
 
         let parsed = ParsedSubtitle::parse(&content, &ext);
 
-        // Extract dialogue entries (1-based index, text)
-        let original_entries: Vec<(usize, String)> = parsed
-            .cues
-            .iter()
-            .map(|c| (c.index, c.text.clone()))
-            .collect();
+        // Extract non-empty dialogue entries (1-based index, text)
+        let original_entries = extract_translatable_entries(&parsed);
 
         if original_entries.is_empty() {
-            // Empty dialogues, just clone the file
-            fs::write(&output_path, &content)
-                .map_err(|e| format!("Failed to write output translated file: {}", e))?;
+            // Empty dialogues, just clone the file atomically
+            write_output_file_atomic(&output_path, &content)?;
             successfully_translated.push(output_file_name);
             continue;
         }
@@ -1583,10 +1684,9 @@ pub async fn translate_files(
             last_extras = untranslated_extras;
         }
 
-        // Reconstruct and save
+        // Reconstruct and save atomically
         let reconstructed = parsed.reconstruct(&translations_map);
-        fs::write(&output_path, reconstructed)
-            .map_err(|e| format!("Failed to write output translated file: {}", e))?;
+        write_output_file_atomic(&output_path, &reconstructed)?;
 
         // File is fully written: the checkpoint has served its purpose.
         crate::translation::checkpoint::remove(Path::new(&target_dir), &output_file_name);
@@ -1754,11 +1854,9 @@ pub async fn preview_translate(
     };
 
     let parsed = ParsedSubtitle::parse(&file_content, format);
-    let original_entries: Vec<(usize, String)> = parsed
-        .cues
-        .iter()
+    let original_entries: Vec<(usize, String)> = extract_translatable_entries(&parsed)
+        .into_iter()
         .take(3) // preview only first 3 lines
-        .map(|c| (c.index, c.text.clone()))
         .collect();
 
     if original_entries.is_empty() {
@@ -1846,14 +1944,15 @@ pub async fn preview_translate(
                 let err_text = res.text().await.unwrap_or_default();
                 if (status.as_u16() == 400 || status.as_u16() == 422)
                     && attempt < 2
-                    && negotiate_parameter_error(&err_text, &mut request_options, &app, &logs)
+                    && negotiate_parameter_error(api_format, &err_text, &mut request_options, &app, &logs)
                 {
                     attempt += 1;
                     continue;
                 }
                 return Err(format!(
                     "API returned error status ({}): {}",
-                    status, err_text
+                    status,
+                    safe_truncate(&err_text, 600)
                 ));
             }
 
@@ -2375,5 +2474,134 @@ mod alignment_tests {
         // At MIN_OUTPUT_TOKENS, even with Some(exact_cap), it must fail instead of looping forever
         assert!(resolve_next_output_cap(Some(1024), Some(4096)).is_err());
         assert!(resolve_next_output_cap(Some(1024), None).is_err());
+    }
+
+    #[test]
+    fn parse_response_content_skips_gemini_thought_parts_and_anthropic_thinking_blocks() {
+        let gemini_resp = serde_json::json!({
+            "candidates": [{
+                "content": {
+                    "parts": [
+                        { "thought": true, "text": "Let me analyze the subtitle context..." },
+                        { "text": "1: سلام دنیا\n2: حالت چطوره؟" }
+                    ]
+                }
+            }]
+        });
+        let gemini_out = parse_response_content(ApiFormat::GeminiResponses, &gemini_resp).unwrap();
+        assert_eq!(gemini_out, "1: سلام دنیا\n2: حالت چطوره؟");
+
+        let anthropic_resp = serde_json::json!({
+            "content": [
+                { "type": "thinking", "thinking": "Internal reasoning..." },
+                { "type": "text", "text": "1: سلام دنیا" }
+            ]
+        });
+        let anthropic_out = parse_response_content(ApiFormat::AnthropicMessages, &anthropic_resp).unwrap();
+        assert_eq!(anthropic_out, "1: سلام دنیا");
+
+        // All-thought Gemini response must fail cleanly instead of passing thoughts as subtitles
+        let thought_only = serde_json::json!({
+            "candidates": [{
+                "content": { "parts": [{ "thought": true, "text": "Only thinking" }] }
+            }]
+        });
+        assert!(parse_response_content(ApiFormat::GeminiResponses, &thought_only).is_err());
+    }
+
+    #[test]
+    fn extract_translatable_entries_filters_empty_and_whitespace_cues() {
+        let content = "1\n00:00:01,000 --> 00:00:02,000\nHello\n\n2\n00:00:03,000 --> 00:00:04,000\n   \n\n3\n00:00:05,000 --> 00:00:06,000\nWorld\n";
+        let parsed = ParsedSubtitle::parse(content, "srt");
+        assert_eq!(parsed.cues.len(), 3);
+
+        let entries = extract_translatable_entries(&parsed);
+        assert_eq!(entries, vec![(1, "Hello".to_string()), (3, "World".to_string())]);
+    }
+
+    #[test]
+    fn reasoning_effort_stays_omitted_after_parameter_negotiation() {
+        let provider = AiProvider {
+            name: "Custom".to_string(),
+            base_url: "https://api.example.com/v1".to_string(),
+            api_key: "sk-test".to_string(),
+            api_format: "Chat completions".to_string(),
+            use_keyring: false,
+            models: vec![AiModel {
+                id: "model-with-reasoning".to_string(),
+                context_window: 128000,
+                max_output_tokens: None,
+                reasoning: "low".to_string(),
+                supports_reasoning: Some(true),
+                vision: false,
+                enabled: true,
+            }],
+            custom_prompt: "".to_string(),
+        };
+
+        let mut opts = build_initial_request_options(
+            ApiFormat::OpenAiCompatible,
+            Some(&provider.models[0]),
+            100,
+        );
+        assert_eq!(opts.reasoning_effort.as_deref(), Some("low"));
+        assert!(opts.include_reasoning_effort);
+
+        let action = classify_non_success_error(
+            ApiFormat::OpenAiCompatible,
+            400,
+            "Unrecognized request argument supplied: reasoning_effort",
+            &mut opts,
+        );
+        assert!(matches!(action, NonSuccessAction::NegotiateRetry(_)));
+        assert!(!opts.include_reasoning_effort);
+        assert_eq!(opts.reasoning_effort, None);
+
+        let retry_body = provider
+            .format_request_body_ext("model-with-reasoning", "sys", "usr", &opts)
+            .unwrap();
+        assert!(retry_body.get("reasoning_effort").is_none());
+    }
+
+    #[test]
+    fn anthropic_output_cap_error_is_not_hijacked_by_parameter_negotiation() {
+        let mut opts = RequestOptions {
+            max_output_tokens: Some(100_000),
+            ..RequestOptions::default()
+        };
+        let err = "invalid_request_error: max_tokens: 100000 > 64000 (maximum allowed)";
+
+        let action = classify_non_success_error(ApiFormat::AnthropicMessages, 400, err, &mut opts);
+        assert!(matches!(
+            action,
+            NonSuccessAction::Outcome(ChunkOutcome::OutputCapExceeded(Some(64_000)))
+        ));
+        assert_eq!(opts.max_output_tokens, Some(100_000));
+
+        // Even if negotiate_parameter_error_step is called directly for Anthropic, max_output_tokens must remain Some
+        assert!(negotiate_parameter_error_step(ApiFormat::AnthropicMessages, err, &mut opts).is_none());
+        assert_eq!(opts.max_output_tokens, Some(100_000));
+    }
+
+    #[test]
+    fn ensure_output_dir_writable_and_write_output_file_atomic_work() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("whisper-translator-io-{}-{}", std::process::id(), nonce));
+
+        ensure_output_dir_writable(&dir).unwrap();
+        assert!(dir.is_dir());
+
+        let out_file = dir.join("movie.fa.srt");
+        write_output_file_atomic(&out_file, "1\n00:00:01,000 --> 00:00:02,000\nسلام\n").unwrap();
+        write_output_file_atomic(&out_file, "1\n00:00:01,000 --> 00:00:02,000\nدرود\n").unwrap();
+        assert_eq!(
+            std::fs::read_to_string(&out_file).unwrap(),
+            "1\n00:00:01,000 --> 00:00:02,000\nدرود\n"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

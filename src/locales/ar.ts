@@ -440,6 +440,7 @@ export const ar: Translations = {
     viewSplit: 'عرض منقسم جنباً إلى جنب',
     viewSource: 'الأصل فقط',
     viewTarget: 'المترجم فقط',
+    viewModeAriaLabel: 'وضع عرض الترجمة',
     progressLines: 'جاري الترجمة: {current} من {total} سطر ({file})',
     progressBatchLines: 'جاري الترجمة [{fileIdx}/{totalFiles}]: {current} من {total} سطر ({file})',
     resumingLines: 'استئناف الترجمة: اكتمل {current} من {total} سطر ({file})',

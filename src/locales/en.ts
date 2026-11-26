@@ -438,6 +438,7 @@ export const en = {
     viewSplit: 'Split View',
     viewSource: 'Original Only',
     viewTarget: 'Translated Only',
+    viewModeAriaLabel: 'Subtitle View Mode',
     progressLines: 'Translating: {current}/{total} lines ({file})',
     progressBatchLines: 'Translating [{fileIdx}/{totalFiles}]: {current}/{total} lines ({file})',
     resumingLines: 'Resuming: {current}/{total} lines done ({file})',

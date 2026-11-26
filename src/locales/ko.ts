@@ -440,6 +440,7 @@ export const ko: Translations = {
     viewSplit: '분할 보기',
     viewSource: '원본만 보기',
     viewTarget: '번역본만 보기',
+    viewModeAriaLabel: '자막 보기 모드',
     progressLines: '번역 중: {current}/{total} 줄 ({file})',
     progressBatchLines: '번역 중 [{fileIdx}/{totalFiles}]: {current}/{total} 줄 ({file})',
     resumingLines: '번역 재개 중: {current}/{total} 줄 완료 ({file})',

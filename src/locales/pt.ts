@@ -440,6 +440,7 @@ export const pt: Translations = {
     viewSplit: 'Visão Dividida',
     viewSource: 'Apenas Original',
     viewTarget: 'Apenas Tradução',
+    viewModeAriaLabel: 'Modo de visualização de legendas',
     progressLines: 'Traduzindo: {current}/{total} linhas ({file})',
     progressBatchLines: 'Traduzindo [{fileIdx}/{totalFiles}]: {current}/{total} linhas ({file})',
     resumingLines: 'Retomando: {current}/{total} linhas concluídas ({file})',

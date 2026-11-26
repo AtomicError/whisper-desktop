@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::sync::LazyLock;
 
 static LRC_TS_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^\[(\d{2,3}:\d{2}(?:[.:]\d{2,3})?)\]").expect("valid lrc timestamp regex")
+    Regex::new(r"^\[(\d{1,3}:\d{2}(?:[.:]\d{2,3})?)\]").expect("valid lrc timestamp regex")
 });
 
 /// Determines if a text line contains meaningful translatable content.
@@ -64,6 +64,7 @@ impl ParsedSubtitle {
         let content = content.strip_prefix('\u{feff}').unwrap_or(content);
         let lines: Vec<String> = content
             .replace("\r\n", "\n")
+            .replace('\r', "\n")
             .split('\n')
             .map(|s| s.to_string())
             .collect();
@@ -236,7 +237,9 @@ impl ParsedSubtitle {
                                 output_lines.push(id.clone());
                             }
                             output_lines.push(cue.timeline.clone());
-                            output_lines.push(text.clone());
+                            if !text.is_empty() {
+                                output_lines.push(text.clone());
+                            }
                         } else if self.format == "lrc" {
                             if text.is_empty() {
                                 output_lines.push(cue.timeline.clone());
@@ -387,5 +390,38 @@ mod tests {
         let p = parse(content, "srt");
         let out = p.reconstruct(&HashMap::new());
         assert!(out.contains("Keep"));
+    }
+
+    #[test]
+    fn lrc_single_digit_minute_timestamps_parse() {
+        let content = "[0:05.00]Intro\n[1:23.45]Verse\n";
+        let p = parse(content, "lrc");
+        assert_eq!(p.cues.len(), 2);
+        assert_eq!(p.cues[0].timeline, "[0:05.00]");
+        assert_eq!(p.cues[0].text, "Intro");
+        let out = p.reconstruct(&map(&[(1, "مقدمه"), (2, "بند")]));
+        assert_eq!(out, "[0:05.00] مقدمه\n[1:23.45] بند\n");
+    }
+
+    #[test]
+    fn standalone_cr_line_endings_parse_cleanly() {
+        let content = "1\r00:00:01,000 --> 00:00:02,000\rHello\r\r2\r00:00:03,000 --> 00:00:04,000\rWorld\r";
+        let p = parse(content, "srt");
+        assert_eq!(p.cues.len(), 2);
+        assert_eq!(p.cues[0].text, "Hello");
+        assert_eq!(p.cues[1].text, "World");
+    }
+
+    #[test]
+    fn empty_srt_cue_roundtrips_without_extra_blank_line() {
+        let content = "1\n00:00:01,000 --> 00:00:02,000\nHello\n\n2\n00:00:03,000 --> 00:00:04,000\n\n3\n00:00:05,000 --> 00:00:06,000\nWorld\n";
+        let p = parse(content, "srt");
+        assert_eq!(p.cues.len(), 3);
+        assert_eq!(p.cues[1].text, "");
+        let out = p.reconstruct(&map(&[(1, "سلام"), (3, "دنیا")]));
+        assert_eq!(
+            out,
+            "1\n00:00:01,000 --> 00:00:02,000\nسلام\n\n2\n00:00:03,000 --> 00:00:04,000\n\n3\n00:00:05,000 --> 00:00:06,000\nدنیا\n"
+        );
     }
 }

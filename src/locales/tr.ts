@@ -440,6 +440,7 @@ export const tr: Translations = {
     viewSplit: 'Bölünmüş Görünüm',
     viewSource: 'Yalnızca Orijinal',
     viewTarget: 'Yalnızca Çeviri',
+    viewModeAriaLabel: 'Altyazı Görünüm Modu',
     progressLines: 'Çevriliyor: {current}/{total} satır ({file})',
     progressBatchLines: 'Çevriliyor [{fileIdx}/{totalFiles}]: {current}/{total} satır ({file})',
     resumingLines: 'Devam ediliyor: {current}/{total} satır tamamlandı ({file})',

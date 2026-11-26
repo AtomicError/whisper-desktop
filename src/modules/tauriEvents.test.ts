@@ -236,7 +236,7 @@ describe('tauriEvents module', () => {
       expect(pctEl?.textContent).toBe('42%');
     });
 
-    it('handles translation-status events and toggles pulse dot', async () => {
+    it('handles translation-status events without overwriting Transcribe HUD elements', async () => {
       const handlers: Record<string, (e: any) => void> = {};
       setOriginalListen(vi.fn().mockImplementation((event: string, handler: (e: any) => void) => {
         handlers[event] = handler;
@@ -247,6 +247,8 @@ describe('tauriEvents module', () => {
       await new Promise(resolve => setTimeout(resolve, 10));
 
       const pulseDot = domMap.get('hud-pulse-dot');
+      const fillBar = domMap.get('progress-linear-fill');
+      const msgEl = domMap.get('lbl-radial-msg');
 
       handlers['translation-status']({
         payload: {
@@ -256,7 +258,10 @@ describe('tauriEvents module', () => {
         }
       });
 
-      expect(pulseDot?.classList.contains('active')).toBe(true);
+      expect((globalThis as any).window.isTranslationRunning).toBe(true);
+      expect(pulseDot?.classList.contains('active')).toBe(false);
+      expect(fillBar?.style.width).toBeUndefined();
+      expect(msgEl?.textContent).toBe('');
 
       handlers['translation-status']({
         payload: {
@@ -266,6 +271,7 @@ describe('tauriEvents module', () => {
         }
       });
 
+      expect((globalThis as any).window.isTranslationRunning).toBe(false);
       expect(pulseDot?.classList.contains('active')).toBe(false);
 
       handlers['translation-status']({
@@ -276,9 +282,8 @@ describe('tauriEvents module', () => {
         }
       });
 
-      const msgEl = domMap.get('lbl-radial-msg');
-      expect(pulseDot?.classList.contains('active')).toBe(false);
-      expect(msgEl?.getAttribute('data-i18n')).toBe('translate.statusFailed');
+      expect((globalThis as any).window.isTranslationRunning).toBe(false);
+      expect(msgEl?.getAttribute('data-i18n')).toBeNull();
     });
 
     it('intercepts Whisper log messages and appends transcript cues', async () => {

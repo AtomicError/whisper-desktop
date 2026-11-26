@@ -440,6 +440,7 @@ export const fr: Translations = {
     viewSplit: 'Vue Partagée',
     viewSource: 'Original Seul',
     viewTarget: 'Traduction Seule',
+    viewModeAriaLabel: 'Mode d’affichage des sous-titres',
     progressLines: 'Traduction en cours : {current}/{total} lignes ({file})',
     progressBatchLines: 'Traduction [{fileIdx}/{totalFiles}] : {current}/{total} lignes ({file})',
     resumingLines: 'Reprise : {current}/{total} lignes terminées ({file})',

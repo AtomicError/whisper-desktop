@@ -115,6 +115,8 @@ describe('locale consistency for speed presets', () => {
       expect(translate.resumingBatchLines).toContain('{totalFiles}');
       expect(translate.cueAriaLabel).toContain('{id}');
       expect(translate.translatedCueAriaLabel).toContain('{id}');
+      expect(typeof translate.viewModeAriaLabel).toBe('string');
+      expect(translate.viewModeAriaLabel.length).toBeGreaterThan(0);
     });
 
     it(`locale ${code} has all required transcribe progress and status keys`, () => {

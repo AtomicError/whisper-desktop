@@ -440,6 +440,7 @@ export const de: Translations = {
     viewSplit: 'Geteilte Ansicht',
     viewSource: 'Nur Original',
     viewTarget: 'Nur Übersetzung',
+    viewModeAriaLabel: 'Untertitel-Ansichtsmodus',
     progressLines: 'Übersetzen: {current}/{total} Zeilen ({file})',
     progressBatchLines: 'Übersetzen [{fileIdx}/{totalFiles}]: {current}/{total} Zeilen ({file})',
     resumingLines: 'Fortsetzen: {current}/{total} Zeilen erledigt ({file})',

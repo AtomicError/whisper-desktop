@@ -8,6 +8,7 @@ import {
   getLanguage,
   formatLocalizedNumber,
 } from './i18n/index';
+import { copyToClipboard } from './modules/nativeWindow';
 import { hardsubController } from './hardsub';
 
 const invoke = async <T>(cmd: string, args: Record<string, any> = {}): Promise<T> => {
@@ -253,7 +254,7 @@ export function parseSubtitleContent(content: string, ext: string): SubtitleCue[
             i++;
           }
 
-          const rawText = dialogueParts.join('\n').replace(/<[^>]+>/g, '').trim();
+          const rawText = dialogueParts.join('\n').replace(/<\/?[a-zA-Z][^>\n]*>/g, '').trim();
           if (rawText || startStr) {
             const parsedId = currentCueNum && /^\d+$/.test(currentCueNum)
               ? parseInt(currentCueNum, 10)
@@ -293,8 +294,6 @@ export class TranslationStudioController {
   private lblSubMeta: HTMLElement | null = null;
   private btnBrowseSub: HTMLButtonElement | null = null;
   private btnClearSub: HTMLButtonElement | null = null;
-  private companionChip: HTMLElement | null = null;
-  private lblCompanionName: HTMLElement | null = null;
 
   // Quick Deck Elements
   private targetLangSelect: HTMLSelectElement | null = null;
@@ -340,6 +339,7 @@ export class TranslationStudioController {
   private isBrowsingSubtitle = false;
   private isBrowsingOutputDir = false;
   private isStartingTranslation = false;
+  private isCancellingTranslation = false;
   private statusBadgeKey = 'translate.statusReady';
   private statusBadgeModifier = '';
   private lastProgressPayload: any = null;
@@ -398,8 +398,6 @@ export class TranslationStudioController {
     this.lblSubMeta = document.getElementById('lbl-translate-sub-meta');
     this.btnBrowseSub = document.getElementById('btn-browse-translate-sub') as HTMLButtonElement;
     this.btnClearSub = document.getElementById('btn-clear-translate-sub') as HTMLButtonElement;
-    this.companionChip = document.getElementById('translate-companion-chip');
-    this.lblCompanionName = document.getElementById('lbl-companion-video-name');
 
     this.targetLangSelect = document.getElementById('translate-target-lang') as HTMLSelectElement;
     this.providerSelect = document.getElementById('translate-provider-select') as HTMLSelectElement;
@@ -445,7 +443,6 @@ export class TranslationStudioController {
 
     this.btnBrowseSub?.addEventListener('click', () => this.browseSubtitleFile());
     this.btnClearSub?.addEventListener('click', () => this.clearLoadedSubtitle());
-    this.companionChip?.addEventListener('click', () => this.promptAndAttachCompanionVideo());
 
     this.targetLangSelect?.addEventListener('change', () => {
       if (this.targetLangSelect) {
@@ -980,8 +977,10 @@ export class TranslationStudioController {
       const files = e.dataTransfer?.files;
       if (files && files.length > 0) {
         const file = files[0];
-        const path = (file as any).path || file.name;
-        await this.loadSubtitleFile(path);
+        const path = (file as any).path;
+        if (typeof path === 'string' && path.trim().length > 0) {
+          await this.loadSubtitleFile(path.trim());
+        }
       }
     });
 
@@ -1026,7 +1025,8 @@ export class TranslationStudioController {
 
     const lastSlash = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
     const fileName = lastSlash >= 0 ? filePath.substring(lastSlash + 1) : filePath;
-    const ext = fileName.split('.').pop()?.toLowerCase() || '';
+    const lastDot = fileName.lastIndexOf('.');
+    const ext = lastDot > 0 ? fileName.substring(lastDot + 1).toLowerCase() : '';
 
     if (!(SUPPORTED_TRANSLATION_EXTENSIONS as readonly string[]).includes(ext)) {
       this.notify(t('translate.unsupportedFormatError'), 'error');
@@ -1115,38 +1115,12 @@ export class TranslationStudioController {
     this.updateActionButtons();
   }
 
-  public async promptAndAttachCompanionVideo() {
-    try {
-      const file = await invoke<string | null>('select_file');
-      if (file) {
-        if (SUPPORTED_VIDEO_EXTENSIONS.some(ext => file.toLowerCase().endsWith(ext))) {
-          await invoke('probe_media_file', { filePath: file });
-          this.setCompanionVideo(file);
-        }
-      }
-    } catch (err) {
-      console.warn('Failed to attach companion video:', err);
-    }
-  }
-
   public setCompanionVideo(candidate: string) {
     this.state.companionVideoPath = candidate;
-    if (this.companionChip && this.lblCompanionName) {
-      const candidateName = candidate.split(/[\/\\]/).pop() || '';
-      this.lblCompanionName.textContent = candidateName;
-      // The chip names a file the same way the card above it names one: the
-      // name reads in its own direction, with the extension last in whatever
-      // order that is, and the chip's icon stays on the interface's own side.
-      applyContentDirection(this.lblCompanionName, candidateName);
-      this.companionChip.title = isolateLtr(candidate);
-      this.companionChip.style.display = 'inline-flex';
-      this.companionChip.style.cursor = 'pointer';
-    }
   }
 
   private async detectCompanionVideo(subtitlePath: string, loadId: number) {
     this.state.companionVideoPath = null;
-    if (this.companionChip) this.companionChip.style.display = 'none';
 
     const lastDot = subtitlePath.lastIndexOf('.');
     if (lastDot <= 0) return;
@@ -1181,12 +1155,14 @@ export class TranslationStudioController {
         if (loadId !== this.subtitleLoadId) return;
         const candidate = `${stem}${ext}`;
         try {
-          await invoke('probe_media_file', { filePath: candidate });
+          const meta = await invoke<{ exists?: boolean } | null>('probe_media_file', { filePath: candidate });
           if (loadId !== this.subtitleLoadId) return;
-          this.setCompanionVideo(candidate);
-          return;
+          if (meta?.exists) {
+            this.setCompanionVideo(candidate);
+            return;
+          }
         } catch (_) {
-          // Not found, continue searching
+          // probe error, continue searching
         }
       }
     }
@@ -1201,10 +1177,12 @@ export class TranslationStudioController {
       const isVideoExt = SUPPORTED_VIDEO_EXTENSIONS.some(ext => activeMedia.toLowerCase().endsWith(ext));
       if (isVideoExt) {
         try {
-          await invoke('probe_media_file', { filePath: activeMedia });
+          const meta = await invoke<{ exists?: boolean } | null>('probe_media_file', { filePath: activeMedia });
           if (loadId !== this.subtitleLoadId) return;
-          this.setCompanionVideo(activeMedia);
-          return;
+          if (meta?.exists) {
+            this.setCompanionVideo(activeMedia);
+            return;
+          }
         } catch (_) {
           // probe failed, continue
         }
@@ -1221,9 +1199,11 @@ export class TranslationStudioController {
       // its extension at the end of the reading order, and `movie.srt` keeps both on
       // the left. Only the line's *alignment* belongs to the interface — it is the
       // card's own side that names hug (see the `.has-file .translate-sub-name` rule).
+      this.lblSubName.removeAttribute?.('data-i18n');
       this.lblSubName.textContent = this.state.subtitleName;
       applyContentDirection(this.lblSubName, this.state.subtitleName);
       this.lblSubName.title = isolateLtr(this.state.subtitlePath);
+      this.lblSubPath.removeAttribute?.('data-i18n');
       this.lblSubPath.textContent = this.state.subtitlePath;
       this.lblSubPath.title = isolateLtr(this.state.subtitlePath);
 
@@ -1244,27 +1224,23 @@ export class TranslationStudioController {
       // A tooltip is the browser's to render, and a path in a right-to-left interface
       // is what `isolateLtr` exists for — the same treatment the two titles above and
       // every other path tooltip in the app already get.
+      this.dropZone?.removeAttribute?.('data-i18n-title');
       this.dropZone?.setAttribute('title', isolateLtr(this.state.subtitlePath));
     } else {
       // Back to the interface's own copy, and back to the interface's direction — a
       // `dir` left behind by the last file would outlive it.
+      this.lblSubName.setAttribute?.('data-i18n', 'translate.noSubLoaded');
       this.lblSubName.textContent = t('translate.noSubLoaded');
       clearContentDirection(this.lblSubName);
       this.lblSubName.removeAttribute('title');
+      this.lblSubPath.setAttribute?.('data-i18n', 'translate.dropSubPrompt');
       this.lblSubPath.textContent = t('translate.dropSubPrompt');
       this.lblSubPath.removeAttribute('title');
       this.lblSubMeta.style.display = 'none';
       this.btnClearSub.style.display = 'none';
       this.dropZone?.classList.remove('has-file');
+      this.dropZone?.setAttribute('data-i18n-title', 'translate.dropSubPrompt');
       this.dropZone?.setAttribute('title', t('translate.dropSubPrompt'));
-      if (this.companionChip) {
-        this.companionChip.style.display = 'none';
-        this.companionChip.removeAttribute('title');
-      }
-      if (this.lblCompanionName) {
-        this.lblCompanionName.textContent = '';
-        clearContentDirection(this.lblCompanionName);
-      }
     }
 
     this.updateOutputDirUI();
@@ -1273,11 +1249,13 @@ export class TranslationStudioController {
   private updateOutputDirUI() {
     if (!this.outputDirText || !this.btnResetDir) return;
     if (this.state.outputDir) {
+      this.outputDirText.removeAttribute?.('data-i18n');
       this.outputDirText.textContent = this.state.outputDir;
       this.outputDirText.title = isolateLtr(this.state.outputDir);
       this.outputDirText.classList.add('has-custom-path');
       this.btnResetDir.style.display = 'inline-flex';
     } else {
+      this.outputDirText.setAttribute?.('data-i18n', 'translate.sameAsSource');
       this.outputDirText.textContent = t('translate.sameAsSource');
       this.outputDirText.removeAttribute('title');
       this.outputDirText.classList.remove('has-custom-path');
@@ -1469,38 +1447,133 @@ export class TranslationStudioController {
     return label;
   }
 
-  private renderSourceCues() {
-    if (!this.sourceList || !this.sourceCountBadge) return;
-    this.sourceCountBadge.textContent = String(this.state.sourceCues.length);
+  private isTimedSubtitlePath(filePath: string): boolean {
+    if (!filePath) return false;
+    const lastSlash = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
+    const fileName = lastSlash >= 0 ? filePath.substring(lastSlash + 1) : filePath;
+    const lastDot = fileName.lastIndexOf('.');
+    if (lastDot <= 0) return false;
+    const ext = fileName.substring(lastDot + 1).toLowerCase();
+    return ext === 'srt' || ext === 'vtt' || ext === 'lrc';
+  }
 
-    if (this.state.sourceCues.length === 0) {
-      this.sourceList.innerHTML = `
-        <div class="translate-empty-pane">
-          <svg class="translate-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <polyline points="14 2 14 8 20 8"/>
-            <line x1="16" y1="13" x2="8" y2="13"/>
-            <line x1="16" y1="17" x2="8" y2="17"/>
-            <polyline points="10 9 9 9 8 9"/>
-          </svg>
-          <div class="translate-empty-title">${escapeHTML(t('translate.emptySourceTitle'))}</div>
-          <div class="translate-empty-desc">${escapeHTML(t('translate.emptySourceDesc'))}</div>
-        </div>
-      `;
+  private renderCueList(listEl: HTMLElement, cues: SubtitleCue[], translated: boolean) {
+    if (cues.length === 0) {
+      const emptyTitle = t(translated ? 'translate.emptyTargetTitle' : 'translate.emptySourceTitle');
+      const emptyDesc = t(translated ? 'translate.emptyTargetDesc' : 'translate.emptySourceDesc');
+      if (typeof document !== 'undefined' && typeof document.createElement === 'function' && typeof listEl.appendChild === 'function') {
+        const emptyPane = document.createElement('div');
+        emptyPane.className = 'translate-empty-pane';
+        emptyPane.innerHTML = translated
+          ? `<svg class="translate-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>`
+          : `<svg class="translate-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`;
+        const titleEl = document.createElement('div');
+        titleEl.className = 'translate-empty-title';
+        titleEl.textContent = emptyTitle;
+        const descEl = document.createElement('div');
+        descEl.className = 'translate-empty-desc';
+        descEl.textContent = emptyDesc;
+        emptyPane.appendChild(titleEl);
+        emptyPane.appendChild(descEl);
+        if (typeof listEl.replaceChildren === 'function') {
+          listEl.replaceChildren(emptyPane);
+        } else {
+          listEl.innerHTML = '';
+          listEl.appendChild(emptyPane);
+        }
+      } else {
+        listEl.innerHTML = `
+          <div class="translate-empty-pane">
+            <svg class="translate-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+              ${translated
+                ? '<path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/>'
+                : '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>'}
+            </svg>
+            <div class="translate-empty-title">${escapeHTML(emptyTitle)}</div>
+            <div class="translate-empty-desc">${escapeHTML(emptyDesc)}</div>
+          </div>
+        `;
+      }
       return;
     }
 
-    // A cue reads in the direction of its own language, not the interface's — a Persian
-    // cue inside an English interface was laid out left-to-right, and an English cue
-    // inside a Persian one right-to-left. Both panes take that direction from the shared
-    // rule at render time (the text is written once, so it cannot be pointed at its
-    // content afterwards the way an editable field is).
-    const html = this.state.sourceCues.map(cue => {
+    if (typeof document !== 'undefined' && typeof document.createElement === 'function' && typeof listEl.appendChild === 'function') {
+      const container: Node = typeof document.createDocumentFragment === 'function'
+        ? document.createDocumentFragment()
+        : (() => {
+            if (typeof listEl.replaceChildren === 'function') listEl.replaceChildren();
+            else listEl.innerHTML = '';
+            return listEl;
+          })();
+
+      for (const cue of cues) {
+        const durSec = cue.endMs > cue.startMs ? Math.max(0, Math.round((cue.endMs - cue.startMs) / 1000)) : 0;
+        const durLabel = this.formatDurationBadge(durSec);
+        const cueAriaLabel = this.formatCueAriaLabel(cue.id, translated);
+
+        const item = document.createElement('div');
+        item.className = translated ? 'translate-cue-item translate-cue-translated' : 'translate-cue-item';
+        item.dataset.id = String(cue.id);
+        item.id = `${translated ? 'translate-target-cue' : 'translate-source-cue'}-${cue.id}`;
+        item.setAttribute('role', 'listitem');
+        item.tabIndex = 0;
+        item.setAttribute('aria-label', cueAriaLabel);
+
+        const header = document.createElement('div');
+        header.className = 'translate-cue-header';
+
+        const badgeWrap = document.createElement('div');
+        badgeWrap.className = 'translate-cue-badge-wrap';
+        const numEl = document.createElement('span');
+        numEl.className = 'translate-cue-num';
+        numEl.textContent = `#${cue.id}`;
+        badgeWrap.appendChild(numEl);
+        if (durLabel) {
+          const durEl = document.createElement('span');
+          durEl.className = 'translate-cue-dur';
+          durEl.textContent = durLabel;
+          badgeWrap.appendChild(durEl);
+        }
+        header.appendChild(badgeWrap);
+
+        if (cue.startTimeStr) {
+          const timeEl = document.createElement('span');
+          timeEl.className = 'translate-cue-time';
+          timeEl.setAttribute('dir', 'ltr');
+          timeEl.textContent = cue.endTimeStr ? `${cue.startTimeStr} ➔ ${cue.endTimeStr}` : cue.startTimeStr;
+          header.appendChild(timeEl);
+        }
+
+        const textEl = document.createElement('div');
+        textEl.className = translated ? 'translate-cue-text translate-cue-text-target' : 'translate-cue-text';
+        textEl.textContent = cue.text;
+        applyContentDirection(textEl, cue.text);
+
+        item.appendChild(header);
+        item.appendChild(textEl);
+        container.appendChild(item);
+      }
+
+      if (container !== listEl) {
+        if (typeof listEl.replaceChildren === 'function') {
+          listEl.replaceChildren(container);
+        } else {
+          listEl.innerHTML = '';
+          listEl.appendChild(container);
+        }
+      }
+      return;
+    }
+
+    const html = cues.map(cue => {
       const durSec = cue.endMs > cue.startMs ? Math.max(0, Math.round((cue.endMs - cue.startMs) / 1000)) : 0;
       const durLabel = this.formatDurationBadge(durSec);
-      const cueAriaLabel = this.formatCueAriaLabel(cue.id, false);
+      const cueAriaLabel = this.formatCueAriaLabel(cue.id, translated);
+      const itemCls = translated ? 'translate-cue-item translate-cue-translated' : 'translate-cue-item';
+      const idPrefix = translated ? 'translate-target-cue' : 'translate-source-cue';
+      const textCls = translated ? 'translate-cue-text translate-cue-text-target' : 'translate-cue-text';
       return `
-      <div class="translate-cue-item" data-id="${cue.id}" id="translate-source-cue-${cue.id}" role="listitem" tabindex="0" aria-label="${escapeHTML(cueAriaLabel)}">
+      <div class="${itemCls}" data-id="${cue.id}" id="${idPrefix}-${cue.id}" role="listitem" tabindex="0" aria-label="${escapeHTML(cueAriaLabel)}">
         <div class="translate-cue-header">
           <div class="translate-cue-badge-wrap">
             <span class="translate-cue-num">#${cue.id}</span>
@@ -1508,55 +1581,24 @@ export class TranslationStudioController {
           </div>
           ${cue.startTimeStr ? `<span class="translate-cue-time" dir="ltr">${escapeHTML(cue.startTimeStr)}${cue.endTimeStr ? ` ➔ ${escapeHTML(cue.endTimeStr)}` : ''}</span>` : ''}
         </div>
-        <div class="translate-cue-text" ${directionAttributes(cue.text)}>${escapeHTML(cue.text)}</div>
+        <div class="${textCls}" ${directionAttributes(cue.text)}>${escapeHTML(cue.text)}</div>
       </div>
     `;
     }).join('');
 
-    this.sourceList.innerHTML = html;
+    listEl.innerHTML = html;
+  }
+
+  private renderSourceCues() {
+    if (!this.sourceList || !this.sourceCountBadge) return;
+    this.sourceCountBadge.textContent = String(this.state.sourceCues.length);
+    this.renderCueList(this.sourceList, this.state.sourceCues, false);
   }
 
   private renderTargetCues() {
     if (!this.targetList || !this.targetCountBadge) return;
     this.targetCountBadge.textContent = String(this.state.translatedCues.length);
-
-    if (this.state.translatedCues.length === 0) {
-      this.targetList.innerHTML = `
-        <div class="translate-empty-pane">
-          <svg class="translate-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="m5 8 6 6"/>
-            <path d="m4 14 6-6 2-3"/>
-            <path d="M2 5h12"/>
-            <path d="M7 2h1"/>
-            <path d="m22 22-5-10-5 10"/>
-            <path d="M14 18h6"/>
-          </svg>
-          <div class="translate-empty-title">${escapeHTML(t('translate.emptyTargetTitle'))}</div>
-          <div class="translate-empty-desc">${escapeHTML(t('translate.emptyTargetDesc'))}</div>
-        </div>
-      `;
-      return;
-    }
-
-    const html = this.state.translatedCues.map(cue => {
-      const durSec = cue.endMs > cue.startMs ? Math.max(0, Math.round((cue.endMs - cue.startMs) / 1000)) : 0;
-      const durLabel = this.formatDurationBadge(durSec);
-      const cueAriaLabel = this.formatCueAriaLabel(cue.id, true);
-      return `
-      <div class="translate-cue-item translate-cue-translated" data-id="${cue.id}" id="translate-target-cue-${cue.id}" role="listitem" tabindex="0" aria-label="${escapeHTML(cueAriaLabel)}">
-        <div class="translate-cue-header">
-          <div class="translate-cue-badge-wrap">
-            <span class="translate-cue-num">#${cue.id}</span>
-            ${durLabel ? `<span class="translate-cue-dur">${escapeHTML(durLabel)}</span>` : ''}
-          </div>
-          ${cue.startTimeStr ? `<span class="translate-cue-time" dir="ltr">${escapeHTML(cue.startTimeStr)}${cue.endTimeStr ? ` ➔ ${escapeHTML(cue.endTimeStr)}` : ''}</span>` : ''}
-        </div>
-        <div class="translate-cue-text translate-cue-text-target" ${directionAttributes(cue.text)}>${escapeHTML(cue.text)}</div>
-      </div>
-    `;
-    }).join('');
-
-    this.targetList.innerHTML = html;
+    this.renderCueList(this.targetList, this.state.translatedCues, true);
   }
 
   private updateActionButtons() {
@@ -1594,13 +1636,14 @@ export class TranslationStudioController {
     if (this.polishToggle) this.polishToggle.disabled = isTranslating;
     if (this.btnCancel) {
       this.btnCancel.style.display = isTranslating ? 'inline-flex' : 'none';
-      this.btnCancel.disabled = false;
+      this.btnCancel.disabled = isTranslating ? this.isCancellingTranslation : false;
     }
     if (this.telemetryBox) {
       this.telemetryBox.style.display = (isTranslating || this.state.progress > 0 || this.lastProgressIsComplete || this.lastProgressIsCancelled || this.lastProgressIsFailed) ? 'block' : 'none';
     }
 
     const hasTranslation = !this.state.isTranslating && !!this.state.translatedPath && this.state.translatedCues.length > 0;
+    const hasTimedTranslation = hasTranslation && this.isTimedSubtitlePath(this.state.translatedPath);
     if (this.btnCopy) {
       this.btnCopy.disabled = !hasTranslation;
       this.btnCopy.title = hasTranslation ? t('translate.copyTranslation') : t('translate.emptyTargetTitle');
@@ -1612,9 +1655,12 @@ export class TranslationStudioController {
       this.btnOpenFolder.setAttribute?.('data-i18n-title', hasTranslation ? 'translate.openOutputFolder' : 'translate.emptyTargetTitle');
     }
     if (this.btnSendToHardsub) {
-      this.btnSendToHardsub.disabled = !hasTranslation;
-      this.btnSendToHardsub.title = hasTranslation ? t('translate.sendToHardsub') : t('translate.emptyTargetTitle');
-      this.btnSendToHardsub.setAttribute?.('data-i18n-title', hasTranslation ? 'translate.sendToHardsub' : 'translate.emptyTargetTitle');
+      this.btnSendToHardsub.disabled = !hasTimedTranslation;
+      const hardsubTitleKey = !hasTranslation
+        ? 'translate.emptyTargetTitle'
+        : (hasTimedTranslation ? 'translate.sendToHardsub' : 'transcribe.hardsubRequiresTimedSub');
+      this.btnSendToHardsub.title = t(hardsubTitleKey);
+      this.btnSendToHardsub.setAttribute?.('data-i18n-title', hardsubTitleKey);
     }
   }
 
@@ -1723,6 +1769,7 @@ export class TranslationStudioController {
           globalSettings = {};
         }
       }
+      this.isCancellingTranslation = false;
       this.state.isTranslating = true;
     } finally {
       this.isStartingTranslation = false;
@@ -1751,6 +1798,12 @@ export class TranslationStudioController {
       totalLines: this.state.totalLines,
       statusBadgeKey: this.statusBadgeKey,
       statusBadgeModifier: this.statusBadgeModifier,
+      lastProgressPayload: this.lastProgressPayload,
+      lastProgressIsComplete: this.lastProgressIsComplete,
+      lastProgressIsCancelled: this.lastProgressIsCancelled,
+      lastProgressIsFailed: this.lastProgressIsFailed,
+      lastUntranslatedCount: this.lastUntranslatedCount,
+      lblMsgText: this.lblMsg?.textContent || '',
     };
 
     this.state.progress = 0;
@@ -1826,16 +1879,39 @@ export class TranslationStudioController {
     } catch (err: any) {
       const errMsg = String(err || '');
       const isBusySession = errMsg.toLowerCase().includes('already active');
-      if (isBusySession && prevTranslation.translatedPath) {
-        this.state.translatedPath = prevTranslation.translatedPath;
-        this.state.translatedName = prevTranslation.translatedName;
-        this.state.translatedRawText = prevTranslation.translatedRawText;
-        this.state.translatedCues = prevTranslation.translatedCues;
+      if (isBusySession) {
+        if (prevTranslation.translatedPath) {
+          this.state.translatedPath = prevTranslation.translatedPath;
+          this.state.translatedName = prevTranslation.translatedName;
+          this.state.translatedRawText = prevTranslation.translatedRawText;
+          this.state.translatedCues = prevTranslation.translatedCues;
+          this.renderTargetCues();
+        }
         this.state.progress = prevTranslation.progress;
         this.state.progressMsg = prevTranslation.progressMsg;
         this.state.currentLine = prevTranslation.currentLine;
         this.state.totalLines = prevTranslation.totalLines;
-        this.renderTargetCues();
+        this.lastProgressPayload = prevTranslation.lastProgressPayload;
+        this.lastProgressIsComplete = prevTranslation.lastProgressIsComplete;
+        this.lastProgressIsCancelled = prevTranslation.lastProgressIsCancelled;
+        this.lastProgressIsFailed = prevTranslation.lastProgressIsFailed;
+        this.lastUntranslatedCount = prevTranslation.lastUntranslatedCount;
+
+        const restoredPct = Math.min(100, Math.max(0, Math.round((prevTranslation.progress || 0) * 100)));
+        if (this.progressFill) this.progressFill.style.width = `${restoredPct}%`;
+        if (this.lblPct) this.lblPct.textContent = `${restoredPct}%`;
+        if (this.lblLines) {
+          if (prevTranslation.totalLines > 0 && (prevTranslation.progress > 0 || prevTranslation.lastProgressIsComplete || prevTranslation.lastProgressIsCancelled || prevTranslation.lastProgressIsFailed)) {
+            this.lblLines.textContent = `${prevTranslation.currentLine} / ${prevTranslation.totalLines}`;
+            this.lblLines.style.display = 'inline';
+          } else {
+            this.lblLines.style.display = 'none';
+          }
+        }
+        if (this.lblMsg) {
+          this.lblMsg.removeAttribute?.('data-i18n');
+          this.lblMsg.textContent = prevTranslation.lblMsgText;
+        }
         this.setStatusBadge(
           prevTranslation.statusBadgeKey || 'translate.statusReady',
           (prevTranslation.statusBadgeModifier || '') as '' | 'active' | 'complete' | 'cancelled' | 'failed'
@@ -1851,6 +1927,7 @@ export class TranslationStudioController {
         this.notify(t('translate.translationError', { error: errMsg }), 'error');
       }
     } finally {
+      this.isCancellingTranslation = false;
       this.state.isTranslating = false;
       this.updateActionButtons();
     }
@@ -1858,11 +1935,13 @@ export class TranslationStudioController {
 
   public async cancelTranslation() {
     try {
+      this.isCancellingTranslation = true;
       if (this.btnCancel) {
         this.btnCancel.disabled = true;
       }
       await invoke('cancel_transcription');
     } catch (err) {
+      this.isCancellingTranslation = false;
       console.error('Failed to cancel translation:', err);
       if (this.btnCancel && this.state.isTranslating) {
         this.btnCancel.disabled = false;
@@ -1945,19 +2024,11 @@ export class TranslationStudioController {
       ? this.state.translatedCues.map(c => c.text).join('\n')
       : this.state.translatedRawText;
     try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(textToCopy);
-      } else {
-        await invoke('copy_to_clipboard', { text: textToCopy });
-      }
+      await copyToClipboard(textToCopy);
       this.notify(t('translate.copiedTranslation'), 'success');
-    } catch (e) {
-      try {
-        await invoke('copy_to_clipboard', { text: textToCopy });
-        this.notify(t('translate.copiedTranslation'), 'success');
-      } catch (invokeErr) {
-        console.error('Failed to copy to clipboard:', invokeErr);
-      }
+    } catch (err: any) {
+      console.error('Failed to copy to clipboard:', err);
+      this.notify(err?.message || String(err), 'error');
     }
   }
 
@@ -2032,6 +2103,10 @@ export class TranslationStudioController {
       this.notify(t('translate.emptyTargetTitle'), 'error');
       return;
     }
+    if (!this.isTimedSubtitlePath(subToLoad)) {
+      this.notify(t('transcribe.hardsubRequiresTimedSub'), 'error');
+      return;
+    }
 
     let videoToLoad = this.state.companionVideoPath || '';
     if (!videoToLoad) {
@@ -2086,6 +2161,7 @@ export class TranslationStudioController {
   }
 
   public dispose() {
+    this.subtitleLoadId++;
     for (const unlisten of this.unlisteners) {
       try {
         unlisten();

@@ -440,6 +440,7 @@ export const it: Translations = {
     viewSplit: 'Vista Affiancata',
     viewSource: 'Solo Originale',
     viewTarget: 'Solo Tradotto',
+    viewModeAriaLabel: 'Modalità di visualizzazione sottotitoli',
     progressLines: 'Traduzione: {current}/{total} righe ({file})',
     progressBatchLines: 'Traduzione [{fileIdx}/{totalFiles}]: {current}/{total} righe ({file})',
     resumingLines: 'Ripresa: {current}/{total} righe completate ({file})',
