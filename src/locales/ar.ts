@@ -627,7 +627,19 @@ export const ar: Translations = {
     presetHigh: 'جودة عالية',
     presetHighSub: 'تفاصيل فائقة الوضوح',
     presetUltra: 'فائق الدقة / ماستر',
-    presetUltraSub: 'أقصى دقة أصلية'
+    presetUltraSub: 'أقصى دقة أصلية',
+    bundledFontsGroup: '— الخطوط المدمجة —',
+    systemFontsGroup: '— خطوط النظام —',
+    noMatchingCues: 'لم يتم العثور على سطور ترجمة مطابقة.',
+    resetStyle: 'إعادة تعيين النمط',
+    bold: 'عريض',
+    italic: 'مائل',
+    toggleBold: 'تبديل الخط العريض',
+    toggleItalic: 'تبديل الخط المائل',
+    resetFontSize: 'إعادة تعيين حجم الخط إلى 14px',
+    resetOutline: 'إعادة تعيين سمك الإطار إلى 2px',
+    resetPosY: 'إعادة تعيين الهامش العمودي إلى 30px',
+    containerCodecAdjusted: 'تم ضبط ترميز الفيديو/الصوت غير المتوافق لحاوية {format}.'
   },
   models: {
     title: 'مركز نماذج التفريغ الصوتي',

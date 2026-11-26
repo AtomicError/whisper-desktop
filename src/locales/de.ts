@@ -627,7 +627,19 @@ export const de: Translations = {
     presetHigh: 'Hohe Qualität',
     presetHighSub: 'Scharfe Details',
     presetUltra: 'Ultra / Master',
-    presetUltraSub: 'Maximale Wiedergabetreue'
+    presetUltraSub: 'Maximale Wiedergabetreue',
+    bundledFontsGroup: '— Mitgelieferte Schriften —',
+    systemFontsGroup: '— Systemschriften —',
+    noMatchingCues: 'Keine passenden Untertitelzeilen gefunden.',
+    resetStyle: 'Stil zurücksetzen',
+    bold: 'Fett',
+    italic: 'Kursiv',
+    toggleBold: 'Fettschrift umschalten',
+    toggleItalic: 'Kursivschrift umschalten',
+    resetFontSize: 'Schriftgröße auf 14px zurücksetzen',
+    resetOutline: 'Konturstärke auf 2px zurücksetzen',
+    resetPosY: 'Vertikale Position auf 30px zurücksetzen',
+    containerCodecAdjusted: 'Inkompatible Codec-/Audio-Einstellungen für Container {format} angepasst.'
   },
   models: {
     title: 'Modell-Hub',

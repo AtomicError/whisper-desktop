@@ -627,7 +627,19 @@ export const fa: Translations = {
     presetHigh: 'کیفیت بالا',
     presetHighSub: 'جزئیات دقیق',
     presetUltra: 'بدون افت کیفیت',
-    presetUltraSub: 'بالاترین کیفیت'
+    presetUltraSub: 'بالاترین کیفیت',
+    bundledFontsGroup: '— فونت‌های داخلی —',
+    systemFontsGroup: '— فونت‌های سیستم —',
+    noMatchingCues: 'هیچ خط زیرنویس مطابقی یافت نشد.',
+    resetStyle: 'بازنشانی استایل',
+    bold: 'ضخیم (Bold)',
+    italic: 'مورب (Italic)',
+    toggleBold: 'تغییر حالت ضخیم متن',
+    toggleItalic: 'تغییر حالت مورب متن',
+    resetFontSize: 'بازنشانی اندازه فونت به ۱۴ پیکسل',
+    resetOutline: 'بازنشانی ضخامت خط دور به ۲ پیکسل',
+    resetPosY: 'بازنشانی فاصله عمودی به ۳۰ پیکسل',
+    containerCodecAdjusted: 'تنظیمات کدک یا صدا به گزینهٔ سازگار با فرمت {format} تغییر یافت.'
   },
   models: {
     title: 'مرکز مدل‌های رونویسی',

@@ -625,7 +625,19 @@ export const en = {
     presetHigh: 'High Quality',
     presetHighSub: 'Crisp Detail',
     presetUltra: 'Ultra / Master',
-    presetUltraSub: 'Max Fidelity'
+    presetUltraSub: 'Max Fidelity',
+    bundledFontsGroup: '— Bundled Fonts —',
+    systemFontsGroup: '— System Fonts —',
+    noMatchingCues: 'No matching subtitle cues found.',
+    resetStyle: 'Reset Style',
+    bold: 'Bold',
+    italic: 'Italic',
+    toggleBold: 'Toggle Bold Text',
+    toggleItalic: 'Toggle Italic Text',
+    resetFontSize: 'Reset font size to 14px',
+    resetOutline: 'Reset outline size to 2px',
+    resetPosY: 'Reset vertical position to 30px',
+    containerCodecAdjusted: 'Adjusted incompatible codec/audio settings for the {format} container.'
   },
   models: {
     title: 'Model Hub',

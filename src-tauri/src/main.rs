@@ -266,87 +266,7 @@ async fn cancel_hardsub_task(
     log_state: State<'_, LogState>,
     app: AppHandle,
 ) -> Result<(), String> {
-    let pid_to_kill = {
-        let mut session = state.0.lock().map_err(|e| format!("Lock error: {}", e))?;
-        if !session.is_running {
-            return Ok(());
-        }
-        session.cancel_requested = true;
-        session.child_pid
-    };
-
-    if let Some(pid) = pid_to_kill {
-        log_state.0.log(&app, "Hardsub", &format!("Cancellation requested for hardsub task (PID: {})", pid));
-        const GRACE_DURATION: std::time::Duration = std::time::Duration::from_millis(1500);
-
-        #[cfg(unix)]
-        {
-            let _ = tokio::process::Command::new("kill")
-                .args(["-TERM", "--", &format!("-{}", pid), &pid.to_string()])
-                .status()
-                .await;
-        }
-        #[cfg(windows)]
-        {
-            let mut cmd = tokio::process::Command::new("taskkill");
-            cmd.creation_flags(0x08000000);
-            let _ = cmd
-                .args(["/T", "/PID", &pid.to_string()])
-                .status()
-                .await;
-        }
-
-        let deadline = std::time::Instant::now() + GRACE_DURATION;
-        let mut session_ended = false;
-
-        while std::time::Instant::now() < deadline {
-            tokio::time::sleep(std::time::Duration::from_millis(75)).await;
-            if let Ok(lock) = state.0.lock() {
-                if !lock.is_running {
-                    session_ended = true;
-                    break;
-                }
-            }
-        }
-
-        if !session_ended {
-            let pid_still_ours = if let Ok(lock) = state.0.lock() {
-                lock.is_running && lock.child_pid == Some(pid)
-            } else {
-                false
-            };
-
-            #[cfg(unix)]
-            let process_alive = {
-                tokio::process::Command::new("kill")
-                    .args(["-0", &pid.to_string()])
-                    .status()
-                    .await
-                    .map(|s| s.success())
-                    .unwrap_or(false)
-            };
-
-            #[cfg(unix)]
-            if pid_still_ours && process_alive {
-                log_state.0.log(&app, "Hardsub", &format!("Escalating hardsub cancellation to SIGKILL (PID: {})", pid));
-                let _ = tokio::process::Command::new("kill")
-                    .args(["-KILL", "--", &format!("-{}", pid), &pid.to_string()])
-                    .status()
-                    .await;
-            }
-
-            #[cfg(windows)]
-            if pid_still_ours {
-                let mut cmd = tokio::process::Command::new("taskkill");
-                cmd.creation_flags(0x08000000);
-                let _ = cmd
-                    .args(["/F", "/T", "/PID", &pid.to_string()])
-                    .status()
-                    .await;
-            }
-        }
-    }
-    Ok(())
+    hardsub::terminate_hardsub_session(Some(&app), Some(&log_state.0), &state.0, false).await
 }
 
 #[tauri::command]
@@ -1598,6 +1518,7 @@ fn main() {
             let exit_state = exit_state.clone();
             tauri::async_runtime::spawn(async move {
                 downloader::shutdown_downloads(&app.state::<DownloadState>().0).await;
+                hardsub::shutdown_hardsub(&app, &app.state::<LogState>().0, &app.state::<HardsubState>().0).await;
                 app.state::<media_preview::PreviewState>().shutdown().await;
                 app.state::<Arc<video_server::MediaServer>>().shutdown().await;
                 cleanup_transcript_cache(&app);

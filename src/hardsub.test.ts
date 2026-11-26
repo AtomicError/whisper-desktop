@@ -2115,6 +2115,529 @@ describe('hardsub output directory management', () => {
       expect(hintSpan.textContent.length).toBeGreaterThan(0);
     });
   });
+
+  describe('audit fixes: cancellation, sync, parsing, preview, and style persistence', () => {
+    it('aborts startHardsub before encoding if cancelled during pre-encode checks', async () => {
+      let resolveProbe!: (val: unknown) => void;
+      const probePromise = new Promise((res) => { resolveProbe = res; });
+      const taskbarSpy = vi.fn();
+      (window as any).updateTaskbarProgress = taskbarSpy;
+      (window as any).showNotification = vi.fn();
+
+      invoke.mockImplementation(async (command: string) => {
+        if (command === 'begin_hardsub_preview') return { requestId: 1, candidateId: '1', url: 'http://localhost/v.mp4', stage: 'direct', source: null };
+        if (command === 'probe_hardsub_source') return probePromise;
+        if (command === 'get_font_render_scale') return { scale: 0.585, ascentRatio: 0.628, descentRatio: 0.372 };
+        return undefined;
+      });
+
+      const { internal, startBtn } = fixture();
+      const cancelBtn = new Control();
+      const cancelSpan = new Control();
+      cancelSpan.tagName = 'SPAN';
+      cancelBtn.appendChild(cancelSpan);
+      (internal as any).cancelBtn = cancelBtn;
+
+      const subInput = new Control();
+      subInput.value = '/sub.srt';
+      (internal as any).subtitlePathInput = subInput;
+      internal.state.videoPath = '/v.mp4';
+      internal.state.subtitlePath = '/sub.srt';
+      internal.subtitleCues = [{ text: 'Hello', startMs: 0, endMs: 1000 }];
+
+      const runPromise = (internal as any).startHardsub();
+      await flush();
+
+      // User cancels while probe_hardsub_source is still pending
+      (internal as any).isCancelling = true;
+      resolveProbe({ displayWidth: 1920, displayHeight: 1080, width: 1920, height: 1080, durationMs: 5000 });
+      await runPromise;
+
+      expect(invoke).not.toHaveBeenCalledWith('write_text_file_content', expect.anything());
+      expect(invoke).not.toHaveBeenCalledWith('start_hardsub_task', expect.anything());
+      expect((window as any).isHardsubRunning).toBe(false);
+      expect(taskbarSpy).toHaveBeenCalledWith(0, false);
+      expect((internal as any).lastStatusPayload?.stage).toBe('cancelled');
+      expect(startBtn.disabled).toBe(false);
+    });
+
+    it('clears taskbar progress, global lock, and lastStatusPayload when hardsub-status emits cancelled', async () => {
+      doc.readyState = 'complete';
+      let statusHandler: ((ev: { payload: any }) => void) | null = null;
+      (window as any).__TAURI__.event.listen = vi.fn(async (name: string, cb: (ev: { payload: any }) => void) => {
+        if (name === 'hardsub-status') statusHandler = cb;
+        return () => {};
+      });
+      const taskbarSpy = vi.fn();
+      (window as any).updateTaskbarProgress = taskbarSpy;
+
+      const { internal } = fixture();
+      await flush();
+      expect(statusHandler).not.toBeNull();
+
+      statusHandler!({
+        payload: { progress: 0.45, message: 'Encoding', active: true, stage: 'encoding' },
+      });
+      expect((window as any).isHardsubRunning).toBe(true);
+
+      statusHandler!({
+        payload: { progress: 0.45, message: 'Cancelled', active: false, stage: 'cancelled' },
+      });
+
+      expect((window as any).isHardsubRunning).toBe(false);
+      expect(taskbarSpy).toHaveBeenLastCalledWith(0, false);
+      expect((internal as any).lastStatusPayload?.stage).toBe('cancelled');
+    });
+
+    it('updates style control visibility and disabled classes even when video phase is idle', () => {
+      const { internal, fontSelect } = fixture();
+      const resetFont = new Control();
+      const bgControls = new Control();
+      const bgExtraControls = new Control();
+      const outlinePicker = new Control();
+      doc.elements.set('reset-fontsize', resetFont);
+      doc.elements.set('hardsub-bg-controls', bgControls);
+      doc.elements.set('hardsub-bg-extra-controls', bgExtraControls);
+      doc.elements.set('hardsub-outline-picker-wrapper', outlinePicker);
+
+      internal.phase = 'idle';
+      (internal.state as any).fontSize = 22;
+      (internal.state as any).bgBox = true;
+      (internal.state as any).outlineSize = 0;
+
+      (internal as any).updateLivePreview();
+
+      expect(resetFont.style.display).toBe('inline-flex');
+      expect(bgControls.classList.contains('control-disabled')).toBe(false);
+      expect(bgExtraControls.classList.contains('control-disabled')).toBe(false);
+      expect(outlinePicker.classList.contains('control-disabled')).toBe(true);
+      expect(fontSelect).toBeTruthy();
+    });
+
+    it('syncs CustomSelect when Arabic subtitles trigger Vazirmatn auto-switch', async () => {
+      const syncCustomSelects = vi.fn();
+      (window as any).syncCustomSelects = syncCustomSelects;
+
+      invoke.mockImplementation(async (command: string) => {
+        if (command === 'read_text_file_content') {
+          return '1\n00:00:00,000 --> 00:00:02,000\nسلام دنیا';
+        }
+        if (command === 'get_font_render_scale') {
+          return { scale: 0.585, ascentRatio: 0.628, descentRatio: 0.372 };
+        }
+        return undefined;
+      });
+
+      const { internal, fontSelect } = fixture();
+      (internal.state as any).fontName = 'Arial';
+      internal.state.subtitlePath = '/fa.srt';
+
+      await internal.loadSubtitleFile('/fa.srt');
+
+      expect((internal.state as any).fontName).toBe('Vazirmatn');
+      expect(fontSelect.value).toBe('Vazirmatn');
+      expect(syncCustomSelects).toHaveBeenCalledWith(false, true);
+    });
+
+    it('detects extended companion formats and discards stale completion after refreshFontRenderScale', async () => {
+      let resolveScale!: (v: unknown) => void;
+      const scalePromise = new Promise((res) => { resolveScale = res; });
+
+      invoke.mockImplementation(async (command: string, args: any) => {
+        if (command === 'read_text_file_content') {
+          if (args?.filePath === '/movie.lrc') return '[00:01.00]Companion LRC';
+          if (args?.filePath === '/manual.srt') return '1\n00:00:00,000 --> 00:00:01,000\nManual Cue';
+          throw new Error('Not found');
+        }
+        if (command === 'get_font_render_scale') {
+          if (args?.fontName === 'Arial') return { scale: 1, ascentRatio: 0.8, descentRatio: 0.2 };
+          return scalePromise;
+        }
+        return undefined;
+      });
+
+      const { internal } = fixture();
+      internal.state.videoPath = '/movie.mp4';
+      const companionPromise = (internal as any).detectAndLoadCompanionSubtitle('/movie', '/movie.mp4');
+      await flush();
+
+      // User manually picks a subtitle while companion font metrics are still resolving
+      (internal.state as any).fontName = 'Arial';
+      internal.state.subtitlePath = '/manual.srt';
+      await internal.loadSubtitleFile('/manual.srt');
+
+      resolveScale({ scale: 0.585, ascentRatio: 0.628, descentRatio: 0.372 });
+      const loadedCompanion = await companionPromise;
+
+      expect(loadedCompanion).toBe(false);
+      expect(internal.state.subtitlePath).toBe('/manual.srt');
+      expect(internal.subtitleCues[0].text).toBe('Manual Cue');
+    });
+
+    it('updates FFmpeg preview without -noautorotate on media changes and enforces container compatibility', () => {
+      const { internal } = fixture();
+      const hwSelect = (internal as any).hwSelect as Control;
+      const codecSelect = (internal as any).codecSelect as Control;
+      const cmdPreview = new Control();
+      const formatSelect = new Control();
+      const audioCodecSelect = new Control();
+      const vp9Opt = new Control();
+      vp9Opt.value = 'vp9';
+      const h264Opt = new Control();
+      h264Opt.value = 'h264';
+      codecSelect.appendChild(h264Opt);
+      codecSelect.appendChild(vp9Opt);
+
+      (internal as any).ffmpegCmdPreview = cmdPreview;
+      (internal as any).formatSelect = formatSelect;
+      (internal as any).audioCodecSelect = audioCodecSelect;
+      (internal as any).setupExportEventListeners();
+
+      (internal as any).selectVideoSource('/clips/test.mp4', true);
+      expect(cmdPreview.textContent).toContain('"test.mp4"');
+      expect(cmdPreview.textContent).not.toContain('-noautorotate');
+
+      (internal as any).state.hwAccel = 'cpu';
+      (internal as any).state.videoCodec = 'h264';
+      (internal as any).state.audioCodec = 'aac';
+      hwSelect.value = 'cpu';
+      codecSelect.value = 'h264';
+      formatSelect.value = 'webm';
+      audioCodecSelect.value = 'aac';
+
+      formatSelect.dispatchEvent(new Event('change'));
+      expect((internal.state as any).videoCodec).toBe('vp9');
+      expect((internal.state as any).audioCodec).toBe('opus');
+    });
+
+    it('renders empty search notice cleanly, resizes textareas on editor tab switch, and locks videoPlaceholder when non-idle', () => {
+      const { internal } = fixture();
+      const list = new Control();
+      (internal as any).subtitleListContainer = list;
+      internal.subtitleCues = [{
+        id: 1,
+        startMs: 0,
+        endMs: 1000,
+        startTimeStr: '00:00:00,000',
+        endTimeStr: '00:00:01,000',
+        text: 'Visible cue',
+      } as any];
+      (internal as any).searchFilterQuery = 'nonexistent';
+      (internal as any).renderSubtitleCards();
+
+      expect(list.children).toHaveLength(1);
+      expect(list.children[0].className).toBe('hardsub-empty-search-notice');
+      expect(list.children[0].textContent.length).toBeGreaterThan(0);
+
+      const editorTabBtn = new Control();
+      const styleTabBtn = new Control();
+      const exportTabBtn = new Control();
+      const editorView = new Control();
+      const styleView = new Control();
+      const exportView = new Control();
+      (internal as any).tabBtnEditor = editorTabBtn;
+      (internal as any).tabBtnStyle = styleTabBtn;
+      (internal as any).tabBtnExport = exportTabBtn;
+      (internal as any).tabViewEditor = editorView;
+      (internal as any).tabViewStyle = styleView;
+      (internal as any).tabViewExport = exportView;
+      const resizeSpy = vi.fn();
+      (internal as any).resizeAllCueTextareas = resizeSpy;
+      (internal as any).setupStudioTabEvents();
+      styleTabBtn.dispatchEvent(new Event('click'));
+      editorTabBtn.dispatchEvent(new Event('click'));
+      expect(resizeSpy).toHaveBeenCalled();
+
+      const placeholder = new Control();
+      (internal as any).videoPlaceholder = placeholder;
+      (internal as any).setupEventListeners();
+      internal.phase = 'loading';
+      placeholder.dispatchEvent(new Event('click'));
+      expect(invoke).not.toHaveBeenCalledWith('select_file', expect.anything());
+    });
+
+    it('preserves multi-line HTML styling and named CSS colors in ASS export and splits SRT blocks with blank whitespace lines', () => {
+      const srtWithSpaces = [
+        '1',
+        '00:00:00,500 --> 00:00:01,500',
+        'First block',
+        '   \t  ',
+        '2',
+        '00:00:02,000 --> 00:00:03,000',
+        'Second block',
+      ].join('\n');
+      const parsed = parseSubtitleContentFn(srtWithSpaces, 'srt');
+      expect(parsed).toHaveLength(2);
+      expect(parsed[1].text).toBe('Second block');
+
+      const { internal } = fixture();
+      (internal as any).directSourceGeometry = { width: 1280, height: 720 };
+      (internal as any).fontMetrics = { scale: 0.585, ascentRatio: 0.628, descentRatio: 0.372 };
+      (internal.state as any).bold = false;
+      (internal.state as any).italic = false;
+      internal.subtitleCues = [{
+        text: '<i>First line\nSecond line</i> <font color="red">Alert</font>',
+        startMs: 0,
+        endMs: 2000,
+      }];
+
+      const ass = (internal as any).generateAssContent();
+      const dialogueLines = ass.split('\n').filter((line: string) => line.startsWith('Dialogue: 1,'));
+      expect(dialogueLines).toHaveLength(2);
+      expect(dialogueLines[0]).toContain('\\i1');
+      expect(dialogueLines[1]).toContain('\\i1');
+      expect(dialogueLines[1]).toContain('\\c&H0000FF&');
+    });
+
+    it('persists and resets style settings in localStorage without persisting outputDir', () => {
+      const store = new Map<string, string>();
+      const prevResizeObserver = (globalThis as any).ResizeObserver;
+      vi.stubGlobal('ResizeObserver', class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      });
+      vi.stubGlobal('localStorage', {
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => { store.set(k, v); },
+        removeItem: (k: string) => { store.delete(k); },
+      });
+
+      try {
+        doc.readyState = 'complete';
+        const { internal, controller } = fixture();
+        (internal.state as any).fontSize = 26;
+        (internal.state as any).primaryColor = '#FF00AA';
+        (internal.state as any).bgBox = true;
+        (internal.state as any).alignment = 8;
+        internal.state.outputDir = '/custom/out';
+        (internal as any).saveStyleSettingsToStorage(true);
+
+        expect(store.has('whisper_hardsub_style_settings')).toBe(true);
+        const savedPayload = JSON.parse(store.get('whisper_hardsub_style_settings')!);
+        expect(savedPayload.outputDir).toBeUndefined();
+
+        const { internal: restoredInternal } = fixture();
+        expect((restoredInternal.state as any).fontSize).toBe(26);
+        expect((restoredInternal.state as any).primaryColor).toBe('#FF00AA');
+        expect((restoredInternal.state as any).bgBox).toBe(true);
+        expect((restoredInternal.state as any).alignment).toBe(8);
+        expect(restoredInternal.state.outputDir).toBe('');
+
+        (restoredInternal as any).resetStyleSettings();
+        expect((restoredInternal.state as any).fontSize).toBe(14);
+        expect((restoredInternal.state as any).primaryColor).toBe('#FFFFFF');
+        expect((restoredInternal.state as any).bgBox).toBe(false);
+        expect((restoredInternal.state as any).alignment).toBe(2);
+        expect(store.has('whisper_hardsub_style_settings')).toBe(false);
+        expect(controller).toBeTruthy();
+      } finally {
+        vi.stubGlobal('localStorage', undefined as any);
+        vi.stubGlobal('ResizeObserver', prevResizeObserver);
+      }
+    });
+
+    it('clears taskbar progress and preserves failure HUD state when startHardsub fails early', async () => {
+      const taskbarSpy = vi.fn();
+      (window as any).updateTaskbarProgress = taskbarSpy;
+      (window as any).showNotification = vi.fn();
+      invoke.mockImplementation(async (command: string) => {
+        if (command === 'probe_hardsub_source') {
+          throw new Error('ffprobe missing');
+        }
+        return undefined;
+      });
+
+      const { internal, startBtn } = fixture();
+      const statusText = new Control();
+      const progressFill = new Control();
+      const progressPct = new Control();
+      const telemetryBox = new Control();
+      const subInput = new Control();
+      subInput.value = '/sub.srt';
+      (internal as any).subtitlePathInput = subInput;
+      (internal as any).progressStatusText = statusText;
+      (internal as any).progressFill = progressFill;
+      (internal as any).progressPctText = progressPct;
+      (internal as any).telemetryBox = telemetryBox;
+
+      internal.state.videoPath = '/v.mp4';
+      internal.state.subtitlePath = '/sub.srt';
+      internal.subtitleCues = [{ id: 1, startMs: 0, endMs: 1000, startTimeStr: '00:00:00,000', endTimeStr: '00:00:01,000', text: 'Hi' } as any];
+
+      await (internal as any).startHardsub();
+
+      expect((internal as any).lastStatusPayload?.stage).toBe('failed');
+      expect(statusText.textContent).toContain('ffprobe missing');
+      expect(progressFill.style.width).toBe('0%');
+      expect(progressPct.textContent).toBe('0%');
+      expect(taskbarSpy).toHaveBeenCalledWith(0, false);
+      expect(startBtn.disabled).toBe(false);
+    });
+
+    it('loads pending subtitles inside startHardsub while keeping external browse loads locked during encode', async () => {
+      let exportedSubPath: string | null = null;
+      let writtenTempAss = '';
+      invoke.mockImplementation(async (command: string, args?: any) => {
+        if (command === 'get_font_render_scale') return { scale: 1, ascentRatio: 0.8, descentRatio: 0.2 };
+        if (command === 'probe_hardsub_source') return { displayWidth: 1920, displayHeight: 1080, width: 1920, height: 1080, durationMs: 5000 };
+        if (command === 'read_text_file_content') {
+          return '1\n00:00:00,000 --> 00:00:01,000\nDeferred cue\n';
+        }
+        if (command === 'write_text_file_content') {
+          writtenTempAss = args?.content ?? '';
+          return undefined;
+        }
+        if (command === 'start_hardsub_task') {
+          exportedSubPath = args?.settings?.subtitlePath ?? null;
+          // Simulate external browse attempt while encode is active
+          await (internal as any).loadSubtitleFile('/other.srt');
+          return { outputPath: '/out.mp4', durationMs: 100, outputSizeMb: 1 };
+        }
+        return undefined;
+      });
+
+      const { internal } = fixture();
+      const subInput = new Control();
+      subInput.value = '/sub.srt';
+      (internal as any).subtitlePathInput = subInput;
+      internal.state.videoPath = '/v.mp4';
+      internal.state.subtitlePath = '/sub.srt';
+      internal.subtitleCues = [];
+
+      await (internal as any).startHardsub();
+
+      expect(exportedSubPath).toBe('/v.temp.ass');
+      expect(writtenTempAss).toContain('Deferred');
+      expect(writtenTempAss).toContain('cue');
+      expect(internal.state.subtitlePath).toBe('/sub.srt');
+      expect(internal.subtitleCues).toHaveLength(1);
+      expect(internal.subtitleCues[0].text).toBe('Deferred cue');
+      expect(invoke).not.toHaveBeenCalledWith('read_text_file_content', { filePath: '/other.srt' });
+    });
+
+    it('refreshes font scale and re-renders live preview on fontSelect and reset, ignoring stale scale responses', async () => {
+      doc.readyState = 'complete';
+      let resolveInterScale!: (val: { scale: number; ascentRatio: number; descentRatio: number }) => void;
+      const interPromise = new Promise<{ scale: number; ascentRatio: number; descentRatio: number }>((resolve) => {
+        resolveInterScale = resolve;
+      });
+      let interCalls = 0;
+      invoke.mockImplementation(async (command: string, args?: any) => {
+        if (command === 'get_system_fonts') return ['Vazirmatn', 'Inter', 'Lora'];
+        if (command === 'get_hw_accels') return [];
+        if (command === 'get_font_render_scale') {
+          if (args?.fontName === 'Inter') {
+            interCalls += 1;
+            return interCalls === 1 ? interPromise : { scale: 0.65, ascentRatio: 0.65, descentRatio: 0.35 };
+          }
+          if (args?.fontName === 'Lora') return { scale: 0.91, ascentRatio: 0.77, descentRatio: 0.23 };
+          return { scale: 0.65, ascentRatio: 0.65, descentRatio: 0.35 };
+        }
+        return undefined;
+      });
+
+      const { internal, fontSelect } = fixture();
+      await flush();
+
+      const previewSpy = vi.spyOn(internal as any, 'updateLivePreview');
+
+      fontSelect.value = 'Inter';
+      fontSelect.dispatchEvent(new Event('change'));
+      await flush();
+
+      // User immediately picks Lora before Inter's scale resolves
+      fontSelect.value = 'Lora';
+      fontSelect.dispatchEvent(new Event('change'));
+      await flush();
+
+      expect((internal as any).fontMetrics.scale).toBe(0.91);
+      const previewCallsBeforeStale = previewSpy.mock.calls.length;
+
+      // Stale Inter scale arrives late and must be ignored
+      resolveInterScale({ scale: 0.42, ascentRatio: 0.5, descentRatio: 0.5 });
+      await flush();
+
+      expect((internal as any).fontMetrics.scale).toBe(0.91);
+      expect(previewSpy.mock.calls.length).toBe(previewCallsBeforeStale);
+
+      // Reset style triggers fresh scale lookup and re-renders preview afterward
+      (internal as any).resetStyleSettings();
+      await flush();
+      expect((internal as any).fontMetrics.scale).toBe(0.65);
+      expect(previewSpy.mock.calls.length).toBeGreaterThan(previewCallsBeforeStale);
+    });
+
+    it('preserves fontSize=6 & positionY=250 in storage, syncs lastVolume on ArrowUp, clamps short cue seeks, and resets cursor on fullscreen exit', () => {
+      const store = new Map<string, string>();
+      const prevResizeObserver = (globalThis as any).ResizeObserver;
+      vi.stubGlobal('ResizeObserver', class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      });
+      store.set('whisper_hardsub_style_settings', JSON.stringify({
+        fontSize: 6,
+        positionY: 220,
+      }));
+      vi.stubGlobal('localStorage', {
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => { store.set(k, v); },
+        removeItem: (k: string) => { store.delete(k); },
+      });
+
+      try {
+        doc.readyState = 'complete';
+        const { controller, internal, video } = fixture();
+        expect((internal.state as any).fontSize).toBe(6);
+        expect((internal.state as any).positionY).toBe(220);
+
+        // Short <50ms cue clamps offset inside cue bounds instead of overshooting endMs
+        expect((internal as any).getCueSeekTimeSec({ startMs: 1000, endMs: 1020 })).toBeCloseTo(1.01, 5);
+        expect((internal as any).getCueSeekTimeSec({ startMs: 1000, endMs: 3000 })).toBeCloseTo(1.05, 5);
+
+        // ArrowUp volume updates lastVolume so mute/unmute restores new level
+        (internal as any).pageActive = true;
+        internal.phase = 'ready';
+        video.volume = 0.25;
+        video.muted = false;
+        const arrowUpEvent = Object.assign(new Event('keydown', { cancelable: true }), {
+          key: 'ArrowUp',
+          isComposing: false,
+          ctrlKey: false,
+          altKey: false,
+          metaKey: false,
+          shiftKey: false,
+        });
+        doc.dispatchEvent(arrowUpEvent);
+        expect(video.volume).toBeCloseTo(0.3, 5);
+        expect((internal as any).lastVolume).toBeCloseTo(0.3, 5);
+
+        // Fullscreen exit resets hidden cursor on player container
+        const playerContainer = new Control();
+        playerContainer.classList.add('player-fullscreen');
+        playerContainer.style.cursor = 'none';
+        doc.elements.set('hardsub-player-container', playerContainer);
+        (internal as any).exitPreviewFullscreen();
+        expect(playerContainer.style.cursor).toBe('');
+
+        // Localization refresh keeps cancelled/idle and failed status consistent
+        const statusText = new Control();
+        (internal as any).progressStatusText = statusText;
+        (internal as any).lastStatusPayload = { progress: 0, message: 'Cancelled', active: false, stage: 'cancelled' };
+        controller.refreshLocalization();
+        expect(statusText.textContent).not.toContain('Cancelled');
+
+        (internal as any).lastFailedErrorText = 'Codec unavailable';
+        (internal as any).lastStatusPayload = { progress: 0, message: 'Hardsubbing encoding failed.', active: false, stage: 'failed' };
+        controller.refreshLocalization();
+        expect(statusText.textContent).toContain('Codec unavailable');
+      } finally {
+        vi.stubGlobal('localStorage', undefined as any);
+        vi.stubGlobal('ResizeObserver', prevResizeObserver);
+      }
+    });
+  });
 });
 
 

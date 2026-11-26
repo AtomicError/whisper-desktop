@@ -627,7 +627,19 @@ export const ko: Translations = {
     presetHigh: '고화질',
     presetHighSub: '선명한 디테일',
     presetUltra: '울트라 / 마스터',
-    presetUltraSub: '최대 충실도'
+    presetUltraSub: '최대 충실도',
+    bundledFontsGroup: '— 내장 글꼴 —',
+    systemFontsGroup: '— 시스템 글꼴 —',
+    noMatchingCues: '일치하는 자막 큐가 없습니다.',
+    resetStyle: '스타일 초기화',
+    bold: '굵게',
+    italic: '기울임꼴',
+    toggleBold: '굵게 전환',
+    toggleItalic: '기울임꼴 전환',
+    resetFontSize: '글꼴 크기를 14px로 초기화',
+    resetOutline: '외곽선 두께를 2px로 초기화',
+    resetPosY: '수직 여백을 30px로 초기화',
+    containerCodecAdjusted: '{format} 컨테이너에 맞게 호환되지 않는 코덱/오디오 설정을 조정했습니다.'
   },
   models: {
     title: '모델 허브',

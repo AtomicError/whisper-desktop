@@ -288,7 +288,7 @@ pub fn ensure_ffprobe_available(app: Option<&tauri::AppHandle>) -> Result<PathBu
     resolve_binary_for_execution(app, "ffprobe")
 }
 
-pub fn resolve_ffmpeg_for_hardsub(app: Option<&tauri::AppHandle>, hw_accel: &str) -> Result<PathBuf, String> {
+pub fn resolve_ffmpeg_for_hardsub(app: Option<&tauri::AppHandle>, hw_accel: &str, video_codec: &str) -> Result<PathBuf, String> {
     let default_bin = resolve_binary_for_execution(app, "ffmpeg")?;
     if hw_accel == "cpu" {
         return Ok(default_bin);
@@ -300,14 +300,14 @@ pub fn resolve_ffmpeg_for_hardsub(app: Option<&tauri::AppHandle>, hw_accel: &str
         return Ok(default_bin);
     }
 
-    // 2. Check if default (bundled) binary supports the requested hardware accelerator
-    if crate::hardsub::probe_encoder_support(&default_bin, hw_accel) {
+    // 2. Check if default (bundled) binary supports the requested hardware accelerator + codec
+    if crate::hardsub::probe_single_encoder(&default_bin, hw_accel, video_codec) {
         return Ok(default_bin);
     }
 
-    // 3. Fallback to system FFmpeg if available and capable
+    // 3. Fallback to system FFmpeg if available and capable for the requested codec
     if let Some(sys_path) = find_system_binary("ffmpeg") {
-        if sys_path != default_bin && crate::hardsub::probe_encoder_support(&sys_path, hw_accel) {
+        if sys_path != default_bin && crate::hardsub::probe_single_encoder(&sys_path, hw_accel, video_codec) {
             return Ok(sys_path);
         }
     }

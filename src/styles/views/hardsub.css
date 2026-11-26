@@ -532,11 +532,29 @@ body.rtl .transcribe-linear-fill,
   pointer-events: none;
 }
 
-/* Hardsub Studio Cue Search RTL */
-html[dir="rtl"] #hardsub-tab-view-editor input#hardsub-search-input,
-.rtl-layout #hardsub-tab-view-editor input#hardsub-search-input {
-  padding-left: 12px !important;
-  padding-right: 34px !important;
+/* Hardsub Studio Cue Search (Logical Properties for seamless LTR/RTL) */
+.hardsub-search-wrapper {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.hardsub-search-input {
+  width: 100%;
+  padding-inline-start: 34px;
+  padding-inline-end: 12px;
+  font-size: 0.85rem;
+}
+
+.hardsub-search-icon {
+  width: 16px;
+  height: 16px;
+  position: absolute;
+  inset-inline-start: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-muted);
+  pointer-events: none;
 }
 
 html[dir="rtl"] #hardsub-tab-view-editor input#hardsub-search-input:not([dir="ltr"]),
@@ -552,10 +570,15 @@ html[dir="rtl"] #hardsub-tab-view-editor input#hardsub-search-input::placeholder
   text-align: right !important;
 }
 
-html[dir="rtl"] #hardsub-tab-view-editor input#hardsub-search-input + svg,
-.rtl-layout #hardsub-tab-view-editor input#hardsub-search-input + svg {
-  left: auto !important;
-  right: 10px !important;
+.hardsub-empty-search-notice {
+  text-align: center;
+  padding: 36px 16px;
+  color: var(--color-text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
 }
 
 /* Dynamic LTR when search inputs contain Latin/LTR text */
@@ -1128,9 +1151,9 @@ body.hardsub-fullscreen-active #hardsub-video-controls {
               transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-body.hardsub-fullscreen-active #hardsub-player-container:hover ~ #hardsub-video-controls,
 body.hardsub-fullscreen-active #hardsub-video-controls.show-controls,
-body.hardsub-fullscreen-active #hardsub-video-controls:hover {
+body.hardsub-fullscreen-active #hardsub-video-controls:hover,
+body.hardsub-fullscreen-active #hardsub-video-controls:focus-within {
   opacity: 1;
   transform: translateY(0);
   pointer-events: auto;

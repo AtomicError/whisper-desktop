@@ -627,7 +627,19 @@ export const ru: Translations = {
     presetHigh: 'Высокое качество',
     presetHighSub: 'Четкие детали',
     presetUltra: 'Ультра / Мастер',
-    presetUltraSub: 'Максимальная точность'
+    presetUltraSub: 'Максимальная точность',
+    bundledFontsGroup: '— Встроенные шрифты —',
+    systemFontsGroup: '— Системные шрифты —',
+    noMatchingCues: 'Совпадающих субтитров не найдено.',
+    resetStyle: 'Сбросить стиль',
+    bold: 'Полужирный',
+    italic: 'Курсив',
+    toggleBold: 'Переключить полужирный',
+    toggleItalic: 'Переключить курсив',
+    resetFontSize: 'Сбросить размер шрифта до 14px',
+    resetOutline: 'Сбросить обводку до 2px',
+    resetPosY: 'Сбросить вертикальный отступ до 30px',
+    containerCodecAdjusted: 'Несовместимый кодек или аудио адаптированы для контейнера {format}.'
   },
   models: {
     title: 'Центр моделей',

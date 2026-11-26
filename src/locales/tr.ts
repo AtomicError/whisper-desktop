@@ -627,7 +627,19 @@ export const tr: Translations = {
     presetHigh: 'Yüksek Kalite',
     presetHighSub: 'Net Ayrıntı',
     presetUltra: 'Ultra / Master',
-    presetUltraSub: 'Maksimum Doğruluk'
+    presetUltraSub: 'Maksimum Doğruluk',
+    bundledFontsGroup: '— Dahili Yazı Tipleri —',
+    systemFontsGroup: '— Sistem Yazı Tipleri —',
+    noMatchingCues: 'Eşleşen altyazı satırı bulunamadı.',
+    resetStyle: 'Stili Sıfırla',
+    bold: 'Kalın',
+    italic: 'İtalik',
+    toggleBold: 'Kalın Metni Aç/Kapat',
+    toggleItalic: 'İtalik Metni Aç/Kapat',
+    resetFontSize: 'Yazı tipi boyutunu 14px yap',
+    resetOutline: 'Kontur kalınlığını 2px yap',
+    resetPosY: 'Dikey konumu 30px yap',
+    containerCodecAdjusted: '{format} kapsayıcısı için uyumsuz kodek/ses ayarları düzenlendi.'
   },
   models: {
     title: 'Model Merkezi',

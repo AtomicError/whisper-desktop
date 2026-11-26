@@ -206,13 +206,16 @@ fn read_u32(data: &[u8], off: usize) -> Option<u32> {
 /// OS/2 winAscent/winDescent, then OS/2 typo metrics, then hhea, then head bbox.
 fn read_font_metrics(path: &Path) -> Option<(u16, u32, u32)> {
     let data = std::fs::read(path).ok()?;
+    parse_font_metrics_bytes(&data)
+}
 
+fn parse_font_metrics_bytes(data: &[u8]) -> Option<(u16, u32, u32)> {
     // TTC collections: read the first font offset table
     let data = if data.starts_with(b"ttcf") {
-        let offset = read_u32(&data, 12)? as usize;
+        let offset = read_u32(data, 12)? as usize;
         data.get(offset..)?
     } else {
-        &data[..]
+        data
     };
 
     let sfnt_ok = data.starts_with(b"\x00\x01\x00\x00")
@@ -251,10 +254,10 @@ fn read_font_metrics(path: &Path) -> Option<(u16, u32, u32)> {
         let fs_selection = read_u16(data, o + 62)?;
         let typo_ascender = read_i16(data, o + 68)?;
         let typo_descender = read_i16(data, o + 70)?;
-        let win_ascent = read_u16(data, o + 74)?;
-        let win_descent = read_u16(data, o + 76)?;
+        let win_ascent = read_u16(data, o + 74)? as u32;
+        let win_descent = read_u16(data, o + 76)? as u32;
         if win_ascent + win_descent != 0 {
-            Some((win_ascent as u32, win_descent as u32))
+            Some((win_ascent, win_descent))
         } else if fs_selection & 0x80 != 0 {
             Some((typo_ascender.max(0) as u32, typo_descender.unsigned_abs() as u32))
         } else {
@@ -605,10 +608,6 @@ pub fn probe_single_encoder(bin: &Path, hw_accel: &str, codec: &str) -> bool {
             false
         }
     }
-}
-
-pub fn probe_encoder_support(bin: &Path, hw_accel: &str) -> bool {
-    probe_single_encoder(bin, hw_accel, "h264")
 }
 
 pub fn probe_accelerator_codecs(bin: &Path, hw_accel: &str) -> Vec<String> {
@@ -1397,6 +1396,80 @@ mod tests {
     }
 
     #[test]
+    fn parse_font_metrics_handles_large_win_metrics_without_u16_overflow() {
+        // Construct a minimal valid SFNT table with head (upem=1000) and OS/2 (winAscent=40000, winDescent=30000).
+        // Previously `win_ascent + win_descent` overflowed u16 when their sum reached 65536 or wrapped in release.
+        let mut font = Vec::new();
+        // SFNT offset table: sfntVersion = 0x00010000, numTables = 2
+        font.extend_from_slice(&0x0001_0000u32.to_be_bytes());
+        font.extend_from_slice(&2u16.to_be_bytes());
+        font.extend_from_slice(&[0u8; 6]); // searchRange, entrySelector, rangeShift
+
+        let head_offset: u32 = 12 + 2 * 16; // 44
+        let head_len: u32 = 20;
+        let os2_offset: u32 = head_offset + head_len; // 64
+        let os2_len: u32 = 78;
+
+        // Table directory: "head"
+        font.extend_from_slice(b"head");
+        font.extend_from_slice(&0u32.to_be_bytes());
+        font.extend_from_slice(&head_offset.to_be_bytes());
+        font.extend_from_slice(&head_len.to_be_bytes());
+
+        // Table directory: "OS/2"
+        font.extend_from_slice(b"OS/2");
+        font.extend_from_slice(&0u32.to_be_bytes());
+        font.extend_from_slice(&os2_offset.to_be_bytes());
+        font.extend_from_slice(&os2_len.to_be_bytes());
+
+        // "head" table payload (upem @ +18)
+        let mut head = vec![0u8; head_len as usize];
+        head[18..20].copy_from_slice(&1000u16.to_be_bytes());
+        font.extend_from_slice(&head);
+
+        // "OS/2" table payload (winAscent=40000 @ +74, winDescent=30000 @ +76 -> sum=70000)
+        let mut os2 = vec![0u8; os2_len as usize];
+        os2[74..76].copy_from_slice(&40_000u16.to_be_bytes());
+        os2[76..78].copy_from_slice(&30_000u16.to_be_bytes());
+        font.extend_from_slice(&os2);
+
+        let parsed = parse_font_metrics_bytes(&font);
+        assert_eq!(parsed, Some((1000, 40_000, 30_000)));
+    }
+
+    #[tokio::test]
+    async fn terminate_hardsub_session_sets_cancel_flag_and_waits_for_completion() {
+        let idle_session = Arc::new(std::sync::Mutex::new(crate::HardsubSession {
+            child_pid: None,
+            is_running: false,
+            cancel_requested: false,
+        }));
+        terminate_hardsub_session(None, None, &idle_session, true)
+            .await
+            .expect("idle session termination should succeed");
+        assert!(!idle_session.lock().unwrap().cancel_requested);
+
+        let active_session = Arc::new(std::sync::Mutex::new(crate::HardsubSession {
+            child_pid: None,
+            is_running: true,
+            cancel_requested: false,
+        }));
+        let active_clone = active_session.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(60)).await;
+            let mut lock = active_clone.lock().unwrap();
+            lock.is_running = false;
+        });
+
+        terminate_hardsub_session(None, None, &active_session, true)
+            .await
+            .expect("active session without pid should settle cleanly");
+        let lock = active_session.lock().unwrap();
+        assert!(lock.cancel_requested);
+        assert!(!lock.is_running);
+    }
+
+    #[test]
     fn hex_to_ass_color_conversion() {
         assert_eq!(hex_to_ass_color("#FF0000", 0), "&H000000FF&");
         assert_eq!(hex_to_ass_color("#0000FF", 0), "&H00FF0000&");
@@ -1889,6 +1962,15 @@ mod tests {
         let vf_idx = args.iter().position(|a| a == "-vf").expect("must have -vf");
         assert!(args[vf_idx + 1].ends_with("format=nv12,hwupload"));
     }
+
+    #[test]
+    fn test_probe_single_encoder_rejects_unsupported_combinations() {
+        let missing_bin = Path::new("/nonexistent/ffmpeg-binary");
+        assert!(!probe_single_encoder(missing_bin, "cpu", "h264"));
+        assert!(!probe_single_encoder(missing_bin, "nvenc", "vp9"));
+        assert!(!probe_single_encoder(missing_bin, "vaapi", "prores"));
+        assert!(!probe_single_encoder(missing_bin, "videotoolbox", "av1"));
+    }
 }
 
 #[tauri::command]
@@ -1981,22 +2063,154 @@ fn resolve_unique_output_path(target_path: &str) -> String {
     }
 }
 
+/// Sends termination signals to an active hardsub FFmpeg child process and waits
+/// for exit, escalating to force-kill after the grace period.
+pub async fn terminate_hardsub_session(
+    app: Option<&AppHandle>,
+    logs: Option<&Arc<AppLogs>>,
+    session: &Arc<std::sync::Mutex<crate::HardsubSession>>,
+    wait_after_force_kill: bool,
+) -> Result<(), String> {
+    let (is_running, pid_to_kill) = {
+        let mut lock = session.lock().map_err(|e| format!("Lock error: {}", e))?;
+        if !lock.is_running {
+            return Ok(());
+        }
+        lock.cancel_requested = true;
+        (true, lock.child_pid)
+    };
+
+    if is_running {
+        if let Some(pid) = pid_to_kill {
+            if let (Some(app_ref), Some(logs_ref)) = (app, logs) {
+                logs_ref.log(app_ref, "Hardsub", &format!("Cancellation requested for hardsub task (PID: {})", pid));
+            }
+            const GRACE_DURATION: std::time::Duration = std::time::Duration::from_millis(1500);
+
+            #[cfg(unix)]
+            {
+                let _ = tokio::process::Command::new("kill")
+                    .args(["-TERM", "--", &format!("-{}", pid), &pid.to_string()])
+                    .status()
+                    .await;
+            }
+            #[cfg(windows)]
+            {
+                let mut cmd = tokio::process::Command::new("taskkill");
+                cmd.creation_flags(0x08000000);
+                let _ = cmd
+                    .args(["/T", "/PID", &pid.to_string()])
+                    .status()
+                    .await;
+            }
+
+            let deadline = std::time::Instant::now() + GRACE_DURATION;
+            let mut session_ended = false;
+
+            while std::time::Instant::now() < deadline {
+                tokio::time::sleep(std::time::Duration::from_millis(75)).await;
+                if let Ok(lock) = session.lock() {
+                    if !lock.is_running {
+                        session_ended = true;
+                        break;
+                    }
+                }
+            }
+
+            if !session_ended {
+                let pid_still_ours = session
+                    .lock()
+                    .map(|lock| lock.is_running && lock.child_pid == Some(pid))
+                    .unwrap_or(false);
+
+                #[cfg(unix)]
+                let process_alive = tokio::process::Command::new("kill")
+                    .args(["-0", &pid.to_string()])
+                    .status()
+                    .await
+                    .map(|s| s.success())
+                    .unwrap_or(false);
+
+                #[cfg(unix)]
+                if pid_still_ours && process_alive {
+                    if let (Some(app_ref), Some(logs_ref)) = (app, logs) {
+                        logs_ref.log(app_ref, "Hardsub", &format!("Escalating hardsub cancellation to SIGKILL (PID: {})", pid));
+                    }
+                    let _ = tokio::process::Command::new("kill")
+                        .args(["-KILL", "--", &format!("-{}", pid), &pid.to_string()])
+                        .status()
+                        .await;
+                }
+
+                #[cfg(windows)]
+                if pid_still_ours {
+                    let mut cmd = tokio::process::Command::new("taskkill");
+                    cmd.creation_flags(0x08000000);
+                    let _ = cmd
+                        .args(["/F", "/T", "/PID", &pid.to_string()])
+                        .status()
+                        .await;
+                }
+            }
+        }
+
+        if wait_after_force_kill {
+            // Allow TempAssCleanupGuard and partial-file removal to settle before app exit completes.
+            let settle_deadline = std::time::Instant::now() + std::time::Duration::from_millis(1500);
+            while std::time::Instant::now() < settle_deadline {
+                let ended = session.lock().map(|lock| !lock.is_running).unwrap_or(true);
+                if ended {
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Cancels any active hardsub session during application shutdown and awaits cleanup.
+pub async fn shutdown_hardsub(
+    app: &AppHandle,
+    logs: &Arc<AppLogs>,
+    session: &Arc<std::sync::Mutex<crate::HardsubSession>>,
+) {
+    let _ = terminate_hardsub_session(Some(app), Some(logs), session, true).await;
+}
+
+fn emit_hardsub_terminal_status(app: &AppHandle, cancelled: bool) {
+    let (message, stage) = if cancelled {
+        ("Hardsubbing cancelled by user.", "cancelled")
+    } else {
+        ("Hardsubbing encoding failed.", "failed")
+    };
+    let _ = app.emit("hardsub-status", HardsubProgress {
+        progress: 0.0,
+        message: message.to_string(),
+        active: false,
+        stage: Some(stage.to_string()),
+        speed: None,
+        fps: None,
+    });
+}
+
 pub async fn run_hardsub_task(
     app: AppHandle,
     logs: Arc<AppLogs>,
     session: Arc<std::sync::Mutex<crate::HardsubSession>>,
     mut settings: HardsubSettings,
 ) -> Result<HardsubResult, String> {
-    struct TempAssCleanupGuard<'a> {
-        path: &'a str,
+    struct TempAssCleanupGuard {
+        path: String,
         logs: Arc<AppLogs>,
         app: AppHandle,
     }
 
-    impl<'a> Drop for TempAssCleanupGuard<'a> {
+    impl Drop for TempAssCleanupGuard {
         fn drop(&mut self) {
             if self.path.ends_with(".temp.ass") {
-                let p = Path::new(self.path);
+                let p = Path::new(&self.path);
                 if p.exists() {
                     let _ = std::fs::remove_file(p);
                     self.logs.log(&self.app, "Hardsub", &format!("Cleaned up temporary subtitle file: {}", self.path));
@@ -2031,7 +2245,7 @@ pub async fn run_hardsub_task(
     let _session_guard = HardsubSessionGuard { session: session.clone() };
 
     let _cleanup_guard = TempAssCleanupGuard {
-        path: &settings.subtitle_path,
+        path: settings.subtitle_path.clone(),
         logs: logs.clone(),
         app: app.clone(),
     };
@@ -2068,52 +2282,55 @@ pub async fn run_hardsub_task(
         fps: None,
     });
 
-    // Export and preview must select the same streams and display geometry.
-    // Export cancellation is flag-based; bridge it only for the shared probe,
-    // and await its completion so cancellation kills and reaps ffprobe first.
-    let probe_cancel = tokio_util::sync::CancellationToken::new();
-    let probe_result = {
-        let probe = crate::media_preview::probe_source_metadata(
-            &app,
-            Path::new(&settings.video_path),
-            probe_cancel.clone(),
-        );
-        tokio::pin!(probe);
-        loop {
-            tokio::select! {
-                result = &mut probe => break result,
-                _ = tokio::time::sleep(std::time::Duration::from_millis(50)) => {
-                    if session.lock().map(|l| l.cancel_requested).unwrap_or(false) {
-                        probe_cancel.cancel();
-                        break probe.await;
+    enum HardsubTaskError {
+        Cancelled,
+        Failed(String),
+    }
+
+    let is_cancel_requested = || session.lock().map(|l| l.cancel_requested).unwrap_or(false);
+    let output_path_for_cleanup = settings.output_path.clone();
+
+    let task_result: Result<HardsubResult, HardsubTaskError> = async {
+        // Export and preview must select the same streams and display geometry.
+        // Export cancellation is flag-based; bridge it only for the shared probe,
+        // and await its completion so cancellation kills and reaps ffprobe first.
+        let probe_cancel = tokio_util::sync::CancellationToken::new();
+        let probe_result = {
+            let probe = crate::media_preview::probe_source_metadata(
+                &app,
+                Path::new(&settings.video_path),
+                probe_cancel.clone(),
+            );
+            tokio::pin!(probe);
+            loop {
+                tokio::select! {
+                    result = &mut probe => break result,
+                    _ = tokio::time::sleep(std::time::Duration::from_millis(50)) => {
+                        if is_cancel_requested() {
+                            probe_cancel.cancel();
+                            break probe.await;
+                        }
                     }
                 }
             }
+        };
+
+        // Preserve the export cancellation result after the probe has settled.
+        if is_cancel_requested() {
+            return Err(HardsubTaskError::Cancelled);
         }
-    };
 
-    // Preserve the export cancellation result after the probe has settled.
-    if session.lock().map(|l| l.cancel_requested).unwrap_or(false) {
-        let _ = app.emit("hardsub-status", HardsubProgress {
-            progress: 0.0,
-            message: "Hardsubbing cancelled by user.".to_string(),
-            active: false,
-            stage: Some("cancelled".to_string()),
-            speed: None,
-            fps: None,
-        });
-        return Err("Hardsubbing cancelled by user.".to_string());
-    }
-
-    let probed = probe_result.map_err(|error| format!("Failed to probe source video: {}", error.detail))?;
-    let source = probed.source;
-    let total_duration_sec = source.duration_sec.unwrap_or(0.0);
-    let normalized_rotation = probed.rotation_degrees.rem_euclid(360) as u32;
-    let (mut video_width, mut video_height) = (source.width, source.height);
-    if normalized_rotation == 90 || normalized_rotation == 270 {
-        std::mem::swap(&mut video_width, &mut video_height);
-    }
-    let ffmpeg_bin = crate::ffmpeg_resolver::resolve_ffmpeg_for_hardsub(Some(&app), &settings.hw_accel)?;
+        let probed = probe_result
+            .map_err(|error| HardsubTaskError::Failed(format!("Failed to probe source video: {}", error.detail)))?;
+        let source = probed.source;
+        let total_duration_sec = source.duration_sec.unwrap_or(0.0);
+        let normalized_rotation = probed.rotation_degrees.rem_euclid(360) as u32;
+        let (mut video_width, mut video_height) = (source.width, source.height);
+        if normalized_rotation == 90 || normalized_rotation == 270 {
+            std::mem::swap(&mut video_width, &mut video_height);
+        }
+        let ffmpeg_bin = crate::ffmpeg_resolver::resolve_ffmpeg_for_hardsub(Some(&app), &settings.hw_accel, &settings.video_codec)
+            .map_err(HardsubTaskError::Failed)?;
 
     logs.log(&app, "Hardsub", &format!("Probed video dimensions: {}x{} (Aspect: {:.3})", video_width, video_height, video_width as f64 / video_height as f64));
 
@@ -2217,73 +2434,68 @@ pub async fn run_hardsub_task(
         vaapi_dev.as_deref(),
     );
 
-    // Check if cancellation was requested while preparing probing/subtitles
-    if session.lock().map(|l| l.cancel_requested).unwrap_or(false) {
-        if Path::new(&settings.output_path).exists() {
-            let _ = std::fs::remove_file(&settings.output_path);
+        // Check if cancellation was requested while preparing probing/subtitles
+        if is_cancel_requested() {
+            return Err(HardsubTaskError::Cancelled);
         }
-        let _ = app.emit("hardsub-status", HardsubProgress {
-            progress: 0.0,
-            message: "Hardsubbing cancelled by user.".to_string(),
-            active: false,
-            stage: Some("cancelled".to_string()),
-            speed: None,
-            fps: None,
-        });
-        return Err("Hardsubbing cancelled by user.".to_string());
-    }
 
-    logs.log(&app, "FFmpeg", &format!("Executing command: {} {}", ffmpeg_bin.display(), ffmpeg_args.join(" ")));
+        logs.log(&app, "FFmpeg", &format!("Executing command: {} {}", ffmpeg_bin.display(), ffmpeg_args.join(" ")));
 
-    let mut cmd = Command::new(&ffmpeg_bin);
-    #[cfg(target_os = "windows")]
-    cmd.creation_flags(0x08000000);
-    #[cfg(target_os = "linux")]
-    apply_linux_media_env_tokio(&mut cmd);
-    cmd.args(&ffmpeg_args)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .kill_on_drop(true);
+        let mut cmd = Command::new(&ffmpeg_bin);
+        #[cfg(target_os = "windows")]
+        cmd.creation_flags(0x08000000);
+        #[cfg(target_os = "linux")]
+        apply_linux_media_env_tokio(&mut cmd);
+        cmd.args(&ffmpeg_args)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .kill_on_drop(true);
 
-    #[cfg(unix)]
-    {
-        cmd.process_group(0);
-    }
+        #[cfg(unix)]
+        {
+            cmd.process_group(0);
+        }
 
-    let mut child = cmd.spawn()
-        .map_err(|e| format!("Failed to spawn ffmpeg ({}): {}", ffmpeg_bin.display(), e))?;
+        let mut child = cmd.spawn().map_err(|e| {
+            if is_cancel_requested() {
+                HardsubTaskError::Cancelled
+            } else {
+                HardsubTaskError::Failed(format!("Failed to spawn ffmpeg ({}): {}", ffmpeg_bin.display(), e))
+            }
+        })?;
 
-    let child_pid = child.id();
-    let is_cancelled = if let Ok(mut lock) = session.lock() {
-        if lock.cancel_requested {
-            true
+        let child_pid = child.id();
+        let is_cancelled = if let Ok(mut lock) = session.lock() {
+            if lock.cancel_requested {
+                true
+            } else {
+                lock.child_pid = child_pid;
+                false
+            }
         } else {
-            lock.child_pid = child_pid;
             false
-        }
-    } else {
-        false
-    };
+        };
 
-    if is_cancelled {
-        let _ = child.kill().await;
-        if Path::new(&settings.output_path).exists() {
-            let _ = std::fs::remove_file(&settings.output_path);
+        if is_cancelled {
+            let _ = child.kill().await;
+            return Err(HardsubTaskError::Cancelled);
         }
-        let _ = app.emit("hardsub-status", HardsubProgress {
-            progress: 0.0,
-            message: "Hardsubbing cancelled by user.".to_string(),
-            active: false,
-            stage: Some("cancelled".to_string()),
-            speed: None,
-            fps: None,
-        });
-        return Err("Hardsubbing cancelled by user.".to_string());
-    }
 
-    let stdout = child.stdout.take().ok_or("Failed to capture ffmpeg stdout")?;
-    let stderr = child.stderr.take().ok_or("Failed to capture ffmpeg stderr")?;
+        let stdout = child.stdout.take().ok_or_else(|| {
+            if is_cancel_requested() {
+                HardsubTaskError::Cancelled
+            } else {
+                HardsubTaskError::Failed("Failed to capture ffmpeg stdout".to_string())
+            }
+        })?;
+        let stderr = child.stderr.take().ok_or_else(|| {
+            if is_cancel_requested() {
+                HardsubTaskError::Cancelled
+            } else {
+                HardsubTaskError::Failed("Failed to capture ffmpeg stderr".to_string())
+            }
+        })?;
 
     let mut stdout_reader = BufReader::new(stdout).lines();
     let mut stderr_reader = BufReader::new(stderr).lines();
@@ -2419,77 +2631,80 @@ pub async fn run_hardsub_task(
         }
     }
 
-    let status = child.wait().await.map_err(|e| format!("ffmpeg execution failed: {}", e))?;
+        let status = child.wait().await.map_err(|e| {
+            if is_cancel_requested() {
+                HardsubTaskError::Cancelled
+            } else {
+                HardsubTaskError::Failed(format!("ffmpeg execution failed: {}", e))
+            }
+        })?;
 
-    // Check cancellation requested flag
-    let was_cancelled = if let Ok(mut lock) = session.lock() {
-        let cancelled = lock.cancel_requested;
-        lock.child_pid = None;
-        lock.is_running = false;
-        cancelled
-    } else {
-        false
-    };
-
-    if was_cancelled || !status.success() {
-        // Clean up partial output file if present
-        if Path::new(&settings.output_path).exists() {
-            let _ = std::fs::remove_file(&settings.output_path);
-            logs.log(&app, "Hardsub", &format!("Removed partial output file: {}", settings.output_path));
-        }
+        // Check cancellation requested flag
+        let was_cancelled = if let Ok(mut lock) = session.lock() {
+            let cancelled = lock.cancel_requested;
+            lock.child_pid = None;
+            lock.is_running = false;
+            cancelled
+        } else {
+            false
+        };
 
         if was_cancelled {
-            let _ = app.emit("hardsub-status", HardsubProgress {
-                progress: 0.0,
-                message: "Hardsubbing cancelled by user.".to_string(),
-                active: false,
-                stage: Some("cancelled".to_string()),
-                speed: None,
-                fps: None,
-            });
-            return Err("Hardsubbing cancelled by user.".to_string());
+            return Err(HardsubTaskError::Cancelled);
+        }
+        if !status.success() {
+            let stderr_lines: Vec<String> = stderr_tail.into_iter().collect();
+            let error_detail = format_ffmpeg_error(status.code(), &stderr_lines, &settings);
+            return Err(HardsubTaskError::Failed(error_detail));
         }
 
-        let stderr_lines: Vec<String> = stderr_tail.into_iter().collect();
-        let error_detail = format_ffmpeg_error(status.code(), &stderr_lines, &settings);
-        logs.log(&app, "Hardsub", &format!("Hardsub encoding failed: {}", error_detail));
+        let duration_ms = start_time.elapsed().as_millis() as u64;
+
+        let output_size_mb = if let Ok(meta) = std::fs::metadata(&settings.output_path) {
+            meta.len() as f64 / 1024.0 / 1024.0
+        } else {
+            0.0
+        };
+
+        logs.log(&app, "Hardsub", &format!("Hardsub completed successfully! Saved to: {}", settings.output_path));
 
         let _ = app.emit("hardsub-status", HardsubProgress {
-            progress: 0.0,
-            message: "Hardsubbing encoding failed.".to_string(),
+            progress: 1.0,
+            message: "Hardsub video exported successfully!".to_string(),
             active: false,
-            stage: Some("failed".to_string()),
+            stage: Some("completed".to_string()),
             speed: None,
             fps: None,
         });
-        return Err(error_detail);
+
+        // Notify OS
+        let _ = app.notification().builder().title("Hardsub Completed").body(format!("Video saved to {}", settings.output_path)).show();
+
+        Ok(HardsubResult {
+            duration_ms,
+            output_path: settings.output_path,
+            output_size_mb,
+        })
+    }.await;
+
+    match task_result {
+        Ok(res) => Ok(res),
+        Err(HardsubTaskError::Cancelled) => {
+            if Path::new(&output_path_for_cleanup).exists() {
+                let _ = std::fs::remove_file(&output_path_for_cleanup);
+                logs.log(&app, "Hardsub", &format!("Removed partial output file: {}", output_path_for_cleanup));
+            }
+            emit_hardsub_terminal_status(&app, true);
+            Err("Hardsubbing cancelled by user.".to_string())
+        }
+        Err(HardsubTaskError::Failed(error_detail)) => {
+            if Path::new(&output_path_for_cleanup).exists() {
+                let _ = std::fs::remove_file(&output_path_for_cleanup);
+                logs.log(&app, "Hardsub", &format!("Removed partial output file: {}", output_path_for_cleanup));
+            }
+            logs.log(&app, "Hardsub", &format!("Hardsub encoding failed: {}", error_detail));
+            emit_hardsub_terminal_status(&app, false);
+            Err(error_detail)
+        }
     }
-
-    let duration_ms = start_time.elapsed().as_millis() as u64;
-
-    let output_size_mb = if let Ok(meta) = std::fs::metadata(&settings.output_path) {
-        meta.len() as f64 / 1024.0 / 1024.0
-    } else {
-        0.0
-    };
-
-    logs.log(&app, "Hardsub", &format!("Hardsub completed successfully! Saved to: {}", settings.output_path));
-
-    let _ = app.emit("hardsub-status", HardsubProgress {
-        progress: 1.0,
-        message: "Hardsub video exported successfully!".to_string(),
-        active: false,
-        stage: Some("completed".to_string()),
-        speed: None,
-        fps: None,
-    });
-
-    // Notify OS
-    let _ = app.notification().builder().title("Hardsub Completed").body(format!("Video saved to {}", settings.output_path)).show();
-
-    Ok(HardsubResult {
-        duration_ms,
-        output_path: settings.output_path,
-        output_size_mb,
-    })
 }

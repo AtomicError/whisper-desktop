@@ -408,7 +408,7 @@ export function parseSubtitleContent(content: string, ext: string): SubtitleCue[
     }
     if (!parsedMicroDvd) {
       // SubViewer (.sub): HH:MM:SS.cc,HH:MM:SS.cc followed by cue lines
-      const blocks = normalized.split(/\n\n+/);
+      const blocks = normalized.split(/\n[ \t]*\n+/);
       for (const block of blocks) {
         const blockLines = block.trim().split('\n');
         const timeMatch = /^(\d{1,2}:\d{2}:\d{2}[.,]\d{1,3})\s*,\s*(\d{1,2}:\d{2}:\d{2}[.,]\d{1,3})$/.exec(blockLines[0]?.trim() || '');
@@ -428,7 +428,7 @@ export function parseSubtitleContent(content: string, ext: string): SubtitleCue[
       }
     }
   } else {
-    const blocks = normalized.split(/\n\n+/);
+    const blocks = normalized.split(/\n[ \t]*\n+/);
     let cueId = 1;
     for (const block of blocks) {
       const lines = block.trim().split('\n');
@@ -522,68 +522,112 @@ interface TextSpan {
 
 const TAG_REGEX = /<\/?(?:i|b|u|font)\b[^>]*>|\{\\an[1-9]\}|\{\\[^}]+\}/gi;
 
-function parseLineToSpans(
+const CSS_NAMED_HEX_COLORS: Record<string, string> = {
+  black: '#000000',
+  silver: '#C0C0C0',
+  gray: '#808080',
+  grey: '#808080',
+  white: '#FFFFFF',
+  maroon: '#800000',
+  red: '#FF0000',
+  purple: '#800080',
+  fuchsia: '#FF00FF',
+  magenta: '#FF00FF',
+  green: '#008000',
+  lime: '#00FF00',
+  olive: '#808000',
+  yellow: '#FFFF00',
+  navy: '#000080',
+  blue: '#0000FF',
+  teal: '#008080',
+  aqua: '#00FFFF',
+  cyan: '#00FFFF',
+  orange: '#FFA500',
+  pink: '#FFC0CB',
+  gold: '#FFD700',
+};
+
+function normalizeColorToAssBgr(color: string): string {
+  const trimmed = color.trim();
+  const mappedHex = CSS_NAMED_HEX_COLORS[trimmed.toLowerCase()];
+  const raw = (mappedHex || trimmed).replace('#', '');
+  let hex = 'FFFFFF';
+  if (/^[0-9a-fA-F]{6}$/.test(raw)) {
+    hex = raw;
+  } else if (/^[0-9a-fA-F]{3}$/.test(raw)) {
+    hex = `${raw[0]}${raw[0]}${raw[1]}${raw[1]}${raw[2]}${raw[2]}`;
+  }
+  const r = hex.substring(0, 2);
+  const g = hex.substring(2, 4);
+  const b = hex.substring(4, 6);
+  return `${b}${g}${r}`;
+}
+
+interface SpanParseState {
+  bold: boolean;
+  italic: boolean;
+  underline: boolean;
+  colorStack: string[];
+  defaultBold: boolean;
+  defaultItalic: boolean;
+  defaultColor: string;
+}
+
+function parseLineToSpansWithState(
   text: string,
-  defaultColor: string,
-  defaultBold: boolean = false,
-  defaultItalic: boolean = false
+  state: SpanParseState
 ): { spans: TextSpan[]; alignmentOverride: number | null } {
   let alignmentOverride: number | null = null;
   const spans: TextSpan[] = [];
-  
-  let bold = defaultBold;
-  let italic = defaultItalic;
-  let underline = false;
-  const colorStack: string[] = [defaultColor];
 
   TAG_REGEX.lastIndex = 0;
   let lastIndex = 0;
-  
+
   const matches = [...text.matchAll(TAG_REGEX)];
-  
+
   for (const match of matches) {
     const startIndex = match.index ?? 0;
-    
+
     if (startIndex > lastIndex) {
       const txt = text.substring(lastIndex, startIndex);
       if (txt) {
         spans.push({
           text: txt,
-          bold,
-          italic,
-          underline,
-          color: colorStack[colorStack.length - 1]
+          bold: state.bold,
+          italic: state.italic,
+          underline: state.underline,
+          color: state.colorStack[state.colorStack.length - 1]
         });
       }
     }
-    
+
     const tag = match[0];
     if (tag.startsWith('<')) {
       const lower = tag.toLowerCase();
       if (lower.startsWith('<i>') || lower.startsWith('<i ')) {
-        italic = true;
+        state.italic = true;
       } else if (lower === '</i>') {
-        italic = defaultItalic;
+        state.italic = state.defaultItalic;
       } else if (lower.startsWith('<b>') || lower.startsWith('<b ')) {
-        bold = true;
+        state.bold = true;
       } else if (lower === '</b>') {
-        bold = defaultBold;
+        state.bold = state.defaultBold;
       } else if (lower.startsWith('<u>') || lower.startsWith('<u ')) {
-        underline = true;
+        state.underline = true;
       } else if (lower === '</u>') {
-        underline = false;
+        state.underline = false;
       } else if (lower.startsWith('<font') && lower.includes('color=')) {
-        const colorMatch = /color=["']#?([0-9a-fA-F]{6}|[a-zA-Z]+)["']/i.exec(tag);
+        const colorMatch = /color=["']#?([0-9a-fA-F]{3,6}|[a-zA-Z]+)["']/i.exec(tag);
         if (colorMatch) {
           const val = colorMatch[1];
-          const colorHex = /^[0-9a-fA-F]{6}$/.test(val) ? `#${val}` : val;
-          colorStack.push(colorHex);
+          const colorHex = /^[0-9a-fA-F]{3,6}$/.test(val) ? `#${val}` : val;
+          state.colorStack.push(colorHex);
         } else {
-          colorStack.push(defaultColor);
+          state.colorStack.push(state.defaultColor);
         }
       } else if (lower === '</font>') {
-        if (colorStack.length > 1) {
-          colorStack.pop();
+        if (state.colorStack.length > 1) {
+          state.colorStack.pop();
         }
       }
     } else if (tag.startsWith('{')) {
@@ -594,13 +638,13 @@ function parseLineToSpans(
           alignmentOverride = parseInt(val, 10) || null;
         } else if (/^i[01]?$/.test(cmd)) {
           const val = cmd.substring(1).trim();
-          italic = val === '1';
+          state.italic = val === '1';
         } else if (/^b[01]?$/.test(cmd)) {
           const val = cmd.substring(1).trim();
-          bold = val === '1';
+          state.bold = val === '1';
         } else if (/^u[01]?$/.test(cmd)) {
           const val = cmd.substring(1).trim();
-          underline = val === '1';
+          state.underline = val === '1';
         } else if (cmd.startsWith('c&H') || cmd.startsWith('1c&H')) {
           const colorMatch = /(?:1?c&H)([0-9a-fA-F]+)&?/i.exec(cmd);
           if (colorMatch) {
@@ -614,33 +658,51 @@ function parseLineToSpans(
             const b = cleanHex.substring(0, 2);
             const g = cleanHex.substring(2, 4);
             const r = cleanHex.substring(4, 6);
-            colorStack.push(`#${r}${g}${b}`);
+            state.colorStack.push(`#${r}${g}${b}`);
           }
         } else if (cmd === 'c' || cmd === '1c') {
-          if (colorStack.length > 1) {
-            colorStack.pop();
+          if (state.colorStack.length > 1) {
+            state.colorStack.pop();
           }
         }
       }
     }
-    
+
     lastIndex = startIndex + tag.length;
   }
-  
+
   if (lastIndex < text.length) {
     const txt = text.substring(lastIndex);
     if (txt) {
       spans.push({
         text: txt,
-        bold,
-        italic,
-        underline,
-        color: colorStack[colorStack.length - 1]
+        bold: state.bold,
+        italic: state.italic,
+        underline: state.underline,
+        color: state.colorStack[state.colorStack.length - 1]
       });
     }
   }
-  
+
   return { spans, alignmentOverride };
+}
+
+function parseCueLinesToSpans(
+  lines: string[],
+  defaultColor: string,
+  defaultBold: boolean = false,
+  defaultItalic: boolean = false
+): Array<{ spans: TextSpan[]; alignmentOverride: number | null }> {
+  const state: SpanParseState = {
+    bold: defaultBold,
+    italic: defaultItalic,
+    underline: false,
+    colorStack: [defaultColor],
+    defaultBold,
+    defaultItalic,
+    defaultColor,
+  };
+  return lines.map((line) => parseLineToSpansWithState(line, state));
 }
 
 function splitSpanIntoWords(span: TextSpan): TextSpan[] {
@@ -701,13 +763,8 @@ function wrapSpans(
 
     if (currentLineWidth + wordWidth > maxTextWidth && currentLine.length > 0 && !isWhitespace) {
       wrappedLines.push(trimTrailingWhitespace(currentLine));
-      if (isWhitespace) {
-        currentLine = [];
-        currentLineWidth = 0;
-      } else {
-        currentLine = [wordSpan];
-        currentLineWidth = wordWidth;
-      }
+      currentLine = [wordSpan];
+      currentLineWidth = wordWidth;
     } else {
       currentLine.push(wordSpan);
       currentLineWidth += wordWidth;
@@ -942,6 +999,10 @@ export class HardsubController {
   private btnResetDir: HTMLButtonElement | null = null;
   private btnOpenFolder: HTMLButtonElement | null = null;
   private btnPlayVideo: HTMLButtonElement | null = null;
+  private btnResetStyle: HTMLButtonElement | null = null;
+  private bundledFontOptgroup: HTMLOptGroupElement | null = null;
+  private systemFontOptgroup: HTMLOptGroupElement | null = null;
+  private hasCustomFontSelection: boolean = false;
   private lastExportedPath: string | null = null;
   private lastStatusPayload: {
     progress: number;
@@ -985,6 +1046,7 @@ export class HardsubController {
   };
 
   private storageDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private styleStorageDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private qualityScaleSig: string | null = null;
   private qualityScaleMin = 0;
   private qualityScaleMax = 51;
@@ -1017,7 +1079,10 @@ export class HardsubController {
   private playIntent = false;
   private playSerial = 0;
   private subtitleSerial = 0;
+  private fontScaleSerial = 0;
   private isCompanionSubtitle = false;
+  private lastFailedErrorText: string | null = null;
+  private pendingSubtitleLoad: { path: string; promise: Promise<void> } | null = null;
   private domTeardowns: Array<() => void> = [];
   private mediaTeardowns: Array<() => void> = [];
   private nativeTeardowns: Array<() => void> = [];
@@ -1097,6 +1162,7 @@ export class HardsubController {
     this.resizeObserver?.disconnect();
     if (this.resizeFrame !== null) cancelAnimationFrame(this.resizeFrame);
     if (this.storageDebounceTimer !== null) clearTimeout(this.storageDebounceTimer);
+    if (this.styleStorageDebounceTimer !== null) clearTimeout(this.styleStorageDebounceTimer);
     if (this.searchDebounceTimer !== null) clearTimeout(this.searchDebounceTimer);
     for (const teardown of this.domTeardowns.splice(0)) teardown();
     for (const teardown of this.nativeTeardowns.splice(0)) teardown();
@@ -1122,6 +1188,8 @@ export class HardsubController {
     this.cancelFreezeCallbacks();
     this.dismissFreezeFrame();
     if (this.volumeHud) this.volumeHud.style.display = 'none';
+    const container = typeof document !== 'undefined' ? document.getElementById('hardsub-player-container') : null;
+    if (container) container.style.cursor = '';
   }
 
   private resetVideoSource(): void {
@@ -1245,12 +1313,14 @@ export class HardsubController {
         this.updateSupportedCodecs();
       }
       this.loadExportSettingsFromStorage();
+      this.loadStyleSettingsFromStorage();
       this.setupEventListeners();
       this.setupExportEventListeners();
       this.setupVideoPlayerEvents();
       this.setupStudioTabEvents();
       this.setupDragAndDropListeners();
       this.listenToProgressEvents();
+      this.syncStyleDOMFromState();
       this.updateQualitySliderConfig();
       this.updateQualityUI();
       this.updateAudioUI();
@@ -1464,6 +1534,15 @@ export class HardsubController {
     this.btnResetDir = document.getElementById('btn-reset-hardsub-dir') as HTMLButtonElement;
     this.btnOpenFolder = document.getElementById('btn-open-hardsub-folder') as HTMLButtonElement;
     this.btnPlayVideo = document.getElementById('btn-play-hardsub-video') as HTMLButtonElement;
+    this.btnResetStyle = document.getElementById('btn-reset-hardsub-style') as HTMLButtonElement | null;
+  }
+
+  private syncFontSelectUI(): void {
+    if (!this.fontSelect) return;
+    this.fontSelect.value = this.state.fontName;
+    if (typeof (window as any)?.syncCustomSelects === 'function') {
+      (window as any).syncCustomSelects(false, true);
+    }
   }
 
   public async loadFontsAndHardware() {
@@ -1473,10 +1552,10 @@ export class HardsubController {
         this.fontSelect.innerHTML = '';
 
         const bundledGroup = document.createElement('optgroup');
-        bundledGroup.label = '— Bundled Fonts —';
+        bundledGroup.label = t('hardsub.bundledFontsGroup');
 
         const systemGroup = document.createElement('optgroup');
-        systemGroup.label = '— System Fonts —';
+        systemGroup.label = t('hardsub.systemFontsGroup');
 
         fonts.forEach((f) => {
           const opt = document.createElement('option');
@@ -1489,17 +1568,27 @@ export class HardsubController {
           }
         });
 
+        this.bundledFontOptgroup = bundledGroup;
+        this.systemFontOptgroup = systemGroup;
         this.fontSelect.appendChild(bundledGroup);
         this.fontSelect.appendChild(systemGroup);
+
+        if (!this.hasCustomFontSelection) {
+          this.state.fontName = this.getSmartDefaultFont();
+        }
         const targetFont = this.state.fontName || this.getSmartDefaultFont();
         this.state.fontName = targetFont;
-        this.fontSelect.value = targetFont;
+        this.syncFontSelectUI();
       }
     } catch (e) {
       console.warn('Failed to load system fonts:', e);
     }
 
-    this.refreshFontRenderScale();
+    void this.refreshFontRenderScale().then((applied) => {
+      if (applied && !this.disposed && this.phase === 'ready') {
+        this.updateLivePreview();
+      }
+    });
 
     try {
       const hwStatus = await invoke<HardwareStatus>('check_hardware_encoders');
@@ -1652,19 +1741,30 @@ export class HardsubController {
     }
   }
 
-  private async refreshFontRenderScale() {
+  private async refreshFontRenderScale(): Promise<boolean> {
+    const serial = ++this.fontScaleSerial;
     try {
       const allCuesText = this.subtitleCues ? this.subtitleCues.map((c) => c.text).join(' ') : '';
       const targetFont = resolveEffectiveFont(this.state.fontName, allCuesText);
-      this.fontMetrics = await invoke<{ scale: number; ascentRatio: number; descentRatio: number }>('get_font_render_scale', {
+      const metrics = await invoke<{ scale: number; ascentRatio: number; descentRatio: number }>('get_font_render_scale', {
         fontName: targetFont,
         bold: this.state.bold,
         italic: this.state.italic,
       });
+      if (this.disposed || serial !== this.fontScaleSerial) return false;
+      this.fontMetrics = metrics;
+      return true;
     } catch (e: any) {
+      if (this.disposed || serial !== this.fontScaleSerial) return false;
       console.warn('Failed to fetch font render scale, using defaults:', e);
       this.fontMetrics = { scale: 1, ascentRatio: 0.78, descentRatio: 0.22 };
+      return true;
     }
+  }
+
+  private getCueSeekTimeSec(cue: SubtitleCue): number {
+    const offsetMs = Math.min(50, Math.max(0, (cue.endMs - cue.startMs) / 2));
+    return (cue.startMs + offsetMs) / 1000;
   }
 
   private setupEventListeners() {
@@ -1692,7 +1792,7 @@ export class HardsubController {
     
           this.wasPlayingBeforeSeek = true;
           this.videoElement.pause();
-          this.performSafeSeek((cue.startMs + 50) / 1000);
+          this.performSafeSeek(this.getCueSeekTimeSec(cue));
         }
         return;
       }
@@ -1712,7 +1812,7 @@ export class HardsubController {
             this.targetClickedCueId = null;
           }, 800);
     
-          this.performSafeSeek((cue.startMs + 50) / 1000);
+          this.performSafeSeek(this.getCueSeekTimeSec(cue));
         }
       }
     });
@@ -1758,9 +1858,9 @@ export class HardsubController {
       this.clearSubtitleState();
     });
 
-    // Clicking placeholder in player expands the accordion and triggers browse
+    // Clicking placeholder in player expands the accordion and triggers browse only when idle
     this.on(this.videoPlaceholder, 'click', () => {
-      if (this.isEncoding) return;
+      if (this.isEncoding || this.phase !== 'idle') return;
       this.toggleMediaAccordion(true);
       (this.btnBrowseVideo ?? document.getElementById('btn-browse-video'))?.click();
     });
@@ -1786,10 +1886,20 @@ export class HardsubController {
     });
 
     // Font Select
-    this.on(this.fontSelect, 'change', () => {
+    this.on(this.fontSelect, 'change', async () => {
+      this.hasCustomFontSelection = true;
       this.state.fontName = this.fontSelect!.value;
-      this.refreshFontRenderScale();
+      this.saveStyleSettingsToStorage();
       this.updateLivePreview();
+      const applied = await this.refreshFontRenderScale();
+      if (applied && !this.disposed) {
+        this.updateLivePreview();
+      }
+    });
+
+    // Reset All Style Settings
+    this.on(this.btnResetStyle, 'click', () => {
+      this.resetStyleSettings();
     });
 
     // Font Size Slider
@@ -1798,6 +1908,7 @@ export class HardsubController {
       this.state.fontSize = val;
       if (this.fontSizeVal) this.fontSizeVal.textContent = `${val}px`;
       this.updateSliderBackground(this.fontSizeSlider!);
+      this.saveStyleSettingsToStorage();
       this.updateLivePreview();
     });
     this.on(document.getElementById('reset-fontsize'), 'click', () => {
@@ -1807,6 +1918,7 @@ export class HardsubController {
         this.updateSliderBackground(this.fontSizeSlider);
       }
       if (this.fontSizeVal) this.fontSizeVal.textContent = '14px';
+      this.saveStyleSettingsToStorage();
       this.updateLivePreview();
     });
 
@@ -1816,6 +1928,7 @@ export class HardsubController {
       this.state.positionY = val;
       if (this.positionYVal) this.positionYVal.textContent = `${val}px`;
       this.updateSliderBackground(this.positionYSlider!);
+      this.saveStyleSettingsToStorage();
       this.updateLivePreview();
     });
     this.on(document.getElementById('reset-posy'), 'click', () => {
@@ -1825,6 +1938,7 @@ export class HardsubController {
         this.updateSliderBackground(this.positionYSlider);
       }
       if (this.positionYVal) this.positionYVal.textContent = '30px';
+      this.saveStyleSettingsToStorage();
       this.updateLivePreview();
     });
 
@@ -1834,6 +1948,7 @@ export class HardsubController {
       this.state.outlineSize = val;
       if (this.outlineSizeVal) this.outlineSizeVal.textContent = `${val}px`;
       this.updateSliderBackground(this.outlineSizeSlider!);
+      this.saveStyleSettingsToStorage();
       this.updateLivePreview();
     });
     this.on(document.getElementById('reset-outline'), 'click', () => {
@@ -1843,6 +1958,7 @@ export class HardsubController {
         this.updateSliderBackground(this.outlineSizeSlider);
       }
       if (this.outlineSizeVal) this.outlineSizeVal.textContent = '2px';
+      this.saveStyleSettingsToStorage();
       this.updateLivePreview();
     });
 
@@ -1850,36 +1966,40 @@ export class HardsubController {
     this.on(this.primaryColorPicker, 'input', () => {
       this.state.primaryColor = this.primaryColorPicker!.value.toUpperCase();
       this.updateColorSwatches();
+      this.saveStyleSettingsToStorage();
       this.updateLivePreview();
     });
 
     this.on(this.outlineColorPicker, 'input', () => {
       this.state.outlineColor = this.outlineColorPicker!.value.toUpperCase();
       this.updateColorSwatches();
+      this.saveStyleSettingsToStorage();
       this.updateLivePreview();
     });
 
     this.on(this.bgBoxToggle, 'change', () => {
       this.state.bgBox = this.bgBoxToggle!.checked;
-      setTimeout(() => {
-        this.updateLivePreview();
-      }, 240);
+      this.saveStyleSettingsToStorage();
+      this.updateLivePreview();
     });
     this.on(this.bgBoxColorPicker, 'input', () => {
       this.state.bgBoxColor = this.bgBoxColorPicker!.value.toUpperCase();
       this.updateColorSwatches();
+      this.saveStyleSettingsToStorage();
       this.updateLivePreview();
     });
     this.on(this.bgBoxOpacitySlider, 'input', () => {
       this.state.bgBoxOpacity = parseInt(this.bgBoxOpacitySlider!.value, 10);
       if (this.bgBoxOpacityVal) this.bgBoxOpacityVal.textContent = `${this.state.bgBoxOpacity}%`;
       this.updateSliderBackground(this.bgBoxOpacitySlider!);
+      this.saveStyleSettingsToStorage();
       this.updateLivePreview();
     });
     this.on(this.bgBoxRadiusSlider, 'input', () => {
       this.state.bgBoxRadius = parseInt(this.bgBoxRadiusSlider!.value, 10);
       if (this.bgBoxRadiusVal) this.bgBoxRadiusVal.textContent = `${this.state.bgBoxRadius}px`;
       this.updateSliderBackground(this.bgBoxRadiusSlider!);
+      this.saveStyleSettingsToStorage();
       this.updateLivePreview();
     });
 
@@ -1897,6 +2017,7 @@ export class HardsubController {
           if (this.primaryColorPicker) this.primaryColorPicker.value = color;
         }
         this.updateColorSwatches();
+        this.saveStyleSettingsToStorage();
         this.updateLivePreview();
       });
     });
@@ -1906,6 +2027,7 @@ export class HardsubController {
       this.state.bold = !this.state.bold;
       this.boldToggle!.classList.toggle('active', this.state.bold);
       this.boldToggle?.setAttribute?.('aria-pressed', String(this.state.bold));
+      this.saveStyleSettingsToStorage();
       this.updateLivePreview();
       await this.refreshFontRenderScale();
       this.updateLivePreview();
@@ -1916,6 +2038,7 @@ export class HardsubController {
       this.state.italic = !this.state.italic;
       this.italicToggle!.classList.toggle('active', this.state.italic);
       this.italicToggle?.setAttribute?.('aria-pressed', String(this.state.italic));
+      this.saveStyleSettingsToStorage();
       this.updateLivePreview();
       await this.refreshFontRenderScale();
       this.updateLivePreview();
@@ -1929,6 +2052,11 @@ export class HardsubController {
       'top-left': 7, 'top-center': 8, 'top-right': 9,
       'middle-left': 4, 'middle-center': 5, 'middle-right': 6,
       'bottom-left': 1, 'bottom-center': 2, 'bottom-right': 3
+    };
+    const reverseAlignMap: Record<number, { v: string; h: string }> = {
+      7: { v: 'top', h: 'left' }, 8: { v: 'top', h: 'center' }, 9: { v: 'top', h: 'right' },
+      4: { v: 'middle', h: 'left' }, 5: { v: 'middle', h: 'center' }, 6: { v: 'middle', h: 'right' },
+      1: { v: 'bottom', h: 'left' }, 2: { v: 'bottom', h: 'center' }, 3: { v: 'bottom', h: 'right' },
     };
     const getAlignName = (code: number): string => {
       switch (code) {
@@ -1945,12 +2073,11 @@ export class HardsubController {
       }
     };
 
-    let currentV = 'bottom';
-    let currentH = 'center';
-
-    const updateAlignmentState = () => {
-      const key = `${currentV}-${currentH}`;
-      const code = alignMap[key] || 2;
+    const updateAlignmentState = (skipPreview = false) => {
+      const resolved = reverseAlignMap[this.state.alignment] || { v: 'bottom', h: 'center' };
+      const currentV = resolved.v;
+      const currentH = resolved.h;
+      const code = alignMap[`${currentV}-${currentH}`] || 2;
       this.state.alignment = code;
       if (alignValLabel) {
         alignValLabel.textContent = getAlignName(code);
@@ -1982,10 +2109,12 @@ export class HardsubController {
         }
       }
 
-      this.updateLivePreview();
+      if (!skipPreview) {
+        this.updateLivePreview();
+      }
     };
 
-    this.updateAlignmentUI = updateAlignmentState;
+    this.updateAlignmentUI = () => updateAlignmentState(true);
 
     this.on(window, 'whisper:languageChanged', () => {
       if (!this.pageActive) {
@@ -1999,9 +2128,10 @@ export class HardsubController {
     document.querySelectorAll('.align-v-btn').forEach((btn) => {
       this.on(btn, 'click', (e) => {
         const target = e.currentTarget as HTMLButtonElement;
-        currentV = target.dataset.v || 'bottom';
-        document.querySelectorAll('.align-v-btn').forEach((b) => b.classList.remove('active'));
-        target.classList.add('active');
+        const nextV = target.dataset.v || 'bottom';
+        const curH = (reverseAlignMap[this.state.alignment] || { h: 'center' }).h;
+        this.state.alignment = alignMap[`${nextV}-${curH}`] || 2;
+        this.saveStyleSettingsToStorage();
         updateAlignmentState();
       });
     });
@@ -2009,9 +2139,10 @@ export class HardsubController {
     document.querySelectorAll('.align-h-btn').forEach((btn) => {
       this.on(btn, 'click', (e) => {
         const target = e.currentTarget as HTMLButtonElement;
-        currentH = target.dataset.h || 'center';
-        document.querySelectorAll('.align-h-btn').forEach((b) => b.classList.remove('active'));
-        target.classList.add('active');
+        const nextH = target.dataset.h || 'center';
+        const curV = (reverseAlignMap[this.state.alignment] || { v: 'bottom' }).v;
+        this.state.alignment = alignMap[`${curV}-${nextH}`] || 2;
+        this.saveStyleSettingsToStorage();
         updateAlignmentState();
       });
     });
@@ -2080,10 +2211,74 @@ export class HardsubController {
     });
   }
 
+  private enforceContainerCompatibility(changedField: 'format' | 'codec' | 'audio'): void {
+    let adjusted = false;
+    if (this.state.outputFormat === 'webm') {
+      if (changedField === 'format') {
+        if (this.state.videoCodec !== 'vp9' && this.state.videoCodec !== 'av1') {
+          const hwSupportsAv1 =
+            (this.state.hwAccel === 'nvenc' && this.cachedHwStatus?.nvencCodecs?.includes('av1')) ||
+            (this.state.hwAccel === 'qsv' && this.cachedHwStatus?.qsvCodecs?.includes('av1')) ||
+            (this.state.hwAccel === 'vaapi' && this.cachedHwStatus?.vaapiCodecs?.includes('av1'));
+          if (hwSupportsAv1) {
+            this.state.videoCodec = 'av1';
+          } else {
+            this.state.hwAccel = 'cpu';
+            if (this.hwSelect) this.hwSelect.value = 'cpu';
+            this.updateSupportedCodecs();
+            this.state.videoCodec = 'vp9';
+          }
+          if (this.codecSelect) this.codecSelect.value = this.state.videoCodec;
+          this.updateQualitySliderConfig();
+          adjusted = true;
+        }
+        if (this.state.audioCodec === 'aac' || this.state.audioCodec === 'mp3') {
+          this.state.audioCodec = 'opus';
+          if (this.audioCodecSelect) this.audioCodecSelect.value = 'opus';
+          this.updateAudioUI();
+          adjusted = true;
+        }
+      } else if (changedField === 'codec' && (this.state.videoCodec === 'h264' || this.state.videoCodec === 'h265' || this.state.videoCodec === 'prores')) {
+        this.state.outputFormat = this.state.videoCodec === 'prores' ? 'mov' : 'mp4';
+        if (this.formatSelect) this.formatSelect.value = this.state.outputFormat;
+        if (this.state.videoPath) this.updateComputedOutputPath();
+        adjusted = true;
+      } else if (changedField === 'audio' && (this.state.audioCodec === 'aac' || this.state.audioCodec === 'mp3')) {
+        this.state.outputFormat = 'mp4';
+        if (this.formatSelect) this.formatSelect.value = 'mp4';
+        if (this.state.videoPath) this.updateComputedOutputPath();
+        adjusted = true;
+      }
+    } else if (this.state.outputFormat === 'mp4' && this.state.videoCodec === 'prores') {
+      if (changedField === 'format') {
+        this.state.videoCodec = 'h264';
+        if (this.codecSelect) this.codecSelect.value = 'h264';
+        this.updateQualitySliderConfig();
+        adjusted = true;
+      } else if (changedField === 'codec') {
+        this.state.outputFormat = 'mov';
+        if (this.formatSelect) this.formatSelect.value = 'mov';
+        if (this.state.videoPath) this.updateComputedOutputPath();
+        adjusted = true;
+      }
+    }
+
+    if (adjusted) {
+      if (typeof (window as any)?.syncCustomSelects === 'function') {
+        (window as any).syncCustomSelects(false, true);
+      }
+      const notifyFn = (window as any)?.showNotification;
+      if (typeof notifyFn === 'function') {
+        notifyFn(t('hardsub.containerCodecAdjusted', { format: this.state.outputFormat.toUpperCase() }), 'info', 4000);
+      }
+    }
+  }
+
   private setupExportEventListeners() {
     // Format Select
     this.on(this.formatSelect, 'change', () => {
       this.state.outputFormat = this.formatSelect!.value;
+      this.enforceContainerCompatibility('format');
       if (this.state.videoPath) {
         this.updateComputedOutputPath();
       }
@@ -2095,6 +2290,7 @@ export class HardsubController {
     this.on(this.hwSelect, 'change', () => {
       this.state.hwAccel = this.hwSelect!.value;
       this.updateSupportedCodecs();
+      this.enforceContainerCompatibility('codec');
       this.updateQualitySliderConfig();
       if (this.state.videoQualityMode === 'preset') {
         this.syncQualityPresetToSlider();
@@ -2106,6 +2302,7 @@ export class HardsubController {
     // Video Codec Select
     this.on(this.codecSelect, 'change', () => {
       this.state.videoCodec = this.codecSelect!.value;
+      this.enforceContainerCompatibility('codec');
       this.updateQualitySliderConfig();
       if (this.state.videoQualityMode === 'preset') {
         this.syncQualityPresetToSlider();
@@ -2171,6 +2368,7 @@ export class HardsubController {
     // Audio Codec Select
     this.on(this.audioCodecSelect, 'change', () => {
       this.state.audioCodec = (this.audioCodecSelect!.value || 'copy') as any;
+      this.enforceContainerCompatibility('audio');
       this.updateAudioUI();
       this.saveExportSettingsToStorage();
       this.updateFfmpegCommandPreview();
@@ -2460,6 +2658,15 @@ export class HardsubController {
   }
 
   public refreshLocalization() {
+    if (this.bundledFontOptgroup) {
+      this.bundledFontOptgroup.label = t('hardsub.bundledFontsGroup');
+    }
+    if (this.systemFontOptgroup) {
+      this.systemFontOptgroup.label = t('hardsub.systemFontsGroup');
+    }
+    if (typeof (window as any)?.syncCustomSelects === 'function') {
+      (window as any).syncCustomSelects(false, true);
+    }
     if (this.cachedHwStatus) {
       this.populateHardwareDropdown(this.cachedHwStatus);
     } else {
@@ -2490,7 +2697,13 @@ export class HardsubController {
     this.renderPlayerPhase();
     this.updateOutputDirUI();
     if (this.progressStatusText && this.lastStatusPayload) {
-      this.progressStatusText.textContent = formatHardsubStatus(this.lastStatusPayload);
+      if (this.lastStatusPayload.stage === 'cancelled') {
+        this.progressStatusText.textContent = t('transcribe.standingBy');
+      } else if (this.lastStatusPayload.stage === 'failed' && this.lastFailedErrorText) {
+        this.progressStatusText.textContent = t('hardsub.statusEncodingError', { error: this.lastFailedErrorText });
+      } else {
+        this.progressStatusText.textContent = formatHardsubStatus(this.lastStatusPayload);
+      }
     }
     this.updateEncodingUIState(this.isEncoding);
   }
@@ -2508,7 +2721,7 @@ export class HardsubController {
     const outputExt = this.state.outputFormat || 'mp4';
     const outputName = `"output.${outputExt}"`;
 
-    args.push('-noautorotate', '-y', '-i', inputName);
+    args.push('-y', '-i', inputName);
 
     // Video Filter
     const vfParts: string[] = [`subtitles=${subName}`];
@@ -2679,6 +2892,186 @@ export class HardsubController {
     }
   }
 
+  private loadStyleSettingsFromStorage() {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      const raw = localStorage.getItem('whisper_hardsub_style_settings');
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return;
+
+      const isHexColor = (val: unknown): val is string =>
+        typeof val === 'string' && /^#[0-9a-f]{6}$/i.test(val.trim());
+      const clampNum = (val: unknown, min: number, max: number): number | null =>
+        typeof val === 'number' && Number.isFinite(val) ? Math.max(min, Math.min(max, Math.round(val))) : null;
+
+      if (typeof parsed.fontName === 'string' && parsed.fontName.trim()) {
+        this.state.fontName = parsed.fontName.trim();
+        if (parsed.hasCustomFontSelection === true || this.state.fontName !== 'Vazirmatn') {
+          this.hasCustomFontSelection = true;
+        }
+      }
+      const fontSize = clampNum(parsed.fontSize, 6, 120);
+      if (fontSize !== null) this.state.fontSize = fontSize;
+
+      if (isHexColor(parsed.primaryColor)) {
+        this.state.primaryColor = parsed.primaryColor.trim().toUpperCase();
+      }
+      if (isHexColor(parsed.outlineColor)) {
+        this.state.outlineColor = parsed.outlineColor.trim().toUpperCase();
+      }
+      const outlineSize = clampNum(parsed.outlineSize, 0, 10);
+      if (outlineSize !== null) this.state.outlineSize = outlineSize;
+
+      if (typeof parsed.bgBox === 'boolean') this.state.bgBox = parsed.bgBox;
+      if (isHexColor(parsed.bgBoxColor)) {
+        this.state.bgBoxColor = parsed.bgBoxColor.trim().toUpperCase();
+      }
+      const bgBoxOpacity = clampNum(parsed.bgBoxOpacity, 0, 100);
+      if (bgBoxOpacity !== null) this.state.bgBoxOpacity = bgBoxOpacity;
+
+      const bgBoxRadius = clampNum(parsed.bgBoxRadius, 0, 24);
+      if (bgBoxRadius !== null) this.state.bgBoxRadius = bgBoxRadius;
+
+      const positionY = clampNum(parsed.positionY, 0, 250);
+      if (positionY !== null) this.state.positionY = positionY;
+
+      const widthMargin = clampNum(parsed.widthMargin, 50, 100);
+      if (widthMargin !== null) this.state.widthMargin = widthMargin;
+
+      if (typeof parsed.bold === 'boolean') this.state.bold = parsed.bold;
+      if (typeof parsed.italic === 'boolean') this.state.italic = parsed.italic;
+
+      if (typeof parsed.alignment === 'number' && Number.isInteger(parsed.alignment) && parsed.alignment >= 1 && parsed.alignment <= 9) {
+        this.state.alignment = parsed.alignment;
+      }
+    } catch (e) {
+      console.warn('Failed to load hardsub style settings:', e);
+    }
+  }
+
+  private saveStyleSettingsToStorage(immediate = false) {
+    const doSave = () => {
+      try {
+        if (typeof localStorage === 'undefined') return;
+        const toSave = {
+          fontName: this.state.fontName,
+          hasCustomFontSelection: this.hasCustomFontSelection,
+          fontSize: this.state.fontSize,
+          primaryColor: this.state.primaryColor,
+          outlineColor: this.state.outlineColor,
+          outlineSize: this.state.outlineSize,
+          bgBox: this.state.bgBox,
+          bgBoxColor: this.state.bgBoxColor,
+          bgBoxOpacity: this.state.bgBoxOpacity,
+          bgBoxRadius: this.state.bgBoxRadius,
+          positionY: this.state.positionY,
+          widthMargin: this.state.widthMargin,
+          bold: this.state.bold,
+          italic: this.state.italic,
+          alignment: this.state.alignment,
+        };
+        localStorage.setItem('whisper_hardsub_style_settings', JSON.stringify(toSave));
+      } catch (e) {
+        console.warn('Failed to save hardsub style settings:', e);
+      }
+    };
+
+    if (immediate) {
+      if (this.styleStorageDebounceTimer) {
+        clearTimeout(this.styleStorageDebounceTimer);
+        this.styleStorageDebounceTimer = null;
+      }
+      doSave();
+    } else {
+      if (this.styleStorageDebounceTimer) clearTimeout(this.styleStorageDebounceTimer);
+      this.styleStorageDebounceTimer = setTimeout(doSave, 120);
+    }
+  }
+
+  private syncStyleDOMFromState() {
+    this.syncFontSelectUI();
+    if (this.fontSizeSlider) {
+      this.fontSizeSlider.value = String(this.state.fontSize);
+      this.updateSliderBackground(this.fontSizeSlider);
+    }
+    if (this.fontSizeVal) this.fontSizeVal.textContent = `${this.state.fontSize}px`;
+
+    if (this.positionYSlider) {
+      this.positionYSlider.value = String(this.state.positionY);
+      this.updateSliderBackground(this.positionYSlider);
+    }
+    if (this.positionYVal) this.positionYVal.textContent = `${this.state.positionY}px`;
+
+    if (this.outlineSizeSlider) {
+      this.outlineSizeSlider.value = String(this.state.outlineSize);
+      this.updateSliderBackground(this.outlineSizeSlider);
+    }
+    if (this.outlineSizeVal) this.outlineSizeVal.textContent = `${this.state.outlineSize}px`;
+
+    if (this.primaryColorPicker) this.primaryColorPicker.value = this.state.primaryColor;
+    if (this.outlineColorPicker) this.outlineColorPicker.value = this.state.outlineColor;
+    if (this.bgBoxColorPicker) this.bgBoxColorPicker.value = this.state.bgBoxColor;
+    if (this.bgBoxToggle) this.bgBoxToggle.checked = this.state.bgBox;
+
+    if (this.bgBoxOpacitySlider) {
+      this.bgBoxOpacitySlider.value = String(this.state.bgBoxOpacity);
+      this.updateSliderBackground(this.bgBoxOpacitySlider);
+    }
+    if (this.bgBoxOpacityVal) this.bgBoxOpacityVal.textContent = `${this.state.bgBoxOpacity}%`;
+
+    if (this.bgBoxRadiusSlider) {
+      this.bgBoxRadiusSlider.value = String(this.state.bgBoxRadius);
+      this.updateSliderBackground(this.bgBoxRadiusSlider);
+    }
+    if (this.bgBoxRadiusVal) this.bgBoxRadiusVal.textContent = `${this.state.bgBoxRadius}px`;
+
+    this.syncStyleControls(true);
+    this.updateAlignmentUI();
+  }
+
+  private resetStyleSettings() {
+    if (this.styleStorageDebounceTimer) {
+      clearTimeout(this.styleStorageDebounceTimer);
+      this.styleStorageDebounceTimer = null;
+    }
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('whisper_hardsub_style_settings');
+      }
+    } catch (e) {
+      console.warn('Failed to clear hardsub style settings:', e);
+    }
+
+    this.hasCustomFontSelection = false;
+    const allText = this.subtitleCues.map((c) => c.text).join(' ');
+    const smartDefault = this.getSmartDefaultFont();
+    this.state.fontName = hasArabicScript(allText) && !isArabicScriptFont(smartDefault)
+      ? 'Vazirmatn'
+      : smartDefault;
+    this.state.fontSize = 14;
+    this.state.primaryColor = '#FFFFFF';
+    this.state.outlineColor = '#000000';
+    this.state.outlineSize = 2;
+    this.state.bgBox = false;
+    this.state.bgBoxColor = '#000000';
+    this.state.bgBoxOpacity = 50;
+    this.state.bgBoxRadius = 0;
+    this.state.positionY = 30;
+    this.state.widthMargin = 90;
+    this.state.bold = true;
+    this.state.italic = false;
+    this.state.alignment = 2;
+
+    this.syncStyleDOMFromState();
+    this.updateLivePreview();
+    void this.refreshFontRenderScale().then((applied) => {
+      if (applied && !this.disposed) {
+        this.updateLivePreview();
+      }
+    });
+  }
+
   private setupStudioTabEvents() {
     const tabs = ['editor', 'style', 'export'] as const;
     type StudioTab = (typeof tabs)[number];
@@ -2715,6 +3108,10 @@ export class HardsubController {
       updateView(this.tabViewEditor, tab === 'editor');
       updateView(this.tabViewStyle, tab === 'style');
       updateView(this.tabViewExport, tab === 'export');
+
+      if (tab === 'editor') {
+        this.resizeAllCueTextareas();
+      }
     };
 
     syncTabStates();
@@ -3287,6 +3684,7 @@ export class HardsubController {
         const volume = Math.max(0, Math.min(1, this.videoElement.volume + (e.key === 'ArrowUp' ? 0.05 : -0.05)));
         this.videoElement.volume = volume;
         this.videoElement.muted = volume === 0;
+        if (volume > 0) this.lastVolume = volume;
         this.updateVolumeIcons(volume, this.videoElement.muted);
         this.showVolumeHUD(volume, this.videoElement.muted);
       } else if (e.code === 'Space' || e.key === ' ' || e.key === 'Spacebar') {
@@ -3953,6 +4351,7 @@ export class HardsubController {
     if (this.videoPathInput) this.videoPathInput.value = videoPath;
     this.updateVideoDropzoneUI(videoPath);
     this.autoSuggestSubtitleAndOutput(videoPath, explicitSubProvided);
+    this.updateFfmpegCommandPreview();
     void this.loadVideoMedia(videoPath);
   }
 
@@ -3986,6 +4385,7 @@ export class HardsubController {
     this.isPlayerFullscreen = false;
     if (container) {
       container.classList.remove('player-fullscreen');
+      container.style.cursor = '';
     }
     document.body?.classList.remove('hardsub-fullscreen-active');
 
@@ -4157,34 +4557,48 @@ export class HardsubController {
     }
   }
 
-  private async loadSubtitleFile(subPath: string) {
-    if (!subPath || this.disposed || this.isEncoding) return;
+  private loadSubtitleFile(subPath: string, allowDuringEncode = false): Promise<void> {
+    if (!subPath || this.disposed || (!allowDuringEncode && this.isEncoding)) {
+      return Promise.resolve();
+    }
+    const run = this.performLoadSubtitleFile(subPath, allowDuringEncode);
+    const entry = { path: subPath, promise: run };
+    this.pendingSubtitleLoad = entry;
+    return run.finally(() => {
+      if (this.pendingSubtitleLoad === entry) {
+        this.pendingSubtitleLoad = null;
+      }
+    });
+  }
+
+  private async performLoadSubtitleFile(subPath: string, allowDuringEncode: boolean): Promise<void> {
+    if (!subPath || this.disposed || (!allowDuringEncode && this.isEncoding)) return;
     this.isCompanionSubtitle = false;
     const serial = ++this.subtitleSerial;
     try {
       const content = await invoke<string>('read_text_file_content', { filePath: subPath });
-      if (this.disposed || this.isEncoding || serial !== this.subtitleSerial || this.state.subtitlePath !== subPath) return;
+      if (this.disposed || (!allowDuringEncode && this.isEncoding) || serial !== this.subtitleSerial || this.state.subtitlePath !== subPath) return;
       const lastDot = subPath.lastIndexOf('.');
       const ext = lastDot > 0 ? subPath.substring(lastDot + 1).toLowerCase() : 'srt';
       this.subtitleCues = parseSubtitleContent(content, ext);
       const allText = this.subtitleCues.map((c) => c.text).join(' ');
       if (hasArabicScript(allText) && !isArabicScriptFont(this.state.fontName)) {
         this.state.fontName = 'Vazirmatn';
-        if (this.fontSelect) {
-          this.fontSelect.value = 'Vazirmatn';
-        }
+        this.syncFontSelectUI();
       }
       await this.refreshFontRenderScale();
-      if (this.disposed || this.isEncoding || serial !== this.subtitleSerial || this.state.subtitlePath !== subPath) return;
+      if (this.disposed || (!allowDuringEncode && this.isEncoding) || serial !== this.subtitleSerial || this.state.subtitlePath !== subPath) return;
       this.maxCueDuration = this.subtitleCues.reduce((max, c) => Math.max(max, c.endMs - c.startMs), 0);
       this.isSubtitlesModified = false;
       this._lastRenderKey = '';
       this.updateSubDropzoneUI(subPath, this.subtitleCues.length);
       this.renderSubtitleCards();
+      this.updateFfmpegCommandPreview();
       this.updateVideoPreviewOverlayBounds();
       if (this.videoElement) {
         this.syncActiveSubtitleWithTime(this.videoElement.currentTime * 1000);
       }
+      this.updateLivePreview();
     } catch (e) {
       console.warn('Failed to read subtitle file content:', e);
       if (!this.disposed && serial === this.subtitleSerial && this.state.subtitlePath === subPath) {
@@ -4230,6 +4644,14 @@ export class HardsubController {
     }
 
     this.subtitleListContainer.innerHTML = '';
+
+    if (filtered.length === 0) {
+      const noMatchNotice = document.createElement('div');
+      noMatchNotice.className = 'hardsub-empty-search-notice';
+      noMatchNotice.textContent = t('hardsub.noMatchingCues');
+      this.subtitleListContainer.appendChild(noMatchNotice);
+      return;
+    }
 
     const frag = document.createDocumentFragment();
 
@@ -4516,6 +4938,9 @@ export class HardsubController {
       `${basePath}.ass`,
       `${basePath}.fa.srt`,
       `${basePath}.en.srt`,
+      `${basePath}.ssa`,
+      `${basePath}.sub`,
+      `${basePath}.lrc`,
     ];
 
     for (const candidatePath of candidatePaths) {
@@ -4525,29 +4950,40 @@ export class HardsubController {
           return false;
         }
         if (typeof content === 'string') {
+          const lastDot = candidatePath.lastIndexOf('.');
+          const ext = lastDot > 0 ? candidatePath.substring(lastDot + 1).toLowerCase() : 'srt';
+          const parsedCues = parseSubtitleContent(content, ext);
+          const allText = parsedCues.map((c) => c.text).join(' ');
+          const previousFontName = this.state.fontName;
+          const switchedFont = hasArabicScript(allText) && !isArabicScriptFont(this.state.fontName);
+          if (switchedFont) {
+            this.state.fontName = 'Vazirmatn';
+          }
+          await this.refreshFontRenderScale();
+          if (this.disposed || this.isEncoding || serial !== this.subtitleSerial || this.state.videoPath !== videoPath) {
+            if (switchedFont && serial === this.subtitleSerial) {
+              this.state.fontName = previousFontName;
+            }
+            return false;
+          }
           if (this.subtitlePathInput) this.subtitlePathInput.value = candidatePath;
           this.state.subtitlePath = candidatePath;
           this.isCompanionSubtitle = true;
-          const lastDot = candidatePath.lastIndexOf('.');
-          const ext = lastDot > 0 ? candidatePath.substring(lastDot + 1).toLowerCase() : 'srt';
-          this.subtitleCues = parseSubtitleContent(content, ext);
-          const allText = this.subtitleCues.map((c) => c.text).join(' ');
-          if (hasArabicScript(allText) && !isArabicScriptFont(this.state.fontName)) {
-            this.state.fontName = 'Vazirmatn';
-            if (this.fontSelect) {
-              this.fontSelect.value = 'Vazirmatn';
-            }
+          this.subtitleCues = parsedCues;
+          if (switchedFont) {
+            this.syncFontSelectUI();
           }
-          await this.refreshFontRenderScale();
           this.maxCueDuration = this.subtitleCues.reduce((max, c) => Math.max(max, c.endMs - c.startMs), 0);
           this.isSubtitlesModified = false;
           this._lastRenderKey = '';
           this.updateSubDropzoneUI(candidatePath, this.subtitleCues.length);
           this.renderSubtitleCards();
+          this.updateFfmpegCommandPreview();
           this.updateVideoPreviewOverlayBounds();
           if (this.videoElement) {
             this.syncActiveSubtitleWithTime(this.videoElement.currentTime * 1000);
           }
+          this.updateLivePreview();
           return true;
         }
       } catch {
@@ -4590,6 +5026,7 @@ export class HardsubController {
     }
     this.updateMediaAccordionSummary();
     this.updateResetAllButtonVisibility();
+    this.updateFfmpegCommandPreview();
   }
 
   public clearSubtitleState(): void {
@@ -4624,6 +5061,7 @@ export class HardsubController {
     }
     this.updateMediaAccordionSummary();
     this.updateResetAllButtonVisibility();
+    this.updateFfmpegCommandPreview();
   }
 
   public resetAllMedia(): void {
@@ -4657,22 +5095,40 @@ export class HardsubController {
     if (this.hexBgLabel) this.hexBgLabel.textContent = this.state.bgBoxColor;
   }
 
+  private syncStyleControls(force: boolean = false) {
+    const uiStateKey = `${this.state.fontSize}|${this.state.outlineSize}|${this.state.positionY}|${this.state.bgBox}|${this.state.primaryColor}|${this.state.outlineColor}|${this.state.bgBoxColor}|${this.state.bold}|${this.state.italic}`;
+    if (force || this._lastUIStateKey !== uiStateKey) {
+      this._lastUIStateKey = uiStateKey;
+      this.updateUIControlsState();
+      this.updateColorSwatches();
+    }
+  }
+
   private updateLivePreview() {
     this.updateVideoPreviewOverlayBounds();
-    this.updateColorSwatches();
+    this.syncStyleControls(true);
+
+    const allCuesText = this.subtitleCues.length > 0
+      ? this.subtitleCues.map((c) => c.text).join(' ')
+      : this.currentSubtitleText;
+    const effectiveFont = resolveEffectiveFont(this.state.fontName, allCuesText);
 
     // Ensure font is loaded before rendering on canvas
     const fontStyle = this.state.italic ? 'italic' : 'normal';
     const fontWeight = this.state.bold ? 'bold' : 'normal';
-    const fontSpec = `${fontStyle} ${fontWeight} 16px '${this.state.fontName}'`;
+    const fontSpec = `${fontStyle} ${fontWeight} 16px '${effectiveFont}'`;
     const generation = this.videoLoadGeneration;
     const candidate = this.candidateId;
-    document.fonts.load(fontSpec).then(() => {
-      if (!this.disposed && generation === this.videoLoadGeneration && candidate === this.candidateId) this.renderSubtitleOnCanvas(true);
-    }).catch(() => {
-      // Fallback: render with whatever font is available
-      if (!this.disposed && generation === this.videoLoadGeneration && candidate === this.candidateId) this.renderSubtitleOnCanvas(true);
-    });
+    if (typeof document !== 'undefined' && document.fonts?.load) {
+      document.fonts.load(fontSpec).then(() => {
+        if (!this.disposed && generation === this.videoLoadGeneration && candidate === this.candidateId) this.renderSubtitleOnCanvas(true);
+      }).catch(() => {
+        // Fallback: render with whatever font is available
+        if (!this.disposed && generation === this.videoLoadGeneration && candidate === this.candidateId) this.renderSubtitleOnCanvas(true);
+      });
+    } else {
+      this.renderSubtitleOnCanvas(true);
+    }
   }
 
   /**
@@ -4681,15 +5137,8 @@ export class HardsubController {
    * subtitles filter with original_size parameter.
    */
   private renderSubtitleOnCanvas(force: boolean = false) {
+    this.syncStyleControls(force);
     if (this.disposed || this.phase !== 'ready') return;
-
-    // Only update UI controls and color swatches when styling state actually changes or forced
-    const uiStateKey = `${this.state.fontSize}|${this.state.outlineSize}|${this.state.positionY}|${this.state.bgBox}|${this.state.primaryColor}|${this.state.outlineColor}|${this.state.bgBoxColor}|${this.state.bold}|${this.state.italic}`;
-    if (force || this._lastUIStateKey !== uiStateKey) {
-      this._lastUIStateKey = uiStateKey;
-      this.updateUIControlsState();
-      this.updateColorSwatches();
-    }
 
     const ctx = this.canvasCtx;
     const canvas = this.subtitleCanvas;
@@ -4704,7 +5153,7 @@ export class HardsubController {
     const renderKey = [
       this.currentSubtitleText,
       canvasW, canvasH,
-      uiStateKey,
+      this._lastUIStateKey,
       this.state.fontName, this.state.widthMargin, this.state.alignment,
       this.state.bold, this.state.italic, this.state.bgBoxOpacity, this.state.bgBoxRadius,
       this.fontMetrics.scale, this.fontMetrics.ascentRatio, this.fontMetrics.descentRatio,
@@ -4737,9 +5186,7 @@ export class HardsubController {
     const sideMarginPx = (canvasW - maxTextWidth) / 2;
 
     // --- Parse and Wrap spans ---
-    const parsedLines: { spans: TextSpan[]; alignmentOverride: number | null }[] = lines.map((line) =>
-      parseLineToSpans(line, this.state.primaryColor, this.state.bold, this.state.italic)
-    );
+    const parsedLines = parseCueLinesToSpans(lines, this.state.primaryColor, this.state.bold, this.state.italic);
 
     // alignmentOverride from any of the parsed lines (if present)
     let alignmentOverride: number | null = null;
@@ -5034,6 +5481,11 @@ export class HardsubController {
       if (!data.active || data.stage === 'cancelled') {
         this.isCancelling = false;
         if (data.stage === 'cancelled') {
+          this.lastStatusPayload = data;
+          (window as any).isHardsubRunning = false;
+          if (typeof (window as any).updateTaskbarProgress === 'function') {
+            (window as any).updateTaskbarProgress(0, false);
+          }
           if (this.progressFill) this.progressFill.style.width = '0%';
           if (this.progressPctText) this.progressPctText.textContent = '0%';
           if (this.progressStatusText) {
@@ -5135,9 +5587,7 @@ export class HardsubController {
         const lines = cue.text.split('\n');
 
         // Parse lines to spans
-        const parsedLines = lines.map((line) =>
-          parseLineToSpans(line, this.state.primaryColor, this.state.bold, this.state.italic)
-        );
+        const parsedLines = parseCueLinesToSpans(lines, this.state.primaryColor, this.state.bold, this.state.italic);
 
         // Find active alignment override for the cue
         let alignmentOverride: number | null = null;
@@ -5242,14 +5692,7 @@ export class HardsubController {
             const iTag = span.italic ? '\\i1' : '\\i0';
             const uTag = span.underline ? '\\u1' : '\\u0';
 
-            const cleanColor = span.color.replace('#', '');
-            let assColor = 'FFFFFF';
-            if (cleanColor.length === 6) {
-              const r = cleanColor.substring(0, 2);
-              const g = cleanColor.substring(2, 4);
-              const b = cleanColor.substring(4, 6);
-              assColor = `${b}${g}${r}`;
-            }
+            const assColor = normalizeColorToAssBgr(span.color);
             const cTag = `\\c&H${assColor}&`;
 
             const spanDirection = firstStrongDirection(span.text) ?? lineDirection;
@@ -5315,53 +5758,98 @@ ${events}`;
 
     const originalSubPath = this.state.subtitlePath;
     let exportSubtitlePath = originalSubPath;
+    const aborted = () => !current() || this.isCancelling;
+    const handlePreEncodeCancel = () => {
+      this.lastStatusPayload = {
+        progress: 0,
+        message: t('hardsub.statusEncodingCancelled'),
+        active: false,
+        stage: 'cancelled',
+      };
+      (window as any).isHardsubRunning = false;
+      if (typeof (window as any).updateTaskbarProgress === 'function') {
+        (window as any).updateTaskbarProgress(0, false);
+      }
+      if ((window as any).showNotification) {
+        (window as any).showNotification(t('hardsub.statusEncodingCancelled'), 'info');
+      }
+      if (this.progressFill) this.progressFill.style.width = '0%';
+      if (this.progressPctText) this.progressPctText.textContent = '0%';
+      if (this.progressStatusText) {
+        this.progressStatusText.textContent = t('transcribe.standingBy');
+      }
+    };
+    this.lastFailedErrorText = null;
+    let completedSuccessfully = false;
     this.updateEncodingUIState(true);
     try {
       await this.refreshFontRenderScale();
-      if (!current()) return;
+      if (aborted()) {
+        if (this.isCancelling) handlePreEncodeCancel();
+        return;
+      }
       if (!this.sourceInfo) {
         try {
           const source = await invoke<SourceInfo>('probe_hardsub_source', { sourcePath: originalVideoPath });
-          if (!current()) return;
+          if (aborted()) {
+            if (this.isCancelling) handlePreEncodeCancel();
+            return;
+          }
           this.sourceInfo = source;
         } catch (error) {
-          if (!current()) return;
+          if (aborted()) {
+            if (this.isCancelling) handlePreEncodeCancel();
+            return;
+          }
           if (!this.directSourceGeometry) throw error;
         }
       }
 
-    if (this.subtitleCues.length === 0 && originalSubPath) {
-      await this.loadSubtitleFile(originalSubPath);
-      if (!current()) return;
-    }
-
-    if (this.isSubtitlesModified && this.subtitleCues.length > 0) {
-      const subExt = (originalSubPath.split('.').pop() || '').toLowerCase();
-      if (subExt === 'srt' || subExt === 'vtt') {
-        try {
-          const updatedContent = subExt === 'vtt'
-            ? convertCuesToVtt(this.subtitleCues)
-            : convertCuesToSrt(this.subtitleCues);
-          await invoke('write_text_file_content', {
-            filePath: originalSubPath,
-            content: updatedContent,
-          });
-          this.isSubtitlesModified = false;
-          if (!current()) return;
-          console.log('Saved modified subtitle content to disk');
-        } catch (e) {
-          console.warn('Failed to save edited subtitles to disk:', e);
+      if (this.pendingSubtitleLoad && this.pendingSubtitleLoad.path === originalSubPath) {
+        await this.pendingSubtitleLoad.promise;
+        if (aborted()) {
+          if (this.isCancelling) handlePreEncodeCancel();
+          return;
         }
-      } else {
-        // For .ass/.ssa files, avoid overwriting native script styles with SRT;
-        // edited cues are burned directly via the generated .temp.ass script below.
-        this.isSubtitlesModified = false;
       }
-    }
+      if (this.subtitleCues.length === 0 && originalSubPath) {
+        await this.loadSubtitleFile(originalSubPath, true);
+        if (aborted()) {
+          if (this.isCancelling) handlePreEncodeCancel();
+          return;
+        }
+      }
 
-    if (!this.state.outputPath) {
-      this.autoSuggestSubtitleAndOutput(originalVideoPath, true);
-    }
+      if (this.isSubtitlesModified && this.subtitleCues.length > 0) {
+        const subExt = (originalSubPath.split('.').pop() || '').toLowerCase();
+        if (subExt === 'srt' || subExt === 'vtt') {
+          try {
+            const updatedContent = subExt === 'vtt'
+              ? convertCuesToVtt(this.subtitleCues)
+              : convertCuesToSrt(this.subtitleCues);
+            await invoke('write_text_file_content', {
+              filePath: originalSubPath,
+              content: updatedContent,
+            });
+            this.isSubtitlesModified = false;
+            if (aborted()) {
+              if (this.isCancelling) handlePreEncodeCancel();
+              return;
+            }
+            console.log('Saved modified subtitle content to disk');
+          } catch (e) {
+            console.warn('Failed to save edited subtitles to disk:', e);
+          }
+        } else {
+          // For .ass/.ssa files, avoid overwriting native script styles with SRT;
+          // edited cues are burned directly via the generated .temp.ass script below.
+          this.isSubtitlesModified = false;
+        }
+      }
+
+      if (!this.state.outputPath) {
+        this.autoSuggestSubtitleAndOutput(originalVideoPath, true);
+      }
 
       // Ensure all export settings dropdown values and slider values are synced with state
       if (this.codecSelect?.value) {
@@ -5445,7 +5933,10 @@ ${events}`;
               throw writeErr;
             }
           }
-          if (!current()) return;
+          if (aborted()) {
+            if (this.isCancelling) handlePreEncodeCancel();
+            return;
+          }
 
           console.log('Generated temporary ASS subtitle file with styled vector boxes');
           exportSubtitlePath = writtenTempAssPath;
@@ -5454,9 +5945,15 @@ ${events}`;
         }
       }
 
+      if (aborted()) {
+        if (this.isCancelling) handlePreEncodeCancel();
+        return;
+      }
+
       const result = await invoke<{ outputPath: string; durationMs: number; outputSizeMb: number }>('start_hardsub_task', {
         settings: { ...this.state, videoPath: originalVideoPath, subtitlePath: exportSubtitlePath },
       });
+      completedSuccessfully = true;
       if (result?.outputPath) {
         this.lastExportedPath = result.outputPath;
       }
@@ -5479,6 +5976,13 @@ ${events}`;
       const msg = String(e || '');
       if (msg.includes('cancelled') || msg.includes('Cancelled')) {
         console.log('Hardsub task cancelled by user');
+        this.lastFailedErrorText = null;
+        this.lastStatusPayload = {
+          progress: 0,
+          message: t('hardsub.statusEncodingCancelled'),
+          active: false,
+          stage: 'cancelled',
+        };
         if ((window as any).showNotification) {
           (window as any).showNotification(t('hardsub.statusEncodingCancelled'), 'info');
         }
@@ -5489,17 +5993,30 @@ ${events}`;
         }
       } else {
         const errorText = this.formatHardsubErrorMessage(e);
+        this.lastFailedErrorText = errorText;
+        this.lastStatusPayload = {
+          progress: 0,
+          message: errorText,
+          active: false,
+          stage: 'failed',
+        };
         if ((window as any).showNotification) {
           (window as any).showNotification(t('hardsub.encodingFailed', { error: errorText }), "error");
         } else {
           alert(t('hardsub.encodingFailed', { error: errorText }));
         }
+        if (this.progressFill) this.progressFill.style.width = '0%';
+        if (this.progressPctText) this.progressPctText.textContent = '0%';
         if (this.progressStatusText) {
           this.progressStatusText.textContent = t('hardsub.statusEncodingError', { error: errorText });
         }
       }
     } finally {
       this.isCancelling = false;
+      (window as any).isHardsubRunning = false;
+      if (!completedSuccessfully && typeof (window as any).updateTaskbarProgress === 'function') {
+        (window as any).updateTaskbarProgress(0, false);
+      }
       this.updateEncodingUIState(false);
     }
   }

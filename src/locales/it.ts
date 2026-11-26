@@ -627,7 +627,19 @@ export const it: Translations = {
     presetHigh: 'Alta Qualità',
     presetHighSub: 'Dettagli Nitidi',
     presetUltra: 'Ultra / Master',
-    presetUltraSub: 'Massima Fedeltà'
+    presetUltraSub: 'Massima Fedeltà',
+    bundledFontsGroup: '— Font inclusi —',
+    systemFontsGroup: '— Font di sistema —',
+    noMatchingCues: 'Nessuna riga di sottotitoli corrispondente trovata.',
+    resetStyle: 'Ripristina stile',
+    bold: 'Grassetto',
+    italic: 'Corsivo',
+    toggleBold: 'Attiva/disattiva grassetto',
+    toggleItalic: 'Attiva/disattiva corsivo',
+    resetFontSize: 'Ripristina dimensione font a 14px',
+    resetOutline: 'Ripristina spessore contorno a 2px',
+    resetPosY: 'Ripristina posizione verticale a 30px',
+    containerCodecAdjusted: 'Codec/audio incompatibile adattato per il contenitore {format}.'
   },
   models: {
     title: 'Centro Modelli',

@@ -627,7 +627,19 @@ export const ja: Translations = {
     presetHigh: '高品質',
     presetHighSub: '鮮明でクリアなディテール',
     presetUltra: 'マスター / 最高品質',
-    presetUltraSub: '最高峰の忠実度'
+    presetUltraSub: '最高峰の忠実度',
+    bundledFontsGroup: '— 同梱フォント —',
+    systemFontsGroup: '— システムフォント —',
+    noMatchingCues: '一致する字幕キューが見つかりません。',
+    resetStyle: 'スタイルをリセット',
+    bold: '太字',
+    italic: '斜体',
+    toggleBold: '太字を切り替え',
+    toggleItalic: '斜体を切り替え',
+    resetFontSize: 'フォントサイズを14pxにリセット',
+    resetOutline: '輪郭の太さを2pxにリセット',
+    resetPosY: '垂直マージンを30pxにリセット',
+    containerCodecAdjusted: '{format} コンテナに合わせて非互換のコーデック/音声設定を調整しました。'
   },
   models: {
     title: 'モデルハブ',

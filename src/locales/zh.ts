@@ -627,7 +627,19 @@ export const zh: Translations = {
     presetHigh: '超清典藏',
     presetHighSub: '细节锐利 / 原画品质',
     presetUltra: '大师级无损',
-    presetUltraSub: '母带级保真 / 极高码率'
+    presetUltraSub: '母带级保真 / 极高码率',
+    bundledFontsGroup: '— 内置字体 —',
+    systemFontsGroup: '— 系统字体 —',
+    noMatchingCues: '未找到匹配的字幕条目。',
+    resetStyle: '重置样式',
+    bold: '粗体',
+    italic: '斜体',
+    toggleBold: '切换粗体',
+    toggleItalic: '切换斜体',
+    resetFontSize: '将字体大小重置为 14px',
+    resetOutline: '将描边大小重置为 2px',
+    resetPosY: '将垂直边距重置为 30px',
+    containerCodecAdjusted: '已为 {format} 容器自动调整不兼容的视频/音频编码设置。'
   },
   models: {
     title: '模型管理中心',

@@ -627,7 +627,19 @@ export const pt: Translations = {
     presetHigh: 'Alta Qualidade',
     presetHighSub: 'Detalhes Nítidos',
     presetUltra: 'Ultra / Master',
-    presetUltraSub: 'Máxima Fidelidade'
+    presetUltraSub: 'Máxima Fidelidade',
+    bundledFontsGroup: '— Fontes integradas —',
+    systemFontsGroup: '— Fontes do sistema —',
+    noMatchingCues: 'Nenhuma linha de legenda correspondente encontrada.',
+    resetStyle: 'Redefinir estilo',
+    bold: 'Negrito',
+    italic: 'Itálico',
+    toggleBold: 'Alternar negrito',
+    toggleItalic: 'Alternar itálico',
+    resetFontSize: 'Redefinir tamanho da fonte para 14px',
+    resetOutline: 'Redefinir espessura do contorno para 2px',
+    resetPosY: 'Redefinir margem vertical para 30px',
+    containerCodecAdjusted: 'Configurações de codec/áudio incompatíveis ajustadas para o contêiner {format}.'
   },
   models: {
     title: 'Central de Modelos',
