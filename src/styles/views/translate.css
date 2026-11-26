@@ -569,7 +569,8 @@
   color: #10b981;
 }
 
-.translate-status-badge.cancelled {
+.translate-status-badge.cancelled,
+.translate-status-badge.failed {
   background: rgba(239, 68, 68, 0.2);
   color: #ef4444;
 }
@@ -955,6 +956,12 @@
 @media (max-width: 640px) {
   .translate-preview-grid {
     grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .translate-preview-grid.view-source-only,
+  .translate-preview-grid.view-target-only {
+    grid-template-rows: minmax(0, 1fr);
   }
 }
 
@@ -968,6 +975,12 @@
 @media (min-width: 1025px) and (max-width: 1300px) {
   .translate-preview-grid {
     grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .translate-preview-grid.view-source-only,
+  .translate-preview-grid.view-target-only {
+    grid-template-rows: minmax(0, 1fr);
   }
 }
 

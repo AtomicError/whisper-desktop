@@ -411,7 +411,7 @@ export function setupTauriListeners(): void {
       delete msgEl.dataset.batchSummarySuccess;
       delete msgEl.dataset.batchSummaryTotal;
       delete msgEl.dataset.batchSummarySkipped;
-      if (msg.includes('Translating with AI') || msg.includes('Translating AI:')) {
+      if (msg.includes('Translating with AI') || msg.includes('Translating AI:') || msg.includes('Resuming translation')) {
         msgEl.setAttribute('data-i18n', 'transcribe.aiTranslating');
         msgEl.textContent = t('transcribe.aiTranslating');
       } else if (msg.includes('AI translation complete')) {
@@ -420,6 +420,9 @@ export function setupTauriListeners(): void {
       } else if (msg.includes('Translation cancelled')) {
         msgEl.setAttribute('data-i18n', 'translate.statusCancelled');
         msgEl.textContent = t('translate.statusCancelled');
+      } else if (msg.includes('Translation failed')) {
+        msgEl.setAttribute('data-i18n', 'translate.statusFailed');
+        msgEl.textContent = t('translate.statusFailed');
       } else {
         msgEl.removeAttribute('data-i18n');
         msgEl.textContent = isolateDirection(payload.message);

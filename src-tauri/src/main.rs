@@ -432,14 +432,35 @@ async fn select_file(app: AppHandle) -> Option<String> {
 }
 
 #[tauri::command]
-async fn select_subtitle_file(app: AppHandle) -> Option<String> {
-    let sub_variants = get_filter_variants(SUBTITLE_EXTENSIONS);
+async fn select_subtitle_file(app: AppHandle, extensions: Option<Vec<String>>) -> Option<String> {
+    let custom_exts: Vec<String> = extensions
+        .unwrap_or_default()
+        .into_iter()
+        .map(|s| s.trim().trim_start_matches('.').to_ascii_lowercase())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    let (filter_label, sub_variants) = if custom_exts.is_empty() {
+        (
+            "Subtitle Files (*.srt, *.vtt, *.ass, ...)".to_string(),
+            get_filter_variants(SUBTITLE_EXTENSIONS),
+        )
+    } else {
+        let mut variants = Vec::with_capacity(custom_exts.len() * 2);
+        let mut labels = Vec::with_capacity(custom_exts.len());
+        for ext in &custom_exts {
+            variants.push(ext.to_lowercase());
+            variants.push(ext.to_uppercase());
+            labels.push(format!("*.{}", ext));
+        }
+        (format!("Subtitle Files ({})", labels.join(", ")), variants)
+    };
     let sub_refs: Vec<&str> = sub_variants.iter().map(|s| s.as_str()).collect();
 
     let (tx, rx) = tokio::sync::oneshot::channel();
     app.dialog()
         .file()
-        .add_filter("Subtitle Files (*.srt, *.vtt, *.ass, ...)", &sub_refs)
+        .add_filter(&filter_label, &sub_refs)
         .add_filter("All Files (*)", &["*"])
         .pick_file(move |file| {
             let _ = tx.send(file);

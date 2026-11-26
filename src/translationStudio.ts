@@ -5,6 +5,8 @@ import {
   directionAttributes,
   applyContentDirection,
   clearContentDirection,
+  getLanguage,
+  formatLocalizedNumber,
 } from './i18n/index';
 import { hardsubController } from './hardsub';
 
@@ -114,9 +116,16 @@ function joinPath(dir: string, file: string): string {
   return `${dir}${sep}${file}`;
 }
 
-function parseTimeToMs(timeStr: string): number {
+function parseTimeToMs(timeStr: string, isLrc = false): number {
   if (!timeStr) return 0;
-  const clean = timeStr.trim().replace(',', '.');
+  let clean = timeStr.trim().replace(',', '.');
+  if (isLrc) {
+    // LRC supports [mm:ss:cc] (two colons) as well as [mm:ss.cc]
+    const partsColon = clean.split(':');
+    if (partsColon.length === 3 && !clean.includes('.')) {
+      clean = `${partsColon[0]}:${partsColon[1]}.${partsColon[2]}`;
+    }
+  }
   const parts = clean.split(':');
   if (parts.length === 3) {
     const hours = parseFloat(parts[0]) || 0;
@@ -129,6 +138,18 @@ function parseTimeToMs(timeStr: string): number {
     return Math.round((minutes * 60 + seconds) * 1000);
   }
   return 0;
+}
+
+const SEPARATORS_ONLY_RE = /^[-=*_~#/]+$/;
+const MUSIC_ONLY_RE = /^[♪♫♩♬\s]+$/;
+const HAS_ALNUM_RE = /[\p{L}\p{N}]/u;
+
+function isTranslatableLineText(text: string): boolean {
+  const trimmed = (text || '').trim();
+  if (!trimmed) return false;
+  if (SEPARATORS_ONLY_RE.test(trimmed)) return false;
+  if (MUSIC_ONLY_RE.test(trimmed)) return false;
+  return HAS_ALNUM_RE.test(trimmed);
 }
 
 export function parseSubtitleContent(content: string, ext: string): SubtitleCue[] {
@@ -147,13 +168,21 @@ export function parseSubtitleContent(content: string, ext: string): SubtitleCue[
   if (extLower === 'lrc') {
     const lines = normalized.split('\n');
     let cueId = 1;
-    const lrcRegex = /\[(\d{1,2}:\d{2}(?:\.\d{1,3})?)\](.*)/;
+    const lrcTsRe = /^\[(\d{1,3}:\d{2}(?:[.:]\d{2,3})?)\]/;
     for (let i = 0; i < lines.length; i++) {
-      const match = lines[i].match(lrcRegex);
-      if (match) {
-        const timeStr = match[1];
-        const text = match[2].trim();
-        const startMs = parseTimeToMs(timeStr);
+      let rest = lines[i];
+      const timestamps: string[] = [];
+      let m = rest.match(lrcTsRe);
+      while (m) {
+        timestamps.push(m[1]);
+        rest = rest.slice(m[0].length);
+        m = rest.match(lrcTsRe);
+      }
+      if (timestamps.length > 0) {
+        const text = rest.trim();
+        if (!isTranslatableLineText(text)) continue;
+        const timeStr = timestamps[0];
+        const startMs = parseTimeToMs(timeStr, true);
         cues.push({
           id: cueId++,
           startMs,
@@ -169,7 +198,7 @@ export function parseSubtitleContent(content: string, ext: string): SubtitleCue[
     let cueId = 1;
     for (const line of lines) {
       const trimmed = line.trim();
-      if (trimmed) {
+      if (isTranslatableLineText(trimmed)) {
         cues.push({
           id: cueId++,
           startMs: 0,
@@ -206,8 +235,8 @@ export function parseSubtitleContent(content: string, ext: string): SubtitleCue[
       if (line.includes('-->')) {
         const times = line.split('-->');
         if (times.length === 2) {
-          const startStr = times[0].trim().split(' ')[0];
-          const endStr = times[1].trim().split(' ')[0];
+          const startStr = times[0].trim().split(/\s+/)[0];
+          const endStr = times[1].trim().split(/\s+/)[0];
           const currentCueNum = lastPotentialCueNum;
           lastPotentialCueNum = '';
 
@@ -309,7 +338,15 @@ export class TranslationStudioController {
   private syncScrollRaf: number | null = null;
   private subtitleLoadId = 0;
   private isBrowsingSubtitle = false;
+  private isBrowsingOutputDir = false;
   private isStartingTranslation = false;
+  private statusBadgeKey = 'translate.statusReady';
+  private statusBadgeModifier = '';
+  private lastProgressPayload: any = null;
+  private lastProgressIsComplete = false;
+  private lastProgressIsCancelled = false;
+  private lastProgressIsFailed = false;
+  private lastUntranslatedCount = 0;
   private unlisteners: Array<() => void> = [];
 
   public state: TranslationStudioState = {
@@ -487,6 +524,9 @@ export class TranslationStudioController {
           win.settingsState.translateAiPolish = this.state.polishPass;
           const globalPolish = document.getElementById('opt-translateAiPolish') as HTMLInputElement;
           if (globalPolish) globalPolish.checked = this.state.polishPass;
+          if (typeof win.markSettingsDirty === 'function') {
+            win.markSettingsDirty();
+          }
           if (typeof win.saveCurrentSettings === 'function') {
             setTimeout(() => {
               win.saveCurrentSettings();
@@ -893,13 +933,25 @@ export class TranslationStudioController {
       });
     };
 
-    this.sourceList.addEventListener('wheel', () => { this.activeScrollDriver = this.sourceList; }, { passive: true });
-    this.sourceList.addEventListener('pointerdown', () => { this.activeScrollDriver = this.sourceList; }, { passive: true });
+    const onSourcePointer = () => { this.activeScrollDriver = this.sourceList; };
+    const onTargetPointer = () => { this.activeScrollDriver = this.targetList; };
+
+    this.sourceList.addEventListener('wheel', onSourcePointer, { passive: true });
+    this.sourceList.addEventListener('pointerdown', onSourcePointer, { passive: true });
     this.sourceList.addEventListener('scroll', onSourceScroll, { passive: true });
 
-    this.targetList.addEventListener('wheel', () => { this.activeScrollDriver = this.targetList; }, { passive: true });
-    this.targetList.addEventListener('pointerdown', () => { this.activeScrollDriver = this.targetList; }, { passive: true });
+    this.targetList.addEventListener('wheel', onTargetPointer, { passive: true });
+    this.targetList.addEventListener('pointerdown', onTargetPointer, { passive: true });
     this.targetList.addEventListener('scroll', onTargetScroll, { passive: true });
+
+    this.unlisteners.push(() => {
+      this.sourceList?.removeEventListener('wheel', onSourcePointer);
+      this.sourceList?.removeEventListener('pointerdown', onSourcePointer);
+      this.sourceList?.removeEventListener('scroll', onSourceScroll);
+      this.targetList?.removeEventListener('wheel', onTargetPointer);
+      this.targetList?.removeEventListener('pointerdown', onTargetPointer);
+      this.targetList?.removeEventListener('scroll', onTargetScroll);
+    });
   }
 
   private setupDropZone() {
@@ -908,6 +960,7 @@ export class TranslationStudioController {
     const highlight = (e: DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
+      if (this.state.isTranslating || this.isStartingTranslation) return;
       this.dropZone?.classList.add('drag-over');
     };
 
@@ -922,7 +975,7 @@ export class TranslationStudioController {
     this.dropZone.addEventListener('dragleave', unhighlight);
     this.dropZone.addEventListener('drop', async (e: DragEvent) => {
       unhighlight(e);
-      if (this.state.isTranslating) return;
+      if (this.state.isTranslating || this.isStartingTranslation) return;
 
       const files = e.dataTransfer?.files;
       if (files && files.length > 0) {
@@ -933,6 +986,7 @@ export class TranslationStudioController {
     });
 
     listen<any>('tauri://drag-drop', async (event: any) => {
+      if (this.state.isTranslating || this.isStartingTranslation) return;
       const paths = event.payload?.paths;
       if (Array.isArray(paths) && paths.length > 0) {
         const path = paths[0];
@@ -953,7 +1007,9 @@ export class TranslationStudioController {
     if (this.isBrowsingSubtitle || this.state.isTranslating || this.isStartingTranslation) return;
     this.isBrowsingSubtitle = true;
     try {
-      const selectedPath = await invoke<string | null>('select_subtitle_file');
+      const selectedPath = await invoke<string | null>('select_subtitle_file', {
+        extensions: [...SUPPORTED_TRANSLATION_EXTENSIONS],
+      });
       if (selectedPath) {
         await this.loadSubtitleFile(selectedPath);
       }
@@ -966,7 +1022,7 @@ export class TranslationStudioController {
   }
 
   public async loadSubtitleFile(filePath: string) {
-    if (!filePath) return;
+    if (!filePath || this.state.isTranslating || this.isStartingTranslation) return;
 
     const lastSlash = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
     const fileName = lastSlash >= 0 ? filePath.substring(lastSlash + 1) : filePath;
@@ -1003,11 +1059,12 @@ export class TranslationStudioController {
       if (this.progressFill) this.progressFill.style.width = '0%';
       if (this.lblPct) this.lblPct.textContent = '0%';
       if (this.lblLines) this.lblLines.style.display = 'none';
-      if (this.lblMsg) this.lblMsg.textContent = '';
-      if (this.statusBadge) {
-        this.statusBadge.textContent = t('translate.statusReady');
-        this.statusBadge.className = 'translate-status-badge';
+      if (this.lblMsg) {
+        this.lblMsg.removeAttribute?.('data-i18n');
+        this.lblMsg.textContent = '';
       }
+      this.clearProgressMeta();
+      this.setStatusBadge('translate.statusReady', '');
 
       this.updateSubtitleInfoUI();
       this.renderSourceCues();
@@ -1045,11 +1102,12 @@ export class TranslationStudioController {
     if (this.progressFill) this.progressFill.style.width = '0%';
     if (this.lblPct) this.lblPct.textContent = '0%';
     if (this.lblLines) this.lblLines.style.display = 'none';
-    if (this.lblMsg) this.lblMsg.textContent = '';
-    if (this.statusBadge) {
-      this.statusBadge.textContent = t('translate.statusReady');
-      this.statusBadge.className = 'translate-status-badge';
+    if (this.lblMsg) {
+      this.lblMsg.removeAttribute?.('data-i18n');
+      this.lblMsg.textContent = '';
     }
+    this.clearProgressMeta();
+    this.setStatusBadge('translate.statusReady', '');
 
     this.updateSubtitleInfoUI();
     this.renderSourceCues();
@@ -1228,14 +1286,18 @@ export class TranslationStudioController {
   }
 
   public async browseOutputDir() {
+    if (this.isBrowsingOutputDir || this.state.isTranslating || this.isStartingTranslation) return;
+    this.isBrowsingOutputDir = true;
     try {
       const selected = await invoke<string | null>('select_directory');
-      if (selected) {
+      if (selected && !this.state.isTranslating && !this.isStartingTranslation) {
         this.state.outputDir = selected;
         this.updateOutputDirUI();
       }
     } catch (err) {
       console.error('Failed to select directory:', err);
+    } finally {
+      this.isBrowsingOutputDir = false;
     }
   }
 
@@ -1282,6 +1344,8 @@ export class TranslationStudioController {
       opt.value = '';
       opt.textContent = t('translate.noModelError');
       this.providerSelect.appendChild(opt);
+      this.state.activeProvider = '';
+      this.providerSelect.value = '';
       this.refreshModelOptions();
       return;
     }
@@ -1293,15 +1357,13 @@ export class TranslationStudioController {
       this.providerSelect?.appendChild(opt);
     });
 
-    const activeName = settings.translateAiProvider || (providers[0] ? providers[0].name : '');
+    const configured = settings.translateAiProvider;
+    const hasConfigured = Boolean(configured && providers.some(p => p.name === configured));
+    const activeName = hasConfigured ? configured : (providers[0] ? providers[0].name : '');
     this.state.activeProvider = activeName;
     this.providerSelect.value = activeName;
 
     this.refreshModelOptions();
-
-    if (typeof win.syncCustomSelects === 'function') {
-      win.syncCustomSelects();
-    }
   }
 
   public refreshModelOptions() {
@@ -1326,7 +1388,11 @@ export class TranslationStudioController {
       opt.textContent = t('translate.noModelError');
       this.modelSelect.appendChild(opt);
       this.state.activeModel = '';
+      this.modelSelect.value = '';
       this.updateActionButtons();
+      if (typeof win.syncCustomSelects === 'function') {
+        win.syncCustomSelects();
+      }
       return;
     }
 
@@ -1337,7 +1403,11 @@ export class TranslationStudioController {
       opt.textContent = t('translate.noModelError');
       this.modelSelect.appendChild(opt);
       this.state.activeModel = '';
+      this.modelSelect.value = '';
       this.updateActionButtons();
+      if (typeof win.syncCustomSelects === 'function') {
+        win.syncCustomSelects();
+      }
       return;
     }
 
@@ -1357,6 +1427,46 @@ export class TranslationStudioController {
     if (typeof win.syncCustomSelects === 'function') {
       win.syncCustomSelects();
     }
+  }
+
+  private clearProgressMeta() {
+    this.lastProgressPayload = null;
+    this.lastProgressIsComplete = false;
+    this.lastProgressIsCancelled = false;
+    this.lastProgressIsFailed = false;
+    this.lastUntranslatedCount = 0;
+  }
+
+  private setStatusBadge(key: string, modifier: '' | 'active' | 'complete' | 'cancelled' | 'failed' = '') {
+    this.statusBadgeKey = key;
+    this.statusBadgeModifier = modifier;
+    if (!this.statusBadge) return;
+    this.statusBadge.setAttribute?.('data-i18n', key);
+    this.statusBadge.textContent = t(key);
+    this.statusBadge.className = modifier ? `translate-status-badge ${modifier}` : 'translate-status-badge';
+  }
+
+  private restoreStatusBadge() {
+    this.setStatusBadge(
+      this.statusBadgeKey || 'translate.statusReady',
+      (this.statusBadgeModifier || '') as '' | 'active' | 'complete' | 'cancelled' | 'failed'
+    );
+  }
+
+  private formatDurationBadge(durSec: number): string {
+    if (durSec <= 0) return '';
+    const localizedSec = formatLocalizedNumber(durSec, getLanguage(), 0);
+    const label = t('transcribe.durationSeconds', { seconds: localizedSec });
+    return (!label || label === 'transcribe.durationSeconds') ? `${localizedSec}s` : label;
+  }
+
+  private formatCueAriaLabel(id: number, translated: boolean): string {
+    const key = translated ? 'translate.translatedCueAriaLabel' : 'translate.cueAriaLabel';
+    const label = t(key, { id: String(id) });
+    if (!label || label === key) {
+      return translated ? `Translated cue #${id}` : `Cue #${id}`;
+    }
+    return label;
   }
 
   private renderSourceCues() {
@@ -1387,13 +1497,14 @@ export class TranslationStudioController {
     // content afterwards the way an editable field is).
     const html = this.state.sourceCues.map(cue => {
       const durSec = cue.endMs > cue.startMs ? Math.max(0, Math.round((cue.endMs - cue.startMs) / 1000)) : 0;
-      const durLabel = durSec > 0 ? `${durSec}s` : '';
+      const durLabel = this.formatDurationBadge(durSec);
+      const cueAriaLabel = this.formatCueAriaLabel(cue.id, false);
       return `
-      <div class="translate-cue-item" data-id="${cue.id}" id="translate-source-cue-${cue.id}" role="listitem" tabindex="0" aria-label="Cue #${cue.id}">
+      <div class="translate-cue-item" data-id="${cue.id}" id="translate-source-cue-${cue.id}" role="listitem" tabindex="0" aria-label="${escapeHTML(cueAriaLabel)}">
         <div class="translate-cue-header">
           <div class="translate-cue-badge-wrap">
             <span class="translate-cue-num">#${cue.id}</span>
-            ${durLabel ? `<span class="translate-cue-dur">${durLabel}</span>` : ''}
+            ${durLabel ? `<span class="translate-cue-dur">${escapeHTML(durLabel)}</span>` : ''}
           </div>
           ${cue.startTimeStr ? `<span class="translate-cue-time" dir="ltr">${escapeHTML(cue.startTimeStr)}${cue.endTimeStr ? ` ➔ ${escapeHTML(cue.endTimeStr)}` : ''}</span>` : ''}
         </div>
@@ -1429,13 +1540,14 @@ export class TranslationStudioController {
 
     const html = this.state.translatedCues.map(cue => {
       const durSec = cue.endMs > cue.startMs ? Math.max(0, Math.round((cue.endMs - cue.startMs) / 1000)) : 0;
-      const durLabel = durSec > 0 ? `${durSec}s` : '';
+      const durLabel = this.formatDurationBadge(durSec);
+      const cueAriaLabel = this.formatCueAriaLabel(cue.id, true);
       return `
-      <div class="translate-cue-item translate-cue-translated" data-id="${cue.id}" id="translate-target-cue-${cue.id}" role="listitem" tabindex="0" aria-label="Translated cue #${cue.id}">
+      <div class="translate-cue-item translate-cue-translated" data-id="${cue.id}" id="translate-target-cue-${cue.id}" role="listitem" tabindex="0" aria-label="${escapeHTML(cueAriaLabel)}">
         <div class="translate-cue-header">
           <div class="translate-cue-badge-wrap">
             <span class="translate-cue-num">#${cue.id}</span>
-            ${durLabel ? `<span class="translate-cue-dur">${durLabel}</span>` : ''}
+            ${durLabel ? `<span class="translate-cue-dur">${escapeHTML(durLabel)}</span>` : ''}
           </div>
           ${cue.startTimeStr ? `<span class="translate-cue-time" dir="ltr">${escapeHTML(cue.startTimeStr)}${cue.endTimeStr ? ` ➔ ${escapeHTML(cue.endTimeStr)}` : ''}</span>` : ''}
         </div>
@@ -1468,14 +1580,24 @@ export class TranslationStudioController {
       }
     }
     if (this.btnStartText) {
-      this.btnStartText.textContent = isTranslating ? t('translate.translating') : t('translate.startTranslate');
+      const startKey = isTranslating ? 'translate.translating' : 'translate.startTranslate';
+      this.btnStartText.setAttribute?.('data-i18n', startKey);
+      this.btnStartText.textContent = t(startKey);
     }
+    if (this.btnBrowseSub) this.btnBrowseSub.disabled = isTranslating;
+    if (this.btnClearSub) this.btnClearSub.disabled = isTranslating;
+    if (this.btnBrowseDir) this.btnBrowseDir.disabled = isTranslating;
+    if (this.btnResetDir) this.btnResetDir.disabled = isTranslating;
+    if (this.targetLangSelect) this.targetLangSelect.disabled = isTranslating;
+    if (this.providerSelect) this.providerSelect.disabled = isTranslating;
+    if (this.modelSelect) this.modelSelect.disabled = isTranslating;
+    if (this.polishToggle) this.polishToggle.disabled = isTranslating;
     if (this.btnCancel) {
       this.btnCancel.style.display = isTranslating ? 'inline-flex' : 'none';
       this.btnCancel.disabled = false;
     }
     if (this.telemetryBox) {
-      this.telemetryBox.style.display = (isTranslating || this.state.progress > 0) ? 'block' : 'none';
+      this.telemetryBox.style.display = (isTranslating || this.state.progress > 0 || this.lastProgressIsComplete || this.lastProgressIsCancelled || this.lastProgressIsFailed) ? 'block' : 'none';
     }
 
     const hasTranslation = !this.state.isTranslating && !!this.state.translatedPath && this.state.translatedCues.length > 0;
@@ -1516,17 +1638,31 @@ export class TranslationStudioController {
 
       const pct = Math.min(100, Math.max(0, Math.round(progressVal * 100)));
 
+      const rawMsg = typeof payload.message === 'string' ? payload.message : '';
       // When translation is complete or progress reached 100%, line counter should display full completion (e.g. 12 / 12)
-      const isCancelled = payload.message === 'Translation cancelled';
-      const isComplete = !isCancelled && (payload.message === 'AI translation complete' || (!payload.active && (progressVal >= 1.0 || pct >= 100)));
+      const isCancelled = rawMsg === 'Translation cancelled';
+      const isFailed = rawMsg === 'Translation failed';
+      const isComplete = !isCancelled && !isFailed && (rawMsg === 'AI translation complete' || (!payload.active && (progressVal >= 1.0 || pct >= 100)));
       if (isComplete && this.state.totalLines > 0) {
         this.state.currentLine = this.state.totalLines;
       } else if (this.state.totalLines > 0 && this.state.currentLine > this.state.totalLines) {
         this.state.currentLine = this.state.totalLines;
       }
 
+      if (rawMsg.includes('could not be translated')) {
+        const countMatch = rawMsg.match(/^(\d+)/);
+        this.lastUntranslatedCount = countMatch ? (Number(countMatch[1]) || 1) : 1;
+      } else if (payload.active) {
+        this.lastUntranslatedCount = 0;
+      }
+
+      this.lastProgressPayload = payload;
+      this.lastProgressIsComplete = isComplete;
+      this.lastProgressIsCancelled = isCancelled;
+      this.lastProgressIsFailed = isFailed;
+
       if (this.telemetryBox) {
-        this.telemetryBox.style.display = (payload.active || this.state.progress > 0 || isComplete) ? 'block' : 'none';
+        this.telemetryBox.style.display = (payload.active || this.state.progress > 0 || isComplete || isCancelled || isFailed) ? 'block' : 'none';
       }
 
       if (this.progressFill) {
@@ -1543,19 +1679,19 @@ export class TranslationStudioController {
           this.lblLines.style.display = 'none';
         }
       }
-      if (this.lblMsg && payload.message) {
-        this.lblMsg.textContent = this.formatProgressMessage(payload, isComplete, isCancelled);
+      if (this.lblMsg && rawMsg) {
+        this.lblMsg.removeAttribute?.('data-i18n');
+        this.lblMsg.textContent = this.formatProgressMessage(payload, isComplete, isCancelled, isFailed);
       }
       if (this.statusBadge) {
         if (payload.active) {
-          this.statusBadge.textContent = t('translate.statusTranslating');
-          this.statusBadge.className = 'translate-status-badge active';
+          this.setStatusBadge('translate.statusTranslating', 'active');
         } else if (isCancelled) {
-          this.statusBadge.textContent = t('translate.statusCancelled');
-          this.statusBadge.className = 'translate-status-badge cancelled';
-        } else if (payload.message === 'AI translation complete' || isComplete) {
-          this.statusBadge.textContent = t('translate.statusComplete');
-          this.statusBadge.className = 'translate-status-badge complete';
+          this.setStatusBadge('translate.statusCancelled', 'cancelled');
+        } else if (isFailed) {
+          this.setStatusBadge('translate.statusFailed', 'failed');
+        } else if (rawMsg === 'AI translation complete' || isComplete) {
+          this.setStatusBadge('translate.statusComplete', 'complete');
         }
       }
     }).then((unlisten) => {
@@ -1604,12 +1740,26 @@ export class TranslationStudioController {
       translateAiPolish: this.state.polishPass,
     };
 
+    const prevTranslation = {
+      translatedPath: this.state.translatedPath,
+      translatedName: this.state.translatedName,
+      translatedRawText: this.state.translatedRawText,
+      translatedCues: this.state.translatedCues,
+      progress: this.state.progress,
+      progressMsg: this.state.progressMsg,
+      currentLine: this.state.currentLine,
+      totalLines: this.state.totalLines,
+      statusBadgeKey: this.statusBadgeKey,
+      statusBadgeModifier: this.statusBadgeModifier,
+    };
+
     this.state.progress = 0;
     this.state.currentLine = 0;
     this.state.translatedPath = '';
     this.state.translatedName = '';
     this.state.translatedRawText = '';
     this.state.translatedCues = [];
+    this.clearProgressMeta();
     this.renderTargetCues();
 
     if (!this.state.totalLines && this.state.sourceCues.length > 0) {
@@ -1621,13 +1771,12 @@ export class TranslationStudioController {
       this.lblLines.textContent = `0 / ${this.state.totalLines}`;
       this.lblLines.style.display = 'inline';
     }
-    if (this.lblMsg) this.lblMsg.textContent = '';
-    this.updateActionButtons();
-
-    if (this.statusBadge) {
-      this.statusBadge.textContent = t('translate.statusTranslating');
-      this.statusBadge.className = 'translate-status-badge active';
+    if (this.lblMsg) {
+      this.lblMsg.removeAttribute?.('data-i18n');
+      this.lblMsg.textContent = '';
     }
+    this.updateActionButtons();
+    this.setStatusBadge('translate.statusTranslating', 'active');
 
     try {
       const trimmedOutputDir = this.state.outputDir ? this.state.outputDir.trim() : '';
@@ -1667,32 +1816,38 @@ export class TranslationStudioController {
           this.lblLines.style.display = 'inline';
         }
 
-        if (this.statusBadge) {
-          this.statusBadge.textContent = t('translate.statusComplete');
-          this.statusBadge.className = 'translate-status-badge complete';
-        }
+        this.setStatusBadge('translate.statusComplete', 'complete');
 
         this.notify(t('translate.translationSuccess'), 'success');
       } else {
-        if (this.statusBadge) {
-          this.statusBadge.textContent = t('translate.statusReady');
-          this.statusBadge.className = 'translate-status-badge';
-        }
+        this.setStatusBadge('translate.statusReady', '');
         this.notify(t('translate.emptyTranslationError'), 'error');
       }
     } catch (err: any) {
       const errMsg = String(err || '');
-      if (errMsg.toLowerCase().includes('cancelled')) {
-        if (this.statusBadge) {
-          this.statusBadge.textContent = t('translate.statusCancelled');
-          this.statusBadge.className = 'translate-status-badge cancelled';
-        }
+      const isBusySession = errMsg.toLowerCase().includes('already active');
+      if (isBusySession && prevTranslation.translatedPath) {
+        this.state.translatedPath = prevTranslation.translatedPath;
+        this.state.translatedName = prevTranslation.translatedName;
+        this.state.translatedRawText = prevTranslation.translatedRawText;
+        this.state.translatedCues = prevTranslation.translatedCues;
+        this.state.progress = prevTranslation.progress;
+        this.state.progressMsg = prevTranslation.progressMsg;
+        this.state.currentLine = prevTranslation.currentLine;
+        this.state.totalLines = prevTranslation.totalLines;
+        this.renderTargetCues();
+        this.setStatusBadge(
+          prevTranslation.statusBadgeKey || 'translate.statusReady',
+          (prevTranslation.statusBadgeModifier || '') as '' | 'active' | 'complete' | 'cancelled' | 'failed'
+        );
+        this.notify(t('translate.translationError', { error: errMsg }), 'error');
+      } else if (errMsg.toLowerCase().includes('cancelled')) {
+        this.lastProgressIsCancelled = true;
+        this.setStatusBadge('translate.statusCancelled', 'cancelled');
         this.notify(t('translate.translationCancelledToast'), 'info');
       } else {
-        if (this.statusBadge) {
-          this.statusBadge.textContent = t('translate.statusReady');
-          this.statusBadge.className = 'translate-status-badge';
-        }
+        this.lastProgressIsFailed = true;
+        this.setStatusBadge('translate.statusFailed', 'failed');
         this.notify(t('translate.translationError', { error: errMsg }), 'error');
       }
     } finally {
@@ -1709,13 +1864,23 @@ export class TranslationStudioController {
       await invoke('cancel_transcription');
     } catch (err) {
       console.error('Failed to cancel translation:', err);
+      if (this.btnCancel && this.state.isTranslating) {
+        this.btnCancel.disabled = false;
+      }
     }
   }
 
-  private formatProgressMessage(payload: any, isComplete: boolean, isCancelled: boolean): string {
+  private formatProgressMessage(payload: any, isComplete: boolean, isCancelled: boolean, isFailed = false): string {
     const raw = payload.message || '';
     if (isCancelled || raw === 'Translation cancelled') {
       return t('translate.statusCancelled');
+    }
+    if (isFailed || raw === 'Translation failed') {
+      return t('translate.statusFailed');
+    }
+    if (raw.includes('could not be translated')) {
+      const countMatch = raw.match(/^(\d+)/);
+      return t('translate.untranslatedNotice', { count: countMatch ? countMatch[1] : '1' });
     }
     if (isComplete || raw === 'AI translation complete') {
       return t('translate.translationSuccess');
@@ -1724,6 +1889,28 @@ export class TranslationStudioController {
       return t('translate.emptyTargetTitle');
     }
     if (raw.startsWith('Translating with AI')) {
+      return t('translate.translating');
+    }
+    if (raw.startsWith('Resuming translation')) {
+      const cur = this.state.currentLine;
+      const tot = this.state.totalLines;
+      const fileName = this.state.subtitleName || '';
+      if (payload.totalFiles && payload.totalFiles > 1 && payload.fileIndex) {
+        return t('translate.resumingBatchLines', {
+          fileIdx: String(payload.fileIndex),
+          totalFiles: String(payload.totalFiles),
+          current: String(cur),
+          total: String(tot),
+          file: fileName
+        });
+      }
+      if (tot > 0) {
+        return t('translate.resumingLines', {
+          current: String(cur),
+          total: String(tot),
+          file: fileName
+        });
+      }
       return t('translate.translating');
     }
     if (raw.startsWith('Translating AI')) {
@@ -1748,10 +1935,6 @@ export class TranslationStudioController {
         });
       }
       return t('translate.translating');
-    }
-    if (raw.includes('could not be translated')) {
-      const countMatch = raw.match(/^(\d+)/);
-      return t('translate.untranslatedNotice', { count: countMatch ? countMatch[1] : '1' });
     }
     return isolateDirection(raw);
   }
@@ -1879,6 +2062,18 @@ export class TranslationStudioController {
     this.renderSourceCues();
     this.renderTargetCues();
     this.updateActionButtons();
+    this.restoreStatusBadge();
+    if (this.lblMsg && this.lastProgressPayload) {
+      this.lblMsg.textContent = this.formatProgressMessage(
+        this.lastProgressPayload,
+        this.lastProgressIsComplete,
+        this.lastProgressIsCancelled,
+        this.lastProgressIsFailed
+      );
+    }
+    if (!this.state.isTranslating && (this.providerSelect?.value === '' || this.modelSelect?.value === '')) {
+      this.refreshProviderOptions();
+    }
   }
 
   private notify(msg: string, type: 'info' | 'success' | 'error' = 'info') {

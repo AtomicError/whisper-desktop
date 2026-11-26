@@ -136,6 +136,65 @@ fn is_cancelled(session: &Arc<Mutex<crate::TranscriptionSession>>) -> bool {
     with_session(session, |s| s.cancel_requested).unwrap_or(false)
 }
 
+/// Ensures a terminal `translation-status` (`active: false`) event is emitted
+/// once an active session has been announced, even if `translate_files` exits
+/// with an error or panics mid-flight, so global job tracking and OS taskbar
+/// progress never stay stuck active.
+struct TranslationStatusGuard {
+    app: AppHandle,
+    last_progress: f64,
+    disarmed: bool,
+}
+
+impl TranslationStatusGuard {
+    fn new(app: AppHandle) -> Self {
+        Self {
+            app,
+            last_progress: 0.0,
+            disarmed: false,
+        }
+    }
+
+    fn set_progress(&mut self, progress: f64) {
+        self.last_progress = progress;
+    }
+
+    fn disarm(&mut self) {
+        self.disarmed = true;
+    }
+}
+
+impl Drop for TranslationStatusGuard {
+    fn drop(&mut self) {
+        if !self.disarmed {
+            emit_status(&self.app, self.last_progress, "Translation failed", false, None);
+        }
+    }
+}
+
+fn resolve_next_output_cap(
+    current_override: Option<u32>,
+    exact_cap: Option<u32>,
+) -> Result<u32, String> {
+    let current = current_override.unwrap_or_else(|| estimate_max_output_tokens(0, None));
+    if current <= MIN_OUTPUT_TOKENS && exact_cap.is_none() {
+        return Err(format!(
+            "Model rejected every output cap down to {} tokens; its max_tokens limit could not be satisfied.",
+            MIN_OUTPUT_TOKENS
+        ));
+    }
+    let new_cap = exact_cap
+        .filter(|&cap| cap < current_override.unwrap_or(u32::MAX))
+        .unwrap_or_else(|| (current / 2).max(MIN_OUTPUT_TOKENS));
+    if new_cap < MIN_OUTPUT_TOKENS || (current_override.is_some() && new_cap >= current) {
+        return Err(format!(
+            "Model output cap ({} tokens) is too small or could not be satisfied to translate dialogue lines.",
+            new_cap
+        ));
+    }
+    Ok(new_cap)
+}
+
 /// Reset the shared session state when translation ends, regardless of whether
 /// it finished, errored, or was cancelled. Mirrors `ActiveSessionGuard` on the
 /// transcription side so the session never gets stuck in `Translating`.
@@ -842,7 +901,14 @@ async fn translate_chunk(
                 if attempt < MAX_TRANSIENT_RETRIES {
                     attempt += 1;
                     logs.log(app, "Translate", &format!("Network error ({}), retry {}/{} in {}s", err_msg, attempt, MAX_TRANSIENT_RETRIES, attempt));
-                    tokio::time::sleep(std::time::Duration::from_secs(attempt as u64)).await;
+                    tokio::select! {
+                        biased;
+                        _ = cancellation_poller(session.clone()) => {
+                            emit_cancelled(app, last_progress);
+                            return Err(TRANSLATION_CANCELLED_MSG.to_string());
+                        }
+                        _ = tokio::time::sleep(std::time::Duration::from_secs(attempt as u64)) => {}
+                    }
                     continue;
                 }
                 return Err(format!("HTTP request to {} failed: {}", provider.name, err_msg));
@@ -886,10 +952,11 @@ async fn translate_chunk(
                 return Ok(ChunkOutcome::ContextLimitExceeded(None));
             }
 
-            // 3. Reactive output-cap recovery: Anthropic rejects an oversized
-            // `max_tokens` with 400 + the exact allowed value. Learn it once,
+            // 3. Reactive output-cap recovery: only applies when we actually sent
+            // a `max_tokens` cap (e.g. Anthropic requires `max_tokens` and rejects
+            // oversized values with 400 + the exact allowed value). Learn it once,
             // persist it, and every later request is right from the start.
-            if status.as_u16() == 400 {
+            if status.as_u16() == 400 && options.max_output_tokens.is_some() {
                 if let Some(cap) = parse_output_cap_from_error(&err_text) {
                     logs.log(app, "Translate", &format!("max_tokens rejected; learned exact output cap: {} tokens", cap));
                     return Ok(ChunkOutcome::OutputCapExceeded(Some(cap)));
@@ -910,7 +977,14 @@ async fn translate_chunk(
                 let delay = retry_after_hdr.unwrap_or(attempt as u64);
                 logs.log(app, "Translate", &format!("Transient HTTP {} — retry {}/{} in {}s{}", status, attempt, MAX_TRANSIENT_RETRIES, delay,
                     if retry_after_hdr.is_some() { " (Retry-After)" } else { "" }));
-                tokio::time::sleep(std::time::Duration::from_secs(delay)).await;
+                tokio::select! {
+                    biased;
+                    _ = cancellation_poller(session.clone()) => {
+                        emit_cancelled(app, last_progress);
+                        return Err(TRANSLATION_CANCELLED_MSG.to_string());
+                    }
+                    _ = tokio::time::sleep(std::time::Duration::from_secs(delay)) => {}
+                }
                 continue;
             }
 
@@ -1050,6 +1124,7 @@ pub async fn translate_files(
         session: session.clone(),
     };
 
+    let mut status_guard = TranslationStatusGuard::new(app.clone());
     if !generated_files.is_empty() {
         emit_status(&app, 0.0, "Translating with AI…", true, None);
         logs.log(&app, "Translate", &format!(
@@ -1061,6 +1136,8 @@ pub async fn translate_files(
             context_window,
             match max_output_override { Some(t) => t.to_string(), None => "auto".to_string() }
         ));
+    } else {
+        status_guard.disarm();
     }
 
     let client = build_http_client();
@@ -1070,6 +1147,7 @@ pub async fn translate_files(
     for (file_idx, file_name) in generated_files.iter().enumerate() {
         // Honour a cancel request between files.
         if is_cancelled(&session) {
+            status_guard.disarm();
             emit_cancelled(&app, last_progress);
             return Err(TRANSLATION_CANCELLED_MSG.to_string());
         }
@@ -1208,12 +1286,14 @@ pub async fn translate_files(
         );
         last_extras = initial_extras;
         last_progress = initial_progress;
+        status_guard.set_progress(last_progress);
 
         let mut stall_rounds: usize = 0;
 
         'chunk_loop: while !remaining_entries.is_empty() {
             // Honour a cancel request between chunks.
             if is_cancelled(&session) {
+                status_guard.disarm();
                 emit_cancelled(&app, last_progress);
                 return Err(TRANSLATION_CANCELLED_MSG.to_string());
             }
@@ -1258,6 +1338,7 @@ pub async fn translate_files(
             );
             last_extras = chunk_extras;
             last_progress = global_progress;
+            status_guard.set_progress(last_progress);
 
             let system_prompt = build_system_prompt(
                 &provider.custom_prompt,
@@ -1303,7 +1384,7 @@ pub async fn translate_files(
                     .join("\n"),
             );
 
-            let outcome = translate_chunk(
+            let outcome = match translate_chunk(
                 &app,
                 session.clone(),
                 &client,
@@ -1324,7 +1405,16 @@ pub async fn translate_files(
                 stall_rounds >= 1,
                 &logs,
             )
-            .await?;
+            .await
+            {
+                Ok(o) => o,
+                Err(e) => {
+                    if e == TRANSLATION_CANCELLED_MSG {
+                        status_guard.disarm();
+                    }
+                    return Err(e);
+                }
+            };
 
             match outcome {
                 ChunkOutcome::ContextLimitExceeded(parsed_exact) => {
@@ -1352,26 +1442,7 @@ pub async fn translate_files(
                     // Anthropic rejected max_tokens as too large. Use the
                     // exact cap when the error named it, otherwise halve —
                     // then persist so future runs start correct.
-                    let current = max_output_override.unwrap_or_else(|| {
-                        estimate_max_output_tokens(0, None)
-                    });
-                    if current <= MIN_OUTPUT_TOKENS && exact_cap.is_none() {
-                        return Err(format!(
-                            "Model rejected every output cap down to {} tokens; its max_tokens limit could not be satisfied.",
-                            MIN_OUTPUT_TOKENS
-                        ));
-                    }
-                    let new_cap = exact_cap
-                        .filter(|&cap| cap < max_output_override.unwrap_or(u32::MAX))
-                        .unwrap_or_else(|| {
-                            (current / 2).max(MIN_OUTPUT_TOKENS)
-                        });
-                    if new_cap < MIN_OUTPUT_TOKENS {
-                        return Err(format!(
-                            "Model output cap ({} tokens) is too small to translate dialogue lines.",
-                            new_cap
-                        ));
-                    }
+                    let new_cap = resolve_next_output_cap(max_output_override, exact_cap)?;
                     max_output_override = Some(new_cap);
                     let _ = update_model_limits(
                         &settings.translate_ai_provider,
@@ -1469,6 +1540,7 @@ pub async fn translate_files(
                     );
                     last_extras = chunk_extras;
                     last_progress = global_progress;
+                    status_guard.set_progress(last_progress);
                 }
             }
         }
@@ -1476,6 +1548,7 @@ pub async fn translate_files(
         // Check cancellation before writing the file to prevent completing
         // even when the in-flight poll missed the flag (e.g. fast API response).
         if is_cancelled(&session) {
+            status_guard.disarm();
             emit_cancelled(&app, last_progress);
             return Err(TRANSLATION_CANCELLED_MSG.to_string());
         }
@@ -1487,6 +1560,10 @@ pub async fn translate_files(
             .filter(|(idx, _)| !translations_map.contains_key(idx))
             .count();
         if untranslated > 0 {
+            logs.log(&app, "Translate", &format!(
+                "Warning: {} line(s) in '{}' could not be translated and were kept in the original language.",
+                untranslated, file_name
+            ));
             let untranslated_extras = Some((
                 total_lines - untranslated,
                 total_lines,
@@ -1523,6 +1600,7 @@ pub async fn translate_files(
     // Terminal event is UNCONDITIONAL: even when every file was skipped
     // (missing / unsupported extension) the frontend must be released from
     // its active state instead of waiting on an event that never arrives.
+    status_guard.disarm();
     if successfully_translated.is_empty() {
         emit_status(&app, 1.0, "Nothing to translate", false, None);
         logs.log(&app, "Translate", "Finished: no file produced a translation");
@@ -2285,5 +2363,17 @@ mod alignment_tests {
         );
         assert!(!sanitized.contains("AIzaSecret123"));
         assert!(sanitized.contains("?key=<redacted>&foo=bar"));
+    }
+
+    #[test]
+    fn resolve_next_output_cap_terminates_without_infinite_loop() {
+        // First hit with exact cap >= default stores override
+        assert_eq!(resolve_next_output_cap(None, Some(4096)).unwrap(), 4096);
+        // Repeated rejection with same exact cap halves monotonically down to MIN_OUTPUT_TOKENS
+        assert_eq!(resolve_next_output_cap(Some(4096), Some(4096)).unwrap(), 2048);
+        assert_eq!(resolve_next_output_cap(Some(2048), Some(4096)).unwrap(), 1024);
+        // At MIN_OUTPUT_TOKENS, even with Some(exact_cap), it must fail instead of looping forever
+        assert!(resolve_next_output_cap(Some(1024), Some(4096)).is_err());
+        assert!(resolve_next_output_cap(Some(1024), None).is_err());
     }
 }

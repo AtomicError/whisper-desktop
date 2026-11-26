@@ -267,6 +267,18 @@ describe('tauriEvents module', () => {
       });
 
       expect(pulseDot?.classList.contains('active')).toBe(false);
+
+      handlers['translation-status']({
+        payload: {
+          active: false,
+          progress: 0.4,
+          message: 'Translation failed'
+        }
+      });
+
+      const msgEl = domMap.get('lbl-radial-msg');
+      expect(pulseDot?.classList.contains('active')).toBe(false);
+      expect(msgEl?.getAttribute('data-i18n')).toBe('translate.statusFailed');
     });
 
     it('intercepts Whisper log messages and appends transcript cues', async () => {

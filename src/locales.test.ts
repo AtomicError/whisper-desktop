@@ -103,6 +103,18 @@ describe('locale consistency for speed presets', () => {
       expect(transcribe.saveLocationSameAsInput.length).toBeGreaterThan(0);
       expect(typeof transcribe.saveLocationCustom).toBe('string');
       expect(transcribe.saveLocationCustom.length).toBeGreaterThan(0);
+
+      const translate = (dict as any).translate;
+      expect(translate).toBeDefined();
+      expect(typeof translate.statusFailed).toBe('string');
+      expect(translate.statusFailed.length).toBeGreaterThan(0);
+      expect(translate.resumingLines).toContain('{current}');
+      expect(translate.resumingLines).toContain('{total}');
+      expect(translate.resumingLines).toContain('{file}');
+      expect(translate.resumingBatchLines).toContain('{fileIdx}');
+      expect(translate.resumingBatchLines).toContain('{totalFiles}');
+      expect(translate.cueAriaLabel).toContain('{id}');
+      expect(translate.translatedCueAriaLabel).toContain('{id}');
     });
 
     it(`locale ${code} has all required transcribe progress and status keys`, () => {

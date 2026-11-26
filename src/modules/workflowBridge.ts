@@ -519,6 +519,13 @@ export async function sendTranscribeToTranslationStudio(): Promise<void> {
 
   const win = getGlobal();
   const controller = win.translationStudioController;
+  if (controller && (controller.state?.isTranslating || controller.isStartingTranslation)) {
+    showNotification(t('translate.translating') || 'Translation is currently in progress.', 'info');
+    if (typeof win.switchView === 'function') {
+      win.switchView('translate');
+    }
+    return;
+  }
   if (controller && typeof controller.loadSubtitleFile === 'function') {
     await controller.loadSubtitleFile(subToLoad);
     const videoToLoad = getLastTranscribedVideoPath();
