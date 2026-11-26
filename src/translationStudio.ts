@@ -41,7 +41,6 @@ export interface SubtitleCue {
 export interface TranslationStudioState {
   subtitlePath: string;
   subtitleName: string;
-  subtitleSize: number;
   subtitleExt: string;
   subtitleRawText: string;
   sourceCues: SubtitleCue[];
@@ -75,26 +74,6 @@ function escapeHTML(str: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
-}
-
-/**
- * The loaded subtitle's size in bytes, for the card's readout.
- *
- * From the file itself: `content.length` counts characters, and a Persian subtitle is
- * mostly two-byte characters in UTF-8, so the card reported it at about half its size.
- * How the text was decoded is the other reason to ask the file rather than measure the
- * string — a UTF-16 subtitle's UTF-8 re-encoding is not the file either. Measuring the
- * content stays as the fallback, for the moment the command cannot answer: a byte count
- * of the text is still far nearer the truth than the character count it replaces.
- */
-async function subtitleSizeInBytes(path: string, content: string): Promise<number> {
-  const measured = () => new TextEncoder().encode(content).length;
-  try {
-    const size = await invoke<number>('get_file_size', { filePath: path });
-    return typeof size === 'number' && size > 0 ? size : measured();
-  } catch (_) {
-    return measured();
-  }
 }
 
 function getParentDir(filePath: string): string {
@@ -193,7 +172,7 @@ export function parseSubtitleContent(content: string, ext: string): SubtitleCue[
         cues.push({
           id: cueId++,
           startMs,
-          endMs: startMs + 3000,
+          endMs: startMs,
           startTimeStr: timeStr,
           endTimeStr: '',
           text,
@@ -349,6 +328,7 @@ export class TranslationStudioController {
   private activeScrollDriver: HTMLElement | null = null;
   private isScrollingThrottled: boolean = false;
   private scrollThrottledTimeout: any = null;
+  private pointerDriverTimeout: any = null;
   private syncScrollRaf: number | null = null;
   private subtitleLoadId = 0;
   private activeLoadToken = 0;
@@ -358,6 +338,8 @@ export class TranslationStudioController {
   private isBrowsingOutputDir = false;
   private isStartingTranslation = false;
   private isCancellingTranslation = false;
+  private isDisposed = false;
+  private pendingSettingsSyncAfterTranslation = false;
   private statusBadgeKey = 'translate.statusReady';
   private statusBadgeModifier = '';
   private lastProgressPayload: any = null;
@@ -370,7 +352,6 @@ export class TranslationStudioController {
   public state: TranslationStudioState = {
     subtitlePath: '',
     subtitleName: '',
-    subtitleSize: 0,
     subtitleExt: '',
     subtitleRawText: '',
     sourceCues: [],
@@ -529,7 +510,9 @@ export class TranslationStudioController {
           if (globalModelSelect) {
             globalModelSelect.value = this.state.activeModel;
           }
-          if (typeof win.updateActiveModelBannerUI === 'function') {
+          if (typeof win.syncActiveModelSelectionUI === 'function') {
+            win.syncActiveModelSelectionUI(this.state.activeModel);
+          } else if (typeof win.updateActiveModelBannerUI === 'function') {
             win.updateActiveModelBannerUI(this.state.activeModel);
           }
           if (typeof win.saveCurrentSettings === 'function') {
@@ -564,9 +547,7 @@ export class TranslationStudioController {
             win.markSettingsDirty();
           }
           if (typeof win.saveCurrentSettings === 'function') {
-            setTimeout(() => {
-              win.saveCurrentSettings();
-            }, 240);
+            win.saveCurrentSettings();
           }
         }
       }
@@ -574,6 +555,7 @@ export class TranslationStudioController {
 
     this.bindListener(this.btnBrowseDir, 'click', () => this.browseOutputDir());
     this.bindListener(this.btnResetDir, 'click', () => {
+      if (this.state.isTranslating || this.isStartingTranslation) return;
       this.state.outputDir = '';
       this.updateOutputDirUI();
     });
@@ -700,7 +682,11 @@ export class TranslationStudioController {
     const cue = (e.key === 'ArrowDown' ? items[0] : items[items.length - 1]) as HTMLElement;
     e.preventDefault();
     cue.focus?.();
-    cue.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+    const owningList = cue.parentElement === this.targetList
+      ? this.targetList
+      : (cue.parentElement === this.sourceList ? this.sourceList : null);
+    if (owningList) this.setTemporaryScrollDriver(owningList);
+    this.scrollCueIntoView(cue);
   }
 
   private setupStudioShortcuts() {
@@ -783,10 +769,58 @@ export class TranslationStudioController {
     }
   }
 
+  private scrollCueIntoView(el: HTMLElement | null) {
+    if (!el || typeof el.scrollIntoView !== 'function') return;
+    const prefersReducedMotion =
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      Boolean(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    el.scrollIntoView({
+      block: 'nearest',
+      behavior: prefersReducedMotion ? 'auto' : 'smooth',
+    });
+  }
+
+  private setTemporaryScrollDriver(driver: HTMLElement | null) {
+    this.activeScrollDriver = driver;
+    if (this.pointerDriverTimeout) {
+      clearTimeout(this.pointerDriverTimeout);
+      this.pointerDriverTimeout = null;
+    }
+    if (driver) {
+      this.pointerDriverTimeout = setTimeout(() => {
+        this.pointerDriverTimeout = null;
+        if (!this.isScrollingThrottled && this.activeScrollDriver === driver) {
+          this.activeScrollDriver = null;
+        }
+      }, 200);
+    }
+  }
+
+  private registerAsyncUnlisten(promise: Promise<(() => void) | undefined>) {
+    promise
+      .then((unlisten) => {
+        if (!unlisten) return;
+        if (this.isDisposed) {
+          try {
+            unlisten();
+          } catch (_) {}
+        } else {
+          this.unlisteners.push(unlisten);
+        }
+      })
+      .catch(() => {});
+  }
+
   private markScrolling() {
     this.isScrollingThrottled = true;
+    if (this.pointerDriverTimeout) {
+      clearTimeout(this.pointerDriverTimeout);
+      this.pointerDriverTimeout = null;
+    }
     if (this.scrollThrottledTimeout) clearTimeout(this.scrollThrottledTimeout);
     this.scrollThrottledTimeout = setTimeout(() => {
+      this.scrollThrottledTimeout = null;
       this.isScrollingThrottled = false;
       this.activeScrollDriver = null;
     }, 120);
@@ -842,6 +876,15 @@ export class TranslationStudioController {
       setHighlight(cueId, false);
     };
 
+    const focusMovedCue = (cueEl: HTMLElement) => {
+      cueEl.focus?.();
+      const owningList = cueEl.parentElement === this.targetList
+        ? this.targetList
+        : (cueEl.parentElement === this.sourceList ? this.sourceList : null);
+      if (owningList) this.setTemporaryScrollDriver(owningList);
+      this.scrollCueIntoView(cueEl);
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.isComposing || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
       const target = (e.target as HTMLElement)?.closest('.translate-cue-item') as HTMLElement | null;
@@ -851,23 +894,20 @@ export class TranslationStudioController {
         const next = target.nextElementSibling as HTMLElement | null;
         if (next && next.classList.contains('translate-cue-item')) {
           e.preventDefault();
-          next.focus();
-          next.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          focusMovedCue(next);
         }
       } else if (e.key === 'ArrowUp') {
         const prev = target.previousElementSibling as HTMLElement | null;
         if (prev && prev.classList.contains('translate-cue-item')) {
           e.preventDefault();
-          prev.focus();
-          prev.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          focusMovedCue(prev);
         }
       } else if (e.key === 'Home') {
         const parent = target.parentElement;
         const first = parent?.querySelector('.translate-cue-item') as HTMLElement | null;
         if (first) {
           e.preventDefault();
-          first.focus();
-          first.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          focusMovedCue(first);
         }
       } else if (e.key === 'End') {
         const parent = target.parentElement;
@@ -875,8 +915,7 @@ export class TranslationStudioController {
         if (items && items.length > 0) {
           const last = items[items.length - 1] as HTMLElement;
           e.preventDefault();
-          last.focus();
-          last.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          focusMovedCue(last);
         }
       } else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
         if (this.state.viewMode === 'split') {
@@ -890,15 +929,13 @@ export class TranslationStudioController {
               const counterpart = document.getElementById(`translate-target-cue-${cueId}`);
               if (counterpart) {
                 e.preventDefault();
-                counterpart.focus();
-                counterpart.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                focusMovedCue(counterpart);
               }
             } else if (shouldJumpToSource) {
               const counterpart = document.getElementById(`translate-source-cue-${cueId}`);
               if (counterpart) {
                 e.preventDefault();
-                counterpart.focus();
-                counterpart.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                focusMovedCue(counterpart);
               }
             }
           }
@@ -967,8 +1004,8 @@ export class TranslationStudioController {
       });
     };
 
-    const onSourcePointer = () => { this.activeScrollDriver = this.sourceList; };
-    const onTargetPointer = () => { this.activeScrollDriver = this.targetList; };
+    const onSourcePointer = () => { this.setTemporaryScrollDriver(this.sourceList); };
+    const onTargetPointer = () => { this.setTemporaryScrollDriver(this.targetList); };
 
     this.sourceList.addEventListener('wheel', onSourcePointer, { passive: true });
     this.sourceList.addEventListener('pointerdown', onSourcePointer, { passive: true });
@@ -1004,9 +1041,19 @@ export class TranslationStudioController {
       this.dropZone?.classList.remove('drag-over');
     };
 
+    const onDragLeave = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const related = e.relatedTarget as Node | null;
+      if (related && typeof this.dropZone?.contains === 'function' && this.dropZone.contains(related)) {
+        return;
+      }
+      this.dropZone?.classList.remove('drag-over');
+    };
+
     this.bindListener(this.dropZone, 'dragenter', highlight as EventListener);
     this.bindListener(this.dropZone, 'dragover', highlight as EventListener);
-    this.bindListener(this.dropZone, 'dragleave', unhighlight as EventListener);
+    this.bindListener(this.dropZone, 'dragleave', onDragLeave as EventListener);
     this.bindListener(this.dropZone, 'drop', (async (e: DragEvent) => {
       unhighlight(e);
       if (this.state.isTranslating || this.isStartingTranslation) return;
@@ -1026,20 +1073,16 @@ export class TranslationStudioController {
       return Boolean(activePanel && activePanel.id === 'panel-translate');
     };
 
-    listen<any>('tauri://drag-over', () => {
+    this.registerAsyncUnlisten(listen<any>('tauri://drag-over', () => {
       if (this.state.isTranslating || this.isStartingTranslation || !isTranslatePanelActive()) return;
       this.dropZone?.classList.add('drag-over');
-    }).then((unlisten) => {
-      if (unlisten) this.unlisteners.push(unlisten);
-    });
+    }));
 
-    listen<any>('tauri://drag-leave', () => {
+    this.registerAsyncUnlisten(listen<any>('tauri://drag-leave', () => {
       this.dropZone?.classList.remove('drag-over');
-    }).then((unlisten) => {
-      if (unlisten) this.unlisteners.push(unlisten);
-    });
+    }));
 
-    listen<any>('tauri://drag-drop', async (event: any) => {
+    this.registerAsyncUnlisten(listen<any>('tauri://drag-drop', async (event: any) => {
       this.dropZone?.classList.remove('drag-over');
       if (this.state.isTranslating || this.isStartingTranslation) return;
       if (!isTranslatePanelActive()) return;
@@ -1050,9 +1093,7 @@ export class TranslationStudioController {
           await this.loadSubtitleFile(path.trim());
         }
       }
-    }).then((unlisten) => {
-      if (unlisten) this.unlisteners.push(unlisten);
-    });
+    }));
   }
 
   public async browseSubtitleFile() {
@@ -1097,18 +1138,10 @@ export class TranslationStudioController {
         this.state.isTranslating ||
         this.isStartingTranslation
       ) return;
-      const size = await subtitleSizeInBytes(filePath, content);
-      if (
-        loadToken !== this.activeLoadToken ||
-        loadId !== this.subtitleLoadId ||
-        this.state.isTranslating ||
-        this.isStartingTranslation
-      ) return;
 
       this.state.subtitlePath = filePath;
       this.state.subtitleName = fileName;
       this.state.subtitleExt = ext;
-      this.state.subtitleSize = size;
       this.state.subtitleRawText = content;
       this.state.sourceCues = parseSubtitleContent(content, ext);
 
@@ -1127,6 +1160,8 @@ export class TranslationStudioController {
       if (this.lblLines) this.lblLines.style.display = 'none';
       if (this.lblMsg) {
         this.lblMsg.removeAttribute?.('data-i18n');
+        this.lblMsg.removeAttribute?.('title');
+        this.lblMsg.title = '';
         this.lblMsg.textContent = '';
       }
       this.clearProgressMeta();
@@ -1159,7 +1194,6 @@ export class TranslationStudioController {
     this.companionProbeCompleted = false;
     this.state.subtitlePath = '';
     this.state.subtitleName = '';
-    this.state.subtitleSize = 0;
     this.state.subtitleExt = '';
     this.state.subtitleRawText = '';
     this.state.sourceCues = [];
@@ -1179,6 +1213,8 @@ export class TranslationStudioController {
     if (this.lblLines) this.lblLines.style.display = 'none';
     if (this.lblMsg) {
       this.lblMsg.removeAttribute?.('data-i18n');
+      this.lblMsg.removeAttribute?.('title');
+      this.lblMsg.title = '';
       this.lblMsg.textContent = '';
     }
     this.clearProgressMeta();
@@ -1306,6 +1342,7 @@ export class TranslationStudioController {
       this.lblSubPath.title = isolateLtr(this.state.subtitlePath);
 
       const cueCount = this.state.sourceCues.length;
+      const localizedCueCount = formatLocalizedNumber(cueCount, getLanguage(), 0);
       const extUpper = this.state.subtitleExt.toUpperCase();
       // Format and cue count, each isolated in the direction it reads in.
       // Isolating each token keeps both whole and hands the ` • ` between them to
@@ -1313,7 +1350,7 @@ export class TranslationStudioController {
       // language and a Persian reader gets the count as `12 قطعه`, not `قطعه 12`.
       this.lblSubMeta.textContent = [
         isolateDirection(extUpper),
-        isolateDirection(t('translate.cuesCount', { count: cueCount })),
+        isolateDirection(t('translate.cuesCount', { count: localizedCueCount })),
       ].join(' • ');
       this.lblSubMeta.style.display = 'inline-flex';
 
@@ -1378,7 +1415,10 @@ export class TranslationStudioController {
   }
 
   public syncFromGlobalSettings() {
-    if (this.state.isTranslating || this.isStartingTranslation) return;
+    if (this.state.isTranslating || this.isStartingTranslation) {
+      this.pendingSettingsSyncAfterTranslation = true;
+      return;
+    }
     const win = window as any;
     const settings = win.settingsState;
     if (!settings) return;
@@ -1404,6 +1444,10 @@ export class TranslationStudioController {
 
   public refreshProviderOptions() {
     if (!this.providerSelect) return;
+    if (this.state.isTranslating || this.isStartingTranslation) {
+      this.pendingSettingsSyncAfterTranslation = true;
+      return;
+    }
     const win = window as any;
     const settings = win.settingsState;
     if (!settings) return;
@@ -1419,7 +1463,7 @@ export class TranslationStudioController {
     if (providers.length === 0) {
       const opt = document.createElement('option');
       opt.value = '';
-      opt.textContent = t('translate.noModelError');
+      opt.textContent = t('translate.selectProvider');
       this.providerSelect.appendChild(opt);
       this.state.activeProvider = '';
       this.providerSelect.value = '';
@@ -1445,6 +1489,10 @@ export class TranslationStudioController {
 
   public refreshModelOptions() {
     if (!this.modelSelect) return;
+    if (this.state.isTranslating || this.isStartingTranslation) {
+      this.pendingSettingsSyncAfterTranslation = true;
+      return;
+    }
     const win = window as any;
     const settings = win.settingsState;
     if (!settings) return;
@@ -1611,7 +1659,9 @@ export class TranslationStudioController {
       for (let idx = 0; idx < cues.length; idx++) {
         const cue = cues[idx];
         const domKey = String(idx + 1);
-        const durSec = cue.endMs > cue.startMs ? Math.max(0, Math.round((cue.endMs - cue.startMs) / 1000)) : 0;
+        const durSec = (cue.endTimeStr && cue.endMs > cue.startMs)
+          ? Math.max(0, Math.round((cue.endMs - cue.startMs) / 1000))
+          : 0;
         const durLabel = this.formatDurationBadge(durSec);
         const cueAriaLabel = this.formatCueAriaLabel(cue.id, translated);
 
@@ -1671,7 +1721,9 @@ export class TranslationStudioController {
 
     const html = cues.map((cue, idx) => {
       const domKey = String(idx + 1);
-      const durSec = cue.endMs > cue.startMs ? Math.max(0, Math.round((cue.endMs - cue.startMs) / 1000)) : 0;
+      const durSec = (cue.endTimeStr && cue.endMs > cue.startMs)
+        ? Math.max(0, Math.round((cue.endMs - cue.startMs) / 1000))
+        : 0;
       const durLabel = this.formatDurationBadge(durSec);
       const cueAriaLabel = this.formatCueAriaLabel(cue.id, translated);
       const itemCls = translated ? 'translate-cue-item translate-cue-translated' : 'translate-cue-item';
@@ -1771,7 +1823,7 @@ export class TranslationStudioController {
   }
 
   private listenToProgressEvents() {
-    listen<any>('translation-status', (event) => {
+    this.registerAsyncUnlisten(listen<any>('translation-status', (event) => {
       const payload = event.payload;
       if (!payload) return;
 
@@ -1796,7 +1848,11 @@ export class TranslationStudioController {
       const isFailed = rawMsg === 'Translation failed';
       const isEmpty = rawMsg === 'Nothing to translate';
       const isComplete = !isCancelled && !isFailed && !isEmpty && (rawMsg === 'AI translation complete' || (!payload.active && (progressVal >= 1.0 || pct >= 100)));
-      if (isEmpty) {
+      const preserveDetailedError =
+        (isFailed || isEmpty) &&
+        (Boolean(this.lastPreflightError) || (isEmpty && this.lastProgressIsFailed));
+
+      if (isEmpty && !preserveDetailedError) {
         this.state.progress = 0;
         this.state.currentLine = 0;
       } else if (isComplete && this.state.totalLines > 0) {
@@ -1807,27 +1863,30 @@ export class TranslationStudioController {
 
       const displayPct = isEmpty ? 0 : pct;
 
-      const preserveDetailedError = isFailed && Boolean(this.lastPreflightError);
-      this.lastProgressPayload = preserveDetailedError ? null : payload;
-      this.lastProgressIsComplete = isComplete;
-      this.lastProgressIsCancelled = isCancelled;
-      this.lastProgressIsFailed = isFailed;
       if (!preserveDetailedError) {
+        this.lastProgressPayload = payload;
+        this.lastProgressIsComplete = isComplete;
+        this.lastProgressIsCancelled = isCancelled;
+        this.lastProgressIsFailed = isFailed;
         this.lastPreflightError = '';
+      } else {
+        this.lastProgressPayload = null;
       }
 
       if (this.telemetryBox) {
-        this.telemetryBox.style.display = (payload.active || this.state.progress > 0 || isComplete || isCancelled || isFailed || isEmpty) ? 'block' : 'none';
+        this.telemetryBox.style.display = (payload.active || this.state.progress > 0 || isComplete || isCancelled || isFailed || isEmpty || preserveDetailedError) ? 'block' : 'none';
       }
 
-      if (this.progressFill) {
-        this.progressFill.style.width = `${displayPct}%`;
+      if (!preserveDetailedError) {
+        if (this.progressFill) {
+          this.progressFill.style.width = `${displayPct}%`;
+        }
+        this.progressTrack?.setAttribute?.('aria-valuenow', String(displayPct));
+        if (this.lblPct) {
+          this.lblPct.textContent = `${displayPct}%`;
+        }
       }
-      this.progressTrack?.setAttribute?.('aria-valuenow', String(displayPct));
-      if (this.lblPct) {
-        this.lblPct.textContent = `${displayPct}%`;
-      }
-      if (this.lblLines) {
+      if (this.lblLines && !preserveDetailedError) {
         if (this.state.totalLines > 0) {
           this.lblLines.textContent = `${this.state.currentLine} / ${this.state.totalLines}`;
           this.lblLines.style.display = 'inline';
@@ -1838,9 +1897,10 @@ export class TranslationStudioController {
       if (this.lblMsg && rawMsg && !preserveDetailedError) {
         this.lblMsg.removeAttribute?.('data-i18n');
         this.lblMsg.removeAttribute?.('title');
+        this.lblMsg.title = '';
         this.lblMsg.textContent = this.formatProgressMessage(payload, isComplete, isCancelled, isFailed);
       }
-      if (this.statusBadge) {
+      if (this.statusBadge && !preserveDetailedError) {
         if (payload.active) {
           this.setStatusBadge('translate.statusTranslating', 'active');
         } else if (isCancelled) {
@@ -1853,11 +1913,9 @@ export class TranslationStudioController {
           this.setStatusBadge('translate.statusComplete', 'complete');
         }
       }
-    }).then((unlisten) => {
-      if (unlisten) this.unlisteners.push(unlisten);
-    });
+    }));
 
-    listen<{ translateAiProviders?: string }>('translation-model-limits-updated', (event) => {
+    this.registerAsyncUnlisten(listen<{ translateAiProviders?: string }>('translation-model-limits-updated', (event) => {
       const updatedProviders = event?.payload?.translateAiProviders;
       if (typeof updatedProviders !== 'string' || !updatedProviders) return;
       const win = window as any;
@@ -1867,9 +1925,7 @@ export class TranslationStudioController {
           win.syncProviderModelsFromSettings();
         }
       }
-    }).then((unlisten) => {
-      if (unlisten) this.unlisteners.push(unlisten);
-    });
+    }));
   }
 
   public async startTranslation() {
@@ -1888,6 +1944,12 @@ export class TranslationStudioController {
     let globalSettings: any;
     try {
       const win = window as any;
+      if (typeof win.flushPendingModelCatalogChanges === 'function') {
+        win.flushPendingModelCatalogChanges({ silent: true, immediate: true });
+      }
+      if (typeof win.flushPendingProviderGeneralChanges === 'function') {
+        await win.flushPendingProviderGeneralChanges({ immediate: true });
+      }
       globalSettings = win.settingsState;
       if (!globalSettings) {
         try {
@@ -1932,6 +1994,8 @@ export class TranslationStudioController {
       lastProgressIsFailed: this.lastProgressIsFailed,
       lastPreflightError: this.lastPreflightError,
       lblMsgText: this.lblMsg?.textContent || '',
+      lblMsgI18n: this.lblMsg?.getAttribute?.('data-i18n') || '',
+      lblMsgTitle: this.lblMsg?.title || '',
     };
 
     this.state.progress = 0;
@@ -1956,6 +2020,7 @@ export class TranslationStudioController {
     if (this.lblMsg) {
       this.lblMsg.removeAttribute?.('data-i18n');
       this.lblMsg.removeAttribute?.('title');
+      this.lblMsg.title = '';
       this.lblMsg.textContent = '';
     }
     this.updateActionButtons();
@@ -2006,11 +2071,17 @@ export class TranslationStudioController {
         this.state.progress = 0;
         this.state.currentLine = 0;
         this.clearProgressMeta();
+        this.lastProgressPayload = null;
+        this.lastProgressIsComplete = false;
+        this.lastProgressIsCancelled = false;
         this.lastProgressIsFailed = true;
+        this.lastPreflightError = '';
         if (this.progressFill) this.progressFill.style.width = '0%';
         this.progressTrack?.setAttribute?.('aria-valuenow', '0');
         if (this.lblPct) this.lblPct.textContent = '0%';
         if (this.lblMsg) {
+          this.lblMsg.removeAttribute?.('title');
+          this.lblMsg.title = '';
           this.lblMsg.setAttribute?.('data-i18n', 'translate.emptyTranslationError');
           this.lblMsg.textContent = t('translate.emptyTranslationError');
         }
@@ -2051,7 +2122,17 @@ export class TranslationStudioController {
           }
         }
         if (this.lblMsg) {
-          this.lblMsg.removeAttribute?.('data-i18n');
+          if (prevTranslation.lblMsgI18n) {
+            this.lblMsg.setAttribute?.('data-i18n', prevTranslation.lblMsgI18n);
+          } else {
+            this.lblMsg.removeAttribute?.('data-i18n');
+          }
+          if (prevTranslation.lblMsgTitle) {
+            this.lblMsg.title = prevTranslation.lblMsgTitle;
+          } else {
+            this.lblMsg.removeAttribute?.('title');
+            this.lblMsg.title = '';
+          }
           this.lblMsg.textContent = prevTranslation.lblMsgText;
         }
         this.setStatusBadge(
@@ -2086,22 +2167,40 @@ export class TranslationStudioController {
     } finally {
       this.isCancellingTranslation = false;
       this.state.isTranslating = false;
+      if (this.pendingSettingsSyncAfterTranslation) {
+        this.pendingSettingsSyncAfterTranslation = false;
+        this.syncFromGlobalSettings();
+      }
       this.updateActionButtons();
     }
   }
 
   public async cancelTranslation() {
-    try {
-      this.isCancellingTranslation = true;
-      if (this.btnCancel) {
-        this.btnCancel.disabled = true;
-      }
-      await invoke('cancel_transcription');
-    } catch (err) {
-      this.isCancellingTranslation = false;
-      console.error('Failed to cancel translation:', err);
-      if (this.btnCancel && this.state.isTranslating) {
-        this.btnCancel.disabled = false;
+    if (!this.state.isTranslating) return;
+    this.isCancellingTranslation = true;
+    if (this.btnCancel) {
+      this.btnCancel.disabled = true;
+    }
+
+    const maxAttempts = 4;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        await invoke('cancel_transcription');
+        return;
+      } catch (err) {
+        const errLower = String(err || '').toLowerCase();
+        const isNotYetActive = errLower.includes('no active transcription or translation session');
+        if (isNotYetActive && attempt < maxAttempts - 1 && this.state.isTranslating && !this.isDisposed) {
+          await new Promise(resolve => setTimeout(resolve, 60));
+          continue;
+        }
+        this.isCancellingTranslation = false;
+        console.error('Failed to cancel translation:', err);
+        if (this.state.isTranslating && !this.isDisposed) {
+          if (this.btnCancel) this.btnCancel.disabled = false;
+          this.notify(t('translate.translationError', { error: String(err) }), 'error');
+        }
+        return;
       }
     }
   }
@@ -2236,16 +2335,34 @@ export class TranslationStudioController {
     if (this.previewGrid && this.sourcePane && this.targetPane) {
       if (mode === 'split') {
         this.previewGrid.classList.remove('view-source-only', 'view-target-only');
+        this.previewGrid.setAttribute?.('role', 'tabpanel');
+        this.previewGrid.setAttribute?.('aria-labelledby', 'btn-view-split');
+        this.sourcePane.removeAttribute?.('role');
+        this.sourcePane.removeAttribute?.('aria-labelledby');
+        this.targetPane.removeAttribute?.('role');
+        this.targetPane.removeAttribute?.('aria-labelledby');
         this.sourcePane.style.display = 'flex';
         this.targetPane.style.display = 'flex';
       } else if (mode === 'source') {
         this.previewGrid.classList.add('view-source-only');
         this.previewGrid.classList.remove('view-target-only');
+        this.previewGrid.removeAttribute?.('role');
+        this.previewGrid.removeAttribute?.('aria-labelledby');
+        this.sourcePane.setAttribute?.('role', 'tabpanel');
+        this.sourcePane.setAttribute?.('aria-labelledby', 'btn-view-source');
+        this.targetPane.removeAttribute?.('role');
+        this.targetPane.removeAttribute?.('aria-labelledby');
         this.sourcePane.style.display = 'flex';
         this.targetPane.style.display = 'none';
       } else if (mode === 'target') {
         this.previewGrid.classList.add('view-target-only');
         this.previewGrid.classList.remove('view-source-only');
+        this.previewGrid.removeAttribute?.('role');
+        this.previewGrid.removeAttribute?.('aria-labelledby');
+        this.targetPane.setAttribute?.('role', 'tabpanel');
+        this.targetPane.setAttribute?.('aria-labelledby', 'btn-view-target');
+        this.sourcePane.removeAttribute?.('role');
+        this.sourcePane.removeAttribute?.('aria-labelledby');
         this.sourcePane.style.display = 'none';
         this.targetPane.style.display = 'flex';
       }
@@ -2309,7 +2426,7 @@ export class TranslationStudioController {
         this.lblMsg.textContent = t('translate.emptyTranslationError');
       }
     }
-    if (!this.state.isTranslating && (this.providerSelect?.value === '' || this.modelSelect?.value === '')) {
+    if (!this.state.isTranslating && !this.isStartingTranslation && (this.providerSelect?.value === '' || this.modelSelect?.value === '')) {
       this.refreshProviderOptions();
     }
   }
@@ -2317,13 +2434,16 @@ export class TranslationStudioController {
   private notify(msg: string, type: 'info' | 'success' | 'error' = 'info') {
     const win = window as any;
     if (typeof win.showNotification === 'function') {
-      win.showNotification(msg, type);
-    } else {
-      console.log(`[Notification ${type}]: ${msg}`);
+      try {
+        win.showNotification(msg, type);
+        return;
+      } catch (_) {}
     }
+    console.log(`[Notification ${type}]: ${msg}`);
   }
 
   public dispose() {
+    this.isDisposed = true;
     this.subtitleLoadId++;
     this.activeLoadToken++;
     for (const unlisten of this.unlisteners) {
@@ -2337,6 +2457,10 @@ export class TranslationStudioController {
     if (this.scrollThrottledTimeout) {
       clearTimeout(this.scrollThrottledTimeout);
       this.scrollThrottledTimeout = null;
+    }
+    if (this.pointerDriverTimeout) {
+      clearTimeout(this.pointerDriverTimeout);
+      this.pointerDriverTimeout = null;
     }
     if (this.syncScrollRaf !== null) {
       if (typeof cancelAnimationFrame === 'function') {

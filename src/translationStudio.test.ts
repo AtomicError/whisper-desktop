@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { loadSourceFile } from './testUtils';
 
 vi.mock('./hardsub', () => ({ hardsubController: {} }));
 
@@ -29,7 +30,6 @@ describe('subtitle loading', () => {
     const firstRead = deferred<string>();
     invoke.mockImplementation((cmd, { filePath }) => {
       if (cmd === 'read_text_file_content') return filePath === '/A.txt' ? firstRead.promise : Promise.resolve('BBBB');
-      if (cmd === 'get_file_size') return Promise.resolve(4);
       if (cmd === 'probe_media_file') return Promise.resolve({ exists: false });
       return Promise.reject(new Error('Not found'));
     });
@@ -39,45 +39,44 @@ describe('subtitle loading', () => {
     firstRead.resolve('AAA');
     await first;
     expect(controller.state).toMatchObject({ subtitlePath: '/B.txt', subtitleRawText: 'BBBB' });
-    expect(invoke).not.toHaveBeenCalledWith('get_file_size', { filePath: '/A.txt' });
+    expect(invoke).not.toHaveBeenCalledWith('get_file_size', expect.anything());
   });
 
-  it('keeps the newest file and its contents together when size lookups finish out of order', async () => {
-    const firstSize = deferred<number>();
+  it('keeps the newest file and its contents together when concurrent loads finish out of order', async () => {
+    const firstRead = deferred<string>();
+    const secondRead = deferred<string>();
     invoke.mockImplementation((cmd, { filePath }) => {
-      if (cmd === 'read_text_file_content') return Promise.resolve(filePath === '/A.txt' ? 'AAA' : 'BBBB');
-      if (cmd === 'get_file_size') return filePath === '/A.txt' ? firstSize.promise : Promise.resolve(4);
+      if (cmd === 'read_text_file_content') return filePath === '/A.txt' ? firstRead.promise : secondRead.promise;
       if (cmd === 'probe_media_file') return Promise.resolve({ exists: false });
       return Promise.reject(new Error('Not found'));
     });
     const controller = new TranslationStudioController();
     const first = controller.loadSubtitleFile('/A.txt');
-    await vi.waitFor(() => expect(invoke).toHaveBeenCalledWith('get_file_size', { filePath: '/A.txt' }));
-    expect(controller.state.subtitlePath).toBe('');
-    await controller.loadSubtitleFile('/B.txt');
-    firstSize.resolve(3);
+    const second = controller.loadSubtitleFile('/B.txt');
+    secondRead.resolve('BBBB');
+    await second;
+    firstRead.resolve('AAA');
     await first;
-    expect(controller.state).toMatchObject({ subtitlePath: '/B.txt', subtitleName: 'B.txt', subtitleRawText: 'BBBB', subtitleSize: 4 });
+    expect(controller.state).toMatchObject({ subtitlePath: '/B.txt', subtitleName: 'B.txt', subtitleRawText: 'BBBB' });
     expect(controller.state.sourceCues[0].text).toBe('BBBB');
   });
 
-  it('does not restore a subtitle cleared during its size lookup', async () => {
-    const size = deferred<number>();
-    invoke.mockImplementation(cmd => cmd === 'read_text_file_content' ? Promise.resolve('AAA') : size.promise);
+  it('does not restore a subtitle cleared while read_text_file_content is in flight', async () => {
+    const read = deferred<string>();
+    invoke.mockImplementation(cmd => cmd === 'read_text_file_content' ? read.promise : Promise.resolve(null));
     const controller = new TranslationStudioController();
     const loading = controller.loadSubtitleFile('/A.txt');
-    await vi.waitFor(() => expect(invoke).toHaveBeenCalledWith('get_file_size', { filePath: '/A.txt' }));
+    await vi.waitFor(() => expect(invoke).toHaveBeenCalledWith('read_text_file_content', { filePath: '/A.txt' }));
     controller.clearLoadedSubtitle();
-    size.resolve(3);
+    read.resolve('AAA');
     await loading;
-    expect(controller.state).toMatchObject({ subtitlePath: '', subtitleRawText: '', subtitleSize: 0, sourceCues: [], companionVideoPath: null });
+    expect(controller.state).toMatchObject({ subtitlePath: '', subtitleRawText: '', sourceCues: [], companionVideoPath: null });
   });
 
   it.each([true, false])('ignores a stale companion probe after clearing (success: %s)', async success => {
     const probe = deferred<string | null>();
     invoke.mockImplementation(cmd => {
       if (cmd === 'read_text_file_content') return Promise.resolve('AAA');
-      if (cmd === 'get_file_size') return Promise.resolve(3);
       if (cmd === 'find_existing_video_file') return probe.promise;
       return Promise.resolve(null);
     });
@@ -92,17 +91,6 @@ describe('subtitle loading', () => {
     await new Promise(resolve => setTimeout(resolve, 0));
     expect(controller.state.companionVideoPath).toBeNull();
     expect(invoke.mock.calls.filter(([cmd]) => cmd === 'find_existing_video_file')).toHaveLength(1);
-  });
-
-  it.each([12, null])('uses disk bytes or UTF-8 fallback for Persian text (size: %s)', async size => {
-    invoke.mockImplementation(cmd => {
-      if (cmd === 'read_text_file_content') return Promise.resolve('سلام');
-      if (cmd === 'get_file_size' && size !== null) return Promise.resolve(size);
-      return Promise.reject(new Error('Unavailable'));
-    });
-    const controller = new TranslationStudioController();
-    await controller.loadSubtitleFile('/A.txt');
-    expect(controller.state.subtitleSize).toBe(size ?? 8);
   });
 
   it('dispose unlistens all registered Tauri event listeners without error', () => {
@@ -798,6 +786,7 @@ describe('translation studio bugfixes and edge cases', () => {
     expect(controller.state.sourceCues).toHaveLength(2);
     expect(controller.state.sourceCues[0]).toMatchObject({
       startMs: 5000,
+      endMs: 5000,
       startTimeStr: '00:05.00',
       text: 'First lyric line',
     });
@@ -1927,6 +1916,499 @@ describe('translation studio bugfixes and edge cases', () => {
       }
       (globalThis as any).document = origDoc;
       (globalThis as any).window = origWin;
+    }
+  });
+});
+
+describe('translation studio regression fixes', () => {
+  it('defers refreshProviderOptions/refreshModelOptions during active or starting translation and flushes after finish', async () => {
+    const origDoc = (globalThis as any).document;
+    const origWin = (globalThis as any).window;
+    const listenersByEl: Record<string, Record<string, Function[]>> = {};
+
+    const makeMockEl = (id = '') => {
+      const attrs: Record<string, string> = {};
+      const children: any[] = [];
+      const el: any = {
+        id,
+        value: '',
+        checked: false,
+        title: '',
+        textContent: '',
+        disabled: false,
+        style: {},
+        classList: { toggle: vi.fn(), add: vi.fn(), remove: vi.fn(), contains: vi.fn(() => false) },
+        children,
+        get innerHTML() {
+          return '';
+        },
+        set innerHTML(_v: string) {
+          children.length = 0;
+        },
+        appendChild: (c: any) => {
+          children.push(c);
+          return c;
+        },
+        setAttribute: vi.fn((k: string, v: string) => { attrs[k] = v; }),
+        removeAttribute: vi.fn((k: string) => { delete attrs[k]; }),
+        getAttribute: (k: string) => (k in attrs ? attrs[k] : null),
+        addEventListener: vi.fn((evt: string, cb: Function) => {
+          listenersByEl[id] ??= {};
+          listenersByEl[id][evt] ??= [];
+          listenersByEl[id][evt].push(cb);
+        }),
+        removeEventListener: vi.fn(),
+        querySelectorAll: vi.fn(() => []),
+      };
+      return el;
+    };
+
+    const providerSelect = makeMockEl('providerSelect');
+    const modelSelect = makeMockEl('modelSelect');
+    const polishToggle = makeMockEl('polishToggle');
+    const telemetryBox = makeMockEl('telemetryBox');
+    const statusBadge = makeMockEl('statusBadge');
+    const progressFill = makeMockEl('progressFill');
+    const progressTrack = makeMockEl('progressTrack');
+    const lblPct = makeMockEl('lblPct');
+    const lblLines = makeMockEl('lblLines');
+    const lblMsg = makeMockEl('lblMsg');
+
+    const tauriListeners: Record<string, (e: any) => void> = {};
+    const translationDeferred = deferred<string[]>();
+    const flushCatalogSpy = vi.fn(() => {
+      (globalThis as any).window.settingsState.translateAiProviders = JSON.stringify([
+        { name: 'OpenAI', models: [{ id: 'gpt-4o-flushed', enabled: true }] },
+      ]);
+    });
+    const flushGeneralSpy = vi.fn(async () => {
+      (globalThis as any).window.settingsState.translateAiCustomPrompt = 'Flushed prompt';
+    });
+    const saveSettingsSpy = vi.fn();
+    const markDirtySpy = vi.fn();
+    const invokeLocal = vi.fn((cmd: string, _args?: any) => {
+      if (cmd === 'translate_transcription_files') return translationDeferred.promise;
+      return Promise.resolve(null);
+    });
+
+    (globalThis as any).document = {
+      readyState: 'loading',
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      createElement: () => makeMockEl(),
+      createDocumentFragment: () => makeMockEl(),
+      getElementById: vi.fn(() => null),
+      querySelector: vi.fn(() => null),
+    };
+    (globalThis as any).window = {
+      ...origWin,
+      __TAURI__: {
+        core: { invoke: invokeLocal },
+        event: {
+          listen: vi.fn((ev: string, cb: (e: any) => void) => {
+            tauriListeners[ev] = cb;
+            return Promise.resolve(() => {});
+          }),
+        },
+      },
+      showNotification: vi.fn(),
+      flushPendingModelCatalogChanges: flushCatalogSpy,
+      flushPendingProviderGeneralChanges: flushGeneralSpy,
+      saveCurrentSettings: saveSettingsSpy,
+      markSettingsDirty: markDirtySpy,
+      settingsState: {
+        translateAiProviders: JSON.stringify([
+          { name: 'OpenAI', models: [{ id: 'gpt-4o', enabled: true }] },
+        ]),
+        translateAiProvider: 'OpenAI',
+        translateAiModel: 'gpt-4o',
+        translateAiTargetLang: 'Persian',
+      },
+    };
+
+    try {
+      const controller = new TranslationStudioController();
+      (controller as any).providerSelect = providerSelect;
+      (controller as any).modelSelect = modelSelect;
+      (controller as any).polishToggle = polishToggle;
+      (controller as any).telemetryBox = telemetryBox;
+      (controller as any).statusBadge = statusBadge;
+      (controller as any).progressFill = progressFill;
+      (controller as any).progressTrack = progressTrack;
+      (controller as any).lblPct = lblPct;
+      (controller as any).lblLines = lblLines;
+      (controller as any).lblMsg = lblMsg;
+      (controller as any).setupEventListeners();
+      (controller as any).listenToProgressEvents();
+      await Promise.resolve();
+
+      // 1. polishToggle calls saveCurrentSettings synchronously without waiting on setTimeout
+      polishToggle.checked = true;
+      for (const cb of listenersByEl.polishToggle?.change || []) {
+        cb();
+      }
+      expect(markDirtySpy).toHaveBeenCalledTimes(1);
+      expect(saveSettingsSpy).toHaveBeenCalledTimes(1);
+
+      // 2. Empty provider list shows selectProvider prompt instead of stale noModelError
+      (globalThis as any).window.settingsState.translateAiProviders = '[]';
+      controller.refreshProviderOptions();
+      expect(providerSelect.children[0].textContent).toBe('Select Provider');
+
+      // Restore provider and prepare subtitle
+      (globalThis as any).window.settingsState.translateAiProviders = JSON.stringify([
+        { name: 'OpenAI', models: [{ id: 'gpt-4o', enabled: true }] },
+      ]);
+      controller.refreshProviderOptions();
+      controller.state.subtitlePath = '/videos/demo.srt';
+      controller.state.subtitleName = 'demo.srt';
+      controller.state.subtitleExt = 'srt';
+      controller.state.activeProvider = 'OpenAI';
+      controller.state.activeModel = 'gpt-4o';
+      controller.state.sourceCues = [
+        { id: 1, startMs: 0, endMs: 1000, startTimeStr: '00:00:00,000', endTimeStr: '00:00:01,000', text: 'Hi' },
+      ];
+
+      // 3. startTranslation flushes debounced provider/model changes before snapshotting settings
+      const runPromise = controller.startTranslation();
+      await vi.waitFor(() => expect(invokeLocal).toHaveBeenCalledWith('translate_transcription_files', expect.anything()));
+      expect(flushCatalogSpy).toHaveBeenCalledWith({ silent: true, immediate: true });
+      expect(flushGeneralSpy).toHaveBeenCalledWith({ immediate: true });
+      const callArgs = invokeLocal.mock.calls.find(c => c[0] === 'translate_transcription_files')?.[1] as any;
+      expect(callArgs.settings.translateAiCustomPrompt).toBe('Flushed prompt');
+      expect(callArgs.settings.translateAiProviders).toContain('gpt-4o-flushed');
+
+      // 4. Mid-flight refreshProviderOptions / refreshModelOptions are blocked & deferred until completion
+      (globalThis as any).window.settingsState.translateAiProviders = JSON.stringify([
+        { name: 'Anthropic', models: [{ id: 'claude-sonnet', enabled: true }] },
+      ]);
+      (globalThis as any).window.settingsState.translateAiProvider = 'Anthropic';
+      (globalThis as any).window.settingsState.translateAiModel = 'claude-sonnet';
+      controller.refreshProviderOptions();
+      controller.refreshModelOptions();
+      expect(controller.state.activeProvider).toBe('OpenAI');
+      expect(controller.state.activeModel).toBe('gpt-4o');
+
+      // Finish with empty output [], then fire late "Nothing to translate" status event
+      translationDeferred.resolve([]);
+      await runPromise;
+      // After finish, deferred settings sync runs automatically
+      expect(controller.state.activeProvider).toBe('Anthropic');
+      expect(controller.state.activeModel).toBe('claude-sonnet');
+      // Late "Nothing to translate" must preserve failed emptyTranslationError & visible telemetry
+      expect(statusBadge.getAttribute('data-i18n')).toBe('translate.statusFailed');
+      tauriListeners['translation-status']?.({
+        payload: { active: false, progress: 1.0, message: 'Nothing to translate' },
+      });
+      expect(statusBadge.getAttribute('data-i18n')).toBe('translate.statusFailed');
+      expect(lblMsg.getAttribute('data-i18n')).toBe('translate.emptyTranslationError');
+      expect(telemetryBox.style.display).toBe('block');
+    } finally {
+      (globalThis as any).document = origDoc;
+      (globalThis as any).window = origWin;
+    }
+  });
+
+  it('wires aria-controls and tabpanel roles cleanly on view mode tabs in translate.html and setViewMode', () => {
+    const html = loadSourceFile('views/translate.html');
+    expect(html).toContain('id="btn-view-split"');
+    expect(html).toContain('aria-controls="translate-preview-grid"');
+    expect(html).toContain('aria-controls="translate-source-pane"');
+    expect(html).toContain('aria-controls="translate-target-pane"');
+    expect(html).toContain('id="translate-preview-grid" role="tabpanel" aria-labelledby="btn-view-split"');
+    expect(html).toContain('id="btn-reset-translate-dir" data-i18n="translate.resetFolder" type="button" aria-describedby="translate-output-dir-text"');
+
+    const controller = new TranslationStudioController();
+    const mkAttrEl = () => {
+      const attrs: Record<string, string> = {};
+      return {
+        style: {} as Record<string, string>,
+        classList: { add: vi.fn(), remove: vi.fn() },
+        setAttribute: (k: string, v: string) => { attrs[k] = v; },
+        removeAttribute: (k: string) => { delete attrs[k]; },
+        getAttribute: (k: string) => attrs[k] ?? null,
+      };
+    };
+    const previewGrid = mkAttrEl();
+    const sourcePane = mkAttrEl();
+    const targetPane = mkAttrEl();
+    (controller as any).previewGrid = previewGrid;
+    (controller as any).sourcePane = sourcePane;
+    (controller as any).targetPane = targetPane;
+
+    controller.setViewMode('source');
+    expect(previewGrid.getAttribute('role')).toBeNull();
+    expect(sourcePane.getAttribute('role')).toBe('tabpanel');
+    expect(sourcePane.getAttribute('aria-labelledby')).toBe('btn-view-source');
+    expect(targetPane.getAttribute('role')).toBeNull();
+
+    controller.setViewMode('target');
+    expect(previewGrid.getAttribute('role')).toBeNull();
+    expect(targetPane.getAttribute('role')).toBe('tabpanel');
+    expect(targetPane.getAttribute('aria-labelledby')).toBe('btn-view-target');
+    expect(sourcePane.getAttribute('role')).toBeNull();
+
+    controller.setViewMode('split');
+    expect(previewGrid.getAttribute('role')).toBe('tabpanel');
+    expect(previewGrid.getAttribute('aria-labelledby')).toBe('btn-view-split');
+    expect(sourcePane.getAttribute('role')).toBeNull();
+    expect(targetPane.getAttribute('role')).toBeNull();
+  });
+
+  it('omits fabricated 3s duration badge on LRC cues while showing duration on SRT cues', () => {
+    const controller = new TranslationStudioController();
+    const lrcHtmlContainer: any = { innerHTML: '', removeAttribute: vi.fn() };
+    (controller as any).renderCueList(lrcHtmlContainer, [
+      { id: 1, startMs: 5000, endMs: 5000, startTimeStr: '00:05.00', endTimeStr: '', text: 'Lyric line' },
+    ], false);
+    expect(lrcHtmlContainer.innerHTML).not.toContain('translate-cue-dur');
+
+    const srtHtmlContainer: any = { innerHTML: '', removeAttribute: vi.fn() };
+    (controller as any).renderCueList(srtHtmlContainer, [
+      { id: 1, startMs: 1000, endMs: 4000, startTimeStr: '00:00:01,000', endTimeStr: '00:00:04,000', text: 'Spoken line' },
+    ], false);
+    expect(srtHtmlContainer.innerHTML).toContain('translate-cue-dur');
+    expect(srtHtmlContainer.innerHTML).toContain('3 sec');
+  });
+
+  it('formats subtitle cue count badge using localized Persian digits in fa mode', async () => {
+    const { setLanguage, getLanguage } = await import('./i18n/index');
+    const prevLang = getLanguage();
+    const origDoc = (globalThis as any).document;
+    (globalThis as any).document = {
+      ...origDoc,
+      getElementById: () => null,
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      documentElement: {
+        setAttribute: vi.fn(),
+        getAttribute: () => 'rtl',
+        classList: { add: vi.fn(), remove: vi.fn() },
+      },
+      body: { classList: { add: vi.fn(), remove: vi.fn() } },
+    };
+    const controller = new TranslationStudioController();
+    const lblSubMeta: any = { textContent: '', style: {} as Record<string, string>, setAttribute: vi.fn(), removeAttribute: vi.fn() };
+    const mkAttr = () => ({ textContent: '', title: '', style: {} as Record<string, string>, classList: { add: vi.fn(), remove: vi.fn() }, setAttribute: vi.fn(), removeAttribute: vi.fn() });
+    (controller as any).lblSubName = mkAttr();
+    (controller as any).lblSubPath = mkAttr();
+    (controller as any).lblSubMeta = lblSubMeta;
+    (controller as any).btnClearSub = mkAttr();
+    controller.state.subtitlePath = '/dir/movie.srt';
+    controller.state.subtitleName = 'movie.srt';
+    controller.state.subtitleExt = 'srt';
+    controller.state.sourceCues = Array.from({ length: 12 }, (_, i) => ({
+      id: i + 1, startMs: 0, endMs: 1000, startTimeStr: '00:00:00,000', endTimeStr: '00:00:01,000', text: 'Hi',
+    }));
+
+    setLanguage('fa');
+    try {
+      (controller as any).updateSubtitleInfoUI();
+      expect(lblSubMeta.textContent).toContain('۱۲');
+      expect(lblSubMeta.textContent).not.toContain('12');
+    } finally {
+      setLanguage(prevLang);
+      (globalThis as any).document = origDoc;
+    }
+  });
+
+  it('keeps sync scrolling working after pointerdown on source followed by arrow navigation into target and releases stale pointer driver', async () => {
+    vi.useFakeTimers();
+    try {
+      const controller = new TranslationStudioController();
+      const sourceHandlers: Record<string, any> = {};
+      const targetHandlers: Record<string, any> = {};
+      const sourceCue: any = {
+        classList: { contains: (c: string) => c === 'translate-cue-item', add: vi.fn(), remove: vi.fn() },
+        dataset: { id: '1' },
+        focus: vi.fn(),
+        scrollIntoView: vi.fn(),
+        closest: (sel: string) => (sel === '.translate-cue-item' ? sourceCue : null),
+      };
+      const targetCue1: any = {
+        classList: { contains: (c: string) => c === 'translate-cue-item', add: vi.fn(), remove: vi.fn() },
+        dataset: { id: '1' },
+        focus: vi.fn(),
+        scrollIntoView: vi.fn(),
+        closest: (sel: string) => (sel === '.translate-cue-item' ? targetCue1 : null),
+      };
+      const targetCue2: any = {
+        classList: { contains: (c: string) => c === 'translate-cue-item', add: vi.fn(), remove: vi.fn() },
+        dataset: { id: '2' },
+        focus: vi.fn(),
+        scrollIntoView: vi.fn(),
+        closest: (sel: string) => (sel === '.translate-cue-item' ? targetCue2 : null),
+      };
+      targetCue1.nextElementSibling = targetCue2;
+
+      const sourceList: any = {
+        scrollTop: 0, scrollHeight: 1000, clientHeight: 200,
+        addEventListener: vi.fn((evt: string, h: any) => { sourceHandlers[evt] = h; }),
+        removeEventListener: vi.fn(),
+      };
+      const targetList: any = {
+        scrollTop: 500, scrollHeight: 1000, clientHeight: 200,
+        addEventListener: vi.fn((evt: string, h: any) => { targetHandlers[evt] = h; }),
+        removeEventListener: vi.fn(),
+      };
+      sourceCue.parentElement = sourceList;
+      targetCue1.parentElement = targetList;
+      targetCue2.parentElement = targetList;
+
+      (controller as any).sourceList = sourceList;
+      (controller as any).targetList = targetList;
+
+      const origDoc = (globalThis as any).document;
+      const origWin = (globalThis as any).window;
+      const rafCallbacks: FrameRequestCallback[] = [];
+      vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+        rafCallbacks.push(cb);
+        return rafCallbacks.length;
+      });
+      vi.stubGlobal('cancelAnimationFrame', vi.fn());
+      (globalThis as any).document = {
+        documentElement: { getAttribute: () => 'ltr' },
+        getElementById: (id: string) => (id === 'translate-target-cue-1' ? targetCue1 : null),
+      };
+      try {
+        (controller as any).setupSynchronizedHighlighting();
+        (controller as any).setupSynchronizedScrolling();
+
+        // Pointerdown on source without scroll sets temporary driver on sourceList
+        sourceHandlers['pointerdown']();
+        expect((controller as any).activeScrollDriver).toBe(sourceList);
+
+        // Navigating via ArrowRight -> Target, then ArrowDown in Target switches driver to targetList
+        sourceHandlers['keydown']({
+          key: 'ArrowRight', defaultPrevented: false, isComposing: false,
+          ctrlKey: false, metaKey: false, altKey: false, shiftKey: false,
+          target: sourceCue, preventDefault: vi.fn(),
+        });
+        expect((controller as any).activeScrollDriver).toBe(targetList);
+
+        targetHandlers['keydown']({
+          key: 'ArrowDown', defaultPrevented: false, isComposing: false,
+          ctrlKey: false, metaKey: false, altKey: false, shiftKey: false,
+          target: targetCue1, preventDefault: vi.fn(),
+        });
+        targetHandlers['scroll']();
+        while (rafCallbacks.length) rafCallbacks.shift()!(0);
+        expect(sourceList.scrollTop).toBe(500);
+
+        // Stale pointerdown driver clears automatically after timeout
+        vi.advanceTimersByTime(250);
+        sourceHandlers['pointerdown']();
+        expect((controller as any).activeScrollDriver).toBe(sourceList);
+        vi.advanceTimersByTime(200);
+        expect((controller as any).activeScrollDriver).toBeNull();
+      } finally {
+        (globalThis as any).document = origDoc;
+        (globalThis as any).window = origWin;
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('cleans up late-resolving listen() unlisteners if dispose() ran first', async () => {
+    const lateUnlisten = vi.fn();
+    const d1 = deferred<(() => void) | undefined>();
+    const d2 = deferred<(() => void) | undefined>();
+    const origWin = (globalThis as any).window;
+    (globalThis as any).window = {
+      ...origWin,
+      __TAURI__: {
+        core: { invoke },
+        event: {
+          listen: vi.fn((name: string) => name === 'translation-status' ? d1.promise : d2.promise),
+        },
+      },
+    };
+    try {
+      const controller = new TranslationStudioController();
+      (controller as any).listenToProgressEvents();
+      controller.dispose();
+      d1.resolve(lateUnlisten);
+      d2.resolve(undefined);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(lateUnlisten).toHaveBeenCalledTimes(1);
+      expect((controller as any).unlisteners).toHaveLength(0);
+    } finally {
+      (globalThis as any).window = origWin;
+    }
+  });
+
+  it('ignores HTML5 dragleave when moving onto child elements and blocks btnResetDir while busy', async () => {
+    const controller = new TranslationStudioController();
+    const dropHandlers: Record<string, any> = {};
+    const childNode = { id: 'child' };
+    const outsideNode = { id: 'outside' };
+    const dropZoneMock: any = {
+      addEventListener: vi.fn((evt: string, h: any) => { dropHandlers[evt] = h; }),
+      removeEventListener: vi.fn(),
+      contains: vi.fn((node: any) => node === childNode),
+      classList: { add: vi.fn(), remove: vi.fn() },
+    };
+    (controller as any).dropZone = dropZoneMock;
+    (controller as any).setupDropZone();
+
+    dropHandlers['dragleave']({ preventDefault: vi.fn(), stopPropagation: vi.fn(), relatedTarget: childNode });
+    expect(dropZoneMock.classList.remove).not.toHaveBeenCalled();
+
+    dropHandlers['dragleave']({ preventDefault: vi.fn(), stopPropagation: vi.fn(), relatedTarget: outsideNode });
+    expect(dropZoneMock.classList.remove).toHaveBeenCalledWith('drag-over');
+
+    // btnResetDir guard during active translation
+    const btnHandlers: Record<string, any> = {};
+    const btnResetDir: any = { addEventListener: vi.fn((evt: string, h: any) => { btnHandlers[evt] = h; }), style: {} };
+    (controller as any).btnResetDir = btnResetDir;
+    (controller as any).setupEventListeners();
+    controller.state.outputDir = '/custom/out';
+    controller.state.isTranslating = true;
+    btnHandlers['click']();
+    expect(controller.state.outputDir).toBe('/custom/out');
+  });
+
+  it('retries early cancel_transcription when session startup is not yet Translating and respects reduced motion', async () => {
+    vi.useFakeTimers();
+    try {
+      let attempts = 0;
+      invoke.mockImplementation((cmd: string) => {
+        if (cmd === 'cancel_transcription') {
+          attempts++;
+          if (attempts === 1) return Promise.reject(new Error('No active transcription or translation session'));
+          return Promise.resolve(undefined);
+        }
+        return Promise.resolve(null);
+      });
+
+      const controller = new TranslationStudioController();
+      controller.state.isTranslating = true;
+      (controller as any).btnCancel = { disabled: false };
+
+      const cancelPromise = controller.cancelTranslation();
+      await vi.advanceTimersByTimeAsync(70);
+      await cancelPromise;
+
+      expect(attempts).toBe(2);
+      expect((controller as any).isCancellingTranslation).toBe(true);
+
+      // prefers-reduced-motion selects 'auto' scroll behavior
+      const origWin = (globalThis as any).window;
+      const scrollSpy = vi.fn();
+      (globalThis as any).window = {
+        ...origWin,
+        matchMedia: vi.fn(() => ({ matches: true })),
+      };
+      try {
+        (controller as any).scrollCueIntoView({ scrollIntoView: scrollSpy });
+        expect(scrollSpy).toHaveBeenCalledWith({ block: 'nearest', behavior: 'auto' });
+      } finally {
+        (globalThis as any).window = origWin;
+      }
+    } finally {
+      vi.useRealTimers();
     }
   });
 });

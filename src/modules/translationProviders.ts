@@ -45,6 +45,8 @@ declare global {
     clearModelsSearch: () => void;
     renderModelsRegistryTable: (provider: ProviderConfig) => void;
     updateActiveModelBannerUI: (modelId: string) => void;
+    syncActiveModelSelectionUI: (modelId: string) => void;
+    syncTranslationSettingsViewIfVisible: () => void;
     setActiveModelFromTable: (modelId: string) => Promise<void>;
     toggleSortModels: (col: string) => void;
     changeModelsPage: (delta: number) => void;
@@ -606,6 +608,68 @@ export function renderProvidersGrid(providers: ProviderConfig[] | null = null): 
   grid.appendChild(addTile);
 }
 
+function loadKeyringCredentialForCurrentProvider(
+  providerName: string,
+  keyInput: HTMLInputElement,
+  loadSeq: number
+): void {
+  let userModifiedKey = false;
+  const onUserKeyInput = () => {
+    userModifiedKey = true;
+  };
+  if (typeof keyInput.addEventListener === 'function') {
+    keyInput.addEventListener('input', onUserKeyInput, { once: true });
+  }
+
+  (async () => {
+    try {
+      const realKey = await invoke('get_keyring_credential', { providerName });
+      const currentSelect = document.getElementById('opt-translateAiProvider') as HTMLSelectElement | null;
+      if (loadSeq === providerKeyLoadSeq && currentSelect && currentSelect.value === providerName && !userModifiedKey) {
+        keyInput.value = realKey;
+        keyInput.dataset.loadedKey = realKey;
+        keyInput.dataset.isKeyring = 'false';
+        delete keyInput.dataset.keyringPending;
+        delete keyInput.dataset.keyringError;
+        keyInput.removeAttribute('title');
+      }
+    } catch (e) {
+      console.error("Background keyring credential fetch failed:", e);
+      const currentSelect = document.getElementById('opt-translateAiProvider') as HTMLSelectElement | null;
+      if (loadSeq === providerKeyLoadSeq && currentSelect && currentSelect.value === providerName && !userModifiedKey) {
+        // Preserve the keyring placeholder and flag instead of clearing to '',
+        // so edits to other provider fields do not silently delete the stored secret.
+        keyInput.value = '••••••••••••••••';
+        keyInput.dataset.isKeyring = 'true';
+        delete keyInput.dataset.keyringPending;
+        keyInput.dataset.keyringError = 'true';
+        keyInput.title = t('toasts.keyringLoadError', { error: String(e) });
+      }
+    } finally {
+      if (typeof keyInput.removeEventListener === 'function') {
+        keyInput.removeEventListener('input', onUserKeyInput);
+      }
+    }
+  })();
+}
+
+function flushPendingKeyringLoadIfNeeded(): void {
+  if (typeof document === 'undefined') return;
+  const keyInput = document.getElementById('mgr-provider-key') as HTMLInputElement | null;
+  if (!keyInput || keyInput.dataset.keyringPending !== 'true') return;
+  delete keyInput.dataset.keyringPending;
+
+  const settingsState = getSettingsState();
+  const activeName = settingsState?.translateAiProvider || '';
+  if (!activeName || keyInput.dataset.isKeyring !== 'true') return;
+
+  const provider = readProvidersSafe(settingsState).find(p => p.name === activeName);
+  const keyVal = provider ? (provider.apiKey || provider.api_key || '') : '';
+  if (keyVal !== '__KEYRING__') return;
+
+  loadKeyringCredentialForCurrentProvider(activeName, keyInput, ++providerKeyLoadSeq);
+}
+
 export function onProviderChanged(keepCurrentTab: boolean | string = false, skipTableRender = false): void {
   if (typeof document === 'undefined') return;
   const providerSelect = document.getElementById('opt-translateAiProvider') as HTMLSelectElement | null;
@@ -696,6 +760,7 @@ export function onProviderChanged(keepCurrentTab: boolean | string = false, skip
     const keyInput = document.getElementById('mgr-provider-key') as HTMLInputElement | null;
     if (keyInput) {
       delete keyInput.dataset.keyringError;
+      delete keyInput.dataset.keyringPending;
       delete keyInput.dataset.loadedKey;
       keyInput.removeAttribute('title');
       const eyeBtn = keyInput.nextElementSibling as HTMLElement | null;
@@ -704,42 +769,17 @@ export function onProviderChanged(keepCurrentTab: boolean | string = false, skip
       if (keyVal === '__KEYRING__') {
         keyInput.value = '••••••••••••••••';
         keyInput.dataset.isKeyring = 'true';
-        let userModifiedKey = false;
-        const onUserKeyInput = () => {
-          userModifiedKey = true;
-        };
-        if (typeof keyInput.addEventListener === 'function') {
-          keyInput.addEventListener('input', onUserKeyInput, { once: true });
+        const settingsPanel = document.getElementById('panel-settings');
+        const shouldDeferKeyring =
+          skipTableRender === true &&
+          keepCurrentTab === true &&
+          Boolean(settingsPanel) &&
+          !settingsPanel!.classList?.contains('active');
+        if (shouldDeferKeyring) {
+          keyInput.dataset.keyringPending = 'true';
+        } else {
+          loadKeyringCredentialForCurrentProvider(providerName, keyInput, loadSeq);
         }
-
-        (async () => {
-          try {
-            const realKey = await invoke('get_keyring_credential', { providerName });
-            const currentSelect = document.getElementById('opt-translateAiProvider') as HTMLSelectElement | null;
-            if (loadSeq === providerKeyLoadSeq && currentSelect && currentSelect.value === providerName && !userModifiedKey) {
-              keyInput.value = realKey;
-              keyInput.dataset.loadedKey = realKey;
-              keyInput.dataset.isKeyring = 'false';
-              delete keyInput.dataset.keyringError;
-              keyInput.removeAttribute('title');
-            }
-          } catch (e) {
-            console.error("Background keyring credential fetch failed:", e);
-            const currentSelect = document.getElementById('opt-translateAiProvider') as HTMLSelectElement | null;
-            if (loadSeq === providerKeyLoadSeq && currentSelect && currentSelect.value === providerName && !userModifiedKey) {
-              // Preserve the keyring placeholder and flag instead of clearing to '',
-              // so edits to other provider fields do not silently delete the stored secret.
-              keyInput.value = '••••••••••••••••';
-              keyInput.dataset.isKeyring = 'true';
-              keyInput.dataset.keyringError = 'true';
-              keyInput.title = t('toasts.keyringLoadError', { error: String(e) });
-            }
-          } finally {
-            if (typeof keyInput.removeEventListener === 'function') {
-              keyInput.removeEventListener('input', onUserKeyInput);
-            }
-          }
-        })();
       } else {
         keyInput.value = keyVal;
         keyInput.dataset.isKeyring = 'false';
@@ -753,6 +793,7 @@ export function onProviderChanged(keepCurrentTab: boolean | string = false, skip
     } else {
       currentProviderModels = buildLiveModelsForProvider(provider);
       currentModelsProviderName = '';
+      updateFilterCounts();
     }
   } else {
     if (genPlaceholder) genPlaceholder.style.display = 'flex';
@@ -796,6 +837,7 @@ export function onProviderChanged(keepCurrentTab: boolean | string = false, skip
       keyEl.value = '';
       delete keyEl.dataset.loadedKey;
       delete keyEl.dataset.keyringError;
+      delete keyEl.dataset.keyringPending;
       keyEl.dataset.isKeyring = 'false';
       keyEl.removeAttribute('title');
       setPasswordFieldMasked(keyEl, keyEl.nextElementSibling as HTMLElement | null);
@@ -816,7 +858,11 @@ export function onProviderChanged(keepCurrentTab: boolean | string = false, skip
   }
 
   if (window.translationStudioController) {
-    window.translationStudioController.refreshModelOptions();
+    if (typeof window.translationStudioController.syncFromGlobalSettings === 'function') {
+      window.translationStudioController.syncFromGlobalSettings();
+    } else {
+      window.translationStudioController.refreshModelOptions();
+    }
   }
 
   syncProviderCustomSelects();
@@ -931,6 +977,7 @@ export function switchProviderTab(tab: string): void {
   } else if (tab === 'general') {
     if (btnGen) { btnGen.classList.add('active'); btnGen.setAttribute('aria-selected', 'true'); }
     if (divGen) { divGen.style.display = 'block'; activeDiv = divGen; }
+    flushPendingKeyringLoadIfNeeded();
   } else {
     if (btnMod) { btnMod.classList.add('active'); btnMod.setAttribute('aria-selected', 'true'); }
     if (divMod) { divMod.style.display = 'block'; activeDiv = divMod; }
@@ -1327,28 +1374,8 @@ export function renderModelsRegistryTable(provider: ProviderConfig): void {
   applyModelsFilterAndRender(0);
 }
 
-export async function setActiveModelFromTable(modelId: string): Promise<void> {
-  if (!modelId) return;
-  const settingsState = getSettingsState();
-  const prevActiveModelId = settingsState ? settingsState.translateAiModel : '';
-  if (prevActiveModelId === modelId) return;
-
-  if (settingsState) {
-    settingsState.translateAiModel = modelId;
-  }
-  
-  await saveActiveProviderModels(true, true);
-  updateActiveModelBannerUI(modelId);
-  
-  const selectDOM = document.getElementById('opt-translateAiModel') as HTMLSelectElement | null;
-  if (selectDOM) selectDOM.value = modelId;
-  
-  await saveSettings();
-  triggerUpdateTranscribeUI();
-  if (window.translationStudioController) {
-    window.translationStudioController.syncFromGlobalSettings();
-  }
-  
+function applyActiveModelRowHighlights(modelId: string): void {
+  if (typeof document === 'undefined') return;
   if (currentModelsSortCol === 'active') {
     applyModelsFilterAndRender(0);
     return;
@@ -1408,6 +1435,83 @@ export async function setActiveModelFromTable(modelId: string): Promise<void> {
       }
     }
   });
+}
+
+export function syncActiveModelSelectionUI(modelId: string): void {
+  if (typeof document === 'undefined') return;
+  const selectDOM = document.getElementById('opt-translateAiModel') as HTMLSelectElement | null;
+  if (selectDOM) {
+    selectDOM.value = modelId;
+    syncProviderCustomSelects();
+  }
+  updateActiveModelBannerUI(modelId);
+
+  const activeProvider = getSettingsState()?.translateAiProvider || '';
+  if (activeProvider && currentModelsProviderName === activeProvider) {
+    applyActiveModelRowHighlights(modelId);
+  }
+}
+
+export function syncTranslationSettingsViewIfVisible(): void {
+  if (typeof document === 'undefined') return;
+  const settingsPanel = document.getElementById('panel-settings');
+  const translationGroup = document.getElementById('group-translation');
+  if (!settingsPanel?.classList?.contains('active') || !translationGroup) return;
+  const isGroupVisible =
+    translationGroup.classList?.contains('active') ||
+    (translationGroup as HTMLElement).style.display === 'block';
+  if (!isGroupVisible) return;
+
+  const settingsState = getSettingsState();
+  const activeName = settingsState?.translateAiProvider || '';
+
+  const genTab = document.getElementById('provider-tab-general');
+  if (genTab && genTab.style.display !== 'none') {
+    flushPendingKeyringLoadIfNeeded();
+  }
+
+  const modelsTab = document.getElementById('provider-tab-models');
+  if (modelsTab && modelsTab.style.display !== 'none' && activeName) {
+    if (currentModelsProviderName !== activeName) {
+      const providers = readProvidersSafe(settingsState);
+      const curProv = providers.find((p: ProviderConfig) => p.name === activeName);
+      if (curProv && curProv.models && curProv.models.length > 0) {
+        renderModelsRegistryTable(curProv);
+      } else {
+        if (curProv) {
+          currentProviderModels = [];
+          currentModelsProviderName = curProv.name;
+        }
+        updateFilterCounts();
+        applyModelsFilterAndRender(0);
+      }
+    }
+  }
+}
+
+export async function setActiveModelFromTable(modelId: string): Promise<void> {
+  if (!modelId) return;
+  const settingsState = getSettingsState();
+  const prevActiveModelId = settingsState ? settingsState.translateAiModel : '';
+  if (prevActiveModelId === modelId) return;
+
+  if (settingsState) {
+    settingsState.translateAiModel = modelId;
+  }
+  
+  await saveActiveProviderModels(true, true);
+  updateActiveModelBannerUI(modelId);
+  
+  const selectDOM = document.getElementById('opt-translateAiModel') as HTMLSelectElement | null;
+  if (selectDOM) selectDOM.value = modelId;
+  
+  await saveSettings();
+  triggerUpdateTranscribeUI();
+  if (window.translationStudioController) {
+    window.translationStudioController.syncFromGlobalSettings();
+  }
+
+  applyActiveModelRowHighlights(modelId);
 }
 
 export function toggleSortModels(col: string): void {
@@ -2878,6 +2982,8 @@ export function syncTranslationProvidersWindowBindings(): void {
   window.clearModelsSearch = clearModelsSearch;
   window.renderModelsRegistryTable = renderModelsRegistryTable;
   window.updateActiveModelBannerUI = updateActiveModelBannerUI;
+  window.syncActiveModelSelectionUI = syncActiveModelSelectionUI;
+  window.syncTranslationSettingsViewIfVisible = syncTranslationSettingsViewIfVisible;
   window.setActiveModelFromTable = setActiveModelFromTable;
   window.toggleSortModels = toggleSortModels;
   window.changeModelsPage = changeModelsPage;
@@ -2945,6 +3051,8 @@ export const translationProviders = {
   testConnection: testTranslationConnection,
   setupEventListeners: setupTranslationEventListeners,
   syncModelsFromSettings: syncProviderModelsFromSettings,
+  syncActiveModelSelectionUI,
+  syncTranslationSettingsViewIfVisible,
   flushPendingModelCatalogChanges,
   syncWindowBindings: syncTranslationProvidersWindowBindings
 };

@@ -1620,5 +1620,42 @@ describe('CustomSelect Module', () => {
       expect(typeof customSelect.initAll).toBe('function');
       expect(typeof customSelect.syncAll).toBe('function');
     });
+
+    it('syncs disabled state without rebuilding options on attribute-only MutationObserver notifications on the select element', () => {
+      const PrevObserver = (globalThis as any).MutationObserver;
+      let observerCb: ((mutations?: any[]) => void) | null = null;
+      (globalThis as any).MutationObserver = class MockAttrObserver {
+        constructor(cb: (mutations?: any[]) => void) {
+          observerCb = cb;
+        }
+        observe() {}
+        disconnect() {}
+        takeRecords() { return []; }
+      };
+
+      try {
+        const selectEl = createTestSelect('attr-only-observer-sel');
+        const cs = new CustomSelect(selectEl);
+        const updateSpy = vi.spyOn(cs, 'updateOptions');
+        const syncDisabledSpy = vi.spyOn(cs, 'syncDisabledState');
+
+        selectEl.disabled = true;
+        observerCb?.([{ type: 'attributes', target: selectEl, attributeName: 'disabled' }]);
+        expect(syncDisabledSpy).toHaveBeenCalledTimes(1);
+        expect(updateSpy).not.toHaveBeenCalled();
+        expect(cs.container?.classList.contains('disabled')).toBe(true);
+
+        // Child addition still triggers updateOptions
+        const extraOpt = new MockDOMNode('OPTION');
+        extraOpt.value = 'opt3';
+        extraOpt.textContent = 'Option Three';
+        selectEl.appendChild(extraOpt as any);
+        observerCb?.([{ type: 'childList', target: selectEl }]);
+        expect(updateSpy).toHaveBeenCalledTimes(1);
+        cs.destroy();
+      } finally {
+        (globalThis as any).MutationObserver = PrevObserver;
+      }
+    });
   });
 });

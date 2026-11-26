@@ -163,6 +163,11 @@ export function switchView(viewName: string): void {
       window.translationStudioController.syncFromGlobalSettings();
       window.translationStudioController.refreshLocalization();
     }
+  } else if (viewName === 'settings') {
+    const win = typeof window !== 'undefined' ? (window as any) : null;
+    if (win && typeof win.syncTranslationSettingsViewIfVisible === 'function') {
+      win.syncTranslationSettingsViewIfVisible();
+    }
   }
 }
 

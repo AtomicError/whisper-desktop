@@ -543,51 +543,48 @@ async fn verify_directory_writable(dir_path: String) -> Result<(), String> {
 
 
 #[tauri::command]
-fn read_text_file_content(file_path: String) -> Result<String, String> {
-    let path = std::path::Path::new(&file_path);
-    let allowed_exts = ["txt", "srt", "vtt", "lrc", "ass", "ssa", "sub", "csv", "tsv"];
-    let ext = path
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-        .to_ascii_lowercase();
-    if !allowed_exts.contains(&ext.as_str()) {
-        return Err("File type not allowed".into());
-    }
-    let canonical = path.canonicalize().map_err(|_| "Invalid file path".to_string())?;
-    read_text_file(canonical.to_string_lossy().to_string())
-}
-
-/// A file's size on disk, in bytes, for the subtitle card's readout. The card used to
-/// measure the decoded text it had loaded, which counts characters rather than bytes — a
-/// Persian subtitle is mostly two-byte characters in UTF-8, so it was reported at about
-/// half its size. Only the file knows how many bytes it holds; how the text happened to
-/// be decoded (a UTF-16 file, a BOM the reader strips) does not change that.
-#[tauri::command]
-fn get_file_size(file_path: String) -> Result<u64, String> {
-    std::fs::metadata(&file_path)
-        .map(|meta| meta.len())
-        .map_err(|e| format!("Failed to read the file's size: {e}"))
-}
-
-#[tauri::command]
-fn find_existing_video_file(candidates: Vec<String>) -> Option<String> {
-    for candidate in candidates {
-        let trimmed = candidate.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-        let path = Path::new(trimmed);
+async fn read_text_file_content(file_path: String) -> Result<String, String> {
+    tokio::task::spawn_blocking(move || {
+        let path = std::path::Path::new(&file_path);
+        let allowed_exts = ["txt", "srt", "vtt", "lrc", "ass", "ssa", "sub", "csv", "tsv"];
         let ext = path
             .extension()
             .and_then(|e| e.to_str())
-            .map(|e| e.to_ascii_lowercase())
-            .unwrap_or_default();
-        if VIDEO_EXTENSIONS.contains(&ext.as_str()) && path.is_file() {
-            return Some(trimmed.to_string());
+            .unwrap_or("")
+            .to_ascii_lowercase();
+        if !allowed_exts.contains(&ext.as_str()) {
+            return Err("File type not allowed".into());
         }
-    }
-    None
+        let canonical = path.canonicalize().map_err(|_| "Invalid file path".to_string())?;
+        read_text_file(canonical.to_string_lossy().to_string())
+    })
+    .await
+    .map_err(|e| format!("Failed to read file: {e}"))?
+}
+
+#[tauri::command]
+async fn find_existing_video_file(candidates: Vec<String>) -> Option<String> {
+    tokio::task::spawn_blocking(move || {
+        for candidate in candidates {
+            let trimmed = candidate.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            let path = Path::new(trimmed);
+            let ext = path
+                .extension()
+                .and_then(|e| e.to_str())
+                .map(|e| e.to_ascii_lowercase())
+                .unwrap_or_default();
+            if VIDEO_EXTENSIONS.contains(&ext.as_str()) && path.is_file() {
+                return Some(trimmed.to_string());
+            }
+        }
+        None
+    })
+    .await
+    .ok()
+    .flatten()
 }
 
 #[tauri::command]
@@ -1510,7 +1507,6 @@ fn main() {
             select_directory,
             verify_directory_writable,
             read_text_file_content,
-            get_file_size,
             find_existing_video_file,
             write_text_file_content,
             start_download_model_task,
@@ -1730,8 +1726,8 @@ mod main_tests {
         );
     }
 
-    #[test]
-    fn test_write_and_read_text_file_content_atomic_and_case_insensitive() {
+    #[tokio::test]
+    async fn test_write_and_read_text_file_content_atomic_and_case_insensitive() {
         let nonce = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
@@ -1748,12 +1744,14 @@ mod main_tests {
             .expect("Overwrite via atomic_replace_file should succeed");
 
         let read_back = read_text_file_content(srt_str)
+            .await
             .expect("Reading uppercase .SRT extension should succeed");
         assert_eq!(read_back, "Updated atomic content");
 
         let sub_path = temp_dir.join("legacy.sub");
         std::fs::write(&sub_path, "{1}{1}25\n{25}{75}Test").unwrap();
         let sub_read = read_text_file_content(sub_path.to_string_lossy().to_string())
+            .await
             .expect("Reading .sub subtitle extension should succeed");
         assert!(sub_read.contains("Test"));
 

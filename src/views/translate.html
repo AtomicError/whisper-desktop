@@ -109,7 +109,7 @@
                       <div class="translate-output-row">
                         <div class="translate-output-display" id="translate-output-dir-text" data-i18n="translate.sameAsSource">Same as source file folder</div>
                         <button class="btn-secondary btn-sm" id="btn-browse-translate-dir" data-i18n="translate.changeFolder" type="button" aria-describedby="translate-output-dir-text">Change...</button>
-                        <button class="btn-secondary btn-sm" id="btn-reset-translate-dir" data-i18n="translate.resetFolder" type="button" style="display:none;">Reset</button>
+                        <button class="btn-secondary btn-sm" id="btn-reset-translate-dir" data-i18n="translate.resetFolder" type="button" aria-describedby="translate-output-dir-text" style="display:none;">Reset</button>
                       </div>
                     </div>
 
@@ -156,9 +156,9 @@
                   <!-- Header Toolbar -->
                   <div class="translate-preview-toolbar">
                     <div class="translate-view-segmented" role="tablist" data-i18n-aria="translate.viewModeAriaLabel" aria-label="Subtitle View Mode">
-                      <button class="view-segment-btn active" id="btn-view-split" type="button" role="tab" aria-selected="true" tabindex="0" data-i18n="translate.viewSplit" data-i18n-aria="translate.viewSplit" aria-label="Split View">Split View</button>
-                      <button class="view-segment-btn" id="btn-view-source" type="button" role="tab" aria-selected="false" tabindex="-1" data-i18n="translate.viewSource" data-i18n-aria="translate.viewSource" aria-label="Original Only">Original Only</button>
-                      <button class="view-segment-btn" id="btn-view-target" type="button" role="tab" aria-selected="false" tabindex="-1" data-i18n="translate.viewTarget" data-i18n-aria="translate.viewTarget" aria-label="Translated Only">Translated Only</button>
+                      <button class="view-segment-btn active" id="btn-view-split" type="button" role="tab" aria-selected="true" aria-controls="translate-preview-grid" tabindex="0" data-i18n="translate.viewSplit" data-i18n-aria="translate.viewSplit" aria-label="Split View">Split View</button>
+                      <button class="view-segment-btn" id="btn-view-source" type="button" role="tab" aria-selected="false" aria-controls="translate-source-pane" tabindex="-1" data-i18n="translate.viewSource" data-i18n-aria="translate.viewSource" aria-label="Original Only">Original Only</button>
+                      <button class="view-segment-btn" id="btn-view-target" type="button" role="tab" aria-selected="false" aria-controls="translate-target-pane" tabindex="-1" data-i18n="translate.viewTarget" data-i18n-aria="translate.viewTarget" aria-label="Translated Only">Translated Only</button>
                     </div>
                     <div class="translate-toolbar-actions">
                       <button class="btn-secondary btn-icon-text" id="btn-copy-translated" type="button" disabled data-i18n-title="translate.emptyTargetTitle" title="No Translation Yet" data-i18n-aria="translate.copyTranslation" aria-label="Copy Subtitles">
@@ -185,7 +185,7 @@
                   </div>
 
                   <!-- Dual Preview Grid -->
-                  <div class="translate-preview-grid" id="translate-preview-grid">
+                  <div class="translate-preview-grid" id="translate-preview-grid" role="tabpanel" aria-labelledby="btn-view-split">
                     <!-- Source Subtitle Pane -->
                     <div class="translate-pane" id="translate-source-pane">
                       <div class="translate-pane-header">

@@ -26,6 +26,8 @@ import {
   hasPendingProviderGeneralChanges,
   flushPendingProviderGeneralChanges,
   syncProviderModelsFromSettings,
+  syncTranslationSettingsViewIfVisible,
+  syncActiveModelSelectionUI,
   addManualModelRow,
   type ModelObject
 } from './translationProviders';
@@ -1247,6 +1249,121 @@ describe('translationProviders module', () => {
       } finally {
         (globalThis as any).window.saveCurrentSettings = prevSave;
       }
+    });
+
+    it('defers keyring unlock when switching provider outside Settings and syncs stale Models table & pending keyring on return', async () => {
+      const invokeSpy = vi.fn().mockImplementation((cmd: string, args: any) => {
+        if (cmd === 'get_keyring_credential') return Promise.resolve(`secret-for-${args.providerName}`);
+        return Promise.resolve(undefined);
+      });
+      (globalThis as any).window.__TAURI__ = { core: { invoke: invokeSpy } };
+
+      const settingsPanel = makeEl('section', 'panel-settings');
+      const translationGroup = makeEl('div', 'group-translation');
+      translationGroup.classList.add('active');
+      makeEl('div', 'provider-manager-card');
+      const provSelect = makeEl('select', 'opt-translateAiProvider');
+      makeEl('select', 'opt-translateAiModel');
+      makeEl('div', 'providers-tiles-grid');
+      makeEl('div', 'general-placeholder-overlay');
+      makeEl('div', 'general-config-fields');
+      makeEl('div', 'models-placeholder-overlay');
+      makeEl('div', 'models-catalog-fields');
+      const tbody = makeEl('div', 'mgr-models-tbody');
+      tbody.appendChild = (child: any) => {
+        if (child && child.tagName === 'FRAGMENT' && Array.isArray(child.children)) {
+          tbody.children.push(...child.children);
+        } else {
+          tbody.children.push(child);
+        }
+        return child;
+      };
+      const origInnerHtmlDescriptor = Object.getOwnPropertyDescriptor(tbody, 'innerHTML');
+      Object.defineProperty(tbody, 'innerHTML', {
+        get: () => origInnerHtmlDescriptor?.get?.call(tbody) ?? tbody._innerHTML,
+        set: (v: string) => {
+          tbody.children = [];
+          origInnerHtmlDescriptor?.set?.call(tbody, v);
+        },
+        configurable: true,
+      });
+      makeEl('div', 'models-table-body');
+      const countEl = makeEl('span', 'provider-models-count');
+      const genTab = makeEl('div', 'provider-tab-general');
+      const modelsTab = makeEl('div', 'provider-tab-models');
+      makeEl('div', 'provider-tab-auto');
+      makeEl('div', 'provider-tab-providers');
+      makeEl('input', 'mgr-provider-url');
+      makeEl('select', 'mgr-provider-format');
+      const keyInput = makeEl('input', 'mgr-provider-key');
+      keyInput.nextElementSibling = makeEl('button');
+      makeEl('textarea', 'mgr-provider-prompt');
+
+      setSettingsState({
+        translateAiProvider: 'OpenAI',
+        translateAiModel: 'gpt-4o',
+        translateAiProviders: JSON.stringify([
+          {
+            name: 'OpenAI',
+            baseUrl: 'https://api.openai.com/v1',
+            apiKey: 'sk-1',
+            useKeyring: false,
+            models: [{ id: 'gpt-4o', contextWindow: 128000, enabled: true }]
+          },
+          {
+            name: 'Anthropic',
+            baseUrl: 'https://api.anthropic.com',
+            apiKey: '__KEYRING__',
+            useKeyring: true,
+            models: [
+              { id: 'claude-sonnet-4', contextWindow: 200000, enabled: true },
+              { id: 'claude-haiku-4', contextWindow: 200000, enabled: true }
+            ]
+          }
+        ])
+      });
+
+      // Initially Settings -> Models tab rendered OpenAI
+      settingsPanel.classList.add('active');
+      modelsTab.style.display = 'block';
+      genTab.style.display = 'none';
+      provSelect.value = 'OpenAI';
+      onProviderChanged('models', false);
+      expect(countEl.textContent).toBe('1');
+      expect(tbody.querySelectorAll('.model-data-row').map((r: any) => r.dataset.modelId)).toEqual(['gpt-4o']);
+
+      // Leave Settings and switch provider from Translation Studio
+      settingsPanel.classList.remove('active');
+      provSelect.value = 'Anthropic';
+      onProviderChanged(true, true);
+
+      expect(countEl.textContent).toBe('2');
+      expect(keyInput.dataset.keyringPending).toBe('true');
+      expect(invokeSpy).not.toHaveBeenCalledWith('get_keyring_credential', expect.anything());
+
+      // Return to Settings while Models tab is already visible -> table refreshes to Anthropic
+      settingsPanel.classList.add('active');
+      syncTranslationSettingsViewIfVisible();
+      expect(tbody.querySelectorAll('.model-data-row').map((r: any) => r.dataset.modelId)).toEqual([
+        'claude-sonnet-4',
+        'claude-haiku-4',
+      ]);
+      expect(invokeSpy).not.toHaveBeenCalledWith('get_keyring_credential', expect.anything());
+
+      // syncActiveModelSelectionUI updates active row highlight to claude-haiku-4
+      getSettingsState().translateAiModel = 'claude-haiku-4';
+      syncActiveModelSelectionUI('claude-haiku-4');
+      const haikuRow = tbody.querySelectorAll('.model-data-row').find((r: any) => r.dataset.modelId === 'claude-haiku-4');
+      expect(haikuRow.classList.contains('active-model-row')).toBe(true);
+
+      // Opening General tab flushes the deferred keyring fetch
+      modelsTab.style.display = 'none';
+      genTab.style.display = 'block';
+      switchProviderTab('general');
+      await new Promise(r => setTimeout(r, 0));
+      expect(invokeSpy).toHaveBeenCalledWith('get_keyring_credential', { providerName: 'Anthropic' });
+      expect(keyInput.value).toBe('secret-for-Anthropic');
+      expect(keyInput.dataset.keyringPending).toBeUndefined();
     });
   });
 });

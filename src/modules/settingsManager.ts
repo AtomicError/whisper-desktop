@@ -794,6 +794,9 @@ export function switchSettingsCategory(catName: string): void {
     if (typeof win.syncCustomSelects === 'function') {
       win.syncCustomSelects(false, true);
     }
+    if (catName === 'translation' && typeof win.syncTranslationSettingsViewIfVisible === 'function') {
+      win.syncTranslationSettingsViewIfVisible();
+    }
   }
 
   if (typeof toggleOutputDirCustomField === 'function') {

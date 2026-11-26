@@ -771,7 +771,20 @@ fn align_translations(
         if let Some(translated_text) = map.get_mut(idx) {
             let starts_with_dialogue_dash = |t: &str| {
                 let s = t.trim_start();
-                s.starts_with("- ") || s.starts_with('—') || s.starts_with('–') || s == "-"
+                if s.starts_with('—') || s.starts_with('–') || s == "-" {
+                    return true;
+                }
+                if let Some(after) = s.strip_prefix('-') {
+                    // Treat compact speaker dashes like "-سلام" as already prefixed so we
+                    // don't double them to "- -سلام", while keeping negative numbers ("-5",
+                    // "-۱۲") unprefixed so prepending "- " produces "- -5" instead of "+5".
+                    !after
+                        .chars()
+                        .next()
+                        .is_some_and(|c| c.is_ascii_digit() || ('\u{0660}'..='\u{0669}').contains(&c) || ('\u{06F0}'..='\u{06F9}').contains(&c))
+                } else {
+                    false
+                }
             };
 
             let orig_lines: Vec<&str> = orig_text.lines().collect();
@@ -822,18 +835,11 @@ pub(crate) fn redact_url_secrets(input: &str) -> String {
 
     while i < bytes.len() {
         let rest = &lower[i..];
-        let matched_param_len = if (i == 0 || matches!(bytes[i - 1], b'?' | b'&'))
-            && rest.starts_with("api_key=")
-        {
-            Some("api_key=".len())
-        } else if (i == 0 || matches!(bytes[i - 1], b'?' | b'&'))
-            && rest.starts_with("apikey=")
-        {
-            Some("apikey=".len())
-        } else if (i == 0 || matches!(bytes[i - 1], b'?' | b'&'))
-            && rest.starts_with("key=")
-        {
-            Some("key=".len())
+        let matched_param_len = if i == 0 || matches!(bytes[i - 1], b'?' | b'&') {
+            ["access_token=", "api_key=", "apikey=", "token=", "key="]
+                .into_iter()
+                .find(|prefix| rest.starts_with(prefix))
+                .map(|prefix| prefix.len())
         } else {
             None
         };
@@ -871,7 +877,34 @@ pub(crate) fn sanitize_reqwest_error(err: reqwest::Error) -> String {
 /// 3. UTF-8 with BOM or lossy UTF-8: if the file is mostly valid UTF-8
 ///    (e.g. Persian/Arabic text with isolated byte corruption), lossy decode
 ///    preserves the text instead of ruining the entire file into Windows-1252 mojibake.
-/// 4. Windows-1252 / Latin-1 decode for genuine legacy European subtitles.
+/// 4. Windows-1256 (Persian/Arabic) vs. Windows-1252 / Latin-1 decode for legacy
+///    single-byte subtitles.
+fn is_likely_windows_1256(bytes: &[u8]) -> bool {
+    let total_non_ascii = bytes.iter().filter(|&&b| b >= 0x80).count();
+    if total_non_ascii < 3 {
+        return false;
+    }
+
+    let (decoded, _, _) = encoding_rs::WINDOWS_1256.decode(bytes);
+    let mut arabic_persian_chars = 0usize;
+    let mut adjacent_arabic_pairs = 0usize;
+    let mut prev_is_letter = false;
+
+    for ch in decoded.chars() {
+        let is_block = ('\u{0600}'..='\u{06FF}').contains(&ch);
+        if is_block {
+            arabic_persian_chars += 1;
+        }
+        let is_letter = ('\u{0621}'..='\u{06FF}').contains(&ch);
+        if is_letter && prev_is_letter {
+            adjacent_arabic_pairs += 1;
+        }
+        prev_is_letter = is_letter;
+    }
+
+    arabic_persian_chars * 100 >= total_non_ascii * 60 && adjacent_arabic_pairs >= 2
+}
+
 pub(crate) fn read_subtitle_string(path: &Path) -> Result<String, String> {
     let bytes = fs::read(path)
         .map_err(|e| format!("Failed to read source file '{}': {}", path.display(), e))?;
@@ -894,19 +927,34 @@ pub(crate) fn read_subtitle_string(path: &Path) -> Result<String, String> {
         return Ok(decoded_utf8.into_owned());
     }
 
-    // If the file contains valid multi-byte non-ASCII UTF-8 characters (e.g.
-    // Persian, Arabic, Cyrillic, CJK, or multi-byte accented letters), it is
-    // genuinely a UTF-8 file with isolated byte errors — preserve it as lossy
-    // UTF-8 rather than corrupting the entire text into Windows-1252 mojibake.
-    let has_valid_multibyte_utf8 = decoded_utf8
-        .chars()
-        .any(|c| c > '\u{7F}' && c != '\u{FFFD}');
+    // 3a. Distinguish genuine Windows-1256 Persian/Arabic files (where occasional
+    // high-byte pairs like `[0xC7, 0xA1]` happen to form valid 2-byte UTF-8, while
+    // most non-ASCII bytes fail UTF-8 decoding) from mostly-valid corrupted UTF-8.
+    let mut valid_multibyte_utf8 = 0usize;
+    let mut fffd_count = 0usize;
+    for c in decoded_utf8.chars() {
+        if c == '\u{FFFD}' {
+            fffd_count += 1;
+        } else if c > '\u{7F}' {
+            valid_multibyte_utf8 += 1;
+        }
+    }
 
-    if has_valid_multibyte_utf8 {
+    if is_likely_windows_1256(&bytes) && fffd_count > valid_multibyte_utf8 {
+        let (decoded_1256, _, _) = encoding_rs::WINDOWS_1256.decode(&bytes);
+        return Ok(decoded_1256.into_owned());
+    }
+
+    // 3b. If the file contains valid multi-byte non-ASCII UTF-8 characters (e.g.
+    // Persian, Arabic, Cyrillic, CJK, or multi-byte accented letters), preserve
+    // it as lossy UTF-8 rather than ruining it into Windows-1252 mojibake.
+    if valid_multibyte_utf8 > 0 {
         return Ok(decoded_utf8.into_owned());
     }
 
-    // 4. Legacy single-byte subtitle encodings (Latin-1 / Windows-1252 family)
+    // 4. Legacy single-byte subtitle encodings: Windows-1252 / Latin-1 fallback
+    // (reached only when `valid_multibyte_utf8 == 0`, so any Windows-1256 file
+    // with `fffd_count > 0` was already handled in step 3a).
     let (decoded_1252, _, _) = encoding_rs::WINDOWS_1252.decode(&bytes);
     Ok(decoded_1252.into_owned())
 }
@@ -1067,6 +1115,9 @@ fn classify_non_success_error(
         return NonSuccessAction::Outcome(ChunkOutcome::ContextLimitExceeded(Some(exact)));
     }
     if is_context_length_error(err_text) {
+        return NonSuccessAction::Outcome(ChunkOutcome::ContextLimitExceeded(None));
+    }
+    if status_code == 413 && !is_rate_limit_or_quota_error(&err_text.to_lowercase()) {
         return NonSuccessAction::Outcome(ChunkOutcome::ContextLimitExceeded(None));
     }
 
@@ -1562,6 +1613,7 @@ pub async fn translate_files(
         status_guard.set_progress(last_progress);
 
         let mut stall_rounds: usize = 0;
+        let mut is_first_resumed_chunk = resumed_lines > 0;
 
         'chunk_loop: while !remaining_entries.is_empty() {
             // Honour a cancel request between chunks.
@@ -1576,42 +1628,46 @@ pub async fn translate_files(
                 break;
             };
 
-            // Emit current in-flight chunk status
-            let current_translated_lines = translations_map.len();
-            let global_progress =
-                compute_progress(file_idx, total_files, current_translated_lines, total_lines);
+            if is_first_resumed_chunk {
+                is_first_resumed_chunk = false;
+            } else {
+                // Emit current in-flight chunk status
+                let current_translated_lines = translations_map.len();
+                let global_progress =
+                    compute_progress(file_idx, total_files, current_translated_lines, total_lines);
 
-            let msg = if total_files > 1 {
-                format!(
-                    "Translating AI [{}/{}]: {}/{} lines ({})",
-                    file_idx + 1,
-                    total_files,
+                let msg = if total_files > 1 {
+                    format!(
+                        "Translating AI [{}/{}]: {}/{} lines ({})",
+                        file_idx + 1,
+                        total_files,
+                        current_translated_lines,
+                        total_lines,
+                        file_name
+                    )
+                } else {
+                    format!(
+                        "Translating AI: {}/{} lines ({})",
+                        current_translated_lines, total_lines, file_name
+                    )
+                };
+                let chunk_extras = Some((
                     current_translated_lines,
                     total_lines,
-                    file_name
-                )
-            } else {
-                format!(
-                    "Translating AI: {}/{} lines ({})",
-                    current_translated_lines, total_lines, file_name
-                )
-            };
-            let chunk_extras = Some((
-                current_translated_lines,
-                total_lines,
-                file_idx + 1,
-                total_files,
-            ));
-            emit_status(
-                &app,
-                global_progress,
-                &msg,
-                true,
-                chunk_extras,
-            );
-            last_extras = chunk_extras;
-            last_progress = global_progress;
-            status_guard.set_progress(last_progress);
+                    file_idx + 1,
+                    total_files,
+                ));
+                emit_status(
+                    &app,
+                    global_progress,
+                    &msg,
+                    true,
+                    chunk_extras,
+                );
+                last_extras = chunk_extras;
+                last_progress = global_progress;
+                status_guard.set_progress(last_progress);
+            }
 
             // Previous context (up to 3 preceding lines) for narrative continuity.
             // Prefer our own translations when available so the model sees the
@@ -2004,17 +2060,7 @@ pub async fn preview_translate(
         provider.api_key.clone()
     };
 
-    let format = if file_content.contains("-->") {
-        if file_content.trim_start().starts_with("WEBVTT") {
-            "vtt"
-        } else {
-            "srt"
-        }
-    } else if file_content.lines().any(|l| l.trim_start().starts_with('[') && l.contains(']')) {
-        "lrc"
-    } else {
-        "txt"
-    };
+    let format = detect_preview_subtitle_format(&file_content);
 
     let parsed = ParsedSubtitle::parse(&file_content, format);
     let original_entries: Vec<(usize, String)> = extract_translatable_entries(&parsed)
@@ -2192,10 +2238,30 @@ fn context_limit_patterns() -> &'static [regex::Regex] {
             regex::Regex::new(r"(?:input|prompt)\s*(?:length|size|tokens?)\s*(?:exceeds?|limit|maximum|max)\s*(?:is|of|:)?\s*(\d{4,})").expect("static regex"),
             // Anthropic: "prompt is too long: 205000 tokens > 200000 maximum"
             regex::Regex::new(r"prompt\s+is\s+too\s+long[^\n]{0,60}?>\s*(\d{4,})").expect("static regex"),
+            // Combined context overflow: "input length and max_tokens exceed context limit: 180000 + 25000 > 200000"
+            regex::Regex::new(r"exceed\s+context\s+limit[^\n]{0,80}?>\s*(\d{4,})").expect("static regex"),
             // Gemini: "The input token count (1200000) exceeds the maximum number of tokens allowed (1048576)."
             regex::Regex::new(r"input\s+token\s+count[^\n]{0,80}?(?:maximum|max|allowed)[^\n]{0,30}?\(?\s*(\d{4,})\s*\)?").expect("static regex"),
         ]
     })
+}
+
+fn mentions_output_cap_field(error_lower: &str) -> bool {
+    error_lower.contains("max_tokens")
+        || error_lower.contains("max tokens")
+        || error_lower.contains("max_output_tokens")
+        || error_lower.contains("max_completion_tokens")
+}
+
+fn mentions_context_or_input_limit(error_lower: &str) -> bool {
+    error_lower.contains("context")
+        || error_lower.contains("max_model_len")
+        || error_lower.contains("maximum model length")
+        || error_lower.contains("prompt is too long")
+        || error_lower.contains("input token")
+        || error_lower.contains("input length")
+        || error_lower.contains("prompt length")
+        || error_lower.contains("too many tokens")
 }
 
 fn is_rate_limit_or_quota_error(error_lower: &str) -> bool {
@@ -2227,6 +2293,21 @@ fn parse_context_limit_from_error(error_msg: &str) -> Option<usize> {
     None
 }
 
+fn detect_preview_subtitle_format(content: &str) -> &'static str {
+    let cleaned = content.trim_start_matches('\u{feff}');
+    if cleaned.contains("-->") {
+        if cleaned.trim_start().starts_with("WEBVTT") {
+            "vtt"
+        } else {
+            "srt"
+        }
+    } else if cleaned.lines().any(|l| l.trim_start().starts_with('[') && l.contains(']')) {
+        "lrc"
+    } else {
+        "txt"
+    }
+}
+
 fn is_context_length_error(error_msg: &str) -> bool {
     let error_lower = error_msg.to_lowercase();
     if is_rate_limit_or_quota_error(&error_lower) {
@@ -2243,7 +2324,14 @@ fn is_context_length_error(error_msg: &str) -> bool {
         && (error_lower.contains("exceed")
             || error_lower.contains("maximum")
             || error_lower.contains("limit"));
-    has_context_phrase || has_anthropic_prompt_limit || has_gemini_input_limit
+    let has_payload_too_large = error_lower.contains("request_too_large")
+        || error_lower.contains("payload too large")
+        || error_lower.contains("request entity too large")
+        || error_lower.contains("request exceeds the maximum size");
+    has_context_phrase
+        || has_anthropic_prompt_limit
+        || has_gemini_input_limit
+        || has_payload_too_large
 }
 
 fn output_cap_patterns() -> &'static [regex::Regex] {
@@ -2261,8 +2349,12 @@ fn output_cap_patterns() -> &'static [regex::Regex] {
 
 /// Extracts the model's exact `max_tokens` cap from an API rejection body.
 /// Bounded to [1024, 200_000] so prose numbers never poison the setting.
+/// Requires an explicit output-cap field and excludes context/input overflow errors.
 fn parse_output_cap_from_error(error_msg: &str) -> Option<u32> {
     let error_lower = error_msg.to_lowercase();
+    if !mentions_output_cap_field(&error_lower) || mentions_context_or_input_limit(&error_lower) {
+        return None;
+    }
     for re in output_cap_patterns() {
         if let Some(caps) = re.captures(&error_lower) {
             if let Some(m) = caps.get(1) {
@@ -2281,10 +2373,8 @@ fn parse_output_cap_from_error(error_msg: &str) -> Option<u32> {
 /// when the exact number cannot be parsed. Halving recovers in O(log n).
 fn is_max_tokens_error(error_msg: &str) -> bool {
     let e = error_msg.to_lowercase();
-    (e.contains("max_tokens")
-        || e.contains("max tokens")
-        || e.contains("max_output_tokens")
-        || e.contains("max_completion_tokens"))
+    mentions_output_cap_field(&e)
+        && !mentions_context_or_input_limit(&e)
         && (e.contains("exceed") || e.contains("too large") || e.contains("too big")
             || e.contains("invalid") || e.contains("greater than")
             || e.contains("above") || e.contains("over") || e.contains("maximum"))
@@ -2957,9 +3047,170 @@ mod alignment_tests {
 
     #[test]
     fn redact_url_secrets_masks_query_keys_in_error_bodies() {
-        let raw = "Upstream failed calling https://generativelanguage.googleapis.com/v1beta/models?key=AIzaTopSecret999&alt=json";
+        let raw = "Upstream failed calling https://generativelanguage.googleapis.com/v1beta/models?key=AIzaTopSecret999&alt=json&access_token=ya29.SecretTok&token=abc123";
         let sanitized = redact_url_secrets(&safe_truncate(raw, 600));
         assert!(!sanitized.contains("AIzaTopSecret999"));
-        assert!(sanitized.contains("?key=<redacted>&alt=json"));
+        assert!(!sanitized.contains("ya29.SecretTok"));
+        assert!(!sanitized.contains("abc123"));
+        assert!(sanitized.contains("?key=<redacted>&alt=json&access_token=<redacted>&token=<redacted>"));
+    }
+
+    #[test]
+    fn align_translations_normalizes_compact_speaker_dash_without_doubling_or_touching_negatives() {
+        let originals = vec![
+            (1, "- Hello!\n- Goodbye.".to_string()),
+            (2, "- How cold is it?".to_string()),
+        ];
+        let response = "1: -سلام!\n- خداحافظ.\n2: -5 درجه";
+        let aligned = align_translations(&originals, response, false);
+        assert_eq!(aligned.get(&1).map(String::as_str), Some("-سلام!\n- خداحافظ."));
+        assert_eq!(aligned.get(&2).map(String::as_str), Some("- -5 درجه"));
+
+        let neg_orig = vec![(1, "- -5°C".to_string())];
+        let neg_aligned = align_translations(&neg_orig, "1: -5 درجه", false);
+        assert_eq!(neg_aligned.get(&1).map(String::as_str), Some("- -5 درجه"));
+    }
+
+    #[test]
+    fn combined_context_and_max_tokens_errors_classify_as_context_limit_not_output_cap() {
+        let mut opts = RequestOptions {
+            max_output_tokens: Some(16_384),
+            ..Default::default()
+        };
+
+        let anthropic_combined =
+            "input length and max_tokens exceed context limit: 180000 + 25000 > 200000, decrease input length or max_tokens and try again";
+        let action = classify_non_success_error(
+            ApiFormat::AnthropicMessages,
+            400,
+            anthropic_combined,
+            &mut opts,
+        );
+        assert!(matches!(
+            action,
+            NonSuccessAction::Outcome(ChunkOutcome::ContextLimitExceeded(Some(200_000)))
+        ));
+
+        let openai_combined =
+            "This model's maximum context length is 8192 tokens, however you requested 9000 tokens (7000 in the messages, 2000 in the completion). Please reduce the length of the messages or max_tokens.";
+        let openai_action = classify_non_success_error(
+            ApiFormat::OpenAiCompatible,
+            400,
+            openai_combined,
+            &mut opts,
+        );
+        assert!(matches!(
+            openai_action,
+            NonSuccessAction::Outcome(ChunkOutcome::ContextLimitExceeded(Some(8192)))
+        ));
+
+        let pure_output_cap = "max_tokens: 100000 > 64000 (maximum allowed)";
+        let output_action = classify_non_success_error(
+            ApiFormat::AnthropicMessages,
+            400,
+            pure_output_cap,
+            &mut opts,
+        );
+        assert!(matches!(
+            output_action,
+            NonSuccessAction::Outcome(ChunkOutcome::OutputCapExceeded(Some(64_000)))
+        ));
+    }
+
+    #[test]
+    fn classify_413_request_too_large_triggers_context_shrink() {
+        let mut opts = RequestOptions::default();
+
+        let anthropic_413 = r#"{"type":"error","error":{"type":"request_too_large","message":"Request exceeds the maximum size."}}"#;
+        let action_anthropic = classify_non_success_error(
+            ApiFormat::AnthropicMessages,
+            413,
+            anthropic_413,
+            &mut opts,
+        );
+        assert!(matches!(
+            action_anthropic,
+            NonSuccessAction::Outcome(ChunkOutcome::ContextLimitExceeded(None))
+        ));
+
+        let proxy_413 = "413 Payload Too Large";
+        let action_proxy = classify_non_success_error(
+            ApiFormat::OpenAiCompatible,
+            413,
+            proxy_413,
+            &mut opts,
+        );
+        assert!(matches!(
+            action_proxy,
+            NonSuccessAction::Outcome(ChunkOutcome::ContextLimitExceeded(None))
+        ));
+
+        let empty_413_action = classify_non_success_error(
+            ApiFormat::OpenAiCompatible,
+            413,
+            "",
+            &mut opts,
+        );
+        assert!(matches!(
+            empty_413_action,
+            NonSuccessAction::Outcome(ChunkOutcome::ContextLimitExceeded(None))
+        ));
+    }
+
+    #[test]
+    fn classify_413_rate_limit_tpm_does_not_shrink_context() {
+        let mut opts = RequestOptions::default();
+        let groq_tpm_413 =
+            "Request too large for model `llama-3.3-70b-versatile` on tokens per minute (TPM): Limit 12000, Requested 15000";
+        let action = classify_non_success_error(
+            ApiFormat::OpenAiCompatible,
+            413,
+            groq_tpm_413,
+            &mut opts,
+        );
+        assert!(matches!(action, NonSuccessAction::CheckTransientOrFail));
+        assert!(!is_context_length_error(groq_tpm_413));
+    }
+
+    #[test]
+    fn windows_1256_persian_subtitle_decodes_cleanly() {
+        let dir = std::env::temp_dir().join(format!("whisper-win1256-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let persian_srt = "1\n00:00:01,000 --> 00:00:03,000\nسلام دنيا، چه خبر؟\n\n2\n00:00:04,000 --> 00:00:06,000\nپدر و مادر گفتند چشم\n";
+        let (encoded, _, had_errors) = encoding_rs::WINDOWS_1256.encode(persian_srt);
+        assert!(!had_errors);
+
+        let p_path = dir.join("legacy_fa.srt");
+        std::fs::write(&p_path, encoded.as_ref()).unwrap();
+        let decoded = read_subtitle_string(&p_path).unwrap();
+        assert_eq!(decoded, persian_srt);
+
+        // Isolated European accented bytes must still use Windows-1252
+        let fr_srt = "1\n00:00:01,000 --> 00:00:02,000\ncaf\u{E9} cr\u{E8}me\n";
+        let (encoded_fr, _, _) = encoding_rs::WINDOWS_1252.encode(fr_srt);
+        let fr_path = dir.join("legacy_fr.srt");
+        std::fs::write(&fr_path, encoded_fr.as_ref()).unwrap();
+        assert_eq!(read_subtitle_string(&fr_path).unwrap(), fr_srt);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn preview_format_detection_handles_utf8_bom_vtt() {
+        let vtt_bom = "\u{feff}WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nHello";
+        assert_eq!(detect_preview_subtitle_format(vtt_bom), "vtt");
+        assert_eq!(
+            detect_preview_subtitle_format("1\n00:00:01,000 --> 00:00:02,000\nHello"),
+            "srt"
+        );
+        assert_eq!(
+            detect_preview_subtitle_format("[00:12.34]Lyric line"),
+            "lrc"
+        );
+        assert_eq!(
+            detect_preview_subtitle_format("Plain line one\nPlain line two"),
+            "txt"
+        );
     }
 }

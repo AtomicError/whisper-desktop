@@ -376,7 +376,15 @@ export class CustomSelect {
       : (!isRowSelect && !isPaginationSelect);
 
     if (shouldObserve && typeof MutationObserver !== 'undefined') {
-      this.observer = new MutationObserver(() => {
+      this.observer = new MutationObserver((mutations = []) => {
+        const hasStructuralChange =
+          !Array.isArray(mutations) ||
+          mutations.length === 0 ||
+          mutations.some((m) => m.type === 'childList' || m.target !== this.select);
+        if (!hasStructuralChange) {
+          this.syncDisabledState();
+          return;
+        }
         if (this._pendingOptionsRefresh) {
           this.syncDisabledState();
           return;
