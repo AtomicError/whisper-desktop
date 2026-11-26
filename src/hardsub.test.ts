@@ -3138,6 +3138,254 @@ describe('hardsub output directory management', () => {
         vi.stubGlobal('ResizeObserver', prevResizeObserver);
       }
     });
+
+    it('enforces container compatibility on hardware fallback and storage restore, adjusts muted volume from zero, sets global running flag pre-probe, and updates placeholder hint on preview error', async () => {
+      const store = new Map<string, string>();
+      const prevResizeObserver = (globalThis as any).ResizeObserver;
+      vi.stubGlobal('ResizeObserver', class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      });
+      store.set('whisper_hardsub_export_settings', JSON.stringify({
+        outputFormat: 'webm',
+        videoCodec: 'h264',
+        hwAccel: 'cpu',
+      }));
+      vi.stubGlobal('localStorage', {
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => { store.set(k, v); },
+        removeItem: (k: string) => { store.delete(k); },
+      });
+
+      try {
+        doc.readyState = 'complete';
+        const { controller, internal, video, container } = fixture();
+        const formatSelect = new Control();
+        (internal as any).formatSelect = formatSelect;
+
+        // 1. Storage restore fixes incompatible webm + h264 -> mp4
+        expect((internal.state as any).outputFormat).toBe('mp4');
+
+        // 2. Hardware fallback from vaapi+av1 to nvenc (without av1) switches webm -> mp4
+        (internal.state as any).outputFormat = 'webm';
+        (internal.state as any).videoCodec = 'av1';
+        (internal.state as any).hwAccel = 'vaapi';
+        (internal as any).cachedHwStatus = {
+          hasQsv: false,
+          hasNvenc: true,
+          hasVaapi: false,
+          hasVideotoolbox: false,
+          qsvCodecs: [],
+          nvencCodecs: ['h264', 'h265'],
+          vaapiCodecs: [],
+          videotoolboxCodecs: [],
+        };
+        (internal as any).populateHardwareDropdown((internal as any).cachedHwStatus);
+        expect((internal.state as any).hwAccel).toBe('nvenc');
+        expect((internal.state as any).videoCodec).toBe('h264');
+        expect((internal.state as any).outputFormat).toBe('mp4');
+
+        // 3. Muted ArrowUp / wheel starts from 0 instead of stale video.volume
+        (internal as any).pageActive = true;
+        video.ready();
+        internal.phase = 'ready';
+        video.volume = 0.8;
+        video.muted = true;
+        doc.dispatchEvent(Object.assign(new Event('keydown', { cancelable: true }), {
+          key: 'ArrowUp',
+          isComposing: false,
+          ctrlKey: false,
+          altKey: false,
+          metaKey: false,
+          shiftKey: false,
+        }));
+        expect(video.volume).toBeCloseTo(0.05, 5);
+        expect(video.muted).toBe(false);
+
+        video.volume = 0.7;
+        video.muted = true;
+        container.dispatchEvent(Object.assign(new Event('wheel', { cancelable: true }), {
+          deltaX: 0,
+          deltaY: 10,
+        }));
+        expect(video.volume).toBe(0);
+        expect(video.muted).toBe(true);
+
+        // 4. Placeholder hint updates on preview error/cancelled and restores on idle
+        const placeholder = new Control();
+        const placeholderIdle = new Control();
+        const hintEl = new Control();
+        placeholderIdle.querySelector = (sel: string) => (sel === '.hardsub-placeholder-hint' ? hintEl : null);
+        (internal as any).videoPlaceholder = placeholder;
+        (internal as any).placeholderIdle = placeholderIdle;
+
+        internal.phase = 'cancelled';
+        (internal as any).renderPlayerPhase();
+        expect(hintEl.textContent).not.toContain('Select a video file above');
+
+        internal.phase = 'idle';
+        (internal as any).renderPlayerPhase();
+        expect(hintEl.textContent.length).toBeGreaterThan(0);
+
+        // 5. startHardsub sets window.isHardsubRunning=true immediately during pre-probe and resets on failure
+        let rejectProbe!: (err: unknown) => void;
+        invoke.mockImplementation((command: string) => {
+          if (command === 'get_font_render_scale') return Promise.resolve({ scale: 1, ascentRatio: 0.8, descentRatio: 0.2 });
+          if (command === 'probe_hardsub_source') {
+            return new Promise((_, reject) => {
+              rejectProbe = reject;
+            });
+          }
+          return Promise.resolve(undefined);
+        });
+        const subInput = new Control();
+        subInput.value = '/sub.srt';
+        (internal as any).subtitlePathInput = subInput;
+        internal.state.videoPath = '/v.mp4';
+        internal.state.subtitlePath = '/sub.srt';
+        (internal as any).sourceInfo = null;
+        (internal as any).directSourceGeometry = null;
+        (window as any).showNotification = vi.fn();
+
+        const run = (internal as any).startHardsub();
+        await flush();
+        expect((window as any).isHardsubRunning).toBe(true);
+
+        rejectProbe(new Error('Probe failed'));
+        await run;
+        expect((window as any).isHardsubRunning).toBe(false);
+        expect(controller).toBeTruthy();
+      } finally {
+        vi.stubGlobal('localStorage', undefined as any);
+        vi.stubGlobal('ResizeObserver', prevResizeObserver);
+      }
+    });
+
+    it('keeps startHardsub running when preview is retried or cancelled mid-setup, rolls back font on superseded subtitle loads, and omits empty system optgroup', async () => {
+      const { internal, retry, cancel } = fixture();
+      const subInput = new Control();
+      subInput.value = '/clip.srt';
+      (internal as any).subtitlePathInput = subInput;
+      internal.state.videoPath = '/clip.mp4';
+      internal.state.subtitlePath = '/clip.srt';
+      (internal as any).subtitleCues = [
+        { id: 1, startMs: 0, endMs: 1200, startTimeStr: '00:00:00,000', endTimeStr: '00:00:01,200', text: 'Hello' },
+      ];
+      (internal as any).sourceInfo = null;
+      (internal as any).directSourceGeometry = null;
+      internal.phase = 'error';
+
+      const probeResolvers: Array<(val: unknown) => void> = [];
+      const startedTasks: any[] = [];
+      const writtenFiles: string[] = [];
+      invoke.mockImplementation((command: string, args: any) => {
+        if (command === 'get_font_render_scale') {
+          return Promise.resolve({ scale: 1, ascentRatio: 0.8, descentRatio: 0.2 });
+        }
+        if (command === 'probe_hardsub_source') {
+          return new Promise((resolve) => {
+            probeResolvers.push(resolve);
+          });
+        }
+        if (command === 'begin_hardsub_preview') {
+          return Promise.resolve({
+            requestId: args.requestId,
+            candidateId: 'cand-retry',
+            url: 'http://127.0.0.1:9/media/retry',
+            stage: 'direct',
+            source: null,
+          });
+        }
+        if (command === 'release_hardsub_preview') {
+          return Promise.resolve(undefined);
+        }
+        if (command === 'write_text_file_content') {
+          writtenFiles.push(args.filePath);
+          return Promise.resolve(undefined);
+        }
+        if (command === 'start_hardsub_task') {
+          startedTasks.push(args.settings);
+          return Promise.resolve({ outputPath: '/clip_hardsub.mp4', durationMs: 100, outputSizeMb: 1 });
+        }
+        return Promise.resolve(undefined);
+      });
+
+      const exportPromise = (internal as any).startHardsub();
+      await flush();
+
+      // Trigger preview retry while startHardsub is awaiting probe_hardsub_source (increments videoLoadGeneration & clears sourceInfo)
+      retry.dispatchEvent(new Event('click'));
+      await flush();
+      // Then cancel preview while still awaiting
+      cancel.dispatchEvent(new Event('click'));
+      await flush();
+
+      const resolvedSource = {
+        width: 1280,
+        height: 720,
+        displayWidth: 1280,
+        displayHeight: 720,
+        durationSec: 10,
+        videoStreamIndex: 0,
+        audioStreamIndex: 1,
+        startTimeSec: 0,
+      };
+      probeResolvers.forEach((resolve) => resolve(resolvedSource));
+      await exportPromise;
+
+      expect(writtenFiles).toContain('/clip.temp.ass');
+      expect(startedTasks).toHaveLength(1);
+      expect(startedTasks[0].subtitlePath).toBe('/clip.temp.ass');
+
+      // Superseded performLoadSubtitleFile restores previous fontName when aborted during refreshFontRenderScale
+      let resolveScale!: (val: unknown) => void;
+      invoke.mockImplementation((command: string) => {
+        if (command === 'read_text_file_content') {
+          return Promise.resolve('1\n00:00:00,000 --> 00:00:01,000\nسلام دنیا\n');
+        }
+        if (command === 'get_font_render_scale') {
+          return new Promise((resolve) => {
+            resolveScale = resolve;
+          });
+        }
+        return Promise.resolve(undefined);
+      });
+
+      (internal.state as any).fontName = 'Inter';
+      internal.state.subtitlePath = '/fa.srt';
+      const firstSubLoad = (internal as any).performLoadSubtitleFile('/fa.srt', false);
+      await flush();
+      // Supersede before refreshFontRenderScale resolves
+      (internal as any).subtitleSerial++;
+      resolveScale({ scale: 1, ascentRatio: 0.8, descentRatio: 0.2 });
+      await firstSubLoad;
+      expect((internal.state as any).fontName).toBe('Inter');
+
+      // loadFontsAndHardware omits empty system optgroup when only bundled fonts are returned
+      const fontSelectEl = new Control();
+      const appendedGroups: any[] = [];
+      fontSelectEl.appendChild = (child: any) => {
+        appendedGroups.push(child);
+        return child;
+      };
+      (internal as any).fontSelect = fontSelectEl;
+      invoke.mockImplementation((command: string) => {
+        if (command === 'get_system_fonts') {
+          return Promise.resolve([{ name: 'Inter', source: 'bundled' }]);
+        }
+        if (command === 'get_font_render_scale') {
+          return Promise.resolve({ scale: 1, ascentRatio: 0.8, descentRatio: 0.2 });
+        }
+        if (command === 'check_hardware_encoders') {
+          return Promise.resolve(undefined);
+        }
+        return Promise.resolve(undefined);
+      });
+      await (internal as any).loadFontsAndHardware();
+      expect(appendedGroups).toHaveLength(1);
+      expect((internal as any).systemFontOptgroup).toBeNull();
+    });
   });
 });
 

@@ -2754,9 +2754,10 @@ html[dir="rtl"] #transcript-search::placeholder,
   font-size: 0.74rem;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.8) !important;
+  width: auto;
   min-width: 34px;
   height: 28px;
-  padding: 0 4px;
+  padding: 0 6px;
   letter-spacing: -0.2px;
 }
 

@@ -425,8 +425,11 @@ export function setupSearchShortcuts(): void {
           input.select();
         }
       } else if (activeView === 'hardsub') {
+        const isHardsubFullscreen = Boolean(
+          document.body?.classList?.contains('hardsub-fullscreen-active') || document.fullscreenElement
+        );
         const input = document.getElementById('hardsub-search-input') as HTMLInputElement | null;
-        if (input && input.offsetParent !== null) {
+        if (!isHardsubFullscreen && input && input.offsetParent !== null) {
           e.preventDefault();
           input.focus();
           input.select();

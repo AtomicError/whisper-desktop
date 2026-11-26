@@ -548,6 +548,17 @@ body.rtl .transcribe-linear-fill,
   font-size: 0.85rem;
 }
 
+html[dir="rtl"] #hardsub-tab-view-editor .hardsub-search-input,
+.rtl-layout #hardsub-tab-view-editor .hardsub-search-input {
+  padding-left: 12px;
+  padding-right: 34px;
+}
+
+html:not([dir="rtl"]) #hardsub-tab-view-editor .hardsub-search-input {
+  padding-left: 34px;
+  padding-right: 12px;
+}
+
 .hardsub-search-icon {
   width: 16px;
   height: 16px;
@@ -1159,7 +1170,7 @@ body.hardsub-fullscreen-active #hardsub-video-controls {
 
 body.hardsub-fullscreen-active #hardsub-video-controls.show-controls,
 body.hardsub-fullscreen-active #hardsub-video-controls:hover,
-body.hardsub-fullscreen-active #hardsub-video-controls:focus-within {
+body.hardsub-fullscreen-active #hardsub-video-controls:has(:focus-visible) {
   opacity: 1;
   transform: translateY(0);
   pointer-events: auto;

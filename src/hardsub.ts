@@ -1598,7 +1598,7 @@ export class HardsubController {
   public async loadFontsAndHardware() {
     try {
       const fonts = await invoke<FontItem[]>('get_system_fonts');
-      if (this.fontSelect && fonts.length > 0) {
+      if (this.fontSelect && Array.isArray(fonts) && fonts.length > 0) {
         this.fontSelect.innerHTML = '';
 
         const bundledGroup = document.createElement('optgroup');
@@ -1619,9 +1619,13 @@ export class HardsubController {
         });
 
         this.bundledFontOptgroup = bundledGroup;
-        this.systemFontOptgroup = systemGroup;
         this.fontSelect.appendChild(bundledGroup);
-        this.fontSelect.appendChild(systemGroup);
+        if (systemGroup.children.length > 0) {
+          this.systemFontOptgroup = systemGroup;
+          this.fontSelect.appendChild(systemGroup);
+        } else {
+          this.systemFontOptgroup = null;
+        }
 
         if (!this.hasCustomFontSelection) {
           this.state.fontName = this.getSmartDefaultFont();
@@ -1647,8 +1651,15 @@ export class HardsubController {
 
     try {
       const hwStatus = await invoke<HardwareStatus>('check_hardware_encoders');
-      this.cachedHwStatus = hwStatus;
-      this.populateHardwareDropdown(hwStatus);
+      if (hwStatus && typeof hwStatus === 'object') {
+        this.cachedHwStatus = hwStatus;
+        this.populateHardwareDropdown(hwStatus);
+      } else {
+        this.updateSupportedCodecs();
+        this.updateQualitySliderConfig();
+        this.updateQualityUI();
+        this.updateFfmpegCommandPreview();
+      }
     } catch (e) {
       console.warn('Failed to probe hardware encoders:', e);
       this.updateSupportedCodecs();
@@ -1721,6 +1732,7 @@ export class HardsubController {
       }
     }
     this.updateSupportedCodecs();
+    this.enforceContainerCompatibility('codec', true);
     this.updateQualitySliderConfig();
     this.updateQualityUI();
     this.updateFfmpegCommandPreview();
@@ -1796,11 +1808,11 @@ export class HardsubController {
     }
   }
 
-  private async refreshFontRenderScale(): Promise<boolean> {
+  private async refreshFontRenderScale(fontOverride?: string): Promise<boolean> {
     const serial = ++this.fontScaleSerial;
     try {
       const allCuesText = this.subtitleCues ? this.subtitleCues.map((c) => c.text).join(' ') : '';
-      const targetFont = resolveEffectiveFont(this.state.fontName, allCuesText);
+      const targetFont = fontOverride ?? resolveEffectiveFont(this.state.fontName, allCuesText);
       const metrics = await invoke<{ scale: number; ascentRatio: number; descentRatio: number }>('get_font_render_scale', {
         fontName: targetFont,
         bold: this.state.bold,
@@ -2288,7 +2300,7 @@ export class HardsubController {
     });
   }
 
-  private enforceContainerCompatibility(changedField: 'format' | 'codec' | 'audio'): void {
+  private enforceContainerCompatibility(changedField: 'format' | 'codec' | 'audio', silent = false): void {
     let adjusted = false;
     if (this.state.outputFormat === 'webm') {
       if (changedField === 'format') {
@@ -2379,9 +2391,11 @@ export class HardsubController {
       if (typeof (window as any)?.syncCustomSelects === 'function') {
         (window as any).syncCustomSelects(false, true);
       }
-      const notifyFn = (window as any)?.showNotification;
-      if (typeof notifyFn === 'function') {
-        notifyFn(t('hardsub.containerCodecAdjusted', { format: this.state.outputFormat.toUpperCase() }), 'info', 4000);
+      if (!silent) {
+        const notifyFn = (window as any)?.showNotification;
+        if (typeof notifyFn === 'function') {
+          notifyFn(t('hardsub.containerCodecAdjusted', { format: this.state.outputFormat.toUpperCase() }), 'info', 4000);
+        }
       }
     }
   }
@@ -3013,6 +3027,7 @@ export class HardsubController {
       if (this.formatSelect) this.formatSelect.value = this.state.outputFormat;
       if (this.hwSelect) this.hwSelect.value = this.state.hwAccel;
       this.updateSupportedCodecs();
+      this.enforceContainerCompatibility('codec', true);
       if (this.resolutionSelect) this.resolutionSelect.value = this.state.resolutionScale;
       if (this.speedPresetSelect) this.speedPresetSelect.value = this.state.videoPresetSpeed;
       if (this.audioCodecSelect) this.audioCodecSelect.value = this.state.audioCodec;
@@ -3386,7 +3401,15 @@ export class HardsubController {
       } else {
         this.videoPlaceholder.style.display = 'flex';
         this.videoPlaceholder.style.cursor = this.phase === 'idle' ? 'pointer' : 'default';
-        if (this.placeholderIdle) this.placeholderIdle.style.display = busy ? 'none' : 'flex';
+        if (this.placeholderIdle) {
+          this.placeholderIdle.style.display = busy ? 'none' : 'flex';
+          const hintEl = typeof this.placeholderIdle.querySelector === 'function'
+            ? this.placeholderIdle.querySelector('.hardsub-placeholder-hint')
+            : null;
+          if (hintEl) {
+            hintEl.textContent = recovery ? message : t('hardsub.selectVideoNotice');
+          }
+        }
         if (this.placeholderLoading) {
           this.placeholderLoading.style.display = busy ? 'flex' : 'none';
           if (this.placeholderLoadingText && busy) {
@@ -3793,7 +3816,8 @@ export class HardsubController {
       } else {
         // Vertical scroll: adjust volume
         const delta = e.deltaY > 0 ? -0.05 : 0.05;
-        const newVal = Math.max(0, Math.min(1, this.videoElement.volume + delta));
+        const baseVol = this.videoElement.muted ? 0 : this.videoElement.volume;
+        const newVal = Math.max(0, Math.min(1, baseVol + delta));
         
         this.videoElement.volume = newVal;
         this.videoElement.muted = (newVal === 0);
@@ -3843,7 +3867,8 @@ export class HardsubController {
         this.performSafeSeek(this.videoElement.currentTime + (e.key === 'ArrowLeft' ? -5 : 5));
       } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         e.preventDefault();
-        const volume = Math.max(0, Math.min(1, this.videoElement.volume + (e.key === 'ArrowUp' ? 0.05 : -0.05)));
+        const baseVol = this.videoElement.muted ? 0 : this.videoElement.volume;
+        const volume = Math.max(0, Math.min(1, baseVol + (e.key === 'ArrowUp' ? 0.05 : -0.05)));
         this.videoElement.volume = volume;
         this.videoElement.muted = volume === 0;
         if (volume > 0) this.lastVolume = volume;
@@ -4735,14 +4760,19 @@ export class HardsubController {
       if (this.disposed || (!allowDuringEncode && this.isEncoding) || serial !== this.subtitleSerial || this.state.subtitlePath !== subPath) return;
       const lastDot = subPath.lastIndexOf('.');
       const ext = lastDot > 0 ? subPath.substring(lastDot + 1).toLowerCase() : 'srt';
-      this.subtitleCues = parseSubtitleContent(content, ext);
-      const allText = this.subtitleCues.map((c) => c.text).join(' ');
-      if (hasArabicScript(allText) && !isArabicScriptFont(this.state.fontName)) {
+      const parsedCues = parseSubtitleContent(content, ext);
+      const allText = parsedCues.map((c) => c.text).join(' ');
+      const switchedFont = hasArabicScript(allText) && !isArabicScriptFont(this.state.fontName);
+      const targetFont = switchedFont ? 'Vazirmatn' : resolveEffectiveFont(this.state.fontName, allText);
+      await this.refreshFontRenderScale(targetFont);
+      if (this.disposed || (!allowDuringEncode && this.isEncoding) || serial !== this.subtitleSerial || this.state.subtitlePath !== subPath) {
+        return;
+      }
+      this.subtitleCues = parsedCues;
+      if (switchedFont) {
         this.state.fontName = 'Vazirmatn';
         this.syncFontSelectUI();
       }
-      await this.refreshFontRenderScale();
-      if (this.disposed || (!allowDuringEncode && this.isEncoding) || serial !== this.subtitleSerial || this.state.subtitlePath !== subPath) return;
       this.maxCueDuration = this.subtitleCues.reduce((max, c) => Math.max(max, c.endMs - c.startMs), 0);
       this.isSubtitlesModified = false;
       this._lastRenderKey = '';
@@ -5704,9 +5734,9 @@ export class HardsubController {
       this.updateEncodingUIState(data.active);
     }));
   }
-  private generateAssContent(): string {
-    const videoW = this.sourceInfo?.displayWidth ?? this.directSourceGeometry?.width;
-    const videoH = this.sourceInfo?.displayHeight ?? this.directSourceGeometry?.height;
+  private generateAssContent(sourceGeometry?: { width: number; height: number } | null): string {
+    const videoW = sourceGeometry?.width ?? this.sourceInfo?.displayWidth ?? this.directSourceGeometry?.width;
+    const videoH = sourceGeometry?.height ?? this.sourceInfo?.displayHeight ?? this.directSourceGeometry?.height;
     if (!videoW || !videoH || !Number.isFinite(videoW) || !Number.isFinite(videoH)) throw new Error(t('hardsub.previewUnavailable'));
     const videoAspect = videoW / videoH;
 
@@ -5905,8 +5935,9 @@ ${events}`;
   private async startHardsub() {
     if (this.isEncoding || this.disposed) return;
     const originalVideoPath = this.state.videoPath;
-    const generation = this.videoLoadGeneration;
-    const current = () => this.isCurrentVideoLoad(generation, originalVideoPath);
+    // Decouple export lifecycle from preview `videoLoadGeneration` so retrying or
+    // cancelling preview during setup never aborts an export silently.
+    const current = () => !this.disposed && originalVideoPath === this.state.videoPath;
     this.state.subtitlePath = this.subtitlePathInput?.value.trim() || '';
 
     if (!this.state.videoPath) {
@@ -5958,6 +5989,7 @@ ${events}`;
     let writtenTempAssPath: string | null = null;
     let startedBackendTask = false;
     let skipTempCleanupInFinally = false;
+    (window as any).isHardsubRunning = true;
     this.updateEncodingUIState(true);
     try {
       await this.refreshFontRenderScale();
@@ -5965,6 +5997,9 @@ ${events}`;
         if (this.isCancelling) handlePreEncodeCancel();
         return;
       }
+      let resolvedGeometry: { width: number; height: number } | null = this.sourceInfo
+        ? { width: this.sourceInfo.displayWidth, height: this.sourceInfo.displayHeight }
+        : (this.directSourceGeometry ? { ...this.directSourceGeometry } : null);
       if (!this.sourceInfo) {
         try {
           const source = await invoke<SourceInfo>('probe_hardsub_source', { sourcePath: originalVideoPath });
@@ -5972,13 +6007,16 @@ ${events}`;
             if (this.isCancelling) handlePreEncodeCancel();
             return;
           }
-          this.sourceInfo = source;
+          if (current()) {
+            this.sourceInfo = source;
+          }
+          resolvedGeometry = { width: source.displayWidth, height: source.displayHeight };
         } catch (error) {
           if (aborted()) {
             if (this.isCancelling) handlePreEncodeCancel();
             return;
           }
-          if (!this.directSourceGeometry) throw error;
+          if (!resolvedGeometry) throw error;
         }
       }
 
@@ -6089,7 +6127,7 @@ ${events}`;
 
       if (this.subtitleCues.length > 0) {
         try {
-          const assContent = this.generateAssContent();
+          const assContent = this.generateAssContent(resolvedGeometry);
           const lastSlash = Math.max(originalVideoPath.lastIndexOf('/'), originalVideoPath.lastIndexOf('\\'));
           const lastDot = originalVideoPath.lastIndexOf('.');
           const primaryBase = lastDot > lastSlash ? originalVideoPath.substring(0, lastDot) : originalVideoPath;

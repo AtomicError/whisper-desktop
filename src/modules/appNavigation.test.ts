@@ -7,6 +7,7 @@ import {
   refreshDynamicDirectionInputs,
   setupDynamicDirectionInputs,
   setupResponsiveMenuFadeIn,
+  setupSearchShortcuts,
   setupVerticalTabKeyboardNavigation,
   getCurrentSourceMediaFile
 } from './appNavigation';
@@ -434,6 +435,40 @@ describe('appNavigation module', () => {
 
       changeHandler?.({ matches: false });
       expect(tablist.getAttribute('aria-orientation')).toBe('vertical');
+    });
+
+    it('does not steal keyboard focus to #hardsub-search-input while Hardsub player is in fullscreen', () => {
+      const searchInput = new MockElement('INPUT') as any;
+      searchInput.id = 'hardsub-search-input';
+      searchInput.offsetParent = {};
+      searchInput.focus = vi.fn();
+      searchInput.select = vi.fn();
+      domMap.set('hardsub-search-input', searchInput);
+
+      const docListeners: Record<string, ((e: any) => void)[]> = {};
+      const body = new MockElement('BODY');
+      body.classList.add('hardsub-fullscreen-active');
+      (globalThis as any).document.body = body;
+      (globalThis as any).document.fullscreenElement = null;
+      (globalThis as any).document.addEventListener = (type: string, cb: (e: any) => void) => {
+        docListeners[type] = docListeners[type] || [];
+        docListeners[type].push(cb);
+      };
+
+      setActiveView('hardsub');
+      setupSearchShortcuts();
+
+      const slashEvent = { key: '/', ctrlKey: false, metaKey: false, altKey: false, target: null, preventDefault: vi.fn() };
+      const ctrlFEvent = { key: 'f', ctrlKey: true, metaKey: false, altKey: false, target: null, preventDefault: vi.fn() };
+      (docListeners['keydown'] || []).forEach(cb => {
+        cb(slashEvent);
+        cb(ctrlFEvent);
+      });
+      expect(searchInput.focus).not.toHaveBeenCalled();
+
+      body.classList.remove('hardsub-fullscreen-active');
+      (docListeners['keydown'] || []).forEach(cb => cb(slashEvent));
+      expect(searchInput.focus).toHaveBeenCalledTimes(1);
     });
   });
 });

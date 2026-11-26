@@ -1353,7 +1353,7 @@ mod tests {
         // Path with special characters
         assert_eq!(
             escape_ffmpeg_filter_path(r"C:\My [Videos] & Movies, Part 1\sub's.srt"),
-            r"C\:/My \[Videos\] & Movies\, Part 1/sub\'\''s.srt"
+            r"C\:/My \[Videos\] & Movies\, Part 1/sub'\\\''s.srt"
         );
     }
 
@@ -2084,7 +2084,7 @@ fn escape_ffmpeg_filter_path(path: &str) -> String {
     clean
         .replace('\\', "/")
         .replace(':', "\\:")
-        .replace('\'', r"\'\''")
+        .replace('\'', r"'\\\''")
         .replace('[', "\\[")
         .replace(']', "\\]")
         .replace(',', "\\,")
@@ -2420,63 +2420,6 @@ pub async fn run_hardsub_task(
 
     logs.log(&app, "Hardsub", &format!("Probed video dimensions: {}x{} (Aspect: {:.3})", video_width, video_height, video_width as f64 / video_height as f64));
 
-    // Calculate dynamic 288p reference canvas dimensions preserving video aspect ratio (for 16:9, 9:16, 4:3, 21:9, etc.)
-    let aspect = source.display_width / source.display_height;
-    let ref_height: u32 = 288;
-    let ref_width = ((ref_height as f64) * aspect).round().max(1.0) as u32;
-
-    // Construct Subtitle Style (force_style parameters)
-    let raw_safe_font = settings
-        .font_name
-        .chars()
-        .filter(|&c| !matches!(c, ',' | '\'' | '"' | ':' | '\\' | '=' | ';' | '\n' | '\r' | '{' | '}' | '%' | '[' | ']'))
-        .collect::<String>()
-        .trim()
-        .to_string();
-    let safe_font_name = if raw_safe_font.is_empty() {
-        "Sans".to_string()
-    } else if raw_safe_font.eq_ignore_ascii_case("Inter") {
-        "Inter 24pt".to_string()
-    } else {
-        raw_safe_font
-    };
-
-    let font_metrics = compute_font_render_scale(&app, &settings.font_name, settings.bold, settings.italic);
-    let compensated_font_size = ((settings.font_size as f64) / font_metrics.scale).round() as u32;
-    logs.log(&app, "Hardsub", &format!("Font render scale for '{}' (bold={}, italic={}): {:.4} -> FontSize {} -> {}", settings.font_name, settings.bold, settings.italic, font_metrics.scale, settings.font_size, compensated_font_size));
-
-    let ass_primary_color = hex_to_ass_color(&settings.primary_color, 0); // 00 = fully opaque
-    let ass_outline_color = hex_to_ass_color(&settings.outline_color, 0);
-    let ass_bg_color = hex_to_ass_color(&settings.bg_box_color, opacity_percent_to_ass_alpha(settings.bg_box_opacity));
-
-    let border_style = if settings.bg_box {
-        3 // Opaque box style
-    } else {
-        1 // Outline + shadow style
-    };
-
-    let alignment = settings.alignment;
-
-    // Use libass style overrides to format subtitle typography and position precisely.
-    // MarginV sets bottom vertical distance in 288p coordinate space, while margin_lr scales with ref_width.
-    let margin_lr = ((100 - settings.width_margin.min(100)) as f64 / 200.0 * (ref_width as f64)).round() as u32;
-    let force_style = format!(
-        "FontName={},FontSize={},Bold={},Italic={},PrimaryColour={},OutlineColour={},BackColour={},BorderStyle={},Outline={},Shadow=0,Alignment={},MarginV={},MarginL={},MarginR={}",
-        safe_font_name,
-        compensated_font_size,
-        if settings.bold { 1 } else { 0 },
-        if settings.italic { 1 } else { 0 },
-        ass_primary_color,
-        ass_outline_color,
-        ass_bg_color,
-        border_style,
-        settings.outline_size,
-        alignment,
-        settings.position_y,
-        margin_lr,
-        margin_lr
-    );
-
     let resolved_fonts_dir = get_bundled_fonts_dir(&app);
     let fonts_dir_opt = if let Some(path) = resolved_fonts_dir {
         let escaped_fonts_dir = escape_ffmpeg_filter_path(&path.to_string_lossy());
@@ -2494,6 +2437,63 @@ pub async fn run_hardsub_task(
         // ASS script has complete style and header metadata defined
         format!("subtitles='{}'{}", escaped_sub_path, fonts_dir_opt)
     } else {
+        // Calculate dynamic 288p reference canvas dimensions preserving video aspect ratio (for 16:9, 9:16, 4:3, 21:9, etc.)
+        let aspect = source.display_width / source.display_height;
+        let ref_height: u32 = 288;
+        let ref_width = ((ref_height as f64) * aspect).round().max(1.0) as u32;
+
+        // Construct Subtitle Style (force_style parameters)
+        let raw_safe_font = settings
+            .font_name
+            .chars()
+            .filter(|&c| !matches!(c, ',' | '\'' | '"' | ':' | '\\' | '=' | ';' | '\n' | '\r' | '{' | '}' | '%' | '[' | ']'))
+            .collect::<String>()
+            .trim()
+            .to_string();
+        let safe_font_name = if raw_safe_font.is_empty() {
+            "Sans".to_string()
+        } else if raw_safe_font.eq_ignore_ascii_case("Inter") {
+            "Inter 24pt".to_string()
+        } else {
+            raw_safe_font
+        };
+
+        let font_metrics = compute_font_render_scale(&app, &settings.font_name, settings.bold, settings.italic);
+        let compensated_font_size = ((settings.font_size as f64) / font_metrics.scale).round() as u32;
+        logs.log(&app, "Hardsub", &format!("Font render scale for '{}' (bold={}, italic={}): {:.4} -> FontSize {} -> {}", settings.font_name, settings.bold, settings.italic, font_metrics.scale, settings.font_size, compensated_font_size));
+
+        let ass_primary_color = hex_to_ass_color(&settings.primary_color, 0); // 00 = fully opaque
+        let ass_outline_color = hex_to_ass_color(&settings.outline_color, 0);
+        let ass_bg_color = hex_to_ass_color(&settings.bg_box_color, opacity_percent_to_ass_alpha(settings.bg_box_opacity));
+
+        let border_style = if settings.bg_box {
+            3 // Opaque box style
+        } else {
+            1 // Outline + shadow style
+        };
+
+        let alignment = settings.alignment;
+
+        // Use libass style overrides to format subtitle typography and position precisely.
+        // MarginV sets bottom vertical distance in 288p coordinate space, while margin_lr scales with ref_width.
+        let margin_lr = ((100 - settings.width_margin.min(100)) as f64 / 200.0 * (ref_width as f64)).round() as u32;
+        let force_style = format!(
+            "FontName={},FontSize={},Bold={},Italic={},PrimaryColour={},OutlineColour={},BackColour={},BorderStyle={},Outline={},Shadow=0,Alignment={},MarginV={},MarginL={},MarginR={}",
+            safe_font_name,
+            compensated_font_size,
+            if settings.bold { 1 } else { 0 },
+            if settings.italic { 1 } else { 0 },
+            ass_primary_color,
+            ass_outline_color,
+            ass_bg_color,
+            border_style,
+            settings.outline_size,
+            alignment,
+            settings.position_y,
+            margin_lr,
+            margin_lr
+        );
+
         format!("subtitles='{}':original_size={}x{}{}:force_style='{}'", escaped_sub_path, ref_width, ref_height, fonts_dir_opt, force_style)
     };
 
