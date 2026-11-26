@@ -2637,6 +2637,507 @@ describe('hardsub output directory management', () => {
         vi.stubGlobal('ResizeObserver', prevResizeObserver);
       }
     });
+
+    it('guards fullscreen Escape when a modal is open, disables inner controls in disabled groups, and preserves failed error text across late status events', async () => {
+      doc.readyState = 'complete';
+      let statusHandler: ((ev: { payload: any }) => void) | null = null;
+      (window as any).__TAURI__.event.listen = vi.fn(async (name: string, cb: (ev: { payload: any }) => void) => {
+        if (name === 'hardsub-status') statusHandler = cb;
+        return () => {};
+      });
+
+      const { internal } = fixture();
+      await flush();
+
+      // 1. Escape in fullscreen must not exit fullscreen while a modal overlay is open
+      const playerContainer = new Control();
+      doc.elements.set('hardsub-player-container', playerContainer);
+      (internal as any).isPlayerFullscreen = true;
+      playerContainer.classList.add('player-fullscreen');
+
+      let modalOpen = true;
+      (doc as any).querySelector = vi.fn((sel: string) => (modalOpen && sel.includes('shortcuts-modal-overlay') ? new Control() : null));
+      key('Escape');
+      expect((internal as any).isPlayerFullscreen).toBe(true);
+
+      modalOpen = false;
+      key('Escape');
+      expect((internal as any).isPlayerFullscreen).toBe(false);
+
+      // 2. setControlsGroupDisabled toggles .disabled on inner controls for keyboard accessibility
+      const bgControls = new Control();
+      const innerInput = new Control();
+      const innerBtn = new Control();
+      (bgControls as any).querySelectorAll = () => [innerInput, innerBtn];
+      doc.elements.set('hardsub-bg-controls', bgControls);
+      (internal.state as any).bgBox = false;
+      (internal as any).updateUIControlsState();
+      expect(bgControls.classList.contains('control-disabled')).toBe(true);
+      expect(innerInput.disabled).toBe(true);
+      expect(innerBtn.disabled).toBe(true);
+
+      (internal.state as any).bgBox = true;
+      (internal as any).updateUIControlsState();
+      expect(bgControls.classList.contains('control-disabled')).toBe(false);
+      expect(innerInput.disabled).toBe(false);
+      expect(innerBtn.disabled).toBe(false);
+
+      // 3. Late failed hardsub-status event preserves lastFailedErrorText
+      const statusText = new Control();
+      (internal as any).progressStatusText = statusText;
+      (internal as any).lastFailedErrorText = 'NVENC unsupported';
+      statusHandler!({
+        payload: { progress: 0, message: 'Hardsubbing encoding failed.', active: false, stage: 'failed' },
+      });
+      expect(statusText.textContent).toContain('NVENC unsupported');
+    });
+
+    it('cleans up temp.ass on late pre-encode abort, preserves CRF 0, resets export HUD on new subtitle, and refreshes scale on RTL cue edit', async () => {
+      const { controller, internal } = fixture();
+      const qualitySlider = new Control();
+      qualitySlider.value = '0';
+      (internal as any).qualitySlider = qualitySlider;
+      (internal.state as any).videoQualityValue = 22;
+
+      const subInput = new Control();
+      subInput.value = '/sub.srt';
+      (internal as any).subtitlePathInput = subInput;
+      internal.state.videoPath = '/v.mp4';
+      internal.state.subtitlePath = '/sub.srt';
+      internal.subtitleCues = [{ id: 1, startMs: 0, endMs: 1000, startTimeStr: '00:00:00,000', endTimeStr: '00:00:01,000', text: 'Hello' } as any];
+      (internal as any).sourceInfo = { width: 1920, height: 1080, displayWidth: 1920, displayHeight: 1080, durationSec: 10, videoStreamIndex: 0, audioStreamIndex: 1, startTimeSec: 0 };
+
+      invoke.mockImplementation(async (command: string) => {
+        if (command === 'get_font_render_scale') return { scale: 1, ascentRatio: 0.8, descentRatio: 0.2 };
+        if (command === 'write_text_file_content') {
+          (internal as any).isCancelling = true;
+          return undefined;
+        }
+        return undefined;
+      });
+
+      await (internal as any).startHardsub();
+      expect((internal.state as any).videoQualityValue).toBe(0);
+      expect(invoke).not.toHaveBeenCalledWith('start_hardsub_task', expect.anything());
+      expect(invoke).toHaveBeenCalledWith('cleanup_hardsub_temp_ass', { filePath: '/v.temp.ass' });
+
+      // Loading a new subtitle resets completed export HUD buttons and path
+      const openFolderBtn = new Control();
+      const playVideoBtn = new Control();
+      openFolderBtn.style.display = 'inline-flex';
+      playVideoBtn.style.display = 'inline-flex';
+      (internal as any).btnOpenFolder = openFolderBtn;
+      (internal as any).btnPlayVideo = playVideoBtn;
+      (internal as any).lastExportedPath = '/out.mp4';
+      invoke.mockImplementation(async (command: string) => {
+        if (command === 'read_text_file_content') return '1\n00:00:00,000 --> 00:00:01,000\nEnglish cue\n';
+        if (command === 'get_font_render_scale') return { scale: 0.82, ascentRatio: 0.78, descentRatio: 0.22 };
+        return undefined;
+      });
+      internal.state.subtitlePath = '/new.srt';
+      await internal.loadSubtitleFile('/new.srt');
+      expect((internal as any).lastExportedPath).toBeNull();
+      expect(openFolderBtn.style.display).toBe('none');
+      expect(playVideoBtn.style.display).toBe('none');
+
+      // Editing English cue to Persian under Inter triggers font metric refresh for Vazirmatn fallback
+      const list = new Control();
+      (internal as any).subtitleListContainer = list;
+      (internal as any).setupEventListeners();
+      (internal.state as any).fontName = 'Inter';
+      const textarea = new Control();
+      textarea.dataset.cueId = '1';
+      textarea.value = 'متن فارسی';
+      textarea.closest = (sel: string) => (sel.includes('subtitle-cue-textarea') ? textarea : null);
+      const inputEv = new Event('input', { bubbles: true });
+      Object.defineProperty(inputEv, 'target', { value: textarea });
+      list.dispatchEvent(inputEv);
+      await flush();
+      expect(invoke).toHaveBeenCalledWith('get_font_render_scale', { fontName: 'Vazirmatn', bold: true, italic: false });
+
+      // prefillFilePaths('', subPath) does not notify selectVideo when video is already loaded
+      const notifySpy = vi.fn();
+      (window as any).showNotification = notifySpy;
+      internal.state.videoPath = '/already.mp4';
+      controller.prefillFilePaths('', '/another.srt');
+      expect(notifySpy).not.toHaveBeenCalled();
+
+      // clearSubtitleState clears pending cue click lock
+      (internal as any).targetClickedCueId = 1;
+      controller.clearSubtitleState();
+      expect((internal as any).targetClickedCueId).toBeNull();
+    });
+
+    it('enforces MOV container compatibility with VP9/AV1/Opus across format, codec, and audio changes', () => {
+      const { internal } = fixture();
+      const formatSelect = new Control();
+      const audioCodecSelect = new Control();
+      const codecSelect = (internal as any).codecSelect as Control;
+      (internal as any).formatSelect = formatSelect;
+      (internal as any).audioCodecSelect = audioCodecSelect;
+      (window as any).showNotification = vi.fn();
+
+      // 1. webm (vp9 + opus) -> mov switches video to h264 and audio to aac
+      (internal.state as any).outputFormat = 'mov';
+      (internal.state as any).videoCodec = 'vp9';
+      (internal.state as any).audioCodec = 'opus';
+      (internal as any).enforceContainerCompatibility('format');
+      expect((internal.state as any).videoCodec).toBe('h264');
+      expect((internal.state as any).audioCodec).toBe('aac');
+
+      // 2. webm + opus -> selecting prores switches container to mov AND audio to aac
+      (internal.state as any).outputFormat = 'webm';
+      (internal.state as any).videoCodec = 'prores';
+      (internal.state as any).audioCodec = 'opus';
+      (internal as any).enforceContainerCompatibility('codec');
+      expect((internal.state as any).outputFormat).toBe('mov');
+      expect((internal.state as any).audioCodec).toBe('aac');
+      expect(formatSelect.value).toBe('mov');
+      expect(audioCodecSelect.value).toBe('aac');
+
+      // 3. mov -> selecting vp9 or av1 switches container to mp4
+      (internal.state as any).outputFormat = 'mov';
+      (internal.state as any).videoCodec = 'av1';
+      (internal as any).enforceContainerCompatibility('codec');
+      expect((internal.state as any).outputFormat).toBe('mp4');
+      expect(codecSelect).toBeTruthy();
+
+      // 4. mov -> selecting opus switches container to mp4
+      (internal.state as any).outputFormat = 'mov';
+      (internal.state as any).videoCodec = 'h264';
+      (internal.state as any).audioCodec = 'opus';
+      (internal as any).enforceContainerCompatibility('audio');
+      expect((internal.state as any).outputFormat).toBe('mp4');
+    });
+
+    it('isolates overlapping startHardsub lifecycles via encodeSerial and handles structured cancellation errors', async () => {
+      doc.readyState = 'complete';
+      let statusHandler: ((ev: { payload: any }) => void) | null = null;
+      (window as any).__TAURI__.event.listen = vi.fn(async (name: string, cb: (ev: { payload: any }) => void) => {
+        if (name === 'hardsub-status') statusHandler = cb;
+        return () => {};
+      });
+      const taskbarSpy = vi.fn();
+      (window as any).updateTaskbarProgress = taskbarSpy;
+      (window as any).showNotification = vi.fn();
+
+      let rejectFirstTask!: (err: unknown) => void;
+      let resolveSecondTask!: (val: { outputPath: string; durationMs: number; outputSizeMb: number }) => void;
+      let taskCallCount = 0;
+
+      invoke.mockImplementation((command: string) => {
+        if (command === 'get_font_render_scale') return Promise.resolve({ scale: 1, ascentRatio: 0.8, descentRatio: 0.2 });
+        if (command === 'probe_hardsub_source') {
+          return Promise.resolve({ width: 1920, height: 1080, displayWidth: 1920, displayHeight: 1080, durationSec: 10, videoStreamIndex: 0, audioStreamIndex: 1, startTimeSec: 0 });
+        }
+        if (command === 'write_text_file_content') return Promise.resolve(undefined);
+        if (command === 'start_hardsub_task') {
+          taskCallCount += 1;
+          if (taskCallCount === 1) {
+            return new Promise((_resolve, reject) => {
+              rejectFirstTask = reject;
+            });
+          }
+          return new Promise((resolve) => {
+            resolveSecondTask = resolve;
+          });
+        }
+        return Promise.resolve(undefined);
+      });
+
+      const { internal, startBtn } = fixture();
+      const subInput = new Control();
+      subInput.value = '/sub.srt';
+      (internal as any).subtitlePathInput = subInput;
+      internal.state.videoPath = '/v.mp4';
+      internal.state.subtitlePath = '/sub.srt';
+      internal.subtitleCues = [{ id: 1, startMs: 0, endMs: 1000, startTimeStr: '00:00:00,000', endTimeStr: '00:00:01,000', text: 'Hi' } as any];
+
+      const firstRun = (internal as any).startHardsub();
+      await flush();
+      expect(taskCallCount).toBe(1);
+
+      // Terminal cancelled event enables UI before first invoke settles; user immediately starts encode #2
+      statusHandler!({ payload: { progress: 0, message: 'Cancelled', active: false, stage: 'cancelled' } });
+      expect(startBtn.disabled).toBe(false);
+
+      const secondRun = (internal as any).startHardsub();
+      await flush();
+      expect(taskCallCount).toBe(2);
+      expect((internal as any).isEncoding).toBe(true);
+      statusHandler!({ payload: { progress: 0.5, message: 'Encoding', active: true, stage: 'encoding' } });
+      expect((window as any).isHardsubRunning).toBe(true);
+
+      // First run rejects late; it must NOT clobber encode #2's active state or taskbar progress
+      taskbarSpy.mockClear();
+      rejectFirstTask(new Error('Hardsubbing cancelled by user.'));
+      await firstRun;
+      expect((internal as any).isEncoding).toBe(true);
+      expect((window as any).isHardsubRunning).toBe(true);
+      expect(taskbarSpy).not.toHaveBeenCalled();
+
+      resolveSecondTask({ outputPath: '/out.mp4', durationMs: 50, outputSizeMb: 2 });
+      await secondRun;
+      expect((internal as any).isEncoding).toBe(false);
+      expect((internal as any).lastExportedPath).toBe('/out.mp4');
+
+      // Structured PreviewError cancellation from probe_hardsub_source is treated as cancellation, not generic failure
+      (internal as any).sourceInfo = null;
+      (internal as any).directSourceGeometry = null;
+      const statusText = new Control();
+      (internal as any).progressStatusText = statusText;
+      invoke.mockImplementation(async (command: string) => {
+        if (command === 'get_font_render_scale') return { scale: 1, ascentRatio: 0.8, descentRatio: 0.2 };
+        if (command === 'probe_hardsub_source') throw { code: 'cancelled', detail: 'Preview cancelled' };
+        return undefined;
+      });
+      await (internal as any).startHardsub();
+      expect((internal as any).lastStatusPayload?.stage).toBe('cancelled');
+      expect((internal as any).lastFailedErrorText).toBeNull();
+    });
+
+    it('clamps style storage to slider bounds, syncs restored codecs on load, falls back missing system fonts, and supports radiogroup keyboard nav', async () => {
+      const store = new Map<string, string>();
+      const prevResizeObserver = (globalThis as any).ResizeObserver;
+      vi.stubGlobal('ResizeObserver', class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      });
+      store.set('whisper_hardsub_style_settings', JSON.stringify({
+        fontName: 'RemovedSystemFont',
+        hasCustomFontSelection: true,
+        fontSize: 110,
+        outlineSize: 10,
+      }));
+      store.set('whisper_hardsub_export_settings', JSON.stringify({
+        outputFormat: 'mp4',
+        hwAccel: 'nvenc',
+        videoCodec: 'h265',
+      }));
+      vi.stubGlobal('localStorage', {
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => { store.set(k, v); },
+        removeItem: (k: string) => { store.delete(k); },
+      });
+
+      try {
+        invoke.mockImplementation(async (command: string) => {
+          if (command === 'get_system_fonts') return [{ name: 'Inter', source: 'bundled' }, { name: 'Vazirmatn', source: 'bundled' }];
+          if (command === 'get_font_render_scale') return { scale: 1, ascentRatio: 0.8, descentRatio: 0.2 };
+          if (command === 'check_hardware_encoders') {
+            return { hasQsv: false, hasNvenc: true, hasVaapi: false, hasVideotoolbox: false, nvencCodecs: ['h264', 'h265'] };
+          }
+          return undefined;
+        });
+        doc.readyState = 'complete';
+        const preCodecSelect = new Control();
+        const preHwSelect = new Control();
+        const preFontSelect = new Control();
+        doc.elements.set('hardsub-codec', preCodecSelect);
+        doc.elements.set('hardsub-hw', preHwSelect);
+        doc.elements.set('hardsub-font', preFontSelect);
+
+        const controller = new Controller();
+        controllers.push(controller);
+        const internal = controller as any;
+        const presetsContainer = new Control();
+        const presetBtns = ['draft', 'balanced', 'high', 'lossless'].map((preset) => {
+          const btn = new Control();
+          btn.dataset.preset = preset;
+          btn.classList.add('quality-preset-btn');
+          return btn;
+        });
+        internal.qualityPresetsContainer = presetsContainer;
+        internal.qualityPresetBtns = presetBtns;
+        internal.setupExportEventListeners();
+
+        // 1. Style storage clamped to slider maxes (64, 8)
+        expect(internal.state.fontSize).toBe(64);
+        expect(internal.state.outlineSize).toBe(8);
+
+        // 2. Restored hwAccel=nvenc + videoCodec=h265 synced codecSelect options immediately
+        expect(preCodecSelect.value).toBe('h265');
+
+        // 3. Uninstalled saved font falls back to smart default instead of leaving select blank
+        await controller.loadFontsAndHardware();
+        expect(internal.state.fontName).toBe('Inter');
+        expect(preFontSelect.value).toBe('Inter');
+
+        // 4. Radiogroup keyboard navigation updates preset, aria-checked, and tabIndex
+        (internal as any).state.videoQualityPreset = 'balanced';
+        (internal as any).updateQualityUI();
+        expect(presetBtns[1].getAttribute('aria-checked')).toBe('true');
+        expect((presetBtns[1] as any).tabIndex).toBe(0);
+        expect((presetBtns[0] as any).tabIndex).toBe(-1);
+
+        const rightEv = Object.assign(new Event('keydown', { cancelable: true }), {
+          key: 'ArrowRight',
+          ctrlKey: false,
+          metaKey: false,
+          altKey: false,
+        });
+        presetsContainer.dispatchEvent(rightEv);
+        expect((internal as any).state.videoQualityPreset).toBe('high');
+        expect(presetBtns[2].getAttribute('aria-checked')).toBe('true');
+        expect((presetBtns[2] as any).tabIndex).toBe(0);
+        expect((presetBtns[1] as any).tabIndex).toBe(-1);
+        expect(presetBtns[2].focus).toHaveBeenCalled();
+
+        const homeEv = Object.assign(new Event('keydown', { cancelable: true }), {
+          key: 'Home',
+          ctrlKey: false,
+          metaKey: false,
+          altKey: false,
+        });
+        presetsContainer.dispatchEvent(homeEv);
+        expect((internal as any).state.videoQualityPreset).toBe('draft');
+      } finally {
+        vi.stubGlobal('localStorage', undefined as any);
+        vi.stubGlobal('ResizeObserver', prevResizeObserver);
+      }
+    });
+
+    it('retries cancel_hardsub_task on active status during pre-start race, uses cue seek offset for prev/next cue buttons, and updates speed preset disabled state', async () => {
+      doc.readyState = 'complete';
+      let statusHandler: ((ev: { payload: any }) => void) | null = null;
+      (window as any).__TAURI__.event.listen = vi.fn(async (name: string, cb: (ev: { payload: any }) => void) => {
+        if (name === 'hardsub-status') statusHandler = cb;
+        return () => {};
+      });
+
+      const { load, internal, video, prevCueBtn, nextCueBtn } = fixture();
+      await load();
+
+      // 1. Pre-start cancel race: isCancelling is true when backend emits active init/encoding
+      (internal as any).isCancelling = true;
+      (internal as any).cancelRetryPending = false;
+      invoke.mockResolvedValue(undefined);
+      statusHandler!({ payload: { progress: 0, message: 'Initializing', active: true, stage: 'init' } });
+      await flush();
+      expect(invoke).toHaveBeenCalledWith('cancel_hardsub_task', {});
+      expect((internal as any).cancelRetryPending).toBe(false);
+
+      // 2. prevCueBtn and nextCueBtn use getCueSeekTimeSec offset (+50ms clamped)
+      (internal as any).isCancelling = false;
+      internal.subtitleCues = [
+        { id: 1, startMs: 1000, endMs: 2000, startTimeStr: '00:00:01,000', endTimeStr: '00:00:02,000', text: 'First' } as any,
+        { id: 2, startMs: 5000, endMs: 5040, startTimeStr: '00:00:05,000', endTimeStr: '00:00:05,040', text: 'Second' } as any,
+      ];
+      video.currentTime = 2.0;
+      video.settle();
+      nextCueBtn.dispatchEvent(new Event('click'));
+      expect(video.currentTime).toBeCloseTo(5.02, 3);
+      video.settle();
+
+      video.currentTime = 5.0;
+      video.settle();
+      prevCueBtn.dispatchEvent(new Event('click'));
+      expect(video.currentTime).toBeCloseTo(1.05, 3);
+      video.settle();
+
+      // 3. Speed preset select is disabled when encoder ignores -preset (vaapi, videotoolbox, prores)
+      const speedSelect = new Control();
+      const speedWrapper = new Control();
+      (speedSelect as any).parentElement = speedWrapper;
+      (internal as any).speedPresetSelect = speedSelect;
+
+      (internal.state as any).hwAccel = 'vaapi';
+      (internal.state as any).videoCodec = 'h264';
+      (internal as any).updateSpeedPresetUI();
+      expect(speedSelect.disabled).toBe(true);
+      expect(speedWrapper.style.pointerEvents).toBe('none');
+
+      (internal.state as any).hwAccel = 'cpu';
+      (internal.state as any).videoCodec = 'prores';
+      (internal as any).updateSpeedPresetUI();
+      expect(speedSelect.disabled).toBe(true);
+
+      (internal.state as any).hwAccel = 'cpu';
+      (internal.state as any).videoCodec = 'h264';
+      (internal as any).updateSpeedPresetUI();
+      expect(speedSelect.disabled).toBe(false);
+      expect(speedWrapper.style.pointerEvents).toBe('auto');
+    });
+
+    it('preserves explicit hasCustomFontSelection=false, clears video outputPath/search filter, notifies on failed subtitle load, and scopes ASS [Events]', async () => {
+      const store = new Map<string, string>();
+      const prevResizeObserver = (globalThis as any).ResizeObserver;
+      vi.stubGlobal('ResizeObserver', class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      });
+      store.set('whisper_hardsub_style_settings', JSON.stringify({
+        fontName: 'Inter',
+        hasCustomFontSelection: false,
+        fontSize: 18,
+      }));
+      vi.stubGlobal('localStorage', {
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => { store.set(k, v); },
+        removeItem: (k: string) => { store.delete(k); },
+      });
+
+      try {
+        doc.readyState = 'complete';
+        const controller = new Controller();
+        controllers.push(controller);
+        const internal = controller as any;
+
+        // 1. Explicit hasCustomFontSelection: false must not be flipped to true just because fontName is Inter
+        expect(internal.hasCustomFontSelection).toBe(false);
+
+        // 2. clearVideoState clears stale outputPath, sourceInfo, and previewError even if a subtitle remains loaded
+        internal.state.videoPath = '/v.mp4';
+        internal.state.subtitlePath = '/sub.srt';
+        internal.state.outputPath = '/v_hardsub.mp4';
+        internal.sourceInfo = { width: 1920, height: 1080, displayWidth: 1920, displayHeight: 1080, durationSec: 10, videoStreamIndex: 0, audioStreamIndex: 1, startTimeSec: 0 };
+        internal.previewError = { code: 'probe_failed', detail: 'bad' };
+        controller.clearVideoState();
+        expect(internal.state.outputPath).toBe('');
+        expect(internal.sourceInfo).toBeNull();
+        expect(internal.previewError).toBeNull();
+
+        // 3. Loading a new subtitle resets active search filter; failing to read notifies the user
+        const searchInput = new Control();
+        searchInput.value = 'old query';
+        internal.searchInput = searchInput;
+        internal.searchFilterQuery = 'old query';
+        const notifySpy = vi.fn();
+        (window as any).showNotification = notifySpy;
+
+        invoke.mockImplementation(async (command: string) => {
+          if (command === 'read_text_file_content') return '1\n00:00:00,000 --> 00:00:01,000\nFresh cue\n';
+          if (command === 'get_font_render_scale') return { scale: 1, ascentRatio: 0.8, descentRatio: 0.2 };
+          return undefined;
+        });
+        internal.state.subtitlePath = '/fresh.srt';
+        await internal.loadSubtitleFile('/fresh.srt');
+        expect(internal.searchFilterQuery).toBe('');
+        expect(searchInput.value).toBe('');
+
+        invoke.mockImplementation(async (command: string) => {
+          if (command === 'read_text_file_content') throw new Error('Read failed');
+          return undefined;
+        });
+        internal.state.subtitlePath = '/broken.srt';
+        await internal.loadSubtitleFile('/broken.srt');
+        expect(notifySpy).toHaveBeenCalledWith(expect.any(String), 'error');
+        expect(internal.state.subtitlePath).toBe('');
+
+        // 4. ASS parser stops reading Dialogue lines if another [Section] follows [Events]
+        const assCues = parseSubtitleContentFn(
+          '[Events]\nDialogue: 0,0:00:01.00,0:00:02.00,Default,,0,0,0,,Valid cue\n[Fonts]\nDialogue: 0,0:00:03.00,0:00:04.00,Default,,0,0,0,,Ignored\n',
+          'ass',
+        );
+        expect(assCues).toHaveLength(1);
+        expect(assCues[0].text).toBe('Valid cue');
+      } finally {
+        vi.stubGlobal('localStorage', undefined as any);
+        vi.stubGlobal('ResizeObserver', prevResizeObserver);
+      }
+    });
   });
 });
 

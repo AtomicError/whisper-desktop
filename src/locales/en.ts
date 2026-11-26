@@ -637,7 +637,20 @@ export const en = {
     resetFontSize: 'Reset font size to 14px',
     resetOutline: 'Reset outline size to 2px',
     resetPosY: 'Reset vertical position to 30px',
-    containerCodecAdjusted: 'Adjusted incompatible codec/audio settings for the {format} container.'
+    containerCodecAdjusted: 'Adjusted incompatible codec/audio settings for the {format} container.',
+    failedLoadSub: 'Failed to read the subtitle file.',
+    studioTabsAria: 'Hardsub Studio Tabs',
+    boxFillColor: 'Box Fill Color',
+    verticalAlignAria: 'Vertical Alignment',
+    horizontalAlignAria: 'Horizontal Alignment',
+    qualityPresetsAria: 'Video Quality Presets',
+    colorWhite: 'White',
+    colorYellow: 'Yellow',
+    colorRoyalBlue: 'Royal Blue',
+    colorRed: 'Red',
+    colorBlack: 'Black',
+    colorDarkNavy: 'Dark Navy',
+    colorSlate: 'Slate'
   },
   models: {
     title: 'Model Hub',

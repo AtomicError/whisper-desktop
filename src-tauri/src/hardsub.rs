@@ -210,37 +210,39 @@ fn read_font_metrics(path: &Path) -> Option<(u16, u32, u32)> {
 }
 
 fn parse_font_metrics_bytes(data: &[u8]) -> Option<(u16, u32, u32)> {
-    // TTC collections: read the first font offset table
-    let data = if data.starts_with(b"ttcf") {
-        let offset = read_u32(data, 12)? as usize;
-        data.get(offset..)?
+    // TTC collections: locate the first font's offset table while keeping `data`
+    // anchored to byte 0, since SFNT table record offsets in a TTC are measured
+    // from the start of the collection file rather than the offset table.
+    let table_dir_offset = if data.starts_with(b"ttcf") {
+        read_u32(data, 12)? as usize
     } else {
-        data
+        0
     };
+    let offset_table = data.get(table_dir_offset..)?;
 
-    let sfnt_ok = data.starts_with(b"\x00\x01\x00\x00")
-        || data.starts_with(b"OTTO")
-        || data.starts_with(b"true");
+    let sfnt_ok = offset_table.starts_with(b"\x00\x01\x00\x00")
+        || offset_table.starts_with(b"OTTO")
+        || offset_table.starts_with(b"true");
     if !sfnt_ok {
         return None;
     }
 
-    let num_tables = read_u16(data, 4)? as usize;
+    let num_tables = read_u16(offset_table, 4)? as usize;
     let find_table = |tag: &[u8; 4]| -> Option<(usize, usize)> {
         for i in 0..num_tables {
             let rec = 12 + i * 16;
-            if data.get(rec..rec + 4) != Some(&tag[..]) {
+            if offset_table.get(rec..rec + 4) != Some(&tag[..]) {
                 continue;
             }
-            let off = read_u32(data, rec + 8)? as usize;
-            let len = read_u32(data, rec + 12)? as usize;
+            let off = read_u32(offset_table, rec + 8)? as usize;
+            let len = read_u32(offset_table, rec + 12)? as usize;
             return Some((off, len));
         }
         None
     };
 
     let upem = find_table(b"head").and_then(|(o, l)| {
-        if l >= 20 { read_u16(data, o + 18) } else { None }
+        if l >= 20 { read_u16(data, o.checked_add(18)?) } else { None }
     })?;
     if upem == 0 {
         return None;
@@ -251,11 +253,11 @@ fn parse_font_metrics_bytes(data: &[u8]) -> Option<(u16, u32, u32)> {
         if l < 78 {
             return None;
         }
-        let fs_selection = read_u16(data, o + 62)?;
-        let typo_ascender = read_i16(data, o + 68)?;
-        let typo_descender = read_i16(data, o + 70)?;
-        let win_ascent = read_u16(data, o + 74)? as u32;
-        let win_descent = read_u16(data, o + 76)? as u32;
+        let fs_selection = read_u16(data, o.checked_add(62)?)?;
+        let typo_ascender = read_i16(data, o.checked_add(68)?)?;
+        let typo_descender = read_i16(data, o.checked_add(70)?)?;
+        let win_ascent = read_u16(data, o.checked_add(74)?)? as u32;
+        let win_descent = read_u16(data, o.checked_add(76)?)? as u32;
         if win_ascent + win_descent != 0 {
             Some((win_ascent, win_descent))
         } else if fs_selection & 0x80 != 0 {
@@ -272,8 +274,8 @@ fn parse_font_metrics_bytes(data: &[u8]) -> Option<(u16, u32, u32)> {
             if l < 8 {
                 return None;
             }
-            let ascender = read_i16(data, o + 4)?;
-            let descender = read_i16(data, o + 6)?;
+            let ascender = read_i16(data, o.checked_add(4)?)?;
+            let descender = read_i16(data, o.checked_add(6)?)?;
             Some((ascender.max(0) as u32, descender.unsigned_abs() as u32))
         });
         if let Some(m) = hhea_metrics {
@@ -283,8 +285,8 @@ fn parse_font_metrics_bytes(data: &[u8]) -> Option<(u16, u32, u32)> {
                 if l < 44 {
                     return None;
                 }
-                let y_min = read_i16(data, o + 38)?;
-                let y_max = read_i16(data, o + 42)?;
+                let y_min = read_i16(data, o.checked_add(38)?)?;
+                let y_max = read_i16(data, o.checked_add(42)?)?;
                 Some((y_max.max(0) as u32, y_min.unsigned_abs() as u32))
             });
             bbox_metrics?
@@ -1437,6 +1439,49 @@ mod tests {
         assert_eq!(parsed, Some((1000, 40_000, 30_000)));
     }
 
+    #[test]
+    fn parse_font_metrics_reads_ttc_tables_using_file_relative_offsets() {
+        // TTC header: "ttcf" + version 1.0 (0x00010000) + numFonts=1 + offsetTable[0]=16
+        let mut ttc = Vec::new();
+        ttc.extend_from_slice(b"ttcf");
+        ttc.extend_from_slice(&0x0001_0000u32.to_be_bytes());
+        ttc.extend_from_slice(&1u32.to_be_bytes());
+        let sfnt_offset: u32 = 16;
+        ttc.extend_from_slice(&sfnt_offset.to_be_bytes());
+
+        // SFNT offset table starts at byte 16: sfntVersion + numTables=2
+        ttc.extend_from_slice(&0x0001_0000u32.to_be_bytes());
+        ttc.extend_from_slice(&2u16.to_be_bytes());
+        ttc.extend_from_slice(&[0u8; 6]);
+
+        // Table offsets are measured from byte 0 of the TTC file
+        let head_offset: u32 = sfnt_offset + 12 + 2 * 16; // 60
+        let head_len: u32 = 20;
+        let os2_offset: u32 = head_offset + head_len; // 80
+        let os2_len: u32 = 78;
+
+        ttc.extend_from_slice(b"head");
+        ttc.extend_from_slice(&0u32.to_be_bytes());
+        ttc.extend_from_slice(&head_offset.to_be_bytes());
+        ttc.extend_from_slice(&head_len.to_be_bytes());
+
+        ttc.extend_from_slice(b"OS/2");
+        ttc.extend_from_slice(&0u32.to_be_bytes());
+        ttc.extend_from_slice(&os2_offset.to_be_bytes());
+        ttc.extend_from_slice(&os2_len.to_be_bytes());
+
+        let mut head = vec![0u8; head_len as usize];
+        head[18..20].copy_from_slice(&1000u16.to_be_bytes());
+        ttc.extend_from_slice(&head);
+
+        let mut os2 = vec![0u8; os2_len as usize];
+        os2[74..76].copy_from_slice(&900u16.to_be_bytes());
+        os2[76..78].copy_from_slice(&300u16.to_be_bytes());
+        ttc.extend_from_slice(&os2);
+
+        assert_eq!(parse_font_metrics_bytes(&ttc), Some((1000, 900, 300)));
+    }
+
     #[tokio::test]
     async fn terminate_hardsub_session_sets_cancel_flag_and_waits_for_completion() {
         let idle_session = Arc::new(std::sync::Mutex::new(crate::HardsubSession {
@@ -1467,6 +1512,33 @@ mod tests {
         let lock = active_session.lock().unwrap();
         assert!(lock.cancel_requested);
         assert!(!lock.is_running);
+    }
+
+    #[test]
+    fn cleanup_hardsub_temp_ass_only_removes_temp_ass_files() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let temp_dir = std::env::temp_dir().join(format!("whisper_hardsub_cleanup_test_{}", nonce));
+        std::fs::create_dir_all(&temp_dir).unwrap();
+
+        let temp_ass = temp_dir.join("clip.temp.ass");
+        let regular_srt = temp_dir.join("clip.srt");
+        std::fs::write(&temp_ass, "[Script Info]\n").unwrap();
+        std::fs::write(&regular_srt, "1\n00:00:00,000 --> 00:00:01,000\nHi\n").unwrap();
+
+        assert!(cleanup_hardsub_temp_ass(regular_srt.to_string_lossy().to_string()).is_err());
+        assert!(regular_srt.exists());
+
+        cleanup_hardsub_temp_ass(temp_ass.to_string_lossy().to_string())
+            .expect("temp.ass cleanup should succeed");
+        assert!(!temp_ass.exists());
+
+        cleanup_hardsub_temp_ass(temp_ass.to_string_lossy().to_string())
+            .expect("missing temp.ass cleanup should be idempotent");
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 
     #[test]
@@ -1974,6 +2046,18 @@ mod tests {
 }
 
 #[tauri::command]
+pub fn cleanup_hardsub_temp_ass(file_path: String) -> Result<(), String> {
+    if !file_path.ends_with(".temp.ass") {
+        return Err("Refusing to remove non-temporary subtitle file.".to_string());
+    }
+    let path = Path::new(&file_path);
+    if path.is_file() {
+        std::fs::remove_file(path).map_err(|e| format!("Failed to clean up temporary subtitle file: {}", e))?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn start_hardsub_task(
     app: AppHandle,
     log_state: tauri::State<'_, crate::LogState>,
@@ -2242,55 +2326,57 @@ pub async fn run_hardsub_task(
         lock.cancel_requested = false;
         lock.child_pid = None;
     }
-    let _session_guard = HardsubSessionGuard { session: session.clone() };
 
-    let _cleanup_guard = TempAssCleanupGuard {
-        path: settings.subtitle_path.clone(),
-        logs: logs.clone(),
-        app: app.clone(),
-    };
+    let outcome: Result<HardsubResult, (bool, String)> = {
+        let _session_guard = HardsubSessionGuard { session: session.clone() };
 
-    let start_time = Instant::now();
+        let _cleanup_guard = TempAssCleanupGuard {
+            path: settings.subtitle_path.clone(),
+            logs: logs.clone(),
+            app: app.clone(),
+        };
 
-    // Auto-increment output filename if file already exists on disk
-    let final_output_path = resolve_unique_output_path(&settings.output_path);
-    settings.output_path = final_output_path.clone();
+        let start_time = Instant::now();
 
-    if let Some(parent) = Path::new(&settings.output_path).parent() {
-        if !parent.as_os_str().is_empty() && !parent.exists() {
-            let _ = std::fs::create_dir_all(parent);
+        // Auto-increment output filename if file already exists on disk
+        let final_output_path = resolve_unique_output_path(&settings.output_path);
+        settings.output_path = final_output_path.clone();
+
+        if let Some(parent) = Path::new(&settings.output_path).parent() {
+            if !parent.as_os_str().is_empty() && !parent.exists() {
+                let _ = std::fs::create_dir_all(parent);
+            }
         }
-    }
 
-    let video_name = Path::new(&settings.video_path)
-        .file_name()
-        .unwrap_or_default()
-        .to_string_lossy()
-        .to_string();
+        let video_name = Path::new(&settings.video_path)
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
 
-    logs.log(&app, "Hardsub", &format!("Starting hardsub task for: {} (Output: {})", video_name, settings.output_path));
+        logs.log(&app, "Hardsub", &format!("Starting hardsub task for: {} (Output: {})", video_name, settings.output_path));
 
-    // Trigger OS notification
-    let _ = app.notification().builder().title("Hardsub Video Started").body(format!("Encoding {}...", video_name)).show();
+        // Trigger OS notification
+        let _ = app.notification().builder().title("Hardsub Video Started").body(format!("Encoding {}...", video_name)).show();
 
-    let _ = app.emit("hardsub-status", HardsubProgress {
-        progress: 0.0,
-        message: "Initializing FFmpeg Encoder...".to_string(),
-        active: true,
-        stage: Some("init".to_string()),
-        speed: None,
-        fps: None,
-    });
+        let _ = app.emit("hardsub-status", HardsubProgress {
+            progress: 0.0,
+            message: "Initializing FFmpeg Encoder...".to_string(),
+            active: true,
+            stage: Some("init".to_string()),
+            speed: None,
+            fps: None,
+        });
 
-    enum HardsubTaskError {
-        Cancelled,
-        Failed(String),
-    }
+        enum HardsubTaskError {
+            Cancelled,
+            Failed(String),
+        }
 
-    let is_cancel_requested = || session.lock().map(|l| l.cancel_requested).unwrap_or(false);
-    let output_path_for_cleanup = settings.output_path.clone();
+        let is_cancel_requested = || session.lock().map(|l| l.cancel_requested).unwrap_or(false);
+        let output_path_for_cleanup = settings.output_path.clone();
 
-    let task_result: Result<HardsubResult, HardsubTaskError> = async {
+        let task_result: Result<HardsubResult, HardsubTaskError> = async {
         // Export and preview must select the same streams and display geometry.
         // Export cancellation is flag-based; bridge it only for the shared probe,
         // and await its completion so cancellation kills and reaps ffprobe first.
@@ -2401,8 +2487,9 @@ pub async fn run_hardsub_task(
 
     let escaped_sub_path = escape_ffmpeg_filter_path(&settings.subtitle_path);
 
-    // Choose subtitles filter mode based on extension (.ass -> subtitles filter preserving native formatting; .srt -> force_style with dynamic reference resolution)
-    let is_ass_file = settings.subtitle_path.to_lowercase().ends_with(".ass");
+    // Choose subtitles filter mode based on extension (.ass/.ssa -> subtitles filter preserving native formatting; others -> force_style with dynamic reference resolution)
+    let lower_sub_path = settings.subtitle_path.to_lowercase();
+    let is_ass_file = lower_sub_path.ends_with(".ass") || lower_sub_path.ends_with(".ssa");
     let sub_filter = if is_ass_file {
         // ASS script has complete style and header metadata defined
         format!("subtitles='{}'{}", escaped_sub_path, fonts_dir_opt)
@@ -2639,11 +2726,12 @@ pub async fn run_hardsub_task(
             }
         })?;
 
-        // Check cancellation requested flag
+        // Check cancellation requested flag; keep is_running true until
+        // HardsubSessionGuard drops so partial-output and .temp.ass cleanup
+        // finish before shutdown or a subsequent encode can proceed.
         let was_cancelled = if let Ok(mut lock) = session.lock() {
             let cancelled = lock.cancel_requested;
             lock.child_pid = None;
-            lock.is_running = false;
             cancelled
         } else {
             false
@@ -2668,42 +2756,51 @@ pub async fn run_hardsub_task(
 
         logs.log(&app, "Hardsub", &format!("Hardsub completed successfully! Saved to: {}", settings.output_path));
 
-        let _ = app.emit("hardsub-status", HardsubProgress {
-            progress: 1.0,
-            message: "Hardsub video exported successfully!".to_string(),
-            active: false,
-            stage: Some("completed".to_string()),
-            speed: None,
-            fps: None,
-        });
-
-        // Notify OS
-        let _ = app.notification().builder().title("Hardsub Completed").body(format!("Video saved to {}", settings.output_path)).show();
-
         Ok(HardsubResult {
             duration_ms,
             output_path: settings.output_path,
             output_size_mb,
         })
-    }.await;
+        }.await;
 
-    match task_result {
-        Ok(res) => Ok(res),
-        Err(HardsubTaskError::Cancelled) => {
-            if Path::new(&output_path_for_cleanup).exists() {
-                let _ = std::fs::remove_file(&output_path_for_cleanup);
-                logs.log(&app, "Hardsub", &format!("Removed partial output file: {}", output_path_for_cleanup));
+        match task_result {
+            Ok(res) => Ok(res),
+            Err(HardsubTaskError::Cancelled) => {
+                if Path::new(&output_path_for_cleanup).exists() {
+                    let _ = std::fs::remove_file(&output_path_for_cleanup);
+                    logs.log(&app, "Hardsub", &format!("Removed partial output file: {}", output_path_for_cleanup));
+                }
+                Err((true, "Hardsubbing cancelled by user.".to_string()))
             }
-            emit_hardsub_terminal_status(&app, true);
-            Err("Hardsubbing cancelled by user.".to_string())
+            Err(HardsubTaskError::Failed(error_detail)) => {
+                if Path::new(&output_path_for_cleanup).exists() {
+                    let _ = std::fs::remove_file(&output_path_for_cleanup);
+                    logs.log(&app, "Hardsub", &format!("Removed partial output file: {}", output_path_for_cleanup));
+                }
+                logs.log(&app, "Hardsub", &format!("Hardsub encoding failed: {}", error_detail));
+                Err((false, error_detail))
+            }
         }
-        Err(HardsubTaskError::Failed(error_detail)) => {
-            if Path::new(&output_path_for_cleanup).exists() {
-                let _ = std::fs::remove_file(&output_path_for_cleanup);
-                logs.log(&app, "Hardsub", &format!("Removed partial output file: {}", output_path_for_cleanup));
-            }
-            logs.log(&app, "Hardsub", &format!("Hardsub encoding failed: {}", error_detail));
-            emit_hardsub_terminal_status(&app, false);
+    };
+
+    // Emit terminal status only after TempAssCleanupGuard and HardsubSessionGuard
+    // have dropped so a subsequent encode started immediately on event arrival sees
+    // `is_running == false` and clean temp files.
+    match outcome {
+        Ok(res) => {
+            let _ = app.emit("hardsub-status", HardsubProgress {
+                progress: 1.0,
+                message: "Hardsub video exported successfully!".to_string(),
+                active: false,
+                stage: Some("completed".to_string()),
+                speed: None,
+                fps: None,
+            });
+            let _ = app.notification().builder().title("Hardsub Completed").body(format!("Video saved to {}", res.output_path)).show();
+            Ok(res)
+        }
+        Err((cancelled, error_detail)) => {
+            emit_hardsub_terminal_status(&app, cancelled);
             Err(error_detail)
         }
     }

@@ -96,8 +96,9 @@
 }
 
 .hardsub-actions-bar .btn-start-hardsub {
-  flex: 1 1 0;
-  min-width: 0;
+  flex: 1 1 auto;
+  min-width: max-content;
+  max-width: 100%;
   height: 42px;
   display: inline-flex;
   align-items: center;
@@ -110,8 +111,9 @@
 }
 
 .hardsub-actions-bar .btn-cancel-hardsub {
-  flex: 1 1 0;
-  min-width: 0;
+  flex: 1 1 auto;
+  min-width: max-content;
+  max-width: 100%;
   height: 42px;
   display: inline-flex;
   align-items: center;
@@ -625,7 +627,7 @@ html:not([dir="rtl"]) #hardsub-search-input[dir="rtl"],
    ========================================================================== */
 .hardsub-layout {
   display: grid;
-  grid-template-columns: minmax(460px, 1fr) minmax(0, 1.38fr);
+  grid-template-columns: minmax(390px, 1fr) minmax(0, 1.38fr);
   gap: 20px;
   min-height: 0;
   height: 100%;
@@ -673,7 +675,7 @@ html:not([dir="rtl"]) #hardsub-search-input[dir="rtl"],
   background: var(--bg-player-stage, rgba(15, 23, 42, 0.9));
 }
 
-@media (max-width: 960px) {
+@media (max-width: 1160px) {
   #panel-hardsub {
     overflow-y: auto !important;
     overflow-x: hidden !important;
@@ -705,6 +707,10 @@ html:not([dir="rtl"]) #hardsub-search-input[dir="rtl"],
   }
   #hardsub-subtitle-list {
     max-height: 480px !important;
+  }
+  #hardsub-player-container {
+    aspect-ratio: 16 / 9;
+    min-height: 220px;
   }
 }
 
@@ -1298,6 +1304,7 @@ body.hardsub-fullscreen-active #hardsub-video-controls:focus-within {
 /* Row 2: Control Actions Bar */
 .hardsub-actions-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
@@ -1461,6 +1468,7 @@ body.hardsub-fullscreen-active #hardsub-video-controls:focus-within {
 
 .hardsub-preview-main-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -1471,7 +1479,8 @@ body.hardsub-fullscreen-active #hardsub-video-controls:focus-within {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-shrink: 0;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 .hardsub-preview-mini-spinner {

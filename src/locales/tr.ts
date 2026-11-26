@@ -639,7 +639,20 @@ export const tr: Translations = {
     resetFontSize: 'Yazı tipi boyutunu 14px yap',
     resetOutline: 'Kontur kalınlığını 2px yap',
     resetPosY: 'Dikey konumu 30px yap',
-    containerCodecAdjusted: '{format} kapsayıcısı için uyumsuz kodek/ses ayarları düzenlendi.'
+    containerCodecAdjusted: '{format} kapsayıcısı için uyumsuz kodek/ses ayarları düzenlendi.',
+    failedLoadSub: 'Altyazı dosyası okunamadı.',
+    studioTabsAria: 'Hardsub Stüdyo Sekmeleri',
+    boxFillColor: 'Kutu Dolgu Rengi',
+    verticalAlignAria: 'Dikey Hizalama',
+    horizontalAlignAria: 'Yatay Hizalama',
+    qualityPresetsAria: 'Video Kalite Ön Ayarları',
+    colorWhite: 'Beyaz',
+    colorYellow: 'Sarı',
+    colorRoyalBlue: 'Kraliyet Mavisi',
+    colorRed: 'Kırmızı',
+    colorBlack: 'Siyah',
+    colorDarkNavy: 'Koyu Lacivert',
+    colorSlate: 'Kayrak Grisi'
   },
   models: {
     title: 'Model Merkezi',

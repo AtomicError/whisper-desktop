@@ -639,7 +639,20 @@ export const de: Translations = {
     resetFontSize: 'Schriftgröße auf 14px zurücksetzen',
     resetOutline: 'Konturstärke auf 2px zurücksetzen',
     resetPosY: 'Vertikale Position auf 30px zurücksetzen',
-    containerCodecAdjusted: 'Inkompatible Codec-/Audio-Einstellungen für Container {format} angepasst.'
+    containerCodecAdjusted: 'Inkompatible Codec-/Audio-Einstellungen für Container {format} angepasst.',
+    failedLoadSub: 'Untertiteldatei konnte nicht gelesen werden.',
+    studioTabsAria: 'Hardsub-Studio-Tabs',
+    boxFillColor: 'Hintergrundfarbe der Box',
+    verticalAlignAria: 'Vertikale Ausrichtung',
+    horizontalAlignAria: 'Horizontale Ausrichtung',
+    qualityPresetsAria: 'Videoqualitäts-Voreinstellungen',
+    colorWhite: 'Weiß',
+    colorYellow: 'Gelb',
+    colorRoyalBlue: 'Königsblau',
+    colorRed: 'Rot',
+    colorBlack: 'Schwarz',
+    colorDarkNavy: 'Dunkelmarine',
+    colorSlate: 'Schiefergrau'
   },
   models: {
     title: 'Modell-Hub',

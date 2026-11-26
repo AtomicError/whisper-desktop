@@ -639,7 +639,20 @@ export const ar: Translations = {
     resetFontSize: 'إعادة تعيين حجم الخط إلى 14px',
     resetOutline: 'إعادة تعيين سمك الإطار إلى 2px',
     resetPosY: 'إعادة تعيين الهامش العمودي إلى 30px',
-    containerCodecAdjusted: 'تم ضبط ترميز الفيديو/الصوت غير المتوافق لحاوية {format}.'
+    containerCodecAdjusted: 'تم ضبط ترميز الفيديو/الصوت غير المتوافق لحاوية {format}.',
+    failedLoadSub: 'فشل قراءة ملف الترجمة.',
+    studioTabsAria: 'تبويبات استوديو دمج الترجمة',
+    boxFillColor: 'لون تعبئة الصندوق',
+    verticalAlignAria: 'المحاذاة العمودية',
+    horizontalAlignAria: 'المحاذاة الأفقية',
+    qualityPresetsAria: 'إعدادات جودة الفيديو المسبقة',
+    colorWhite: 'أبيض',
+    colorYellow: 'أصفر',
+    colorRoyalBlue: 'أزرق ملكي',
+    colorRed: 'أحمر',
+    colorBlack: 'أسود',
+    colorDarkNavy: 'كحلي داكن',
+    colorSlate: 'رمادي داكن'
   },
   models: {
     title: 'مركز نماذج التفريغ الصوتي',

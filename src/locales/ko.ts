@@ -639,7 +639,20 @@ export const ko: Translations = {
     resetFontSize: '글꼴 크기를 14px로 초기화',
     resetOutline: '외곽선 두께를 2px로 초기화',
     resetPosY: '수직 여백을 30px로 초기화',
-    containerCodecAdjusted: '{format} 컨테이너에 맞게 호환되지 않는 코덱/오디오 설정을 조정했습니다.'
+    containerCodecAdjusted: '{format} 컨테이너에 맞게 호환되지 않는 코덱/오디오 설정을 조정했습니다.',
+    failedLoadSub: '자막 파일을 읽지 못했습니다.',
+    studioTabsAria: '하드서브 스튜디오 탭',
+    boxFillColor: '배경 상자 색상',
+    verticalAlignAria: '수직 정렬',
+    horizontalAlignAria: '수평 정렬',
+    qualityPresetsAria: '비디오 화질 프리셋',
+    colorWhite: '흰색',
+    colorYellow: '노란색',
+    colorRoyalBlue: '로열 블루',
+    colorRed: '빨간색',
+    colorBlack: '검은색',
+    colorDarkNavy: '다크 네이비',
+    colorSlate: '슬레이트'
   },
   models: {
     title: '모델 허브',

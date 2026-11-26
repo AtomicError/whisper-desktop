@@ -49,6 +49,24 @@ describe('locale consistency for speed presets', () => {
       expect(hardsub.videoVolume.length).toBeGreaterThan(0);
       expect(typeof hardsub.cueAriaLabel).toBe('string');
       expect(hardsub.cueAriaLabel).toContain('{id}');
+      for (const extraKey of [
+        'failedLoadSub',
+        'studioTabsAria',
+        'boxFillColor',
+        'verticalAlignAria',
+        'horizontalAlignAria',
+        'qualityPresetsAria',
+        'colorWhite',
+        'colorYellow',
+        'colorRoyalBlue',
+        'colorRed',
+        'colorBlack',
+        'colorDarkNavy',
+        'colorSlate',
+      ]) {
+        expect(typeof hardsub[extraKey]).toBe('string');
+        expect(hardsub[extraKey].length).toBeGreaterThan(0);
+      }
       const toasts = (dict as any).toasts;
       expect(toasts).toBeDefined();
       expect(typeof toasts.openVideoError).toBe('string');

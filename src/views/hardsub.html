@@ -6,16 +6,16 @@
               <div class="hardsub-left-panel">
                 
                 <!-- Studio Navigation Tabs Bar (3 Dedicated Tabs) -->
-                <div class="hardsub-tabs-container" role="tablist" aria-label="Hardsub Studio Tabs">
-                  <button id="hardsub-tab-btn-editor" role="tab" aria-selected="true" aria-controls="hardsub-tab-view-editor" tabindex="0" class="pill-btn hardsub-tab-pill active" style="flex:1; padding: 10px; justify-content: center; border-radius: 8px; font-weight: 600; gap: 6px;">
+                <div class="hardsub-tabs-container" role="tablist" data-i18n-aria="hardsub.studioTabsAria" aria-label="Hardsub Studio Tabs">
+                  <button id="hardsub-tab-btn-editor" type="button" role="tab" aria-selected="true" aria-controls="hardsub-tab-view-editor" tabindex="0" class="pill-btn hardsub-tab-pill active" style="flex:1; padding: 10px; justify-content: center; border-radius: 8px; font-weight: 600; gap: 6px;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px;"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
                     <span data-i18n="hardsub.tabEditor">Editor</span>
                   </button>
-                  <button id="hardsub-tab-btn-style" role="tab" aria-selected="false" aria-controls="hardsub-tab-view-style" tabindex="-1" class="pill-btn hardsub-tab-pill" style="flex:1; padding: 10px; justify-content: center; border-radius: 8px; font-weight: 600; gap: 6px;">
+                  <button id="hardsub-tab-btn-style" type="button" role="tab" aria-selected="false" aria-controls="hardsub-tab-view-style" tabindex="-1" class="pill-btn hardsub-tab-pill" style="flex:1; padding: 10px; justify-content: center; border-radius: 8px; font-weight: 600; gap: 6px;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px;"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
                     <span data-i18n="hardsub.tabStyleShort">Style</span>
                   </button>
-                  <button id="hardsub-tab-btn-export" role="tab" aria-selected="false" aria-controls="hardsub-tab-view-export" tabindex="-1" class="pill-btn hardsub-tab-pill" style="flex:1; padding: 10px; justify-content: center; border-radius: 8px; font-weight: 600; gap: 6px;">
+                  <button id="hardsub-tab-btn-export" type="button" role="tab" aria-selected="false" aria-controls="hardsub-tab-view-export" tabindex="-1" class="pill-btn hardsub-tab-pill" style="flex:1; padding: 10px; justify-content: center; border-radius: 8px; font-weight: 600; gap: 6px;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px;"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
                     <span data-i18n="hardsub.tabExportShort">Export</span>
                   </button>
@@ -104,16 +104,16 @@
                             <span id="hardsub-hex-text" style="font-family: monospace; font-size: 0.78rem; color: var(--color-royal-blue); font-weight: 600;">#FFFFFF</span>
                           </div>
                           <div style="display: flex; align-items: center; gap: 10px;">
-                            <div class="color-picker-wrapper" title="Text Color">
+                            <div class="color-picker-wrapper" data-i18n-title="hardsub.primaryColor" title="Text Color">
                               <div id="hardsub-swatch-text" style="width:100%; height:100%; background: #FFFFFF;"></div>
                               <input type="color" id="hardsub-color-text" value="#FFFFFF" aria-label="Text Color" data-i18n-aria="hardsub.primaryColor" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: none; padding: 0; margin: 0;" />
                             </div>
                             <!-- Quick Presets -->
                             <div style="display: flex; gap: 5px;">
-                              <button class="color-preset-dot" type="button" data-target="text" data-color="#FFFFFF" style="background:#FFFFFF;" title="White" aria-label="White"></button>
-                              <button class="color-preset-dot" type="button" data-target="text" data-color="#FFD700" style="background:#FFD700;" title="Yellow" aria-label="Yellow"></button>
-                              <button class="color-preset-dot" type="button" data-target="text" data-color="#2D7FFF" style="background:#2D7FFF;" title="Royal Blue" aria-label="Royal Blue"></button>
-                              <button class="color-preset-dot" type="button" data-target="text" data-color="#FF3B30" style="background:#FF3B30;" title="Red" aria-label="Red"></button>
+                              <button class="color-preset-dot" type="button" data-target="text" data-color="#FFFFFF" style="background:#FFFFFF;" data-i18n-title="hardsub.colorWhite" title="White" data-i18n-aria="hardsub.colorWhite" aria-label="White"></button>
+                              <button class="color-preset-dot" type="button" data-target="text" data-color="#FFD700" style="background:#FFD700;" data-i18n-title="hardsub.colorYellow" title="Yellow" data-i18n-aria="hardsub.colorYellow" aria-label="Yellow"></button>
+                              <button class="color-preset-dot" type="button" data-target="text" data-color="#2D7FFF" style="background:#2D7FFF;" data-i18n-title="hardsub.colorRoyalBlue" title="Royal Blue" data-i18n-aria="hardsub.colorRoyalBlue" aria-label="Royal Blue"></button>
+                              <button class="color-preset-dot" type="button" data-target="text" data-color="#FF3B30" style="background:#FF3B30;" data-i18n-title="hardsub.colorRed" title="Red" data-i18n-aria="hardsub.colorRed" aria-label="Red"></button>
                             </div>
                           </div>
                         </div>
@@ -141,7 +141,7 @@
                           </div>
                         </div>
                         <div style="display: flex; align-items: center; gap: 12px;">
-                          <div id="hardsub-outline-picker-wrapper" class="color-picker-wrapper" title="Outline Color">
+                          <div id="hardsub-outline-picker-wrapper" class="color-picker-wrapper" data-i18n-title="hardsub.outlineColor" title="Outline Color">
                             <div id="hardsub-swatch-outline" style="width:100%; height:100%; background: #000000;"></div>
                             <input type="color" id="hardsub-color-outline" value="#000000" aria-label="Outline Color" data-i18n-aria="hardsub.outlineColor" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: none; padding: 0; margin: 0;" />
                           </div>
@@ -161,15 +161,15 @@
                           
                           <div id="hardsub-bg-controls" class="control-disabled" style="display: flex; align-items: center; gap: 10px;">
                             <span id="hardsub-hex-bg" style="font-family: monospace; font-size: 0.78rem; color: var(--color-royal-blue); font-weight: 600;">#000000</span>
-                            <div class="color-picker-wrapper" title="Box Fill Color">
+                            <div class="color-picker-wrapper" data-i18n-title="hardsub.boxFillColor" title="Box Fill Color">
                               <div id="hardsub-swatch-bg" style="width:100%; height:100%; background: #000000;"></div>
-                              <input type="color" id="hardsub-color-bg" value="#000000" aria-label="Box Fill Color" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: none; padding: 0; margin: 0;" />
+                              <input type="color" id="hardsub-color-bg" value="#000000" data-i18n-aria="hardsub.boxFillColor" aria-label="Box Fill Color" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: none; padding: 0; margin: 0;" />
                             </div>
                             <div style="display: flex; gap: 4px;">
-                              <button class="color-preset-dot" type="button" data-target="bg" data-color="#000000" style="background:#000000; border-color:rgba(255,255,255,0.4);" title="Black" aria-label="Black"></button>
-                              <button class="color-preset-dot" type="button" data-target="bg" data-color="#0B0E1B" style="background:#0B0E1B; border-color:rgba(255,255,255,0.4);" title="Dark Navy" aria-label="Dark Navy"></button>
-                              <button class="color-preset-dot" type="button" data-target="bg" data-color="#1E293B" style="background:#1E293B; border-color:rgba(255,255,255,0.4);" title="Slate" aria-label="Slate"></button>
-                              <button class="color-preset-dot" type="button" data-target="bg" data-color="#2D7FFF" style="background:#2D7FFF;" title="Royal Blue" aria-label="Royal Blue"></button>
+                              <button class="color-preset-dot" type="button" data-target="bg" data-color="#000000" style="background:#000000; border-color:rgba(255,255,255,0.4);" data-i18n-title="hardsub.colorBlack" title="Black" data-i18n-aria="hardsub.colorBlack" aria-label="Black"></button>
+                              <button class="color-preset-dot" type="button" data-target="bg" data-color="#0B0E1B" style="background:#0B0E1B; border-color:rgba(255,255,255,0.4);" data-i18n-title="hardsub.colorDarkNavy" title="Dark Navy" data-i18n-aria="hardsub.colorDarkNavy" aria-label="Dark Navy"></button>
+                              <button class="color-preset-dot" type="button" data-target="bg" data-color="#1E293B" style="background:#1E293B; border-color:rgba(255,255,255,0.4);" data-i18n-title="hardsub.colorSlate" title="Slate" data-i18n-aria="hardsub.colorSlate" aria-label="Slate"></button>
+                              <button class="color-preset-dot" type="button" data-target="bg" data-color="#2D7FFF" style="background:#2D7FFF;" data-i18n-title="hardsub.colorRoyalBlue" title="Royal Blue" data-i18n-aria="hardsub.colorRoyalBlue" aria-label="Royal Blue"></button>
                             </div>
                           </div>
                         </div>
@@ -211,13 +211,13 @@
                         <label style="font-size: 0.8rem; color: var(--color-text-muted); display: block; margin-bottom: 6px;" data-i18n="hardsub.screenAlign">Screen Alignment</label>
                         <div style="display: flex; flex-direction: column; gap: 6px;">
                           <!-- Vertical Segmented Control -->
-                          <div role="group" aria-label="Vertical Alignment" style="display: flex; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 3px; gap: 3px;">
+                          <div role="group" data-i18n-aria="hardsub.verticalAlignAria" aria-label="Vertical Alignment" style="display: flex; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 3px; gap: 3px;">
                             <button class="pill-btn align-v-btn" type="button" aria-pressed="false" data-v="top" style="flex:1; padding: 5px 0; font-size: 0.75rem; border:none; border-radius:6px; font-weight:500;" data-i18n="hardsub.alignTop">Top</button>
                             <button class="pill-btn align-v-btn" type="button" aria-pressed="false" data-v="middle" style="flex:1; padding: 5px 0; font-size: 0.75rem; border:none; border-radius:6px; font-weight:500;" data-i18n="hardsub.alignMiddle">Middle</button>
                             <button class="pill-btn align-v-btn active" type="button" aria-pressed="true" data-v="bottom" style="flex:1; padding: 5px 0; font-size: 0.75rem; border:none; border-radius:6px; font-weight:500;" data-i18n="hardsub.alignBottom">Bottom</button>
                           </div>
                           <!-- Horizontal Segmented Control -->
-                          <div role="group" dir="ltr" aria-label="Horizontal Alignment" style="display: flex; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 3px; gap: 3px;">
+                          <div role="group" dir="ltr" data-i18n-aria="hardsub.horizontalAlignAria" aria-label="Horizontal Alignment" style="display: flex; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 3px; gap: 3px;">
                             <button class="pill-btn align-h-btn" type="button" aria-pressed="false" data-h="left" style="flex:1; padding: 5px 0; font-size: 0.75rem; border:none; border-radius:6px; font-weight:500;" data-i18n="hardsub.alignLeft">Left</button>
                             <button class="pill-btn align-h-btn active" type="button" aria-pressed="true" data-h="center" style="flex:1; padding: 5px 0; font-size: 0.75rem; border:none; border-radius:6px; font-weight:500;" data-i18n="hardsub.alignCenter">Center</button>
                             <button class="pill-btn align-h-btn" type="button" aria-pressed="false" data-h="right" style="flex:1; padding: 5px 0; font-size: 0.75rem; border:none; border-radius:6px; font-weight:500;" data-i18n="hardsub.alignRight">Right</button>
@@ -319,20 +319,20 @@
                     </div>
 
                     <!-- Quick Preset Buttons -->
-                    <div id="hardsub-quality-presets-container" role="radiogroup" aria-label="Video Quality Presets">
-                      <button type="button" class="quality-preset-btn" role="radio" aria-checked="false" data-preset="draft">
+                    <div id="hardsub-quality-presets-container" role="radiogroup" data-i18n-aria="hardsub.qualityPresetsAria" aria-label="Video Quality Presets">
+                      <button type="button" class="quality-preset-btn" role="radio" aria-checked="false" tabindex="-1" data-preset="draft">
                         <span class="preset-title" data-i18n="hardsub.presetDraft">Draft</span>
                         <span class="preset-subtitle" data-i18n="hardsub.presetDraftSub">Fast / Compact</span>
                       </button>
-                      <button type="button" class="quality-preset-btn active" role="radio" aria-checked="true" data-preset="balanced">
+                      <button type="button" class="quality-preset-btn active" role="radio" aria-checked="true" tabindex="0" data-preset="balanced">
                         <span class="preset-title" data-i18n="hardsub.presetBalanced">Balanced</span>
                         <span class="preset-subtitle" data-i18n="hardsub.presetBalancedSub">Recommended</span>
                       </button>
-                      <button type="button" class="quality-preset-btn" role="radio" aria-checked="false" data-preset="high">
+                      <button type="button" class="quality-preset-btn" role="radio" aria-checked="false" tabindex="-1" data-preset="high">
                         <span class="preset-title" data-i18n="hardsub.presetHigh">High Quality</span>
                         <span class="preset-subtitle" data-i18n="hardsub.presetHighSub">Crisp Detail</span>
                       </button>
-                      <button type="button" class="quality-preset-btn" role="radio" aria-checked="false" data-preset="lossless">
+                      <button type="button" class="quality-preset-btn" role="radio" aria-checked="false" tabindex="-1" data-preset="lossless">
                         <span class="preset-title" data-i18n="hardsub.presetUltra">Ultra / Master</span>
                         <span class="preset-subtitle" data-i18n="hardsub.presetUltraSub">Max Fidelity</span>
                       </button>
@@ -478,7 +478,7 @@
                 <!-- File Selection Accordion (Collapsible Wizard Step matching Transcribe page style) -->
                 <div class="wizard-step active" id="hardsub-media-step">
                   <div class="wizard-step-header" id="hardsub-media-step-header">
-                    <div style="display:flex; align-items:center; gap:12px;">
+                    <div style="display:flex; align-items:center; gap:12px; min-width: 0;">
                       <div class="wizard-step-icon" id="hardsub-media-step-icon">1</div>
                       <div class="wizard-step-title" id="hardsub-media-step-title" data-i18n="hardsub.selectResource">Select Video &amp; Subtitle</div>
                     </div>

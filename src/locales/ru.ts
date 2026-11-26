@@ -639,7 +639,20 @@ export const ru: Translations = {
     resetFontSize: 'Сбросить размер шрифта до 14px',
     resetOutline: 'Сбросить обводку до 2px',
     resetPosY: 'Сбросить вертикальный отступ до 30px',
-    containerCodecAdjusted: 'Несовместимый кодек или аудио адаптированы для контейнера {format}.'
+    containerCodecAdjusted: 'Несовместимый кодек или аудио адаптированы для контейнера {format}.',
+    failedLoadSub: 'Не удалось прочитать файл субтитров.',
+    studioTabsAria: 'Вкладки студии хардсаба',
+    boxFillColor: 'Цвет заливки фона',
+    verticalAlignAria: 'Вертикальное выравнивание',
+    horizontalAlignAria: 'Горизонтальное выравнивание',
+    qualityPresetsAria: 'Пресеты качества видео',
+    colorWhite: 'Белый',
+    colorYellow: 'Жёлтый',
+    colorRoyalBlue: 'Королевский синий',
+    colorRed: 'Красный',
+    colorBlack: 'Чёрный',
+    colorDarkNavy: 'Тёмно-синий',
+    colorSlate: 'Грифельно-серый'
   },
   models: {
     title: 'Центр моделей',

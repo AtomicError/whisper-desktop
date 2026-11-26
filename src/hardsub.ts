@@ -313,12 +313,13 @@ export function parseSubtitleContent(content: string, ext: string): SubtitleCue[
     let inEvents = false;
     let cueId = 1;
     for (const line of lines) {
-      if (line.startsWith('[Events]')) {
-        inEvents = true;
+      const trimmedLine = line.trim();
+      if (trimmedLine.startsWith('[') && trimmedLine.endsWith(']')) {
+        inEvents = trimmedLine.toLowerCase() === '[events]';
         continue;
       }
-      if (inEvents && line.startsWith('Dialogue:')) {
-        const parts = line.substring(9).split(',');
+      if (inEvents && trimmedLine.startsWith('Dialogue:')) {
+        const parts = trimmedLine.substring(9).split(',');
         if (parts.length >= 10) {
           const startStr = parts[1].trim();
           const endStr = parts[2].trim();
@@ -1080,6 +1081,8 @@ export class HardsubController {
   private playSerial = 0;
   private subtitleSerial = 0;
   private fontScaleSerial = 0;
+  private encodeSerial = 0;
+  private cancelRetryPending = false;
   private isCompanionSubtitle = false;
   private lastFailedErrorText: string | null = null;
   private pendingSubtitleLoad: { path: string; promise: Promise<void> } | null = null;
@@ -1088,6 +1091,7 @@ export class HardsubController {
   private nativeTeardowns: Array<() => void> = [];
   private resizeObserver: ResizeObserver | null = null;
   private resizeFrame: number | null = null;
+  private resizeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private controlsTimeout: ReturnType<typeof setTimeout> | null = null;
   private clickTimeout: ReturnType<typeof setTimeout> | null = null;
   private accordionTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -1161,6 +1165,10 @@ export class HardsubController {
     this.phase = 'idle';
     this.resizeObserver?.disconnect();
     if (this.resizeFrame !== null) cancelAnimationFrame(this.resizeFrame);
+    if (this.resizeDebounceTimer !== null) {
+      clearTimeout(this.resizeDebounceTimer);
+      this.resizeDebounceTimer = null;
+    }
     if (this.storageDebounceTimer !== null) clearTimeout(this.storageDebounceTimer);
     if (this.styleStorageDebounceTimer !== null) clearTimeout(this.styleStorageDebounceTimer);
     if (this.searchDebounceTimer !== null) clearTimeout(this.searchDebounceTimer);
@@ -1228,6 +1236,48 @@ export class HardsubController {
   private canSeek(): boolean {
     const video = this.videoElement;
     return this.canInteractWithVideo() && !!video && video.readyState >= 1 && Number.isFinite(video.duration) && video.duration > 0;
+  }
+
+  private isModalOverlayOpen(): boolean {
+    return typeof document.querySelector === 'function' && Boolean(
+      document.querySelector('.modal-overlay.show, #app-modal-overlay:not([style*="display: none"]), #shortcuts-modal-overlay.show')
+    );
+  }
+
+  private setControlsGroupDisabled(container: HTMLElement | null, disabled: boolean): void {
+    if (!container) return;
+    container.classList.toggle('control-disabled', disabled);
+    container.setAttribute?.('aria-disabled', String(disabled));
+    const controls = typeof container.querySelectorAll === 'function'
+      ? container.querySelectorAll('input, button, select, textarea')
+      : [];
+    controls.forEach((el) => {
+      (el as HTMLInputElement | HTMLButtonElement | HTMLSelectElement | HTMLTextAreaElement).disabled = disabled;
+    });
+  }
+
+  private clearExportOutcomeUI(): void {
+    this.lastExportedPath = null;
+    this.lastStatusPayload = null;
+    this.lastFailedErrorText = null;
+    if (this.btnOpenFolder) {
+      this.btnOpenFolder.style.display = 'none';
+    }
+    if (this.btnPlayVideo) {
+      this.btnPlayVideo.style.display = 'none';
+    }
+    if (this.telemetryBox) {
+      this.telemetryBox.style.display = 'flex';
+    }
+    if (this.progressFill) {
+      this.progressFill.style.width = '0%';
+    }
+    if (this.progressPctText) {
+      this.progressPctText.textContent = '0%';
+    }
+    if (this.progressStatusText) {
+      this.progressStatusText.textContent = t('transcribe.standingBy');
+    }
   }
 
   private isInteractiveTarget(target: EventTarget | null): boolean {
@@ -1324,11 +1374,11 @@ export class HardsubController {
       this.updateQualitySliderConfig();
       this.updateQualityUI();
       this.updateAudioUI();
+      this.updateSpeedPresetUI();
       this.updateFfmpegCommandPreview();
       this.updateEncodingUIState(false);
       this.updateVolumeIcons(1.0, false);
 
-      let resizeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
       let lastSubtitleContainerWidth = 0;
       const container = document.getElementById('hardsub-player-container');
       if (container) {
@@ -1345,9 +1395,9 @@ export class HardsubController {
                   this.resizeAllCueTextareas();
                 }
               }
-              if (resizeDebounceTimer !== null) clearTimeout(resizeDebounceTimer);
-              resizeDebounceTimer = setTimeout(() => {
-                resizeDebounceTimer = null;
+              if (this.resizeDebounceTimer !== null) clearTimeout(this.resizeDebounceTimer);
+              this.resizeDebounceTimer = setTimeout(() => {
+                this.resizeDebounceTimer = null;
                 if (!this.disposed) {
                   this.updateVideoPreviewOverlayBounds(true);
                   if (this.subtitleListContainer) {
@@ -1576,7 +1626,12 @@ export class HardsubController {
         if (!this.hasCustomFontSelection) {
           this.state.fontName = this.getSmartDefaultFont();
         }
-        const targetFont = this.state.fontName || this.getSmartDefaultFont();
+        let targetFont = this.state.fontName || this.getSmartDefaultFont();
+        const availableOptions = Array.from(this.fontSelect.options ?? []);
+        if (availableOptions.length > 0 && !availableOptions.some((o) => o.value === targetFont)) {
+          this.hasCustomFontSelection = false;
+          targetFont = this.getSmartDefaultFont();
+        }
         this.state.fontName = targetFont;
         this.syncFontSelectUI();
       }
@@ -1824,12 +1879,26 @@ export class HardsubController {
         const cueId = parseInt(textarea.dataset.cueId || '0', 10);
         const cue = this.subtitleCues.find((c) => c.id === cueId);
         if (cue) {
+          const prevAllText = this.subtitleCues.map((c) => c.text).join(' ');
+          const prevEffectiveFont = resolveEffectiveFont(this.state.fontName, prevAllText);
           cue.text = textarea.value;
+          const nextAllText = this.subtitleCues.map((c) => c.text).join(' ');
+          const nextEffectiveFont = resolveEffectiveFont(this.state.fontName, nextAllText);
           // Keep the field's direction in step with its content, so clearing a cue
           // mid-edit puts the caret back on the interface's side.
           applyTextDirection(textarea);
           this.isSubtitlesModified = true;
-          if (this.activeCueId === cue.id) {
+          if (nextEffectiveFont !== prevEffectiveFont) {
+            if (this.activeCueId === cue.id) {
+              this.currentSubtitleText = cue.text;
+              this.updateLivePreview();
+            }
+            void this.refreshFontRenderScale().then((applied) => {
+              if (applied && !this.disposed && this.phase === 'ready') {
+                this.renderSubtitleOnCanvas(true);
+              }
+            });
+          } else if (this.activeCueId === cue.id) {
             this.currentSubtitleText = cue.text;
             this.renderSubtitleOnCanvas(true);
           }
@@ -2029,8 +2098,10 @@ export class HardsubController {
       this.boldToggle?.setAttribute?.('aria-pressed', String(this.state.bold));
       this.saveStyleSettingsToStorage();
       this.updateLivePreview();
-      await this.refreshFontRenderScale();
-      this.updateLivePreview();
+      const applied = await this.refreshFontRenderScale();
+      if (applied && !this.disposed) {
+        this.updateLivePreview();
+      }
     });
 
     // Italic Toggle
@@ -2040,8 +2111,10 @@ export class HardsubController {
       this.italicToggle?.setAttribute?.('aria-pressed', String(this.state.italic));
       this.saveStyleSettingsToStorage();
       this.updateLivePreview();
-      await this.refreshFontRenderScale();
-      this.updateLivePreview();
+      const applied = await this.refreshFontRenderScale();
+      if (applied && !this.disposed) {
+        this.updateLivePreview();
+      }
     });
 
     // Format & Codec & HW Acceleration
@@ -2100,12 +2173,14 @@ export class HardsubController {
       const posyWrapper = document.getElementById('hardsub-posy-wrapper');
       const posyTitle = document.getElementById('lbl-posy-title');
       if (posyWrapper) {
-        if (currentV === 'middle') {
-          posyWrapper.classList.add('control-disabled');
-          if (posyTitle) posyTitle.textContent = t('hardsub.vOffsetMiddleLocked');
-        } else {
-          posyWrapper.classList.remove('control-disabled');
-          if (posyTitle) posyTitle.textContent = currentV === 'top' ? t('hardsub.vMarginTop') : t('hardsub.vMarginBottom');
+        const isMiddle = currentV === 'middle';
+        this.setControlsGroupDisabled(posyWrapper, isMiddle);
+        if (posyTitle) {
+          posyTitle.textContent = isMiddle
+            ? t('hardsub.vOffsetMiddleLocked')
+            : currentV === 'top'
+              ? t('hardsub.vMarginTop')
+              : t('hardsub.vMarginBottom');
         }
       }
 
@@ -2168,6 +2243,7 @@ export class HardsubController {
     // Cancel Hardsub Button
     this.on(this.cancelBtn, 'click', async () => {
       if (this.isCancelling) return;
+      this.cancelRetryPending = false;
       this.isCancelling = true;
       if (this.cancelBtn) {
         this.cancelBtn.disabled = true;
@@ -2181,6 +2257,7 @@ export class HardsubController {
         await invoke('cancel_hardsub_task');
       } catch (e) {
         console.warn('Cancel hardsub error:', e);
+        this.cancelRetryPending = false;
         this.isCancelling = false;
         if (this.cancelBtn) {
           this.cancelBtn.disabled = false;
@@ -2241,6 +2318,11 @@ export class HardsubController {
       } else if (changedField === 'codec' && (this.state.videoCodec === 'h264' || this.state.videoCodec === 'h265' || this.state.videoCodec === 'prores')) {
         this.state.outputFormat = this.state.videoCodec === 'prores' ? 'mov' : 'mp4';
         if (this.formatSelect) this.formatSelect.value = this.state.outputFormat;
+        if (this.state.outputFormat === 'mov' && this.state.audioCodec === 'opus') {
+          this.state.audioCodec = 'aac';
+          if (this.audioCodecSelect) this.audioCodecSelect.value = 'aac';
+          this.updateAudioUI();
+        }
         if (this.state.videoPath) this.updateComputedOutputPath();
         adjusted = true;
       } else if (changedField === 'audio' && (this.state.audioCodec === 'aac' || this.state.audioCodec === 'mp3')) {
@@ -2258,6 +2340,36 @@ export class HardsubController {
       } else if (changedField === 'codec') {
         this.state.outputFormat = 'mov';
         if (this.formatSelect) this.formatSelect.value = 'mov';
+        if (this.state.audioCodec === 'opus') {
+          this.state.audioCodec = 'aac';
+          if (this.audioCodecSelect) this.audioCodecSelect.value = 'aac';
+          this.updateAudioUI();
+        }
+        if (this.state.videoPath) this.updateComputedOutputPath();
+        adjusted = true;
+      }
+    } else if (this.state.outputFormat === 'mov') {
+      if (changedField === 'format') {
+        if (this.state.videoCodec === 'vp9' || this.state.videoCodec === 'av1') {
+          this.state.videoCodec = 'h264';
+          if (this.codecSelect) this.codecSelect.value = 'h264';
+          this.updateQualitySliderConfig();
+          adjusted = true;
+        }
+        if (this.state.audioCodec === 'opus') {
+          this.state.audioCodec = 'aac';
+          if (this.audioCodecSelect) this.audioCodecSelect.value = 'aac';
+          this.updateAudioUI();
+          adjusted = true;
+        }
+      } else if (changedField === 'codec' && (this.state.videoCodec === 'vp9' || this.state.videoCodec === 'av1')) {
+        this.state.outputFormat = 'mp4';
+        if (this.formatSelect) this.formatSelect.value = 'mp4';
+        if (this.state.videoPath) this.updateComputedOutputPath();
+        adjusted = true;
+      } else if (changedField === 'audio' && this.state.audioCodec === 'opus') {
+        this.state.outputFormat = 'mp4';
+        if (this.formatSelect) this.formatSelect.value = 'mp4';
         if (this.state.videoPath) this.updateComputedOutputPath();
         adjusted = true;
       }
@@ -2318,17 +2430,49 @@ export class HardsubController {
       this.updateFfmpegCommandPreview();
     });
 
-    // Quality Preset Buttons (Interactive snapping)
+    // Quality Preset Buttons (Interactive snapping + WAI-ARIA radiogroup keyboard nav)
+    const selectQualityPreset = (preset: 'draft' | 'balanced' | 'high' | 'lossless', focusBtn?: HTMLButtonElement) => {
+      this.state.videoQualityPreset = preset;
+      this.state.videoQualityMode = 'preset';
+      this.syncQualityPresetToSlider();
+      this.updateQualityUI();
+      this.saveExportSettingsToStorage();
+      this.updateFfmpegCommandPreview();
+      if (focusBtn && typeof focusBtn.focus === 'function') {
+        focusBtn.focus();
+      }
+    };
+
     this.qualityPresetBtns?.forEach((btn) => {
       this.on(btn, 'click', () => {
         const p = (btn.dataset.preset || 'balanced') as 'draft' | 'balanced' | 'high' | 'lossless';
-        this.state.videoQualityPreset = p;
-        this.state.videoQualityMode = 'preset';
-        this.syncQualityPresetToSlider();
-        this.updateQualityUI();
-        this.saveExportSettingsToStorage();
-        this.updateFfmpegCommandPreview();
+        selectQualityPreset(p);
       });
+    });
+
+    this.on(this.qualityPresetsContainer, 'keydown', (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || !this.qualityPresetBtns?.length) return;
+      const btns = Array.from(this.qualityPresetBtns);
+      const currentIdx = Math.max(0, btns.findIndex((b) => b === e.target || b.classList.contains('active')));
+      const rtl = isRtlLanguage(getLanguage());
+      let targetIdx = -1;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        const step = e.key === 'ArrowRight' && rtl ? -1 : 1;
+        targetIdx = (currentIdx + step + btns.length) % btns.length;
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        const step = e.key === 'ArrowLeft' && rtl ? 1 : -1;
+        targetIdx = (currentIdx + step + btns.length) % btns.length;
+      } else if (e.key === 'Home') {
+        targetIdx = 0;
+      } else if (e.key === 'End') {
+        targetIdx = btns.length - 1;
+      }
+      if (targetIdx !== -1 && btns[targetIdx]) {
+        e.preventDefault();
+        const targetBtn = btns[targetIdx];
+        const p = (targetBtn.dataset.preset || 'balanced') as 'draft' | 'balanced' | 'high' | 'lossless';
+        selectQualityPreset(p, targetBtn);
+      }
     });
 
     // Custom Quality Slider (Interactive bidirectional adjustment)
@@ -2513,6 +2657,7 @@ export class HardsubController {
     this.qualityScaleMax = max;
     this.qualityScaleHigherIsBetter = higherIsBetter;
     this.updateQualityUI();
+    this.updateSpeedPresetUI();
   }
 
   private getRecommendedQualityValue(preset: 'draft' | 'balanced' | 'high' | 'lossless' | 'custom'): number {
@@ -2619,10 +2764,12 @@ export class HardsubController {
 
     // Active state is styled exclusively via the .quality-preset-btn.active CSS
     // rules (single source of truth) — no inline style duplication here.
-    this.qualityPresetBtns?.forEach((btn) => {
+    const hasMatchedPreset = ['draft', 'balanced', 'high', 'lossless'].includes(activePreset);
+    this.qualityPresetBtns?.forEach((btn, idx) => {
       const isActive = btn.dataset.preset === activePreset;
       btn.classList.toggle('active', isActive);
       btn.setAttribute('aria-checked', isActive ? 'true' : 'false');
+      btn.tabIndex = isActive || (!hasMatchedPreset && idx === 0) ? 0 : -1;
     });
 
     if (this.qualityBadge) {
@@ -2657,6 +2804,20 @@ export class HardsubController {
     }
   }
 
+  private updateSpeedPresetUI() {
+    const hw = this.state.hwAccel || 'cpu';
+    const codec = this.state.videoCodec || 'h264';
+    const presetIgnored = hw === 'vaapi' || hw === 'videotoolbox' || codec === 'prores';
+    if (this.speedPresetSelect) {
+      this.speedPresetSelect.disabled = presetIgnored;
+      const wrapper = this.speedPresetSelect.parentElement;
+      if (wrapper) {
+        wrapper.style.opacity = presetIgnored ? '0.45' : '1';
+        wrapper.style.pointerEvents = presetIgnored ? 'none' : 'auto';
+      }
+    }
+  }
+
   public refreshLocalization() {
     if (this.bundledFontOptgroup) {
       this.bundledFontOptgroup.label = t('hardsub.bundledFontsGroup');
@@ -2676,6 +2837,7 @@ export class HardsubController {
       this.updateFfmpegCommandPreview();
     }
     this.updateAudioUI();
+    this.updateSpeedPresetUI();
     this.updateAlignmentUI();
     this.updateVideoDropzoneUI(this.state.videoPath);
     this.updateSubDropzoneUI(this.state.subtitlePath, this.subtitleCues.length);
@@ -2850,6 +3012,7 @@ export class HardsubController {
       // Sync DOM inputs with restored state
       if (this.formatSelect) this.formatSelect.value = this.state.outputFormat;
       if (this.hwSelect) this.hwSelect.value = this.state.hwAccel;
+      this.updateSupportedCodecs();
       if (this.resolutionSelect) this.resolutionSelect.value = this.state.resolutionScale;
       if (this.speedPresetSelect) this.speedPresetSelect.value = this.state.videoPresetSpeed;
       if (this.audioCodecSelect) this.audioCodecSelect.value = this.state.audioCodec;
@@ -2907,11 +3070,11 @@ export class HardsubController {
 
       if (typeof parsed.fontName === 'string' && parsed.fontName.trim()) {
         this.state.fontName = parsed.fontName.trim();
-        if (parsed.hasCustomFontSelection === true || this.state.fontName !== 'Vazirmatn') {
+        if (parsed.hasCustomFontSelection === true || (parsed.hasCustomFontSelection === undefined && this.state.fontName !== 'Vazirmatn')) {
           this.hasCustomFontSelection = true;
         }
       }
-      const fontSize = clampNum(parsed.fontSize, 6, 120);
+      const fontSize = clampNum(parsed.fontSize, 6, 64);
       if (fontSize !== null) this.state.fontSize = fontSize;
 
       if (isHexColor(parsed.primaryColor)) {
@@ -2920,7 +3083,7 @@ export class HardsubController {
       if (isHexColor(parsed.outlineColor)) {
         this.state.outlineColor = parsed.outlineColor.trim().toUpperCase();
       }
-      const outlineSize = clampNum(parsed.outlineSize, 0, 10);
+      const outlineSize = clampNum(parsed.outlineSize, 0, 8);
       if (outlineSize !== null) this.state.outlineSize = outlineSize;
 
       if (typeof parsed.bgBox === 'boolean') this.state.bgBox = parsed.bgBox;
@@ -3454,7 +3617,7 @@ export class HardsubController {
       const curMs = this.videoElement.currentTime * 1000;
       const prev = [...this.subtitleCues].reverse().find((c) => c.startMs < curMs - 300);
       if (prev) {
-        this.performSafeSeek(prev.startMs / 1000);
+        this.performSafeSeek(this.getCueSeekTimeSec(prev));
       }
     });
 
@@ -3463,7 +3626,7 @@ export class HardsubController {
       const curMs = this.videoElement.currentTime * 1000;
       const next = this.subtitleCues.find((c) => c.startMs > curMs + 100);
       if (next) {
-        this.performSafeSeek(next.startMs / 1000);
+        this.performSafeSeek(this.getCueSeekTimeSec(next));
       }
     });
 
@@ -3517,9 +3680,9 @@ export class HardsubController {
     });
     this.onFullscreenStateChanged(this.isFullscreen());
 
-    // Support Escape key to exit player fullscreen
+    // Support Escape key to exit player fullscreen (never override an open modal's Escape)
     this.on(document, 'keydown', (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && this.isFullscreen()) {
+      if (e.key === 'Escape' && !e.defaultPrevented && !this.isModalOverlayOpen() && this.isFullscreen()) {
         this.exitPreviewFullscreen();
       }
     });
@@ -3652,8 +3815,7 @@ export class HardsubController {
       if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
 
       // Do not intercept if an application modal overlay is open
-      const isModalOpen = typeof document.querySelector === 'function' && Boolean(document.querySelector('.modal-overlay.show, #app-modal-overlay:not([style*="display: none"]), #shortcuts-modal-overlay.show'));
-      if (isModalOpen) return;
+      if (this.isModalOverlayOpen()) return;
 
       const target = e.target as HTMLElement | null;
       const activeEl = document.activeElement as HTMLElement | null;
@@ -4328,26 +4490,7 @@ export class HardsubController {
   private selectVideoSource(videoPath: string, explicitSubProvided = false): void {
     if (this.disposed || this.isEncoding) return;
     this.state.videoPath = videoPath;
-    this.lastExportedPath = null;
-    this.lastStatusPayload = null;
-    if (this.btnOpenFolder) {
-      this.btnOpenFolder.style.display = 'none';
-    }
-    if (this.btnPlayVideo) {
-      this.btnPlayVideo.style.display = 'none';
-    }
-    if (this.telemetryBox) {
-      this.telemetryBox.style.display = 'flex';
-    }
-    if (this.progressFill) {
-      this.progressFill.style.width = '0%';
-    }
-    if (this.progressPctText) {
-      this.progressPctText.textContent = '0%';
-    }
-    if (this.progressStatusText) {
-      this.progressStatusText.textContent = t('transcribe.standingBy');
-    }
+    this.clearExportOutcomeUI();
     if (this.videoPathInput) this.videoPathInput.value = videoPath;
     this.updateVideoDropzoneUI(videoPath);
     this.autoSuggestSubtitleAndOutput(videoPath, explicitSubProvided);
@@ -4571,6 +4714,18 @@ export class HardsubController {
     });
   }
 
+  private resetSearchFilter(): void {
+    if (this.searchDebounceTimer !== null) {
+      clearTimeout(this.searchDebounceTimer);
+      this.searchDebounceTimer = null;
+    }
+    this.searchFilterQuery = '';
+    if (this.searchInput) {
+      this.searchInput.value = '';
+      clearContentDirection(this.searchInput);
+    }
+  }
+
   private async performLoadSubtitleFile(subPath: string, allowDuringEncode: boolean): Promise<void> {
     if (!subPath || this.disposed || (!allowDuringEncode && this.isEncoding)) return;
     this.isCompanionSubtitle = false;
@@ -4591,6 +4746,10 @@ export class HardsubController {
       this.maxCueDuration = this.subtitleCues.reduce((max, c) => Math.max(max, c.endMs - c.startMs), 0);
       this.isSubtitlesModified = false;
       this._lastRenderKey = '';
+      if (!allowDuringEncode) {
+        this.resetSearchFilter();
+        this.clearExportOutcomeUI();
+      }
       this.updateSubDropzoneUI(subPath, this.subtitleCues.length);
       this.renderSubtitleCards();
       this.updateFfmpegCommandPreview();
@@ -4602,6 +4761,12 @@ export class HardsubController {
     } catch (e) {
       console.warn('Failed to read subtitle file content:', e);
       if (!this.disposed && serial === this.subtitleSerial && this.state.subtitlePath === subPath) {
+        if (!allowDuringEncode) {
+          const notifyFn = (window as any).showNotification;
+          if (typeof notifyFn === 'function') {
+            notifyFn(t('hardsub.failedLoadSub'), 'error');
+          }
+        }
         this.clearSubtitleState();
       }
     }
@@ -4799,7 +4964,7 @@ export class HardsubController {
     }
     if (videoPath) {
       this.selectVideoSource(videoPath, !!subPath);
-    } else if (subPath) {
+    } else if (subPath && !this.state.videoPath) {
       const notifyFn = (window as any).showNotification;
       if (typeof notifyFn === 'function') {
         notifyFn(t('hardsub.subLoadedSelectVideo'), 'info');
@@ -5003,27 +5168,25 @@ export class HardsubController {
     if (this.disposed || this.isEncoding) return;
     ++this.videoLoadGeneration;
     this.phase = 'idle';
+    this.playbackError = null;
+    this.previewError = null;
+    this.previewStage = null;
+    this.previewProgress = null;
+    this.previewCandidateStage = null;
+    this.attemptedCandidates.clear();
+    this.sourceInfo = null;
+    this.directSourceGeometry = null;
     this.resetVideoSource();
     void this.releasePreview();
     this.exitPreviewFullscreen();
     this.state.videoPath = '';
-    this.lastExportedPath = null;
-    this.lastStatusPayload = null;
+    this.state.outputPath = '';
+    this.clearExportOutcomeUI();
     if (this.videoPathInput) this.videoPathInput.value = '';
     this.updateVideoDropzoneUI('');
-    if (!this.state.subtitlePath) {
-      this.state.outputPath = '';
-    }
-    this.updateComputedOutputPath();
     this.updateOutputDirUI();
     this.renderPlayerPhase();
     this.syncPlayPauseUI();
-    if (this.btnOpenFolder) {
-      this.btnOpenFolder.style.display = 'none';
-    }
-    if (this.btnPlayVideo) {
-      this.btnPlayVideo.style.display = 'none';
-    }
     this.updateMediaAccordionSummary();
     this.updateResetAllButtonVisibility();
     this.updateFfmpegCommandPreview();
@@ -5034,12 +5197,17 @@ export class HardsubController {
     ++this.subtitleSerial;
     this.isCompanionSubtitle = false;
     this.state.subtitlePath = '';
-    this.lastExportedPath = null;
-    this.lastStatusPayload = null;
+    this.resetSearchFilter();
+    this.clearExportOutcomeUI();
     if (this.subtitlePathInput) this.subtitlePathInput.value = '';
     this.subtitleCues = [];
     this.maxCueDuration = 0;
     this.isSubtitlesModified = false;
+    this.targetClickedCueId = null;
+    if (this.clickLockTimer) {
+      clearTimeout(this.clickLockTimer);
+      this.clickLockTimer = null;
+    }
     this.activeCueId = null;
     this.currentSubtitleText = '';
     this._lastRenderKey = '';
@@ -5053,12 +5221,6 @@ export class HardsubController {
     }
     this.updateComputedOutputPath();
     this.updateOutputDirUI();
-    if (this.btnOpenFolder) {
-      this.btnOpenFolder.style.display = 'none';
-    }
-    if (this.btnPlayVideo) {
-      this.btnPlayVideo.style.display = 'none';
-    }
     this.updateMediaAccordionSummary();
     this.updateResetAllButtonVisibility();
     this.updateFfmpegCommandPreview();
@@ -5347,17 +5509,11 @@ export class HardsubController {
 
     const bgControls = document.getElementById('hardsub-bg-controls');
     const bgExtraControls = document.getElementById('hardsub-bg-extra-controls');
-    if (bgControls) {
-      bgControls.classList.toggle('control-disabled', !this.state.bgBox);
-    }
-    if (bgExtraControls) {
-      bgExtraControls.classList.toggle('control-disabled', !this.state.bgBox);
-    }
+    this.setControlsGroupDisabled(bgControls, !this.state.bgBox);
+    this.setControlsGroupDisabled(bgExtraControls, !this.state.bgBox);
 
     const outlinePicker = document.getElementById('hardsub-outline-picker-wrapper');
-    if (outlinePicker) {
-      outlinePicker.classList.toggle('control-disabled', this.state.outlineSize === 0);
-    }
+    this.setControlsGroupDisabled(outlinePicker, this.state.outlineSize === 0);
 
     if (this.boldToggle) {
       this.boldToggle.classList.toggle('active', this.state.bold);
@@ -5408,6 +5564,7 @@ export class HardsubController {
           span.setAttribute?.('data-i18n', 'common.cancel');
         }
         this.isCancelling = false;
+        this.cancelRetryPending = false;
       }
     }
 
@@ -5476,10 +5633,19 @@ export class HardsubController {
       if (this.disposed) return;
       const data = event.payload;
       if (this.isCancelling && data.active && (data.stage === 'encoding' || data.stage === 'init')) {
+        if (!this.cancelRetryPending) {
+          this.cancelRetryPending = true;
+          void invoke('cancel_hardsub_task')
+            .catch(() => {})
+            .finally(() => {
+              this.cancelRetryPending = false;
+            });
+        }
         return;
       }
       if (!data.active || data.stage === 'cancelled') {
         this.isCancelling = false;
+        this.cancelRetryPending = false;
         if (data.stage === 'cancelled') {
           this.lastStatusPayload = data;
           (window as any).isHardsubRunning = false;
@@ -5513,7 +5679,11 @@ export class HardsubController {
         this.progressPctText.textContent = `${pct}%`;
       }
       if (this.progressStatusText) {
-        this.progressStatusText.textContent = formatHardsubStatus(data);
+        if (data.stage === 'failed' && this.lastFailedErrorText) {
+          this.progressStatusText.textContent = t('hardsub.statusEncodingError', { error: this.lastFailedErrorText });
+        } else {
+          this.progressStatusText.textContent = formatHardsubStatus(data);
+        }
       }
 
       if (!data.active && (data.stage === 'completed' || data.progress >= 1.0)) {
@@ -5756,10 +5926,13 @@ ${events}`;
       return;
     }
 
+    const encodeSerial = ++this.encodeSerial;
+    const isCurrentEncode = () => encodeSerial === this.encodeSerial && !this.disposed;
     const originalSubPath = this.state.subtitlePath;
     let exportSubtitlePath = originalSubPath;
-    const aborted = () => !current() || this.isCancelling;
+    const aborted = () => !current() || !isCurrentEncode() || this.isCancelling;
     const handlePreEncodeCancel = () => {
+      if (!isCurrentEncode()) return;
       this.lastStatusPayload = {
         progress: 0,
         message: t('hardsub.statusEncodingCancelled'),
@@ -5780,7 +5953,11 @@ ${events}`;
       }
     };
     this.lastFailedErrorText = null;
+    this.cancelRetryPending = false;
     let completedSuccessfully = false;
+    let writtenTempAssPath: string | null = null;
+    let startedBackendTask = false;
+    let skipTempCleanupInFinally = false;
     this.updateEncodingUIState(true);
     try {
       await this.refreshFontRenderScale();
@@ -5873,8 +6050,11 @@ ${events}`;
       if (this.audioBitrateSelect?.value) {
         this.state.audioBitrate = this.audioBitrateSelect.value as any;
       }
-      if (this.qualitySlider?.value) {
-        this.state.videoQualityValue = parseInt(this.qualitySlider.value, 10) || this.state.videoQualityValue;
+      if (this.qualitySlider?.value !== undefined && this.qualitySlider.value !== '') {
+        const parsedQuality = parseInt(this.qualitySlider.value, 10);
+        if (!Number.isNaN(parsedQuality)) {
+          this.state.videoQualityValue = parsedQuality;
+        }
       }
       // Persist immediately: encoding is starting and the app may close before
       // the debounced write fires.
@@ -5902,7 +6082,10 @@ ${events}`;
       }
       this.updateComputedOutputPath();
 
-      if (!current()) return;
+      if (aborted()) {
+        if (this.isCancelling) handlePreEncodeCancel();
+        return;
+      }
 
       if (this.subtitleCues.length > 0) {
         try {
@@ -5911,7 +6094,6 @@ ${events}`;
           const lastDot = originalVideoPath.lastIndexOf('.');
           const primaryBase = lastDot > lastSlash ? originalVideoPath.substring(0, lastDot) : originalVideoPath;
           const primaryTempAssPath = `${primaryBase}.temp.ass`;
-          let writtenTempAssPath: string | null = null;
           try {
             await invoke('write_text_file_content', {
               filePath: primaryTempAssPath,
@@ -5950,9 +6132,11 @@ ${events}`;
         return;
       }
 
+      startedBackendTask = true;
       const result = await invoke<{ outputPath: string; durationMs: number; outputSizeMb: number }>('start_hardsub_task', {
         settings: { ...this.state, videoPath: originalVideoPath, subtitlePath: exportSubtitlePath },
       });
+      if (!isCurrentEncode()) return;
       completedSuccessfully = true;
       if (result?.outputPath) {
         this.lastExportedPath = result.outputPath;
@@ -5973,8 +6157,13 @@ ${events}`;
         this.progressStatusText.textContent = t('hardsub.statusExportSuccess');
       }
     } catch (e: any) {
+      if (!isCurrentEncode()) return;
       const msg = String(e || '');
-      if (msg.includes('cancelled') || msg.includes('Cancelled')) {
+      const isCancelledErr =
+        (e && typeof e === 'object' && (e as { code?: unknown }).code === 'cancelled') ||
+        msg.includes('cancelled') ||
+        msg.includes('Cancelled');
+      if (isCancelledErr) {
         console.log('Hardsub task cancelled by user');
         this.lastFailedErrorText = null;
         this.lastStatusPayload = {
@@ -5992,6 +6181,9 @@ ${events}`;
           this.progressStatusText.textContent = t('transcribe.standingBy');
         }
       } else {
+        if (msg.includes('already running')) {
+          skipTempCleanupInFinally = true;
+        }
         const errorText = this.formatHardsubErrorMessage(e);
         this.lastFailedErrorText = errorText;
         this.lastStatusPayload = {
@@ -6012,12 +6204,18 @@ ${events}`;
         }
       }
     } finally {
-      this.isCancelling = false;
-      (window as any).isHardsubRunning = false;
-      if (!completedSuccessfully && typeof (window as any).updateTaskbarProgress === 'function') {
-        (window as any).updateTaskbarProgress(0, false);
+      if (writtenTempAssPath && (!startedBackendTask || (!completedSuccessfully && isCurrentEncode() && !skipTempCleanupInFinally))) {
+        void invoke('cleanup_hardsub_temp_ass', { filePath: writtenTempAssPath }).catch(() => {});
       }
-      this.updateEncodingUIState(false);
+      if (isCurrentEncode()) {
+        this.isCancelling = false;
+        this.cancelRetryPending = false;
+        (window as any).isHardsubRunning = false;
+        if (!completedSuccessfully && typeof (window as any).updateTaskbarProgress === 'function') {
+          (window as any).updateTaskbarProgress(0, false);
+        }
+        this.updateEncodingUIState(false);
+      }
     }
   }
 

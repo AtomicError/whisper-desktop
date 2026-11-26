@@ -639,7 +639,20 @@ export const fr: Translations = {
     resetFontSize: 'Réinitialiser la taille de police à 14px',
     resetOutline: 'Réinitialiser le contour à 2px',
     resetPosY: 'Réinitialiser la position verticale à 30px',
-    containerCodecAdjusted: 'Codec/audio incompatible ajusté pour le conteneur {format}.'
+    containerCodecAdjusted: 'Codec/audio incompatible ajusté pour le conteneur {format}.',
+    failedLoadSub: 'Impossible de lire le fichier de sous-titres.',
+    studioTabsAria: 'Onglets de Hardsub Studio',
+    boxFillColor: 'Couleur de fond du cadre',
+    verticalAlignAria: 'Alignement vertical',
+    horizontalAlignAria: 'Alignement horizontal',
+    qualityPresetsAria: 'Préréglages de qualité vidéo',
+    colorWhite: 'Blanc',
+    colorYellow: 'Jaune',
+    colorRoyalBlue: 'Bleu roi',
+    colorRed: 'Rouge',
+    colorBlack: 'Noir',
+    colorDarkNavy: 'Bleu marine foncé',
+    colorSlate: 'Ardoise'
   },
   models: {
     title: 'Centre de Modèles',

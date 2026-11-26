@@ -639,7 +639,20 @@ export const fa: Translations = {
     resetFontSize: 'بازنشانی اندازه فونت به ۱۴ پیکسل',
     resetOutline: 'بازنشانی ضخامت خط دور به ۲ پیکسل',
     resetPosY: 'بازنشانی فاصله عمودی به ۳۰ پیکسل',
-    containerCodecAdjusted: 'تنظیمات کدک یا صدا به گزینهٔ سازگار با فرمت {format} تغییر یافت.'
+    containerCodecAdjusted: 'تنظیمات کدک یا صدا به گزینهٔ سازگار با فرمت {format} تغییر یافت.',
+    failedLoadSub: 'خواندن فایل زیرنویس با خطا مواجه شد.',
+    studioTabsAria: 'تب‌های استودیو هاردساب',
+    boxFillColor: 'رنگ پس‌زمینه کادر',
+    verticalAlignAria: 'تراز عمودی',
+    horizontalAlignAria: 'تراز افقی',
+    qualityPresetsAria: 'پیش‌تنظیمات کیفیت ویدیو',
+    colorWhite: 'سفید',
+    colorYellow: 'زرد',
+    colorRoyalBlue: 'آبی سلطنتی',
+    colorRed: 'قرمز',
+    colorBlack: 'مشکی',
+    colorDarkNavy: 'سرمه‌ای تیره',
+    colorSlate: 'خاکستری تیره'
   },
   models: {
     title: 'مرکز مدل‌های رونویسی',

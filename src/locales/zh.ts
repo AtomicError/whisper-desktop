@@ -639,7 +639,20 @@ export const zh: Translations = {
     resetFontSize: '将字体大小重置为 14px',
     resetOutline: '将描边大小重置为 2px',
     resetPosY: '将垂直边距重置为 30px',
-    containerCodecAdjusted: '已为 {format} 容器自动调整不兼容的视频/音频编码设置。'
+    containerCodecAdjusted: '已为 {format} 容器自动调整不兼容的视频/音频编码设置。',
+    failedLoadSub: '读取字幕文件失败。',
+    studioTabsAria: '硬字幕工作室标签页',
+    boxFillColor: '背景框填充颜色',
+    verticalAlignAria: '垂直对齐',
+    horizontalAlignAria: '水平对齐',
+    qualityPresetsAria: '视频画质预设',
+    colorWhite: '白色',
+    colorYellow: '黄色',
+    colorRoyalBlue: '皇家蓝',
+    colorRed: '红色',
+    colorBlack: '黑色',
+    colorDarkNavy: '深藏青',
+    colorSlate: '岩灰'
   },
   models: {
     title: '模型管理中心',

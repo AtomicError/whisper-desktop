@@ -639,7 +639,20 @@ export const ja: Translations = {
     resetFontSize: 'フォントサイズを14pxにリセット',
     resetOutline: '輪郭の太さを2pxにリセット',
     resetPosY: '垂直マージンを30pxにリセット',
-    containerCodecAdjusted: '{format} コンテナに合わせて非互換のコーデック/音声設定を調整しました。'
+    containerCodecAdjusted: '{format} コンテナに合わせて非互換のコーデック/音声設定を調整しました。',
+    failedLoadSub: '字幕ファイルの読み込みに失敗しました。',
+    studioTabsAria: 'ハードサブスタジオのタブ',
+    boxFillColor: '背景ボックスの色',
+    verticalAlignAria: '垂直配置',
+    horizontalAlignAria: '水平配置',
+    qualityPresetsAria: '画質プリセット',
+    colorWhite: '白',
+    colorYellow: '黄',
+    colorRoyalBlue: 'ロイヤルブルー',
+    colorRed: '赤',
+    colorBlack: '黒',
+    colorDarkNavy: 'ダークネイビー',
+    colorSlate: 'スレート'
   },
   models: {
     title: 'モデルハブ',
