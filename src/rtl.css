@@ -420,19 +420,6 @@ html[dir="rtl"] .about-update-subtext {
 }
 
 /* 8. Translation Studio RTL */
-/* The drop-zone's file card. The loaded name carries its own direction (`dir` is set
-   from the name itself), so it is not forced anywhere: a Persian name reads right to
-   left with its extension at the end of the reading order, a Latin one reads left to
-   right. Only its side is the interface's — the name sits against the card's icon,
-   which in this layout is the right-hand edge. styles.css aligns the loaded name to
-   the left for an English interface, so this is the other half of that pair, for the
-   interface whose icon is on the right. The meta badge used to need a rule here too,
-   back when it forced its own direction; it now follows the interface and carries its
-   isolation with the rest of its definition in styles.css. */
-html[dir="rtl"] #translate-drop-zone.translate-dropzone-card.has-file .translate-sub-name {
-  text-align: right;
-}
-
 html[dir="rtl"] .transcribe-switch-info {
   text-align: right;
 }

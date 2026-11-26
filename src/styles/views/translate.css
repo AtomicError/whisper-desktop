@@ -231,7 +231,7 @@
   transition: all 0.15s ease;
 }
 
-.translate-dropzone-card .btn-clear-sub:hover {
+.translate-dropzone-card .btn-clear-sub:hover:not(:disabled) {
   color: var(--danger, #ef4444);
   border-color: rgba(239, 68, 68, 0.35);
   background: rgba(239, 68, 68, 0.08);
@@ -259,7 +259,7 @@
 }
 
 #translate-drop-zone.translate-dropzone-card.has-file .translate-sub-name {
-  text-align: left;
+  text-align: start;
 }
 
 #translate-drop-zone.translate-dropzone-card.has-file .btn-sub-browse {
@@ -343,8 +343,13 @@
   transition: border-color 0.2s ease;
 }
 
-.translate-switch-row:hover {
+.translate-switch-row:hover:not(:has(input:disabled)) {
   border-color: rgba(var(--color-royal-blue-rgb), 0.35);
+}
+
+.translate-switch-row:has(input:disabled) {
+  opacity: 0.72;
+  cursor: not-allowed;
 }
 
 .translate-switch-info {
@@ -452,6 +457,11 @@
   border-color: rgba(var(--color-royal-blue-rgb), 0.35);
 }
 
+.translate-output-row .btn-secondary:disabled,
+.translate-output-row button:disabled {
+  cursor: not-allowed;
+}
+
 /* 5. Action Bar & Telemetry HUD */
 .translate-actions-section {
   display: flex;
@@ -515,8 +525,21 @@
   border: 1px solid rgba(239, 68, 68, 0.3);
   background: rgba(239, 68, 68, 0.05);
   white-space: nowrap;
-  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   transition: all 0.15s ease;
+}
+
+.btn-link-settings:focus-visible,
+.view-segment-btn:focus-visible,
+.translate-output-row button:focus-visible,
+.btn-start-translation:focus-visible,
+.btn-cancel-translation:focus-visible,
+.translate-dropzone-card .btn-sub-browse:focus-visible,
+.translate-dropzone-card .btn-clear-sub:focus-visible,
+.translate-toolbar-actions button:focus-visible {
+  outline: 2px solid var(--color-royal-blue);
+  outline-offset: 2px;
 }
 
 .btn-cancel-translation:hover:not(:disabled) {

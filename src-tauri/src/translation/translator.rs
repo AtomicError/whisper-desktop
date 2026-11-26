@@ -1,6 +1,6 @@
 use crate::settings::WhisperSettings;
 use crate::logger::AppLogs;
-use crate::translation::chunker::chunk_dialogues;
+use crate::translation::chunker::{chunk_dialogues_with_cap, MAX_ITEMS_PER_CHUNK};
 use crate::translation::formatter::ParsedSubtitle;
 use crate::translation::prompts::build_system_prompt;
 use crate::translation::provider::{get_keyring_key, AiModel, AiProvider, ApiFormat, RequestOptions, ANTHROPIC_VERSION};
@@ -496,6 +496,20 @@ fn parse_translated_lines(
     // advanced whenever a capture is accepted as a genuine numbered line.
     let mut expect_pos: usize = 0;
 
+    // Tracks a cue slot tentatively populated by a bare-clock or compact
+    // numeric line (`N:MM ...` with no space after the colon) while inside
+    // another active cue. If a genuine cue `N: ...` (with explicit separator
+    // space) arrives immediately afterward, we restore the tentative clock/ratio
+    // text as a continuation line of `prev_owner` and place the genuine cue
+    // into `map[N]`.
+    struct TentativeCompact {
+        idx: usize,
+        prev_owner: usize,
+        raw_line: String,
+        extra_lines: Vec<String>,
+    }
+    let mut tentative_compact: Option<TentativeCompact> = None;
+
     for line in response_text.lines() {
         let trimmed = line.trim();
         if trimmed.starts_with("```") {
@@ -525,6 +539,40 @@ fn parse_translated_lines(
                     let is_behind_duplicate =
                         matched_pos.is_some_and(|pos| pos < expect_pos) && map.contains_key(&idx);
 
+                    let reclaims_tentative = tentative_compact
+                        .as_ref()
+                        .is_some_and(|t| t.idx == idx)
+                        && has_separator_space
+                        && !val_cap.as_str().trim().is_empty();
+
+                    if reclaims_tentative {
+                        if let Some(t) = tentative_compact.take() {
+                            map.entry(t.prev_owner)
+                                .and_modify(|existing: &mut String| {
+                                    existing.push('\n');
+                                    existing.push_str(&t.raw_line);
+                                    for extra in &t.extra_lines {
+                                        existing.push('\n');
+                                        existing.push_str(extra);
+                                    }
+                                })
+                                .or_insert_with(|| {
+                                    let mut combined = t.raw_line.clone();
+                                    for extra in &t.extra_lines {
+                                        combined.push('\n');
+                                        combined.push_str(extra);
+                                    }
+                                    combined
+                                });
+                            map.insert(idx, val_cap.as_str().trim().to_string());
+                            if let Some(pos) = matched_pos {
+                                expect_pos = expect_pos.max(pos + 1);
+                            }
+                            current_idx = Some(idx);
+                            continue;
+                        }
+                    }
+
                     // If a line looks like a bare clock time, a compact N:M numeric ratio/time
                     // without a separator space, or an already-translated behind-cursor number
                     // inside an active cue and does not match the next expected cue number, treat
@@ -540,6 +588,7 @@ fn parse_translated_lines(
                         // or hallucinated extra cues) must be dropped cleanly and must
                         // not bleed into the previously accepted cue.
                         current_idx = None;
+                        tentative_compact = None;
                         continue;
                     } else {
                         // Disambiguation: "12:30 نیمه‌شب" or "9:00 صبح بود" is
@@ -562,9 +611,34 @@ fn parse_translated_lines(
                             if let Some(pos) = matched_pos {
                                 expect_pos = expect_pos.max(pos + 1);
                             }
+                            let prev_owner = current_idx;
+                            let was_unpopulated = !map.contains_key(&idx);
                             let text = val_cap.as_str().trim().to_string();
                             if !text.is_empty() {
                                 map.insert(idx, text);
+                                if !has_separator_space
+                                    && (is_bare_clock || is_compact_numeric)
+                                    && was_unpopulated
+                                {
+                                    if let Some(prev) = prev_owner {
+                                        if prev != idx && in_allowed(prev) {
+                                            tentative_compact = Some(TentativeCompact {
+                                                idx,
+                                                prev_owner: prev,
+                                                raw_line: trimmed.to_string(),
+                                                extra_lines: Vec::new(),
+                                            });
+                                        } else {
+                                            tentative_compact = None;
+                                        }
+                                    } else {
+                                        tentative_compact = None;
+                                    }
+                                } else {
+                                    tentative_compact = None;
+                                }
+                            } else {
+                                tentative_compact = None;
                             }
                             current_idx = Some(idx);
                             continue;
@@ -584,6 +658,11 @@ fn parse_translated_lines(
                         existing.push_str(trimmed);
                     })
                     .or_insert_with(|| trimmed.to_string());
+                if let Some(ref mut t) = tentative_compact {
+                    if t.idx == idx {
+                        t.extra_lines.push(trimmed.to_string());
+                    }
+                }
             }
         }
     }
@@ -879,6 +958,12 @@ pub(crate) fn sanitize_reqwest_error(err: reqwest::Error) -> String {
 ///    preserves the text instead of ruining the entire file into Windows-1252 mojibake.
 /// 4. Windows-1256 (Persian/Arabic) vs. Windows-1252 / Latin-1 decode for legacy
 ///    single-byte subtitles.
+fn is_arabic_persian_letter(ch: char) -> bool {
+    ('\u{0621}'..='\u{063A}').contains(&ch)
+        || ('\u{0641}'..='\u{064A}').contains(&ch)
+        || ('\u{0671}'..='\u{06D5}').contains(&ch)
+}
+
 fn is_likely_windows_1256(bytes: &[u8]) -> bool {
     let total_non_ascii = bytes.iter().filter(|&&b| b >= 0x80).count();
     if total_non_ascii < 3 {
@@ -886,23 +971,38 @@ fn is_likely_windows_1256(bytes: &[u8]) -> bool {
     }
 
     let (decoded, _, _) = encoding_rs::WINDOWS_1256.decode(bytes);
-    let mut arabic_persian_chars = 0usize;
-    let mut adjacent_arabic_pairs = 0usize;
-    let mut prev_is_letter = false;
+    let chars: Vec<char> = decoded.chars().collect();
+    let arabic_persian_chars = chars
+        .iter()
+        .filter(|&&ch| ('\u{0600}'..='\u{06FF}').contains(&ch))
+        .count();
 
-    for ch in decoded.chars() {
-        let is_block = ('\u{0600}'..='\u{06FF}').contains(&ch);
-        if is_block {
-            arabic_persian_chars += 1;
+    let mut clean_arabic_pairs = 0usize;
+    let mut clean_arabic_words = 0usize;
+    let mut i = 0;
+    while i < chars.len() {
+        if is_arabic_persian_letter(chars[i]) {
+            let start = i;
+            while i < chars.len() && is_arabic_persian_letter(chars[i]) {
+                i += 1;
+            }
+            let run_len = i - start;
+            let prev_is_latin = start > 0 && chars[start - 1].is_ascii_alphabetic();
+            let next_is_latin = i < chars.len() && chars[i].is_ascii_alphabetic();
+            if !prev_is_latin && !next_is_latin {
+                clean_arabic_pairs += run_len.saturating_sub(1);
+                if run_len >= 2 {
+                    clean_arabic_words += 1;
+                }
+            }
+        } else {
+            i += 1;
         }
-        let is_letter = ('\u{0621}'..='\u{06FF}').contains(&ch);
-        if is_letter && prev_is_letter {
-            adjacent_arabic_pairs += 1;
-        }
-        prev_is_letter = is_letter;
     }
 
-    arabic_persian_chars * 100 >= total_non_ascii * 60 && adjacent_arabic_pairs >= 2
+    arabic_persian_chars * 100 >= total_non_ascii * 60
+        && clean_arabic_pairs >= 2
+        && clean_arabic_words >= 1
 }
 
 pub(crate) fn read_subtitle_string(path: &Path) -> Result<String, String> {
@@ -945,16 +1045,19 @@ pub(crate) fn read_subtitle_string(path: &Path) -> Result<String, String> {
         return Ok(decoded_1256.into_owned());
     }
 
-    // 3b. If the file contains valid multi-byte non-ASCII UTF-8 characters (e.g.
-    // Persian, Arabic, Cyrillic, CJK, or multi-byte accented letters), preserve
-    // it as lossy UTF-8 rather than ruining it into Windows-1252 mojibake.
-    if valid_multibyte_utf8 > 0 {
+    // 3b. Preserve mostly-valid corrupted UTF-8 (where valid multi-byte UTF-8
+    // characters are at least as frequent as U+FFFD replacement characters)
+    // rather than ruining it into Windows-1252 mojibake. Conversely, if a file
+    // has more replacement characters than accidental 2-byte UTF-8 pairs (e.g.
+    // German/French Windows-1252 sequences like `ß…` [0xDF, 0x85] or `É…`
+    // [0xC9, 0x85]), fall through to Windows-1252 below.
+    if valid_multibyte_utf8 > 0 && valid_multibyte_utf8 >= fffd_count {
         return Ok(decoded_utf8.into_owned());
     }
 
     // 4. Legacy single-byte subtitle encodings: Windows-1252 / Latin-1 fallback
-    // (reached only when `valid_multibyte_utf8 == 0`, so any Windows-1256 file
-    // with `fffd_count > 0` was already handled in step 3a).
+    // (reached when `valid_multibyte_utf8 < fffd_count`, so Windows-1256 was
+    // already handled in step 3a and single-byte European files recover cleanly).
     let (decoded_1252, _, _) = encoding_rs::WINDOWS_1252.decode(&bytes);
     Ok(decoded_1252.into_owned())
 }
@@ -984,16 +1087,18 @@ fn build_request_url(
             }
         }
         ApiFormat::GeminiResponses => {
+            let trimmed_model = model.trim();
+            let clean_model = trimmed_model.strip_prefix("models/").unwrap_or(trimmed_model);
             if path_part.contains(":generateContent") {
                 path_part.to_string()
             } else if path_part.ends_with("/models") {
-                format!("{}/{}:generateContent", path_part, model)
+                format!("{}/{}:generateContent", path_part, clean_model)
             } else if path_part.contains("/models/") {
                 format!("{}:generateContent", path_part)
             } else if path_part.ends_with("/v1beta") || path_part.ends_with("/v1") {
-                format!("{}/models/{}:generateContent", path_part, model)
+                format!("{}/models/{}:generateContent", path_part, clean_model)
             } else {
-                format!("{}/v1beta/models/{}:generateContent", path_part, model)
+                format!("{}/v1beta/models/{}:generateContent", path_part, clean_model)
             }
         }
         ApiFormat::OpenAiCompatible => {
@@ -1130,6 +1235,34 @@ fn classify_non_success_error(
     }
 
     NonSuccessAction::CheckTransientOrFail
+}
+
+fn resolve_next_context_shrink(
+    current_window: usize,
+    current_chunk_len: usize,
+    current_max_items: usize,
+    parsed_exact: Option<usize>,
+) -> Result<(usize, usize, Option<usize>), String> {
+    let persist_window = parsed_exact.filter(|&limit| limit >= 1024 && limit < current_window);
+    let next_window = persist_window.unwrap_or(current_window);
+    if current_chunk_len <= 1 {
+        return Err(format!(
+            "Model context window ({}) is too small to translate even a single dialogue line.",
+            parsed_exact.unwrap_or(current_window)
+        ));
+    }
+    let next_max_items = (current_chunk_len / 2)
+        .max(1)
+        .min(current_max_items.saturating_sub(1).max(1));
+    Ok((next_window, next_max_items, persist_window))
+}
+
+fn finalize_empty_translation_error(skipped_reasons: &[String]) -> Option<String> {
+    if skipped_reasons.is_empty() {
+        None
+    } else {
+        Some(skipped_reasons.join("; "))
+    }
 }
 
 fn extract_translatable_entries(parsed: &ParsedSubtitle) -> Vec<(usize, String)> {
@@ -1450,6 +1583,8 @@ pub async fn translate_files(
 
     let lang_code = get_language_code(&settings.translate_ai_target_lang);
     let mut successfully_translated = Vec::new();
+    let mut skipped_reasons: Vec<String> = Vec::new();
+    let mut effective_max_items: usize = MAX_ITEMS_PER_CHUNK;
 
     let mut status_guard = TranslationStatusGuard::new(app.clone());
     if !generated_files.is_empty() {
@@ -1482,6 +1617,7 @@ pub async fn translate_files(
         let input_path = Path::new(&parent_dir).join(file_name);
         if !input_path.exists() {
             logs.log(&app, "Translate", &format!("Skipped '{}': file not found", file_name));
+            skipped_reasons.push(format!("Source subtitle file not found: '{}'", file_name));
             continue;
         }
 
@@ -1489,12 +1625,14 @@ pub async fn translate_files(
             Some(e) => e.to_lowercase(),
             None => {
                 logs.log(&app, "Translate", &format!("Skipped '{}': no extension", file_name));
+                skipped_reasons.push(format!("Unsupported subtitle format for '{}'", file_name));
                 continue;
             }
         };
 
         if ext != "srt" && ext != "vtt" && ext != "lrc" && ext != "txt" {
             logs.log(&app, "Translate", &format!("Skipped '.{}': unsupported subtitle format", ext));
+            skipped_reasons.push(format!("Unsupported subtitle format for '{}'", file_name));
             continue;
         }
 
@@ -1623,7 +1761,7 @@ pub async fn translate_files(
                 return Err(TRANSLATION_CANCELLED_MSG.to_string());
             }
 
-            let chunks = chunk_dialogues(&remaining_entries, context_window);
+            let chunks = chunk_dialogues_with_cap(&remaining_entries, context_window, effective_max_items);
             let Some(chunk) = chunks.into_iter().next() else {
                 break;
             };
@@ -1741,34 +1879,35 @@ pub async fn translate_files(
 
             match outcome {
                 ChunkOutcome::ContextLimitExceeded(parsed_exact) => {
-                    // Prefer the exact limit reported by the API; fall back
-                    // to halving. Then let the outer loop re-chunk.
-                    let new_limit = parsed_exact
-                        .filter(|&limit| limit < context_window)
-                        .unwrap_or(context_window / 2);
-                    if new_limit < 1024 {
-                        return Err(format!(
-                            "Model context window ({}) is too small to translate even a single dialogue line.",
-                            new_limit
-                        ));
-                    }
-                    context_window = new_limit;
-                    if let Ok(Some(updated_providers)) = update_model_limits(
-                        &settings.translate_ai_provider,
-                        &settings.translate_ai_model,
-                        Some(new_limit),
-                        None,
-                    ) {
-                        let _ = app.emit(
-                            "translation-model-limits-updated",
-                            serde_json::json!({
-                                "provider": settings.translate_ai_provider,
-                                "model": settings.translate_ai_model,
-                                "contextWindow": new_limit,
-                                "maxOutputTokens": serde_json::Value::Null,
-                                "translateAiProviders": updated_providers,
-                            }),
-                        );
+                    // Shrink chunk item cap monotonically so identical chunks are never
+                    // retried, even when the window hits MIN_USABLE_TOKENS or on 413s.
+                    // Only persist context_window when the API reported an exact limit.
+                    let (new_window, new_max_items, persist_window) = resolve_next_context_shrink(
+                        context_window,
+                        chunk.len(),
+                        effective_max_items,
+                        parsed_exact,
+                    )?;
+                    context_window = new_window;
+                    effective_max_items = new_max_items;
+                    if let Some(persisted_limit) = persist_window {
+                        if let Ok(Some(updated_providers)) = update_model_limits(
+                            &settings.translate_ai_provider,
+                            &settings.translate_ai_model,
+                            Some(persisted_limit),
+                            None,
+                        ) {
+                            let _ = app.emit(
+                                "translation-model-limits-updated",
+                                serde_json::json!({
+                                    "provider": settings.translate_ai_provider,
+                                    "model": settings.translate_ai_model,
+                                    "contextWindow": persisted_limit,
+                                    "maxOutputTokens": serde_json::Value::Null,
+                                    "translateAiProviders": updated_providers,
+                                }),
+                            );
+                        }
                     }
                     continue 'chunk_loop;
                 }
@@ -1919,11 +2058,16 @@ pub async fn translate_files(
     // Terminal event is UNCONDITIONAL: even when every file was skipped
     // (missing / unsupported extension) the frontend must be released from
     // its active state instead of waiting on an event that never arrives.
-    status_guard.disarm();
     if successfully_translated.is_empty() {
+        if let Some(err_msg) = finalize_empty_translation_error(&skipped_reasons) {
+            logs.log(&app, "Translate", &format!("Failed: {}", err_msg));
+            return Err(err_msg);
+        }
+        status_guard.disarm();
         emit_status(&app, 1.0, "Nothing to translate", false, None);
         logs.log(&app, "Translate", "Finished: no file produced a translation");
     } else {
+        status_guard.disarm();
         let final_extras = last_extras.map(|(_, total_lines, file_idx, total_files)| {
             (total_lines, total_lines, file_idx, total_files)
         });
@@ -3193,7 +3337,54 @@ mod alignment_tests {
         std::fs::write(&fr_path, encoded_fr.as_ref()).unwrap();
         assert_eq!(read_subtitle_string(&fr_path).unwrap(), fr_srt);
 
+        // German Windows-1252 subtitles with ß / ä / ö / ü must never be misdetected as Windows-1256
+        let de_srt = "1\n00:00:01,000 --> 00:00:04,000\nGroß, größer, am größten. Straße, Maße, Füße.\n\n2\n00:00:05,000 --> 00:00:08,000\nÜbermäßige Größe und schöne Straße für äußere Übungen.\n";
+        let (encoded_de, _, had_de_errors) = encoding_rs::WINDOWS_1252.encode(de_srt);
+        assert!(!had_de_errors);
+        let de_path = dir.join("legacy_de.srt");
+        std::fs::write(&de_path, encoded_de.as_ref()).unwrap();
+        assert_eq!(read_subtitle_string(&de_path).unwrap(), de_srt);
+
+        // Persian Windows-1256 mixed with HTML tags and English words still decodes cleanly
+        let mixed_fa = "1\n00:00:01,000 --> 00:00:03,000\n<i>Hello سلام دنيا</i>\n";
+        let (encoded_mixed_fa, _, had_mixed_errors) = encoding_rs::WINDOWS_1256.encode(mixed_fa);
+        assert!(!had_mixed_errors);
+        let mixed_fa_path = dir.join("legacy_mixed_fa.srt");
+        std::fs::write(&mixed_fa_path, encoded_mixed_fa.as_ref()).unwrap();
+        assert_eq!(read_subtitle_string(&mixed_fa_path).unwrap(), mixed_fa);
+
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn resolve_next_context_shrink_reduces_chunk_items_monotonically_and_persists_only_exact_limits() {
+        // Without exact API limit (e.g. HTTP 413), shrinks chunk cap 30 -> 15 -> 7 -> 3 -> 1 without overwriting model window
+        let (w1, m1, p1) = resolve_next_context_shrink(128_000, 30, 30, None).unwrap();
+        assert_eq!((w1, m1, p1), (128_000, 15, None));
+        let (w2, m2, p2) = resolve_next_context_shrink(w1, 15, m1, None).unwrap();
+        assert_eq!((w2, m2, p2), (128_000, 7, None));
+        let (w3, m3, p3) = resolve_next_context_shrink(w2, 7, m2, None).unwrap();
+        assert_eq!((w3, m3, p3), (128_000, 3, None));
+        let (w4, m4, p4) = resolve_next_context_shrink(w3, 3, m3, None).unwrap();
+        assert_eq!((w4, m4, p4), (128_000, 1, None));
+        // Even on a small local window (2048), chunk size still shrinks down to 1 before failing
+        let (ws, ms, ps) = resolve_next_context_shrink(2048, 12, 30, None).unwrap();
+        assert_eq!((ws, ms, ps), (2048, 6, None));
+        // When single line fails, errors cleanly
+        assert!(resolve_next_context_shrink(2048, 1, 1, None).is_err());
+
+        // Exact API context limit smaller than current window is persisted
+        let (we, me, pe) = resolve_next_context_shrink(128_000, 30, 30, Some(32_768)).unwrap();
+        assert_eq!((we, me, pe), (32_768, 15, Some(32_768)));
+    }
+
+    #[test]
+    fn finalize_empty_translation_error_reports_skipped_reasons() {
+        assert_eq!(finalize_empty_translation_error(&[]), None);
+        assert_eq!(
+            finalize_empty_translation_error(&["Source subtitle file not found: 'missing.srt'".to_string()]),
+            Some("Source subtitle file not found: 'missing.srt'".to_string())
+        );
     }
 
     #[test]
@@ -3211,6 +3402,104 @@ mod alignment_tests {
         assert_eq!(
             detect_preview_subtitle_format("Plain line one\nPlain line two"),
             "txt"
+        );
+    }
+
+    #[test]
+    fn read_subtitle_string_prefers_windows_1252_over_lossy_utf8_when_accidental_pair_is_outnumbered() {
+        let dir = std::env::temp_dir().join(format!("whisper-win1252-pair-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+
+        // German Windows-1252 text containing `ß…` ([0xDF, 0x85], an accidental valid 2-byte UTF-8 sequence)
+        // plus several invalid UTF-8 high bytes (`ü`, `ä`, `ö`, `ß` followed by ASCII).
+        let de_with_ellipsis = "1\n00:00:01,000 --> 00:00:04,000\nStra\u{DF}e \u{FC}ber M\u{FC}nchen \u{2014} Ich wei\u{DF}\u{2026} gr\u{F6}\u{DF}er\n";
+        let (encoded_de, _, had_de_errors) = encoding_rs::WINDOWS_1252.encode(de_with_ellipsis);
+        assert!(!had_de_errors);
+        let de_path = dir.join("de_ellipsis.srt");
+        std::fs::write(&de_path, encoded_de.as_ref()).unwrap();
+        assert_eq!(read_subtitle_string(&de_path).unwrap(), de_with_ellipsis);
+
+        // French Windows-1252 text with `É… été` (`[0xC9, 0x85]` accidental valid 2-byte UTF-8 pair).
+        let fr_with_ellipsis = "1\n00:00:01,000 --> 00:00:03,000\n\u{C9}\u{2026} l\u{27}\u{E9}t\u{E9} \u{E0} c\u{F4}t\u{E9}\n";
+        let (encoded_fr, _, had_fr_errors) = encoding_rs::WINDOWS_1252.encode(fr_with_ellipsis);
+        assert!(!had_fr_errors);
+        let fr_path = dir.join("fr_ellipsis.srt");
+        std::fs::write(&fr_path, encoded_fr.as_ref()).unwrap();
+        assert_eq!(read_subtitle_string(&fr_path).unwrap(), fr_with_ellipsis);
+
+        // Mostly-valid corrupted UTF-8 (`valid_multibyte_utf8 >= fffd_count`) must still stay UTF-8 lossy.
+        let mut corrupted_utf8 = "سلام دنیا".as_bytes().to_vec();
+        corrupted_utf8.push(0xFF);
+        let utf8_path = dir.join("corrupted_utf8.srt");
+        std::fs::write(&utf8_path, &corrupted_utf8).unwrap();
+        let decoded_utf8 = read_subtitle_string(&utf8_path).unwrap();
+        assert!(decoded_utf8.contains("سلام دنیا"));
+        assert!(decoded_utf8.contains('\u{FFFD}'));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn parse_translated_lines_reclaims_tentative_clock_time_when_genuine_cue_follows() {
+        let order: Vec<usize> = vec![1, 2, 3, 4];
+        let response = "\
+1: سلام
+2: قرارمون توی ایستگاه
+3:30 بعدازظهر دقیقاً.
+3: متوجه شدم، ممنون!
+4: خداحافظ";
+        let map = parse_translated_lines(response, &order);
+        assert_eq!(map.get(&1).map(String::as_str), Some("سلام"));
+        assert_eq!(
+            map.get(&2).map(String::as_str),
+            Some("قرارمون توی ایستگاه\n3:30 بعدازظهر دقیقاً.")
+        );
+        assert_eq!(map.get(&3).map(String::as_str), Some("متوجه شدم، ممنون!"));
+        assert_eq!(map.get(&4).map(String::as_str), Some("خداحافظ"));
+
+        // Variant with an unnumbered continuation line between the clock time and the genuine cue 3.
+        let response_with_cont = "\
+1: سلام
+2: قرارمون توی ایستگاه
+3:30 بعدازظهر دقیقاً
+تا ساعت چهار.
+3: متوجه شدم!
+4: خداحافظ";
+        let map_cont = parse_translated_lines(response_with_cont, &order);
+        assert_eq!(
+            map_cont.get(&2).map(String::as_str),
+            Some("قرارمون توی ایستگاه\n3:30 بعدازظهر دقیقاً\nتا ساعت چهار.")
+        );
+        assert_eq!(map_cont.get(&3).map(String::as_str), Some("متوجه شدم!"));
+        assert_eq!(map_cont.get(&4).map(String::as_str), Some("خداحافظ"));
+    }
+
+    #[test]
+    fn build_request_url_strips_duplicate_models_prefix_for_gemini() {
+        let expected = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+        assert_eq!(
+            build_request_url(
+                ApiFormat::GeminiResponses,
+                "https://generativelanguage.googleapis.com",
+                "models/gemini-2.5-flash"
+            ),
+            expected
+        );
+        assert_eq!(
+            build_request_url(
+                ApiFormat::GeminiResponses,
+                "https://generativelanguage.googleapis.com/v1beta",
+                " models/gemini-2.5-flash "
+            ),
+            expected
+        );
+        assert_eq!(
+            build_request_url(
+                ApiFormat::GeminiResponses,
+                "https://generativelanguage.googleapis.com/v1beta/models",
+                "models/gemini-2.5-flash"
+            ),
+            expected
         );
     }
 }

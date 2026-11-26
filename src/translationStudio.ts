@@ -462,6 +462,10 @@ export class TranslationStudioController {
 
     this.bindListener(this.targetLangSelect, 'change', () => {
       if (this.targetLangSelect) {
+        if (this.state.isTranslating || this.isStartingTranslation) {
+          this.targetLangSelect.value = this.state.targetLang;
+          return;
+        }
         this.state.targetLang = this.targetLangSelect.value;
         const win = window as any;
         if (win.settingsState) {
@@ -477,6 +481,10 @@ export class TranslationStudioController {
 
     this.bindListener(this.providerSelect, 'change', () => {
       if (this.providerSelect) {
+        if (this.state.isTranslating || this.isStartingTranslation) {
+          this.providerSelect.value = this.state.activeProvider;
+          return;
+        }
         this.state.activeProvider = this.providerSelect.value;
         const win = window as any;
         if (win.settingsState) {
@@ -492,16 +500,27 @@ export class TranslationStudioController {
           if (globalProviderSelect) {
             globalProviderSelect.value = this.state.activeProvider;
           }
+          this.refreshModelOptions();
+          win.settingsState.translateAiModel = this.state.activeModel;
+          const globalModelSelect = document.getElementById('opt-translateAiModel') as HTMLSelectElement | null;
+          if (globalModelSelect) {
+            globalModelSelect.value = this.state.activeModel;
+          }
           if (typeof win.saveCurrentSettings === 'function') {
             win.saveCurrentSettings();
           }
+        } else {
+          this.refreshModelOptions();
         }
-        this.refreshModelOptions();
       }
     });
 
     this.bindListener(this.modelSelect, 'change', () => {
       if (this.modelSelect) {
+        if (this.state.isTranslating || this.isStartingTranslation) {
+          this.modelSelect.value = this.state.activeModel;
+          return;
+        }
         this.state.activeModel = this.modelSelect.value;
         const win = window as any;
         if (win.settingsState) {
@@ -537,6 +556,10 @@ export class TranslationStudioController {
 
     this.bindListener(this.polishToggle, 'change', () => {
       if (this.polishToggle) {
+        if (this.state.isTranslating || this.isStartingTranslation) {
+          this.polishToggle.checked = this.state.polishPass;
+          return;
+        }
         this.state.polishPass = this.polishToggle.checked;
         const win = window as any;
         if (win.settingsState) {
@@ -1114,8 +1137,8 @@ export class TranslationStudioController {
     }
   }
 
-  public async loadSubtitleFile(filePath: string) {
-    if (!filePath || this.state.isTranslating || this.isStartingTranslation) return;
+  public async loadSubtitleFile(filePath: string): Promise<boolean> {
+    if (!filePath || this.state.isTranslating || this.isStartingTranslation) return false;
 
     const lastSlash = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
     const fileName = lastSlash >= 0 ? filePath.substring(lastSlash + 1) : filePath;
@@ -1124,7 +1147,7 @@ export class TranslationStudioController {
 
     if (!(SUPPORTED_TRANSLATION_EXTENSIONS as readonly string[]).includes(ext)) {
       this.notify(t('translate.unsupportedFormatError'), 'error');
-      return;
+      return false;
     }
 
     const loadId = ++this.subtitleLoadId;
@@ -1137,7 +1160,7 @@ export class TranslationStudioController {
         loadId !== this.subtitleLoadId ||
         this.state.isTranslating ||
         this.isStartingTranslation
-      ) return;
+      ) return false;
 
       this.state.subtitlePath = filePath;
       this.state.subtitleName = fileName;
@@ -1172,17 +1195,19 @@ export class TranslationStudioController {
       this.renderTargetCues();
       this.updateActionButtons();
       void this.detectCompanionVideo(filePath, loadId);
+      return true;
     } catch (err: any) {
       if (
         loadToken !== this.activeLoadToken ||
         loadId !== this.subtitleLoadId ||
         this.state.isTranslating ||
         this.isStartingTranslation
-      ) return;
+      ) return false;
       console.error('Failed to load subtitle file:', err);
       this.clearLoadedSubtitle();
       const errMsg = err?.message || (typeof err === 'string' ? err : null) || t('translate.noSubSelectedError');
       this.notify(errMsg, 'error');
+      return false;
     }
   }
 
@@ -1463,6 +1488,8 @@ export class TranslationStudioController {
     if (providers.length === 0) {
       const opt = document.createElement('option');
       opt.value = '';
+      opt.disabled = true;
+      opt.selected = true;
       opt.textContent = t('translate.selectProvider');
       this.providerSelect.appendChild(opt);
       this.state.activeProvider = '';
@@ -1510,6 +1537,8 @@ export class TranslationStudioController {
     if (!provider || !provider.models || provider.models.length === 0) {
       const opt = document.createElement('option');
       opt.value = '';
+      opt.disabled = true;
+      opt.selected = true;
       opt.textContent = t('translate.noModelError');
       this.modelSelect.appendChild(opt);
       this.state.activeModel = '';
@@ -1525,6 +1554,8 @@ export class TranslationStudioController {
     if (enabledModels.length === 0) {
       const opt = document.createElement('option');
       opt.value = '';
+      opt.disabled = true;
+      opt.selected = true;
       opt.textContent = t('translate.noModelError');
       this.modelSelect.appendChild(opt);
       this.state.activeModel = '';
@@ -1761,16 +1792,17 @@ export class TranslationStudioController {
   private updateActionButtons() {
     const hasSub = !!this.state.subtitlePath;
     const isTranslating = this.state.isTranslating;
+    const isBusy = isTranslating || this.isStartingTranslation;
 
     if (this.btnStart) {
-      this.btnStart.disabled = !hasSub || isTranslating || !this.state.activeModel;
+      this.btnStart.disabled = !hasSub || isBusy || !this.state.activeModel;
       if (!hasSub) {
         this.btnStart.title = t('translate.noSubSelectedError');
         this.btnStart.setAttribute?.('data-i18n-title', 'translate.noSubSelectedError');
       } else if (!this.state.activeModel) {
         this.btnStart.title = t('translate.noModelError');
         this.btnStart.setAttribute?.('data-i18n-title', 'translate.noModelError');
-      } else if (isTranslating) {
+      } else if (isBusy) {
         this.btnStart.title = t('translate.translating');
         this.btnStart.setAttribute?.('data-i18n-title', 'translate.translating');
       } else {
@@ -1779,18 +1811,18 @@ export class TranslationStudioController {
       }
     }
     if (this.btnStartText) {
-      const startKey = isTranslating ? 'translate.translating' : 'translate.startTranslate';
+      const startKey = isBusy ? 'translate.translating' : 'translate.startTranslate';
       this.btnStartText.setAttribute?.('data-i18n', startKey);
       this.btnStartText.textContent = t(startKey);
     }
-    if (this.btnBrowseSub) this.btnBrowseSub.disabled = isTranslating;
-    if (this.btnClearSub) this.btnClearSub.disabled = isTranslating;
-    if (this.btnBrowseDir) this.btnBrowseDir.disabled = isTranslating;
-    if (this.btnResetDir) this.btnResetDir.disabled = isTranslating;
-    if (this.targetLangSelect) this.targetLangSelect.disabled = isTranslating;
-    if (this.providerSelect) this.providerSelect.disabled = isTranslating;
-    if (this.modelSelect) this.modelSelect.disabled = isTranslating;
-    if (this.polishToggle) this.polishToggle.disabled = isTranslating;
+    if (this.btnBrowseSub) this.btnBrowseSub.disabled = isBusy;
+    if (this.btnClearSub) this.btnClearSub.disabled = isBusy;
+    if (this.btnBrowseDir) this.btnBrowseDir.disabled = isBusy;
+    if (this.btnResetDir) this.btnResetDir.disabled = isBusy;
+    if (this.targetLangSelect) this.targetLangSelect.disabled = isBusy;
+    if (this.providerSelect) this.providerSelect.disabled = isBusy;
+    if (this.modelSelect) this.modelSelect.disabled = isBusy;
+    if (this.polishToggle) this.polishToggle.disabled = isBusy;
     if (this.btnCancel) {
       this.btnCancel.style.display = isTranslating ? 'inline-flex' : 'none';
       this.btnCancel.disabled = isTranslating ? this.isCancellingTranslation : false;
@@ -1799,7 +1831,7 @@ export class TranslationStudioController {
       this.telemetryBox.style.display = (isTranslating || this.state.progress > 0 || this.lastProgressIsComplete || this.lastProgressIsCancelled || this.lastProgressIsFailed) ? 'block' : 'none';
     }
 
-    const hasTranslatedFile = !this.state.isTranslating && !!this.state.translatedPath;
+    const hasTranslatedFile = !isBusy && !!this.state.translatedPath;
     const hasTranslation = hasTranslatedFile && this.state.translatedCues.length > 0;
     const hasTimedTranslation = hasTranslation && this.isTimedSubtitlePath(this.state.translatedPath);
     if (this.btnCopy) {
@@ -1941,14 +1973,25 @@ export class TranslationStudioController {
 
     this.activeLoadToken++;
     this.isStartingTranslation = true;
+    this.updateActionButtons();
     let globalSettings: any;
     try {
       const win = window as any;
+      const hadProviderListBeforeFlush = (() => {
+        try {
+          const raw = win.settingsState?.translateAiProviders;
+          if (typeof raw !== 'string' || !raw.trim()) return false;
+          const parsed = JSON.parse(raw);
+          return Array.isArray(parsed) && parsed.length > 0;
+        } catch (_) {
+          return false;
+        }
+      })();
       if (typeof win.flushPendingModelCatalogChanges === 'function') {
-        win.flushPendingModelCatalogChanges({ silent: true, immediate: true });
+        win.flushPendingModelCatalogChanges();
       }
       if (typeof win.flushPendingProviderGeneralChanges === 'function') {
-        await win.flushPendingProviderGeneralChanges({ immediate: true });
+        await win.flushPendingProviderGeneralChanges();
       }
       globalSettings = win.settingsState;
       if (!globalSettings) {
@@ -1959,10 +2002,79 @@ export class TranslationStudioController {
           globalSettings = {};
         }
       }
+      if (typeof globalSettings?.translateAiProviders === 'string' && globalSettings.translateAiProviders.trim().length > 0) {
+        let flushedProviders: any[] = [];
+        let parsedValid = false;
+        try {
+          const parsed = JSON.parse(globalSettings.translateAiProviders);
+          if (Array.isArray(parsed)) {
+            flushedProviders = parsed;
+            parsedValid = true;
+          }
+        } catch (_) {
+          parsedValid = false;
+        }
+        if (parsedValid) {
+          if (flushedProviders.length > 0) {
+            const resolvedProvider =
+              flushedProviders.find((p: any) => p?.name === this.state.activeProvider) ||
+              flushedProviders.find((p: any) => p?.name === globalSettings.translateAiProvider) ||
+              flushedProviders[0];
+            if (resolvedProvider && typeof resolvedProvider.name === 'string') {
+              this.state.activeProvider = resolvedProvider.name;
+              if (this.providerSelect) {
+                this.providerSelect.value = this.state.activeProvider;
+              }
+            }
+            const enabledModels = Array.isArray(resolvedProvider?.models)
+              ? resolvedProvider.models.filter((m: any) => m && m.enabled !== false && typeof m.id === 'string' && m.id.trim().length > 0)
+              : [];
+            if (enabledModels.length === 0) {
+              this.state.activeModel = '';
+              if (this.modelSelect) {
+                this.modelSelect.value = '';
+              }
+              this.notify(t('translate.noModelError'), 'error');
+              return;
+            }
+            const matchedCurrent = enabledModels.find((m: any) => isModelIdMatch(m.id, this.state.activeModel));
+            if (matchedCurrent) {
+              this.state.activeModel = matchedCurrent.id;
+            } else {
+              const matchedGlobal = enabledModels.find((m: any) => isModelIdMatch(m.id, globalSettings.translateAiModel));
+              const nextModel = matchedGlobal || enabledModels[0];
+              this.state.activeModel = nextModel.id;
+              if (this.modelSelect) {
+                this.modelSelect.value = this.state.activeModel;
+              }
+              globalSettings.translateAiModel = this.state.activeModel;
+            }
+          } else if (hadProviderListBeforeFlush) {
+            this.state.activeProvider = '';
+            this.state.activeModel = '';
+            if (this.providerSelect) this.providerSelect.value = '';
+            if (this.modelSelect) this.modelSelect.value = '';
+            this.notify(t('translate.noModelError'), 'error');
+            return;
+          }
+        }
+      }
       this.isCancellingTranslation = false;
       this.state.isTranslating = true;
+    } catch (prepErr: any) {
+      console.error('Failed to prepare translation settings:', prepErr);
+      const errMsg = prepErr?.message || String(prepErr || '');
+      this.notify(t('translate.translationError', { error: errMsg }), 'error');
+      return;
     } finally {
       this.isStartingTranslation = false;
+      if (!this.state.isTranslating) {
+        if (this.pendingSettingsSyncAfterTranslation) {
+          this.pendingSettingsSyncAfterTranslation = false;
+          this.syncFromGlobalSettings();
+        }
+        this.updateActionButtons();
+      }
     }
 
     const parentDir = getParentDir(this.state.subtitlePath);
@@ -2146,7 +2258,16 @@ export class TranslationStudioController {
         errMsg.toLowerCase() === 'translation cancelled by user' ||
         errMsg.toLowerCase().includes('translation cancelled')
       ) {
+        this.lastProgressIsComplete = false;
+        this.lastProgressIsFailed = false;
         this.lastProgressIsCancelled = true;
+        this.lastPreflightError = '';
+        if (this.lblMsg) {
+          this.lblMsg.removeAttribute?.('data-i18n');
+          this.lblMsg.removeAttribute?.('title');
+          this.lblMsg.title = '';
+          this.lblMsg.textContent = t('translate.statusCancelled');
+        }
         this.setStatusBadge('translate.statusCancelled', 'cancelled');
         this.notify(t('translate.translationCancelledToast'), 'info');
       } else {

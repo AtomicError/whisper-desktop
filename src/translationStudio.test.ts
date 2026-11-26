@@ -1095,7 +1095,7 @@ describe('translation studio bugfixes and edge cases', () => {
       (controller as any).setupDropZone();
       await Promise.resolve();
 
-      const loadSpy = vi.spyOn(controller, 'loadSubtitleFile').mockResolvedValue();
+      const loadSpy = vi.spyOn(controller, 'loadSubtitleFile').mockResolvedValue(true);
       controller.state.isTranslating = true;
       await tauriListeners['tauri://drag-drop']?.({ payload: { paths: ['/tmp/movie.srt'] } });
       expect(loadSpy).not.toHaveBeenCalled();
@@ -2072,11 +2072,13 @@ describe('translation studio regression fixes', () => {
       // 3. startTranslation flushes debounced provider/model changes before snapshotting settings
       const runPromise = controller.startTranslation();
       await vi.waitFor(() => expect(invokeLocal).toHaveBeenCalledWith('translate_transcription_files', expect.anything()));
-      expect(flushCatalogSpy).toHaveBeenCalledWith({ silent: true, immediate: true });
-      expect(flushGeneralSpy).toHaveBeenCalledWith({ immediate: true });
+      expect(flushCatalogSpy).toHaveBeenCalledWith();
+      expect(flushGeneralSpy).toHaveBeenCalledWith();
       const callArgs = invokeLocal.mock.calls.find(c => c[0] === 'translate_transcription_files')?.[1] as any;
       expect(callArgs.settings.translateAiCustomPrompt).toBe('Flushed prompt');
       expect(callArgs.settings.translateAiProviders).toContain('gpt-4o-flushed');
+      expect(callArgs.settings.translateAiModel).toBe('gpt-4o-flushed');
+      expect(controller.state.activeModel).toBe('gpt-4o-flushed');
 
       // 4. Mid-flight refreshProviderOptions / refreshModelOptions are blocked & deferred until completion
       (globalThis as any).window.settingsState.translateAiProviders = JSON.stringify([
@@ -2087,7 +2089,7 @@ describe('translation studio regression fixes', () => {
       controller.refreshProviderOptions();
       controller.refreshModelOptions();
       expect(controller.state.activeProvider).toBe('OpenAI');
-      expect(controller.state.activeModel).toBe('gpt-4o');
+      expect(controller.state.activeModel).toBe('gpt-4o-flushed');
 
       // Finish with empty output [], then fire late "Nothing to translate" status event
       translationDeferred.resolve([]);
@@ -2409,6 +2411,272 @@ describe('translation studio regression fixes', () => {
       }
     } finally {
       vi.useRealTimers();
+    }
+  });
+
+  it('locks config controls and reverts change events during isStartingTranslation flush, and handles flush rejection cleanly', async () => {
+    const flushDeferred = deferred<boolean>();
+    const flushCatalogSpy = vi.fn(() => true);
+    const flushGeneralSpy = vi.fn(() => flushDeferred.promise);
+    const showNotification = vi.fn();
+
+    const origWin = (globalThis as any).window;
+    (globalThis as any).window = {
+      ...origWin,
+      settingsState: { translateAiProviders: '[]' },
+      flushPendingModelCatalogChanges: flushCatalogSpy,
+      flushPendingProviderGeneralChanges: flushGeneralSpy,
+      showNotification,
+    };
+
+    try {
+      const controller = new TranslationStudioController();
+      const providerHandlers: Record<string, any> = {};
+      const providerSelect: any = {
+        value: 'OpenAI',
+        disabled: false,
+        addEventListener: vi.fn((evt: string, h: any) => { providerHandlers[evt] = h; }),
+        removeEventListener: vi.fn(),
+      };
+      const modelSelect: any = { value: 'gpt-4o', disabled: false, addEventListener: vi.fn(), removeEventListener: vi.fn() };
+      const targetLangSelect: any = { value: 'Persian', disabled: false, addEventListener: vi.fn(), removeEventListener: vi.fn() };
+      const polishToggle: any = { checked: false, disabled: false, addEventListener: vi.fn(), removeEventListener: vi.fn() };
+      const btnStart: any = { disabled: false, title: '', setAttribute: vi.fn() };
+
+      (controller as any).providerSelect = providerSelect;
+      (controller as any).modelSelect = modelSelect;
+      (controller as any).targetLangSelect = targetLangSelect;
+      (controller as any).polishToggle = polishToggle;
+      (controller as any).btnStart = btnStart;
+      (controller as any).setupEventListeners();
+
+      controller.state.subtitlePath = '/tmp/movie.srt';
+      controller.state.subtitleName = 'movie.srt';
+      controller.state.activeProvider = 'OpenAI';
+      controller.state.activeModel = 'gpt-4o';
+      controller.state.targetLang = 'Persian';
+      controller.state.polishPass = false;
+
+      const startPromise = controller.startTranslation();
+
+      // Immediately locked before flushPendingProviderGeneralChanges resolves
+      expect((controller as any).isStartingTranslation).toBe(true);
+      expect(providerSelect.disabled).toBe(true);
+      expect(modelSelect.disabled).toBe(true);
+      expect(targetLangSelect.disabled).toBe(true);
+      expect(polishToggle.disabled).toBe(true);
+      expect(btnStart.disabled).toBe(true);
+      expect(flushCatalogSpy).toHaveBeenCalledWith();
+      expect(flushGeneralSpy).toHaveBeenCalledWith();
+
+      // Changing provider during startup flush must be ignored and reverted
+      providerSelect.value = 'Anthropic';
+      providerHandlers['change']();
+      expect(controller.state.activeProvider).toBe('OpenAI');
+      expect(providerSelect.value).toBe('OpenAI');
+
+      // If flush rejects, startTranslation catches cleanly, unlocks controls, and never invokes backend
+      flushDeferred.reject(new Error('Keyring locked'));
+      await startPromise;
+
+      expect((controller as any).isStartingTranslation).toBe(false);
+      expect(controller.state.isTranslating).toBe(false);
+      expect(providerSelect.disabled).toBe(false);
+      expect(btnStart.disabled).toBe(false);
+      expect(showNotification).toHaveBeenCalledWith(expect.stringContaining('Keyring locked'), 'error');
+      expect(invoke).not.toHaveBeenCalledWith('translate_transcription_files', expect.anything());
+    } finally {
+      (globalThis as any).window = origWin;
+    }
+  });
+
+  it('loadSubtitleFile returns true on success and false on unsupported format or read failure', async () => {
+    const controller = new TranslationStudioController();
+    expect(await controller.loadSubtitleFile('/tmp/video.mp4')).toBe(false);
+
+    invoke.mockImplementation((cmd: string) => {
+      if (cmd === 'read_text_file_content') return Promise.reject(new Error('Not found'));
+      return Promise.resolve(null);
+    });
+    expect(await controller.loadSubtitleFile('/tmp/missing.srt')).toBe(false);
+
+    invoke.mockImplementation((cmd: string) => {
+      if (cmd === 'read_text_file_content') return Promise.resolve('1\n00:00:01,000 --> 00:00:02,000\nHi\n');
+      return Promise.resolve(null);
+    });
+    expect(await controller.loadSubtitleFile('/tmp/ok.srt')).toBe(true);
+  });
+
+  it('aborts startTranslation when flush disables all models, resolves cancel race cleanly, and updates model before fallback save', async () => {
+    const origDoc = (globalThis as any).document;
+    const origWin = (globalThis as any).window;
+    const tauriListeners: Record<string, (e: any) => void> = {};
+
+    const makeEl = () => {
+      const attrs: Record<string, string> = {};
+      const children: any[] = [];
+      const handlers: Record<string, Function[]> = {};
+      return {
+        value: '',
+        disabled: false,
+        title: '',
+        textContent: '',
+        style: {} as Record<string, string>,
+        children,
+        handlers,
+        get innerHTML() { return ''; },
+        set innerHTML(_v: string) { children.length = 0; },
+        appendChild: (c: any) => { children.push(c); return c; },
+        setAttribute: vi.fn((k: string, v: string) => { attrs[k] = v; }),
+        removeAttribute: vi.fn((k: string) => { delete attrs[k]; }),
+        getAttribute: (k: string) => (k in attrs ? attrs[k] : null),
+        classList: { toggle: vi.fn(), add: vi.fn(), remove: vi.fn(), contains: vi.fn(() => false) },
+        addEventListener: vi.fn((evt: string, cb: Function) => {
+          handlers[evt] ??= [];
+          handlers[evt].push(cb);
+        }),
+        removeEventListener: vi.fn(),
+      } as any;
+    };
+
+    const providerSelect = makeEl();
+    const modelSelect = makeEl();
+    const statusBadge = makeEl();
+    const lblMsg = makeEl();
+    const progressFill = makeEl();
+    const progressTrack = makeEl();
+    const lblPct = makeEl();
+    const lblLines = makeEl();
+    const telemetryBox = makeEl();
+
+    const showNotification = vi.fn();
+    let savedSettingsSnapshot: any = null;
+    const saveCurrentSettings = vi.fn(() => {
+      savedSettingsSnapshot = { ...(globalThis as any).window.settingsState };
+    });
+
+    const invokeLocal = vi.fn();
+    const createdOptions: any[] = [];
+    (globalThis as any).document = {
+      readyState: 'loading',
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      createElement: () => {
+        const opt: any = { value: '', textContent: '', disabled: false, selected: false };
+        createdOptions.push(opt);
+        return opt;
+      },
+      getElementById: vi.fn(() => null),
+    };
+    (globalThis as any).window = {
+      ...origWin,
+      __TAURI__: {
+        core: { invoke: invokeLocal },
+        event: {
+          listen: vi.fn((ev: string, cb: (e: any) => void) => {
+            tauriListeners[ev] = cb;
+            return Promise.resolve(() => {});
+          }),
+        },
+      },
+      showNotification,
+      saveCurrentSettings,
+      settingsState: {
+        translateAiProviders: JSON.stringify([
+          { name: 'OpenAI', models: [{ id: 'gpt-4o', enabled: true }] },
+          { name: 'Anthropic', models: [{ id: 'claude-sonnet', enabled: true }] },
+        ]),
+        translateAiProvider: 'OpenAI',
+        translateAiModel: 'gpt-4o',
+        translateAiTargetLang: 'Persian',
+      },
+    };
+
+    try {
+      const controller = new TranslationStudioController();
+      (controller as any).providerSelect = providerSelect;
+      (controller as any).modelSelect = modelSelect;
+      (controller as any).statusBadge = statusBadge;
+      (controller as any).lblMsg = lblMsg;
+      (controller as any).progressFill = progressFill;
+      (controller as any).progressTrack = progressTrack;
+      (controller as any).lblPct = lblPct;
+      (controller as any).lblLines = lblLines;
+      (controller as any).telemetryBox = telemetryBox;
+      (controller as any).setupEventListeners();
+      (controller as any).listenToProgressEvents();
+      await Promise.resolve();
+
+      // 1. Empty model placeholder option must be disabled so CustomSelect treats it as non-selectable
+      (globalThis as any).window.settingsState.translateAiProviders = JSON.stringify([
+        { name: 'OpenAI', models: [] },
+      ]);
+      controller.refreshProviderOptions();
+      expect(modelSelect.children[0].value).toBe('');
+      expect(modelSelect.children[0].disabled).toBe(true);
+
+      // 2. Fallback provider change (no win.onProviderChanged) updates activeModel BEFORE saveCurrentSettings()
+      (globalThis as any).window.settingsState.translateAiProviders = JSON.stringify([
+        { name: 'OpenAI', models: [{ id: 'gpt-4o', enabled: true }] },
+        { name: 'Anthropic', models: [{ id: 'claude-sonnet', enabled: true }] },
+      ]);
+      controller.refreshProviderOptions();
+      providerSelect.value = 'Anthropic';
+      for (const cb of providerSelect.handlers.change || []) cb();
+      expect(saveCurrentSettings).toHaveBeenCalledTimes(1);
+      expect(savedSettingsSnapshot.translateAiProvider).toBe('Anthropic');
+      expect(savedSettingsSnapshot.translateAiModel).toBe('claude-sonnet');
+
+      // 3. startTranslation aborts before running if flushPendingModelCatalogChanges removes/disables all models
+      controller.state.subtitlePath = '/dir/sub.srt';
+      controller.state.subtitleName = 'sub.srt';
+      controller.state.subtitleExt = 'srt';
+      controller.state.sourceCues = [
+        { id: 1, startMs: 0, endMs: 1000, startTimeStr: '00:00:00,000', endTimeStr: '00:00:01,000', text: 'Hi' },
+      ];
+      (globalThis as any).window.flushPendingModelCatalogChanges = () => {
+        (globalThis as any).window.settingsState.translateAiProviders = JSON.stringify([
+          { name: 'Anthropic', models: [{ id: 'claude-sonnet', enabled: false }] },
+        ]);
+      };
+      await controller.startTranslation();
+      expect(invokeLocal).not.toHaveBeenCalledWith('translate_transcription_files', expect.anything());
+      expect(showNotification).toHaveBeenCalledWith(expect.any(String), 'error');
+      expect(controller.state.isTranslating).toBe(false);
+
+      // 4. Cancel race: backend emits "Translation failed" while isCancellingTranslation is true, then rejects
+      (globalThis as any).window.flushPendingModelCatalogChanges = undefined;
+      (globalThis as any).window.settingsState.translateAiProviders = JSON.stringify([
+        { name: 'Anthropic', models: [{ id: 'claude-sonnet', enabled: true }] },
+      ]);
+      controller.refreshProviderOptions();
+
+      const pending = deferred<string[]>();
+      invokeLocal.mockImplementation((cmd: string) => {
+        if (cmd === 'translate_transcription_files') return pending.promise;
+        return Promise.resolve(null);
+      });
+      const runPromise = controller.startTranslation();
+      await vi.waitFor(() => expect(invokeLocal).toHaveBeenCalledWith('translate_transcription_files', expect.anything()));
+
+      await controller.cancelTranslation();
+      tauriListeners['translation-status']?.({
+        payload: { active: false, progress: 0.4, currentLine: 1, totalLines: 5, message: 'Translation failed' },
+      });
+      pending.reject(new Error('Upstream aborted'));
+      await runPromise;
+
+      expect((controller as any).lastProgressIsFailed).toBe(false);
+      expect((controller as any).lastProgressIsCancelled).toBe(true);
+      expect(statusBadge.getAttribute('data-i18n')).toBe('translate.statusCancelled');
+      expect(lblMsg.textContent).toBe('Translation Cancelled');
+
+      controller.refreshLocalization();
+      expect(statusBadge.getAttribute('data-i18n')).toBe('translate.statusCancelled');
+      expect(lblMsg.textContent).toBe('Translation Cancelled');
+    } finally {
+      (globalThis as any).document = origDoc;
+      (globalThis as any).window = origWin;
     }
   });
 });

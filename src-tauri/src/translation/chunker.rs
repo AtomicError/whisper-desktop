@@ -19,7 +19,7 @@ const MIN_USABLE_TOKENS: usize = 512;
 
 /// Hard cap on items per chunk: keeps LLM output accuracy high and gives
 /// fine-grained real-time progress updates.
-const MAX_ITEMS_PER_CHUNK: usize = 30;
+pub const MAX_ITEMS_PER_CHUNK: usize = 30;
 
 /// Per-entry overhead beyond raw text: index digits, ": " separator,
 /// response-side duplication and JSON escaping slack.
@@ -41,18 +41,27 @@ pub fn chunk_dialogues(
     entries: &[(usize, String)],
     context_limit_tokens: usize,
 ) -> Vec<Vec<(usize, String)>> {
+    chunk_dialogues_with_cap(entries, context_limit_tokens, MAX_ITEMS_PER_CHUNK)
+}
+
+pub fn chunk_dialogues_with_cap(
+    entries: &[(usize, String)],
+    context_limit_tokens: usize,
+    max_items_cap: usize,
+) -> Vec<Vec<(usize, String)>> {
     let mut chunks = Vec::new();
     let mut current_chunk = Vec::new();
     let mut current_len = 0;
 
     let safety_limit = chunk_byte_budget(context_limit_tokens);
+    let effective_item_cap = max_items_cap.clamp(1, MAX_ITEMS_PER_CHUNK);
 
     for entry in entries {
         let entry_len = entry.1.len() + ENTRY_OVERHEAD_BYTES;
 
         if !current_chunk.is_empty()
             && (current_len + entry_len > safety_limit
-                || current_chunk.len() >= MAX_ITEMS_PER_CHUNK)
+                || current_chunk.len() >= effective_item_cap)
         {
             chunks.push(current_chunk);
             current_chunk = Vec::new();
@@ -138,5 +147,17 @@ mod tests {
         // Even an absurdly small window must produce chunks, not panic or loop.
         let chunks = chunk_dialogues(&entries(3, 100), 100);
         assert!(!chunks.is_empty());
+    }
+
+    #[test]
+    fn custom_item_cap_shrinks_chunks_even_with_small_window_floor() {
+        let items = entries(20, 40);
+        let chunks = chunk_dialogues_with_cap(&items, 1024, 3);
+        assert_eq!(chunks.len(), 7);
+        assert!(chunks.iter().all(|c| c.len() <= 3));
+
+        let single_chunks = chunk_dialogues_with_cap(&items, 2048, 1);
+        assert_eq!(single_chunks.len(), 20);
+        assert!(single_chunks.iter().all(|c| c.len() == 1));
     }
 }

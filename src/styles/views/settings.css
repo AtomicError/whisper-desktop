@@ -921,6 +921,23 @@
   border-color: var(--color-accent);
 }
 
+.switch input:disabled + .slider {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.switch:hover input:disabled + .slider,
+.setting-control:hover input:disabled + .slider {
+  border-color: var(--border-glass);
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.switch:hover input:checked:disabled + .slider,
+.setting-control:hover input:checked:disabled + .slider {
+  background-color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
 .switch input:focus-visible + .slider {
   border-color: var(--color-accent);
 }

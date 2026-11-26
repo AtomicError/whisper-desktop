@@ -687,5 +687,23 @@ describe('workflowBridge module', () => {
       expect(mockLoadSub).toHaveBeenCalledWith('/output/lecture.txt');
       expect(mockSwitchView).toHaveBeenCalledWith('translate');
     });
+
+    it('does not attach companion video when loadSubtitleFile returns false', async () => {
+      setLastTranscribedSubtitlePath('/output/missing.srt');
+      setLastTranscribedVideoPath('/media/video.mp4');
+
+      const mockLoadSub = vi.fn().mockResolvedValue(false);
+      const mockSetCompanion = vi.fn();
+      (globalThis as any).window.translationStudioController = {
+        loadSubtitleFile: mockLoadSub,
+        setCompanionVideo: mockSetCompanion,
+        state: { subtitlePath: '' }
+      };
+
+      await sendTranscribeToTranslationStudio();
+
+      expect(mockLoadSub).toHaveBeenCalledWith('/output/missing.srt');
+      expect(mockSetCompanion).not.toHaveBeenCalled();
+    });
   });
 });

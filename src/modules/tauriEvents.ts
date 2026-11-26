@@ -18,7 +18,8 @@ import {
   getIsTranscriptionRunning,
   getIsTranscribingActive,
   getIsTranslationRunning,
-  getIsHardsubRunning
+  getIsHardsubRunning,
+  getIsDownloadingModelRunning
 } from './nativeWindow';
 import { showNotification } from './appModal';
 import { scanAndPopulateModels } from './settingsManager';
@@ -390,8 +391,22 @@ export function setupTauriListeners(): void {
   on('translation-status', (event: any) => {
     const payload = event?.payload;
     if (!payload) return;
-    setIsTranslationRunning(!!payload.active);
-    updateTaskbarProgress(payload.progress, payload.active);
+    const isActive = !!payload.active;
+    setIsTranslationRunning(isActive);
+    if (isActive) {
+      updateTaskbarProgress(payload.progress, true);
+    } else {
+      const hasOtherActiveJob =
+        getIsTranscriptionRunning() ||
+        getIsTranscribingActive() ||
+        getIsHardsubRunning() ||
+        _activeModelDownloads.size > 0 ||
+        getIsDownloadingModelRunning();
+      if (!hasOtherActiveJob) {
+        const isFailed = payload.message === 'Translation failed';
+        updateTaskbarProgress(0, false, isFailed ? 'error' : 'normal');
+      }
+    }
   });
 
   // 3. Model Download Progress Event Listener

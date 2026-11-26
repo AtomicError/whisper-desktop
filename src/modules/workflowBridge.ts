@@ -527,9 +527,10 @@ export async function sendTranscribeToTranslationStudio(): Promise<void> {
     return;
   }
   if (controller && typeof controller.loadSubtitleFile === 'function') {
-    await controller.loadSubtitleFile(subToLoad);
+    const loaded = await controller.loadSubtitleFile(subToLoad);
+    const isLoaded = loaded !== false && (!controller.state || controller.state.subtitlePath === subToLoad);
     const videoToLoad = getLastTranscribedVideoPath();
-    if (videoToLoad && typeof controller.setCompanionVideo === 'function') {
+    if (isLoaded && videoToLoad && typeof controller.setCompanionVideo === 'function') {
       if (isSupportedVideoFile(videoToLoad)) {
         controller.setCompanionVideo(videoToLoad);
       }

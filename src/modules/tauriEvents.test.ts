@@ -286,6 +286,47 @@ describe('tauriEvents module', () => {
       expect(msgEl?.getAttribute('data-i18n')).toBeNull();
     });
 
+    it('preserves taskbar progress during other active jobs and sets error state when translation fails alone', async () => {
+      vi.useFakeTimers();
+      const setProgressBar = vi.fn(() => Promise.resolve());
+      const origTauri = (globalThis as any).window.__TAURI__;
+      (globalThis as any).window.__TAURI__ = {
+        ...origTauri,
+        window: {
+          getCurrentWindow: () => ({ setProgressBar }),
+        },
+      };
+
+      const handlers: Record<string, (e: any) => void> = {};
+      setOriginalListen(vi.fn().mockImplementation((event: string, handler: (e: any) => void) => {
+        handlers[event] = handler;
+        return Promise.resolve(() => {});
+      }));
+
+      try {
+        setupTauriListeners();
+        await vi.runAllTimersAsync();
+
+        // When another background job (transcription) is active, inactive translation-status must NOT clear taskbar progress
+        setIsTranscriptionRunning(true);
+        handlers['translation-status']({
+          payload: { active: false, progress: 1.0, message: 'AI translation complete' },
+        });
+        expect(setProgressBar).not.toHaveBeenCalled();
+
+        // When no other job is active and translation fails, taskbar receives error state
+        setIsTranscriptionRunning(false);
+        handlers['translation-status']({
+          payload: { active: false, progress: 0.4, message: 'Translation failed' },
+        });
+        expect(setProgressBar).toHaveBeenCalledWith({ status: 'error', progress: 100 });
+        await vi.advanceTimersByTimeAsync(4000);
+      } finally {
+        (globalThis as any).window.__TAURI__ = origTauri;
+        vi.useRealTimers();
+      }
+    });
+
     it('intercepts Whisper log messages and appends transcript cues', async () => {
       const handlers: Record<string, (e: any) => void> = {};
       setOriginalListen(vi.fn().mockImplementation((event: string, handler: (e: any) => void) => {
