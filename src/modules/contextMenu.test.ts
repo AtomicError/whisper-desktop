@@ -103,6 +103,9 @@ class MockElement {
   }
 
   appendChild(child: MockElement): MockElement {
+    if (child.parentNode) {
+      child.parentNode.children = child.parentNode.children.filter(c => c !== child);
+    }
     child.parentNode = this;
     child.parentElement = this;
     this.children.push(child);
@@ -213,16 +216,33 @@ class MockElement {
   }
 
   dispatchEvent(ev: any) {
+    if (!ev.target) ev.target = this;
+    let stopped = false;
+    const origStop = ev.stopPropagation;
+    ev.stopPropagation = () => {
+      stopped = true;
+      if (typeof origStop === 'function') origStop();
+    };
     const list = this.listeners[ev.type] || [];
     for (const fn of list) fn(ev);
+    if (!stopped && this.parentElement) {
+      this.parentElement.dispatchEvent(ev);
+    }
   }
 
   click() {
-    this.dispatchEvent({ type: 'click', stopPropagation: vi.fn(), preventDefault: vi.fn() });
+    this.dispatchEvent({ type: 'click', target: this, stopPropagation: vi.fn(), preventDefault: vi.fn() });
   }
 
   focus() {
     (globalThis as any).document.activeElement = this;
+  }
+
+  blur() {
+    const doc = (globalThis as any).document;
+    if (doc && doc.activeElement === this) {
+      doc.activeElement = doc.body || null;
+    }
   }
 
   getBoundingClientRect() {
@@ -266,6 +286,7 @@ describe('contextMenu', () => {
       documentElement: docEl,
       body: bodyEl,
       activeElement: null as MockElement | null,
+      fullscreenElement: null as MockElement | null,
       createElement: (tag: string) => new MockElement(tag),
       createElementNS: (_ns: string, tag: string) => new MockElement(tag),
       createRange: () => ({
@@ -312,7 +333,8 @@ describe('contextMenu', () => {
         },
         getRangeAt: () => ({
           commonAncestorContainer: selectionState.ancestor,
-          intersectsNode: (node: MockElement) => Boolean(selectionState.ancestor?.contains(node) || node.contains(selectionState.ancestor))
+          intersectsNode: (node: MockElement) => Boolean(selectionState.ancestor?.contains(node) || node.contains(selectionState.ancestor)),
+          getBoundingClientRect: () => selectionState.ancestor?.getBoundingClientRect?.() ?? { width: 100, height: 20, top: 40, left: 40, right: 140, bottom: 60 }
         })
       }),
       addEventListener: (type: string, fn: (e: any) => void) => {
@@ -797,18 +819,193 @@ describe('contextMenu', () => {
     const firstItem = (document as any).querySelector('.app-context-menu__item');
     expect((document as any).activeElement).toBe(firstItem);
 
-    // Tab while opened by keyboard closes menu and restores focus to triggering element
+    // Tab while opened by keyboard closes menu, stops propagation to modal trap, and restores focus to triggering element
     let tabPrevented = false;
+    let tabStopped = false;
     (document as any).dispatchEvent({
       type: 'keydown',
       key: 'Tab',
       preventDefault: () => {
         tabPrevented = true;
       },
-      stopPropagation: vi.fn()
+      stopPropagation: () => {
+        tabStopped = true;
+      }
     });
     expect(tabPrevented).toBe(true);
+    expect(tabStopped).toBe(true);
     expect(isContextMenuOpen()).toBe(false);
     expect((document as any).activeElement).toBe(details);
+  });
+
+  it('mounts inside fullscreenElement during native fullscreen and restores to body on exit', () => {
+    setupContextMenu();
+    const fsHost = new MockElement('DIV');
+    fsHost.id = 'companion-console';
+    bodyEl.appendChild(fsHost);
+    (document as any).fullscreenElement = fsHost;
+
+    openContextMenuAt(
+      120,
+      140,
+      [{ type: 'item', spec: { id: 'fs-copy', label: 'Copy Timecode', icon: 'clock', onSelect: vi.fn() } }],
+      false,
+      fsHost as any
+    );
+
+    const menuEl = (document as any).getElementById('app-context-menu');
+    expect(menuEl.parentNode).toBe(fsHost);
+    expect(fsHost.children).toContain(menuEl);
+
+    (document as any).fullscreenElement = null;
+    (document as any).dispatchEvent({ type: 'fullscreenchange' });
+    expect(isContextMenuOpen()).toBe(false);
+    expect(menuEl.parentNode).toBe(bodyEl);
+  });
+
+  it('restores focus when executing a keyboard-opened menu item, clears keyboard-nav on mousemove, and blurs hidden focus', () => {
+    setupContextMenu();
+    const details = new MockElement('PRE');
+    details.id = 'app-modal-details';
+    details.tabIndex = 0;
+    details.textContent = 'Stack trace';
+    bodyEl.appendChild(details);
+    details.focus();
+
+    const selectSpy = vi.fn();
+    openContextMenuAt(
+      80,
+      80,
+      [{ type: 'item', spec: { id: 'act', label: 'Select All', icon: 'selectAll', onSelect: selectSpy } }],
+      true,
+      details as any
+    );
+
+    const menuEl = (document as any).getElementById('app-context-menu');
+    expect(menuEl.classList.contains('is-keyboard-nav')).toBe(true);
+    const btn = (document as any).querySelector('.app-context-menu__item');
+    expect((document as any).activeElement).toBe(btn);
+
+    btn.click();
+    expect(selectSpy).toHaveBeenCalledTimes(1);
+    expect(isContextMenuOpen()).toBe(false);
+    expect(menuEl.getAttribute('aria-hidden')).toBe('true');
+    expect((document as any).activeElement).toBe(details);
+
+    // Mousemove removes is-keyboard-nav; if previousFocus is unfocusable, closing blurs focus out of hidden menu
+    openContextMenuAt(
+      80,
+      80,
+      [{ type: 'item', spec: { id: 'act2', label: 'Copy', icon: 'copy', onSelect: vi.fn() } }],
+      true
+    );
+    expect(menuEl.classList.contains('is-keyboard-nav')).toBe(true);
+    menuEl.dispatchEvent({ type: 'mousemove' });
+    expect(menuEl.classList.contains('is-keyboard-nav')).toBe(false);
+    closeContextMenu();
+    expect(menuEl.contains((document as any).activeElement)).toBe(false);
+  });
+
+  it('prevents native browser menu on preserved speed button, skips card action buttons, pauses toast timer, and survives log auto-scroll', () => {
+    setupContextMenu();
+
+    // Preserved speed button should always prevent raw browser menu even if its own handler returned early
+    const speedBtn = new MockElement('BUTTON');
+    speedBtn.id = 'hardsub-btn-speed';
+    bodyEl.appendChild(speedBtn);
+    let speedPrevented = false;
+    handleGlobalContextMenu({
+      defaultPrevented: false,
+      target: speedBtn,
+      preventDefault: () => {
+        speedPrevented = true;
+      }
+    } as any);
+    expect(speedPrevented).toBe(true);
+    expect(isContextMenuOpen()).toBe(false);
+
+    // Right-clicking an action button inside transcript card does not open transcript card menu
+    const card = new MockElement('DIV');
+    card.className = 'transcript-card';
+    const delBtn = new MockElement('BUTTON');
+    delBtn.className = 'btn-card-action';
+    card.appendChild(delBtn);
+    bodyEl.appendChild(card);
+    expect(resolveContextMenuEntries(delBtn as any)).toEqual([]);
+
+    // Opening on a toast pauses its timer and closing resumes it
+    const toast = new MockElement('DIV') as any;
+    toast.className = 'toast-notification';
+    const toastMsg = new MockElement('DIV');
+    toastMsg.className = 'toast-message';
+    toastMsg.textContent = 'Saved successfully';
+    toast.appendChild(toastMsg);
+    toast._pauseForContextMenu = vi.fn();
+    toast._resumeAfterContextMenu = vi.fn();
+    bodyEl.appendChild(toast);
+
+    handleGlobalContextMenu({
+      defaultPrevented: false,
+      target: toastMsg,
+      clientX: 200,
+      clientY: 200,
+      preventDefault: vi.fn()
+    } as any);
+    expect(isContextMenuOpen()).toBe(true);
+    expect(toast.dataset.contextMenuActive).toBe('true');
+    expect(toast._pauseForContextMenu).toHaveBeenCalledTimes(1);
+    closeContextMenu();
+    expect(toast.dataset.contextMenuActive).toBeUndefined();
+    expect(toast._resumeAfterContextMenu).toHaveBeenCalledTimes(1);
+
+    // Live auto-scroll inside #log-viewport keeps the menu open, while wheel closes it
+    const logVp = new MockElement('DIV');
+    logVp.id = 'log-viewport';
+    const logLine = new MockElement('DIV');
+    logLine.className = 'log-line';
+    logLine.dataset.timestamp = '12:00:00';
+    logLine.dataset.category = 'App';
+    const msg = new MockElement('SPAN');
+    msg.className = 'log-msg';
+    msg.textContent = 'Streaming log';
+    logLine.appendChild(msg);
+    logVp.appendChild(logLine);
+    bodyEl.appendChild(logVp);
+
+    handleGlobalContextMenu({
+      defaultPrevented: false,
+      target: msg,
+      clientX: 150,
+      clientY: 150,
+      preventDefault: vi.fn()
+    } as any);
+    expect(isContextMenuOpen()).toBe(true);
+    (document as any).dispatchEvent({ type: 'scroll', target: logVp });
+    expect(isContextMenuOpen()).toBe(true);
+    (document as any).dispatchEvent({ type: 'wheel', target: logVp });
+    expect(isContextMenuOpen()).toBe(false);
+
+    // Shift+F10 when focus is on body but text is selected resolves the selection's menu
+    const note = new MockElement('P');
+    note.textContent = 'Highlighted snippet';
+    bodyEl.appendChild(note);
+    bodyEl.focus();
+    selectAllTextInElement(note as any);
+    let selPrevented = false;
+    handleContextMenuShortcut({
+      defaultPrevented: false,
+      key: 'F10',
+      shiftKey: true,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+      target: bodyEl,
+      preventDefault: () => {
+        selPrevented = true;
+      },
+      stopPropagation: vi.fn()
+    } as any);
+    expect(selPrevented).toBe(true);
+    expect(isContextMenuOpen()).toBe(true);
   });
 });

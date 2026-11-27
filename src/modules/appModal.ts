@@ -226,9 +226,19 @@ export function showNotification(
   toast._restartTimer = (newDuration: number) => {
     startTimer(newDuration);
   };
+  toast._pauseForContextMenu = () => {
+    pauseTimer();
+  };
+  toast._resumeAfterContextMenu = () => {
+    if (typeof toast.matches === 'function' && toast.matches(':hover')) return;
+    resumeTimer();
+  };
 
   toast.addEventListener('mouseenter', pauseTimer);
-  toast.addEventListener('mouseleave', resumeTimer);
+  toast.addEventListener('mouseleave', () => {
+    if (toast.dataset?.contextMenuActive === 'true') return;
+    resumeTimer();
+  });
   
   const closeBtn = toast.querySelector('.toast-close-btn');
   if (closeBtn) {

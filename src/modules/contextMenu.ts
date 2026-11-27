@@ -76,6 +76,9 @@ let _menuEl: HTMLDivElement | null = null;
 let _isInitialized = false;
 let _previousFocusEl: HTMLElement | null = null;
 let _openedByKeyboard = false;
+let _openedInsideLogViewport = false;
+let _activeToastEl: HTMLElement | null = null;
+const _actionHandlers = new Map<string, () => void | Promise<void>>();
 
 export function stripBidiMarks(text: string | null | undefined): string {
   return String(text ?? '').replace(BIDI_MARKS_RE, '').trim();
@@ -99,17 +102,6 @@ export function isNativeEditableTarget(target: EventTarget | null): boolean {
 export function isPreservedCustomContextTarget(target: EventTarget | null): boolean {
   if (!target || typeof (target as HTMLElement).closest !== 'function') return false;
   return Boolean((target as HTMLElement).closest('#btn-companion-speed, #hardsub-btn-speed'));
-}
-
-export function isElementSelectable(el: HTMLElement | null): boolean {
-  if (!el || typeof window === 'undefined' || typeof window.getComputedStyle !== 'function') return false;
-  try {
-    const style = window.getComputedStyle(el);
-    const val = style.userSelect || (style as any).webkitUserSelect || '';
-    return val === 'text' || val === 'all';
-  } catch {
-    return false;
-  }
 }
 
 export function getActiveSelectionTextForTarget(target: HTMLElement | null): string {
@@ -493,6 +485,7 @@ function buildTranscriptEntries(target: HTMLElement, selectedText: string): Cont
   const card = target.closest('.transcript-card') as HTMLElement | null;
   const viewport = target.closest('#transcript-viewport') as HTMLElement | null;
   if (!card && !viewport) return null;
+  if (target.closest('button')) return null;
 
   const entries: ContextMenuEntry[] = [];
   addSelectionCopyEntry(entries, selectedText);
@@ -732,6 +725,7 @@ function buildHardsubEntries(target: HTMLElement, selectedText: string): Context
   // 5. Hardsub Subtitle Cue Card (outside textarea which uses native menu)
   const cueCard = target.closest('.subtitle-cue-card') as HTMLElement | null;
   if (cueCard) {
+    if (target.closest('button')) return null;
     const entries: ContextMenuEntry[] = [];
     addSelectionCopyEntry(entries, selectedText);
 
@@ -1056,15 +1050,70 @@ function createIconSvg(name: ContextMenuIconName): SVGSVGElement {
   return svg;
 }
 
+function getMenuHostElement(): HTMLElement | null {
+  if (typeof document === 'undefined') return null;
+  const fsEl = (document as any).fullscreenElement as HTMLElement | null | undefined;
+  if (
+    fsEl &&
+    fsEl !== document.documentElement &&
+    fsEl !== document.body &&
+    typeof fsEl.appendChild === 'function'
+  ) {
+    return fsEl;
+  }
+  return document.body || null;
+}
+
+function bindMenuElementListeners(menu: HTMLDivElement): void {
+  if ((menu as any)._contextMenuBound) return;
+  (menu as any)._contextMenuBound = true;
+
+  // Prevent mousedown inside the menu from clearing text selection or dismissing immediately
+  menu.addEventListener('mousedown', (e: MouseEvent) => {
+    e.preventDefault();
+  });
+  menu.addEventListener('contextmenu', (e: MouseEvent) => {
+    e.preventDefault();
+  });
+  menu.addEventListener('mousemove', () => {
+    menu.classList.remove('is-keyboard-nav');
+  });
+  menu.addEventListener('click', (e: MouseEvent) => {
+    const rawTarget = e.target as HTMLElement | null;
+    const btn = rawTarget && typeof rawTarget.closest === 'function'
+      ? (rawTarget.closest('.app-context-menu__item') as HTMLButtonElement | null)
+      : null;
+    if (!btn || btn.disabled) return;
+    e.stopPropagation();
+    const menuId = btn.dataset?.menuId || '';
+    const handler = _actionHandlers.get(menuId);
+    const shouldRestoreFocus = _openedByKeyboard;
+    closeContextMenu({ restoreFocus: shouldRestoreFocus });
+    if (handler) {
+      void handler();
+    }
+  });
+}
+
 function ensureMenuElement(): HTMLDivElement | null {
-  if (typeof document === 'undefined' || !document.body) return null;
-  if (_menuEl && _menuEl.parentNode === document.body) {
+  const host = getMenuHostElement();
+  if (!host) return null;
+
+  if (_menuEl) {
+    bindMenuElementListeners(_menuEl);
+    if (_menuEl.parentNode !== host) {
+      host.appendChild(_menuEl);
+    }
     return _menuEl;
   }
 
   const existing = document.getElementById(MENU_ID) as HTMLDivElement | null;
   if (existing) {
     _menuEl = existing;
+    bindMenuElementListeners(_menuEl);
+    if (_menuEl.parentNode !== host) {
+      host.appendChild(_menuEl);
+    }
     return _menuEl;
   }
 
@@ -1074,16 +1123,9 @@ function ensureMenuElement(): HTMLDivElement | null {
   menu.setAttribute('role', 'menu');
   menu.setAttribute('aria-hidden', 'true');
   menu.tabIndex = -1;
+  bindMenuElementListeners(menu);
 
-  // Prevent mousedown inside the menu from clearing text selection or dismissing immediately
-  menu.addEventListener('mousedown', (e: MouseEvent) => {
-    e.preventDefault();
-  });
-  menu.addEventListener('contextmenu', (e: MouseEvent) => {
-    e.preventDefault();
-  });
-
-  document.body.appendChild(menu);
+  host.appendChild(menu);
   _menuEl = menu;
   return menu;
 }
@@ -1095,8 +1137,13 @@ export function isContextMenuOpen(): boolean {
 export function closeContextMenu(options?: { restoreFocus?: boolean }): void {
   if (!_menuEl) return;
   const wasOpen = _menuEl.classList.contains('open');
-  _menuEl.classList.remove('open');
-  _menuEl.setAttribute('aria-hidden', 'true');
+
+  const activeEl = typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null;
+  const activeInsideMenu = Boolean(
+    activeEl &&
+    typeof _menuEl.contains === 'function' &&
+    _menuEl.contains(activeEl)
+  );
 
   if (wasOpen && options?.restoreFocus && _openedByKeyboard && _previousFocusEl) {
     try {
@@ -1105,8 +1152,34 @@ export function closeContextMenu(options?: { restoreFocus?: boolean }): void {
       // Ignore focus errors on detached elements
     }
   }
+
+  const postRestoreActive = typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null;
+  if (
+    activeInsideMenu &&
+    postRestoreActive &&
+    typeof _menuEl.contains === 'function' &&
+    _menuEl.contains(postRestoreActive)
+  ) {
+    try {
+      postRestoreActive.blur?.();
+    } catch {
+      // Ignore blur errors
+    }
+  }
+
+  _menuEl.classList.remove('open');
+  _menuEl.classList.remove('is-keyboard-nav');
+  _menuEl.setAttribute('aria-hidden', 'true');
+  _actionHandlers.clear();
   _previousFocusEl = null;
   _openedByKeyboard = false;
+  _openedInsideLogViewport = false;
+
+  if (_activeToastEl) {
+    if (_activeToastEl.dataset) delete _activeToastEl.dataset.contextMenuActive;
+    (_activeToastEl as any)._resumeAfterContextMenu?.();
+    _activeToastEl = null;
+  }
 }
 
 function getCssZoomFactor(): number {
@@ -1141,24 +1214,22 @@ function positionMenu(menu: HTMLDivElement, clientX: number, clientY: number): v
 
   let x = isRtl ? anchorX - width : anchorX;
   let y = anchorY;
-  let originX: 'left' | 'right' = isRtl ? 'right' : 'left';
-  let originY: 'top' | 'bottom' = 'top';
 
   if (x + width > vw - VIEWPORT_PADDING) {
     x = Math.max(VIEWPORT_PADDING, anchorX - width);
-    originX = 'right';
   }
   if (x < VIEWPORT_PADDING) {
     x = Math.min(vw - width - VIEWPORT_PADDING, Math.max(VIEWPORT_PADDING, anchorX));
-    originX = 'left';
   }
   if (y + height > vh - VIEWPORT_PADDING) {
     y = Math.max(VIEWPORT_PADDING, anchorY - height);
-    originY = 'bottom';
   }
 
   x = Math.max(VIEWPORT_PADDING, Math.min(x, Math.max(VIEWPORT_PADDING, vw - width - VIEWPORT_PADDING)));
   y = Math.max(VIEWPORT_PADDING, Math.min(y, Math.max(VIEWPORT_PADDING, vh - height - VIEWPORT_PADDING)));
+
+  const originX: 'left' | 'right' = x + width * 0.5 < anchorX ? 'right' : 'left';
+  const originY: 'top' | 'bottom' = y + height * 0.5 < anchorY ? 'bottom' : 'top';
 
   menu.style.transformOrigin = `${originY} ${originX}`;
   menu.style.left = `${Math.round(x)}px`;
@@ -1169,7 +1240,8 @@ export function openContextMenuAt(
   clientX: number,
   clientY: number,
   entries: ContextMenuEntry[],
-  openedByKeyboard = false
+  openedByKeyboard = false,
+  contextTarget?: HTMLElement | null
 ): boolean {
   const normalized = normalizeMenuEntries(entries);
   if (normalized.length === 0) {
@@ -1180,9 +1252,35 @@ export function openContextMenuAt(
   const menu = ensureMenuElement();
   if (!menu) return false;
 
-  _previousFocusEl = typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null;
+  const wasOpen = menu.classList.contains('open');
+  const currentActive = typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null;
+  if (!currentActive || typeof menu.contains !== 'function' || !menu.contains(currentActive)) {
+    _previousFocusEl = currentActive;
+  }
   _openedByKeyboard = openedByKeyboard;
 
+  if (_activeToastEl && (!contextTarget || typeof _activeToastEl.contains !== 'function' || !_activeToastEl.contains(contextTarget))) {
+    if (_activeToastEl.dataset) delete _activeToastEl.dataset.contextMenuActive;
+    (_activeToastEl as any)._resumeAfterContextMenu?.();
+    _activeToastEl = null;
+  }
+
+  _openedInsideLogViewport = Boolean(
+    contextTarget &&
+    typeof contextTarget.closest === 'function' &&
+    contextTarget.closest('#log-viewport')
+  );
+  const toastEl =
+    contextTarget && typeof contextTarget.closest === 'function'
+      ? (contextTarget.closest('.toast-notification') as HTMLElement | null)
+      : null;
+  if (toastEl) {
+    _activeToastEl = toastEl;
+    if (toastEl.dataset) toastEl.dataset.contextMenuActive = 'true';
+    (toastEl as any)._pauseForContextMenu?.();
+  }
+
+  _actionHandlers.clear();
   menu.replaceChildren();
   menu.setAttribute('aria-label', t('contextMenu.menuAria'));
 
@@ -1196,6 +1294,8 @@ export function openContextMenuAt(
     }
 
     const { spec } = entry;
+    _actionHandlers.set(spec.id, spec.onSelect);
+
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = spec.danger ? 'app-context-menu__item app-context-menu__item--danger' : 'app-context-menu__item';
@@ -1219,16 +1319,20 @@ export function openContextMenuAt(
       btn.appendChild(hintSpan);
     }
 
-    btn.addEventListener('click', (e: MouseEvent) => {
-      e.stopPropagation();
-      closeContextMenu();
-      void spec.onSelect();
-    });
-
     menu.appendChild(btn);
   }
 
+  if (openedByKeyboard) {
+    menu.classList.add('is-keyboard-nav');
+  } else {
+    menu.classList.remove('is-keyboard-nav');
+  }
+
   positionMenu(menu, clientX, clientY);
+  if (!wasOpen) {
+    // Force layout flush so the entrance scale/opacity micro-transition plays on initial mount too
+    void menu.offsetWidth;
+  }
   menu.classList.add('open');
   menu.setAttribute('aria-hidden', 'false');
 
@@ -1242,6 +1346,7 @@ export function openContextMenuAt(
 
 function moveMenuFocus(direction: 1 | -1 | 'first' | 'last'): void {
   if (!_menuEl) return;
+  _menuEl.classList.add('is-keyboard-nav');
   const items = Array.from(
     _menuEl.querySelectorAll('.app-context-menu__item:not(:disabled)')
   ) as HTMLButtonElement[];
@@ -1270,6 +1375,7 @@ export function handleGlobalContextMenu(e: MouseEvent): void {
 
   // Preserve specialized speed controls that bind their own right-click action
   if (isPreservedCustomContextTarget(target)) {
+    e.preventDefault();
     closeContextMenu();
     return;
   }
@@ -1289,7 +1395,40 @@ export function handleGlobalContextMenu(e: MouseEvent): void {
     return;
   }
 
-  openContextMenuAt(e.clientX, e.clientY, entries, false);
+  openContextMenuAt(e.clientX, e.clientY, entries, false, target);
+}
+
+function resolveKeyboardShortcutContext(): { target: HTMLElement | null; selectionRect: DOMRect | null } {
+  if (typeof document === 'undefined') return { target: null, selectionRect: null };
+  const activeFallback = document.activeElement as HTMLElement | null;
+  if (
+    activeFallback &&
+    activeFallback !== document.body &&
+    activeFallback !== document.documentElement &&
+    typeof activeFallback.closest === 'function'
+  ) {
+    return { target: activeFallback, selectionRect: null };
+  }
+
+  if (typeof window !== 'undefined' && typeof window.getSelection === 'function') {
+    try {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+        const range = sel.getRangeAt(0);
+        const ancestor = range.commonAncestorContainer;
+        const ancestorEl = (ancestor.nodeType === 1 ? ancestor : ancestor.parentElement) as HTMLElement | null;
+        if (ancestorEl && typeof ancestorEl.closest === 'function') {
+          const rect = typeof range.getBoundingClientRect === 'function' ? range.getBoundingClientRect() : null;
+          const hasRect = Boolean(rect && (rect.width > 0 || rect.height > 0));
+          return { target: ancestorEl, selectionRect: hasRect ? rect : null };
+        }
+      }
+    } catch {
+      // Ignore selection lookup errors
+    }
+  }
+
+  return { target: activeFallback, selectionRect: null };
 }
 
 export function handleContextMenuShortcut(e: KeyboardEvent): void {
@@ -1298,12 +1437,17 @@ export function handleContextMenuShortcut(e: KeyboardEvent): void {
   const isShiftF10 = e.shiftKey && e.key === 'F10' && !e.ctrlKey && !e.metaKey && !e.altKey;
   if (!isContextKey && !isShiftF10) return;
 
-  const activeFallback = typeof document !== 'undefined' ? document.activeElement : null;
-  const target = (
-    e.target && typeof (e.target as HTMLElement).closest === 'function'
-      ? e.target
-      : activeFallback
-  ) as HTMLElement | null;
+  const rawTarget = e.target as HTMLElement | null;
+  const isGenericEventTarget =
+    !rawTarget ||
+    typeof rawTarget.closest !== 'function' ||
+    rawTarget === document.body ||
+    rawTarget === document.documentElement;
+
+  const resolved = isGenericEventTarget
+    ? resolveKeyboardShortcutContext()
+    : { target: rawTarget, selectionRect: null };
+  const target = resolved.target;
 
   if (!target || isPreservedCustomContextTarget(target) || isNativeEditableTarget(target)) {
     return;
@@ -1319,17 +1463,27 @@ export function handleContextMenuShortcut(e: KeyboardEvent): void {
     (typeof document !== 'undefined' && document.documentElement?.getAttribute('dir') === 'rtl') ||
     isRtlLanguage(getLanguage());
 
-  let anchorX = 16;
-  let anchorY = 16;
-  if (typeof target.getBoundingClientRect === 'function') {
-    const rect = target.getBoundingClientRect() as DOMRect;
-    if (rect && (rect.width > 0 || rect.height > 0)) {
-      anchorX = isRtl ? Math.max(8, (rect.right ?? rect.left) - 8) : rect.left + 8;
-      anchorY = Math.max(8, (rect.bottom ?? rect.top) - 4);
-    }
+  const cssZoom = getCssZoomFactor();
+  const vhPx = typeof window !== 'undefined' ? window.innerHeight : 720;
+  let anchorX = 16 * cssZoom;
+  let anchorY = 16 * cssZoom;
+
+  const rect =
+    resolved.selectionRect ||
+    (typeof target.getBoundingClientRect === 'function' ? (target.getBoundingClientRect() as DOMRect) : null);
+
+  if (rect && (rect.width > 0 || rect.height > 0)) {
+    const clampedTop = Math.max(0, rect.top ?? 0);
+    const clampedBottom = Math.min(vhPx, rect.bottom ?? rect.top ?? 0);
+    anchorX = isRtl
+      ? Math.max(8 * cssZoom, (rect.right ?? rect.left) - 8 * cssZoom)
+      : Math.max(8 * cssZoom, rect.left + 8 * cssZoom);
+    anchorY = clampedBottom > clampedTop + 8 * cssZoom
+      ? Math.max(8 * cssZoom, clampedBottom - 4 * cssZoom)
+      : Math.max(8 * cssZoom, clampedTop + 8 * cssZoom);
   }
 
-  openContextMenuAt(anchorX, anchorY, entries, true);
+  openContextMenuAt(anchorX, anchorY, entries, true, target);
 }
 
 export function setupContextMenu(): void {
@@ -1383,6 +1537,7 @@ export function setupContextMenu(): void {
     if (e.key === 'Tab') {
       if (_openedByKeyboard) {
         e.preventDefault();
+        e.stopPropagation();
       }
       closeContextMenu({ restoreFocus: _openedByKeyboard });
     }
@@ -1394,19 +1549,46 @@ export function setupContextMenu(): void {
     window.addEventListener('whisper:languageChanged', () => closeContextMenu());
   }
 
-  document.addEventListener('scroll', (e: Event) => {
+  document.addEventListener('wheel', (e: Event) => {
     if (!isContextMenuOpen()) return;
     if (_menuEl && (e.target === _menuEl || (_menuEl.contains && _menuEl.contains(e.target as Node)))) {
       return;
     }
     closeContextMenu();
   }, { capture: true, passive: true });
+
+  document.addEventListener('scroll', (e: Event) => {
+    if (!isContextMenuOpen()) return;
+    if (_menuEl && (e.target === _menuEl || (_menuEl.contains && _menuEl.contains(e.target as Node)))) {
+      return;
+    }
+    if (_openedInsideLogViewport && (e.target as HTMLElement | null)?.id === 'log-viewport') {
+      return;
+    }
+    closeContextMenu();
+  }, { capture: true, passive: true });
+
+  document.addEventListener('fullscreenchange', () => {
+    closeContextMenu();
+    if (_menuEl) {
+      const host = getMenuHostElement();
+      if (host && _menuEl.parentNode !== host) {
+        host.appendChild(_menuEl);
+      }
+    }
+  });
 }
 
 export function _resetContextMenuForTest(): void {
+  if (_activeToastEl) {
+    if (_activeToastEl.dataset) delete _activeToastEl.dataset.contextMenuActive;
+    _activeToastEl = null;
+  }
+  _actionHandlers.clear();
   _menuEl?.remove?.();
   _menuEl = null;
   _isInitialized = false;
   _previousFocusEl = null;
   _openedByKeyboard = false;
+  _openedInsideLogViewport = false;
 }

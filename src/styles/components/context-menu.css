@@ -38,7 +38,7 @@
   pointer-events: none;
   transform: scale(0.96);
   transform-origin: top left;
-  transition: opacity 0.12s ease, transform 0.12s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.12s ease;
+  transition: opacity 0.12s ease, transform 0.12s cubic-bezier(0.16, 1, 0.3, 1), visibility 0s linear 0.12s;
   user-select: none;
   -webkit-user-select: none;
   outline: none;
@@ -53,6 +53,7 @@ html[dir="rtl"] .app-context-menu {
   visibility: visible;
   pointer-events: auto;
   transform: scale(1);
+  transition: opacity 0.12s ease, transform 0.12s cubic-bezier(0.16, 1, 0.3, 1), visibility 0s linear 0s;
 }
 
 .app-context-menu__item {
@@ -78,7 +79,7 @@ html[dir="rtl"] .app-context-menu {
   outline: none;
 }
 
-.app-context-menu__item:hover:not(:disabled) {
+.app-context-menu:not(.is-keyboard-nav) .app-context-menu__item:hover:not(:disabled) {
   background: rgba(var(--color-accent-rgb, 45, 127, 255), 0.16);
   border-color: rgba(var(--color-accent-rgb, 45, 127, 255), 0.28);
   color: #ffffff;
@@ -103,7 +104,7 @@ html[dir="rtl"] .app-context-menu {
   color: #fca5a5;
 }
 
-.app-context-menu__item--danger:hover:not(:disabled),
+.app-context-menu:not(.is-keyboard-nav) .app-context-menu__item--danger:hover:not(:disabled),
 .app-context-menu__item--danger:focus-visible {
   background: rgba(var(--color-red-rgb, 239, 68, 68), 0.16);
   border-color: rgba(var(--color-red-rgb, 239, 68, 68), 0.35);
@@ -118,13 +119,13 @@ html[dir="rtl"] .app-context-menu {
   transition: color 0.12s ease;
 }
 
-.app-context-menu__item:hover:not(:disabled) .app-context-menu__icon,
+.app-context-menu:not(.is-keyboard-nav) .app-context-menu__item:hover:not(:disabled) .app-context-menu__icon,
 .app-context-menu__item:focus-visible .app-context-menu__icon {
   color: var(--color-sky, #38bdf8);
 }
 
 .app-context-menu__item--danger .app-context-menu__icon,
-.app-context-menu__item--danger:hover:not(:disabled) .app-context-menu__icon,
+.app-context-menu:not(.is-keyboard-nav) .app-context-menu__item--danger:hover:not(:disabled) .app-context-menu__icon,
 .app-context-menu__item--danger:focus-visible .app-context-menu__icon {
   color: #f87171;
 }
