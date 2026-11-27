@@ -1371,5 +1371,23 @@ export const fa: Translations = {
     outputDirNotWritable: 'پوشه خروجی انتخاب‌شده قابل نوشتن نیست:\n{error}',
     modelIdExists: 'مدلی با شناسه «{id}» از قبل برای این ارائه‌دهنده وجود دارد.',
     providersJsonCorrupt: 'فهرست ذخیره‌شده ارائه‌دهندگان هوش مصنوعی نامعتبر بود و قابل خواندن نیست.'
+  },
+  contextMenu: {
+    menuAria: 'منوی کلیک راست',
+    selectAll: 'انتخاب همه',
+    copyLine: 'کپی خط گزارش',
+    copyAllLogs: 'کپی همهٔ گزارش‌ها',
+    clearLogs: 'پاک‌سازی گزارش‌ها',
+    copyPath: 'کپی مسیر',
+    copyFileName: 'کپی نام فایل',
+    copySegment: 'کپی متن سگمنت',
+    copySubtitle: 'کپی متن زیرنویس',
+    copyTimestamp: 'کپی زمان‌بندی',
+    copyTimecode: 'کپی تایم‌کد',
+    copyCommand: 'کپی دستور FFmpeg',
+    copyModelId: 'کپی شناسهٔ مدل',
+    copyColorCode: 'کپی کد رنگ',
+    copyMessage: 'کپی پیام',
+    copyVersionInfo: 'کپی اطلاعات نسخه'
   }
 };

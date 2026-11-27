@@ -1369,5 +1369,23 @@ export const ru: Translations = {
     outputDirNotWritable: 'Папка сохранения недоступна для записи:\n{error}',
     modelIdExists: 'Модель с идентификатором "{id}" уже существует для этого провайдера.',
     providersJsonCorrupt: 'Сохраненный список ИИ-провайдеров поврежден и не может быть корректно прочитан.'
+  },
+  contextMenu: {
+    menuAria: 'Контекстное меню',
+    selectAll: 'Выделить всё',
+    copyLine: 'Копировать строку журнала',
+    copyAllLogs: 'Копировать весь журнал',
+    clearLogs: 'Очистить журнал',
+    copyPath: 'Копировать путь',
+    copyFileName: 'Копировать имя файла',
+    copySegment: 'Копировать текст сегмента',
+    copySubtitle: 'Копировать текст субтитров',
+    copyTimestamp: 'Копировать метку времени',
+    copyTimecode: 'Копировать таймкод',
+    copyCommand: 'Копировать команду FFmpeg',
+    copyModelId: 'Копировать ID модели',
+    copyColorCode: 'Копировать код цвета',
+    copyMessage: 'Копировать сообщение',
+    copyVersionInfo: 'Копировать сведения о версии'
   }
 };

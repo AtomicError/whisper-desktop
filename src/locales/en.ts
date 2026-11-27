@@ -1369,6 +1369,24 @@ export const en = {
     outputDirNotWritable: 'Selected output directory is not writable:\n{error}',
     modelIdExists: 'A model with ID "{id}" already exists for this provider.',
     providersJsonCorrupt: 'Saved AI providers list was unreadable and could not be parsed cleanly.'
+  },
+  contextMenu: {
+    menuAria: 'Context menu',
+    selectAll: 'Select All',
+    copyLine: 'Copy Log Line',
+    copyAllLogs: 'Copy All Logs',
+    clearLogs: 'Clear Logs',
+    copyPath: 'Copy Path',
+    copyFileName: 'Copy File Name',
+    copySegment: 'Copy Segment Text',
+    copySubtitle: 'Copy Subtitle Text',
+    copyTimestamp: 'Copy Timestamp',
+    copyTimecode: 'Copy Timecode',
+    copyCommand: 'Copy FFmpeg Command',
+    copyModelId: 'Copy Model ID',
+    copyColorCode: 'Copy Color Code',
+    copyMessage: 'Copy Message',
+    copyVersionInfo: 'Copy Version Info'
   }
 };
 

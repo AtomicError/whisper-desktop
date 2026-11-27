@@ -1765,6 +1765,12 @@ html[dir="rtl"] .custom-select-group-label,
   padding-top: 9px;
 }
 
+#model-specs-subtitle,
+.setting-card[data-model] .setting-title {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 .custom-select-option.hidden,
 .custom-select-group-label.hidden,
 .custom-select-no-results.hidden {

@@ -278,7 +278,11 @@ export function _trapModalFocus(modalEl: HTMLElement, closeCallback: () => void)
 
   const keyHandler = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
-      if (typeof document !== 'undefined' && document.querySelector?.('.custom-select-options.open')) {
+      if (
+        typeof document !== 'undefined' &&
+        (document.querySelector?.('.custom-select-options.open') ||
+          document.getElementById?.('app-context-menu')?.classList?.contains('open'))
+      ) {
         return;
       }
       e.preventDefault();

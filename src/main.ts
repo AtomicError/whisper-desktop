@@ -33,6 +33,7 @@ import {
   formatLocalizedTimeDuration,
   updateMediaCardName
 } from './modules/nativeWindow';
+import { setupContextMenu } from './modules/contextMenu';
 import {
   getSettingsState,
   refreshSettings,
@@ -312,13 +313,8 @@ export async function initApp(): Promise<void> {
   // Phase 2: Hydrate core UI & settings while the completed splash lockup holds steady on screen
   initI18n();
 
-  // Desktop native feel: disable context menu outside inputs/textareas
-  document.addEventListener('contextmenu', (e: MouseEvent) => {
-    const target = e.target as HTMLElement | null;
-    if (!target || !target.closest('input, textarea')) {
-      e.preventDefault();
-    }
-  });
+  // Desktop native feel: theme-aware in-app context menu outside editable inputs
+  setupContextMenu();
 
   // Setup native titlebar and controls
   setupTitlebar();

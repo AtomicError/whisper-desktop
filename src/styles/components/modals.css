@@ -77,10 +77,14 @@
   color: var(--color-text-muted);
   line-height: 1.5;
   margin: 0 0 16px 0;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 #batch-error-message {
   white-space: pre-line;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .modal-details-box {
@@ -97,6 +101,8 @@
   white-space: pre-wrap;
   word-break: break-all;
   margin: 0;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .modal-footer {
@@ -471,6 +477,8 @@ html[dir="rtl"] .about-modal-close-btn {
   font-weight: 600;
   color: var(--color-royal-blue);
   line-height: 1.2;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .about-privacy-badge {
@@ -554,6 +562,8 @@ html[dir="rtl"] .about-modal-close-btn {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .about-engine-spec {
@@ -575,7 +585,14 @@ html[dir="rtl"] .about-modal-close-btn {
   font-weight: 600;
   color: var(--color-royal-blue);
   line-height: 1.2;
+  user-select: text;
+  -webkit-user-select: text;
   letter-spacing: 0.01em;
+}
+
+#about-update-subtext {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 /* Update Checker Card */

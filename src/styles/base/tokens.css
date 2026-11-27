@@ -221,6 +221,7 @@ html {
   --z-dropdown: 50;
   --z-modal-overlay: 1000005; /* Above hardsub overlays (1000000), below portal dropdowns (1000010) */
   --z-portal-dropdown: 1000010; /* Above hardsub overlays (1000000), below toasts (9999999) */
+  --z-context-menu: 10000010; /* Above modals, portal dropdowns, and toast notifications */
 
   /* Surfaces & Typography Design Tokens */
   --bg-app: #09090b;

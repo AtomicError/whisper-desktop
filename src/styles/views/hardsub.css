@@ -1839,6 +1839,17 @@ body.hardsub-fullscreen-active #hardsub-video-controls:has(:focus-visible) {
    data-theme attribute is set). */
 #hardsub-ffmpeg-cmd-preview {
   color: var(--color-sky);
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+#hardsub-preview-detail,
+#hardsub-hex-text,
+#hardsub-hex-bg,
+.hardsub-timecode,
+.subtitle-cue-time {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 #hardsub-ffmpeg-cmd-preview::-webkit-scrollbar {

@@ -1371,5 +1371,23 @@ export const tr: Translations = {
     outputDirNotWritable: 'Seçilen çıktı klasörü yazılabilir değil:\n{error}',
     modelIdExists: 'Bu sağlayıcı için "{id}" kimliğine sahip bir model zaten mevcut.',
     providersJsonCorrupt: 'Kaydedilen yapay zeka sağlayıcı listesi geçersizdi ve düzgün okunamadı.'
+  },
+  contextMenu: {
+    menuAria: 'Bağlam menüsü',
+    selectAll: 'Tümünü Seç',
+    copyLine: 'Günlük Satırını Kopyala',
+    copyAllLogs: 'Tüm Günlükleri Kopyala',
+    clearLogs: 'Günlükleri Temizle',
+    copyPath: 'Yolu Kopyala',
+    copyFileName: 'Dosya Adını Kopyala',
+    copySegment: 'Bölüm Metnini Kopyala',
+    copySubtitle: 'Altyazı Metnini Kopyala',
+    copyTimestamp: 'Zaman Damgasını Kopyala',
+    copyTimecode: 'Zaman Kodunu Kopyala',
+    copyCommand: 'FFmpeg Komutunu Kopyala',
+    copyModelId: 'Model Kimliğini Kopyala',
+    copyColorCode: 'Renk Kodunu Kopyala',
+    copyMessage: 'Mesajı Kopyala',
+    copyVersionInfo: 'Sürüm Bilgisini Kopyala'
   }
 };

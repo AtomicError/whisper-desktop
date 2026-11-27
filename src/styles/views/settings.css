@@ -503,6 +503,13 @@
 
 .setting-desc code,
 .setting-desc-point code,
+.setting-desc-points code {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.setting-desc code,
+.setting-desc-point code,
 .setting-desc-points code,
 .kbd-shortcut {
   font-family: var(--font-mono);
@@ -1839,6 +1846,8 @@ select.select-control {
   font-weight: 500;
   padding: 4px 8px 4px 12px;
   letter-spacing: 0.02em;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .active-model-chip-model {
@@ -1852,6 +1861,8 @@ select.select-control {
   border-radius: 6px;
   box-shadow: 0 0 10px rgba(var(--color-royal-blue-rgb), 0.15);
   letter-spacing: 0.02em;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 /* Eye Icon Sizes */

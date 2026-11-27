@@ -1371,5 +1371,23 @@ export const ko: Translations = {
     outputDirNotWritable: '선택한 출력 디렉터리에 쓰기 권한이 없습니다:\n{error}',
     modelIdExists: '이 제공자에 ID "{id}"를 가진 모델이 이미 존재합니다.',
     providersJsonCorrupt: '저장된 AI 제공자 목록이 잘못되어 올바르게 읽을 수 없습니다.'
+  },
+  contextMenu: {
+    menuAria: '컨텍스트 메뉴',
+    selectAll: '모두 선택',
+    copyLine: '로그 줄 복사',
+    copyAllLogs: '모든 로그 복사',
+    clearLogs: '로그 지우기',
+    copyPath: '경로 복사',
+    copyFileName: '파일 이름 복사',
+    copySegment: '세그먼트 텍스트 복사',
+    copySubtitle: '자막 텍스트 복사',
+    copyTimestamp: '타임스탬프 복사',
+    copyTimecode: '타임코드 복사',
+    copyCommand: 'FFmpeg 명령어 복사',
+    copyModelId: '모델 ID 복사',
+    copyColorCode: '색상 코드 복사',
+    copyMessage: '메시지 복사',
+    copyVersionInfo: '버전 정보 복사'
   }
 };

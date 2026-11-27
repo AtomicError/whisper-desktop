@@ -250,6 +250,9 @@ export function clearSingleMediaFile(): void {
   if (dropZone) {
     dropZone.classList.remove('has-file');
     dropZone.classList.remove('is-batch-summary');
+    if (dropZone.dataset) {
+      delete dropZone.dataset.filePath;
+    }
     dropZone.title = t('transcribe.selectFilePrompt');
     if (typeof dropZone.setAttribute === 'function') {
       dropZone.setAttribute('data-i18n-title', 'transcribe.selectFilePrompt');
@@ -436,6 +439,9 @@ export function applySingleFileSelectedUI(filePath: string): void {
   if (dropZone) {
     dropZone.classList.add('has-file');
     dropZone.classList.remove('is-batch-summary');
+    if (dropZone.dataset) {
+      dropZone.dataset.filePath = filePath;
+    }
     dropZone.title = t('transcribe.selectFilePrompt');
     if (typeof dropZone.setAttribute === 'function') {
       dropZone.setAttribute('data-i18n-title', 'transcribe.selectFilePrompt');

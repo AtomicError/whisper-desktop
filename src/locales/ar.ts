@@ -1369,5 +1369,23 @@ export const ar: Translations = {
     outputDirNotWritable: 'مجلد المخرجات المحدد غير قابل للكتابة:\n{error}',
     modelIdExists: 'يوجد نموذج بالمعرف "{id}" مسبقًا لهذا المزود.',
     providersJsonCorrupt: 'تعذر تحليل قائمة مزودي الذكاء الاصطناعي المحفوظة لأنها غير صالحة.'
+  },
+  contextMenu: {
+    menuAria: 'قائمة السياق',
+    selectAll: 'تحديد الكل',
+    copyLine: 'نسخ سطر السجل',
+    copyAllLogs: 'نسخ جميع السجلات',
+    clearLogs: 'مسح السجلات',
+    copyPath: 'نسخ المسار',
+    copyFileName: 'نسخ اسم الملف',
+    copySegment: 'نسخ نص المقطع',
+    copySubtitle: 'نسخ نص الترجمة',
+    copyTimestamp: 'نسخ الطابع الزمني',
+    copyTimecode: 'نسخ التوقيت',
+    copyCommand: 'نسخ أمر FFmpeg',
+    copyModelId: 'نسخ معرف النموذج',
+    copyColorCode: 'نسخ رمز اللون',
+    copyMessage: 'نسخ الرسالة',
+    copyVersionInfo: 'نسخ معلومات الإصدار'
   }
 };

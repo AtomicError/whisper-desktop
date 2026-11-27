@@ -1,0 +1,164 @@
+/* ==========================================================================
+   Native-Feel Theme-Aware In-App Context Menu
+   ========================================================================== */
+
+.app-context-menu {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: var(--z-context-menu, 10000010);
+  min-width: 196px;
+  max-width: min(300px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 5px;
+  border-radius: var(--radius-lg, 12px);
+  background: var(--bg-dropdown, #111427);
+  background-image: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.01) 100%
+  );
+  border: 1px solid var(--border-glass-active, rgba(45, 127, 255, 0.35));
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.72),
+    0 0 0 1px rgba(255, 255, 255, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  font-family: var(--font-sans);
+  color: var(--color-text, #f3f4f6);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: scale(0.96);
+  transform-origin: top left;
+  transition: opacity 0.12s ease, transform 0.12s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.12s ease;
+  user-select: none;
+  -webkit-user-select: none;
+  outline: none;
+}
+
+html[dir="rtl"] .app-context-menu {
+  transform-origin: top right;
+}
+
+.app-context-menu.open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: scale(1);
+}
+
+.app-context-menu__item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-block: 7px;
+  padding-inline: 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md, 8px);
+  background: transparent;
+  color: var(--color-text, #f3f4f6);
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: start;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+  outline: none;
+}
+
+.app-context-menu__item:hover:not(:disabled) {
+  background: rgba(var(--color-accent-rgb, 45, 127, 255), 0.16);
+  border-color: rgba(var(--color-accent-rgb, 45, 127, 255), 0.28);
+  color: #ffffff;
+}
+
+.app-context-menu__item:active:not(:disabled) {
+  background: rgba(var(--color-accent-rgb, 45, 127, 255), 0.24);
+}
+
+.app-context-menu__item:focus-visible {
+  background: rgba(var(--color-accent-rgb, 45, 127, 255), 0.18);
+  border-color: var(--color-accent, #2d7fff);
+  color: #ffffff;
+}
+
+.app-context-menu__item:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.app-context-menu__item--danger {
+  color: #fca5a5;
+}
+
+.app-context-menu__item--danger:hover:not(:disabled),
+.app-context-menu__item--danger:focus-visible {
+  background: rgba(var(--color-red-rgb, 239, 68, 68), 0.16);
+  border-color: rgba(var(--color-red-rgb, 239, 68, 68), 0.35);
+  color: #fecaca;
+}
+
+.app-context-menu__icon {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  color: var(--color-text-muted, #9ca3af);
+  transition: color 0.12s ease;
+}
+
+.app-context-menu__item:hover:not(:disabled) .app-context-menu__icon,
+.app-context-menu__item:focus-visible .app-context-menu__icon {
+  color: var(--color-sky, #38bdf8);
+}
+
+.app-context-menu__item--danger .app-context-menu__icon,
+.app-context-menu__item--danger:hover:not(:disabled) .app-context-menu__icon,
+.app-context-menu__item--danger:focus-visible .app-context-menu__icon {
+  color: #f87171;
+}
+
+.app-context-menu__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-context-menu__hint {
+  flex-shrink: 0;
+  margin-inline-start: 12px;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.7rem;
+  color: var(--color-text-dim, #94a3b8);
+  opacity: 0.75;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+.app-context-menu__separator {
+  height: 1px;
+  margin-block: 4px;
+  margin-inline: 6px;
+  background: var(--border-glass, rgba(255, 255, 255, 0.08));
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-context-menu,
+  .app-context-menu__item,
+  .app-context-menu__icon {
+    transition: none !important;
+  }
+}

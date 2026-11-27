@@ -1369,5 +1369,23 @@ export const de: Translations = {
     outputDirNotWritable: 'Ausgewähltes Ausgabeverzeichnis ist nicht beschreibbar:\n{error}',
     modelIdExists: 'Ein Modell mit der ID "{id}" existiert für diesen Provider bereits.',
     providersJsonCorrupt: 'Gespeicherte Liste der KI-Provider war ungültig und konnte nicht gelesen werden.'
+  },
+  contextMenu: {
+    menuAria: 'Kontextmenü',
+    selectAll: 'Alles auswählen',
+    copyLine: 'Protokollzeile kopieren',
+    copyAllLogs: 'Alle Protokolle kopieren',
+    clearLogs: 'Protokolle löschen',
+    copyPath: 'Pfad kopieren',
+    copyFileName: 'Dateinamen kopieren',
+    copySegment: 'Segmenttext kopieren',
+    copySubtitle: 'Untertiteltext kopieren',
+    copyTimestamp: 'Zeitstempel kopieren',
+    copyTimecode: 'Timecode kopieren',
+    copyCommand: 'FFmpeg-Befehl kopieren',
+    copyModelId: 'Modell-ID kopieren',
+    copyColorCode: 'Farbcode kopieren',
+    copyMessage: 'Nachricht kopieren',
+    copyVersionInfo: 'Versionsinfo kopieren'
   }
 };

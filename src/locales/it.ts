@@ -1371,5 +1371,23 @@ export const it: Translations = {
     outputDirNotWritable: 'La cartella di output selezionata non è scrivibile:\n{error}',
     modelIdExists: 'Esiste già un modello con ID "{id}" per questo provider.',
     providersJsonCorrupt: 'L\'elenco salvato dei provider IA non era valido e non può essere analizzato correttamente.'
+  },
+  contextMenu: {
+    menuAria: 'Menu contestuale',
+    selectAll: 'Seleziona tutto',
+    copyLine: 'Copia riga del registro',
+    copyAllLogs: 'Copia tutti i registri',
+    clearLogs: 'Cancella registri',
+    copyPath: 'Copia percorso',
+    copyFileName: 'Copia nome file',
+    copySegment: 'Copia testo segmento',
+    copySubtitle: 'Copia testo sottotitolo',
+    copyTimestamp: 'Copia marcatura temporale',
+    copyTimecode: 'Copia timecode',
+    copyCommand: 'Copia comando FFmpeg',
+    copyModelId: 'Copia ID modello',
+    copyColorCode: 'Copia codice colore',
+    copyMessage: 'Copia messaggio',
+    copyVersionInfo: 'Copia info versione'
   }
 };

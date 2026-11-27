@@ -1364,5 +1364,23 @@ export const pt: Translations = {
     outputDirNotWritable: 'A pasta de saída selecionada não possui permissão de escrita:\n{error}',
     modelIdExists: 'Já existe um modelo com o identificador "{id}" para este provedor.',
     providersJsonCorrupt: 'A lista salva de provedores de IA estava corrompida e não pôde ser lida.'
+  },
+  contextMenu: {
+    menuAria: 'Menu de contexto',
+    selectAll: 'Selecionar tudo',
+    copyLine: 'Copiar linha do registro',
+    copyAllLogs: 'Copiar todos os registros',
+    clearLogs: 'Limpar registros',
+    copyPath: 'Copiar caminho',
+    copyFileName: 'Copiar nome do arquivo',
+    copySegment: 'Copiar texto do segmento',
+    copySubtitle: 'Copiar texto da legenda',
+    copyTimestamp: 'Copiar carimbo de tempo',
+    copyTimecode: 'Copiar código de tempo',
+    copyCommand: 'Copiar comando FFmpeg',
+    copyModelId: 'Copiar ID do modelo',
+    copyColorCode: 'Copiar código de cor',
+    copyMessage: 'Copiar mensagem',
+    copyVersionInfo: 'Copiar informações da versão'
   }
 };

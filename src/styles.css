@@ -11,6 +11,7 @@
 /* 2. Global Components */
 @import './styles/components/toast.css';
 @import './styles/components/modals.css';
+@import './styles/components/context-menu.css';
 
 /* 3. Dedicated Workspace Views */
 @import './styles/views/transcribe.css';

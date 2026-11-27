@@ -1364,5 +1364,23 @@ export const fr: Translations = {
     outputDirNotWritable: 'Le dossier de sortie n\'est pas accessible en écriture :\n{error}',
     modelIdExists: 'Un modèle avec l\'identifiant "{id}" existe déjà pour ce fournisseur.',
     providersJsonCorrupt: 'La liste enregistrée des fournisseurs d\'IA est invalide et n\'a pas pu être lue.'
+  },
+  contextMenu: {
+    menuAria: 'Menu contextuel',
+    selectAll: 'Tout sélectionner',
+    copyLine: 'Copier la ligne du journal',
+    copyAllLogs: 'Copier tous les journaux',
+    clearLogs: 'Effacer les journaux',
+    copyPath: 'Copier le chemin',
+    copyFileName: 'Copier le nom du fichier',
+    copySegment: 'Copier le texte du segment',
+    copySubtitle: 'Copier le texte du sous-titre',
+    copyTimestamp: 'Copier l\'horodatage',
+    copyTimecode: 'Copier le code temporel',
+    copyCommand: 'Copier la commande FFmpeg',
+    copyModelId: 'Copier l\'ID du modèle',
+    copyColorCode: 'Copier le code couleur',
+    copyMessage: 'Copier le message',
+    copyVersionInfo: 'Copier les infos de version'
   }
 };

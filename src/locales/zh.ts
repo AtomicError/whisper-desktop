@@ -1364,5 +1364,23 @@ export const zh: Translations = {
     outputDirNotWritable: '选定的输出文件夹无写入权限:\n{error}',
     modelIdExists: '此服务商已存在 ID 为“{id}”的模型。',
     providersJsonCorrupt: '已保存的 AI 服务商列表格式无效，无法正常解析。'
+  },
+  contextMenu: {
+    menuAria: '上下文菜单',
+    selectAll: '全选',
+    copyLine: '复制日志行',
+    copyAllLogs: '复制全部日志',
+    clearLogs: '清空日志',
+    copyPath: '复制路径',
+    copyFileName: '复制文件名',
+    copySegment: '复制片段文本',
+    copySubtitle: '复制字幕文本',
+    copyTimestamp: '复制时间戳',
+    copyTimecode: '复制时间码',
+    copyCommand: '复制 FFmpeg 命令',
+    copyModelId: '复制模型 ID',
+    copyColorCode: '复制颜色代码',
+    copyMessage: '复制消息',
+    copyVersionInfo: '复制版本信息'
   }
 };

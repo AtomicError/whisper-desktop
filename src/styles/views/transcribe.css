@@ -320,6 +320,18 @@ body.is-resizing-transcribe * {
   text-wrap: pretty;
 }
 
+.media-drop-zone.has-file #lbl-hardsub-video-name,
+.media-drop-zone.has-file #lbl-hardsub-video-path,
+.media-drop-zone.has-file #lbl-hardsub-sub-name,
+.media-drop-zone.has-file #lbl-hardsub-sub-path,
+.media-drop-zone.has-file:not(.is-batch-summary) #lbl-file-name,
+.media-drop-zone.has-file:not(.is-batch-summary) #lbl-file-path,
+.media-drop-zone.has-file #lbl-translate-sub-name,
+.media-drop-zone.has-file #lbl-translate-sub-path {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 .media-drop-zone.has-file #lbl-hardsub-video-path,
 .media-drop-zone.has-file #lbl-hardsub-sub-path {
   white-space: nowrap;
@@ -1533,6 +1545,8 @@ body.is-resizing-transcribe * {
   text-align: center;
   padding: 24px;
   color: var(--color-text-dim);
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .transcript-empty-icon {
@@ -2091,6 +2105,8 @@ body.is-resizing-transcribe * {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .transcript-time-icon {
@@ -2355,6 +2371,8 @@ html[dir="rtl"] #transcript-search::placeholder,
   white-space: nowrap;
   font-size: var(--text-xs, 11px);
   min-width: 0;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .companion-meta-specs {

@@ -1369,5 +1369,23 @@ export const ja: Translations = {
     outputDirNotWritable: '選択された出力フォルダに書き込み権限がありません:\n{error}',
     modelIdExists: 'このプロバイダーには ID「{id}」のモデルが既に存在します。',
     providersJsonCorrupt: '保存された AI プロバイダー一覧が無効であり、正しく読み込めませんでした。'
+  },
+  contextMenu: {
+    menuAria: 'コンテキストメニュー',
+    selectAll: 'すべて選択',
+    copyLine: 'ログ行をコピー',
+    copyAllLogs: 'すべてのログをコピー',
+    clearLogs: 'ログをクリア',
+    copyPath: 'パスをコピー',
+    copyFileName: 'ファイル名をコピー',
+    copySegment: 'セグメントテキストをコピー',
+    copySubtitle: '字幕テキストをコピー',
+    copyTimestamp: 'タイムスタンプをコピー',
+    copyTimecode: 'タイムコードをコピー',
+    copyCommand: 'FFmpeg コマンドをコピー',
+    copyModelId: 'モデル ID をコピー',
+    copyColorCode: 'カラーコードをコピー',
+    copyMessage: 'メッセージをコピー',
+    copyVersionInfo: 'バージョン情報をコピー'
   }
 };

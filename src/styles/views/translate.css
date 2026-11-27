@@ -428,6 +428,8 @@
   text-align: left;
   unicode-bidi: isolate;
   font-family: var(--font-mono);
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .translate-output-row .btn-secondary,
@@ -918,6 +920,8 @@
   unicode-bidi: isolate;
   display: inline-block;
   text-wrap: pretty;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .translate-cue-text {
@@ -1033,6 +1037,8 @@
   padding: 10px;
   box-sizing: border-box;
   color: var(--color-text);
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .test-preview-container {

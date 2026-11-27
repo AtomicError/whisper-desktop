@@ -4455,6 +4455,7 @@ export class HardsubController {
         clearContentDirection(this.lblVideoName);
       }
       if (this.lblVideoPath) this.lblVideoPath.textContent = t('hardsub.dropVideoPrompt');
+      if (this.videoDropZone?.dataset) delete this.videoDropZone.dataset.filePath;
       this.videoDropZone?.classList.remove('has-file');
       if (this.btnClearVideo) this.btnClearVideo.style.display = 'none';
       this.updateMediaAccordionSummary();
@@ -4473,6 +4474,7 @@ export class HardsubController {
       applyContentDirection(this.lblVideoName, fileName);
     }
     if (this.lblVideoPath) this.lblVideoPath.textContent = videoPath;
+    if (this.videoDropZone?.dataset) this.videoDropZone.dataset.filePath = videoPath;
     this.videoDropZone?.classList.add('has-file');
     if (this.btnClearVideo) this.btnClearVideo.style.display = 'inline-flex';
     this.updateMediaAccordionSummary();
@@ -4486,6 +4488,7 @@ export class HardsubController {
         clearContentDirection(this.lblSubName);
       }
       if (this.lblSubPath) this.lblSubPath.textContent = t('hardsub.dropSubPrompt');
+      if (this.subDropZone?.dataset) delete this.subDropZone.dataset.filePath;
       this.subDropZone?.classList.remove('has-file');
       if (this.btnClearSub) this.btnClearSub.style.display = 'none';
       this.updateMediaAccordionSummary();
@@ -4506,6 +4509,7 @@ export class HardsubController {
       applyContentDirection(this.lblSubName, fileName);
     }
     if (this.lblSubPath) this.lblSubPath.textContent = subPath;
+    if (this.subDropZone?.dataset) this.subDropZone.dataset.filePath = subPath;
     this.subDropZone?.classList.add('has-file');
     if (this.btnClearSub) this.btnClearSub.style.display = 'inline-flex';
     this.updateMediaAccordionSummary();

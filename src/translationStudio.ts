@@ -1369,6 +1369,9 @@ export class TranslationStudioController {
       this.lblSubPath.removeAttribute?.('data-i18n');
       this.lblSubPath.textContent = this.state.subtitlePath;
       this.lblSubPath.title = isolateLtr(this.state.subtitlePath);
+      if (this.dropZone?.dataset) {
+        this.dropZone.dataset.filePath = this.state.subtitlePath;
+      }
 
       const cueCount = this.state.sourceCues.length;
       const localizedCueCount = formatLocalizedNumber(cueCount, getLanguage(), 0);
@@ -1403,6 +1406,9 @@ export class TranslationStudioController {
       this.lblSubMeta.style.display = 'none';
       this.btnClearSub.style.display = 'none';
       this.dropZone?.classList.remove('has-file');
+      if (this.dropZone?.dataset) {
+        delete this.dropZone.dataset.filePath;
+      }
       this.dropZone?.setAttribute('data-i18n-title', 'translate.dropSubPrompt');
       this.dropZone?.setAttribute('title', t('translate.dropSubPrompt'));
     }

@@ -787,6 +787,8 @@ function renderBatchQueueTable(): void {
 
     card.className = `batch-queue-card batch-row ${isActive ? 'is-active' : ''} ${isClickable ? 'is-clickable' : ''} ${isSelected ? 'is-selected' : ''}`;
     card.dataset.index = String(index);
+    card.dataset.path = item.path;
+    card.dataset.name = item.name;
 
     if (isClickable) {
       card.tabIndex = 0;
