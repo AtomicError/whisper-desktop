@@ -360,12 +360,14 @@
     overflow: visible;
   }
   .transcribe-unified-deck,
+  .translate-unified-deck,
   .transcribe-media-deck {
     height: auto;
     max-height: none;
     overflow: visible;
   }
-  .transcribe-deck-body {
+  .transcribe-deck-body,
+  .translate-deck-body {
     flex: none;
     overflow: visible;
   }

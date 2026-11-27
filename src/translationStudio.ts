@@ -8,7 +8,7 @@ import {
   getLanguage,
   formatLocalizedNumber,
 } from './i18n/index';
-import { copyToClipboard } from './modules/nativeWindow';
+import { copyToClipboard, openFileInEditor } from './modules/nativeWindow';
 import { hardsubController } from './hardsub';
 import { isModelIdMatch } from './modules/providerHelpers';
 
@@ -52,6 +52,7 @@ export interface TranslationStudioState {
   activeProvider: string;
   activeModel: string;
   polishPass: boolean;
+  outputDirMode: 'input_dir' | 'custom';
   outputDir: string;
   companionVideoPath: string | null;
   isTranslating: boolean;
@@ -289,14 +290,20 @@ export class TranslationStudioController {
   private btnClearSub: HTMLButtonElement | null = null;
 
   // Quick Deck Elements
+  private unifiedDeck: HTMLElement | null = null;
+  private deckBody: HTMLElement | null = null;
   private targetLangSelect: HTMLSelectElement | null = null;
   private providerSelect: HTMLSelectElement | null = null;
   private modelSelect: HTMLSelectElement | null = null;
   private btnManageProviders: HTMLButtonElement | null = null;
   private polishToggle: HTMLInputElement | null = null;
+  private outputLocationModes: HTMLElement | null = null;
+  private outputModeInputBtn: HTMLButtonElement | null = null;
+  private outputModeCustomBtn: HTMLButtonElement | null = null;
+  private outputCustomRow: HTMLElement | null = null;
   private outputDirText: HTMLElement | null = null;
+  private btnOpenDir: HTMLButtonElement | null = null;
   private btnBrowseDir: HTMLButtonElement | null = null;
-  private btnResetDir: HTMLButtonElement | null = null;
 
   // Telemetry & Action Elements
   private btnStart: HTMLButtonElement | null = null;
@@ -336,10 +343,13 @@ export class TranslationStudioController {
   private companionProbeCompleted = false;
   private isBrowsingSubtitle = false;
   private isBrowsingOutputDir = false;
+  private isOpeningOutputDir = false;
   private isStartingTranslation = false;
   private isCancellingTranslation = false;
   private isDisposed = false;
   private pendingSettingsSyncAfterTranslation = false;
+  private deckResizeObserver: ResizeObserver | null = null;
+  private openDirCooldownTimer: ReturnType<typeof setTimeout> | null = null;
   private statusBadgeKey = 'translate.statusReady';
   private statusBadgeModifier = '';
   private lastProgressPayload: any = null;
@@ -363,6 +373,7 @@ export class TranslationStudioController {
     activeProvider: '',
     activeModel: '',
     polishPass: false,
+    outputDirMode: 'input_dir',
     outputDir: '',
     companionVideoPath: null,
     isTranslating: false,
@@ -380,6 +391,7 @@ export class TranslationStudioController {
       this.setupDropZone();
       this.listenToProgressEvents();
       this.syncFromGlobalSettings();
+      this.updateOutputDirUI();
       this.updateActionButtons();
     };
 
@@ -398,14 +410,22 @@ export class TranslationStudioController {
     this.btnBrowseSub = document.getElementById('btn-browse-translate-sub') as HTMLButtonElement;
     this.btnClearSub = document.getElementById('btn-clear-translate-sub') as HTMLButtonElement;
 
+    this.unifiedDeck = document.getElementById('translate-unified-deck');
+    this.deckBody = typeof this.unifiedDeck?.querySelector === 'function'
+      ? (this.unifiedDeck.querySelector('.translate-deck-body') as HTMLElement | null)
+      : null;
     this.targetLangSelect = document.getElementById('translate-target-lang') as HTMLSelectElement;
     this.providerSelect = document.getElementById('translate-provider-select') as HTMLSelectElement;
     this.modelSelect = document.getElementById('translate-model-select') as HTMLSelectElement;
     this.btnManageProviders = document.getElementById('btn-translate-manage-providers') as HTMLButtonElement;
     this.polishToggle = document.getElementById('translate-polish-toggle') as HTMLInputElement;
+    this.outputLocationModes = document.getElementById('translate-output-location-modes');
+    this.outputModeInputBtn = document.getElementById('translate-output-mode-input') as HTMLButtonElement;
+    this.outputModeCustomBtn = document.getElementById('translate-output-mode-custom') as HTMLButtonElement;
+    this.outputCustomRow = document.getElementById('translate-output-custom-row');
     this.outputDirText = document.getElementById('translate-output-dir-text');
+    this.btnOpenDir = document.getElementById('btn-open-translate-dir') as HTMLButtonElement;
     this.btnBrowseDir = document.getElementById('btn-browse-translate-dir') as HTMLButtonElement;
-    this.btnResetDir = document.getElementById('btn-reset-translate-dir') as HTMLButtonElement;
 
     this.btnStart = document.getElementById('btn-start-translation') as HTMLButtonElement;
     this.btnStartText = document.getElementById('btn-start-translation-text');
@@ -576,12 +596,46 @@ export class TranslationStudioController {
       }
     });
 
-    this.bindListener(this.btnBrowseDir, 'click', () => this.browseOutputDir());
-    this.bindListener(this.btnResetDir, 'click', () => {
-      if (this.state.isTranslating || this.isStartingTranslation) return;
-      this.state.outputDir = '';
-      this.updateOutputDirUI();
+    this.bindListener(this.outputModeInputBtn, 'click', () => {
+      void this.setOutputDirMode('input_dir');
     });
+    this.bindListener(this.outputModeCustomBtn, 'click', () => {
+      void this.setOutputDirMode('custom');
+    });
+    this.bindListener(this.outputLocationModes, 'keydown', ((e: KeyboardEvent) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'ArrowUp' && e.key !== 'ArrowDown') {
+        return;
+      }
+      if (this.state.isTranslating || this.isStartingTranslation) return;
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      const isInputBtn = target.id === 'translate-output-mode-input';
+      const isCustomBtn = target.id === 'translate-output-mode-custom';
+      if (!isInputBtn && !isCustomBtn) return;
+
+      e.preventDefault();
+      const nextMode: 'input_dir' | 'custom' = isInputBtn ? 'custom' : 'input_dir';
+      const nextBtn = nextMode === 'custom' ? this.outputModeCustomBtn : this.outputModeInputBtn;
+      nextBtn?.focus?.();
+
+      void this.setOutputDirMode(nextMode).then(() => {
+        const activeMode = this.state.outputDirMode === 'custom' ? 'custom' : 'input_dir';
+        if (activeMode === nextMode) return;
+        const activeEl = typeof document !== 'undefined' ? document.activeElement : null;
+        const focusStillInGroup = !activeEl || activeEl === nextBtn || activeEl === target;
+        if (!focusStillInGroup) return;
+        const activeBtn = activeMode === 'custom' ? this.outputModeCustomBtn : this.outputModeInputBtn;
+        activeBtn?.focus?.();
+      });
+    }) as EventListener);
+    this.bindListener(this.btnOpenDir, 'click', () => {
+      void this.openCustomOutputDir();
+    });
+    this.bindListener(this.btnBrowseDir, 'click', () => {
+      void this.browseOutputDir();
+    });
+
+    this.setupDeckScrollCueObserver();
 
     this.bindListener(this.btnStart, 'click', () => this.startTranslation());
     this.bindListener(this.btnCancel, 'click', () => this.cancelTranslation());
@@ -1416,36 +1470,162 @@ export class TranslationStudioController {
     this.updateOutputDirUI();
   }
 
+  private setupDeckScrollCueObserver() {
+    if (this.deckBody) {
+      this.bindListener(this.deckBody, 'scroll', () => this.updateDeckScrollCue(), { passive: true });
+    }
+    if (typeof ResizeObserver !== 'undefined' && this.deckBody) {
+      if (this.deckResizeObserver) {
+        this.deckResizeObserver.disconnect();
+      }
+      const ro = new ResizeObserver(() => this.updateDeckScrollCue());
+      ro.observe(this.deckBody);
+      for (const el of [this.dropZone, this.outputCustomRow, this.telemetryBox]) {
+        if (el) ro.observe(el);
+      }
+      this.deckResizeObserver = ro;
+    }
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      const onResize = () => this.updateDeckScrollCue();
+      window.addEventListener('resize', onResize);
+      this.unlisteners.push(() => window.removeEventListener?.('resize', onResize));
+    }
+    this.updateDeckScrollCue();
+  }
+
+  public updateDeckScrollCue() {
+    if (!this.unifiedDeck || !this.deckBody) return;
+    if (typeof this.deckBody.scrollHeight !== 'number' || typeof this.deckBody.clientHeight !== 'number') return;
+    const hasOverflowBelow =
+      this.deckBody.scrollHeight - this.deckBody.clientHeight - (this.deckBody.scrollTop || 0) > 6;
+    this.unifiedDeck.classList?.toggle?.('has-scroll-below', hasOverflowBelow);
+  }
+
   private updateOutputDirUI() {
-    if (!this.outputDirText || !this.btnResetDir) return;
-    if (this.state.outputDir) {
-      this.outputDirText.removeAttribute?.('data-i18n');
-      this.outputDirText.textContent = this.state.outputDir;
-      this.outputDirText.title = isolateLtr(this.state.outputDir);
-      this.outputDirText.classList.add('has-custom-path');
-      this.btnResetDir.style.display = 'inline-flex';
+    const isCustomMode = this.state.outputDirMode === 'custom';
+    const customPath = String(this.state.outputDir || '').trim();
+    const hasCustomPath = Boolean(customPath);
+
+    if (this.outputModeInputBtn) {
+      this.outputModeInputBtn.classList?.toggle?.('active', !isCustomMode);
+      this.outputModeInputBtn.setAttribute?.('aria-checked', !isCustomMode ? 'true' : 'false');
+      this.outputModeInputBtn.setAttribute?.('tabindex', !isCustomMode ? '0' : '-1');
+    }
+    if (this.outputModeCustomBtn) {
+      this.outputModeCustomBtn.classList?.toggle?.('active', isCustomMode);
+      this.outputModeCustomBtn.setAttribute?.('aria-checked', isCustomMode ? 'true' : 'false');
+      this.outputModeCustomBtn.setAttribute?.('tabindex', isCustomMode ? '0' : '-1');
+    }
+
+    if (this.outputCustomRow) {
+      this.outputCustomRow.style.display = isCustomMode ? 'block' : 'none';
+    }
+
+    if (this.outputDirText) {
+      if (hasCustomPath) {
+        this.outputDirText.removeAttribute?.('data-i18n');
+        this.outputDirText.textContent = customPath;
+        this.outputDirText.title = isolateLtr(customPath);
+        this.outputDirText.classList?.add?.('has-custom-path');
+      } else if (isCustomMode) {
+        this.outputDirText.setAttribute?.('data-i18n', 'settings.outputDirSelectPlaceholder');
+        this.outputDirText.textContent = t('settings.outputDirSelectPlaceholder') || 'Select output folder...';
+        this.outputDirText.removeAttribute?.('title');
+        this.outputDirText.classList?.remove?.('has-custom-path');
+      } else {
+        this.outputDirText.setAttribute?.('data-i18n', 'translate.sameAsSource');
+        this.outputDirText.textContent = t('translate.sameAsSource');
+        this.outputDirText.removeAttribute?.('title');
+        this.outputDirText.classList?.remove?.('has-custom-path');
+      }
+    }
+
+    if (this.btnOpenDir) {
+      this.btnOpenDir.disabled = !hasCustomPath;
+    }
+
+    this.updateDeckScrollCue();
+  }
+
+  public async setOutputDirMode(mode: 'input_dir' | 'custom') {
+    if (this.state.isTranslating || this.isStartingTranslation) return;
+    if (mode === 'custom') {
+      const existingPath = String(this.state.outputDir || '').trim();
+      if (!existingPath) {
+        await this.browseOutputDir();
+        return;
+      }
+      if (this.state.outputDirMode === 'custom') {
+        this.updateOutputDirUI();
+        return;
+      }
+      this.state.outputDirMode = 'custom';
     } else {
-      this.outputDirText.setAttribute?.('data-i18n', 'translate.sameAsSource');
-      this.outputDirText.textContent = t('translate.sameAsSource');
-      this.outputDirText.removeAttribute('title');
-      this.outputDirText.classList.remove('has-custom-path');
-      this.btnResetDir.style.display = 'none';
+      if (this.state.outputDirMode === 'input_dir') {
+        this.updateOutputDirUI();
+        return;
+      }
+      this.state.outputDirMode = 'input_dir';
+    }
+    this.updateOutputDirUI();
+  }
+
+  public async openCustomOutputDir() {
+    if (this.isOpeningOutputDir) return;
+    const dirPath = String(this.state.outputDir || '').trim();
+    if (!dirPath) {
+      this.notify(t('toasts.noOutputDirFound'), 'info');
+      return;
+    }
+
+    this.isOpeningOutputDir = true;
+    try {
+      try {
+        await invoke('verify_directory_writable', { dirPath });
+      } catch (permErr) {
+        this.notify(t('toasts.outputDirNotWritable', { error: String(permErr) }), 'error');
+        return;
+      }
+      await openFileInEditor(dirPath);
+    } catch (err: any) {
+      console.error('Failed to open output directory:', err);
+      const msg = (err && (err.message || err.toString())) || String(err);
+      this.notify(t('toasts.openFolderError', { error: msg }), 'error');
+    } finally {
+      if (this.openDirCooldownTimer) {
+        clearTimeout(this.openDirCooldownTimer);
+      }
+      this.openDirCooldownTimer = setTimeout(() => {
+        this.openDirCooldownTimer = null;
+        this.isOpeningOutputDir = false;
+      }, 1000);
     }
   }
 
   public async browseOutputDir() {
     if (this.isBrowsingOutputDir || this.state.isTranslating || this.isStartingTranslation) return;
     this.isBrowsingOutputDir = true;
+    if (this.btnBrowseDir) {
+      this.btnBrowseDir.disabled = true;
+    }
     try {
       const selected = await invoke<string | null>('select_directory');
       if (selected && !this.state.isTranslating && !this.isStartingTranslation) {
+        try {
+          await invoke('verify_directory_writable', { dirPath: selected });
+        } catch (permErr) {
+          this.notify(t('toasts.outputDirNotWritable', { error: String(permErr) }), 'error');
+          return;
+        }
         this.state.outputDir = selected;
+        this.state.outputDirMode = 'custom';
         this.updateOutputDirUI();
       }
     } catch (err) {
       console.error('Failed to select directory:', err);
     } finally {
       this.isBrowsingOutputDir = false;
+      this.updateActionButtons();
     }
   }
 
@@ -1827,8 +2007,9 @@ export class TranslationStudioController {
     }
     if (this.btnBrowseSub) this.btnBrowseSub.disabled = isBusy;
     if (this.btnClearSub) this.btnClearSub.disabled = isBusy;
-    if (this.btnBrowseDir) this.btnBrowseDir.disabled = isBusy;
-    if (this.btnResetDir) this.btnResetDir.disabled = isBusy;
+    if (this.outputModeInputBtn) this.outputModeInputBtn.disabled = isBusy;
+    if (this.outputModeCustomBtn) this.outputModeCustomBtn.disabled = isBusy;
+    if (this.btnBrowseDir) this.btnBrowseDir.disabled = isBusy || this.isBrowsingOutputDir;
     if (this.targetLangSelect) this.targetLangSelect.disabled = isBusy;
     if (this.providerSelect) this.providerSelect.disabled = isBusy;
     if (this.modelSelect) this.modelSelect.disabled = isBusy;
@@ -1840,6 +2021,7 @@ export class TranslationStudioController {
     if (this.telemetryBox) {
       this.telemetryBox.style.display = (isTranslating || this.state.progress > 0 || this.lastProgressIsComplete || this.lastProgressIsCancelled || this.lastProgressIsFailed) ? 'block' : 'none';
     }
+    this.updateDeckScrollCue();
 
     const hasTranslatedFile = !isBusy && !!this.state.translatedPath;
     const hasTranslation = hasTranslatedFile && this.state.translatedCues.length > 0;
@@ -2173,7 +2355,10 @@ export class TranslationStudioController {
     this.setStatusBadge('translate.statusTranslating', 'active');
 
     try {
-      const trimmedOutputDir = this.state.outputDir ? this.state.outputDir.trim() : '';
+      const trimmedOutputDir =
+        this.state.outputDirMode === 'custom' && this.state.outputDir
+          ? this.state.outputDir.trim()
+          : '';
       const translatedFiles = await invoke<string[]>('translate_transcription_files', {
         settings: runSettings,
         generatedFiles: [fileName],
@@ -2628,6 +2813,15 @@ export class TranslationStudioController {
       }
       this.syncScrollRaf = null;
     }
+    if (this.deckResizeObserver) {
+      this.deckResizeObserver.disconnect();
+      this.deckResizeObserver = null;
+    }
+    if (this.openDirCooldownTimer) {
+      clearTimeout(this.openDirCooldownTimer);
+      this.openDirCooldownTimer = null;
+    }
+    this.isOpeningOutputDir = false;
   }
 }
 

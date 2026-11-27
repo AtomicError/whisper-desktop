@@ -16,11 +16,9 @@
   flex-direction: column;
   gap: 10px;
   height: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-gutter: stable;
-  padding-inline-end: 4px;
+  overflow: hidden;
   min-width: 0;
+  min-height: 0;
 }
 
 .translate-right-panel {
@@ -36,10 +34,11 @@
 .translate-unified-deck {
   display: flex;
   flex-direction: column;
-  min-height: 100%;
-  height: auto;
-  flex-shrink: 0;
-  padding: 18px 20px;
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
+  padding: 16px 0;
   border-radius: 12px;
   background: var(--bg-glass-card, rgba(20, 24, 39, 0.65));
   border: 1px solid var(--border-glass, rgba(255, 255, 255, 0.08));
@@ -55,8 +54,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 12px;
-  padding-bottom: 10px;
+  margin-inline: 18px;
+  margin-bottom: 0;
+  padding-bottom: 12px;
   border-bottom: 1px solid var(--border-glass, rgba(255, 255, 255, 0.08));
   flex-shrink: 0;
 }
@@ -80,8 +80,12 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-inline: 18px;
+  padding-block: 14px;
 }
 
 .translate-field-group {
@@ -395,7 +399,84 @@
   padding-inline-end: 28px;
 }
 
-/* 4. Output Folder Row */
+/* 4. Output Files Save Location (Matching Transcribe Setup Design) */
+.translate-save-mode-pills {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  min-width: 0;
+}
+
+.translate-preset-pill {
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-glass);
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--color-text-muted);
+  font-size: 0.76rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  user-select: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.translate-preset-pill:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(var(--color-royal-blue-rgb, 59, 130, 246), 0.35);
+  color: var(--color-text);
+}
+
+.translate-preset-pill.active,
+.translate-preset-pill[aria-checked="true"] {
+  background: rgba(var(--color-royal-blue-rgb, 59, 130, 246), 0.18);
+  border-color: rgba(var(--color-royal-blue-rgb, 59, 130, 246), 0.5);
+  color: var(--color-text);
+}
+
+.translate-preset-pill:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.translate-preset-pill:focus-visible {
+  outline: 2px solid var(--accent-primary, #3b82f6);
+  outline-offset: 1px;
+}
+
+.translate-format-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.3;
+  flex-shrink: 0;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.translate-preset-pill[aria-checked="true"] .translate-format-dot {
+  background: var(--color-cyan, #22d3ee);
+  opacity: 1;
+}
+
+.translate-pill-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.translate-output-custom-panel {
+  min-width: 0;
+}
+
 .translate-output-row {
   display: flex;
   align-items: center;
@@ -407,19 +488,21 @@
   flex: 1;
   min-width: 0;
   display: block;
-  height: 38px;
-  min-height: 38px;
-  line-height: 36px;
+  height: 36px;
+  min-height: 36px;
+  line-height: 34px;
   padding: 0 10px;
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.22);
   border: 1px solid var(--border-glass);
   border-radius: 8px;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   color: var(--color-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   box-sizing: border-box;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .translate-output-display.has-custom-path {
@@ -427,9 +510,7 @@
   direction: ltr;
   text-align: left;
   unicode-bidi: isolate;
-  font-family: var(--font-mono);
-  user-select: text;
-  -webkit-user-select: text;
+  font-family: var(--font-mono, monospace);
 }
 
 .translate-output-row .btn-secondary,
@@ -437,10 +518,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 38px;
-  min-height: 38px;
+  height: 36px;
+  min-height: 36px;
   padding: 0 12px;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 500;
   border-radius: 8px;
   border: 1px solid var(--border-glass);
@@ -450,7 +531,7 @@
   white-space: nowrap;
   flex-shrink: 0;
   cursor: pointer;
-  transition: var(--transition-smooth);
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
 }
 
 .translate-output-row .btn-secondary:hover:not(:disabled),
@@ -464,14 +545,37 @@
   cursor: not-allowed;
 }
 
-/* 5. Action Bar & Telemetry HUD */
+.translate-output-row .translate-output-open-btn {
+  width: 36px;
+  min-width: 36px;
+  padding: 0;
+  color: var(--color-text-muted);
+}
+
+.translate-output-row .translate-output-open-btn:hover:not(:disabled) {
+  color: var(--color-text);
+}
+
+.translate-output-row .translate-output-open-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* 5. Docked Action Bar & Telemetry HUD (Always Pinned Visible) */
 .translate-actions-section {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-top: auto;
-  padding-top: 14px;
+  flex-shrink: 0;
+  margin-inline: 18px;
+  margin-top: 0;
+  padding-top: 12px;
   border-top: 1px solid var(--border-glass, rgba(255, 255, 255, 0.08));
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.translate-unified-deck.has-scroll-below .translate-actions-section {
+  box-shadow: 0 -10px 18px -10px rgba(0, 0, 0, 0.55);
 }
 
 .translate-actions-bar {

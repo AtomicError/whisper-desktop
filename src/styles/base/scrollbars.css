@@ -275,14 +275,16 @@
   background: transparent !important;
 }
 
-/* Transcribe Setup Deck Body & Companion Media Deck: Clean Invisible Scrollbar (Zero Width Shift, Matches Settings) */
+/* Transcribe & Translate Setup Deck Bodies & Companion Media Deck: Clean Invisible Scrollbar (Zero Width Shift, Matches Settings) */
 .transcribe-deck-body,
+.translate-deck-body,
 .transcribe-media-deck {
   scrollbar-width: none !important;
   -ms-overflow-style: none !important;
 }
 
 .transcribe-deck-body::-webkit-scrollbar,
+.translate-deck-body::-webkit-scrollbar,
 .transcribe-media-deck::-webkit-scrollbar {
   display: none !important;
   width: 0 !important;
@@ -291,6 +293,7 @@
 }
 
 .transcribe-deck-body::-webkit-scrollbar-thumb,
+.translate-deck-body::-webkit-scrollbar-thumb,
 .transcribe-media-deck::-webkit-scrollbar-thumb {
   display: none !important;
   background: transparent !important;

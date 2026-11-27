@@ -98,52 +98,70 @@
                       </div>
                     </div>
 
-                    <!-- 4. Output Folder Row -->
-                    <div class="translate-field-group">
-                      <div class="translate-field-label" id="lbl-translate-output-folder">
+                    <!-- 4. Output Files Save Location -->
+                    <div class="translate-field-group" id="translate-output-location-group">
+                      <label id="lbl-translate-output-folder">
                         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                         </svg>
-                        <span data-i18n="translate.outputFolder">Output Folder</span>
+                        <span data-i18n="settings.outputDirModeTitle">Output Files Save Location</span>
+                      </label>
+                      <div class="translate-save-mode-pills" id="translate-output-location-modes" role="radiogroup" aria-labelledby="lbl-translate-output-folder">
+                        <button type="button" class="translate-preset-pill active" id="translate-output-mode-input" data-output-mode="input_dir" role="radio" aria-checked="true" tabindex="0" data-i18n-title="settings.outputDirSameAsInput" title="Same as Input File Directory (Default)">
+                          <span class="translate-format-dot" aria-hidden="true"></span>
+                          <span class="translate-pill-label" data-i18n="transcribe.saveLocationSameAsInput">Same as Input</span>
+                        </button>
+                        <button type="button" class="translate-preset-pill" id="translate-output-mode-custom" data-output-mode="custom" role="radio" aria-checked="false" tabindex="-1" data-i18n-title="settings.outputDirCustom" title="Custom Directory...">
+                          <span class="translate-format-dot" aria-hidden="true"></span>
+                          <span class="translate-pill-label" data-i18n="transcribe.saveLocationCustom">Custom Folder</span>
+                        </button>
                       </div>
-                      <div class="translate-output-row">
-                        <div class="translate-output-display" id="translate-output-dir-text" data-i18n="translate.sameAsSource">Same as source file folder</div>
-                        <button class="btn-secondary btn-sm" id="btn-browse-translate-dir" data-i18n="translate.changeFolder" type="button" aria-describedby="translate-output-dir-text">Change...</button>
-                        <button class="btn-secondary btn-sm" id="btn-reset-translate-dir" data-i18n="translate.resetFolder" type="button" aria-describedby="translate-output-dir-text" style="display:none;">Reset</button>
+                      <div class="translate-output-custom-panel" id="translate-output-custom-row" style="display:none;">
+                        <div class="translate-output-row">
+                          <div class="translate-output-display" id="translate-output-dir-text" data-i18n="settings.outputDirSelectPlaceholder">Select output folder...</div>
+                          <button type="button" class="btn-secondary translate-output-open-btn" id="btn-open-translate-dir" data-i18n-title="settings.openOutputDirTooltip" data-i18n-aria="settings.openOutputDirTooltip" title="Click to open output folder in File Manager" aria-label="Open output folder in File Manager" disabled>
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                              <polyline points="15 3 21 3 21 9"/>
+                              <line x1="10" y1="14" x2="21" y2="3"/>
+                            </svg>
+                          </button>
+                          <button class="btn-secondary btn-sm" id="btn-browse-translate-dir" data-i18n="common.browse" type="button" aria-describedby="translate-output-dir-text">Browse</button>
+                        </div>
                       </div>
                     </div>
+                  </div>
 
-                    <!-- 5. Action & Telemetry Deck -->
-                    <div class="translate-actions-section">
-                      <div class="translate-actions-bar">
-                        <button class="btn-primary btn-start-translation" id="btn-start-translation" type="button" disabled data-i18n-title="translate.noSubSelectedError" title="Please select a subtitle file first.">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px;" aria-hidden="true">
-                            <path d="m5 8 6 6"/>
-                            <path d="m4 14 6-6 2-3"/>
-                            <path d="M2 5h12"/>
-                            <path d="M7 2h1"/>
-                            <path d="m22 22-5-10-5 10"/>
-                            <path d="M14 18h6"/>
-                          </svg>
-                          <span id="btn-start-translation-text" data-i18n="translate.startTranslate">Translate Subtitle</span>
-                        </button>
-                        <button class="btn-secondary btn-cancel-translation" id="btn-cancel-translation" type="button" style="display:none;" data-i18n="translate.cancelTranslate" data-i18n-aria="translate.cancelTranslate" aria-label="Cancel Translation">Cancel</button>
-                      </div>
+                  <!-- 5. Docked Action & Telemetry Footer (Always Pinned Visible) -->
+                  <div class="translate-actions-section">
+                    <div class="translate-actions-bar">
+                      <button class="btn-primary btn-start-translation" id="btn-start-translation" type="button" disabled data-i18n-title="translate.noSubSelectedError" title="Please select a subtitle file first.">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px;" aria-hidden="true">
+                          <path d="m5 8 6 6"/>
+                          <path d="m4 14 6-6 2-3"/>
+                          <path d="M2 5h12"/>
+                          <path d="M7 2h1"/>
+                          <path d="m22 22-5-10-5 10"/>
+                          <path d="M14 18h6"/>
+                        </svg>
+                        <span id="btn-start-translation-text" data-i18n="translate.startTranslate">Translate Subtitle</span>
+                      </button>
+                      <button class="btn-secondary btn-cancel-translation" id="btn-cancel-translation" type="button" style="display:none;" data-i18n="translate.cancelTranslate" data-i18n-aria="translate.cancelTranslate" aria-label="Cancel Translation">Cancel</button>
+                    </div>
 
-                      <!-- Telemetry HUD -->
-                      <div class="translate-telemetry" id="translate-telemetry-box" role="status" aria-live="polite" style="display:none;">
-                        <div class="translate-telemetry-header">
-                          <div class="translate-telemetry-status">
-                            <span class="translate-status-badge" id="translate-status-badge" data-i18n="translate.statusReady">Ready</span>
-                            <span id="lbl-translate-lines" class="translate-lines-badge" style="display:none;"></span>
-                          </div>
-                          <div class="translate-telemetry-pct" id="lbl-translate-pct">0%</div>
+                    <!-- Telemetry HUD -->
+                    <div class="translate-telemetry" id="translate-telemetry-box" role="status" aria-live="polite" style="display:none;">
+                      <div class="translate-telemetry-header">
+                        <div class="translate-telemetry-status">
+                          <span class="translate-status-badge" id="translate-status-badge" data-i18n="translate.statusReady">Ready</span>
+                          <span id="lbl-translate-lines" class="translate-lines-badge" style="display:none;"></span>
                         </div>
-                        <div class="translate-linear-track" id="translate-progress-track" role="progressbar" aria-labelledby="translate-status-badge" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-                          <div class="translate-linear-fill" id="translate-progress-fill" style="width:0%;"></div>
-                        </div>
-                        <div class="translate-telemetry-msg" id="lbl-translate-msg"></div>
+                        <div class="translate-telemetry-pct" id="lbl-translate-pct">0%</div>
                       </div>
+                      <div class="translate-linear-track" id="translate-progress-track" role="progressbar" aria-labelledby="translate-status-badge" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                        <div class="translate-linear-fill" id="translate-progress-fill" style="width:0%;"></div>
+                      </div>
+                      <div class="translate-telemetry-msg" id="lbl-translate-msg"></div>
                     </div>
                   </div>
                 </div>

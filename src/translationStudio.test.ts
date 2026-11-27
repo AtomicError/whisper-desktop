@@ -822,11 +822,12 @@ describe('translation studio bugfixes and edge cases', () => {
       expect(invokeLocal).toHaveBeenCalledTimes(2);
       resolveDir('/tmp/out');
       await Promise.all([firstDir, secondDir]);
+      expect(invokeLocal).toHaveBeenCalledWith('verify_directory_writable', { dirPath: '/tmp/out' });
       expect(controller.state.outputDir).toBe('/tmp/out');
 
       controller.state.isTranslating = true;
       await controller.browseOutputDir();
-      expect(invokeLocal).toHaveBeenCalledTimes(2);
+      expect(invokeLocal).toHaveBeenCalledTimes(3);
     } finally {
       (globalThis as any).window = origWin;
     }
@@ -2118,7 +2119,13 @@ describe('translation studio regression fixes', () => {
     expect(html).toContain('aria-controls="translate-source-pane"');
     expect(html).toContain('aria-controls="translate-target-pane"');
     expect(html).toContain('id="translate-preview-grid" role="tabpanel" aria-labelledby="btn-view-split"');
-    expect(html).toContain('id="btn-reset-translate-dir" data-i18n="translate.resetFolder" type="button" aria-describedby="translate-output-dir-text"');
+    expect(html).toContain('id="translate-output-location-modes" role="radiogroup" aria-labelledby="lbl-translate-output-folder"');
+    expect(html).toContain('id="translate-output-mode-input" data-output-mode="input_dir" role="radio" aria-checked="true"');
+    expect(html).toContain('id="translate-output-mode-custom" data-output-mode="custom" role="radio" aria-checked="false"');
+    expect(html).toContain('id="translate-output-custom-row"');
+    expect(html).toContain('id="btn-open-translate-dir"');
+    expect(html).toContain('id="btn-browse-translate-dir" data-i18n="common.browse" type="button" aria-describedby="translate-output-dir-text"');
+    expect(html).not.toContain('id="btn-reset-translate-dir"');
 
     const controller = new TranslationStudioController();
     const mkAttrEl = () => {
@@ -2361,15 +2368,17 @@ describe('translation studio regression fixes', () => {
     dropHandlers['dragleave']({ preventDefault: vi.fn(), stopPropagation: vi.fn(), relatedTarget: outsideNode });
     expect(dropZoneMock.classList.remove).toHaveBeenCalledWith('drag-over');
 
-    // btnResetDir guard during active translation
+    // outputModeInputBtn guard during active translation
     const btnHandlers: Record<string, any> = {};
-    const btnResetDir: any = { addEventListener: vi.fn((evt: string, h: any) => { btnHandlers[evt] = h; }), style: {} };
-    (controller as any).btnResetDir = btnResetDir;
+    const outputModeInputBtn: any = { addEventListener: vi.fn((evt: string, h: any) => { btnHandlers[evt] = h; }), style: {}, classList: { toggle: vi.fn() }, setAttribute: vi.fn() };
+    (controller as any).outputModeInputBtn = outputModeInputBtn;
     (controller as any).setupEventListeners();
     controller.state.outputDir = '/custom/out';
+    controller.state.outputDirMode = 'custom';
     controller.state.isTranslating = true;
     btnHandlers['click']();
     expect(controller.state.outputDir).toBe('/custom/out');
+    expect(controller.state.outputDirMode).toBe('custom');
   });
 
   it('retries early cancel_transcription when session startup is not yet Translating and respects reduced motion', async () => {
@@ -2896,6 +2905,187 @@ describe('translation studio regression fixes', () => {
       expect(lblMsg.textContent).toBe('ترجمه لغو شد');
       setLanguage('en', false);
     } finally {
+      (globalThis as any).document = origDoc;
+      (globalThis as any).window = origWin;
+    }
+  });
+
+  it('matches Transcribe Output Files Save Location behavior: preserves custom path, verifies writability, opens folder, supports keyboard navigation, and updates scroll cue', async () => {
+    const origWin = (globalThis as any).window;
+    const origDoc = (globalThis as any).document;
+    const showNotification = vi.fn();
+
+    let nextSelectedDir: string | null = null;
+    let writableError: Error | null = null;
+    const invokeLocal = vi.fn(async (cmd: string, args?: any) => {
+      if (cmd === 'select_directory') return nextSelectedDir;
+      if (cmd === 'verify_directory_writable') {
+        if (writableError) throw writableError;
+        return null;
+      }
+      if (cmd === 'open_file_in_editor') return null;
+      if (cmd === 'translate_transcription_files') return ['movie.fa.srt'];
+      if (cmd === 'read_text_file_content') return '1\n00:00:01,000 --> 00:00:02,000\nسلام\n';
+      return null;
+    });
+
+    const makeEl = (id: string) => {
+      const attrs: Record<string, string> = {};
+      const listeners: Record<string, Function[]> = {};
+      const classes = new Set<string>();
+      return {
+        id,
+        disabled: false,
+        textContent: '',
+        title: '',
+        style: {} as Record<string, string>,
+        focus: vi.fn(),
+        setAttribute: (k: string, v: string) => { attrs[k] = v; },
+        removeAttribute: (k: string) => { delete attrs[k]; },
+        getAttribute: (k: string) => attrs[k] ?? null,
+        addEventListener: (evt: string, fn: Function) => { (listeners[evt] ??= []).push(fn); },
+        removeEventListener: (evt: string, fn: Function) => {
+          listeners[evt] = (listeners[evt] ?? []).filter(f => f !== fn);
+        },
+        dispatch: (evt: string, payload: any = {}) => {
+          for (const fn of listeners[evt] ?? []) fn(payload);
+        },
+        classList: {
+          add: (c: string) => classes.add(c),
+          remove: (c: string) => classes.delete(c),
+          toggle: (c: string, force?: boolean) => {
+            const next = force !== undefined ? force : !classes.has(c);
+            if (next) classes.add(c);
+            else classes.delete(c);
+            return next;
+          },
+          contains: (c: string) => classes.has(c),
+        },
+      };
+    };
+
+    const unifiedDeck = makeEl('translate-unified-deck');
+    const deckBody: any = { ...makeEl('deck-body'), scrollHeight: 800, clientHeight: 400, scrollTop: 0 };
+    const modeGroup = makeEl('translate-output-location-modes');
+    const modeInputBtn = makeEl('translate-output-mode-input');
+    const modeCustomBtn = makeEl('translate-output-mode-custom');
+    const customRow = makeEl('translate-output-custom-row');
+    const outputDirText = makeEl('translate-output-dir-text');
+    const btnOpenDir = makeEl('btn-open-translate-dir');
+    const btnBrowseDir = makeEl('btn-browse-translate-dir');
+
+    (globalThis as any).document = {
+      ...origDoc,
+      activeElement: modeCustomBtn,
+    };
+    (globalThis as any).window = {
+      ...origWin,
+      showNotification,
+      __TAURI__: { core: { invoke: invokeLocal } },
+    };
+
+    const controller = new TranslationStudioController();
+    (controller as any).unifiedDeck = unifiedDeck;
+    (controller as any).deckBody = deckBody;
+    (controller as any).outputLocationModes = modeGroup;
+    (controller as any).outputModeInputBtn = modeInputBtn;
+    (controller as any).outputModeCustomBtn = modeCustomBtn;
+    (controller as any).outputCustomRow = customRow;
+    (controller as any).outputDirText = outputDirText;
+    (controller as any).btnOpenDir = btnOpenDir;
+    (controller as any).btnBrowseDir = btnBrowseDir;
+    (controller as any).setupEventListeners();
+    (controller as any).updateOutputDirUI();
+
+    try {
+      // 1. Scroll cue reflects overflow on .translate-deck-body
+      expect(unifiedDeck.classList.contains('has-scroll-below')).toBe(true);
+      deckBody.scrollTop = 398;
+      controller.updateDeckScrollCue();
+      expect(unifiedDeck.classList.contains('has-scroll-below')).toBe(false);
+
+      // 2. Switching to custom with empty path & cancelling browse reverts to input_dir + reverts focus
+      nextSelectedDir = null;
+      modeGroup.dispatch('keydown', {
+        key: 'ArrowRight',
+        target: modeInputBtn,
+        preventDefault: vi.fn(),
+      });
+      await vi.waitFor(() => expect(modeInputBtn.focus).toHaveBeenCalled());
+      expect(controller.state.outputDirMode).toBe('input_dir');
+      expect(modeInputBtn.getAttribute('aria-checked')).toBe('true');
+      expect(customRow.style.display).toBe('none');
+      expect(btnOpenDir.disabled).toBe(true);
+
+      // 3. Selecting non-writable folder shows error and does not apply path
+      nextSelectedDir = '/readonly/dir';
+      writableError = new Error('Permission denied');
+      await controller.setOutputDirMode('custom');
+      expect(invokeLocal).toHaveBeenCalledWith('verify_directory_writable', { dirPath: '/readonly/dir' });
+      expect(controller.state.outputDir).toBe('');
+      expect(controller.state.outputDirMode).toBe('input_dir');
+      expect(showNotification).toHaveBeenCalledWith(expect.stringContaining('Permission denied'), 'error');
+
+      // 4. Selecting writable folder switches to custom mode and enables open button
+      writableError = null;
+      nextSelectedDir = '/tmp/translated-out';
+      await controller.setOutputDirMode('custom');
+      expect(controller.state.outputDir).toBe('/tmp/translated-out');
+      expect(controller.state.outputDirMode).toBe('custom');
+      expect(customRow.style.display).toBe('block');
+      expect(outputDirText.textContent).toBe('/tmp/translated-out');
+      expect(btnOpenDir.disabled).toBe(false);
+
+      // 5. Switching back to input_dir hides custom row while preserving remembered path
+      await controller.setOutputDirMode('input_dir');
+      expect(controller.state.outputDirMode).toBe('input_dir');
+      expect(controller.state.outputDir).toBe('/tmp/translated-out');
+      expect(customRow.style.display).toBe('none');
+
+      // 6. startTranslation in input_dir mode passes outputDir: null despite preserved custom path
+      (globalThis as any).window.settingsState = {
+        translateAiProviders: JSON.stringify([{ name: 'OpenAI', models: [{ id: 'gpt-4o', enabled: true }] }]),
+        translateAiProvider: 'OpenAI',
+        translateAiModel: 'gpt-4o',
+      };
+      controller.state.activeProvider = 'OpenAI';
+      controller.state.activeModel = 'gpt-4o';
+      controller.state.subtitlePath = '/src/movie.srt';
+      controller.state.subtitleName = 'movie.srt';
+      controller.state.subtitleExt = 'srt';
+      await controller.startTranslation();
+      expect(invokeLocal).toHaveBeenCalledWith(
+        'translate_transcription_files',
+        expect.objectContaining({ outputDir: null, parentDir: '/src' })
+      );
+
+      // 7. Switching back to custom restores without browsing and startTranslation passes custom path
+      invokeLocal.mockClear();
+      await controller.setOutputDirMode('custom');
+      expect(invokeLocal).not.toHaveBeenCalledWith('select_directory', expect.anything());
+      expect(customRow.style.display).toBe('block');
+      await controller.startTranslation();
+      expect(invokeLocal).toHaveBeenCalledWith(
+        'translate_transcription_files',
+        expect.objectContaining({ outputDir: '/tmp/translated-out' })
+      );
+
+      // 8. openCustomOutputDir verifies writability and opens directory
+      invokeLocal.mockClear();
+      await controller.openCustomOutputDir();
+      expect(invokeLocal).toHaveBeenCalledWith('verify_directory_writable', { dirPath: '/tmp/translated-out' });
+      expect(invokeLocal).toHaveBeenCalledWith('open_file_in_editor', { filePath: '/tmp/translated-out' });
+
+      // 9. Action section is pinned outside .translate-deck-body in translate.html
+      const html = loadSourceFile('views/translate.html');
+      const deckBodyIdx = html.indexOf('<div class="translate-deck-body">');
+      const actionsIdx = html.indexOf('<div class="translate-actions-section">');
+      const previewColIdx = html.indexOf('<!-- Right Column: Dual Subtitle Comparison Deck -->');
+      expect(deckBodyIdx).toBeGreaterThan(-1);
+      expect(actionsIdx).toBeGreaterThan(deckBodyIdx);
+      expect(previewColIdx).toBeGreaterThan(actionsIdx);
+    } finally {
+      controller.dispose();
       (globalThis as any).document = origDoc;
       (globalThis as any).window = origWin;
     }
