@@ -3223,6 +3223,14 @@ describe('translation studio regression fixes', () => {
       expect(controller.state.outputDir).toBe('/global/transcribe/output');
       expect(controller.state.outputDirMode).toBe('input_dir');
 
+      // Clearing global settings.outputDirPath also clears non-overridden outputDir
+      (globalThis as any).window.settingsState.outputDirPath = '';
+      controller.syncFromGlobalSettings();
+      expect(controller.state.outputDir).toBe('');
+      (globalThis as any).window.settingsState.outputDirPath = '/global/transcribe/output';
+      controller.syncFromGlobalSettings();
+      expect(controller.state.outputDir).toBe('/global/transcribe/output');
+
       // Clicking Custom Folder shows the pre-populated global path immediately
       await controller.setOutputDirMode('custom');
       expect(customRow.style.display).toBe('block');
@@ -3232,11 +3240,77 @@ describe('translation studio regression fixes', () => {
       // Picking a dedicated folder in Translate overrides and persists independently
       await controller.browseOutputDir();
       expect(controller.state.outputDir).toBe('/translate/custom/override');
+      (globalThis as any).window.settingsState.outputDirPath = '';
       controller.syncFromGlobalSettings();
       expect(controller.state.outputDir).toBe('/translate/custom/override');
       controller.dispose();
     } finally {
       (globalThis as any).localStorage = origStorage;
+      (globalThis as any).document = origDoc;
+      (globalThis as any).window = origWin;
+    }
+  });
+
+  it('ignores modified arrow keys on output location radiogroup and skips cooldown timer after dispose', async () => {
+    const origWin = (globalThis as any).window;
+    const origDoc = (globalThis as any).document;
+    const listeners: Record<string, Function[]> = {};
+    const modeGroup: any = {
+      addEventListener: (evt: string, fn: Function) => { (listeners[evt] ??= []).push(fn); },
+      removeEventListener: vi.fn(),
+    };
+    const modeInputBtn: any = { id: 'translate-output-mode-input', focus: vi.fn(), classList: { toggle: vi.fn() }, setAttribute: vi.fn() };
+    const modeCustomBtn: any = { id: 'translate-output-mode-custom', focus: vi.fn(), classList: { toggle: vi.fn() }, setAttribute: vi.fn() };
+
+    let resolveWritable!: () => void;
+    const writablePromise = new Promise<void>((r) => { resolveWritable = r; });
+
+    (globalThis as any).document = {
+      ...origDoc,
+      readyState: 'complete',
+      getElementById: vi.fn(() => null),
+      querySelector: vi.fn(() => null),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    };
+    (globalThis as any).window = {
+      ...origWin,
+      __TAURI__: {
+        core: {
+          invoke: vi.fn(async (cmd: string) => {
+            if (cmd === 'verify_directory_writable') {
+              await writablePromise;
+              return null;
+            }
+            if (cmd === 'open_file_in_editor') return null;
+            return null;
+          }),
+        },
+      },
+    };
+
+    const controller = new TranslationStudioController();
+    (controller as any).outputLocationModes = modeGroup;
+    (controller as any).outputModeInputBtn = modeInputBtn;
+    (controller as any).outputModeCustomBtn = modeCustomBtn;
+    (controller as any).setupEventListeners();
+
+    try {
+      const preventDefault = vi.fn();
+      for (const fn of listeners['keydown'] ?? []) {
+        fn({ key: 'ArrowRight', altKey: true, target: modeInputBtn, preventDefault });
+      }
+      expect(preventDefault).not.toHaveBeenCalled();
+      expect(controller.state.outputDirMode).toBe('input_dir');
+
+      controller.state.outputDir = '/tmp/out';
+      const openPromise = controller.openCustomOutputDir();
+      controller.dispose();
+      resolveWritable();
+      await openPromise;
+      expect((controller as any).openDirCooldownTimer).toBeNull();
+      expect((controller as any).isOpeningOutputDir).toBe(false);
+    } finally {
       (globalThis as any).document = origDoc;
       (globalThis as any).window = origWin;
     }

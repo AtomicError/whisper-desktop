@@ -608,6 +608,7 @@ export class TranslationStudioController {
       void this.setOutputDirMode('custom');
     });
     this.bindListener(this.outputLocationModes, 'keydown', ((e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'ArrowUp' && e.key !== 'ArrowDown') {
         return;
       }
@@ -1631,11 +1632,16 @@ export class TranslationStudioController {
     } finally {
       if (this.openDirCooldownTimer) {
         clearTimeout(this.openDirCooldownTimer);
-      }
-      this.openDirCooldownTimer = setTimeout(() => {
         this.openDirCooldownTimer = null;
+      }
+      if (this.isDisposed) {
         this.isOpeningOutputDir = false;
-      }, 1000);
+      } else {
+        this.openDirCooldownTimer = setTimeout(() => {
+          this.openDirCooldownTimer = null;
+          this.isOpeningOutputDir = false;
+        }, 1000);
+      }
     }
   }
 
@@ -1690,11 +1696,8 @@ export class TranslationStudioController {
       if (this.polishToggle) this.polishToggle.checked = this.state.polishPass;
     }
 
-    if (!this.hasExplicitOutputDir) {
-      const globalOutputDir = typeof settings.outputDirPath === 'string' ? settings.outputDirPath.trim() : '';
-      if (globalOutputDir) {
-        this.state.outputDir = globalOutputDir;
-      }
+    if (!this.hasExplicitOutputDir && typeof settings.outputDirPath === 'string') {
+      this.state.outputDir = settings.outputDirPath.trim();
     }
 
     if (!this.hasExplicitOutputDirMode && (settings.outputDirMode === 'custom' || settings.outputDirMode === 'input_dir')) {
