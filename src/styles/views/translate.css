@@ -5,7 +5,7 @@
 .translate-layout {
   display: grid;
   grid-template-columns: minmax(380px, 440px) 1fr;
-  gap: 16px;
+  gap: 20px;
   flex-grow: 1;
   min-height: 0;
   height: 100%;

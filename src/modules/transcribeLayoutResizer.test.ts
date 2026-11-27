@@ -69,7 +69,7 @@ describe('Transcription Studio Layout Resizer Module', () => {
 
     mockLeftPanel = {
       id: 'transcribe-left-panel',
-      getBoundingClientRect: () => ({ width: 420, left: 0, right: 420 })
+      getBoundingClientRect: () => ({ width: 440, left: 0, right: 440 })
     };
 
     mockResizer = {
@@ -179,13 +179,13 @@ describe('Transcription Studio Layout Resizer Module', () => {
     expect(isRtlLayout()).toBe(true);
   });
 
-  it('enforces minimum width floor so left panel cannot shrink below 420px', () => {
+  it('enforces minimum width floor so left panel cannot shrink below 440px', () => {
     initTranscribeLayoutResizer();
 
     // Attempting to set width to 300px
     const result = setTranscribeLeftPanelWidth(300, true, false);
     expect(result).toBe(MIN_LEFT_PANEL_WIDTH);
-    expect(mockLayout.style.getPropertyValue('--transcribe-left-panel-width')).toBe('420px');
+    expect(mockLayout.style.getPropertyValue('--transcribe-left-panel-width')).toBe('440px');
   });
 
   it('preserves currentWidth and avoids collapsing to floor when layout container has 0 width (hidden tab)', () => {
@@ -208,7 +208,7 @@ describe('Transcription Studio Layout Resizer Module', () => {
     setTranscribeLeftPanelWidth(520, true, false);
 
     expect(mockResizer.getAttribute('aria-valuenow')).toBe('520');
-    expect(mockResizer.getAttribute('aria-valuemin')).toBe('420');
+    expect(mockResizer.getAttribute('aria-valuemin')).toBe('440');
     expect(mockResizer.getAttribute('aria-valuemax')).toBe('760');
   });
 
@@ -219,7 +219,7 @@ describe('Transcription Studio Layout Resizer Module', () => {
     onPointerDown({
       button: 0,
       pointerId: 1,
-      clientX: 420,
+      clientX: 440,
       currentTarget: mockResizer,
       preventDefault: vi.fn()
     });
@@ -236,7 +236,7 @@ describe('Transcription Studio Layout Resizer Module', () => {
     onPointerDown({
       button: 0,
       pointerId: 2,
-      clientX: 420,
+      clientX: 440,
       currentTarget: mockResizer,
       preventDefault: vi.fn()
     });
@@ -247,20 +247,20 @@ describe('Transcription Studio Layout Resizer Module', () => {
     expect(globalThis.document.body.classList.contains('is-resizing-transcribe')).toBe(false);
   });
 
-  it('snaps magnetically to default width (420px) when within snap threshold', () => {
+  it('snaps magnetically to default width (440px) when within snap threshold', () => {
     initTranscribeLayoutResizer();
 
-    // 428px is within ±20px of 420px -> should snap to 420px
-    const snappedWidth = setTranscribeLeftPanelWidth(428, true, true);
+    // 448px is within ±20px of 440px -> should snap to 440px
+    const snappedWidth = setTranscribeLeftPanelWidth(448, true, true);
     expect(snappedWidth).toBe(DEFAULT_LEFT_PANEL_WIDTH);
     expect(mockResizer.classList.contains('is-snapped')).toBe(true);
-    expect(mockLayout.style.getPropertyValue('--transcribe-left-panel-width')).toBe('420px');
+    expect(mockLayout.style.getPropertyValue('--transcribe-left-panel-width')).toBe('440px');
 
-    // 460px is outside snap threshold -> should NOT snap
-    const freeWidth = setTranscribeLeftPanelWidth(460, true, true);
-    expect(freeWidth).toBe(460);
+    // 480px is outside snap threshold -> should NOT snap
+    const freeWidth = setTranscribeLeftPanelWidth(480, true, true);
+    expect(freeWidth).toBe(480);
     expect(mockResizer.classList.contains('is-snapped')).toBe(false);
-    expect(mockLayout.style.getPropertyValue('--transcribe-left-panel-width')).toBe('460px');
+    expect(mockLayout.style.getPropertyValue('--transcribe-left-panel-width')).toBe('480px');
   });
 
   it('resets width to default and clears localStorage on double click', () => {
@@ -271,7 +271,7 @@ describe('Transcription Studio Layout Resizer Module', () => {
     resetTranscribeLayoutWidth();
     expect(getTranscribeLeftPanelWidth()).toBe(DEFAULT_LEFT_PANEL_WIDTH);
     expect(mockStorage[STORAGE_KEY]).toBeUndefined();
-    expect(mockLayout.style.getPropertyValue('--transcribe-left-panel-width')).toBe('420px');
+    expect(mockLayout.style.getPropertyValue('--transcribe-left-panel-width')).toBe('440px');
     expect(mockLayout.classes.has('is-animating')).toBe(true);
   });
 
@@ -282,11 +282,11 @@ describe('Transcription Studio Layout Resizer Module', () => {
     const onPointerMove = registeredListeners['pointermove'][0];
     const onPointerUp = registeredListeners['pointerup'][0];
 
-    // Pointer down at clientX = 420
+    // Pointer down at clientX = 440
     const downEvt = {
       button: 0,
       pointerId: 1,
-      clientX: 420,
+      clientX: 440,
       currentTarget: mockResizer,
       preventDefault: vi.fn()
     };
@@ -295,15 +295,15 @@ describe('Transcription Studio Layout Resizer Module', () => {
     expect(globalThis.document.body.classList.contains('is-resizing-transcribe')).toBe(true);
     expect(mockResizer.setPointerCapture).toHaveBeenCalledWith(1);
 
-    // Pointer move to clientX = 570 (dragged right by +150px)
+    // Pointer move to clientX = 590 (dragged right by +150px)
     const moveEvt = {
       pointerId: 1,
-      clientX: 570
+      clientX: 590
     };
     onPointerMove(moveEvt);
 
-    expect(getTranscribeLeftPanelWidth()).toBe(570);
-    expect(mockLayout.style.getPropertyValue('--transcribe-left-panel-width')).toBe('570px');
+    expect(getTranscribeLeftPanelWidth()).toBe(590);
+    expect(mockLayout.style.getPropertyValue('--transcribe-left-panel-width')).toBe('590px');
 
     // Pointer up
     const upEvt = {
@@ -313,7 +313,7 @@ describe('Transcription Studio Layout Resizer Module', () => {
     onPointerUp(upEvt);
 
     expect(globalThis.document.body.classList.contains('is-resizing-transcribe')).toBe(false);
-    expect(mockStorage[STORAGE_KEY]).toBe('570');
+    expect(mockStorage[STORAGE_KEY]).toBe('590');
   });
 
   it('executes pointer drag resizing in RTL mode (inverted vector)', () => {
@@ -339,15 +339,15 @@ describe('Transcription Studio Layout Resizer Module', () => {
       clientX: 650
     });
 
-    expect(getTranscribeLeftPanelWidth()).toBe(570); // 420 + 150 = 570
-    expect(mockLayout.style.getPropertyValue('--transcribe-left-panel-width')).toBe('570px');
+    expect(getTranscribeLeftPanelWidth()).toBe(590); // 440 + 150 = 590
+    expect(mockLayout.style.getPropertyValue('--transcribe-left-panel-width')).toBe('590px');
 
     onPointerUp({
       pointerId: 1,
       currentTarget: mockResizer
     });
 
-    expect(mockStorage[STORAGE_KEY]).toBe('570');
+    expect(mockStorage[STORAGE_KEY]).toBe('590');
   });
 
   it('supports keyboard navigation with Arrow keys and Home to reset', () => {
@@ -357,23 +357,23 @@ describe('Transcription Studio Layout Resizer Module', () => {
     // ArrowRight in LTR increases width by 20px
     const rightEvt = { key: 'ArrowRight', shiftKey: false, preventDefault: vi.fn(), stopPropagation: vi.fn() };
     onKeyDown(rightEvt);
-    expect(getTranscribeLeftPanelWidth()).toBe(440);
+    expect(getTranscribeLeftPanelWidth()).toBe(460);
     expect(rightEvt.preventDefault).toHaveBeenCalled();
     expect(rightEvt.stopPropagation).toHaveBeenCalled();
 
     // Shift + ArrowRight increases width by 48px
     const shiftRightEvt = { key: 'ArrowRight', shiftKey: true, preventDefault: vi.fn(), stopPropagation: vi.fn() };
     onKeyDown(shiftRightEvt);
-    expect(getTranscribeLeftPanelWidth()).toBe(488);
+    expect(getTranscribeLeftPanelWidth()).toBe(508);
     expect(shiftRightEvt.stopPropagation).toHaveBeenCalled();
 
     // ArrowLeft decreases width
     const leftEvt = { key: 'ArrowLeft', shiftKey: false, preventDefault: vi.fn(), stopPropagation: vi.fn() };
     onKeyDown(leftEvt);
-    expect(getTranscribeLeftPanelWidth()).toBe(468);
+    expect(getTranscribeLeftPanelWidth()).toBe(488);
     expect(leftEvt.stopPropagation).toHaveBeenCalled();
 
-    // Home resets to default 420px
+    // Home resets to default 440px
     const homeEvt = { key: 'Home', shiftKey: false, preventDefault: vi.fn(), stopPropagation: vi.fn() };
     onKeyDown(homeEvt);
     expect(getTranscribeLeftPanelWidth()).toBe(DEFAULT_LEFT_PANEL_WIDTH);

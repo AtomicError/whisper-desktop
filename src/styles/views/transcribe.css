@@ -1,7 +1,7 @@
 /* 4. Transcribe File View */
 .transcribe-layout {
-  --transcribe-default-left-width: 420px;
-  --transcribe-min-left-width: 420px;
+  --transcribe-default-left-width: 440px;
+  --transcribe-min-left-width: 440px;
   display: grid;
   grid-template-columns: var(--transcribe-left-panel-width, var(--transcribe-default-left-width)) 12px minmax(0, 1fr);
   gap: 4px;
@@ -553,7 +553,7 @@ body.is-resizing-transcribe * {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  min-height: 64px;
+  min-height: 62px;
   flex-shrink: 0;
   background: rgba(0, 0, 0, 0.2);
   text-align: start;
@@ -577,7 +577,7 @@ body.is-resizing-transcribe * {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 14px;
   width: 100%;
   min-width: 0;
 }
@@ -585,15 +585,15 @@ body.is-resizing-transcribe * {
 .transcribe-dropzone-identity {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   flex: 1;
   min-width: 0;
 }
 
 .transcribe-dropzone-card .transcribe-media-icon {
-  width: 26px;
-  height: 26px;
-  min-width: 26px;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
   color: var(--color-royal-blue, #2d7fff);
   flex-shrink: 0;
   stroke-width: 1.8;
@@ -604,12 +604,12 @@ body.is-resizing-transcribe * {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 3px;
+  gap: 4px;
   flex: 1;
   min-width: 0;
 }
 .transcribe-dropzone-card .transcribe-media-name {
-  font-size: 0.88rem;
+  font-size: 0.92rem;
   font-weight: 600;
   color: var(--text-primary, #fafafa);
   margin: 0;
@@ -620,7 +620,7 @@ body.is-resizing-transcribe * {
 }
 
 .transcribe-dropzone-card .transcribe-media-prompt {
-  font-size: 0.76rem;
+  font-size: 0.78rem;
   color: var(--text-muted, #71717a);
   margin: 0;
   white-space: nowrap;
@@ -631,28 +631,28 @@ body.is-resizing-transcribe * {
 
 .transcribe-dropzone-card .transcribe-dropzone-actions {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
   flex-shrink: 0;
 }
 
 .transcribe-dropzone-card .btn-media-browse {
-  padding: 0 10px;
-  font-size: 0.75rem;
+  padding: 0 12px;
+  font-size: 0.78rem;
   font-weight: 500;
   border-radius: var(--radius-sm, 6px);
-  height: 28px;
+  height: 30px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
 .transcribe-dropzone-card .btn-clear-media {
-  padding: 0 10px;
-  font-size: 0.75rem;
+  padding: 0 12px;
+  font-size: 0.78rem;
   font-weight: 500;
   border-radius: var(--radius-sm, 6px);
-  height: 28px;
+  height: 30px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -691,8 +691,8 @@ body.is-resizing-transcribe * {
 }
 
 #transcribe-drop-zone.transcribe-dropzone-card.has-file .btn-media-browse {
-  height: 28px;
-  padding: 0 10px;
+  height: 30px;
+  padding: 0 12px;
 }
 
 /* Embedded metadata row (Clean inline text under filename) */
@@ -713,7 +713,7 @@ body.is-resizing-transcribe * {
 .transcribe-meta-badge {
   display: inline-flex;
   align-items: center;
-  font-size: 0.76rem;
+  font-size: 0.78rem;
   font-weight: 500;
   color: var(--text-secondary, #a1a1aa);
   background: none;

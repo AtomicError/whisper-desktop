@@ -9,15 +9,15 @@
  *  - Bidirectional RTL/LTR support (direction-aware delta calculation).
  *  - Strict minimum width boundary (cannot shrink below default width ~400px).
  *  - Maximum width boundary (guarantees transcript viewer maintains minimum reading width).
- *  - Magnetic snapping to factory default (420px) within snap threshold zone.
+ *  - Magnetic snapping to factory default (440px) within snap threshold zone.
  *  - Instant reset to factory default via double-click with smooth animation.
  *  - Keyboard accessibility (ArrowLeft, ArrowRight, Home/Enter to reset).
  *  - LocalStorage state persistence across views and app restarts.
  *  - Defensive cleanup and window resize clamping.
  */
 
-export const DEFAULT_LEFT_PANEL_WIDTH = 420;
-export const MIN_LEFT_PANEL_WIDTH = 420;
+export const DEFAULT_LEFT_PANEL_WIDTH = 440;
+export const MIN_LEFT_PANEL_WIDTH = 440;
 export const MIN_RIGHT_PANEL_WIDTH = 420;
 export const RESIZER_COLUMN_WIDTH = 12;
 export const RESIZER_GAP = 8;
