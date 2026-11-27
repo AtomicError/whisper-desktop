@@ -293,6 +293,9 @@ export function clearBatchQueue(): void {
     if (dropZone) {
       dropZone.classList.remove('has-file');
       dropZone.classList.remove('is-batch-summary');
+      if (dropZone.dataset) {
+        delete dropZone.dataset.filePath;
+      }
       dropZone.title = t('transcribe.selectFilePrompt');
       if (typeof dropZone.setAttribute === 'function') {
         dropZone.setAttribute('data-i18n-title', 'transcribe.selectFilePrompt');
@@ -1783,6 +1786,9 @@ export async function addBatchFiles(files: string[]): Promise<boolean> {
       if (dropZone) {
         dropZone.classList.add('has-file');
         dropZone.classList.add('is-batch-summary');
+        if (dropZone.dataset) {
+          delete dropZone.dataset.filePath;
+        }
         dropZone.title = t('transcribe.queueFilesHeader');
         if (typeof dropZone.setAttribute === 'function') {
           dropZone.setAttribute('data-i18n-title', 'transcribe.queueFilesHeader');
@@ -1879,6 +1885,9 @@ export async function addBatchFiles(files: string[]): Promise<boolean> {
     if (dropZone) {
       dropZone.classList.add('has-file');
       dropZone.classList.add('is-batch-summary');
+      if (dropZone.dataset) {
+        delete dropZone.dataset.filePath;
+      }
       dropZone.title = t('transcribe.queueFilesHeader');
       if (typeof dropZone.setAttribute === 'function') {
         dropZone.setAttribute('data-i18n-title', 'transcribe.queueFilesHeader');

@@ -7,7 +7,8 @@
   top: 0;
   left: 0;
   z-index: var(--z-context-menu, 10000010);
-  min-width: 196px;
+  box-sizing: border-box;
+  min-width: min(196px, calc(100vw - 16px));
   max-width: min(300px, calc(100vw - 16px));
   max-height: calc(100vh - 16px);
   overflow-y: auto;
@@ -57,12 +58,13 @@ html[dir="rtl"] .app-context-menu {
 }
 
 .app-context-menu__item {
+  position: relative;
   width: 100%;
   display: flex;
   align-items: center;
   gap: 10px;
   padding-block: 7px;
-  padding-inline: 10px;
+  padding-inline: 12px 10px;
   border: 1px solid transparent;
   border-radius: var(--radius-md, 8px);
   background: transparent;
@@ -79,17 +81,47 @@ html[dir="rtl"] .app-context-menu {
   outline: none;
 }
 
+.app-context-menu__item::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 4px;
+  inset-block: 24%;
+  width: 2.5px;
+  border-radius: 9999px;
+  background-color: var(--color-accent, #2d7fff);
+  transform: scaleY(0);
+  transform-origin: center;
+  opacity: 0;
+  transition: transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.14s ease, background-color 0.12s ease;
+  pointer-events: none;
+}
+
 .app-context-menu:not(.is-keyboard-nav) .app-context-menu__item:hover:not(:disabled) {
   background: rgba(var(--color-accent-rgb, 45, 127, 255), 0.16);
   border-color: rgba(var(--color-accent-rgb, 45, 127, 255), 0.28);
   color: #ffffff;
 }
 
-.app-context-menu__item:active:not(:disabled) {
-  background: rgba(var(--color-accent-rgb, 45, 127, 255), 0.24);
+.app-context-menu:not(.is-keyboard-nav) .app-context-menu__item:hover:not(:disabled)::before,
+.app-context-menu.is-keyboard-nav .app-context-menu__item.is-focused:not(:disabled)::before,
+.app-context-menu.is-keyboard-nav .app-context-menu__item:focus-visible::before {
+  transform: scaleY(0.8);
+  opacity: 0.92;
 }
 
-.app-context-menu__item:focus-visible {
+.app-context-menu__item:active:not(:disabled) {
+  background: rgba(var(--color-accent-rgb, 45, 127, 255), 0.24);
+  border-color: rgba(var(--color-accent-rgb, 45, 127, 255), 0.42);
+  color: #ffffff;
+}
+
+.app-context-menu__item:active:not(:disabled)::before {
+  transform: scaleY(1);
+  opacity: 1;
+}
+
+.app-context-menu.is-keyboard-nav .app-context-menu__item.is-focused:not(:disabled),
+.app-context-menu.is-keyboard-nav .app-context-menu__item:focus-visible {
   background: rgba(var(--color-accent-rgb, 45, 127, 255), 0.18);
   border-color: var(--color-accent, #2d7fff);
   color: #ffffff;
@@ -101,14 +133,24 @@ html[dir="rtl"] .app-context-menu {
 }
 
 .app-context-menu__item--danger {
-  color: #fca5a5;
+  color: color-mix(in srgb, var(--color-red, #ef4444) 45%, var(--color-text, #f3f4f6));
+}
+
+.app-context-menu__item--danger::before {
+  background-color: var(--color-red, #ef4444);
 }
 
 .app-context-menu:not(.is-keyboard-nav) .app-context-menu__item--danger:hover:not(:disabled),
-.app-context-menu__item--danger:focus-visible {
+.app-context-menu.is-keyboard-nav .app-context-menu__item--danger.is-focused:not(:disabled),
+.app-context-menu.is-keyboard-nav .app-context-menu__item--danger:focus-visible {
   background: rgba(var(--color-red-rgb, 239, 68, 68), 0.16);
   border-color: rgba(var(--color-red-rgb, 239, 68, 68), 0.35);
-  color: #fecaca;
+  color: color-mix(in srgb, var(--color-red, #ef4444) 28%, #ffffff);
+}
+
+.app-context-menu__item--danger:active:not(:disabled) {
+  background: rgba(var(--color-red-rgb, 239, 68, 68), 0.24);
+  border-color: rgba(var(--color-red-rgb, 239, 68, 68), 0.48);
 }
 
 .app-context-menu__icon {
@@ -120,14 +162,18 @@ html[dir="rtl"] .app-context-menu {
 }
 
 .app-context-menu:not(.is-keyboard-nav) .app-context-menu__item:hover:not(:disabled) .app-context-menu__icon,
-.app-context-menu__item:focus-visible .app-context-menu__icon {
+.app-context-menu__item:active:not(:disabled) .app-context-menu__icon,
+.app-context-menu.is-keyboard-nav .app-context-menu__item.is-focused:not(:disabled) .app-context-menu__icon,
+.app-context-menu.is-keyboard-nav .app-context-menu__item:focus-visible .app-context-menu__icon {
   color: var(--color-sky, #38bdf8);
 }
 
 .app-context-menu__item--danger .app-context-menu__icon,
 .app-context-menu:not(.is-keyboard-nav) .app-context-menu__item--danger:hover:not(:disabled) .app-context-menu__icon,
-.app-context-menu__item--danger:focus-visible .app-context-menu__icon {
-  color: #f87171;
+.app-context-menu__item--danger:active:not(:disabled) .app-context-menu__icon,
+.app-context-menu.is-keyboard-nav .app-context-menu__item--danger.is-focused:not(:disabled) .app-context-menu__icon,
+.app-context-menu.is-keyboard-nav .app-context-menu__item--danger:focus-visible .app-context-menu__icon {
+  color: color-mix(in srgb, var(--color-red, #ef4444) 78%, #ffffff);
 }
 
 .app-context-menu__label {
@@ -160,6 +206,7 @@ html[dir="rtl"] .app-context-menu {
 @media (prefers-reduced-motion: reduce) {
   .app-context-menu,
   .app-context-menu__item,
+  .app-context-menu__item::before,
   .app-context-menu__icon {
     transition: none !important;
   }

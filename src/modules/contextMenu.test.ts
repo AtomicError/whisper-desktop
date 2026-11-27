@@ -1008,4 +1008,394 @@ describe('contextMenu', () => {
     expect(selPrevented).toBe(true);
     expect(isContextMenuOpen()).toBe(true);
   });
+
+  it('skips buttons inside batch cards, dropzones, and generic selection fallback', () => {
+    // Batch queue card action buttons must not open the file path menu
+    const batchCard = new MockElement('DIV');
+    batchCard.className = 'batch-queue-card';
+    batchCard.dataset.path = '/media/clip.mp4';
+    batchCard.dataset.name = 'clip.mp4';
+    const removeBtn = new MockElement('BUTTON');
+    removeBtn.className = 'btn-batch-action btn-remove-batch';
+    batchCard.appendChild(removeBtn);
+    bodyEl.appendChild(batchCard);
+
+    expect(resolveContextMenuEntries(batchCard as any).length).toBeGreaterThan(0);
+    expect(resolveContextMenuEntries(removeBtn as any)).toEqual([]);
+
+    // Dropzone action buttons (Browse/Clear) must not open file path menu
+    const dz = new MockElement('DIV');
+    dz.id = 'transcribe-drop-zone';
+    dz.className = 'has-file';
+    dz.dataset.filePath = '/media/clip.mp4';
+    const clearBtn = new MockElement('BUTTON');
+    clearBtn.id = 'btn-clear-media';
+    dz.appendChild(clearBtn);
+    bodyEl.appendChild(dz);
+
+    expect(resolveContextMenuEntries(dz as any).length).toBeGreaterThan(0);
+    expect(resolveContextMenuEntries(clearBtn as any)).toEqual([]);
+
+    // Generic selection fallback must not leak onto buttons inside a selected card
+    const tCard = new MockElement('DIV');
+    tCard.className = 'transcript-card';
+    tCard.textContent = 'Selected card snippet';
+    const playBtn = new MockElement('BUTTON');
+    playBtn.className = 'btn-card-action btn-card-play';
+    tCard.appendChild(playBtn);
+    bodyEl.appendChild(tCard);
+
+    selectAllTextInElement(tCard as any);
+    expect(resolveContextMenuEntries(playBtn as any)).toEqual([]);
+  });
+
+  it('restores focus when navigating a mouse-opened menu with keyboard and prevents hover/focus competition', () => {
+    setupContextMenu();
+
+    const triggerBtn = new MockElement('BUTTON');
+    triggerBtn.id = 'trigger-btn';
+    bodyEl.appendChild(triggerBtn);
+    triggerBtn.focus();
+
+    const itemSpy = vi.fn();
+    openContextMenuAt(
+      120,
+      120,
+      [
+        { type: 'item', spec: { id: 'one', label: 'First', icon: 'copy', onSelect: itemSpy } },
+        { type: 'item', spec: { id: 'two', label: 'Second', icon: 'folder', onSelect: vi.fn() } }
+      ],
+      false,
+      triggerBtn as any
+    );
+
+    const menuEl = (document as any).getElementById('app-context-menu');
+    expect(menuEl.classList.contains('is-keyboard-nav')).toBe(false);
+    expect((document as any).activeElement).toBe(triggerBtn);
+
+    // ArrowDown enters keyboard navigation and moves focus into menu item
+    (document as any).dispatchEvent({
+      type: 'keydown',
+      key: 'ArrowDown',
+      preventDefault: vi.fn(),
+      stopPropagation: vi.fn()
+    });
+    const buttons = (document as any).querySelectorAll('.app-context-menu__item');
+    expect(menuEl.classList.contains('is-keyboard-nav')).toBe(true);
+    expect(buttons[0].classList.contains('is-focused')).toBe(true);
+    expect((document as any).activeElement).toBe(buttons[0]);
+
+    // Tab after keyboard navigation stops propagation and restores focus to triggerBtn
+    let tabStopped = false;
+    (document as any).dispatchEvent({
+      type: 'keydown',
+      key: 'Tab',
+      preventDefault: vi.fn(),
+      stopPropagation: () => {
+        tabStopped = true;
+      }
+    });
+    expect(tabStopped).toBe(true);
+    expect(isContextMenuOpen()).toBe(false);
+    expect((document as any).activeElement).toBe(triggerBtn);
+
+    // Re-open with mouse, navigate with ArrowDown, then click via Enter/click -> restores focus
+    openContextMenuAt(
+      140,
+      140,
+      [{ type: 'item', spec: { id: 'one', label: 'First', icon: 'copy', onSelect: itemSpy } }],
+      false,
+      triggerBtn as any
+    );
+    (document as any).dispatchEvent({
+      type: 'keydown',
+      key: 'ArrowDown',
+      preventDefault: vi.fn(),
+      stopPropagation: vi.fn()
+    });
+    const activeBtn = (document as any).querySelector('.app-context-menu__item');
+    activeBtn.click();
+    expect(itemSpy).toHaveBeenCalledTimes(1);
+    expect((document as any).activeElement).toBe(triggerBtn);
+
+    // Synthetic zero-delta mousemove keeps keyboard nav; real pointer movement clears .is-focused & moves focus off item
+    openContextMenuAt(
+      140,
+      140,
+      [{ type: 'item', spec: { id: 'one', label: 'First', icon: 'copy', onSelect: vi.fn() } }],
+      true,
+      triggerBtn as any
+    );
+    const kbdBtn = (document as any).querySelector('.app-context-menu__item');
+    expect(kbdBtn.classList.contains('is-focused')).toBe(true);
+
+    menuEl.dispatchEvent({ type: 'mousemove', clientX: 150, clientY: 150, movementX: 0, movementY: 0 });
+    menuEl.dispatchEvent({ type: 'mousemove', clientX: 150, clientY: 150, movementX: 0, movementY: 0 });
+    expect(menuEl.classList.contains('is-keyboard-nav')).toBe(true);
+
+    menuEl.dispatchEvent({ type: 'mousemove', clientX: 170, clientY: 165, movementX: 20, movementY: 15 });
+    expect(menuEl.classList.contains('is-keyboard-nav')).toBe(false);
+    expect(kbdBtn.classList.contains('is-focused')).toBe(false);
+    expect((document as any).activeElement).toBe(menuEl);
+  });
+
+  it('replays open state cleanly when reopened while already open, clamps zoom bounds, and omits empty log prefix brackets', async () => {
+    setupContextMenu();
+    docEl.style.zoom = '2';
+
+    openContextMenuAt(
+      100,
+      100,
+      [{ type: 'item', spec: { id: 'a', label: 'Alpha', icon: 'copy', onSelect: vi.fn() } }],
+      false
+    );
+    const menuEl = (document as any).getElementById('app-context-menu');
+    expect(menuEl.style.maxWidth).toBe('300px');
+    expect(menuEl.style.maxHeight).toBe('344px');
+
+    // Reopening while already open resets entrance cleanly and preserves transition
+    openContextMenuAt(
+      200,
+      180,
+      [{ type: 'item', spec: { id: 'b', label: 'Beta', icon: 'copy', onSelect: vi.fn() } }],
+      false
+    );
+    expect(menuEl.classList.contains('open')).toBe(true);
+    expect(menuEl.style.transition).toBe('');
+    docEl.style.zoom = '';
+
+    // Log line without timestamp should not emit empty '[]'
+    const logVp = new MockElement('DIV');
+    logVp.id = 'log-viewport';
+    const logLine = new MockElement('DIV');
+    logLine.className = 'log-line';
+    logLine.dataset.category = 'App';
+    const msg = new MockElement('SPAN');
+    msg.className = 'log-msg';
+    msg.textContent = 'Ready';
+    logLine.appendChild(msg);
+    logVp.appendChild(logLine);
+    bodyEl.appendChild(logVp);
+
+    const entries = resolveContextMenuEntries(msg as any);
+    const copyLine = entries.find(e => e.type === 'item' && e.spec.id === 'logs-copy-line') as any;
+    await copyLine.spec.onSelect();
+    expect(copySpy).toHaveBeenCalledWith('[App] Ready');
+  });
+
+  it('handles Shift+F10 selection fallback when a button holds focus, survives live transcript auto-scroll, skips hiding toasts, and avoids mouse focus hijack', () => {
+    setupContextMenu();
+
+    // 1. Focus on an unrelated button (e.g. modal OK button) while text in modal details is selected
+    const okBtn = new MockElement('BUTTON');
+    okBtn.id = 'app-modal-ok-btn';
+    const detailsBox = new MockElement('PRE');
+    detailsBox.id = 'app-modal-details';
+    detailsBox.textContent = 'Detailed error trace line';
+    bodyEl.appendChild(detailsBox);
+    bodyEl.appendChild(okBtn);
+    okBtn.focus();
+    selectAllTextInElement(detailsBox as any);
+
+    let fallbackPrevented = false;
+    handleContextMenuShortcut({
+      defaultPrevented: false,
+      key: 'F10',
+      shiftKey: true,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+      target: okBtn,
+      preventDefault: () => {
+        fallbackPrevented = true;
+      },
+      stopPropagation: vi.fn()
+    } as any);
+    expect(fallbackPrevented).toBe(true);
+    expect(isContextMenuOpen()).toBe(true);
+    const modalMenuIds = (document as any)
+      .querySelectorAll('.app-context-menu__item')
+      .map((el: any) => el.dataset.menuId);
+    expect(modalMenuIds).toContain('copy-selection');
+    expect(modalMenuIds).toContain('modal-copy-message');
+    closeContextMenu({ restoreFocus: true });
+
+    // 2. Live transcription auto-scroll inside #transcript-viewport keeps menu open, while wheel closes it
+    const transcriptVp = new MockElement('DIV');
+    transcriptVp.id = 'transcript-viewport';
+    const tCard = new MockElement('DIV');
+    tCard.className = 'transcript-card';
+    const tTimeWrap = new MockElement('DIV');
+    tTimeWrap.className = 'transcript-card-time';
+    const tTimeSpan = new MockElement('SPAN');
+    tTimeSpan.textContent = '00:01 - 00:03';
+    tTimeWrap.appendChild(tTimeSpan);
+    tCard.appendChild(tTimeWrap);
+    transcriptVp.appendChild(tCard);
+    bodyEl.appendChild(transcriptVp);
+
+    handleGlobalContextMenu({
+      defaultPrevented: false,
+      target: tTimeSpan,
+      clientX: 160,
+      clientY: 160,
+      preventDefault: vi.fn()
+    } as any);
+    expect(isContextMenuOpen()).toBe(true);
+    (document as any).dispatchEvent({ type: 'scroll', target: transcriptVp });
+    expect(isContextMenuOpen()).toBe(true);
+    (document as any).dispatchEvent({ type: 'wheel', target: transcriptVp });
+    expect(isContextMenuOpen()).toBe(false);
+
+    // 3. Toast already fading out (.hide) must not open a context menu or get paused
+    const hidingToast = new MockElement('DIV') as any;
+    hidingToast.className = 'toast-notification hide';
+    const hidingMsg = new MockElement('DIV');
+    hidingMsg.className = 'toast-message';
+    hidingMsg.textContent = 'Dismissing toast';
+    hidingToast.appendChild(hidingMsg);
+    bodyEl.appendChild(hidingToast);
+    expect(resolveContextMenuEntries(hidingMsg as any)).toEqual([]);
+
+    // 4. Mouse-opened -> ArrowDown -> mousemove back to pointer -> mouse click must NOT hijack focus back
+    const outsideBtn = new MockElement('BUTTON');
+    outsideBtn.id = 'outside-focus-btn';
+    const anotherBtn = new MockElement('BUTTON');
+    anotherBtn.id = 'another-btn';
+    bodyEl.appendChild(outsideBtn);
+    bodyEl.appendChild(anotherBtn);
+    outsideBtn.focus();
+
+    const mouseActionSpy = vi.fn();
+    openContextMenuAt(
+      140,
+      140,
+      [{ type: 'item', spec: { id: 'mouse-act', label: 'Action', icon: 'copy', onSelect: mouseActionSpy } }],
+      false,
+      anotherBtn as any
+    );
+    const menuEl = (document as any).getElementById('app-context-menu');
+
+    (document as any).dispatchEvent({
+      type: 'keydown',
+      key: 'ArrowDown',
+      preventDefault: vi.fn(),
+      stopPropagation: vi.fn()
+    });
+    expect(menuEl.classList.contains('is-keyboard-nav')).toBe(true);
+
+    // Move mouse back onto menu -> exits keyboard nav & clears _keyboardFocusActive
+    menuEl.dispatchEvent({ type: 'mousemove', clientX: 175, clientY: 160, movementX: 12, movementY: 8 });
+    expect(menuEl.classList.contains('is-keyboard-nav')).toBe(false);
+    expect((document as any).activeElement).toBe(menuEl);
+
+    const itemBtn = (document as any).querySelector('.app-context-menu__item');
+    itemBtn.dispatchEvent({ type: 'click', target: itemBtn, detail: 1, stopPropagation: vi.fn(), preventDefault: vi.fn() });
+    expect(mouseActionSpy).toHaveBeenCalledTimes(1);
+    expect((document as any).activeElement).not.toBe(outsideBtn);
+  });
+
+  it('contains keyboard modality (ArrowLeft/Right, Space/Enter, single-key hotkeys), supports type-ahead, and keeps scrollbar draggable', () => {
+    setupContextMenu();
+
+    const bgBtn = new MockElement('BUTTON');
+    bgBtn.id = 'bg-action-btn';
+    bodyEl.appendChild(bgBtn);
+    bgBtn.focus();
+
+    const copySpyAction = vi.fn();
+    const folderSpyAction = vi.fn();
+    openContextMenuAt(
+      120,
+      120,
+      [
+        { type: 'item', spec: { id: 'copy-item', label: 'Copy Line', icon: 'copy', onSelect: copySpyAction } },
+        { type: 'item', spec: { id: 'copy-all', label: 'Copy All', icon: 'clipboardList', onSelect: vi.fn() } },
+        { type: 'item', spec: { id: 'open-dir', label: 'Open Folder', icon: 'folder', onSelect: folderSpyAction } }
+      ],
+      false
+    );
+
+    const menuEl = (document as any).getElementById('app-context-menu');
+
+    // ArrowLeft/Right and single-key hotkeys (e.g. '?') must not leak behind open menu
+    const arrowLeftEv = { type: 'keydown', key: 'ArrowLeft', preventDefault: vi.fn(), stopPropagation: vi.fn() };
+    (document as any).dispatchEvent(arrowLeftEv);
+    expect(arrowLeftEv.preventDefault).toHaveBeenCalledTimes(1);
+    expect(arrowLeftEv.stopPropagation).toHaveBeenCalledTimes(1);
+    expect(isContextMenuOpen()).toBe(true);
+
+    const helpKeyEv = { type: 'keydown', key: '?', ctrlKey: false, metaKey: false, altKey: false, preventDefault: vi.fn(), stopPropagation: vi.fn() };
+    (document as any).dispatchEvent(helpKeyEv);
+    expect(helpKeyEv.preventDefault).toHaveBeenCalledTimes(1);
+    expect(helpKeyEv.stopPropagation).toHaveBeenCalledTimes(1);
+    expect(isContextMenuOpen()).toBe(true);
+
+    // Ctrl+C must pass through unblocked while menu is open
+    const ctrlCEv = { type: 'keydown', key: 'c', ctrlKey: true, metaKey: false, altKey: false, preventDefault: vi.fn(), stopPropagation: vi.fn() };
+    (document as any).dispatchEvent(ctrlCEv);
+    expect(ctrlCEv.stopPropagation).not.toHaveBeenCalled();
+
+    // First-letter type-ahead jumps between matching items ('o' -> Open Folder, 'c' -> Copy Line -> Copy All)
+    const buttons = (document as any).querySelectorAll('.app-context-menu__item');
+    (document as any).dispatchEvent({ type: 'keydown', key: 'o', ctrlKey: false, metaKey: false, altKey: false, preventDefault: vi.fn(), stopPropagation: vi.fn() });
+    expect((document as any).activeElement).toBe(buttons[2]);
+    expect(menuEl.classList.contains('is-keyboard-nav')).toBe(true);
+
+    (document as any).dispatchEvent({ type: 'keydown', key: 'c', ctrlKey: false, metaKey: false, altKey: false, preventDefault: vi.fn(), stopPropagation: vi.fn() });
+    expect((document as any).activeElement).toBe(buttons[0]);
+    (document as any).dispatchEvent({ type: 'keydown', key: 'c', ctrlKey: false, metaKey: false, altKey: false, preventDefault: vi.fn(), stopPropagation: vi.fn() });
+    expect((document as any).activeElement).toBe(buttons[1]);
+
+    // Space when mouse-opened (focus outside menu) closes menu and stops propagation so bgBtn/player is not triggered
+    openContextMenuAt(
+      120,
+      120,
+      [{ type: 'item', spec: { id: 'copy-item', label: 'Copy Line', icon: 'copy', onSelect: copySpyAction } }],
+      false
+    );
+    bgBtn.focus();
+    const spaceBgEv = { type: 'keydown', key: ' ', code: 'Space', preventDefault: vi.fn(), stopPropagation: vi.fn() };
+    (document as any).dispatchEvent(spaceBgEv);
+    expect(spaceBgEv.preventDefault).toHaveBeenCalledTimes(1);
+    expect(spaceBgEv.stopPropagation).toHaveBeenCalledTimes(1);
+    expect(isContextMenuOpen()).toBe(false);
+    expect(copySpyAction).not.toHaveBeenCalled();
+
+    // Enter when an item IS focused executes that item and stops propagation
+    openContextMenuAt(
+      120,
+      120,
+      [{ type: 'item', spec: { id: 'copy-item', label: 'Copy Line', icon: 'copy', onSelect: copySpyAction } }],
+      true
+    );
+    const enterItemEv = { type: 'keydown', key: 'Enter', preventDefault: vi.fn(), stopPropagation: vi.fn() };
+    (document as any).dispatchEvent(enterItemEv);
+    expect(enterItemEv.preventDefault).toHaveBeenCalledTimes(1);
+    expect(enterItemEv.stopPropagation).toHaveBeenCalledTimes(1);
+    expect(copySpyAction).toHaveBeenCalledTimes(1);
+    expect(isContextMenuOpen()).toBe(false);
+
+    // Scrollbar mousedown on overflowed menu container is not blocked, while item mousedown preserves selection
+    openContextMenuAt(
+      120,
+      120,
+      [{ type: 'item', spec: { id: 'copy-item', label: 'Copy Line', icon: 'copy', onSelect: vi.fn() } }],
+      false
+    );
+    menuEl.clientWidth = 200;
+    menuEl.clientLeft = 1;
+    menuEl.clientHeight = 140;
+    menuEl.scrollHeight = 280;
+    menuEl.getBoundingClientRect = () => ({ left: 100, top: 100, width: 210, height: 140 });
+
+    const scrollbarDown = { type: 'mousedown', target: menuEl, clientX: 306, preventDefault: vi.fn(), stopPropagation: vi.fn() };
+    menuEl.dispatchEvent(scrollbarDown);
+    expect(scrollbarDown.preventDefault).not.toHaveBeenCalled();
+
+    const firstItem = (document as any).querySelector('.app-context-menu__item');
+    const itemDown = { type: 'mousedown', target: firstItem, clientX: 150, preventDefault: vi.fn(), stopPropagation: vi.fn() };
+    firstItem.dispatchEvent(itemDown);
+    expect(itemDown.preventDefault).toHaveBeenCalledTimes(1);
+  });
 });

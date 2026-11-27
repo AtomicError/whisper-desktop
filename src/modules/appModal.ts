@@ -53,6 +53,13 @@ export function formatToastMessage(text: string | null | undefined): string | nu
   }).join('\n');
 }
 
+interface ManagedToastElement extends HTMLDivElement {
+  _rawMessage?: string;
+  _restartTimer?: (newDuration: number) => void;
+  _pauseForContextMenu?: () => void;
+  _resumeAfterContextMenu?: () => void;
+}
+
 export function showNotification(
   message: any,
   type = 'info',
@@ -79,10 +86,10 @@ export function showNotification(
 
   // Smart Deduplication
   const existingToasts = container.querySelectorAll('.toast-notification');
-  for (const existing of Array.from(existingToasts) as any[]) {
+  for (const existing of Array.from(existingToasts) as ManagedToastElement[]) {
     const msgEl = existing.querySelector('.toast-message');
     const existingRaw = existing._rawMessage;
-    const existingText = msgEl ? msgEl.textContent.replace(/\u00A0/g, ' ').trim() : '';
+    const existingText = msgEl ? (msgEl.textContent || '').replace(/\u00A0/g, ' ').trim() : '';
     if ((existingRaw === cleanMsg || existingText === cleanNormalized) && !existing.classList.contains('hide')) {
       existing.style.animation = 'none';
       void existing.offsetWidth; // trigger reflow
@@ -94,7 +101,7 @@ export function showNotification(
     }
   }
 
-  const toast = document.createElement('div') as any;
+  const toast = document.createElement('div') as ManagedToastElement;
   toast.className = `toast-notification toast-${type}`;
   toast._rawMessage = cleanMsg;
   
@@ -164,6 +171,7 @@ export function showNotification(
   
   let timerId: any = null;
   let startTime = Date.now();
+  let activeDuration = duration;
   let remainingTime = duration;
   let isPaused = false;
   
@@ -179,10 +187,32 @@ export function showNotification(
     }, 400);
   };
   
+  const isInteractionHeld = (): boolean =>
+    toast.dataset?.contextMenuActive === 'true' ||
+    (typeof toast.matches === 'function' && toast.matches(':hover'));
+
   const startTimer = (dur = remainingTime) => {
+    activeDuration = dur;
     if (dur <= 0 || dur === Infinity) return;
+    if (progressBar) {
+      progressBar.style.display = '';
+    }
     startTime = Date.now();
     remainingTime = dur;
+    if (timerId) {
+      clearTimeout(timerId);
+      timerId = null;
+    }
+
+    if (isInteractionHeld()) {
+      isPaused = true;
+      if (progressBar) {
+        progressBar.style.transition = 'none';
+        progressBar.style.width = '100%';
+      }
+      return;
+    }
+
     isPaused = false;
     if (progressBar) {
       progressBar.style.transition = 'none';
@@ -191,17 +221,16 @@ export function showNotification(
       progressBar.style.transition = `width ${dur}ms linear`;
       progressBar.style.width = '0%';
     }
-    if (timerId) clearTimeout(timerId);
     timerId = setTimeout(closeToast, dur);
   };
   
   const pauseTimer = () => {
-    if (duration <= 0 || duration === Infinity || isPaused) return;
+    if (activeDuration <= 0 || activeDuration === Infinity || isPaused) return;
     isPaused = true;
     clearTimeout(timerId);
     remainingTime -= (Date.now() - startTime);
     if (remainingTime < 0) remainingTime = 0;
-    if (progressBar) {
+    if (progressBar && typeof getComputedStyle === 'function') {
       const computedWidth = getComputedStyle(progressBar).width;
       progressBar.style.transition = 'none';
       progressBar.style.width = computedWidth;
@@ -209,11 +238,12 @@ export function showNotification(
   };
 
   const resumeTimer = () => {
-    if (duration <= 0 || duration === Infinity || !isPaused) return;
+    if (activeDuration <= 0 || activeDuration === Infinity || !isPaused) return;
     isPaused = false;
     if (remainingTime > 0) {
       startTime = Date.now();
       if (progressBar) {
+        void progressBar.offsetWidth; // commit paused/reset width before starting linear shrink
         progressBar.style.transition = `width ${remainingTime}ms linear`;
         progressBar.style.width = '0%';
       }

@@ -307,6 +307,61 @@ describe('appModal & Feedback Module', () => {
       expect(tech?.textContent).toBe('Technical error detail line');
       expect(tech?.getAttribute('dir')).toBe('ltr');
     });
+
+    it('keeps deduplicated toast paused while a context menu is active on it', () => {
+      vi.useFakeTimers();
+      try {
+        showNotification('Persistent message', 'info', 2000);
+        vi.advanceTimersByTime(50);
+
+        const container = (globalThis as any).document.getElementById('toast-container');
+        const toast = container?.querySelector('.toast-notification') as any;
+        expect(toast).not.toBeNull();
+
+        toast.dataset.contextMenuActive = 'true';
+        toast._pauseForContextMenu();
+
+        // Duplicate notification restarts timer, which must remain paused while contextMenuActive is true
+        showNotification('Persistent message', 'info', 2000);
+        vi.advanceTimersByTime(5000);
+        expect(toast.classList.contains('hide')).toBe(false);
+
+        // Once context menu closes, toast resumes and dismisses after remaining duration
+        delete toast.dataset.contextMenuActive;
+        toast._resumeAfterContextMenu();
+        vi.advanceTimersByTime(2100);
+        expect(toast.classList.contains('hide')).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('pauses and resumes correctly when a deduplicated toast updates duration from Infinity to finite', () => {
+      vi.useFakeTimers();
+      try {
+        showNotification('Upgradeable toast', 'info', Infinity);
+        vi.advanceTimersByTime(50);
+
+        const container = (globalThis as any).document.getElementById('toast-container');
+        const toast = container?.querySelector('.toast-notification') as any;
+        expect(toast).not.toBeNull();
+
+        showNotification('Upgradeable toast', 'info', 1500);
+        const progressBar = toast.querySelector('.toast-progress-bar') as HTMLElement | null;
+        expect(progressBar?.style.display).toBe('');
+        toast.dataset.contextMenuActive = 'true';
+        toast._pauseForContextMenu();
+        vi.advanceTimersByTime(3000);
+        expect(toast.classList.contains('hide')).toBe(false);
+
+        delete toast.dataset.contextMenuActive;
+        toast._resumeAfterContextMenu();
+        vi.advanceTimersByTime(1600);
+        expect(toast.classList.contains('hide')).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   describe('_trapModalFocus accessibility helper', () => {
