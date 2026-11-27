@@ -345,11 +345,22 @@
 
 /* 11. Studio Workspaces (Transcribe & Translate) Layout Stacking (Screens <= 1024px) */
 @media (max-width: 1024px) {
+  #panel-translate,
+  #panel-transcribe {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch;
+  }
   .translate-layout,
   .transcribe-layout {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+    grid-template-columns: none;
     height: auto;
-    overflow-y: auto;
+    min-height: min-content;
+    overflow: visible;
+    gap: 20px;
+    flex: none;
   }
   .transcribe-layout-resizer {
     display: none !important;
@@ -357,7 +368,9 @@
   .translate-left-panel,
   .transcribe-left-panel {
     height: auto;
+    min-height: min-content;
     overflow: visible;
+    flex: none;
   }
   .transcribe-unified-deck,
   .translate-unified-deck,
@@ -375,14 +388,18 @@
     max-height: 360px;
   }
   .translate-right-panel {
+    flex: none;
     height: 540px;
     max-height: 70vh;
     min-height: 420px;
     overflow: hidden;
   }
   .transcribe-right-panel {
+    flex: none;
     height: auto;
     min-height: 480px;
+    overflow: visible;
+    contain: none;
   }
   .translate-preview-card {
     height: 100%;

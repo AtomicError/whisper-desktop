@@ -3626,6 +3626,21 @@ describe('Phase 2 Translation Setup parity controls', () => {
       cleanup();
     }
   });
+
+  it('stacks Translation Studio panels sequentially without overlap on <=1024px viewports', () => {
+    const responsiveCss = loadSourceFile('styles/base/responsive.css');
+    const scrollbarsCss = loadSourceFile('styles/base/scrollbars.css');
+
+    const blockIdx = responsiveCss.indexOf('@media (max-width: 1024px)');
+    expect(blockIdx).toBeGreaterThan(-1);
+    const stackedBlock = responsiveCss.slice(blockIdx);
+
+    expect(stackedBlock).toMatch(/#panel-translate[\s\S]*?overflow-y:\s*auto/);
+    expect(stackedBlock).toMatch(/\.translate-layout[\s\S]*?display:\s*flex;[\s\S]*?flex-direction:\s*column;[\s\S]*?min-height:\s*min-content;[\s\S]*?flex:\s*none;/);
+    expect(stackedBlock).toMatch(/\.translate-left-panel[\s\S]*?min-height:\s*min-content;[\s\S]*?overflow:\s*visible;[\s\S]*?flex:\s*none;/);
+    expect(stackedBlock).toMatch(/\.translate-right-panel[\s\S]*?flex:\s*none;/);
+    expect(scrollbarsCss).toContain('#panel-translate::-webkit-scrollbar');
+  });
 });
 
 
