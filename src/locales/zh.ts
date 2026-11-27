@@ -1373,6 +1373,8 @@ export const zh: Translations = {
     clearLogs: '清空日志',
     copyPath: '复制路径',
     copyFileName: '复制文件名',
+    openContainingFolder: '打开所在文件夹',
+    openOutputFolder: '打开输出文件夹',
     copySegment: '复制片段文本',
     copySubtitle: '复制字幕文本',
     copyTimestamp: '复制时间戳',

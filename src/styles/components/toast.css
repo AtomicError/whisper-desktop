@@ -47,6 +47,8 @@
   word-break: normal;
   text-wrap: pretty;
   text-wrap: balance;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .toast-title {
@@ -55,6 +57,8 @@
   line-height: 1.45;
   text-wrap: pretty;
   text-wrap: balance;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .toast-tech-detail {

@@ -1378,6 +1378,8 @@ export const de: Translations = {
     clearLogs: 'Protokolle löschen',
     copyPath: 'Pfad kopieren',
     copyFileName: 'Dateinamen kopieren',
+    openContainingFolder: 'Enthaltenden Ordner öffnen',
+    openOutputFolder: 'Ausgabeordner öffnen',
     copySegment: 'Segmenttext kopieren',
     copySubtitle: 'Untertiteltext kopieren',
     copyTimestamp: 'Zeitstempel kopieren',

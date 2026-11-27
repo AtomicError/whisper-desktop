@@ -1378,6 +1378,8 @@ export const ja: Translations = {
     clearLogs: 'ログをクリア',
     copyPath: 'パスをコピー',
     copyFileName: 'ファイル名をコピー',
+    openContainingFolder: '保存先フォルダを開く',
+    openOutputFolder: '出力フォルダを開く',
     copySegment: 'セグメントテキストをコピー',
     copySubtitle: '字幕テキストをコピー',
     copyTimestamp: 'タイムスタンプをコピー',

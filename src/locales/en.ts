@@ -1378,6 +1378,8 @@ export const en = {
     clearLogs: 'Clear Logs',
     copyPath: 'Copy Path',
     copyFileName: 'Copy File Name',
+    openContainingFolder: 'Open Containing Folder',
+    openOutputFolder: 'Open Output Folder',
     copySegment: 'Copy Segment Text',
     copySubtitle: 'Copy Subtitle Text',
     copyTimestamp: 'Copy Timestamp',

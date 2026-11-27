@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { setLanguage } from '../i18n/index';
+import { setLanguage, t } from '../i18n/index';
 import {
   _resetContextMenuForTest,
   closeContextMenu,
   getActiveSelectionTextForTarget,
+  handleContextMenuShortcut,
   handleGlobalContextMenu,
   isContextMenuOpen,
   isNativeEditableTarget,
@@ -45,6 +46,8 @@ class MockElement {
   public disabled = false;
   public isContentEditable = false;
   public tabIndex = 0;
+  public offsetWidth = 210;
+  public offsetHeight = 140;
   public nodeType = 1;
   public dataset: Record<string, string> = {};
   public style: Record<string, string> = {};
@@ -436,12 +439,68 @@ describe('contextMenu', () => {
       'file-copy-name',
       'file-open-folder'
     ]);
+    const openItem = entries.find(e => e.type === 'item' && e.spec.id === 'file-open-folder') as any;
+    expect(openItem.spec.label).toBe(t('contextMenu.openContainingFolder'));
+    expect(openItem.spec.label).not.toBe('transcribe.openOutputFolder');
 
     await (entries[0] as any).spec.onSelect();
     expect(copySpy).toHaveBeenCalledWith('/media/demo/interview.mp4');
 
     dz.classList.add('is-batch-summary');
     expect(resolveContextMenuEntries(lblPath as any)).toEqual([]);
+  });
+
+  it('omits Copy File Name on custom output directories and ignores empty companion placeholder', () => {
+    const outDir = new MockElement('DIV');
+    outDir.id = 'transcribe-output-dir-text';
+    outDir.className = 'has-custom-path';
+    outDir.textContent = '/media/exports';
+    bodyEl.appendChild(outDir);
+
+    const dirEntries = resolveContextMenuEntries(outDir as any);
+    expect(dirEntries.filter(e => e.type === 'item').map(e => (e as any).spec.id)).toEqual([
+      'file-copy-path',
+      'file-open-folder'
+    ]);
+    expect((dirEntries.find(e => e.type === 'item' && e.spec.id === 'file-open-folder') as any).spec.label).toBe(
+      t('contextMenu.openOutputFolder')
+    );
+
+    const compEmpty = new MockElement('SPAN');
+    compEmpty.id = 'companion-meta-filename';
+    compEmpty.textContent = '—';
+    bodyEl.appendChild(compEmpty);
+    expect(resolveContextMenuEntries(compEmpty as any)).toEqual([]);
+  });
+
+  it('matches inline code inside setting-desc-point and detects Mac shortcut hints', () => {
+    const point = new MockElement('SPAN');
+    point.className = 'setting-desc-point';
+    const code = new MockElement('CODE');
+    code.textContent = 'ggml-silero-v6.2.0.bin';
+    point.appendChild(code);
+    bodyEl.appendChild(point);
+
+    const entries = resolveContextMenuEntries(code as any);
+    expect(entries.filter(e => e.type === 'item').map(e => (e as any).spec.id)).toEqual([
+      'settings-copy-code'
+    ]);
+
+    const origNav = (globalThis as any).navigator;
+    Object.defineProperty(globalThis, 'navigator', {
+      value: { platform: 'MacIntel', userAgent: 'Mozilla/5.0 (Macintosh)' },
+      configurable: true
+    });
+    try {
+      selectionState = { text: 'ggml-silero', ancestor: code };
+      const macEntries = resolveContextMenuEntries(code as any);
+      expect((macEntries[0] as any).spec.shortcutHint).toBe('⌘C');
+    } finally {
+      Object.defineProperty(globalThis, 'navigator', {
+        value: origNav,
+        configurable: true
+      });
+    }
   });
 
   it('resolves transcript confidence view, translate cues, hardsub FFmpeg preview, modals, and toasts', async () => {
@@ -599,7 +658,7 @@ describe('contextMenu', () => {
     expect(isContextMenuOpen()).toBe(true);
 
     const menuEl = (document as any).getElementById('app-context-menu');
-    expect(menuEl.getAttribute('aria-label')).toBe('منوی کلیک راست');
+    expect(menuEl.getAttribute('aria-label')).toBe('منوی زمینه');
     expect(menuEl.textContent).toContain('کپی پیام');
 
     (document as any).dispatchEvent({
@@ -689,5 +748,67 @@ describe('contextMenu', () => {
       stopPropagation: vi.fn()
     });
     expect((document as any).activeElement).toBe(buttons[1]);
+  });
+
+  it('normalizes position for CSS zoom, flips transform-origin at edges, and supports Shift+F10 keyboard menu', () => {
+    setupContextMenu();
+    docEl.style.zoom = '1.25';
+
+    // Simulate near-bottom-right corner click in zoomed coordinates
+    openContextMenuAt(
+      1260,
+      710,
+      [{ type: 'item', spec: { id: 'one', label: 'Action', icon: 'copy', onSelect: vi.fn() } }],
+      false
+    );
+    const menuEl = (document as any).getElementById('app-context-menu');
+    expect(menuEl.style.transformOrigin).toBe('bottom right');
+    expect(parseInt(menuEl.style.left, 10)).toBeLessThanOrEqual(Math.round(1280 / 1.25) - 210);
+    expect(parseInt(menuEl.style.top, 10)).toBeLessThanOrEqual(Math.round(720 / 1.25) - 140);
+    closeContextMenu();
+    docEl.style.zoom = '';
+
+    // Shift+F10 on a focusable modal details box opens menu with keyboard focus and Tab restores focus
+    const details = new MockElement('PRE');
+    details.id = 'app-modal-details';
+    details.tabIndex = 0;
+    details.textContent = 'Detailed stack trace';
+    details.getBoundingClientRect = () => ({ width: 300, height: 80, top: 100, left: 50, right: 350, bottom: 180 } as any);
+    bodyEl.appendChild(details);
+    details.focus();
+
+    let prevented = false;
+    handleContextMenuShortcut({
+      defaultPrevented: false,
+      key: 'F10',
+      shiftKey: true,
+      ctrlKey: false,
+      metaKey: false,
+      altKey: false,
+      target: details,
+      preventDefault: () => {
+        prevented = true;
+      },
+      stopPropagation: vi.fn()
+    } as any);
+
+    expect(prevented).toBe(true);
+    expect(isContextMenuOpen()).toBe(true);
+    const firstItem = (document as any).querySelector('.app-context-menu__item');
+    expect((document as any).activeElement).toBe(firstItem);
+
+    // Tab while opened by keyboard closes menu and restores focus to triggering element
+    let tabPrevented = false;
+    (document as any).dispatchEvent({
+      type: 'keydown',
+      key: 'Tab',
+      preventDefault: () => {
+        tabPrevented = true;
+      },
+      stopPropagation: vi.fn()
+    });
+    expect(tabPrevented).toBe(true);
+    expect(isContextMenuOpen()).toBe(false);
+    expect((document as any).activeElement).toBe(details);
   });
 });

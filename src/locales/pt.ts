@@ -1373,6 +1373,8 @@ export const pt: Translations = {
     clearLogs: 'Limpar registros',
     copyPath: 'Copiar caminho',
     copyFileName: 'Copiar nome do arquivo',
+    openContainingFolder: 'Abrir pasta do arquivo',
+    openOutputFolder: 'Abrir pasta de saída',
     copySegment: 'Copiar texto do segmento',
     copySubtitle: 'Copiar texto da legenda',
     copyTimestamp: 'Copiar carimbo de tempo',

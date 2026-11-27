@@ -197,7 +197,17 @@ function normalizeMenuEntries(entries: ContextMenuEntry[]): ContextMenuEntry[] {
   return result;
 }
 
-function addSelectionCopyEntry(entries: ContextMenuEntry[], selectedText: string, shortcutHint = 'Ctrl+C'): void {
+function getCopyShortcutHint(): string {
+  if (typeof navigator !== 'undefined') {
+    const platform = `${(navigator as any).userAgentData?.platform || ''} ${navigator.platform || ''} ${navigator.userAgent || ''}`;
+    if (/\b(Mac|Macintosh|MacIntel|iPhone|iPad|iPod)\b/i.test(platform)) {
+      return '⌘C';
+    }
+  }
+  return 'Ctrl+C';
+}
+
+function addSelectionCopyEntry(entries: ContextMenuEntry[], selectedText: string, shortcutHint = getCopyShortcutHint()): void {
   if (!selectedText) return;
   entries.push({
     type: 'item',
@@ -279,13 +289,15 @@ function buildFilePathEntries(
   name: string,
   selectedText: string,
   openFolderLabel: string,
-  openAction: () => void | Promise<void>
+  openAction: () => void | Promise<void>,
+  options?: { isDirectory?: boolean }
 ): ContextMenuEntry[] {
   const entries: ContextMenuEntry[] = [];
   addSelectionCopyEntry(entries, selectedText);
 
+  const isDirectory = Boolean(options?.isDirectory);
   const cleanPath = stripBidiMarks(path);
-  const cleanName = stripBidiMarks(name) || (cleanPath ? getBasename(cleanPath) : '');
+  const cleanName = isDirectory ? '' : (stripBidiMarks(name) || (cleanPath ? getBasename(cleanPath) : ''));
 
   if (cleanPath) {
     entries.push({
@@ -298,7 +310,7 @@ function buildFilePathEntries(
       }
     });
   }
-  if (cleanName && cleanName !== cleanPath) {
+  if (!isDirectory && cleanName && cleanName !== cleanPath) {
     entries.push({
       type: 'item',
       spec: {
@@ -325,6 +337,37 @@ function buildFilePathEntries(
   return normalizeMenuEntries(entries);
 }
 
+interface DropzoneFileSpec {
+  selector: string;
+  pathLabelId: string;
+  nameLabelId: string;
+  excludeClass?: string;
+}
+
+const DROPZONE_FILE_SPECS: DropzoneFileSpec[] = [
+  {
+    selector: '#transcribe-drop-zone',
+    pathLabelId: 'lbl-file-path',
+    nameLabelId: 'lbl-file-name',
+    excludeClass: 'is-batch-summary'
+  },
+  {
+    selector: '#translate-drop-zone',
+    pathLabelId: 'lbl-translate-sub-path',
+    nameLabelId: 'lbl-translate-sub-name'
+  },
+  {
+    selector: '#hardsub-video-drop-zone',
+    pathLabelId: 'lbl-hardsub-video-path',
+    nameLabelId: 'lbl-hardsub-video-name'
+  },
+  {
+    selector: '#hardsub-sub-drop-zone',
+    pathLabelId: 'lbl-hardsub-sub-path',
+    nameLabelId: 'lbl-hardsub-sub-name'
+  }
+];
+
 function buildFilesAndPathsEntries(target: HTMLElement, selectedText: string): ContextMenuEntry[] | null {
   // 1. Batch Queue Cards
   const batchCard = target.closest('.batch-queue-card') as HTMLElement | null;
@@ -336,99 +379,54 @@ function buildFilesAndPathsEntries(target: HTMLElement, selectedText: string): C
         path,
         name,
         selectedText,
-        t('transcribe.openOutputFolder'),
+        t('contextMenu.openContainingFolder'),
         () => showInFolder(path)
       );
     }
   }
 
-  // 2. Transcribe Single-File Dropzone
-  const transcribeDrop = target.closest('#transcribe-drop-zone') as HTMLElement | null;
-  if (transcribeDrop && transcribeDrop.classList.contains('has-file') && !transcribeDrop.classList.contains('is-batch-summary')) {
-    const lblPath = document.getElementById('lbl-file-path')?.textContent;
-    const lblName = document.getElementById('lbl-file-name')?.textContent;
-    const filePath = transcribeDrop.dataset?.filePath || getSelectedMediaFile() || stripBidiMarks(lblPath);
+  // 2. Single-File & Studio Dropzones
+  for (const spec of DROPZONE_FILE_SPECS) {
+    const zone = target.closest(spec.selector) as HTMLElement | null;
+    if (!zone || !zone.classList.contains('has-file')) continue;
+    if (spec.excludeClass && zone.classList.contains(spec.excludeClass)) continue;
+
+    const lblPath = document.getElementById(spec.pathLabelId)?.textContent;
+    const lblName = document.getElementById(spec.nameLabelId)?.textContent;
+    const fallbackMedia = spec.selector === '#transcribe-drop-zone' ? getSelectedMediaFile() : '';
+    const filePath = zone.dataset?.filePath || fallbackMedia || stripBidiMarks(lblPath);
     if (filePath) {
       return buildFilePathEntries(
         filePath,
         stripBidiMarks(lblName) || getBasename(filePath),
         selectedText,
-        t('transcribe.openOutputFolder'),
+        t('contextMenu.openContainingFolder'),
         () => showInFolder(filePath)
       );
     }
   }
 
-  // 3. Translate Subtitle Dropzone
-  const translateDrop = target.closest('#translate-drop-zone') as HTMLElement | null;
-  if (translateDrop && translateDrop.classList.contains('has-file')) {
-    const lblPath = document.getElementById('lbl-translate-sub-path')?.textContent;
-    const lblName = document.getElementById('lbl-translate-sub-name')?.textContent;
-    const subPath = translateDrop.dataset?.filePath || stripBidiMarks(lblPath);
-    if (subPath) {
-      return buildFilePathEntries(
-        subPath,
-        stripBidiMarks(lblName) || getBasename(subPath),
-        selectedText,
-        t('translate.openOutputFolder'),
-        () => showInFolder(subPath)
-      );
-    }
-  }
-
-  // 4. Hardsub Video Dropzone
-  const hardsubVideoDrop = target.closest('#hardsub-video-drop-zone') as HTMLElement | null;
-  if (hardsubVideoDrop && hardsubVideoDrop.classList.contains('has-file')) {
-    const lblPath = document.getElementById('lbl-hardsub-video-path')?.textContent;
-    const lblName = document.getElementById('lbl-hardsub-video-name')?.textContent;
-    const videoPath = hardsubVideoDrop.dataset?.filePath || stripBidiMarks(lblPath);
-    if (videoPath) {
-      return buildFilePathEntries(
-        videoPath,
-        stripBidiMarks(lblName) || getBasename(videoPath),
-        selectedText,
-        t('hardsub.openOutputFolder'),
-        () => showInFolder(videoPath)
-      );
-    }
-  }
-
-  // 5. Hardsub Subtitle Dropzone
-  const hardsubSubDrop = target.closest('#hardsub-sub-drop-zone') as HTMLElement | null;
-  if (hardsubSubDrop && hardsubSubDrop.classList.contains('has-file')) {
-    const lblPath = document.getElementById('lbl-hardsub-sub-path')?.textContent;
-    const lblName = document.getElementById('lbl-hardsub-sub-name')?.textContent;
-    const subPath = hardsubSubDrop.dataset?.filePath || stripBidiMarks(lblPath);
-    if (subPath) {
-      return buildFilePathEntries(
-        subPath,
-        stripBidiMarks(lblName) || getBasename(subPath),
-        selectedText,
-        t('hardsub.openOutputFolder'),
-        () => showInFolder(subPath)
-      );
-    }
-  }
-
-  // 6. Custom Output Directory Readouts
+  // 3. Custom Output Directory Readouts
   const outputDisplay = target.closest('#transcribe-output-dir-text, #translate-output-dir-text, #hardsub-output-dir-text') as HTMLElement | null;
   if (outputDisplay && outputDisplay.classList.contains('has-custom-path')) {
     const dirPath = stripBidiMarks(outputDisplay.textContent);
     if (dirPath) {
-      const openLabel =
-        outputDisplay.id === 'translate-output-dir-text'
-          ? t('translate.openOutputFolder')
-          : outputDisplay.id === 'hardsub-output-dir-text'
-            ? t('hardsub.openOutputFolder')
-            : t('transcribe.openOutputFolder');
-      return buildFilePathEntries(dirPath, '', selectedText, openLabel, () => openFileInEditor(dirPath));
+      return buildFilePathEntries(
+        dirPath,
+        '',
+        selectedText,
+        t('contextMenu.openOutputFolder'),
+        () => openFileInEditor(dirPath),
+        { isDirectory: true }
+      );
     }
   }
 
-  // 7. Companion Media Filename & Timecode
+  // 4. Companion Media Filename & Timecode
   const companionName = target.closest('#companion-meta-filename') as HTMLElement | null;
   if (companionName) {
-    const name = stripBidiMarks(companionName.textContent);
+    const rawName = stripBidiMarks(companionName.textContent);
+    const name = rawName && rawName !== '—' ? rawName : '';
     const fullPath = stripBidiMarks(getCurrentSourceMediaFile());
     if (name || fullPath) {
       const entries: ContextMenuEntry[] = [];
@@ -459,7 +457,7 @@ function buildFilesAndPathsEntries(target: HTMLElement, selectedText: string): C
           type: 'item',
           spec: {
             id: 'companion-open-folder',
-            label: t('transcribe.openOutputFolder'),
+            label: t('contextMenu.openContainingFolder'),
             icon: 'folder',
             onSelect: () => showInFolder(fullPath)
           }
@@ -856,7 +854,7 @@ function buildSettingsAndModelsEntries(target: HTMLElement, selectedText: string
   }
 
   // 3. Inline <code> snippets in settings descriptions
-  const codeEl = target.closest('.setting-desc code') as HTMLElement | null;
+  const codeEl = target.closest('.setting-desc code, .setting-desc-point code, .setting-desc-points code') as HTMLElement | null;
   if (codeEl) {
     const codeText = stripBidiMarks(codeEl.textContent);
     if (codeText) {
@@ -1111,9 +1109,18 @@ export function closeContextMenu(options?: { restoreFocus?: boolean }): void {
   _openedByKeyboard = false;
 }
 
+function getCssZoomFactor(): number {
+  if (typeof document === 'undefined' || !document.documentElement?.style) return 1;
+  const parsed = parseFloat(document.documentElement.style.zoom || '1');
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
+
 function positionMenu(menu: HTMLDivElement, clientX: number, clientY: number): void {
-  const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
-  const vh = typeof window !== 'undefined' ? window.innerHeight : 720;
+  const cssZoom = getCssZoomFactor();
+  const vw = (typeof window !== 'undefined' ? window.innerWidth : 1280) / cssZoom;
+  const vh = (typeof window !== 'undefined' ? window.innerHeight : 720) / cssZoom;
+  const anchorX = clientX / cssZoom;
+  const anchorY = clientY / cssZoom;
 
   menu.style.left = '0px';
   menu.style.top = '0px';
@@ -1121,29 +1128,39 @@ function positionMenu(menu: HTMLDivElement, clientX: number, clientY: number): v
   const rect = typeof menu.getBoundingClientRect === 'function'
     ? menu.getBoundingClientRect()
     : { width: 210, height: 140 };
-  const width = rect.width || 210;
-  const height = rect.height || 140;
+  const width = (menu.offsetWidth && menu.offsetWidth > 0)
+    ? menu.offsetWidth
+    : ((rect.width ? rect.width / cssZoom : 0) || 210);
+  const height = (menu.offsetHeight && menu.offsetHeight > 0)
+    ? menu.offsetHeight
+    : ((rect.height ? rect.height / cssZoom : 0) || 140);
 
   const isRtl =
     (typeof document !== 'undefined' && document.documentElement?.getAttribute('dir') === 'rtl') ||
     isRtlLanguage(getLanguage());
 
-  let x = isRtl ? clientX - width : clientX;
-  let y = clientY;
+  let x = isRtl ? anchorX - width : anchorX;
+  let y = anchorY;
+  let originX: 'left' | 'right' = isRtl ? 'right' : 'left';
+  let originY: 'top' | 'bottom' = 'top';
 
   if (x + width > vw - VIEWPORT_PADDING) {
-    x = Math.max(VIEWPORT_PADDING, clientX - width);
+    x = Math.max(VIEWPORT_PADDING, anchorX - width);
+    originX = 'right';
   }
   if (x < VIEWPORT_PADDING) {
-    x = Math.min(vw - width - VIEWPORT_PADDING, Math.max(VIEWPORT_PADDING, clientX));
+    x = Math.min(vw - width - VIEWPORT_PADDING, Math.max(VIEWPORT_PADDING, anchorX));
+    originX = 'left';
   }
   if (y + height > vh - VIEWPORT_PADDING) {
-    y = Math.max(VIEWPORT_PADDING, clientY - height);
+    y = Math.max(VIEWPORT_PADDING, anchorY - height);
+    originY = 'bottom';
   }
 
   x = Math.max(VIEWPORT_PADDING, Math.min(x, Math.max(VIEWPORT_PADDING, vw - width - VIEWPORT_PADDING)));
   y = Math.max(VIEWPORT_PADDING, Math.min(y, Math.max(VIEWPORT_PADDING, vh - height - VIEWPORT_PADDING)));
 
+  menu.style.transformOrigin = `${originY} ${originX}`;
   menu.style.left = `${Math.round(x)}px`;
   menu.style.top = `${Math.round(y)}px`;
 }
@@ -1275,6 +1292,46 @@ export function handleGlobalContextMenu(e: MouseEvent): void {
   openContextMenuAt(e.clientX, e.clientY, entries, false);
 }
 
+export function handleContextMenuShortcut(e: KeyboardEvent): void {
+  if (e.defaultPrevented) return;
+  const isContextKey = e.key === 'ContextMenu';
+  const isShiftF10 = e.shiftKey && e.key === 'F10' && !e.ctrlKey && !e.metaKey && !e.altKey;
+  if (!isContextKey && !isShiftF10) return;
+
+  const activeFallback = typeof document !== 'undefined' ? document.activeElement : null;
+  const target = (
+    e.target && typeof (e.target as HTMLElement).closest === 'function'
+      ? e.target
+      : activeFallback
+  ) as HTMLElement | null;
+
+  if (!target || isPreservedCustomContextTarget(target) || isNativeEditableTarget(target)) {
+    return;
+  }
+
+  const entries = resolveContextMenuEntries(target);
+  if (entries.length === 0) return;
+
+  e.preventDefault();
+  e.stopPropagation();
+
+  const isRtl =
+    (typeof document !== 'undefined' && document.documentElement?.getAttribute('dir') === 'rtl') ||
+    isRtlLanguage(getLanguage());
+
+  let anchorX = 16;
+  let anchorY = 16;
+  if (typeof target.getBoundingClientRect === 'function') {
+    const rect = target.getBoundingClientRect() as DOMRect;
+    if (rect && (rect.width > 0 || rect.height > 0)) {
+      anchorX = isRtl ? Math.max(8, (rect.right ?? rect.left) - 8) : rect.left + 8;
+      anchorY = Math.max(8, (rect.bottom ?? rect.top) - 4);
+    }
+  }
+
+  openContextMenuAt(anchorX, anchorY, entries, true);
+}
+
 export function setupContextMenu(): void {
   if (_isInitialized || typeof document === 'undefined') return;
   _isInitialized = true;
@@ -1289,7 +1346,10 @@ export function setupContextMenu(): void {
   }, true);
 
   document.addEventListener('keydown', (e: KeyboardEvent) => {
-    if (!isContextMenuOpen()) return;
+    if (!isContextMenuOpen()) {
+      handleContextMenuShortcut(e);
+      return;
+    }
     if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
@@ -1321,7 +1381,10 @@ export function setupContextMenu(): void {
       return;
     }
     if (e.key === 'Tab') {
-      closeContextMenu();
+      if (_openedByKeyboard) {
+        e.preventDefault();
+      }
+      closeContextMenu({ restoreFocus: _openedByKeyboard });
     }
   }, true);
 

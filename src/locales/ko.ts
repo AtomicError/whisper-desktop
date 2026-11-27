@@ -1380,6 +1380,8 @@ export const ko: Translations = {
     clearLogs: '로그 지우기',
     copyPath: '경로 복사',
     copyFileName: '파일 이름 복사',
+    openContainingFolder: '파일 위치 폴더 열기',
+    openOutputFolder: '출력 폴더 열기',
     copySegment: '세그먼트 텍스트 복사',
     copySubtitle: '자막 텍스트 복사',
     copyTimestamp: '타임스탬프 복사',

@@ -1380,6 +1380,8 @@ export const tr: Translations = {
     clearLogs: 'Günlükleri Temizle',
     copyPath: 'Yolu Kopyala',
     copyFileName: 'Dosya Adını Kopyala',
+    openContainingFolder: 'Dosyanın Klasörünü Aç',
+    openOutputFolder: 'Çıktı Klasörünü Aç',
     copySegment: 'Bölüm Metnini Kopyala',
     copySubtitle: 'Altyazı Metnini Kopyala',
     copyTimestamp: 'Zaman Damgasını Kopyala',

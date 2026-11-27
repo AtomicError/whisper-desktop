@@ -1378,6 +1378,8 @@ export const ru: Translations = {
     clearLogs: 'Очистить журнал',
     copyPath: 'Копировать путь',
     copyFileName: 'Копировать имя файла',
+    openContainingFolder: 'Открыть папку с файлом',
+    openOutputFolder: 'Открыть папку вывода',
     copySegment: 'Копировать текст сегмента',
     copySubtitle: 'Копировать текст субтитров',
     copyTimestamp: 'Копировать метку времени',

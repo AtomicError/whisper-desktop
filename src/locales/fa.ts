@@ -1373,13 +1373,15 @@ export const fa: Translations = {
     providersJsonCorrupt: 'فهرست ذخیره‌شده ارائه‌دهندگان هوش مصنوعی نامعتبر بود و قابل خواندن نیست.'
   },
   contextMenu: {
-    menuAria: 'منوی کلیک راست',
+    menuAria: 'منوی زمینه',
     selectAll: 'انتخاب همه',
     copyLine: 'کپی خط گزارش',
     copyAllLogs: 'کپی همهٔ گزارش‌ها',
     clearLogs: 'پاک‌سازی گزارش‌ها',
     copyPath: 'کپی مسیر',
     copyFileName: 'کپی نام فایل',
+    openContainingFolder: 'باز کردن پوشهٔ فایل',
+    openOutputFolder: 'باز کردن پوشهٔ خروجی',
     copySegment: 'کپی متن سگمنت',
     copySubtitle: 'کپی متن زیرنویس',
     copyTimestamp: 'کپی زمان‌بندی',

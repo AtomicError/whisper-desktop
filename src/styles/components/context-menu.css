@@ -15,6 +15,7 @@
   padding: 5px;
   border-radius: var(--radius-lg, 12px);
   background: var(--bg-dropdown, #111427);
+  background: color-mix(in srgb, var(--bg-dropdown, #111427) 92%, transparent);
   background-image: linear-gradient(
     180deg,
     rgba(255, 255, 255, 0.04) 0%,

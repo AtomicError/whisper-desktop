@@ -1378,6 +1378,8 @@ export const ar: Translations = {
     clearLogs: 'مسح السجلات',
     copyPath: 'نسخ المسار',
     copyFileName: 'نسخ اسم الملف',
+    openContainingFolder: 'فتح المجلد الحاوي',
+    openOutputFolder: 'فتح مجلد المخرجات',
     copySegment: 'نسخ نص المقطع',
     copySubtitle: 'نسخ نص الترجمة',
     copyTimestamp: 'نسخ الطابع الزمني',

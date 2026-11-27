@@ -1380,6 +1380,8 @@ export const it: Translations = {
     clearLogs: 'Cancella registri',
     copyPath: 'Copia percorso',
     copyFileName: 'Copia nome file',
+    openContainingFolder: 'Apri cartella contenente',
+    openOutputFolder: 'Apri cartella di output',
     copySegment: 'Copia testo segmento',
     copySubtitle: 'Copia testo sottotitolo',
     copyTimestamp: 'Copia marcatura temporale',
