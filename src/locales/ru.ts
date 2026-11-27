@@ -450,7 +450,6 @@ export const ru: Translations = {
     translationError: 'Ошибка перевода:\n{error}',
     translationCancelledToast: 'AI-перевод был отменен.',
     metaContext: 'Контекст: {ctx}',
-    metaReasoning: 'Рассуждение: {level}',
     warningMissingBaseUrl: 'Не указан Base URL API — Настроить',
     warningMissingApiKey: 'Отсутствует API-ключ — Настроить',
     reasoningOff: 'Выкл',

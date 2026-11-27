@@ -450,7 +450,6 @@ export const tr: Translations = {
     translationError: 'Çeviri başarısız oldu:\n{error}',
     translationCancelledToast: 'Yapay zeka çevirisi iptal edildi.',
     metaContext: 'Bağlam: {ctx}',
-    metaReasoning: 'Akıl Yürütme: {level}',
     warningMissingBaseUrl: 'API Temel URL Eksik — Yapılandır',
     warningMissingApiKey: 'API Anahtarı Eksik — Yapılandır',
     reasoningOff: 'Kapalı',

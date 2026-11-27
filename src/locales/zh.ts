@@ -450,7 +450,6 @@ export const zh: Translations = {
     translationError: '字幕翻译失败:\n{error}',
     translationCancelledToast: '用户已取消本次 AI 字幕翻译。',
     metaContext: '上下文: {ctx}',
-    metaReasoning: '推理深度: {level}',
     warningMissingBaseUrl: '缺少 API 接口地址 — 前往配置',
     warningMissingApiKey: '缺少 API 密钥 — 前往配置',
     reasoningOff: '关闭',

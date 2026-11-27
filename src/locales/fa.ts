@@ -450,7 +450,6 @@ export const fa: Translations = {
     translationError: 'خطا در ترجمه:\n{error}',
     translationCancelledToast: 'عملیات ترجمه لغو شد.',
     metaContext: 'زمینه: {ctx}',
-    metaReasoning: 'استدلال: {level}',
     warningMissingBaseUrl: 'نشانی پایه API تنظیم نشده — پیکربندی',
     warningMissingApiKey: 'کلید API تنظیم نشده — پیکربندی',
     reasoningOff: 'خاموش',

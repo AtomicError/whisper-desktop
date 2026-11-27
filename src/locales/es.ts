@@ -450,7 +450,6 @@ export const es: Translations = {
     translationError: 'Error en la traducción:\n{error}',
     translationCancelledToast: 'La traducción con IA fue cancelada.',
     metaContext: 'Contexto: {ctx}',
-    metaReasoning: 'Razonamiento: {level}',
     warningMissingBaseUrl: 'Falta la URL base de API — Configurar',
     warningMissingApiKey: 'Falta la clave API — Configurar',
     reasoningOff: 'Desactivado',

@@ -312,7 +312,6 @@ export class TranslationStudioController {
   private modelSelect: HTMLSelectElement | null = null;
   private modelMetaRow: HTMLElement | null = null;
   private modelCtxChip: HTMLElement | null = null;
-  private modelReasoningChip: HTMLElement | null = null;
   private providerWarningBtn: HTMLButtonElement | null = null;
   private reasoningGroup: HTMLElement | null = null;
   private reasoningPillsContainer: HTMLElement | null = null;
@@ -485,7 +484,6 @@ export class TranslationStudioController {
     this.modelSelect = document.getElementById('translate-model-select') as HTMLSelectElement;
     this.modelMetaRow = document.getElementById('translate-model-meta-row');
     this.modelCtxChip = document.getElementById('translate-model-ctx-chip');
-    this.modelReasoningChip = document.getElementById('translate-model-reasoning-chip');
     this.providerWarningBtn = document.getElementById('translate-provider-warning-btn') as HTMLButtonElement;
     this.reasoningGroup = document.getElementById('translate-reasoning-group');
     this.reasoningPillsContainer = document.getElementById('translate-reasoning-pills');
@@ -2160,26 +2158,14 @@ export class TranslationStudioController {
     const supportsReasoning = Boolean(provider && model && isModelReasoningSupported(model));
     const activeReasoning = String(model?.reasoning || 'Medium').trim() || 'Medium';
 
-    let hasVisibleMeta = false;
+    let hasWarningRow = false;
     if (this.modelCtxChip) {
       const ctxVal = Number(model?.contextWindow ?? model?.context_window ?? 0);
       if (provider && model && Number.isFinite(ctxVal) && ctxVal > 0) {
         this.modelCtxChip.textContent = t('translate.metaContext', { ctx: formatTokensShort(ctxVal) });
         this.modelCtxChip.style.display = 'inline-flex';
-        hasVisibleMeta = true;
       } else {
         this.modelCtxChip.style.display = 'none';
-      }
-    }
-
-    if (this.modelReasoningChip) {
-      if (supportsReasoning) {
-        const levelLabel = this.getReasoningPillLabel(activeReasoning);
-        this.modelReasoningChip.textContent = t('translate.metaReasoning', { level: levelLabel });
-        this.modelReasoningChip.style.display = 'inline-flex';
-        hasVisibleMeta = true;
-      } else {
-        this.modelReasoningChip.style.display = 'none';
       }
     }
 
@@ -2199,7 +2185,7 @@ export class TranslationStudioController {
         this.providerWarningBtn.textContent = t(warningKey);
         this.providerWarningBtn.title = t(warningKey);
         this.providerWarningBtn.style.display = 'inline-flex';
-        hasVisibleMeta = true;
+        hasWarningRow = true;
       } else {
         this.providerWarningBtn.removeAttribute?.('data-i18n');
         this.providerWarningBtn.style.display = 'none';
@@ -2207,7 +2193,7 @@ export class TranslationStudioController {
     }
 
     if (this.modelMetaRow) {
-      this.modelMetaRow.style.display = hasVisibleMeta ? 'flex' : 'none';
+      this.modelMetaRow.style.display = hasWarningRow ? 'flex' : 'none';
     }
 
     if (this.reasoningGroup) {
@@ -2335,7 +2321,7 @@ export class TranslationStudioController {
     if (this.advancedSummary) {
       const tempText = this.formatTemperatureText(temp, lang);
       const batchText = formatLocalizedNumber(batch, lang, 0);
-      this.advancedSummary.textContent = `${tempText} • ${batchText}`;
+      this.advancedSummary.textContent = `${tempText} · ${batchText}`;
     }
 
     const isTempPreset = !this.tempCustomOpen && TEMP_PRESETS.has(temp);

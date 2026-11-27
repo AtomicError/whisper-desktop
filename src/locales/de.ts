@@ -450,7 +450,6 @@ export const de: Translations = {
     translationError: 'Übersetzungsfehler:\n{error}',
     translationCancelledToast: 'KI-Übersetzung wurde abgebrochen.',
     metaContext: 'Kontext: {ctx}',
-    metaReasoning: 'Denken: {level}',
     warningMissingBaseUrl: 'API-Basis-URL fehlt — Konfigurieren',
     warningMissingApiKey: 'API-Schlüssel fehlt — Konfigurieren',
     reasoningOff: 'Aus',

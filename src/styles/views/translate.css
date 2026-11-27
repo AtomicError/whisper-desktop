@@ -80,13 +80,13 @@
 .translate-deck-body {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 13px;
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding-inline: 18px;
-  padding-block: 14px;
+  padding-block: 12px;
 }
 
 .translate-field-group {
@@ -99,15 +99,15 @@
 
 .translate-field-group label,
 .translate-field-group .translate-field-label {
-  font-size: 0.76rem;
-  font-weight: 700;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-secondary, #a1a1aa);
+  text-transform: none;
+  letter-spacing: 0;
   display: flex;
   align-items: center;
   gap: 7px;
-  line-height: 1.2;
+  line-height: 1.25;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -117,17 +117,18 @@
 .translate-field-group label svg,
 .translate-field-group .translate-field-label svg {
   flex-shrink: 0;
+  color: var(--text-muted, #71717a);
 }
 
 /* 1. Smart Subtitle File Card */
 #translate-drop-zone.translate-dropzone-card {
   border: 1.5px dashed rgba(255, 255, 255, 0.16);
   border-radius: var(--radius-lg, 12px);
-  padding: 14px 16px;
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  min-height: 68px;
+  min-height: 62px;
   flex-shrink: 0;
   background: rgba(0, 0, 0, 0.2);
   text-align: start;
@@ -379,6 +380,7 @@
 
 .translate-switch-title svg {
   flex-shrink: 0;
+  color: var(--text-muted, #71717a);
 }
 
 .translate-switch-desc {
@@ -440,9 +442,17 @@
 .translate-preset-pill.active,
 .translate-preset-pill[aria-pressed="true"],
 .translate-preset-pill[aria-checked="true"] {
-  background: rgba(var(--color-royal-blue-rgb, 59, 130, 246), 0.18);
+  background: rgba(var(--color-royal-blue-rgb, 59, 130, 246), 0.16);
   border-color: rgba(var(--color-royal-blue-rgb, 59, 130, 246), 0.5);
-  color: var(--color-text);
+  color: var(--text-primary, #fafafa);
+}
+
+.translate-preset-pill.active:hover:not(:disabled),
+.translate-preset-pill[aria-pressed="true"]:hover:not(:disabled),
+.translate-preset-pill[aria-checked="true"]:hover:not(:disabled) {
+  background: rgba(var(--color-royal-blue-rgb, 59, 130, 246), 0.24);
+  border-color: rgba(var(--color-royal-blue-rgb, 59, 130, 246), 0.65);
+  color: #ffffff;
 }
 
 .translate-preset-pill:disabled {
@@ -582,34 +592,26 @@
   box-shadow: 0 -10px 18px -10px rgba(0, 0, 0, 0.55);
 }
 
-/* Model Meta Strip & Provider Config Warning */
+/* Model Context Inline Metadata & Provider Config Warning */
+.translate-meta-inline {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-muted, #71717a);
+  font-variant-numeric: tabular-nums;
+  unicode-bidi: isolate;
+  white-space: nowrap;
+  flex-shrink: 0;
+  user-select: none;
+}
+
 .translate-model-meta-row {
   display: flex;
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
   min-width: 0;
-}
-
-.translate-meta-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--color-text-muted);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border-glass);
-  font-variant-numeric: tabular-nums;
-  user-select: none;
-}
-
-.translate-meta-chip.is-reasoning {
-  color: #c084fc;
-  background: rgba(168, 85, 247, 0.12);
-  border-color: rgba(168, 85, 247, 0.28);
 }
 
 .translate-meta-warning-btn {
@@ -741,11 +743,16 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  font-size: 0.76rem;
-  font-weight: 700;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-secondary, #a1a1aa);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.translate-advanced-toggle-title svg {
+  flex-shrink: 0;
+  color: var(--text-muted, #71717a);
 }
 
 .translate-advanced-toggle-meta {
@@ -755,13 +762,11 @@
 }
 
 .translate-advanced-summary {
-  font-size: 0.72rem;
+  font-size: 0.73rem;
+  font-weight: 500;
   font-family: var(--font-mono, monospace);
-  color: var(--color-cyan);
-  background: rgba(var(--color-cyan-rgb, 34, 211, 238), 0.1);
-  border: 1px solid rgba(var(--color-cyan-rgb, 34, 211, 238), 0.22);
-  padding: 1px 6px;
-  border-radius: 5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted, #71717a);
 }
 
 .translate-advanced-chevron {
@@ -904,6 +909,14 @@
 
 .btn-start-translation:active:not(:disabled) {
   filter: brightness(0.92);
+}
+
+.btn-start-translation:disabled {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--border-glass, rgba(255, 255, 255, 0.08));
+  color: var(--text-muted, #71717a);
+  opacity: 1;
+  box-shadow: none;
 }
 
 .btn-cancel-translation {

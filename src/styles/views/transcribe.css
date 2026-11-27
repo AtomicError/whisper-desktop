@@ -498,33 +498,33 @@ body.is-resizing-transcribe * {
 .transcribe-deck-body {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 13px;
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding-inline: 18px;
-  padding-block: 14px;
+  padding-block: 12px;
 }
 
 .transcribe-field-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 7px;
   min-width: 0;
   flex-shrink: 0;
 }
 
 .transcribe-field-group label {
-  font-size: 0.76rem;
-  font-weight: 700;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-secondary, #a1a1aa);
+  text-transform: none;
+  letter-spacing: 0;
   display: flex;
   align-items: center;
   gap: 7px;
-  line-height: 1.2;
+  line-height: 1.25;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -533,6 +533,7 @@ body.is-resizing-transcribe * {
 
 .transcribe-field-group label svg {
   flex-shrink: 0;
+  color: var(--text-muted, #71717a);
 }
 
 .transcribe-field-group select.select-control {
@@ -811,6 +812,7 @@ body.is-resizing-transcribe * {
 
 .transcribe-switch-title svg {
   flex-shrink: 0;
+  color: var(--text-muted, #71717a);
 }
 
 .transcribe-switch-desc {
@@ -987,6 +989,14 @@ body.is-resizing-transcribe * {
 
 .btn-start-transcription:active:not(:disabled) {
   opacity: 0.9;
+}
+
+.btn-start-transcription:disabled {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--border-glass, rgba(255, 255, 255, 0.08));
+  color: var(--text-muted, #71717a);
+  opacity: 1;
+  box-shadow: none;
 }
 
 .btn-cancel-transcription {
@@ -3525,7 +3535,7 @@ select.confidence-threshold-select {
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.transcribe-format-pill:hover {
+.transcribe-format-pill:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(var(--color-royal-blue-rgb, 59, 130, 246), 0.35);
   color: var(--color-text);
@@ -3535,7 +3545,14 @@ select.confidence-threshold-select {
 .transcribe-format-pill[aria-pressed="true"] {
   background: rgba(var(--color-royal-blue-rgb, 59, 130, 246), 0.16);
   border-color: rgba(var(--color-royal-blue-rgb, 59, 130, 246), 0.55);
-  color: var(--color-text);
+  color: var(--text-primary, #fafafa);
+}
+
+.transcribe-format-pill.active:hover:not(:disabled),
+.transcribe-format-pill[aria-pressed="true"]:hover:not(:disabled) {
+  background: rgba(var(--color-royal-blue-rgb, 59, 130, 246), 0.24);
+  border-color: rgba(var(--color-royal-blue-rgb, 59, 130, 246), 0.65);
+  color: #ffffff;
 }
 
 .transcribe-format-pill:focus-visible,
@@ -3914,7 +3931,7 @@ select.confidence-threshold-select {
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.transcribe-preset-pill:hover {
+.transcribe-preset-pill:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(var(--color-royal-blue-rgb, 59, 130, 246), 0.35);
   color: var(--color-text);
@@ -3923,9 +3940,17 @@ select.confidence-threshold-select {
 .transcribe-preset-pill.active,
 .transcribe-preset-pill[aria-pressed="true"],
 .transcribe-preset-pill[aria-checked="true"] {
-  background: rgba(var(--color-royal-blue-rgb, 59, 130, 246), 0.18);
+  background: rgba(var(--color-royal-blue-rgb, 59, 130, 246), 0.16);
   border-color: rgba(var(--color-royal-blue-rgb, 59, 130, 246), 0.5);
-  color: var(--color-text);
+  color: var(--text-primary, #fafafa);
+}
+
+.transcribe-preset-pill.active:hover:not(:disabled),
+.transcribe-preset-pill[aria-pressed="true"]:hover:not(:disabled),
+.transcribe-preset-pill[aria-checked="true"]:hover:not(:disabled) {
+  background: rgba(var(--color-royal-blue-rgb, 59, 130, 246), 0.24);
+  border-color: rgba(var(--color-royal-blue-rgb, 59, 130, 246), 0.65);
+  color: #ffffff;
 }
 
 .transcribe-maxlen-custom-row {

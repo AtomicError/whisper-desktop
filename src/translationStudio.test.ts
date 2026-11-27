@@ -3366,7 +3366,6 @@ describe('Phase 2 Translation Setup parity controls', () => {
       'translate-model-select',
       'translate-model-meta-row',
       'translate-model-ctx-chip',
-      'translate-model-reasoning-chip',
       'translate-provider-warning-btn',
       'translate-reasoning-group',
       'translate-reasoning-pills',
@@ -3477,7 +3476,7 @@ describe('Phase 2 Translation Setup parity controls', () => {
     return { controller, elements, tauriInvoke, saveCurrentSettings, syncActiveModelSelectionUI, showNotification, cleanup };
   }
 
-  it('displays model context/reasoning metadata, warning chip, and updates reasoning effort cleanly', () => {
+  it('displays model context metadata, warning chip, and updates reasoning effort cleanly', () => {
     const { controller, elements, saveCurrentSettings, syncActiveModelSelectionUI, cleanup } = setupPhase2Harness();
     try {
       expect(elements.get('translate-model-meta-row').style.display).toBe('flex');
@@ -3502,7 +3501,21 @@ describe('Phase 2 Translation Setup parity controls', () => {
       (globalThis as any).window.settingsState.translateAiModel = 'gpt-4o-mini';
       controller.syncFromGlobalSettings();
       expect(elements.get('translate-reasoning-group').style.display).toBe('none');
-      expect(elements.get('translate-model-reasoning-chip').style.display).toBe('none');
+      expect(elements.get('translate-model-ctx-chip').textContent).toContain('64K');
+
+      // When provider has API key configured, warning row stays hidden
+      const providers = JSON.parse((globalThis as any).window.settingsState.translateAiProviders);
+      providers[0].apiKey = 'sk-valid';
+      (globalThis as any).window.settingsState.translateAiProviders = JSON.stringify(providers);
+      controller.syncFromGlobalSettings();
+      expect(elements.get('translate-provider-warning-btn').style.display).toBe('none');
+      expect(elements.get('translate-model-meta-row').style.display).toBe('none');
+
+      // Verify translate.html removes redundant reasoning badge and keeps active pill hover specificity intact
+      const html = loadSourceFile('views/translate.html');
+      expect(html).not.toContain('translate-model-reasoning-chip');
+      const css = loadSourceFile('styles/views/translate.css');
+      expect(css).toContain('.translate-preset-pill.active:hover:not(:disabled)');
     } finally {
       cleanup();
     }

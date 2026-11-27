@@ -450,7 +450,6 @@ export const ko: Translations = {
     translationError: '번역 실패:\n{error}',
     translationCancelledToast: 'AI 번역이 취소되었습니다.',
     metaContext: '컨텍스트: {ctx}',
-    metaReasoning: '추론: {level}',
     warningMissingBaseUrl: 'API 기본 URL 누락 — 설정',
     warningMissingApiKey: 'API 키 누락 — 설정',
     reasoningOff: '끔',

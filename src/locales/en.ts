@@ -448,7 +448,6 @@ export const en = {
     translationError: 'Translation failed:\n{error}',
     translationCancelledToast: 'AI translation was cancelled.',
     metaContext: 'Context: {ctx}',
-    metaReasoning: 'Reasoning: {level}',
     warningMissingBaseUrl: 'Missing API Base URL — Configure',
     warningMissingApiKey: 'Missing API Key — Configure',
     reasoningOff: 'Off',

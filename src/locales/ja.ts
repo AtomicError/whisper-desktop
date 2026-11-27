@@ -450,7 +450,6 @@ export const ja: Translations = {
     translationError: '翻訳エラー:\n{error}',
     translationCancelledToast: 'AI 翻訳がキャンセルされました。',
     metaContext: 'コンテキスト: {ctx}',
-    metaReasoning: '推論: {level}',
     warningMissingBaseUrl: 'API ベース URL 未設定 — 設定へ',
     warningMissingApiKey: 'API キー未設定 — 設定へ',
     reasoningOff: 'オフ',

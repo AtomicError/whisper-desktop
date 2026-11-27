@@ -450,7 +450,6 @@ export const ar: Translations = {
     translationError: 'فشلت الترجمة:\n{error}',
     translationCancelledToast: 'تم إلغاء الترجمة الذكية.',
     metaContext: 'السياق: {ctx}',
-    metaReasoning: 'الاستدلال: {level}',
     warningMissingBaseUrl: 'عنوان URL الأساسي للواجهة مفقود — إعداد',
     warningMissingApiKey: 'مفتاح API مفقود — إعداد',
     reasoningOff: 'إيقاف',
