@@ -65,6 +65,7 @@
   display: flex;
   align-items: center;
   min-width: 0;
+  flex: 1;
 }
 
 .translate-deck-title {
@@ -93,6 +94,7 @@
   flex-direction: column;
   gap: 7px;
   min-width: 0;
+  flex-shrink: 0;
 }
 
 .translate-field-group label,
@@ -126,6 +128,7 @@
   flex-direction: column;
   justify-content: center;
   min-height: 68px;
+  flex-shrink: 0;
   background: rgba(0, 0, 0, 0.2);
   text-align: start;
   cursor: pointer;
@@ -638,7 +641,6 @@
 
 .btn-link-settings:focus-visible,
 .view-segment-btn:focus-visible,
-.translate-output-row button:focus-visible,
 .btn-start-translation:focus-visible,
 .btn-cancel-translation:focus-visible,
 .translate-dropzone-card .btn-sub-browse:focus-visible,
@@ -646,6 +648,11 @@
 .translate-toolbar-actions button:focus-visible {
   outline: 2px solid var(--color-royal-blue);
   outline-offset: 2px;
+}
+
+.translate-output-row button:focus-visible {
+  outline: 2px solid var(--accent-primary, #3b82f6);
+  outline-offset: 1px;
 }
 
 .btn-cancel-translation:hover:not(:disabled) {

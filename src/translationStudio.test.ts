@@ -23,7 +23,13 @@ beforeAll(async () => {
 });
 
 afterAll(() => vi.unstubAllGlobals());
-beforeEach(() => { invoke.mockReset(); });
+beforeEach(() => {
+  invoke.mockReset();
+  if (typeof localStorage !== 'undefined' && typeof localStorage.removeItem === 'function') {
+    localStorage.removeItem('whisper_translate_output_dir_mode');
+    localStorage.removeItem('whisper_translate_output_dir');
+  }
+});
 
 describe('subtitle loading', () => {
   it('ignores an older text read that finishes after the newer file loads', async () => {
@@ -3004,32 +3010,52 @@ describe('translation studio regression fixes', () => {
       controller.updateDeckScrollCue();
       expect(unifiedDeck.classList.contains('has-scroll-below')).toBe(false);
 
-      // 2. Switching to custom with empty path & cancelling browse reverts to input_dir + reverts focus
-      nextSelectedDir = null;
+      // 2. Switching to custom with empty path expands custom panel without opening OS directory picker
       modeGroup.dispatch('keydown', {
         key: 'ArrowRight',
         target: modeInputBtn,
         preventDefault: vi.fn(),
       });
-      await vi.waitFor(() => expect(modeInputBtn.focus).toHaveBeenCalled());
-      expect(controller.state.outputDirMode).toBe('input_dir');
-      expect(modeInputBtn.getAttribute('aria-checked')).toBe('true');
-      expect(customRow.style.display).toBe('none');
+      await vi.waitFor(() => expect(modeCustomBtn.focus).toHaveBeenCalled());
+      expect(invokeLocal).not.toHaveBeenCalledWith('select_directory', expect.anything());
+      expect(controller.state.outputDirMode).toBe('custom');
+      expect(modeCustomBtn.getAttribute('aria-checked')).toBe('true');
+      expect(modeInputBtn.getAttribute('aria-checked')).toBe('false');
+      expect(customRow.style.display).toBe('block');
+      expect(outputDirText.getAttribute('data-i18n')).toBe('settings.outputDirSelectPlaceholder');
       expect(btnOpenDir.disabled).toBe(true);
 
-      // 3. Selecting non-writable folder shows error and does not apply path
+      // 2b. Starting translation while custom mode has no folder prompts user and does not run backend
+      (globalThis as any).window.settingsState = {
+        translateAiProviders: JSON.stringify([{ name: 'OpenAI', models: [{ id: 'gpt-4o', enabled: true }] }]),
+        translateAiProvider: 'OpenAI',
+        translateAiModel: 'gpt-4o',
+      };
+      controller.state.activeProvider = 'OpenAI';
+      controller.state.activeModel = 'gpt-4o';
+      controller.state.subtitlePath = '/src/movie.srt';
+      controller.state.subtitleName = 'movie.srt';
+      controller.state.subtitleExt = 'srt';
+      await controller.startTranslation();
+      expect(showNotification).toHaveBeenCalledWith(expect.any(String), 'error');
+      expect(invokeLocal).not.toHaveBeenCalledWith('translate_transcription_files', expect.anything());
+
+      // 3. Selecting non-writable folder via Browse shows error and keeps empty path
+      showNotification.mockClear();
       nextSelectedDir = '/readonly/dir';
       writableError = new Error('Permission denied');
-      await controller.setOutputDirMode('custom');
+      await controller.browseOutputDir();
       expect(invokeLocal).toHaveBeenCalledWith('verify_directory_writable', { dirPath: '/readonly/dir' });
       expect(controller.state.outputDir).toBe('');
-      expect(controller.state.outputDirMode).toBe('input_dir');
+      expect(controller.state.outputDirMode).toBe('custom');
+      expect(customRow.style.display).toBe('block');
+      expect(btnOpenDir.disabled).toBe(true);
       expect(showNotification).toHaveBeenCalledWith(expect.stringContaining('Permission denied'), 'error');
 
-      // 4. Selecting writable folder switches to custom mode and enables open button
+      // 4. Selecting writable folder via Browse populates path and enables open button
       writableError = null;
       nextSelectedDir = '/tmp/translated-out';
-      await controller.setOutputDirMode('custom');
+      await controller.browseOutputDir();
       expect(controller.state.outputDir).toBe('/tmp/translated-out');
       expect(controller.state.outputDirMode).toBe('custom');
       expect(customRow.style.display).toBe('block');
@@ -3043,16 +3069,6 @@ describe('translation studio regression fixes', () => {
       expect(customRow.style.display).toBe('none');
 
       // 6. startTranslation in input_dir mode passes outputDir: null despite preserved custom path
-      (globalThis as any).window.settingsState = {
-        translateAiProviders: JSON.stringify([{ name: 'OpenAI', models: [{ id: 'gpt-4o', enabled: true }] }]),
-        translateAiProvider: 'OpenAI',
-        translateAiModel: 'gpt-4o',
-      };
-      controller.state.activeProvider = 'OpenAI';
-      controller.state.activeModel = 'gpt-4o';
-      controller.state.subtitlePath = '/src/movie.srt';
-      controller.state.subtitleName = 'movie.srt';
-      controller.state.subtitleExt = 'srt';
       await controller.startTranslation();
       expect(invokeLocal).toHaveBeenCalledWith(
         'translate_transcription_files',
@@ -3086,6 +3102,141 @@ describe('translation studio regression fixes', () => {
       expect(previewColIdx).toBeGreaterThan(actionsIdx);
     } finally {
       controller.dispose();
+      (globalThis as any).document = origDoc;
+      (globalThis as any).window = origWin;
+    }
+  });
+
+  it('persists and restores outputDirMode and outputDir across controller instances via localStorage', async () => {
+    const origWin = (globalThis as any).window;
+    const origDoc = (globalThis as any).document;
+    const origStorage = (globalThis as any).localStorage;
+    const storageMap = new Map<string, string>();
+    const mockStorage = {
+      getItem: (k: string) => storageMap.get(k) ?? null,
+      setItem: (k: string, v: string) => { storageMap.set(k, v); },
+      removeItem: (k: string) => { storageMap.delete(k); },
+    };
+
+    (globalThis as any).localStorage = mockStorage;
+    (globalThis as any).document = {
+      ...origDoc,
+      readyState: 'complete',
+      getElementById: vi.fn(() => null),
+      querySelector: vi.fn(() => null),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    };
+    (globalThis as any).window = {
+      ...origWin,
+      __TAURI__: {
+        core: {
+          invoke: vi.fn(async (cmd: string) => {
+            if (cmd === 'select_directory') return '/persisted/subs';
+            if (cmd === 'verify_directory_writable') return null;
+            return null;
+          }),
+        },
+      },
+    };
+
+    try {
+      const first = new TranslationStudioController();
+      await first.browseOutputDir();
+      expect(storageMap.get('whisper_translate_output_dir_mode')).toBe('custom');
+      expect(storageMap.get('whisper_translate_output_dir')).toBe('/persisted/subs');
+      first.dispose();
+
+      const second = new TranslationStudioController();
+      expect(second.state.outputDirMode).toBe('custom');
+      expect(second.state.outputDir).toBe('/persisted/subs');
+      await second.setOutputDirMode('input_dir');
+      expect(storageMap.get('whisper_translate_output_dir_mode')).toBe('input_dir');
+      expect(storageMap.get('whisper_translate_output_dir')).toBe('/persisted/subs');
+      second.dispose();
+
+      const third = new TranslationStudioController();
+      expect(third.state.outputDirMode).toBe('input_dir');
+      expect(third.state.outputDir).toBe('/persisted/subs');
+      third.dispose();
+    } finally {
+      (globalThis as any).localStorage = origStorage;
+      (globalThis as any).document = origDoc;
+      (globalThis as any).window = origWin;
+    }
+  });
+
+  it('pre-populates outputDir from global settingsState.outputDirPath when no Translate override is saved', async () => {
+    const origWin = (globalThis as any).window;
+    const origDoc = (globalThis as any).document;
+    const origStorage = (globalThis as any).localStorage;
+    const storageMap = new Map<string, string>();
+    const mockStorage = {
+      getItem: (k: string) => storageMap.get(k) ?? null,
+      setItem: (k: string, v: string) => { storageMap.set(k, v); },
+      removeItem: (k: string) => { storageMap.delete(k); },
+    };
+
+    const outputDirText: any = {
+      textContent: '',
+      title: '',
+      setAttribute: vi.fn(),
+      removeAttribute: vi.fn(),
+      classList: { add: vi.fn(), remove: vi.fn(), toggle: vi.fn() },
+    };
+    const btnOpenDir: any = { disabled: true };
+    const customRow: any = { style: { display: 'none' } };
+
+    (globalThis as any).localStorage = mockStorage;
+    (globalThis as any).document = {
+      ...origDoc,
+      readyState: 'complete',
+      getElementById: vi.fn(() => null),
+      querySelector: vi.fn(() => null),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    };
+    (globalThis as any).window = {
+      ...origWin,
+      settingsState: {
+        outputDirMode: 'input_dir',
+        outputDirPath: '/global/transcribe/output',
+      },
+      __TAURI__: {
+        core: {
+          invoke: vi.fn(async (cmd: string) => {
+            if (cmd === 'select_directory') return '/translate/custom/override';
+            if (cmd === 'verify_directory_writable') return null;
+            return null;
+          }),
+        },
+      },
+    };
+
+    try {
+      const controller = new TranslationStudioController();
+      (controller as any).outputDirText = outputDirText;
+      (controller as any).btnOpenDir = btnOpenDir;
+      (controller as any).outputCustomRow = customRow;
+
+      controller.syncFromGlobalSettings();
+      expect(controller.state.outputDir).toBe('/global/transcribe/output');
+      expect(controller.state.outputDirMode).toBe('input_dir');
+
+      // Clicking Custom Folder shows the pre-populated global path immediately
+      await controller.setOutputDirMode('custom');
+      expect(customRow.style.display).toBe('block');
+      expect(outputDirText.textContent).toBe('/global/transcribe/output');
+      expect(btnOpenDir.disabled).toBe(false);
+
+      // Picking a dedicated folder in Translate overrides and persists independently
+      await controller.browseOutputDir();
+      expect(controller.state.outputDir).toBe('/translate/custom/override');
+      controller.syncFromGlobalSettings();
+      expect(controller.state.outputDir).toBe('/translate/custom/override');
+      controller.dispose();
+    } finally {
+      (globalThis as any).localStorage = origStorage;
       (globalThis as any).document = origDoc;
       (globalThis as any).window = origWin;
     }

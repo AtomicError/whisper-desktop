@@ -28,6 +28,8 @@ const listen = async <T>(event: string, handler: (e: { payload: T }) => void): P
 };
 
 export const SUPPORTED_TRANSLATION_EXTENSIONS = ['srt', 'vtt', 'lrc', 'txt'] as const;
+const TRANSLATE_OUTPUT_MODE_STORAGE_KEY = 'whisper_translate_output_dir_mode';
+const TRANSLATE_OUTPUT_DIR_STORAGE_KEY = 'whisper_translate_output_dir';
 
 export interface SubtitleCue {
   id: number;
@@ -348,6 +350,8 @@ export class TranslationStudioController {
   private isCancellingTranslation = false;
   private isDisposed = false;
   private pendingSettingsSyncAfterTranslation = false;
+  private hasExplicitOutputDirMode = false;
+  private hasExplicitOutputDir = false;
   private deckResizeObserver: ResizeObserver | null = null;
   private openDirCooldownTimer: ReturnType<typeof setTimeout> | null = null;
   private statusBadgeKey = 'translate.statusReady';
@@ -390,6 +394,7 @@ export class TranslationStudioController {
       this.setupEventListeners();
       this.setupDropZone();
       this.listenToProgressEvents();
+      this.loadPersistedOutputDirState();
       this.syncFromGlobalSettings();
       this.updateOutputDirUI();
       this.updateActionButtons();
@@ -1547,26 +1552,58 @@ export class TranslationStudioController {
     this.updateDeckScrollCue();
   }
 
+  private loadPersistedOutputDirState() {
+    try {
+      if (typeof localStorage === 'undefined' || typeof localStorage.getItem !== 'function') return;
+      const savedMode = localStorage.getItem(TRANSLATE_OUTPUT_MODE_STORAGE_KEY);
+      if (savedMode === 'custom' || savedMode === 'input_dir') {
+        this.state.outputDirMode = savedMode;
+        this.hasExplicitOutputDirMode = true;
+      }
+      const savedDir = localStorage.getItem(TRANSLATE_OUTPUT_DIR_STORAGE_KEY);
+      if (typeof savedDir === 'string' && savedDir.trim()) {
+        this.state.outputDir = savedDir.trim();
+        this.hasExplicitOutputDir = true;
+      }
+    } catch (_) {
+      // Ignore storage access errors in restricted environments
+    }
+  }
+
+  private persistOutputDirState() {
+    try {
+      if (typeof localStorage === 'undefined' || typeof localStorage.setItem !== 'function') return;
+      if (this.hasExplicitOutputDirMode) {
+        localStorage.setItem(TRANSLATE_OUTPUT_MODE_STORAGE_KEY, this.state.outputDirMode);
+      }
+      if (this.hasExplicitOutputDir) {
+        localStorage.setItem(TRANSLATE_OUTPUT_DIR_STORAGE_KEY, String(this.state.outputDir || '').trim());
+      }
+    } catch (_) {
+      // Ignore storage access errors in restricted environments
+    }
+  }
+
   public async setOutputDirMode(mode: 'input_dir' | 'custom') {
     if (this.state.isTranslating || this.isStartingTranslation) return;
     if (mode === 'custom') {
-      const existingPath = String(this.state.outputDir || '').trim();
-      if (!existingPath) {
-        await this.browseOutputDir();
-        return;
-      }
+      this.hasExplicitOutputDirMode = true;
       if (this.state.outputDirMode === 'custom') {
+        this.persistOutputDirState();
         this.updateOutputDirUI();
         return;
       }
       this.state.outputDirMode = 'custom';
     } else {
+      this.hasExplicitOutputDirMode = true;
       if (this.state.outputDirMode === 'input_dir') {
+        this.persistOutputDirState();
         this.updateOutputDirUI();
         return;
       }
       this.state.outputDirMode = 'input_dir';
     }
+    this.persistOutputDirState();
     this.updateOutputDirUI();
   }
 
@@ -1619,6 +1656,9 @@ export class TranslationStudioController {
         }
         this.state.outputDir = selected;
         this.state.outputDirMode = 'custom';
+        this.hasExplicitOutputDir = true;
+        this.hasExplicitOutputDirMode = true;
+        this.persistOutputDirState();
         this.updateOutputDirUI();
       }
     } catch (err) {
@@ -1649,6 +1689,19 @@ export class TranslationStudioController {
       this.state.polishPass = settings.translateAiPolish;
       if (this.polishToggle) this.polishToggle.checked = this.state.polishPass;
     }
+
+    if (!this.hasExplicitOutputDir) {
+      const globalOutputDir = typeof settings.outputDirPath === 'string' ? settings.outputDirPath.trim() : '';
+      if (globalOutputDir) {
+        this.state.outputDir = globalOutputDir;
+      }
+    }
+
+    if (!this.hasExplicitOutputDirMode && (settings.outputDirMode === 'custom' || settings.outputDirMode === 'input_dir')) {
+      this.state.outputDirMode = settings.outputDirMode;
+    }
+
+    this.updateOutputDirUI();
 
     this.refreshProviderOptions(force);
 
@@ -2160,6 +2213,10 @@ export class TranslationStudioController {
     }
     if (!this.state.activeModel) {
       this.notify(t('translate.noModelError'), 'error');
+      return;
+    }
+    if (this.state.outputDirMode === 'custom' && !String(this.state.outputDir || '').trim()) {
+      this.notify(t('settings.outputDirSelectPlaceholder') || t('toasts.noOutputDirFound'), 'error');
       return;
     }
 
