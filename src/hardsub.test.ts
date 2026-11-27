@@ -198,7 +198,6 @@ function fixture() {
   const btnOpenDir = new Control();
   btnOpenDir.disabled = true;
   const btnBrowseDir = new Control();
-  const btnResetDir = new Control();
   const btnOpenFolder = new Control();
   const btnPlayVideo = new Control();
   const telemetryBox = new Control();
@@ -224,7 +223,6 @@ function fixture() {
   doc.elements.set('hardsub-output-dir-text', outputDirText);
   doc.elements.set('btn-open-hardsub-dir', btnOpenDir);
   doc.elements.set('btn-browse-hardsub-dir', btnBrowseDir);
-  doc.elements.set('btn-reset-hardsub-dir', btnResetDir);
   doc.elements.set('btn-open-hardsub-folder', btnOpenFolder);
   doc.elements.set('btn-play-hardsub-video', btnPlayVideo);
   doc.elements.set('hardsub-telemetry-box', telemetryBox);
@@ -261,7 +259,6 @@ function fixture() {
     outputDirText: Control;
     btnOpenDir: Control;
     btnBrowseDir: Control;
-    btnResetDir: Control;
     btnOpenFolder: Control;
     btnPlayVideo: Control;
     telemetryBox: Control;
@@ -285,7 +282,7 @@ function fixture() {
   Object.assign(internal, {
     videoElement: video, videoSeekSlider: slider, videoPlayBtn: play, lblVideoName: label, videoStatusBadge: badge, videoTimeDisplay: time,
     videoIconPlay: iconPlay, videoIconPause: iconPause,
-    outputLocationModes, outputModeInputBtn, outputModeCustomBtn, outputCustomRow, outputDirText, btnOpenDir, btnBrowseDir, btnResetDir, btnOpenFolder, btnPlayVideo, telemetryBox,
+    outputLocationModes, outputModeInputBtn, outputModeCustomBtn, outputCustomRow, outputDirText, btnOpenDir, btnBrowseDir, btnOpenFolder, btnPlayVideo, telemetryBox,
     volumeControlWrapper: volumeWrapper, videoVolumeBtn: volumeBtn, videoVolumeSlider: volumeSlider,
     videoFullscreenBtn: fullscreenBtn, videoIconFsEnter: iconFsEnter, videoIconFsExit: iconFsExit,
     btnClearVideo, btnClearSub, btnResetAll,
@@ -308,7 +305,7 @@ function fixture() {
     if (active) controller.setPageActive(true);
     video.pause.mockClear();
   };
-  return { controller, video, slider, play, iconPlay, iconPause, label, badge, time, container, internal, load, cancel, retry, outputLocationModes, outputModeInputBtn, outputModeCustomBtn, outputCustomRow, outputDirText, btnOpenDir, btnBrowseDir, btnResetDir, btnOpenFolder, btnPlayVideo, telemetryBox, volumeWrapper, volumeBtn, volumeSlider, btnClearVideo, btnClearSub, btnResetAll, fullscreenBtn, iconFsEnter, iconFsExit, fontSelect, boldBtn, italicBtn, startBtn, jumpBackBtn, jumpFwdBtn, speedBtn, speedLabel, timeCurrent, timeTotal, prevCueBtn, nextCueBtn };
+  return { controller, video, slider, play, iconPlay, iconPause, label, badge, time, container, internal, load, cancel, retry, outputLocationModes, outputModeInputBtn, outputModeCustomBtn, outputCustomRow, outputDirText, btnOpenDir, btnBrowseDir, btnOpenFolder, btnPlayVideo, telemetryBox, volumeWrapper, volumeBtn, volumeSlider, btnClearVideo, btnClearSub, btnResetAll, fullscreenBtn, iconFsEnter, iconFsExit, fontSelect, boldBtn, italicBtn, startBtn, jumpBackBtn, jumpFwdBtn, speedBtn, speedLabel, timeCurrent, timeTotal, prevCueBtn, nextCueBtn };
 }
 
 beforeAll(async () => {

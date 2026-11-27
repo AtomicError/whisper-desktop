@@ -1004,7 +1004,6 @@ export class HardsubController {
   private outputDirText: HTMLElement | null = null;
   private btnOpenDir: HTMLButtonElement | null = null;
   private btnBrowseDir: HTMLButtonElement | null = null;
-  private btnResetDir: HTMLButtonElement | null = null;
   private btnOpenFolder: HTMLButtonElement | null = null;
   private btnPlayVideo: HTMLButtonElement | null = null;
   private btnResetStyle: HTMLButtonElement | null = null;
@@ -1602,7 +1601,6 @@ export class HardsubController {
     this.outputDirText = document.getElementById('hardsub-output-dir-text');
     this.btnOpenDir = document.getElementById('btn-open-hardsub-dir') as HTMLButtonElement;
     this.btnBrowseDir = document.getElementById('btn-browse-hardsub-dir') as HTMLButtonElement;
-    this.btnResetDir = document.getElementById('btn-reset-hardsub-dir') as HTMLButtonElement;
     this.btnOpenFolder = document.getElementById('btn-open-hardsub-folder') as HTMLButtonElement;
     this.btnPlayVideo = document.getElementById('btn-play-hardsub-video') as HTMLButtonElement;
     this.btnResetStyle = document.getElementById('btn-reset-hardsub-style') as HTMLButtonElement | null;
@@ -2337,10 +2335,6 @@ export class HardsubController {
 
     this.on(this.btnBrowseDir, 'click', () => {
       void this.browseOutputDir();
-    });
-
-    this.on(this.btnResetDir, 'click', () => {
-      this.resetOutputDir();
     });
 
     this.on(this.btnOpenFolder, 'click', () => {
@@ -5215,10 +5209,6 @@ export class HardsubController {
         this.outputDirText.classList.remove('has-custom-path');
       }
     }
-
-    if (this.btnResetDir) {
-      this.btnResetDir.style.display = (isCustomMode && hasCustomPath) ? 'inline-flex' : 'none';
-    }
   }
 
   public async openOutputFolder() {
@@ -5766,9 +5756,6 @@ export class HardsubController {
     }
     if (this.btnBrowseDir) {
       this.btnBrowseDir.disabled = active || this.isBrowsingOutputDir;
-    }
-    if (this.btnResetDir) {
-      this.btnResetDir.disabled = active;
     }
     if (this.btnBrowseVideo) {
       this.btnBrowseVideo.disabled = active;

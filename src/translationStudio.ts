@@ -1947,7 +1947,7 @@ export class TranslationStudioController {
     const nextTemp = settings.translateAiTemperature !== undefined
       ? clampFloatSettingValue('translateAiTemperature', settings.translateAiTemperature)
       : 0.3;
-    this.state.temperature = Math.round(nextTemp * 10) / 10;
+    this.state.temperature = nextTemp;
     this.tempCustomOpen = !TEMP_PRESETS.has(this.state.temperature);
 
     const rawBatch = settings.translateAiBatchSize;
@@ -2255,9 +2255,13 @@ export class TranslationStudioController {
     const { providers, providerIndex, modelIndex } = this.getActiveProviderAndModel();
     if (providerIndex < 0 || modelIndex < 0 || !providers[providerIndex]?.models) return;
 
+    const existingModel = providers[providerIndex].models![modelIndex];
     providers[providerIndex].models![modelIndex] = {
-      ...providers[providerIndex].models![modelIndex],
+      ...existingModel,
       reasoning: normalizedLevel,
+      ...(typeof existingModel.supportsReasoning !== 'boolean' && typeof existingModel.supports_reasoning !== 'boolean'
+        ? { supportsReasoning: true }
+        : {}),
     };
 
     if (win.settingsState) {
@@ -2316,15 +2320,20 @@ export class TranslationStudioController {
     this.updateDeckScrollCue();
   }
 
+  private formatTemperatureText(temp: number, lang?: ReturnType<typeof getLanguage>): string {
+    const decimals = Math.abs(temp * 10 - Math.round(temp * 10)) < 0.001 ? 1 : 2;
+    return lang ? formatLocalizedNumber(temp, lang, decimals) : temp.toFixed(decimals);
+  }
+
   private updateAdvancedTuningUI(skipTempInput = false, skipBatchInput = false) {
-    const temp = Math.round(clampFloatSettingValue('translateAiTemperature', this.state.temperature) * 10) / 10;
+    const temp = clampFloatSettingValue('translateAiTemperature', this.state.temperature);
     this.state.temperature = temp;
     const batch = clampIntSettingValue('translateAiBatchSize', this.state.batchSize);
     this.state.batchSize = batch;
 
     const lang = getLanguage();
     if (this.advancedSummary) {
-      const tempText = formatLocalizedNumber(temp, lang, 1);
+      const tempText = this.formatTemperatureText(temp, lang);
       const batchText = formatLocalizedNumber(batch, lang, 0);
       this.advancedSummary.textContent = `${tempText} • ${batchText}`;
     }
@@ -2347,7 +2356,7 @@ export class TranslationStudioController {
       this.tempCustomRow.style.display = showTempCustom ? 'flex' : 'none';
     }
     if (this.tempInput && !skipTempInput) {
-      this.tempInput.value = temp.toFixed(1);
+      this.tempInput.value = this.formatTemperatureText(temp);
     }
     const isBusy = this.state.isTranslating || this.isStartingTranslation;
     if (this.btnTempDec) this.btnTempDec.disabled = isBusy || temp <= 0;
@@ -2381,7 +2390,7 @@ export class TranslationStudioController {
 
   public setTemperature(value: number, isCustom: boolean, skipInputRewrite = false) {
     if (this.state.isTranslating || this.isStartingTranslation) return;
-    const clamped = Math.round(clampFloatSettingValue('translateAiTemperature', value) * 10) / 10;
+    const clamped = clampFloatSettingValue('translateAiTemperature', value);
     this.state.temperature = clamped;
     this.tempCustomOpen = isCustom || !TEMP_PRESETS.has(clamped);
 
@@ -2429,7 +2438,6 @@ export class TranslationStudioController {
     }
 
     this.updateAdvancedTuningUI(false, skipInputRewrite);
-    this.scheduleCheckpointCheck(250);
   }
 
   public activateCustomBatchSize() {

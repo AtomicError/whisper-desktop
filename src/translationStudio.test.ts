@@ -3577,6 +3577,42 @@ describe('Phase 2 Translation Setup parity controls', () => {
       cleanup();
     }
   });
+
+  it('keeps reasoning controls visible when toggling Off on legacy models without supportsReasoning and preserves 2-decimal temperature', () => {
+    const { controller, elements, cleanup } = setupPhase2Harness();
+    try {
+      const win = (globalThis as any).window;
+      win.settingsState.translateAiProviders = JSON.stringify([
+        {
+          name: 'OpenAI',
+          baseUrl: 'https://api.openai.com/v1',
+          apiKey: 'sk-test',
+          useKeyring: false,
+          customPrompt: '',
+          models: [
+            { id: 'o3-mini', contextWindow: 128000, reasoning: 'Medium', enabled: true },
+          ],
+        },
+      ]);
+      controller.syncFromGlobalSettings();
+
+      expect(elements.get('translate-reasoning-group').style.display).toBe('flex');
+      controller.setActiveModelReasoning('None');
+      expect(elements.get('translate-reasoning-group').style.display).toBe('flex');
+      expect(elements.get('translate-reasoning-none').getAttribute('aria-pressed')).toBe('true');
+
+      const savedProviders = JSON.parse(win.settingsState.translateAiProviders);
+      expect(savedProviders[0].models[0].supportsReasoning).toBe(true);
+      expect(savedProviders[0].models[0].reasoning).toBe('None');
+
+      controller.setTemperature(0.25, true);
+      expect(controller.state.temperature).toBe(0.25);
+      expect(elements.get('translate-temp-input').value).toBe('0.25');
+      expect(elements.get('translate-advanced-summary').textContent).toContain('0.25');
+    } finally {
+      cleanup();
+    }
+  });
 });
 
 
