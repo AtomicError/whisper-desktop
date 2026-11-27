@@ -100,8 +100,14 @@ export function clampIntSettingValue(key: string, raw: unknown): number {
   if (Number.isNaN(parsed)) {
     if (key === 'maxContext') return -1;
     if (key === 'confidenceThreshold') return 70;
+    if (key === 'translateAiBatchSize') return 30;
     if (key === 'threads' || key === 'processors' || key === 'bestOf' || key === 'beamSize') return 1;
     return 0;
+  }
+
+  if (key === 'translateAiBatchSize') {
+    if (parsed <= 0) return 30;
+    return Math.max(1, Math.min(30, parsed));
   }
 
   if (key === 'confidenceThreshold') {
@@ -163,6 +169,11 @@ export function clampFloatSettingValue(key: string, raw: unknown): number {
   if (key === 'temperature' || key === 'temperatureInc') {
     if (!isValid) return 0.0;
     return Math.max(0.0, Math.min(2.0, parsed));
+  }
+  if (key === 'translateAiTemperature') {
+    if (!isValid) return 0.3;
+    const rounded = Math.round(parsed * 100) / 100;
+    return Math.max(0.0, Math.min(2.0, rounded));
   }
   if (key === 'entropyThold') {
     if (!isValid) return 0.0;

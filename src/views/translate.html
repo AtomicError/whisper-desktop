@@ -77,9 +77,31 @@
                         <span data-i18n="translate.activeModel">Active Model</span>
                       </label>
                       <select class="select-control" id="translate-model-select" data-searchable data-model-select title="Active Model" data-i18n-title="translate.activeModel" data-i18n-aria="translate.activeModel" aria-label="Active Model"></select>
+                      <div class="translate-model-meta-row" id="translate-model-meta-row" style="display:none;">
+                        <span class="translate-meta-chip" id="translate-model-ctx-chip" style="display:none;"></span>
+                        <span class="translate-meta-chip is-reasoning" id="translate-model-reasoning-chip" style="display:none;"></span>
+                        <button type="button" class="translate-meta-warning-btn" id="translate-provider-warning-btn" style="display:none;"></button>
+                      </div>
                     </div>
 
-                    <!-- 4. Conversational Polish Pass (Full Width) -->
+                    <!-- 5. Reasoning Effort (Only visible when selected model supports reasoning) -->
+                    <div class="translate-field-group" id="translate-reasoning-group" style="display:none;">
+                      <label id="lbl-translate-reasoning">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#a855f7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                          <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"/><path d="M17.599 6.5a3 3 0 0 0 .399-1.375"/><path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"/><path d="M3.477 10.896a4 4 0 0 1 .585-.396"/><path d="M19.938 10.5a4 4 0 0 1 .585.396"/><path d="M6 18a4 4 0 0 1-1.967-.516"/><path d="M19.967 17.484A4 4 0 0 1 18 18"/>
+                        </svg>
+                        <span data-i18n="settings.reasoning">Reasoning</span>
+                      </label>
+                      <div class="translate-reasoning-pills" id="translate-reasoning-pills" role="group" aria-labelledby="lbl-translate-reasoning">
+                        <button type="button" class="translate-preset-pill" id="translate-reasoning-none" data-reasoning="None" aria-pressed="false" data-i18n="translate.reasoningOff">Off</button>
+                        <button type="button" class="translate-preset-pill" id="translate-reasoning-low" data-reasoning="Low" aria-pressed="false" data-i18n="translate.reasoningLow">Low</button>
+                        <button type="button" class="translate-preset-pill" id="translate-reasoning-medium" data-reasoning="Medium" aria-pressed="false" data-i18n="translate.reasoningMedium">Medium</button>
+                        <button type="button" class="translate-preset-pill" id="translate-reasoning-high" data-reasoning="High" aria-pressed="false" data-i18n="translate.reasoningHigh">High</button>
+                        <button type="button" class="translate-preset-pill" id="translate-reasoning-extended" data-reasoning="" aria-pressed="false" style="display:none;"></button>
+                      </div>
+                    </div>
+
+                    <!-- 6. Conversational Polish Pass (Full Width) -->
                     <div class="translate-field-group">
                       <div class="translate-switch-row" title="Refines translated subtitles for natural conversational rhythm and reading speed." data-i18n-title="settings.polishDesc">
                         <div class="translate-switch-info">
@@ -98,7 +120,7 @@
                       </div>
                     </div>
 
-                    <!-- 4. Output Files Save Location -->
+                    <!-- 7. Output Files Save Location -->
                     <div class="translate-field-group" id="translate-output-location-group">
                       <label id="lbl-translate-output-folder">
                         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -130,10 +152,93 @@
                         </div>
                       </div>
                     </div>
+
+                    <!-- 8. Translation Instructions (Custom Prompt) -->
+                    <div class="translate-field-group" id="translate-prompt-group">
+                      <div class="translate-field-header-row">
+                        <label for="translate-custom-prompt">
+                          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-royal-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                          </svg>
+                          <span data-i18n="settings.customPromptTitle">Custom Translation Instructions</span>
+                        </label>
+                        <button type="button" class="translate-inline-reset-btn" id="btn-reset-translate-prompt" style="display:none;" data-i18n="translate.resetPrompt">Reset</button>
+                      </div>
+                      <textarea id="translate-custom-prompt" class="translate-adv-textarea" rows="2" dir="auto" spellcheck="false" data-i18n-placeholder="translate.promptPlaceholder" placeholder="Optional tone, terminology, or glossary instructions..."></textarea>
+                    </div>
+
+                    <!-- 9. Advanced Tuning (Collapsible: Temperature & Lines per Batch) -->
+                    <div class="translate-field-group" id="translate-advanced-group">
+                      <div class="translate-advanced-card" id="translate-advanced-card">
+                        <button type="button" class="translate-advanced-toggle" id="btn-toggle-translate-advanced" aria-expanded="false" aria-controls="translate-advanced-body">
+                          <span class="translate-advanced-toggle-title">
+                            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                              <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>
+                            </svg>
+                            <span data-i18n="translate.advancedTuning">Advanced Tuning</span>
+                          </span>
+                          <span class="translate-advanced-toggle-meta">
+                            <span class="translate-advanced-summary" id="translate-advanced-summary" dir="ltr">0.3 • 30</span>
+                            <svg class="translate-advanced-chevron" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                              <polyline points="6 9 12 15 18 9"/>
+                            </svg>
+                          </span>
+                        </button>
+
+                        <div class="translate-advanced-body" id="translate-advanced-body" style="display:none;">
+                          <!-- Temperature -->
+                          <div class="translate-sub-field">
+                            <label id="lbl-translate-temp" data-i18n="translate.temperatureLabel">Temperature</label>
+                            <div class="translate-preset-pills-4" role="group" aria-labelledby="lbl-translate-temp">
+                              <button type="button" class="translate-preset-pill" id="translate-temp-01" data-temp="0.1" aria-pressed="false" data-i18n="translate.tempLiteral" title="0.1 (Literal)">0.1 Literal</button>
+                              <button type="button" class="translate-preset-pill active" id="translate-temp-03" data-temp="0.3" aria-pressed="true" data-i18n="translate.tempBalanced" title="0.3 (Balanced)">0.3 Balanced</button>
+                              <button type="button" class="translate-preset-pill" id="translate-temp-06" data-temp="0.6" aria-pressed="false" data-i18n="translate.tempNatural" title="0.6 (Natural)">0.6 Natural</button>
+                              <button type="button" class="translate-preset-pill" id="translate-temp-custom" data-temp="custom" aria-pressed="false" data-i18n="transcribe.lineLenCustom" title="Custom">Custom</button>
+                            </div>
+                            <div class="translate-custom-stepper-row" id="translate-temp-custom-row" style="display:none;">
+                              <span class="translate-custom-stepper-label" data-i18n="translate.temperatureLabel">Temperature</span>
+                              <div class="number-input-control translate-number-control" data-custom-stepper="true">
+                                <button type="button" id="btn-translate-temp-dec" data-i18n-aria="settings.decreaseValue" aria-label="Decrease value">-</button>
+                                <input type="text" id="translate-temp-input" value="0.3" inputmode="decimal" autocomplete="off" dir="ltr" data-i18n-aria="translate.temperatureLabel" aria-label="Temperature" />
+                                <button type="button" id="btn-translate-temp-inc" data-i18n-aria="settings.increaseValue" aria-label="Increase value">+</button>
+                              </div>
+                            </div>
+                          </div>
+
+                          <!-- Lines per Batch -->
+                          <div class="translate-sub-field">
+                            <label id="lbl-translate-batch" data-i18n="settings.chunkLinesTitle">Lines Per Batch Chunk</label>
+                            <div class="translate-preset-pills-4" role="group" aria-labelledby="lbl-translate-batch">
+                              <button type="button" class="translate-preset-pill" id="translate-batch-10" data-batch="10" aria-pressed="false">10</button>
+                              <button type="button" class="translate-preset-pill" id="translate-batch-20" data-batch="20" aria-pressed="false">20</button>
+                              <button type="button" class="translate-preset-pill active" id="translate-batch-30" data-batch="30" aria-pressed="true" data-i18n="translate.batchAuto30">30 (Auto)</button>
+                              <button type="button" class="translate-preset-pill" id="translate-batch-custom" data-batch="custom" aria-pressed="false" data-i18n="transcribe.lineLenCustom">Custom</button>
+                            </div>
+                            <div class="translate-custom-stepper-row" id="translate-batch-custom-row" style="display:none;">
+                              <span class="translate-custom-stepper-label" data-i18n="settings.chunkLinesTitle">Lines Per Batch Chunk</span>
+                              <div class="number-input-control translate-number-control" data-custom-stepper="true">
+                                <button type="button" id="btn-translate-batch-dec" data-i18n-aria="settings.decreaseValue" aria-label="Decrease value">-</button>
+                                <input type="text" id="translate-batch-input" value="30" inputmode="numeric" autocomplete="off" dir="ltr" data-i18n-aria="settings.chunkLinesTitle" aria-label="Lines Per Batch Chunk" />
+                                <button type="button" id="btn-translate-batch-inc" data-i18n-aria="settings.increaseValue" aria-label="Increase value">+</button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  <!-- 5. Docked Action & Telemetry Footer (Always Pinned Visible) -->
+                  <!-- 10. Docked Action, Checkpoint & Telemetry Footer (Always Pinned Visible) -->
                   <div class="translate-actions-section">
+                    <div class="translate-checkpoint-banner" id="translate-checkpoint-banner" style="display:none;" role="status">
+                      <span class="translate-checkpoint-info">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="var(--color-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
+                        </svg>
+                        <span id="translate-checkpoint-text"></span>
+                      </span>
+                      <button type="button" class="btn-secondary translate-checkpoint-clear-btn" id="btn-clear-translate-checkpoint" data-i18n="translate.startFresh">Start Fresh</button>
+                    </div>
                     <div class="translate-actions-bar">
                       <button class="btn-primary btn-start-translation" id="btn-start-translation" type="button" disabled data-i18n-title="translate.noSubSelectedError" title="Please select a subtitle file first.">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px;" aria-hidden="true">

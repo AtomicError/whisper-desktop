@@ -3282,5 +3282,25 @@ describe('settingsManager module', () => {
         setSettingsState(prevSettings);
       }
     });
+
+    it('sanitizes Phase 2 translation tuning and output location fields in sanitizeSettingsPayload', () => {
+      const cleaned = sanitizeSettingsPayload({
+        translateAiTemperature: 3.5,
+        translateAiBatchSize: 0,
+        translateOutputDirMode: 'custom',
+      });
+      expect(cleaned.translateAiTemperature).toBe(2);
+      expect(cleaned.translateAiBatchSize).toBe(30);
+      expect(cleaned.translateOutputDirMode).toBe('custom');
+
+      const fallbackCleaned = sanitizeSettingsPayload({
+        translateAiTemperature: -1,
+        translateAiBatchSize: 45,
+        translateOutputDirMode: 'bogus_mode',
+      });
+      expect(fallbackCleaned.translateAiTemperature).toBe(0);
+      expect(fallbackCleaned.translateAiBatchSize).toBe(30);
+      expect(fallbackCleaned.translateOutputDirMode).toBe('input_dir');
+    });
   });
 });

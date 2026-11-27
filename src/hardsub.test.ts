@@ -189,7 +189,14 @@ function fixture() {
   const time = new Control();
   const container = new Control();
   doc.elements.set('hardsub-player-container', container);
+  const outputLocationModes = new Control();
+  const outputModeInputBtn = new Control();
+  const outputModeCustomBtn = new Control();
+  const outputCustomRow = new Control();
+  outputCustomRow.style.display = 'none';
   const outputDirText = new Control();
+  const btnOpenDir = new Control();
+  btnOpenDir.disabled = true;
   const btnBrowseDir = new Control();
   const btnResetDir = new Control();
   const btnOpenFolder = new Control();
@@ -210,7 +217,12 @@ function fixture() {
   (startBtnSpan as any).tagName = 'SPAN';
   startBtn.appendChild(startBtnSpan);
   doc.elements.set('btn-start-hardsub', startBtn);
+  doc.elements.set('hardsub-output-location-modes', outputLocationModes);
+  doc.elements.set('hardsub-output-mode-input', outputModeInputBtn);
+  doc.elements.set('hardsub-output-mode-custom', outputModeCustomBtn);
+  doc.elements.set('hardsub-output-custom-row', outputCustomRow);
   doc.elements.set('hardsub-output-dir-text', outputDirText);
+  doc.elements.set('btn-open-hardsub-dir', btnOpenDir);
   doc.elements.set('btn-browse-hardsub-dir', btnBrowseDir);
   doc.elements.set('btn-reset-hardsub-dir', btnResetDir);
   doc.elements.set('btn-open-hardsub-folder', btnOpenFolder);
@@ -240,9 +252,14 @@ function fixture() {
     btnClearVideo: Control; btnClearSub: Control; btnResetAll: Control;
     freezeCanvas: { width: number; height: number; style: Record<string, string> };
     freezeCtx: { clearRect(): void; drawImage(): void };
-    state: { videoPath: string; outputPath: string; outputDir: string; subtitlePath: string };
+    state: { videoPath: string; outputPath: string; outputDirMode: 'input_dir' | 'custom'; outputDir: string; subtitlePath: string };
     subtitleCues: Array<{ text: string; startMs: number; endMs: number }>;
+    outputLocationModes: Control;
+    outputModeInputBtn: Control;
+    outputModeCustomBtn: Control;
+    outputCustomRow: Control;
     outputDirText: Control;
+    btnOpenDir: Control;
     btnBrowseDir: Control;
     btnResetDir: Control;
     btnOpenFolder: Control;
@@ -250,6 +267,8 @@ function fixture() {
     telemetryBox: Control;
     updateEncodingUIState(active: boolean): void;
     setupVideoPlayerEvents(): void;
+    setOutputDirMode(mode: 'input_dir' | 'custom'): void;
+    openCustomOutputDir(): Promise<void>;
     browseOutputDir(): Promise<void>;
     resetOutputDir(): void;
     updateOutputDirUI(): void;
@@ -266,7 +285,7 @@ function fixture() {
   Object.assign(internal, {
     videoElement: video, videoSeekSlider: slider, videoPlayBtn: play, lblVideoName: label, videoStatusBadge: badge, videoTimeDisplay: time,
     videoIconPlay: iconPlay, videoIconPause: iconPause,
-    outputDirText, btnBrowseDir, btnResetDir, btnOpenFolder, btnPlayVideo, telemetryBox,
+    outputLocationModes, outputModeInputBtn, outputModeCustomBtn, outputCustomRow, outputDirText, btnOpenDir, btnBrowseDir, btnResetDir, btnOpenFolder, btnPlayVideo, telemetryBox,
     volumeControlWrapper: volumeWrapper, videoVolumeBtn: volumeBtn, videoVolumeSlider: volumeSlider,
     videoFullscreenBtn: fullscreenBtn, videoIconFsEnter: iconFsEnter, videoIconFsExit: iconFsExit,
     btnClearVideo, btnClearSub, btnResetAll,
@@ -289,7 +308,7 @@ function fixture() {
     if (active) controller.setPageActive(true);
     video.pause.mockClear();
   };
-  return { controller, video, slider, play, iconPlay, iconPause, label, badge, time, container, internal, load, cancel, retry, outputDirText, btnBrowseDir, btnResetDir, btnOpenFolder, btnPlayVideo, telemetryBox, volumeWrapper, volumeBtn, volumeSlider, btnClearVideo, btnClearSub, btnResetAll, fullscreenBtn, iconFsEnter, iconFsExit, fontSelect, boldBtn, italicBtn, startBtn, jumpBackBtn, jumpFwdBtn, speedBtn, speedLabel, timeCurrent, timeTotal, prevCueBtn, nextCueBtn };
+  return { controller, video, slider, play, iconPlay, iconPause, label, badge, time, container, internal, load, cancel, retry, outputLocationModes, outputModeInputBtn, outputModeCustomBtn, outputCustomRow, outputDirText, btnOpenDir, btnBrowseDir, btnResetDir, btnOpenFolder, btnPlayVideo, telemetryBox, volumeWrapper, volumeBtn, volumeSlider, btnClearVideo, btnClearSub, btnResetAll, fullscreenBtn, iconFsEnter, iconFsExit, fontSelect, boldBtn, italicBtn, startBtn, jumpBackBtn, jumpFwdBtn, speedBtn, speedLabel, timeCurrent, timeTotal, prevCueBtn, nextCueBtn };
 }
 
 beforeAll(async () => {
@@ -763,17 +782,20 @@ describe('formatHardsubStatus localization', () => {
 });
 
 describe('hardsub output directory management', () => {
-  it('defaults to source video folder and updates when output directory is set or reset', async () => {
-    const { controller, internal, outputDirText, btnResetDir } = fixture();
+  it('defaults to source video folder and switches between Same as Input and Custom Folder cleanly', async () => {
+    const { controller, internal, outputModeInputBtn, outputModeCustomBtn, outputCustomRow, outputDirText, btnOpenDir } = fixture();
     controller.prefillFilePaths('/media/movies/intro.mp4', '');
     await flush();
 
     // Default output path is in the same directory as source video
+    expect(internal.state.outputDirMode).toBe('input_dir');
     expect(internal.state.outputPath).toBe('/media/movies/intro_hardsub.mp4');
-    expect(outputDirText.classList.contains('has-custom-path')).toBe(false);
-    expect(btnResetDir.style.display).toBe('none');
+    expect(outputModeInputBtn.classList.contains('active')).toBe(true);
+    expect(outputModeInputBtn.getAttribute('aria-checked')).toBe('true');
+    expect(outputCustomRow.style.display).toBe('none');
+    expect(btnOpenDir.disabled).toBe(true);
 
-    // Select custom output directory
+    // Select custom output directory via browse
     invoke.mockImplementation(async (command: string) => {
       if (command === 'select_directory') return '/custom/export/path';
       return undefined;
@@ -782,18 +804,34 @@ describe('hardsub output directory management', () => {
     await internal.browseOutputDir();
     await flush();
 
+    expect(internal.state.outputDirMode).toBe('custom');
     expect(internal.state.outputDir).toBe('/custom/export/path');
     expect(internal.state.outputPath).toBe('/custom/export/path/intro_hardsub.mp4');
+    expect(outputModeCustomBtn.classList.contains('active')).toBe(true);
+    expect(outputCustomRow.style.display).toBe('block');
     expect(outputDirText.textContent).toBe('/custom/export/path');
     expect(outputDirText.classList.contains('has-custom-path')).toBe(true);
-    expect(btnResetDir.style.display).toBe('inline-flex');
+    expect(btnOpenDir.disabled).toBe(false);
+
+    // Switch back to Same as Input without losing the remembered custom directory
+    internal.setOutputDirMode('input_dir');
+    expect(internal.state.outputDirMode).toBe('input_dir');
+    expect(internal.state.outputDir).toBe('/custom/export/path');
+    expect(internal.state.outputPath).toBe('/media/movies/intro_hardsub.mp4');
+    expect(outputCustomRow.style.display).toBe('none');
+
+    // Switch back to Custom Folder restores the remembered directory
+    internal.setOutputDirMode('custom');
+    expect(internal.state.outputPath).toBe('/custom/export/path/intro_hardsub.mp4');
+    expect(outputCustomRow.style.display).toBe('block');
 
     // Reset output directory
     internal.resetOutputDir();
+    expect(internal.state.outputDirMode).toBe('input_dir');
     expect(internal.state.outputDir).toBe('');
     expect(internal.state.outputPath).toBe('/media/movies/intro_hardsub.mp4');
     expect(outputDirText.classList.contains('has-custom-path')).toBe(false);
-    expect(btnResetDir.style.display).toBe('none');
+    expect(btnOpenDir.disabled).toBe(true);
   });
 
   it('formats init stage and fallback for encoder initialization', () => {

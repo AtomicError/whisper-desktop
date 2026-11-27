@@ -3317,3 +3317,266 @@ describe('translation studio regression fixes', () => {
   });
 });
 
+describe('Phase 2 Translation Setup parity controls', () => {
+  const createEl = (id: string) => ({
+    id,
+    value: '',
+    textContent: '',
+    title: '',
+    placeholder: '',
+    disabled: false,
+    checked: false,
+    style: {} as Record<string, string>,
+    dataset: {} as Record<string, string>,
+    attributes: new Map<string, string>(),
+    classes: new Set<string>(),
+    setAttribute(k: string, v: string) { this.attributes.set(k, v); },
+    getAttribute(k: string) { return this.attributes.get(k) ?? null; },
+    removeAttribute(k: string) { this.attributes.delete(k); },
+    classList: {
+      add: function (c: string) { (this as any)._set.add(c); },
+      remove: function (c: string) { (this as any)._set.delete(c); },
+      toggle: function (c: string, force?: boolean) {
+        if (force === undefined) {
+          if ((this as any)._set.has(c)) (this as any)._set.delete(c);
+          else (this as any)._set.add(c);
+        } else if (force) {
+          (this as any)._set.add(c);
+        } else {
+          (this as any)._set.delete(c);
+        }
+      },
+      contains: function (c: string) { return (this as any)._set.has(c); },
+      _set: new Set<string>(),
+    },
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    focus: vi.fn(),
+    appendChild: vi.fn(),
+    querySelector: vi.fn(() => null),
+    querySelectorAll: vi.fn(() => []),
+  });
+
+  function setupPhase2Harness() {
+    const origWin = (globalThis as any).window;
+    const origDoc = (globalThis as any).document;
+    const elements = new Map<string, any>();
+    for (const id of [
+      'translate-provider-select',
+      'translate-model-select',
+      'translate-model-meta-row',
+      'translate-model-ctx-chip',
+      'translate-model-reasoning-chip',
+      'translate-provider-warning-btn',
+      'translate-reasoning-group',
+      'translate-reasoning-pills',
+      'translate-reasoning-none',
+      'translate-reasoning-low',
+      'translate-reasoning-medium',
+      'translate-reasoning-high',
+      'translate-reasoning-extended',
+      'translate-custom-prompt',
+      'btn-reset-translate-prompt',
+      'btn-toggle-translate-advanced',
+      'translate-advanced-body',
+      'translate-advanced-summary',
+      'translate-temp-01',
+      'translate-temp-03',
+      'translate-temp-06',
+      'translate-temp-custom',
+      'translate-temp-custom-row',
+      'translate-temp-input',
+      'btn-translate-temp-dec',
+      'btn-translate-temp-inc',
+      'translate-batch-10',
+      'translate-batch-20',
+      'translate-batch-30',
+      'translate-batch-custom',
+      'translate-batch-custom-row',
+      'translate-batch-input',
+      'btn-translate-batch-dec',
+      'btn-translate-batch-inc',
+      'translate-checkpoint-banner',
+      'translate-checkpoint-text',
+      'btn-clear-translate-checkpoint',
+    ]) {
+      const el = createEl(id);
+      if (id === 'translate-reasoning-none') el.dataset.reasoning = 'None';
+      if (id === 'translate-reasoning-low') el.dataset.reasoning = 'Low';
+      if (id === 'translate-reasoning-medium') el.dataset.reasoning = 'Medium';
+      if (id === 'translate-reasoning-high') el.dataset.reasoning = 'High';
+      el.classList._set = el.classes;
+      elements.set(id, el);
+    }
+
+    const saveCurrentSettings = vi.fn();
+    const markSettingsDirty = vi.fn();
+    const syncActiveModelSelectionUI = vi.fn();
+    const showNotification = vi.fn();
+
+    const tauriInvoke = vi.fn(async (cmd: string, _args?: Record<string, any>) => {
+      if (cmd === 'read_text_file_content') return '1\n00:00:01,000 --> 00:00:02,000\nHello world\n';
+      if (cmd === 'get_translation_checkpoint_info') return { translatedLines: 4, totalLines: 12 };
+      if (cmd === 'clear_translation_checkpoint') return true;
+      if (cmd === 'translate_transcription_files') return [];
+      return null;
+    });
+
+    (globalThis as any).document = {
+      ...origDoc,
+      readyState: 'complete',
+      getElementById: vi.fn((id: string) => elements.get(id) ?? null),
+      querySelector: vi.fn(() => null),
+      querySelectorAll: vi.fn(() => []),
+      createElement: (tag: string) => createEl(tag),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    };
+    (globalThis as any).window = {
+      ...origWin,
+      __TAURI__: { core: { invoke: tauriInvoke } },
+      saveCurrentSettings,
+      markSettingsDirty,
+      syncActiveModelSelectionUI,
+      showNotification,
+      settingsState: {
+        translateAiTargetLang: 'Persian',
+        translateAiProvider: 'OpenAI',
+        translateAiModel: 'o3-mini',
+        translateAiPolish: false,
+        translateAiCustomPrompt: '',
+        translateAiTemperature: 0.3,
+        translateAiBatchSize: 30,
+        translateOutputDirMode: 'custom',
+        translateOutputDirPath: '/dedicated/out',
+        outputDirMode: 'input_dir',
+        outputDirPath: '/global/out',
+        translateAiProviders: JSON.stringify([
+          {
+            name: 'OpenAI',
+            baseUrl: 'https://api.openai.com/v1',
+            apiKey: '',
+            useKeyring: false,
+            customPrompt: 'Use formal tone.',
+            models: [
+              { id: 'o3-mini', contextWindow: 128000, supportsReasoning: true, reasoning: 'Medium', enabled: true },
+              { id: 'gpt-4o-mini', contextWindow: 64000, supportsReasoning: false, enabled: true },
+            ],
+          },
+        ]),
+      },
+    };
+
+    const controller = new TranslationStudioController();
+    const cleanup = () => {
+      controller.dispose();
+      (globalThis as any).document = origDoc;
+      (globalThis as any).window = origWin;
+    };
+
+    return { controller, elements, tauriInvoke, saveCurrentSettings, syncActiveModelSelectionUI, showNotification, cleanup };
+  }
+
+  it('displays model context/reasoning metadata, warning chip, and updates reasoning effort cleanly', () => {
+    const { controller, elements, saveCurrentSettings, syncActiveModelSelectionUI, cleanup } = setupPhase2Harness();
+    try {
+      expect(elements.get('translate-model-meta-row').style.display).toBe('flex');
+      expect(elements.get('translate-model-ctx-chip').textContent).toContain('128K');
+      expect(elements.get('translate-provider-warning-btn').style.display).toBe('inline-flex');
+      expect(elements.get('translate-reasoning-group').style.display).toBe('flex');
+      expect(elements.get('translate-reasoning-medium').getAttribute('aria-pressed')).toBe('true');
+
+      controller.setActiveModelReasoning('High');
+      expect(elements.get('translate-reasoning-high').getAttribute('aria-pressed')).toBe('true');
+      expect(elements.get('translate-reasoning-medium').getAttribute('aria-pressed')).toBe('false');
+      expect(saveCurrentSettings).toHaveBeenCalledWith(false);
+      expect(syncActiveModelSelectionUI).toHaveBeenCalledWith('o3-mini');
+
+      // Extended reasoning value appears dynamically in the extended pill
+      controller.setActiveModelReasoning('XHigh');
+      expect(elements.get('translate-reasoning-extended').style.display).toBe('inline-flex');
+      expect(elements.get('translate-reasoning-extended').dataset.reasoning).toBe('XHigh');
+      expect(elements.get('translate-reasoning-extended').getAttribute('aria-pressed')).toBe('true');
+
+      // Switching to non-reasoning model hides reasoning controls
+      (globalThis as any).window.settingsState.translateAiModel = 'gpt-4o-mini';
+      controller.syncFromGlobalSettings();
+      expect(elements.get('translate-reasoning-group').style.display).toBe('none');
+      expect(elements.get('translate-model-reasoning-chip').style.display).toBe('none');
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('syncs custom prompt, temperature/batch presets & steppers, and dedicated output location', async () => {
+    const { controller, elements, tauriInvoke, cleanup } = setupPhase2Harness();
+    try {
+      // Dedicated translateOutputDir takes precedence over global outputDirPath
+      expect(controller.state.outputDirMode).toBe('custom');
+      expect(controller.state.outputDir).toBe('/dedicated/out');
+      expect(elements.get('translate-custom-prompt').placeholder).toContain('Use formal tone.');
+      expect(elements.get('btn-reset-translate-prompt').style.display).toBe('none');
+
+      // Setting temperature & batch presets/custom values updates summary & clamps bounds
+      controller.setTemperature(2.8, true);
+      expect(controller.state.temperature).toBe(2);
+      controller.stepTemperature(-1.9);
+      expect(controller.state.temperature).toBe(0.1);
+      controller.setBatchSize(-5, false);
+      expect(controller.state.batchSize).toBe(30);
+      controller.setBatchSize(1, true);
+      expect(controller.state.batchSize).toBe(1);
+      controller.setBatchSize(18, true);
+      expect(controller.state.batchSize).toBe(18);
+      expect(elements.get('translate-advanced-summary').textContent).toContain('18');
+      expect(elements.get('translate-batch-custom-row').style.display).toBe('flex');
+
+      // Sync prompt & start translation forwards all Phase 2 settings
+      (globalThis as any).window.settingsState.translateAiCustomPrompt = 'Keep names untranslated';
+      controller.syncFromGlobalSettings();
+      expect(elements.get('btn-reset-translate-prompt').style.display).toBe('inline-flex');
+
+      await controller.loadSubtitleFile('/subs/episode1.srt');
+      await controller.startTranslation();
+
+      const translateCall = tauriInvoke.mock.calls.find(([cmd]) => cmd === 'translate_transcription_files');
+      expect(translateCall).toBeTruthy();
+      expect((translateCall![1] as any).settings).toMatchObject({
+        translateAiCustomPrompt: 'Keep names untranslated',
+        translateAiTemperature: 0.1,
+        translateAiBatchSize: 18,
+        translateOutputDirMode: 'custom',
+        translateOutputDirPath: '/dedicated/out',
+      });
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('displays resumable checkpoint banner on subtitle load and clears checkpoint via backend command', async () => {
+    const { controller, elements, tauriInvoke, showNotification, cleanup } = setupPhase2Harness();
+    try {
+      await controller.loadSubtitleFile('/subs/movie.srt');
+      await vi.waitFor(() => {
+        expect(elements.get('translate-checkpoint-banner').style.display).toBe('flex');
+      });
+      expect(elements.get('translate-checkpoint-text').textContent).toContain('4');
+      expect(elements.get('translate-checkpoint-text').textContent).toContain('12');
+
+      await controller.clearCheckpoint();
+      expect(tauriInvoke).toHaveBeenCalledWith('clear_translation_checkpoint', expect.objectContaining({
+        subtitlePath: '/subs/movie.srt',
+        outputDir: '/dedicated/out',
+      }));
+      expect(elements.get('translate-checkpoint-banner').style.display).toBe('none');
+      expect(showNotification).toHaveBeenCalled();
+
+      controller.clearLoadedSubtitle();
+      expect(elements.get('translate-checkpoint-banner').style.display).toBe('none');
+    } finally {
+      cleanup();
+    }
+  });
+});
+
+

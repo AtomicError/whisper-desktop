@@ -4,13 +4,21 @@ import {
   isolateDirection,
   directionAttributes,
   applyContentDirection,
+  applyTextDirection,
   clearContentDirection,
   getLanguage,
   formatLocalizedNumber,
 } from './i18n/index';
+import { formatTokensShort } from './i18n/formatters';
 import { copyToClipboard, openFileInEditor } from './modules/nativeWindow';
 import { hardsubController } from './hardsub';
-import { isModelIdMatch } from './modules/providerHelpers';
+import { readProviders, writeProviders, isModelIdMatch, isModelReasoningSupported, type ProviderConfig, type ModelObject } from './modules/providerHelpers';
+import {
+  clampIntSettingValue,
+  clampFloatSettingValue,
+  normalizeDigitsToAscii,
+  filterNumericInputPreservingLocalizedDigits,
+} from './modules/transcribeConfigHelpers';
 
 const invoke = async <T>(cmd: string, args: Record<string, any> = {}): Promise<T> => {
   const tauri = (window as any).__TAURI__;
@@ -30,6 +38,8 @@ const listen = async <T>(event: string, handler: (e: { payload: T }) => void): P
 export const SUPPORTED_TRANSLATION_EXTENSIONS = ['srt', 'vtt', 'lrc', 'txt'] as const;
 const TRANSLATE_OUTPUT_MODE_STORAGE_KEY = 'whisper_translate_output_dir_mode';
 const TRANSLATE_OUTPUT_DIR_STORAGE_KEY = 'whisper_translate_output_dir';
+const TEMP_PRESETS = new Set([0.1, 0.3, 0.6]);
+const BATCH_PRESETS = new Set([10, 20, 30]);
 
 export interface SubtitleCue {
   id: number;
@@ -54,6 +64,9 @@ export interface TranslationStudioState {
   activeProvider: string;
   activeModel: string;
   polishPass: boolean;
+  customPrompt: string;
+  temperature: number;
+  batchSize: number;
   outputDirMode: 'input_dir' | 'custom';
   outputDir: string;
   companionVideoPath: string | null;
@@ -297,6 +310,17 @@ export class TranslationStudioController {
   private targetLangSelect: HTMLSelectElement | null = null;
   private providerSelect: HTMLSelectElement | null = null;
   private modelSelect: HTMLSelectElement | null = null;
+  private modelMetaRow: HTMLElement | null = null;
+  private modelCtxChip: HTMLElement | null = null;
+  private modelReasoningChip: HTMLElement | null = null;
+  private providerWarningBtn: HTMLButtonElement | null = null;
+  private reasoningGroup: HTMLElement | null = null;
+  private reasoningPillsContainer: HTMLElement | null = null;
+  private reasoningNoneBtn: HTMLButtonElement | null = null;
+  private reasoningLowBtn: HTMLButtonElement | null = null;
+  private reasoningMediumBtn: HTMLButtonElement | null = null;
+  private reasoningHighBtn: HTMLButtonElement | null = null;
+  private reasoningExtendedBtn: HTMLButtonElement | null = null;
   private btnManageProviders: HTMLButtonElement | null = null;
   private polishToggle: HTMLInputElement | null = null;
   private outputLocationModes: HTMLElement | null = null;
@@ -306,6 +330,30 @@ export class TranslationStudioController {
   private outputDirText: HTMLElement | null = null;
   private btnOpenDir: HTMLButtonElement | null = null;
   private btnBrowseDir: HTMLButtonElement | null = null;
+  private customPromptEl: HTMLTextAreaElement | null = null;
+  private btnResetPrompt: HTMLButtonElement | null = null;
+  private advancedToggleBtn: HTMLButtonElement | null = null;
+  private advancedBody: HTMLElement | null = null;
+  private advancedSummary: HTMLElement | null = null;
+  private temp01Btn: HTMLButtonElement | null = null;
+  private temp03Btn: HTMLButtonElement | null = null;
+  private temp06Btn: HTMLButtonElement | null = null;
+  private tempCustomBtn: HTMLButtonElement | null = null;
+  private tempCustomRow: HTMLElement | null = null;
+  private tempInput: HTMLInputElement | null = null;
+  private btnTempDec: HTMLButtonElement | null = null;
+  private btnTempInc: HTMLButtonElement | null = null;
+  private batch10Btn: HTMLButtonElement | null = null;
+  private batch20Btn: HTMLButtonElement | null = null;
+  private batch30Btn: HTMLButtonElement | null = null;
+  private batchCustomBtn: HTMLButtonElement | null = null;
+  private batchCustomRow: HTMLElement | null = null;
+  private batchInput: HTMLInputElement | null = null;
+  private btnBatchDec: HTMLButtonElement | null = null;
+  private btnBatchInc: HTMLButtonElement | null = null;
+  private checkpointBanner: HTMLElement | null = null;
+  private checkpointText: HTMLElement | null = null;
+  private btnClearCheckpoint: HTMLButtonElement | null = null;
 
   // Telemetry & Action Elements
   private btnStart: HTMLButtonElement | null = null;
@@ -354,6 +402,13 @@ export class TranslationStudioController {
   private hasExplicitOutputDir = false;
   private deckResizeObserver: ResizeObserver | null = null;
   private openDirCooldownTimer: ReturnType<typeof setTimeout> | null = null;
+  private checkpointCheckTimer: ReturnType<typeof setTimeout> | null = null;
+  private checkpointCheckSeq = 0;
+  private activeCheckpointInfo: { translatedLines: number; totalLines: number } | null = null;
+  private isClearingCheckpoint = false;
+  private tempCustomOpen = false;
+  private batchCustomOpen = false;
+  private advancedExpanded = false;
   private statusBadgeKey = 'translate.statusReady';
   private statusBadgeModifier = '';
   private lastProgressPayload: any = null;
@@ -377,6 +432,9 @@ export class TranslationStudioController {
     activeProvider: '',
     activeModel: '',
     polishPass: false,
+    customPrompt: '',
+    temperature: 0.3,
+    batchSize: 30,
     outputDirMode: 'input_dir',
     outputDir: '',
     companionVideoPath: null,
@@ -397,6 +455,9 @@ export class TranslationStudioController {
       this.loadPersistedOutputDirState();
       this.syncFromGlobalSettings();
       this.updateOutputDirUI();
+      this.updateModelMetaAndReasoningUI();
+      this.updatePromptUI();
+      this.updateAdvancedTuningUI();
       this.updateActionButtons();
     };
 
@@ -422,6 +483,17 @@ export class TranslationStudioController {
     this.targetLangSelect = document.getElementById('translate-target-lang') as HTMLSelectElement;
     this.providerSelect = document.getElementById('translate-provider-select') as HTMLSelectElement;
     this.modelSelect = document.getElementById('translate-model-select') as HTMLSelectElement;
+    this.modelMetaRow = document.getElementById('translate-model-meta-row');
+    this.modelCtxChip = document.getElementById('translate-model-ctx-chip');
+    this.modelReasoningChip = document.getElementById('translate-model-reasoning-chip');
+    this.providerWarningBtn = document.getElementById('translate-provider-warning-btn') as HTMLButtonElement;
+    this.reasoningGroup = document.getElementById('translate-reasoning-group');
+    this.reasoningPillsContainer = document.getElementById('translate-reasoning-pills');
+    this.reasoningNoneBtn = document.getElementById('translate-reasoning-none') as HTMLButtonElement;
+    this.reasoningLowBtn = document.getElementById('translate-reasoning-low') as HTMLButtonElement;
+    this.reasoningMediumBtn = document.getElementById('translate-reasoning-medium') as HTMLButtonElement;
+    this.reasoningHighBtn = document.getElementById('translate-reasoning-high') as HTMLButtonElement;
+    this.reasoningExtendedBtn = document.getElementById('translate-reasoning-extended') as HTMLButtonElement;
     this.btnManageProviders = document.getElementById('btn-translate-manage-providers') as HTMLButtonElement;
     this.polishToggle = document.getElementById('translate-polish-toggle') as HTMLInputElement;
     this.outputLocationModes = document.getElementById('translate-output-location-modes');
@@ -431,6 +503,30 @@ export class TranslationStudioController {
     this.outputDirText = document.getElementById('translate-output-dir-text');
     this.btnOpenDir = document.getElementById('btn-open-translate-dir') as HTMLButtonElement;
     this.btnBrowseDir = document.getElementById('btn-browse-translate-dir') as HTMLButtonElement;
+    this.customPromptEl = document.getElementById('translate-custom-prompt') as HTMLTextAreaElement;
+    this.btnResetPrompt = document.getElementById('btn-reset-translate-prompt') as HTMLButtonElement;
+    this.advancedToggleBtn = document.getElementById('btn-toggle-translate-advanced') as HTMLButtonElement;
+    this.advancedBody = document.getElementById('translate-advanced-body');
+    this.advancedSummary = document.getElementById('translate-advanced-summary');
+    this.temp01Btn = document.getElementById('translate-temp-01') as HTMLButtonElement;
+    this.temp03Btn = document.getElementById('translate-temp-03') as HTMLButtonElement;
+    this.temp06Btn = document.getElementById('translate-temp-06') as HTMLButtonElement;
+    this.tempCustomBtn = document.getElementById('translate-temp-custom') as HTMLButtonElement;
+    this.tempCustomRow = document.getElementById('translate-temp-custom-row');
+    this.tempInput = document.getElementById('translate-temp-input') as HTMLInputElement;
+    this.btnTempDec = document.getElementById('btn-translate-temp-dec') as HTMLButtonElement;
+    this.btnTempInc = document.getElementById('btn-translate-temp-inc') as HTMLButtonElement;
+    this.batch10Btn = document.getElementById('translate-batch-10') as HTMLButtonElement;
+    this.batch20Btn = document.getElementById('translate-batch-20') as HTMLButtonElement;
+    this.batch30Btn = document.getElementById('translate-batch-30') as HTMLButtonElement;
+    this.batchCustomBtn = document.getElementById('translate-batch-custom') as HTMLButtonElement;
+    this.batchCustomRow = document.getElementById('translate-batch-custom-row');
+    this.batchInput = document.getElementById('translate-batch-input') as HTMLInputElement;
+    this.btnBatchDec = document.getElementById('btn-translate-batch-dec') as HTMLButtonElement;
+    this.btnBatchInc = document.getElementById('btn-translate-batch-inc') as HTMLButtonElement;
+    this.checkpointBanner = document.getElementById('translate-checkpoint-banner');
+    this.checkpointText = document.getElementById('translate-checkpoint-text');
+    this.btnClearCheckpoint = document.getElementById('btn-clear-translate-checkpoint') as HTMLButtonElement;
 
     this.btnStart = document.getElementById('btn-start-translation') as HTMLButtonElement;
     this.btnStartText = document.getElementById('btn-start-translation-text');
@@ -501,6 +597,7 @@ export class TranslationStudioController {
             win.saveCurrentSettings();
           }
         }
+        this.scheduleCheckpointCheck(0);
       }
     });
 
@@ -563,21 +660,14 @@ export class TranslationStudioController {
             win.saveCurrentSettings();
           }
         }
+        this.updateModelMetaAndReasoningUI();
         this.updateActionButtons();
+        this.scheduleCheckpointCheck(0);
       }
     });
 
-    this.bindListener(this.btnManageProviders, 'click', () => {
-      const win = window as any;
-      if (typeof win.switchView === 'function') {
-        win.switchView('settings');
-        if (typeof win.switchSettingsCategory === 'function') {
-          win.switchSettingsCategory('translation');
-        } else if (typeof win.switchSettingsTab === 'function') {
-          win.switchSettingsTab('translation');
-        }
-      }
-    });
+    this.bindListener(this.btnManageProviders, 'click', () => this.openTranslationSettings('providers'));
+    this.bindListener(this.providerWarningBtn, 'click', () => this.openTranslationSettings('general'));
 
     this.bindListener(this.polishToggle, 'change', () => {
       if (this.polishToggle) {
@@ -598,6 +688,7 @@ export class TranslationStudioController {
             win.saveCurrentSettings();
           }
         }
+        this.scheduleCheckpointCheck(0);
       }
     });
 
@@ -639,6 +730,130 @@ export class TranslationStudioController {
     });
     this.bindListener(this.btnBrowseDir, 'click', () => {
       void this.browseOutputDir();
+    });
+
+    this.bindListener(this.reasoningPillsContainer, 'click', (e) => {
+      const btn = (e.target as HTMLElement | null)?.closest?.('.translate-preset-pill') as HTMLButtonElement | null;
+      if (!btn || btn.disabled) return;
+      const level = btn.dataset?.reasoning;
+      if (!level) return;
+      this.setActiveModelReasoning(level);
+    });
+
+    this.bindListener(this.customPromptEl, 'input', () => {
+      if (!this.customPromptEl) return;
+      if (this.state.isTranslating || this.isStartingTranslation) {
+        this.customPromptEl.value = this.state.customPrompt;
+        return;
+      }
+      applyTextDirection(this.customPromptEl);
+      this.state.customPrompt = this.customPromptEl.value;
+      const win = window as any;
+      if (win.settingsState) {
+        win.settingsState.translateAiCustomPrompt = this.state.customPrompt;
+        if (typeof win.markSettingsDirty === 'function') {
+          win.markSettingsDirty();
+        }
+        if (typeof win.saveCurrentSettings === 'function') {
+          win.saveCurrentSettings(false);
+        }
+      }
+      this.updatePromptResetButtonUI();
+      this.scheduleCheckpointCheck(250);
+    });
+
+    this.bindListener(this.btnResetPrompt, 'click', () => {
+      if (this.state.isTranslating || this.isStartingTranslation) return;
+      this.state.customPrompt = '';
+      if (this.customPromptEl) {
+        this.customPromptEl.value = '';
+      }
+      const win = window as any;
+      if (win.settingsState) {
+        win.settingsState.translateAiCustomPrompt = '';
+        if (typeof win.saveCurrentSettings === 'function') {
+          win.saveCurrentSettings();
+        }
+      }
+      this.updatePromptUI();
+      this.scheduleCheckpointCheck(0);
+    });
+
+    this.bindListener(this.advancedToggleBtn, 'click', () => {
+      this.advancedExpanded = !this.advancedExpanded;
+      this.updateAdvancedDisclosureUI();
+    });
+
+    for (const btn of [this.temp01Btn, this.temp03Btn, this.temp06Btn, this.tempCustomBtn]) {
+      this.bindListener(btn, 'click', () => {
+        if (!btn) return;
+        const val = btn.dataset?.temp;
+        if (val === 'custom') {
+          this.activateCustomTemperature();
+        } else if (val !== undefined) {
+          this.setTemperature(parseFloat(val), false);
+        }
+      });
+    }
+
+    this.bindListener(this.btnTempDec, 'click', () => this.stepTemperature(-0.1));
+    this.bindListener(this.btnTempInc, 'click', () => this.stepTemperature(0.1));
+    this.bindListener(this.tempInput, 'input', () => {
+      if (!this.tempInput) return;
+      const filtered = this.tempInput.value.replace(/[^\d.,٫\u06F0-\u06F9\u0660-\u0669]/g, '');
+      if (filtered !== this.tempInput.value) {
+        this.tempInput.value = filtered;
+      }
+      const normalized = normalizeDigitsToAscii(filtered).replace(/[,٫]/g, '.').trim();
+      const parsed = parseFloat(normalized);
+      if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 2) {
+        this.setTemperature(parsed, true, true);
+      }
+    });
+    const commitTempInput = () => {
+      if (!this.tempInput) return;
+      const normalized = normalizeDigitsToAscii(this.tempInput.value).replace(/[,٫]/g, '.').trim();
+      const clamped = clampFloatSettingValue('translateAiTemperature', normalized);
+      this.setTemperature(clamped, true);
+    };
+    this.bindListener(this.tempInput, 'change', commitTempInput);
+    this.bindListener(this.tempInput, 'blur', commitTempInput);
+
+    for (const btn of [this.batch10Btn, this.batch20Btn, this.batch30Btn, this.batchCustomBtn]) {
+      this.bindListener(btn, 'click', () => {
+        if (!btn) return;
+        const val = btn.dataset?.batch;
+        if (val === 'custom') {
+          this.activateCustomBatchSize();
+        } else if (val !== undefined) {
+          this.setBatchSize(parseInt(val, 10), false);
+        }
+      });
+    }
+
+    this.bindListener(this.btnBatchDec, 'click', () => this.stepBatchSize(-1));
+    this.bindListener(this.btnBatchInc, 'click', () => this.stepBatchSize(1));
+    this.bindListener(this.batchInput, 'input', () => {
+      if (!this.batchInput) return;
+      const filtered = filterNumericInputPreservingLocalizedDigits(this.batchInput.value);
+      if (filtered !== this.batchInput.value) {
+        this.batchInput.value = filtered;
+      }
+      const parsed = parseInt(normalizeDigitsToAscii(filtered), 10);
+      if (Number.isFinite(parsed) && parsed >= 1 && parsed <= 30) {
+        this.setBatchSize(parsed, true, true);
+      }
+    });
+    const commitBatchInput = () => {
+      if (!this.batchInput) return;
+      const clamped = clampIntSettingValue('translateAiBatchSize', this.batchInput.value);
+      this.setBatchSize(clamped, true);
+    };
+    this.bindListener(this.batchInput, 'change', commitBatchInput);
+    this.bindListener(this.batchInput, 'blur', commitBatchInput);
+
+    this.bindListener(this.btnClearCheckpoint, 'click', () => {
+      void this.clearCheckpoint();
     });
 
     this.setupDeckScrollCueObserver();
@@ -1256,6 +1471,7 @@ export class TranslationStudioController {
       if (this.sourceList) this.sourceList.scrollTop = 0;
       if (this.targetList) this.targetList.scrollTop = 0;
       this.updateActionButtons();
+      this.scheduleCheckpointCheck(0);
       void this.detectCompanionVideo(filePath, loadId);
       return true;
     } catch (err: any) {
@@ -1279,6 +1495,12 @@ export class TranslationStudioController {
     this.activeLoadToken++;
     this.companionProbeSeq++;
     this.companionProbeCompleted = false;
+    this.checkpointCheckSeq++;
+    if (this.checkpointCheckTimer) {
+      clearTimeout(this.checkpointCheckTimer);
+      this.checkpointCheckTimer = null;
+    }
+    this.activeCheckpointInfo = null;
     this.state.subtitlePath = '';
     this.state.subtitleName = '';
     this.state.subtitleExt = '';
@@ -1308,6 +1530,7 @@ export class TranslationStudioController {
     this.setStatusBadge('translate.statusReady', '');
 
     this.updateSubtitleInfoUI();
+    this.updateCheckpointBannerUI();
     this.renderSourceCues();
     this.renderTargetCues();
     if (this.sourceList) this.sourceList.scrollTop = 0;
@@ -1585,6 +1808,23 @@ export class TranslationStudioController {
     }
   }
 
+  private syncOutputDirToGlobalSettings() {
+    const win = window as any;
+    if (!win?.settingsState) return;
+    if (this.hasExplicitOutputDirMode) {
+      win.settingsState.translateOutputDirMode = this.state.outputDirMode;
+    }
+    if (this.hasExplicitOutputDir) {
+      win.settingsState.translateOutputDirPath = String(this.state.outputDir || '').trim();
+    }
+    if (typeof win.markSettingsDirty === 'function') {
+      win.markSettingsDirty();
+    }
+    if (typeof win.saveCurrentSettings === 'function') {
+      win.saveCurrentSettings(false);
+    }
+  }
+
   public async setOutputDirMode(mode: 'input_dir' | 'custom') {
     if (this.state.isTranslating || this.isStartingTranslation) return;
     if (mode === 'custom') {
@@ -1605,7 +1845,9 @@ export class TranslationStudioController {
       this.state.outputDirMode = 'input_dir';
     }
     this.persistOutputDirState();
+    this.syncOutputDirToGlobalSettings();
     this.updateOutputDirUI();
+    this.scheduleCheckpointCheck(0);
   }
 
   public async openCustomOutputDir() {
@@ -1665,7 +1907,9 @@ export class TranslationStudioController {
         this.hasExplicitOutputDir = true;
         this.hasExplicitOutputDirMode = true;
         this.persistOutputDirState();
+        this.syncOutputDirToGlobalSettings();
         this.updateOutputDirUI();
+        this.scheduleCheckpointCheck(0);
       }
     } catch (err) {
       console.error('Failed to select directory:', err);
@@ -1696,21 +1940,53 @@ export class TranslationStudioController {
       if (this.polishToggle) this.polishToggle.checked = this.state.polishPass;
     }
 
-    if (!this.hasExplicitOutputDir && typeof settings.outputDirPath === 'string') {
-      this.state.outputDir = settings.outputDirPath.trim();
+    if (typeof settings.translateAiCustomPrompt === 'string') {
+      this.state.customPrompt = settings.translateAiCustomPrompt;
     }
 
-    if (!this.hasExplicitOutputDirMode && (settings.outputDirMode === 'custom' || settings.outputDirMode === 'input_dir')) {
-      this.state.outputDirMode = settings.outputDirMode;
+    const nextTemp = settings.translateAiTemperature !== undefined
+      ? clampFloatSettingValue('translateAiTemperature', settings.translateAiTemperature)
+      : 0.3;
+    this.state.temperature = Math.round(nextTemp * 10) / 10;
+    this.tempCustomOpen = !TEMP_PRESETS.has(this.state.temperature);
+
+    const rawBatch = settings.translateAiBatchSize;
+    const nextBatch = (typeof rawBatch === 'number' && rawBatch <= 0)
+      ? 30
+      : (rawBatch !== undefined ? clampIntSettingValue('translateAiBatchSize', rawBatch) : 30);
+    this.state.batchSize = nextBatch;
+    this.batchCustomOpen = !BATCH_PRESETS.has(this.state.batchSize);
+
+    if (!this.hasExplicitOutputDir) {
+      const dedicatedDir = typeof settings.translateOutputDirPath === 'string' ? settings.translateOutputDirPath.trim() : '';
+      const fallbackDir = typeof settings.outputDirPath === 'string' ? settings.outputDirPath.trim() : '';
+      if (dedicatedDir) {
+        this.state.outputDir = dedicatedDir;
+        this.hasExplicitOutputDir = true;
+      } else if (typeof settings.outputDirPath === 'string') {
+        this.state.outputDir = fallbackDir;
+      }
+    }
+
+    if (!this.hasExplicitOutputDirMode) {
+      if (settings.translateOutputDirMode === 'custom' || settings.translateOutputDirMode === 'input_dir') {
+        this.state.outputDirMode = settings.translateOutputDirMode;
+        this.hasExplicitOutputDirMode = true;
+      } else if (settings.outputDirMode === 'custom' || settings.outputDirMode === 'input_dir') {
+        this.state.outputDirMode = settings.outputDirMode;
+      }
     }
 
     this.updateOutputDirUI();
+    this.updatePromptUI();
+    this.updateAdvancedTuningUI();
 
     this.refreshProviderOptions(force);
 
     if (typeof win.syncCustomSelects === 'function') {
       win.syncCustomSelects();
     }
+    this.scheduleCheckpointCheck(0);
   }
 
   public refreshProviderOptions(force = false) {
@@ -1789,10 +2065,13 @@ export class TranslationStudioController {
       this.modelSelect.appendChild(opt);
       this.state.activeModel = '';
       this.modelSelect.value = '';
+      this.updateModelMetaAndReasoningUI();
+      this.updatePromptUI();
       this.updateActionButtons();
       if (typeof win.syncCustomSelects === 'function') {
         win.syncCustomSelects();
       }
+      this.scheduleCheckpointCheck(0);
       return;
     }
 
@@ -1806,10 +2085,13 @@ export class TranslationStudioController {
       this.modelSelect.appendChild(opt);
       this.state.activeModel = '';
       this.modelSelect.value = '';
+      this.updateModelMetaAndReasoningUI();
+      this.updatePromptUI();
       this.updateActionButtons();
       if (typeof win.syncCustomSelects === 'function') {
         win.syncCustomSelects();
       }
+      this.scheduleCheckpointCheck(0);
       return;
     }
 
@@ -1824,10 +2106,467 @@ export class TranslationStudioController {
     this.state.activeModel = matchedModel ? matchedModel.id : enabledModels[0].id;
     this.modelSelect.value = this.state.activeModel;
 
+    this.updateModelMetaAndReasoningUI();
+    this.updatePromptUI();
     this.updateActionButtons();
 
     if (typeof win.syncCustomSelects === 'function') {
       win.syncCustomSelects();
+    }
+    this.scheduleCheckpointCheck(0);
+  }
+
+  public openTranslationSettings(subTab: 'general' | 'providers' = 'providers') {
+    const win = window as any;
+    if (typeof win.switchView === 'function') {
+      win.switchView('settings');
+    }
+    if (typeof win.switchSettingsCategory === 'function') {
+      win.switchSettingsCategory('translation');
+    }
+    if (typeof win.switchProviderTab === 'function') {
+      win.switchProviderTab(subTab);
+    }
+  }
+
+  private getActiveProviderAndModel(): {
+    providers: ProviderConfig[];
+    providerIndex: number;
+    provider: ProviderConfig | null;
+    modelIndex: number;
+    model: ModelObject | null;
+  } {
+    const win = window as any;
+    const providers = readProviders(win?.settingsState);
+    const providerIndex = providers.findIndex((p) => p.name === this.state.activeProvider);
+    const provider = providerIndex >= 0 ? providers[providerIndex] : null;
+    const models = Array.isArray(provider?.models) ? provider!.models! : [];
+    const modelIndex = models.findIndex((m) => isModelIdMatch(m.id, this.state.activeModel));
+    const model = modelIndex >= 0 ? models[modelIndex] : null;
+    return { providers, providerIndex, provider, modelIndex, model };
+  }
+
+  private getReasoningPillLabel(level: string): string {
+    const lower = level.trim().toLowerCase();
+    if (lower === 'none') return t('translate.reasoningOff') || 'Off';
+    if (lower === 'low') return t('translate.reasoningLow') || 'Low';
+    if (lower === 'medium') return t('translate.reasoningMedium') || 'Medium';
+    if (lower === 'high') return t('translate.reasoningHigh') || 'High';
+    return level.trim() || 'Medium';
+  }
+
+  private updateModelMetaAndReasoningUI() {
+    const { provider, model } = this.getActiveProviderAndModel();
+    const supportsReasoning = Boolean(provider && model && isModelReasoningSupported(model));
+    const activeReasoning = String(model?.reasoning || 'Medium').trim() || 'Medium';
+
+    let hasVisibleMeta = false;
+    if (this.modelCtxChip) {
+      const ctxVal = Number(model?.contextWindow ?? model?.context_window ?? 0);
+      if (provider && model && Number.isFinite(ctxVal) && ctxVal > 0) {
+        this.modelCtxChip.textContent = t('translate.metaContext', { ctx: formatTokensShort(ctxVal) });
+        this.modelCtxChip.style.display = 'inline-flex';
+        hasVisibleMeta = true;
+      } else {
+        this.modelCtxChip.style.display = 'none';
+      }
+    }
+
+    if (this.modelReasoningChip) {
+      if (supportsReasoning) {
+        const levelLabel = this.getReasoningPillLabel(activeReasoning);
+        this.modelReasoningChip.textContent = t('translate.metaReasoning', { level: levelLabel });
+        this.modelReasoningChip.style.display = 'inline-flex';
+        hasVisibleMeta = true;
+      } else {
+        this.modelReasoningChip.style.display = 'none';
+      }
+    }
+
+    if (this.providerWarningBtn) {
+      const baseUrl = String(provider?.baseUrl || provider?.base_url || '').trim();
+      const apiKey = String(provider?.apiKey || provider?.api_key || '').trim();
+      const usesKeyring = Boolean(provider?.useKeyring || provider?.use_keyring);
+      const isLocalUrl = /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?(\/|$)/i.test(baseUrl);
+      let warningKey = '';
+      if (provider && !baseUrl) {
+        warningKey = 'translate.warningMissingBaseUrl';
+      } else if (provider && !apiKey && !usesKeyring && !isLocalUrl) {
+        warningKey = 'translate.warningMissingApiKey';
+      }
+      if (warningKey) {
+        this.providerWarningBtn.setAttribute?.('data-i18n', warningKey);
+        this.providerWarningBtn.textContent = t(warningKey);
+        this.providerWarningBtn.title = t(warningKey);
+        this.providerWarningBtn.style.display = 'inline-flex';
+        hasVisibleMeta = true;
+      } else {
+        this.providerWarningBtn.removeAttribute?.('data-i18n');
+        this.providerWarningBtn.style.display = 'none';
+      }
+    }
+
+    if (this.modelMetaRow) {
+      this.modelMetaRow.style.display = hasVisibleMeta ? 'flex' : 'none';
+    }
+
+    if (this.reasoningGroup) {
+      this.reasoningGroup.style.display = supportsReasoning ? 'flex' : 'none';
+    }
+
+    const activeLower = activeReasoning.toLowerCase();
+    const stdLevels = ['none', 'low', 'medium', 'high'];
+    const isExtended = supportsReasoning && !stdLevels.includes(activeLower);
+    if (this.reasoningExtendedBtn) {
+      if (isExtended) {
+        this.reasoningExtendedBtn.dataset.reasoning = activeReasoning;
+        this.reasoningExtendedBtn.textContent = this.getReasoningPillLabel(activeReasoning);
+        this.reasoningExtendedBtn.style.display = 'inline-flex';
+      } else {
+        this.reasoningExtendedBtn.dataset.reasoning = '';
+        this.reasoningExtendedBtn.style.display = 'none';
+      }
+    }
+
+    const pills: Array<HTMLButtonElement | null> = [
+      this.reasoningNoneBtn,
+      this.reasoningLowBtn,
+      this.reasoningMediumBtn,
+      this.reasoningHighBtn,
+      this.reasoningExtendedBtn,
+    ];
+    for (const pill of pills) {
+      if (!pill) continue;
+      const level = String(pill.dataset?.reasoning || '').trim().toLowerCase();
+      const isActive = supportsReasoning && level.length > 0 && level === activeLower;
+      pill.classList?.toggle?.('active', isActive);
+      pill.setAttribute?.('aria-pressed', isActive ? 'true' : 'false');
+    }
+
+    this.updateDeckScrollCue();
+  }
+
+  public setActiveModelReasoning(level: string) {
+    if (this.state.isTranslating || this.isStartingTranslation) return;
+    const normalizedLevel = level.trim();
+    if (!normalizedLevel) return;
+
+    const win = window as any;
+    const { providers, providerIndex, modelIndex } = this.getActiveProviderAndModel();
+    if (providerIndex < 0 || modelIndex < 0 || !providers[providerIndex]?.models) return;
+
+    providers[providerIndex].models![modelIndex] = {
+      ...providers[providerIndex].models![modelIndex],
+      reasoning: normalizedLevel,
+    };
+
+    if (win.settingsState) {
+      writeProviders(win.settingsState, providers);
+      if (typeof win.syncActiveModelSelectionUI === 'function') {
+        win.syncActiveModelSelectionUI(this.state.activeModel);
+      }
+      if (typeof win.markSettingsDirty === 'function') {
+        win.markSettingsDirty();
+      }
+      if (typeof win.saveCurrentSettings === 'function') {
+        win.saveCurrentSettings(false);
+      }
+    }
+
+    this.updateModelMetaAndReasoningUI();
+    this.scheduleCheckpointCheck(0);
+  }
+
+  private updatePromptResetButtonUI() {
+    if (!this.btnResetPrompt) return;
+    const hasCustom = this.state.customPrompt.trim().length > 0;
+    this.btnResetPrompt.style.display = hasCustom ? 'inline-flex' : 'none';
+  }
+
+  private updatePromptUI() {
+    const { provider } = this.getActiveProviderAndModel();
+    const providerDefault = String(provider?.customPrompt || provider?.custom_prompt || '').trim();
+
+    if (this.customPromptEl) {
+      if (this.customPromptEl.value !== this.state.customPrompt) {
+        this.customPromptEl.value = this.state.customPrompt;
+      }
+      if (!this.state.customPrompt.trim() && providerDefault) {
+        const snippet = providerDefault.length > 72 ? `${providerDefault.slice(0, 69)}...` : providerDefault;
+        this.customPromptEl.removeAttribute?.('data-i18n-placeholder');
+        this.customPromptEl.placeholder = t('translate.promptProviderFallbackPlaceholder', { prompt: snippet });
+      } else {
+        this.customPromptEl.setAttribute?.('data-i18n-placeholder', 'translate.promptPlaceholder');
+        this.customPromptEl.placeholder = t('translate.promptPlaceholder');
+      }
+      applyTextDirection(this.customPromptEl);
+    }
+
+    this.updatePromptResetButtonUI();
+    this.updateDeckScrollCue();
+  }
+
+  private updateAdvancedDisclosureUI() {
+    if (this.advancedToggleBtn) {
+      this.advancedToggleBtn.setAttribute?.('aria-expanded', this.advancedExpanded ? 'true' : 'false');
+    }
+    if (this.advancedBody) {
+      this.advancedBody.style.display = this.advancedExpanded ? 'flex' : 'none';
+    }
+    this.updateDeckScrollCue();
+  }
+
+  private updateAdvancedTuningUI(skipTempInput = false, skipBatchInput = false) {
+    const temp = Math.round(clampFloatSettingValue('translateAiTemperature', this.state.temperature) * 10) / 10;
+    this.state.temperature = temp;
+    const batch = clampIntSettingValue('translateAiBatchSize', this.state.batchSize);
+    this.state.batchSize = batch;
+
+    const lang = getLanguage();
+    if (this.advancedSummary) {
+      const tempText = formatLocalizedNumber(temp, lang, 1);
+      const batchText = formatLocalizedNumber(batch, lang, 0);
+      this.advancedSummary.textContent = `${tempText} • ${batchText}`;
+    }
+
+    const isTempPreset = !this.tempCustomOpen && TEMP_PRESETS.has(temp);
+    const tempPairs: Array<[HTMLButtonElement | null, boolean]> = [
+      [this.temp01Btn, isTempPreset && Math.abs(temp - 0.1) < 0.001],
+      [this.temp03Btn, isTempPreset && Math.abs(temp - 0.3) < 0.001],
+      [this.temp06Btn, isTempPreset && Math.abs(temp - 0.6) < 0.001],
+      [this.tempCustomBtn, this.tempCustomOpen || !TEMP_PRESETS.has(temp)],
+    ];
+    for (const [btn, active] of tempPairs) {
+      if (!btn) continue;
+      btn.classList?.toggle?.('active', active);
+      btn.setAttribute?.('aria-pressed', active ? 'true' : 'false');
+    }
+
+    const showTempCustom = this.tempCustomOpen || !TEMP_PRESETS.has(temp);
+    if (this.tempCustomRow) {
+      this.tempCustomRow.style.display = showTempCustom ? 'flex' : 'none';
+    }
+    if (this.tempInput && !skipTempInput) {
+      this.tempInput.value = temp.toFixed(1);
+    }
+    const isBusy = this.state.isTranslating || this.isStartingTranslation;
+    if (this.btnTempDec) this.btnTempDec.disabled = isBusy || temp <= 0;
+    if (this.btnTempInc) this.btnTempInc.disabled = isBusy || temp >= 2;
+
+    const isBatchPreset = !this.batchCustomOpen && BATCH_PRESETS.has(batch);
+    const batchPairs: Array<[HTMLButtonElement | null, boolean]> = [
+      [this.batch10Btn, isBatchPreset && batch === 10],
+      [this.batch20Btn, isBatchPreset && batch === 20],
+      [this.batch30Btn, isBatchPreset && batch === 30],
+      [this.batchCustomBtn, this.batchCustomOpen || !BATCH_PRESETS.has(batch)],
+    ];
+    for (const [btn, active] of batchPairs) {
+      if (!btn) continue;
+      btn.classList?.toggle?.('active', active);
+      btn.setAttribute?.('aria-pressed', active ? 'true' : 'false');
+    }
+
+    const showBatchCustom = this.batchCustomOpen || !BATCH_PRESETS.has(batch);
+    if (this.batchCustomRow) {
+      this.batchCustomRow.style.display = showBatchCustom ? 'flex' : 'none';
+    }
+    if (this.batchInput && !skipBatchInput) {
+      this.batchInput.value = String(batch);
+    }
+    if (this.btnBatchDec) this.btnBatchDec.disabled = isBusy || batch <= 1;
+    if (this.btnBatchInc) this.btnBatchInc.disabled = isBusy || batch >= 30;
+
+    this.updateAdvancedDisclosureUI();
+  }
+
+  public setTemperature(value: number, isCustom: boolean, skipInputRewrite = false) {
+    if (this.state.isTranslating || this.isStartingTranslation) return;
+    const clamped = Math.round(clampFloatSettingValue('translateAiTemperature', value) * 10) / 10;
+    this.state.temperature = clamped;
+    this.tempCustomOpen = isCustom || !TEMP_PRESETS.has(clamped);
+
+    const win = window as any;
+    if (win.settingsState) {
+      win.settingsState.translateAiTemperature = clamped;
+      if (typeof win.markSettingsDirty === 'function') {
+        win.markSettingsDirty();
+      }
+      if (typeof win.saveCurrentSettings === 'function') {
+        win.saveCurrentSettings(false);
+      }
+    }
+
+    this.updateAdvancedTuningUI(skipInputRewrite, false);
+  }
+
+  public activateCustomTemperature() {
+    if (this.state.isTranslating || this.isStartingTranslation) return;
+    this.tempCustomOpen = true;
+    this.updateAdvancedTuningUI();
+    this.tempInput?.focus?.();
+  }
+
+  public stepTemperature(delta: number) {
+    if (this.state.isTranslating || this.isStartingTranslation) return;
+    this.setTemperature(this.state.temperature + delta, true);
+  }
+
+  public setBatchSize(value: number, isCustom: boolean, skipInputRewrite = false) {
+    if (this.state.isTranslating || this.isStartingTranslation) return;
+    const clamped = clampIntSettingValue('translateAiBatchSize', value);
+    this.state.batchSize = clamped;
+    this.batchCustomOpen = isCustom || !BATCH_PRESETS.has(clamped);
+
+    const win = window as any;
+    if (win.settingsState) {
+      win.settingsState.translateAiBatchSize = clamped;
+      if (typeof win.markSettingsDirty === 'function') {
+        win.markSettingsDirty();
+      }
+      if (typeof win.saveCurrentSettings === 'function') {
+        win.saveCurrentSettings(false);
+      }
+    }
+
+    this.updateAdvancedTuningUI(false, skipInputRewrite);
+    this.scheduleCheckpointCheck(250);
+  }
+
+  public activateCustomBatchSize() {
+    if (this.state.isTranslating || this.isStartingTranslation) return;
+    this.batchCustomOpen = true;
+    this.updateAdvancedTuningUI();
+    this.batchInput?.focus?.();
+  }
+
+  public stepBatchSize(delta: number) {
+    if (this.state.isTranslating || this.isStartingTranslation) return;
+    this.setBatchSize(this.state.batchSize + delta, true);
+  }
+
+  private buildEffectiveRunSettings(baseSettings: Record<string, any> = {}): Record<string, any> {
+    const trimmedDir = this.state.outputDirMode === 'custom' && this.state.outputDir
+      ? this.state.outputDir.trim()
+      : String(baseSettings.translateOutputDirPath || this.state.outputDir || '').trim();
+    return {
+      ...baseSettings,
+      translateAiEnabled: true,
+      translateAiTargetLang: this.state.targetLang,
+      translateAiProvider: this.state.activeProvider,
+      translateAiModel: this.state.activeModel,
+      translateAiPolish: this.state.polishPass,
+      translateAiCustomPrompt: this.state.customPrompt,
+      translateAiTemperature: this.state.temperature,
+      translateAiBatchSize: this.state.batchSize,
+      translateOutputDirMode: this.state.outputDirMode,
+      translateOutputDirPath: trimmedDir,
+    };
+  }
+
+  private scheduleCheckpointCheck(delayMs = 0) {
+    if (this.checkpointCheckTimer) {
+      clearTimeout(this.checkpointCheckTimer);
+      this.checkpointCheckTimer = null;
+    }
+    if (this.isDisposed || !this.state.subtitlePath || !this.state.activeModel) {
+      this.checkpointCheckSeq++;
+      this.activeCheckpointInfo = null;
+      this.updateCheckpointBannerUI();
+      return;
+    }
+    if (delayMs <= 0) {
+      void this.refreshCheckpointStatus();
+      return;
+    }
+    this.checkpointCheckTimer = setTimeout(() => {
+      this.checkpointCheckTimer = null;
+      void this.refreshCheckpointStatus();
+    }, delayMs);
+  }
+
+  private async refreshCheckpointStatus() {
+    if (this.isDisposed || this.state.isTranslating || this.isStartingTranslation) return;
+    const subtitlePath = this.state.subtitlePath;
+    if (!subtitlePath || !this.state.activeModel) {
+      this.activeCheckpointInfo = null;
+      this.updateCheckpointBannerUI();
+      return;
+    }
+
+    const seq = ++this.checkpointCheckSeq;
+    const win = window as any;
+    const effectiveSettings = this.buildEffectiveRunSettings(win?.settingsState || {});
+    const trimmedOutputDir = this.state.outputDirMode === 'custom' && this.state.outputDir
+      ? this.state.outputDir.trim()
+      : '';
+
+    let info: { translatedLines: number; totalLines: number } | null = null;
+    try {
+      info = await invoke<{ translatedLines: number; totalLines: number } | null>('get_translation_checkpoint_info', {
+        settings: effectiveSettings,
+        subtitlePath,
+        outputDir: trimmedOutputDir || null,
+      });
+    } catch (_) {
+      info = null;
+    }
+
+    if (seq !== this.checkpointCheckSeq || this.isDisposed || this.state.subtitlePath !== subtitlePath) {
+      return;
+    }
+
+    this.activeCheckpointInfo = info && typeof info.translatedLines === 'number' && info.translatedLines > 0
+      ? info
+      : null;
+    this.updateCheckpointBannerUI();
+  }
+
+  private updateCheckpointBannerUI() {
+    if (!this.checkpointBanner) return;
+    const isBusy = this.state.isTranslating || this.isStartingTranslation;
+    const info = this.activeCheckpointInfo;
+    const show = Boolean(!isBusy && this.state.subtitlePath && info && info.translatedLines > 0);
+    this.checkpointBanner.style.display = show ? 'flex' : 'none';
+    if (show && info && this.checkpointText) {
+      const lang = getLanguage();
+      const doneText = formatLocalizedNumber(info.translatedLines, lang, 0);
+      const totalValue = info.totalLines > 0 ? info.totalLines : this.state.sourceCues.length;
+      const totalText = formatLocalizedNumber(totalValue, lang, 0);
+      this.checkpointText.textContent = t('translate.checkpointResumable', {
+        done: doneText,
+        total: totalText,
+      });
+    }
+    if (this.btnClearCheckpoint) {
+      this.btnClearCheckpoint.disabled = isBusy || this.isClearingCheckpoint;
+    }
+    this.updateDeckScrollCue();
+  }
+
+  public async clearCheckpoint() {
+    if (this.isClearingCheckpoint || this.state.isTranslating || this.isStartingTranslation) return;
+    if (!this.state.subtitlePath) return;
+
+    this.isClearingCheckpoint = true;
+    this.updateCheckpointBannerUI();
+    try {
+      const win = window as any;
+      const effectiveSettings = this.buildEffectiveRunSettings(win?.settingsState || {});
+      const trimmedOutputDir = this.state.outputDirMode === 'custom' && this.state.outputDir
+        ? this.state.outputDir.trim()
+        : '';
+      await invoke<boolean>('clear_translation_checkpoint', {
+        settings: effectiveSettings,
+        subtitlePath: this.state.subtitlePath,
+        outputDir: trimmedOutputDir || null,
+      });
+      this.activeCheckpointInfo = null;
+      this.notify(t('translate.checkpointClearedToast'), 'info');
+    } catch (err) {
+      console.error('Failed to clear translation checkpoint:', err);
+    } finally {
+      this.isClearingCheckpoint = false;
+      this.updateCheckpointBannerUI();
     }
   }
 
@@ -2070,6 +2809,32 @@ export class TranslationStudioController {
     if (this.providerSelect) this.providerSelect.disabled = isBusy;
     if (this.modelSelect) this.modelSelect.disabled = isBusy;
     if (this.polishToggle) this.polishToggle.disabled = isBusy;
+    for (const btn of [
+      this.reasoningNoneBtn,
+      this.reasoningLowBtn,
+      this.reasoningMediumBtn,
+      this.reasoningHighBtn,
+      this.reasoningExtendedBtn,
+      this.btnResetPrompt,
+      this.temp01Btn,
+      this.temp03Btn,
+      this.temp06Btn,
+      this.tempCustomBtn,
+      this.batch10Btn,
+      this.batch20Btn,
+      this.batch30Btn,
+      this.batchCustomBtn,
+    ]) {
+      if (btn) btn.disabled = isBusy;
+    }
+    if (this.customPromptEl) this.customPromptEl.disabled = isBusy;
+    if (this.tempInput) this.tempInput.disabled = isBusy;
+    if (this.batchInput) this.batchInput.disabled = isBusy;
+    if (this.btnTempDec) this.btnTempDec.disabled = isBusy || this.state.temperature <= 0;
+    if (this.btnTempInc) this.btnTempInc.disabled = isBusy || this.state.temperature >= 2;
+    if (this.btnBatchDec) this.btnBatchDec.disabled = isBusy || this.state.batchSize <= 1;
+    if (this.btnBatchInc) this.btnBatchInc.disabled = isBusy || this.state.batchSize >= 30;
+    this.updateCheckpointBannerUI();
     if (this.btnCancel) {
       this.btnCancel.style.display = isTranslating ? 'inline-flex' : 'none';
       this.btnCancel.disabled = isTranslating ? this.isCancellingTranslation : false;
@@ -2356,13 +3121,13 @@ export class TranslationStudioController {
     const parentDir = getParentDir(this.state.subtitlePath);
     const fileName = this.state.subtitleName;
 
+    const runCustomPrompt = (typeof globalSettings?.translateAiCustomPrompt === 'string' && globalSettings.translateAiCustomPrompt.length > 0)
+      ? globalSettings.translateAiCustomPrompt
+      : this.state.customPrompt;
+
     const runSettings = {
-      ...globalSettings,
-      translateAiEnabled: true,
-      translateAiTargetLang: this.state.targetLang,
-      translateAiProvider: this.state.activeProvider,
-      translateAiModel: this.state.activeModel,
-      translateAiPolish: this.state.polishPass,
+      ...this.buildEffectiveRunSettings(globalSettings),
+      translateAiCustomPrompt: runCustomPrompt,
     };
 
     const prevTranslation = {
@@ -2572,6 +3337,7 @@ export class TranslationStudioController {
         this.syncFromGlobalSettings();
       }
       this.updateActionButtons();
+      this.scheduleCheckpointCheck(0);
     }
   }
 
@@ -2808,6 +3574,10 @@ export class TranslationStudioController {
 
   public refreshLocalization() {
     this.updateSubtitleInfoUI();
+    this.updateModelMetaAndReasoningUI();
+    this.updatePromptUI();
+    this.updateAdvancedTuningUI();
+    this.updateCheckpointBannerUI();
     this.renderSourceCues();
     this.renderTargetCues();
     if (this.sourceList) this.sourceList.scrollTop = 0;
@@ -2880,6 +3650,11 @@ export class TranslationStudioController {
     if (this.openDirCooldownTimer) {
       clearTimeout(this.openDirCooldownTimer);
       this.openDirCooldownTimer = null;
+    }
+    this.checkpointCheckSeq++;
+    if (this.checkpointCheckTimer) {
+      clearTimeout(this.checkpointCheckTimer);
+      this.checkpointCheckTimer = null;
     }
     this.isOpeningOutputDir = false;
   }

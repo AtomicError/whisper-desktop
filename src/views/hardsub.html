@@ -387,17 +387,36 @@
 
                   <!-- 4. Output Destination Card -->
                   <div class="glass-card" style="padding: 16px 18px;">
-                    <h3 style="margin: 0 0 12px 0; font-size: 0.95rem; color: var(--color-royal-blue); display: flex; align-items: center; gap: 8px;">
+                    <h3 id="lbl-hardsub-output-folder" style="margin: 0 0 12px 0; font-size: 0.95rem; color: var(--color-royal-blue); display: flex; align-items: center; gap: 8px;">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px; height:16px;">
                         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                       </svg>
-                      <span data-i18n="hardsub.outputFolder">Output Folder</span>
+                      <span data-i18n="settings.outputDirModeTitle">Output Files Save Location</span>
                     </h3>
-                    
-                    <div class="translate-output-row">
-                      <div class="translate-output-display" id="hardsub-output-dir-text" data-i18n="hardsub.sameAsSource">Same as source file folder</div>
-                      <button class="btn-secondary btn-sm" id="btn-browse-hardsub-dir" data-i18n="hardsub.changeFolder" type="button">Change...</button>
-                      <button class="btn-secondary btn-sm" id="btn-reset-hardsub-dir" data-i18n="hardsub.resetFolder" type="button" style="display:none;">Reset</button>
+
+                    <div class="translate-save-mode-pills" id="hardsub-output-location-modes" role="radiogroup" aria-labelledby="lbl-hardsub-output-folder">
+                      <button type="button" class="translate-preset-pill active" id="hardsub-output-mode-input" data-output-mode="input_dir" role="radio" aria-checked="true" tabindex="0" data-i18n-title="settings.outputDirSameAsInput" title="Same as Input File Directory (Default)">
+                        <span class="translate-format-dot" aria-hidden="true"></span>
+                        <span class="translate-pill-label" data-i18n="transcribe.saveLocationSameAsInput">Same as Input</span>
+                      </button>
+                      <button type="button" class="translate-preset-pill" id="hardsub-output-mode-custom" data-output-mode="custom" role="radio" aria-checked="false" tabindex="-1" data-i18n-title="settings.outputDirCustom" title="Custom Directory...">
+                        <span class="translate-format-dot" aria-hidden="true"></span>
+                        <span class="translate-pill-label" data-i18n="transcribe.saveLocationCustom">Custom Folder</span>
+                      </button>
+                    </div>
+
+                    <div class="translate-output-custom-panel" id="hardsub-output-custom-row" style="display:none; margin-top: 10px;">
+                      <div class="translate-output-row">
+                        <div class="translate-output-display" id="hardsub-output-dir-text" data-i18n="settings.outputDirSelectPlaceholder">Select output folder...</div>
+                        <button type="button" class="btn-secondary translate-output-open-btn" id="btn-open-hardsub-dir" data-i18n-title="settings.openOutputDirTooltip" data-i18n-aria="settings.openOutputDirTooltip" title="Click to open output folder in File Manager" aria-label="Open output folder in File Manager" disabled>
+                          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                            <polyline points="15 3 21 3 21 9"/>
+                            <line x1="10" y1="14" x2="21" y2="3"/>
+                          </svg>
+                        </button>
+                        <button class="btn-secondary btn-sm" id="btn-browse-hardsub-dir" data-i18n="common.browse" type="button" aria-describedby="hardsub-output-dir-text">Browse</button>
+                      </div>
                     </div>
                   </div>
 

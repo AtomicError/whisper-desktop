@@ -189,6 +189,15 @@ pub fn remove(parent_dir: &Path, output_file_name: &str) {
     let _ = fs::remove_file(TranslationCheckpoint::path_for(parent_dir, output_file_name));
 }
 
+/// Removes the checkpoint if present and reports whether a file was deleted.
+pub fn remove_if_exists(parent_dir: &Path, output_file_name: &str) -> bool {
+    let path = TranslationCheckpoint::path_for(parent_dir, output_file_name);
+    if !path.exists() {
+        return false;
+    }
+    fs::remove_file(path).is_ok()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

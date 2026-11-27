@@ -100,6 +100,14 @@ pub struct WhisperSettings {
     pub translate_ai_providers: String,
     pub translate_ai_custom_prompt: String,
     pub translate_ai_polish: bool,
+    #[serde(default = "default_translate_ai_temperature", deserialize_with = "deserialize_f64_lenient")]
+    pub translate_ai_temperature: f64,
+    #[serde(default = "default_translate_ai_batch_size", deserialize_with = "deserialize_i32_lenient")]
+    pub translate_ai_batch_size: i32,
+    #[serde(default = "default_output_dir_mode")]
+    pub translate_output_dir_mode: String, // "input_dir" or "custom"
+    #[serde(default)]
+    pub translate_output_dir_path: String,
     #[serde(default = "default_engine_source")]
     pub ffmpeg_source: String, // "bundled" or "system"
     #[serde(default = "default_whisper_source")]
@@ -204,6 +212,14 @@ fn default_output_dir_mode() -> String {
     "input_dir".to_string()
 }
 
+fn default_translate_ai_temperature() -> f64 {
+    0.3
+}
+
+fn default_translate_ai_batch_size() -> i32 {
+    30
+}
+
 fn default_ui_language() -> String {
     "en".to_string()
 }
@@ -282,6 +298,10 @@ impl WhisperSettings {
             translate_ai_providers: "[]".to_string(),
             translate_ai_custom_prompt: "".to_string(),
             translate_ai_polish: false,
+            translate_ai_temperature: default_translate_ai_temperature(),
+            translate_ai_batch_size: default_translate_ai_batch_size(),
+            translate_output_dir_mode: default_output_dir_mode(),
+            translate_output_dir_path: "".to_string(),
             ffmpeg_source: default_engine_source(),
             whisper_source: default_engine_source(),
             output_dir_mode: "input_dir".to_string(),
@@ -426,6 +446,21 @@ impl WhisperSettings {
 
         self.temperature = if self.temperature.is_finite() { self.temperature } else { defaults.temperature }.clamp(0.0, 2.0);
         self.temperature_inc = if self.temperature_inc.is_finite() { self.temperature_inc } else { defaults.temperature_inc }.clamp(0.0, 2.0);
+
+        self.translate_ai_temperature = if self.translate_ai_temperature.is_finite() {
+            (self.translate_ai_temperature * 100.0).round() / 100.0
+        } else {
+            defaults.translate_ai_temperature
+        }
+        .clamp(0.0, 2.0);
+        self.translate_ai_batch_size = if self.translate_ai_batch_size <= 0 {
+            defaults.translate_ai_batch_size
+        } else {
+            self.translate_ai_batch_size.clamp(1, 30)
+        };
+        if self.translate_output_dir_mode != "custom" {
+            self.translate_output_dir_mode = default_output_dir_mode();
+        }
 
         self.word_thold = if self.word_thold.is_finite() { self.word_thold } else { defaults.word_thold }.clamp(0.0, 1.0);
         self.no_speech_thold = if self.no_speech_thold.is_finite() { self.no_speech_thold } else { defaults.no_speech_thold }.clamp(0.0, 1.0);

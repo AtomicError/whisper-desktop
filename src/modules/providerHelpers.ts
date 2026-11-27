@@ -145,3 +145,15 @@ export function normalizeProviderModelsList(models: ModelObject[]): ModelObject[
   });
   return validModels;
 }
+
+export function isModelReasoningSupported(modelObj: ModelObject | null | undefined): boolean {
+  if (!modelObj || typeof modelObj !== 'object') return false;
+  if (typeof modelObj.supportsReasoning === 'boolean') {
+    return modelObj.supportsReasoning;
+  }
+  if (typeof modelObj.supports_reasoning === 'boolean') {
+    return modelObj.supports_reasoning;
+  }
+  const reasoning = (modelObj.reasoning || '').trim().toLowerCase();
+  return Boolean(reasoning && reasoning !== 'none');
+}

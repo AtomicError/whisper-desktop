@@ -77,6 +77,10 @@ export interface SettingsState {
   translateAiProviders?: string;
   translateAiCustomPrompt?: string;
   translateAiPolish?: boolean;
+  translateAiTemperature?: number;
+  translateAiBatchSize?: number;
+  translateOutputDirMode?: string;
+  translateOutputDirPath?: string;
   [key: string]: any;
 }
 

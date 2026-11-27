@@ -1578,9 +1578,18 @@ pub async fn translate_files(
     // `None` = auto mode (conservative default, reactive discovery).
     let mut max_output_override = active_model.and_then(|m| m.max_output_tokens).filter(|&t| t >= MIN_OUTPUT_TOKENS);
 
-    let mut request_options = build_initial_request_options(api_format, active_model, 0);
-    let system_prompt = build_system_prompt(
+    let mut request_options = build_initial_request_options(
+        api_format,
+        active_model,
+        0,
+        settings.translate_ai_temperature,
+    );
+    let effective_custom_prompt = resolve_effective_custom_prompt(
+        &settings.translate_ai_custom_prompt,
         &provider.custom_prompt,
+    );
+    let system_prompt = build_system_prompt(
+        effective_custom_prompt,
         &settings.translate_ai_target_lang,
         settings.translate_ai_polish,
     );
@@ -1755,7 +1764,8 @@ pub async fn translate_files(
 
         let mut stall_rounds: usize = 0;
         let mut is_first_resumed_chunk = resumed_lines > 0;
-        let mut effective_max_items: usize = MAX_ITEMS_PER_CHUNK;
+        let initial_batch_cap = resolve_batch_size_cap(settings.translate_ai_batch_size);
+        let mut effective_max_items: usize = initial_batch_cap;
 
         'chunk_loop: while !remaining_entries.is_empty() {
             // Honour a cancel request between chunks.
@@ -2106,18 +2116,197 @@ pub struct PreviewLine {
     pub is_fallback: bool,
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CheckpointInfo {
+    pub translated_lines: usize,
+    pub total_lines: usize,
+}
+
+pub(crate) fn resolve_effective_custom_prompt<'a>(
+    override_prompt: &'a str,
+    provider_prompt: &'a str,
+) -> &'a str {
+    let trimmed_override = override_prompt.trim();
+    if !trimmed_override.is_empty() {
+        trimmed_override
+    } else {
+        provider_prompt.trim()
+    }
+}
+
+pub(crate) fn resolve_batch_size_cap(batch_size: i32) -> usize {
+    if batch_size <= 0 {
+        MAX_ITEMS_PER_CHUNK
+    } else {
+        (batch_size as usize).clamp(1, MAX_ITEMS_PER_CHUNK)
+    }
+}
+
+pub(crate) fn normalize_translation_temperature(temp: f64) -> f64 {
+    if temp.is_finite() {
+        ((temp * 100.0).round() / 100.0).clamp(0.0, 2.0)
+    } else {
+        0.3
+    }
+}
+
+struct CheckpointLookupContext {
+    parent_dir: String,
+    target_dir: String,
+    file_name: String,
+    output_file_name: String,
+    lang_code: String,
+    ext: String,
+    model_id: String,
+    system_prompt: String,
+    content: String,
+    total_lines: usize,
+}
+
+fn build_checkpoint_lookup_context(
+    settings: &WhisperSettings,
+    subtitle_path: &str,
+    output_dir: Option<&str>,
+) -> Option<CheckpointLookupContext> {
+    let clean_sub = subtitle_path.trim();
+    if clean_sub.is_empty() {
+        return None;
+    }
+    let path = Path::new(clean_sub);
+    if !path.exists() {
+        return None;
+    }
+    let parent_dir = path.parent()?.to_string_lossy().to_string();
+    let file_name = path.file_name()?.to_string_lossy().to_string();
+    let ext = path.extension()?.to_str()?.to_lowercase();
+    if ext != "srt" && ext != "vtt" && ext != "lrc" && ext != "txt" {
+        return None;
+    }
+    let model_id = settings.translate_ai_model.trim();
+    if model_id.is_empty() || settings.translate_ai_provider.trim().is_empty() {
+        return None;
+    }
+
+    let providers_list: Vec<AiProvider> = serde_json::from_str(&settings.translate_ai_providers).ok()?;
+    let provider = providers_list
+        .iter()
+        .find(|p| p.name == settings.translate_ai_provider)?;
+
+    let effective_prompt = resolve_effective_custom_prompt(
+        &settings.translate_ai_custom_prompt,
+        &provider.custom_prompt,
+    );
+    let system_prompt = build_system_prompt(
+        effective_prompt,
+        &settings.translate_ai_target_lang,
+        settings.translate_ai_polish,
+    );
+    let lang_code = get_language_code(&settings.translate_ai_target_lang);
+    let stem = path.file_stem()?.to_string_lossy();
+    let output_file_name = format!("{}.{}.{}", stem, lang_code, ext);
+    let target_dir = match output_dir {
+        Some(dir) if !dir.trim().is_empty() => dir.trim().to_string(),
+        _ => parent_dir.clone(),
+    };
+    let content = read_subtitle_string(path).ok()?;
+    let parsed = ParsedSubtitle::parse(&content, &ext);
+    let total_lines = extract_translatable_entries(&parsed).len();
+    if total_lines == 0 {
+        return None;
+    }
+
+    Some(CheckpointLookupContext {
+        parent_dir,
+        target_dir,
+        file_name,
+        output_file_name,
+        lang_code,
+        ext,
+        model_id: model_id.to_string(),
+        system_prompt,
+        content,
+        total_lines,
+    })
+}
+
+pub fn inspect_checkpoint(
+    settings: &WhisperSettings,
+    subtitle_path: &str,
+    output_dir: Option<&str>,
+) -> Option<CheckpointInfo> {
+    let ctx = build_checkpoint_lookup_context(settings, subtitle_path, output_dir)?;
+    let loaded = crate::translation::checkpoint::load(
+        Path::new(&ctx.target_dir),
+        &ctx.output_file_name,
+        &ctx.file_name,
+        &ctx.lang_code,
+        &ctx.ext,
+        &settings.translate_ai_provider,
+        &ctx.model_id,
+        &ctx.system_prompt,
+        &ctx.content,
+    )
+    .or_else(|| {
+        if ctx.target_dir != ctx.parent_dir {
+            crate::translation::checkpoint::load(
+                Path::new(&ctx.parent_dir),
+                &ctx.output_file_name,
+                &ctx.file_name,
+                &ctx.lang_code,
+                &ctx.ext,
+                &settings.translate_ai_provider,
+                &ctx.model_id,
+                &ctx.system_prompt,
+                &ctx.content,
+            )
+        } else {
+            None
+        }
+    })?;
+
+    let translated_lines = loaded.translations.len().min(ctx.total_lines);
+    if translated_lines == 0 {
+        return None;
+    }
+    Some(CheckpointInfo {
+        translated_lines,
+        total_lines: ctx.total_lines,
+    })
+}
+
+pub fn clear_checkpoint(
+    settings: &WhisperSettings,
+    subtitle_path: &str,
+    output_dir: Option<&str>,
+) -> bool {
+    let Some(ctx) = build_checkpoint_lookup_context(settings, subtitle_path, output_dir) else {
+        return false;
+    };
+    let removed_target =
+        crate::translation::checkpoint::remove_if_exists(Path::new(&ctx.target_dir), &ctx.output_file_name);
+    let removed_parent = if ctx.target_dir != ctx.parent_dir {
+        crate::translation::checkpoint::remove_if_exists(Path::new(&ctx.parent_dir), &ctx.output_file_name)
+    } else {
+        false
+    };
+    removed_target || removed_parent
+}
+
 /// Builds initial per-model `RequestOptions` shared by both real translation and
 /// Settings preview tests so reasoning effort and output caps never drift apart.
 fn build_initial_request_options(
     api_format: ApiFormat,
     active_model: Option<&AiModel>,
     prompt_char_len: usize,
+    temperature: f64,
 ) -> RequestOptions {
     let max_output_override = active_model
         .and_then(|m| m.max_output_tokens)
         .filter(|&t| t >= MIN_OUTPUT_TOKENS);
 
     RequestOptions {
+        temperature: normalize_translation_temperature(temperature),
         max_output_tokens: if api_format == ApiFormat::AnthropicMessages {
             Some(estimate_max_output_tokens(prompt_char_len, max_output_override))
         } else {
@@ -2221,8 +2410,12 @@ pub async fn preview_translate(
     }
 
     let client = build_preview_http_client();
-    let system_prompt = build_system_prompt(
+    let effective_custom_prompt = resolve_effective_custom_prompt(
+        &settings.translate_ai_custom_prompt,
         &provider.custom_prompt,
+    );
+    let system_prompt = build_system_prompt(
+        effective_custom_prompt,
         &settings.translate_ai_target_lang,
         settings.translate_ai_polish,
     );
@@ -2238,6 +2431,7 @@ pub async fn preview_translate(
         api_format,
         active_model,
         system_prompt.len() + user_content.len(),
+        settings.translate_ai_temperature,
     );
 
     let cancel_watcher = async {
@@ -2859,9 +3053,11 @@ mod alignment_tests {
             ApiFormat::AnthropicMessages,
             Some(&reasoning_model),
             120_000,
+            0.3,
         );
         assert_eq!(anthropic_opts.reasoning_effort.as_deref(), Some("Low"));
         assert_eq!(anthropic_opts.max_output_tokens, Some(4096));
+        assert!((anthropic_opts.temperature - 0.3).abs() < f64::EPSILON);
 
         let blocked_reasoning = AiModel {
             supports_reasoning: Some(false),
@@ -2871,9 +3067,11 @@ mod alignment_tests {
             ApiFormat::OpenAiCompatible,
             Some(&blocked_reasoning),
             500,
+            0.6,
         );
         assert_eq!(openai_opts.reasoning_effort, None);
         assert_eq!(openai_opts.max_output_tokens, None);
+        assert!((openai_opts.temperature - 0.6).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -2980,6 +3178,7 @@ mod alignment_tests {
             ApiFormat::OpenAiCompatible,
             Some(&provider.models[0]),
             100,
+            0.3,
         );
         assert_eq!(opts.reasoning_effort.as_deref(), Some("low"));
         assert!(opts.include_reasoning_effort);
@@ -3595,5 +3794,88 @@ mod alignment_tests {
             req_gemini.headers().get("x-goog-api-key").and_then(|v| v.to_str().ok()),
             Some("AIzaTest789")
         );
+    }
+
+    #[test]
+    fn phase2_translation_knobs_resolve_and_checkpoint_inspect_clear_work() {
+        assert_eq!(
+            resolve_effective_custom_prompt("  Project tone  ", "Provider default"),
+            "Project tone"
+        );
+        assert_eq!(
+            resolve_effective_custom_prompt("   ", "  Provider default  "),
+            "Provider default"
+        );
+        assert_eq!(resolve_batch_size_cap(0), MAX_ITEMS_PER_CHUNK);
+        assert_eq!(resolve_batch_size_cap(10), 10);
+        assert_eq!(resolve_batch_size_cap(99), MAX_ITEMS_PER_CHUNK);
+        assert!((normalize_translation_temperature(f64::NAN) - 0.3).abs() < f64::EPSILON);
+        assert!((normalize_translation_temperature(5.0) - 2.0).abs() < f64::EPSILON);
+
+        let base_dir = std::env::temp_dir().join(format!(
+            "whisper-trans-ckpt-cmd-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&base_dir).unwrap();
+        let sub_path = base_dir.join("movie.srt");
+        let content = "1\n00:00:01,000 --> 00:00:02,000\nHello\n\n2\n00:00:03,000 --> 00:00:04,000\nWorld\n";
+        fs::write(&sub_path, content).unwrap();
+
+        let provider = AiProvider {
+            name: "OpenAI".to_string(),
+            base_url: "https://api.openai.com/v1".to_string(),
+            api_key: "sk-test".to_string(),
+            api_format: "Chat completions".to_string(),
+            use_keyring: false,
+            models: vec![AiModel {
+                id: "gpt-4o".to_string(),
+                context_window: 128_000,
+                max_output_tokens: None,
+                reasoning: "None".to_string(),
+                supports_reasoning: None,
+                vision: false,
+                enabled: true,
+            }],
+            custom_prompt: "Provider default".to_string(),
+        };
+
+        let mut settings = WhisperSettings::default_settings();
+        settings.translate_ai_provider = "OpenAI".to_string();
+        settings.translate_ai_model = "gpt-4o".to_string();
+        settings.translate_ai_target_lang = "Persian".to_string();
+        settings.translate_ai_custom_prompt = "Override prompt".to_string();
+        settings.translate_ai_providers = serde_json::to_string(&vec![provider]).unwrap();
+
+        let effective_prompt = build_system_prompt(
+            resolve_effective_custom_prompt(&settings.translate_ai_custom_prompt, "Provider default"),
+            &settings.translate_ai_target_lang,
+            settings.translate_ai_polish,
+        );
+        let mut map = HashMap::new();
+        map.insert(1usize, "سلام".to_string());
+        let ckpt = crate::translation::checkpoint::TranslationCheckpoint::new(
+            "movie.srt",
+            "fa",
+            "srt",
+            "OpenAI",
+            "gpt-4o",
+            &effective_prompt,
+            content,
+            map,
+        );
+        crate::translation::checkpoint::save(&base_dir, "movie.fa.srt", &ckpt).unwrap();
+
+        let info = inspect_checkpoint(&settings, sub_path.to_str().unwrap(), None).unwrap();
+        assert_eq!(info.translated_lines, 1);
+        assert_eq!(info.total_lines, 2);
+
+        assert!(clear_checkpoint(&settings, sub_path.to_str().unwrap(), None));
+        assert!(inspect_checkpoint(&settings, sub_path.to_str().unwrap(), None).is_none());
+        assert!(!clear_checkpoint(&settings, sub_path.to_str().unwrap(), None));
+
+        let _ = fs::remove_dir_all(&base_dir);
     }
 }

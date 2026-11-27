@@ -473,6 +473,32 @@ pub fn cancel_preview_translate() -> Result<(), String> {
 }
 
 #[tauri::command]
+pub async fn get_translation_checkpoint_info(
+    settings: WhisperSettings,
+    subtitle_path: String,
+    output_dir: Option<String>,
+) -> Result<Option<translator::CheckpointInfo>, String> {
+    tokio::task::spawn_blocking(move || {
+        translator::inspect_checkpoint(&settings, &subtitle_path, output_dir.as_deref())
+    })
+    .await
+    .map_err(|e| format!("Checkpoint inspection failed: {}", e))
+}
+
+#[tauri::command]
+pub async fn clear_translation_checkpoint(
+    settings: WhisperSettings,
+    subtitle_path: String,
+    output_dir: Option<String>,
+) -> Result<bool, String> {
+    tokio::task::spawn_blocking(move || {
+        translator::clear_checkpoint(&settings, &subtitle_path, output_dir.as_deref())
+    })
+    .await
+    .map_err(|e| format!("Checkpoint removal failed: {}", e))
+}
+
+#[tauri::command]
 pub fn store_keyring_credential(provider_name: String, key: String) -> Result<(), String> {
     provider::store_keyring_key(&provider_name, &key)
 }

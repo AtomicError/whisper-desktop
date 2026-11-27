@@ -17,6 +17,7 @@ import {
   writeProviders,
   normalizeModelId,
   isModelIdMatch,
+  isModelReasoningSupported,
   hasDuplicateModelId,
   normalizeProviderModel,
   normalizeProviderModelsList
@@ -233,15 +234,7 @@ function dedupeLiveModels(models: ModelObject[]): ModelObject[] {
 export function isReasoningSupportedModel(modelObj: any): boolean {
   if (!modelObj) return false;
   if (typeof modelObj === 'object') {
-    if (typeof modelObj.supportsReasoning === 'boolean') {
-      return modelObj.supportsReasoning;
-    }
-    if (typeof modelObj.supports_reasoning === 'boolean') {
-      return modelObj.supports_reasoning;
-    }
-    const reasoning = (modelObj.reasoning || '').trim().toLowerCase();
-    if (reasoning && reasoning !== 'none') return true;
-    return false;
+    return isModelReasoningSupported(modelObj);
   }
   if (typeof modelObj === 'string') {
     let found = currentProviderModels.find(m => m && m.id === modelObj);

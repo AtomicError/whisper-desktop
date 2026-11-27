@@ -1825,12 +1825,13 @@ export async function refreshWhisperStatus(
 export const INT_SETTING_KEYS = new Set([
   'threads', 'processors', 'offsetT', 'duration', 'maxContext', 'maxLen',
   'bestOf', 'beamSize', 'audioCtx', 'deviceId', 'vadMinSpeech', 'vadMinSil', 'vadSpeechPad',
-  'confidenceThreshold'
+  'confidenceThreshold', 'translateAiBatchSize'
 ]);
 
 export const FLOAT_SETTING_KEYS = new Set([
   'wordThold', 'entropyThold', 'logprobThold', 'noSpeechThold',
-  'temperature', 'temperatureInc', 'vadThold', 'vadMaxSpeech', 'vadOverlap', 'uiScale'
+  'temperature', 'temperatureInc', 'vadThold', 'vadMaxSpeech', 'vadOverlap', 'uiScale',
+  'translateAiTemperature'
 ]);
 
 export function sanitizeSettingsPayload(state: any): any {
@@ -1840,6 +1841,9 @@ export function sanitizeSettingsPayload(state: any): any {
     clean.translateAiEnabled = Boolean(clean.autoTransferToTranslate);
   } else if (clean.translateAiEnabled !== undefined) {
     clean.autoTransferToTranslate = Boolean(clean.translateAiEnabled);
+  }
+  if (clean.translateOutputDirMode !== undefined) {
+    clean.translateOutputDirMode = clean.translateOutputDirMode === 'custom' ? 'custom' : 'input_dir';
   }
   for (const key of Object.keys(clean)) {
     if (INT_SETTING_KEYS.has(key)) {

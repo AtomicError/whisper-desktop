@@ -36,6 +36,8 @@ allow = [
   "translate_transcription_files",
   "preview_translate_first_lines",
   "cancel_preview_translate",
+  "get_translation_checkpoint_info",
+  "clear_translation_checkpoint",
   "store_keyring_credential",
   "get_keyring_credential",
   "delete_keyring_credential",

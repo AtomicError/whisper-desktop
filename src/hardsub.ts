@@ -1,6 +1,7 @@
 import { t, getLanguage, isRtlLanguage, firstStrongDirection, applyTextDirection, applyContentDirection, clearContentDirection, isolateDirection, isolateLtr } from './i18n/index';
 import { spanOrigins, assRunOrder, protectRtlPunctuation, calculateSubtitleLineLayout, calculateSubtitleBoxGeometry, hasArabicScript, isArabicScriptFont, resolveEffectiveFont, toAssFontName } from './hardsubLayout';
 import { formatTimecodeHTML, formatSpeedLabel } from './modules/companionPlayer';
+import { openFileInEditor } from './modules/nativeWindow';
 
 const invoke = async <T>(cmd: string, args: Record<string, any> = {}): Promise<T> => {
   const tauri = (window as any).__TAURI__;
@@ -68,6 +69,7 @@ export interface HardsubSettings {
   videoPath: string;
   subtitlePath: string;
   outputPath: string;
+  outputDirMode?: 'input_dir' | 'custom';
   outputDir?: string;
   outputFormat: string;
   videoCodec: string;
@@ -995,7 +997,12 @@ export class HardsubController {
   private audioBitrateSelect: HTMLSelectElement | null = null;
   private ffmpegCmdPreview: HTMLElement | null = null;
   private btnCopyFfmpegCmd: HTMLButtonElement | null = null;
+  private outputLocationModes: HTMLElement | null = null;
+  private outputModeInputBtn: HTMLButtonElement | null = null;
+  private outputModeCustomBtn: HTMLButtonElement | null = null;
+  private outputCustomRow: HTMLElement | null = null;
   private outputDirText: HTMLElement | null = null;
+  private btnOpenDir: HTMLButtonElement | null = null;
   private btnBrowseDir: HTMLButtonElement | null = null;
   private btnResetDir: HTMLButtonElement | null = null;
   private btnOpenFolder: HTMLButtonElement | null = null;
@@ -1005,6 +1012,9 @@ export class HardsubController {
   private systemFontOptgroup: HTMLOptGroupElement | null = null;
   private hasCustomFontSelection: boolean = false;
   private lastExportedPath: string | null = null;
+  private isBrowsingOutputDir: boolean = false;
+  private isOpeningOutputDir: boolean = false;
+  private openDirCooldownTimer: ReturnType<typeof setTimeout> | null = null;
   private lastStatusPayload: {
     progress: number;
     message: string;
@@ -1019,6 +1029,7 @@ export class HardsubController {
     videoPath: '',
     subtitlePath: '',
     outputPath: '',
+    outputDirMode: 'input_dir',
     outputDir: '',
     outputFormat: 'mp4',
     videoCodec: 'h264',
@@ -1170,6 +1181,11 @@ export class HardsubController {
       this.resizeDebounceTimer = null;
     }
     if (this.storageDebounceTimer !== null) clearTimeout(this.storageDebounceTimer);
+    if (this.openDirCooldownTimer !== null) {
+      clearTimeout(this.openDirCooldownTimer);
+      this.openDirCooldownTimer = null;
+    }
+    this.isOpeningOutputDir = false;
     if (this.styleStorageDebounceTimer !== null) clearTimeout(this.styleStorageDebounceTimer);
     if (this.searchDebounceTimer !== null) clearTimeout(this.searchDebounceTimer);
     for (const teardown of this.domTeardowns.splice(0)) teardown();
@@ -1579,7 +1595,12 @@ export class HardsubController {
     this.telemetryBox = document.getElementById('hardsub-telemetry-box');
 
     // Output Folder Controls & Completion Action
+    this.outputLocationModes = document.getElementById('hardsub-output-location-modes');
+    this.outputModeInputBtn = document.getElementById('hardsub-output-mode-input') as HTMLButtonElement;
+    this.outputModeCustomBtn = document.getElementById('hardsub-output-mode-custom') as HTMLButtonElement;
+    this.outputCustomRow = document.getElementById('hardsub-output-custom-row');
     this.outputDirText = document.getElementById('hardsub-output-dir-text');
+    this.btnOpenDir = document.getElementById('btn-open-hardsub-dir') as HTMLButtonElement;
     this.btnBrowseDir = document.getElementById('btn-browse-hardsub-dir') as HTMLButtonElement;
     this.btnResetDir = document.getElementById('btn-reset-hardsub-dir') as HTMLButtonElement;
     this.btnOpenFolder = document.getElementById('btn-open-hardsub-folder') as HTMLButtonElement;
@@ -2283,8 +2304,39 @@ export class HardsubController {
     });
 
     // Output Directory Controls
+    this.on(this.outputModeInputBtn, 'click', () => {
+      this.setOutputDirMode('input_dir');
+    });
+
+    this.on(this.outputModeCustomBtn, 'click', () => {
+      this.setOutputDirMode('custom');
+    });
+
+    this.on(this.outputLocationModes, 'keydown', ((e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'ArrowUp' && e.key !== 'ArrowDown') {
+        return;
+      }
+      if (this.isEncoding) return;
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      const isInputBtn = target.id === 'hardsub-output-mode-input';
+      const isCustomBtn = target.id === 'hardsub-output-mode-custom';
+      if (!isInputBtn && !isCustomBtn) return;
+
+      e.preventDefault();
+      const nextMode: 'input_dir' | 'custom' = isInputBtn ? 'custom' : 'input_dir';
+      const nextBtn = nextMode === 'custom' ? this.outputModeCustomBtn : this.outputModeInputBtn;
+      nextBtn?.focus?.();
+      this.setOutputDirMode(nextMode);
+    }) as EventListener);
+
+    this.on(this.btnOpenDir, 'click', () => {
+      void this.openCustomOutputDir();
+    });
+
     this.on(this.btnBrowseDir, 'click', () => {
-      this.browseOutputDir();
+      void this.browseOutputDir();
     });
 
     this.on(this.btnResetDir, 'click', () => {
@@ -5021,7 +5073,7 @@ export class HardsubController {
     const format = this.state.outputFormat || 'mp4';
     const outFileName = `${stem}_hardsub.${format}`;
 
-    if (this.state.outputDir) {
+    if (this.state.outputDirMode === 'custom' && this.state.outputDir) {
       this.state.outputPath = joinPath(this.state.outputDir, outFileName);
     } else {
       const parentDir = getParentDir(originalVideoPath);
@@ -5029,39 +5081,143 @@ export class HardsubController {
     }
   }
 
+  public setOutputDirMode(mode: 'input_dir' | 'custom') {
+    if (this.isEncoding) return;
+    const normalized: 'input_dir' | 'custom' = mode === 'custom' ? 'custom' : 'input_dir';
+    if (this.state.outputDirMode !== normalized) {
+      this.state.outputDirMode = normalized;
+    }
+    this.updateComputedOutputPath();
+    this.updateOutputDirUI();
+    this.updateFfmpegCommandPreview();
+  }
+
+  public async openCustomOutputDir() {
+    if (this.isOpeningOutputDir) return;
+    const dirPath = String(this.state.outputDir || '').trim();
+    const notifyFn = (window as any).showNotification;
+    if (!dirPath) {
+      if (typeof notifyFn === 'function') notifyFn(t('toasts.noOutputDirFound'), 'info');
+      return;
+    }
+
+    this.isOpeningOutputDir = true;
+    try {
+      try {
+        await invoke('verify_directory_writable', { dirPath });
+      } catch (permErr) {
+        if (typeof notifyFn === 'function') notifyFn(t('toasts.outputDirNotWritable', { error: String(permErr) }), 'error');
+        return;
+      }
+      const win = window as any;
+      if (typeof win.openFileInEditor === 'function') {
+        await win.openFileInEditor(dirPath);
+      } else {
+        await openFileInEditor(dirPath);
+      }
+    } catch (err: any) {
+      console.error('Failed to open output directory:', err);
+      const msg = (err && (err.message || err.toString())) || String(err);
+      if (typeof notifyFn === 'function') notifyFn(t('toasts.openFolderError', { error: msg }), 'error');
+    } finally {
+      if (this.openDirCooldownTimer) {
+        clearTimeout(this.openDirCooldownTimer);
+        this.openDirCooldownTimer = null;
+      }
+      if (this.disposed) {
+        this.isOpeningOutputDir = false;
+      } else {
+        this.openDirCooldownTimer = setTimeout(() => {
+          this.openDirCooldownTimer = null;
+          this.isOpeningOutputDir = false;
+        }, 1000);
+      }
+    }
+  }
+
   public async browseOutputDir() {
+    if (this.isBrowsingOutputDir || this.isEncoding) return;
+    this.isBrowsingOutputDir = true;
+    if (this.btnBrowseDir) {
+      this.btnBrowseDir.disabled = true;
+    }
     try {
       const selected = await invoke<string | null>('select_directory');
-      if (selected) {
+      if (selected && !this.isEncoding) {
+        try {
+          await invoke('verify_directory_writable', { dirPath: selected });
+        } catch (permErr) {
+          const notifyFn = (window as any).showNotification;
+          if (typeof notifyFn === 'function') notifyFn(t('toasts.outputDirNotWritable', { error: String(permErr) }), 'error');
+          return;
+        }
         this.state.outputDir = selected;
+        this.state.outputDirMode = 'custom';
         this.updateComputedOutputPath();
         this.updateOutputDirUI();
         this.updateFfmpegCommandPreview();
       }
     } catch (err) {
       console.error('Failed to select directory:', err);
+    } finally {
+      this.isBrowsingOutputDir = false;
+      if (this.btnBrowseDir) {
+        this.btnBrowseDir.disabled = this.isEncoding;
+      }
     }
   }
 
   public resetOutputDir() {
     this.state.outputDir = '';
+    this.state.outputDirMode = 'input_dir';
     this.updateComputedOutputPath();
     this.updateOutputDirUI();
     this.updateFfmpegCommandPreview();
   }
 
   private updateOutputDirUI() {
-    if (!this.outputDirText || !this.btnResetDir) return;
-    if (this.state.outputDir) {
-      this.outputDirText.textContent = this.state.outputDir;
-      this.outputDirText.title = isolateLtr(this.state.outputDir);
-      this.outputDirText.classList.add('has-custom-path');
-      this.btnResetDir.style.display = 'inline-flex';
-    } else {
-      this.outputDirText.textContent = t('hardsub.sameAsSource');
-      this.outputDirText.removeAttribute('title');
-      this.outputDirText.classList.remove('has-custom-path');
-      this.btnResetDir.style.display = 'none';
+    const isCustomMode = this.state.outputDirMode === 'custom';
+    const customPath = String(this.state.outputDir || '').trim();
+    const hasCustomPath = Boolean(customPath);
+
+    if (this.outputModeInputBtn) {
+      this.outputModeInputBtn.classList?.toggle?.('active', !isCustomMode);
+      this.outputModeInputBtn.setAttribute?.('aria-checked', !isCustomMode ? 'true' : 'false');
+      this.outputModeInputBtn.setAttribute?.('tabindex', !isCustomMode ? '0' : '-1');
+    }
+    if (this.outputModeCustomBtn) {
+      this.outputModeCustomBtn.classList?.toggle?.('active', isCustomMode);
+      this.outputModeCustomBtn.setAttribute?.('aria-checked', isCustomMode ? 'true' : 'false');
+      this.outputModeCustomBtn.setAttribute?.('tabindex', isCustomMode ? '0' : '-1');
+    }
+    if (this.outputCustomRow) {
+      this.outputCustomRow.style.display = isCustomMode ? 'block' : 'none';
+    }
+    if (this.btnOpenDir) {
+      this.btnOpenDir.disabled = !hasCustomPath;
+    }
+
+    if (this.outputDirText) {
+      if (hasCustomPath) {
+        this.outputDirText.removeAttribute?.('data-i18n');
+        this.outputDirText.textContent = customPath;
+        this.outputDirText.title = isolateLtr(customPath);
+        this.outputDirText.classList.add('has-custom-path');
+      } else if (isCustomMode) {
+        this.outputDirText.setAttribute?.('data-i18n', 'settings.outputDirSelectPlaceholder');
+        this.outputDirText.textContent = t('settings.outputDirSelectPlaceholder') || 'Select output folder...';
+        this.outputDirText.removeAttribute('title');
+        this.outputDirText.classList.remove('has-custom-path');
+      } else {
+        this.outputDirText.setAttribute?.('data-i18n', 'hardsub.sameAsSource');
+        this.outputDirText.textContent = t('hardsub.sameAsSource');
+        this.outputDirText.removeAttribute('title');
+        this.outputDirText.classList.remove('has-custom-path');
+      }
+    }
+
+    if (this.btnResetDir) {
+      this.btnResetDir.style.display = (isCustomMode && hasCustomPath) ? 'inline-flex' : 'none';
     }
   }
 
@@ -5602,8 +5758,14 @@ export class HardsubController {
       }
     }
 
+    if (this.outputModeInputBtn) {
+      this.outputModeInputBtn.disabled = active;
+    }
+    if (this.outputModeCustomBtn) {
+      this.outputModeCustomBtn.disabled = active;
+    }
     if (this.btnBrowseDir) {
-      this.btnBrowseDir.disabled = active;
+      this.btnBrowseDir.disabled = active || this.isBrowsingOutputDir;
     }
     if (this.btnResetDir) {
       this.btnResetDir.disabled = active;
