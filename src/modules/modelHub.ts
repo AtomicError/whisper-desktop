@@ -1,5 +1,5 @@
 // Model Hub & Management Controller for Whisper Desktop
-import { t } from '../i18n/index';
+import { getLanguage, t } from '../i18n/index';
 import { formatNumberForLang } from '../i18n/formatters';
 import { escapeHTML } from './logsController';
 import { recommendModelsForSystem } from '../modelRecommender';
@@ -248,6 +248,10 @@ function renderQuickFilterBar(category: string, counts: { all: number; multi: nu
   `;
 }
 
+function getBannerCountsKey(counts: { all: number; multi: number; en: number; quant: number }): string {
+  return `${counts.all}:${counts.multi}:${counts.en}:${counts.quant}`;
+}
+
 export function renderFamilyHeaderBanner(category: string, counts = { all: 0, multi: 0, en: 0, quant: 0 }): string {
   const meta = FAMILY_BANNER_META[category] || FAMILY_BANNER_META.all;
   const title = t(meta.titleKey);
@@ -259,9 +263,11 @@ export function renderFamilyHeaderBanner(category: string, counts = { all: 0, mu
     ? `<div class="model-family-specs"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px; height:13px; opacity:0.85;"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><span>${escapeHTML(specs)}</span></div>`
     : '';
   const filterBarHtml = renderQuickFilterBar(category, counts);
+  const countsKey = getBannerCountsKey(counts);
+  const lang = getLanguage();
 
   return `
-    <div class="model-family-banner">
+    <div class="model-family-banner" data-category="${escapeHTML(category)}" data-counts="${countsKey}" data-lang="${escapeHTML(lang)}">
       <div class="model-family-banner-top">
         <div class="model-family-identity">
           <div class="model-family-icon">${meta.iconSvg}</div>
@@ -311,8 +317,49 @@ function cancelModelSearchDebounce(): void {
   }
 }
 
+function syncQuickFilterTabsInBanner(banner: HTMLElement, activeFilter: string): void {
+  if (typeof banner.querySelectorAll !== 'function') return;
+  const tabButtons = banner.querySelectorAll('button[data-quick-filter]');
+  tabButtons.forEach(btn => {
+    const htmlBtn = btn as HTMLButtonElement;
+    const isActive = htmlBtn.dataset?.quickFilter === activeFilter;
+    htmlBtn.classList?.toggle?.('active', isActive);
+    htmlBtn.setAttribute?.('aria-selected', isActive ? 'true' : 'false');
+    htmlBtn.setAttribute?.('tabindex', isActive ? '0' : '-1');
+  });
+}
+
 export function switchModelQuickFilter(filter: string): void {
+  if (currentModelQuickFilter === filter) return;
   currentModelQuickFilter = filter;
+
+  if (typeof document !== 'undefined') {
+    const win = getGlobal();
+    const gridEl = document.getElementById('models-list-scroll') as (HTMLElement & { _modelDelegate?: boolean }) | null;
+    const cached = _cachedModelStatuses;
+    const hasCachedActive = Array.isArray(cached) && cached.some(m => m.status === 'Downloading');
+
+    if (
+      !hasCachedActive
+      && Array.isArray(cached)
+      && win.systemSpecs
+      && gridEl
+      && getConfiguredModelsDir(win)
+    ) {
+      // Cancel stale in-flight fetches and re-filter synchronously from cached statuses
+      _loadModelsSeq++;
+      renderModelHubGrid(gridEl, cached, win.systemSpecs);
+      return;
+    }
+
+    if (gridEl && typeof gridEl.querySelector === 'function') {
+      const existingBanner = gridEl.querySelector('.model-family-banner') as HTMLElement | null;
+      if (existingBanner && existingBanner.dataset?.category === currentCategoryFilter) {
+        syncQuickFilterTabsInBanner(existingBanner, filter);
+      }
+    }
+  }
+
   loadModelStatusesGrid(true);
 }
 
@@ -412,11 +459,14 @@ function updateSpecsSubtitle(systemSpecs: any): void {
 
   // Detach data-i18n so language switches/translateDOM do not overwrite the dynamic hardware summary
   specsSubtitle.removeAttribute('data-i18n');
-  specsSubtitle.innerHTML = t('models.systemSpecsDetected', {
+  const nextHtml = t('models.systemSpecsDetected', {
     ram: formatNumForLang(ramFormatted),
     cores: formatNumForLang(systemSpecs.cpu_cores),
     gpu: escapeHTML(gpuDisplayName)
   });
+  if (specsSubtitle.innerHTML !== nextHtml) {
+    specsSubtitle.innerHTML = nextHtml;
+  }
 }
 
 function filterCategoryModels(
@@ -842,6 +892,59 @@ function syncQuickFilterWithCounts(counts: { all: number; multi: number; en: num
   }
 }
 
+function getReusableFamilyBanner(
+  grid: HTMLElement,
+  category: string,
+  countsKey: string,
+  lang: string
+): HTMLElement | null {
+  if (typeof grid.querySelector !== 'function') return null;
+  const existing = grid.querySelector('.model-family-banner') as HTMLElement | null;
+  if (!existing) return null;
+  if (
+    existing.dataset?.category !== category
+    || existing.dataset?.counts !== countsKey
+    || existing.dataset?.lang !== lang
+  ) {
+    return null;
+  }
+  return existing;
+}
+
+function clearNonBannerGridChildren(grid: HTMLElement, preservedBanner: HTMLElement): void {
+  if (!grid.children) return;
+  Array.from(grid.children).forEach(child => {
+    if (child !== preservedBanner && typeof (child as HTMLElement).remove === 'function') {
+      (child as HTMLElement).remove();
+    }
+  });
+}
+
+function appendGridCards(
+  grid: HTMLElement,
+  categoryModels: ModelStatus[],
+  query: string,
+  recMap: Map<string, any>
+): number {
+  const useFragment = typeof document !== 'undefined' && typeof document.createDocumentFragment === 'function';
+  const target: DocumentFragment | HTMLElement = useFragment ? document.createDocumentFragment() : grid;
+  let renderedCount = 0;
+
+  for (const m of categoryModels) {
+    if (!matchesQuickFilter(m.name, query)) continue;
+    target.appendChild(buildModelCardElement(m, recMap.get(m.name)));
+    renderedCount++;
+  }
+
+  if (useFragment && renderedCount > 0) {
+    grid.appendChild(target);
+  }
+  if (renderedCount === 0) {
+    renderModelsEmptyState(grid, query);
+  }
+  return renderedCount;
+}
+
 function renderModelHubGrid(
   grid: HTMLElement & { _modelDelegate?: boolean },
   statuses: ModelStatus[],
@@ -877,8 +980,26 @@ function renderModelHubGrid(
 
   const focusSnap = captureGridFocus(grid);
   const prevScrollTop = grid.scrollTop;
-  grid.innerHTML = '';
   attachModelGridDelegate(grid);
+
+  const countsKey = getBannerCountsKey(counts);
+  const reusableBanner = !isSearching
+    ? getReusableFamilyBanner(grid, currentCategoryFilter, countsKey, getLanguage())
+    : null;
+
+  if (reusableBanner) {
+    // Keep the existing banner DOM node intact so quick-filter switches never replay fadeIn or drop tab focus
+    syncQuickFilterTabsInBanner(reusableBanner, currentModelQuickFilter);
+    clearNonBannerGridChildren(grid, reusableBanner);
+    appendGridCards(grid, categoryModels, query, recMap);
+    grid.scrollTop = prevScrollTop;
+    if (focusSnap && focusSnap.kind !== 'quickFilter') {
+      restoreGridFocus(grid, focusSnap);
+    }
+    return;
+  }
+
+  grid.innerHTML = '';
 
   if (!isSearching) {
     const bannerHtml = renderFamilyHeaderBanner(currentCategoryFilter, counts);
@@ -887,13 +1008,7 @@ function renderModelHubGrid(
     grid.insertAdjacentHTML('beforeend', renderSearchResultsBanner(categoryModels.length));
   }
 
-  let renderedCount = 0;
-  for (const m of categoryModels) {
-    if (!matchesQuickFilter(m.name, query)) continue;
-    grid.appendChild(buildModelCardElement(m, recMap.get(m.name)));
-    renderedCount++;
-  }
-  if (renderedCount === 0) renderModelsEmptyState(grid, query);
+  appendGridCards(grid, categoryModels, query, recMap);
 
   grid.scrollTop = prevScrollTop;
   restoreGridFocus(grid, focusSnap);

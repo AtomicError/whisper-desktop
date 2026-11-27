@@ -1011,5 +1011,113 @@ describe('modelHub', () => {
         vi.useRealTimers();
       }
     });
+
+    it('reuses family banner node in-place and filters synchronously on quick-filter switch without active downloads', async () => {
+      const { grid } = setupMinimalModelHubDom();
+      const invokeMock = vi.fn().mockImplementation((cmd: string) => {
+        if (cmd === 'get_all_models_status') {
+          return Promise.resolve([
+            { name: 'tiny', sizeBytes: 77691713, downloadedBytes: 0, progress: 0, status: 'NotDownloaded' },
+            { name: 'tiny-q8_0', sizeBytes: 43537433, downloadedBytes: 0, progress: 0, status: 'NotDownloaded' },
+            { name: 'tiny.en', sizeBytes: 77704715, downloadedBytes: 0, progress: 0, status: 'NotDownloaded' }
+          ]);
+        }
+        return Promise.resolve(null);
+      });
+      (globalThis as any).window.invoke = invokeMock;
+
+      const makeTabBtn = (qf: string, active: boolean) => {
+        const classes = new Set<string>(['model-segment-btn', ...(active ? ['active'] : [])]);
+        const btnAttrs = new Map<string, string>([
+          ['aria-selected', active ? 'true' : 'false'],
+          ['tabindex', active ? '0' : '-1']
+        ]);
+        return {
+          dataset: { quickFilter: qf },
+          classList: {
+            toggle: (c: string, force?: boolean) => {
+              if (force) classes.add(c);
+              else classes.delete(c);
+            },
+            contains: (c: string) => classes.has(c)
+          },
+          setAttribute: (k: string, v: string) => btnAttrs.set(k, v),
+          getAttribute: (k: string) => btnAttrs.get(k) || null
+        };
+      };
+
+      let bannerNode: any = null;
+      const tabButtons = [
+        makeTabBtn('all', true),
+        makeTabBtn('multi', false),
+        makeTabBtn('en', false),
+        makeTabBtn('quant', false)
+      ];
+      let insertCount = 0;
+
+      const origCreateElement = (globalThis as any).document.createElement;
+      (globalThis as any).document.createElement = (tag: string) => {
+        const el = origCreateElement(tag);
+        el.remove = () => {
+          const idx = grid.children.indexOf(el);
+          if (idx >= 0) grid.children.splice(idx, 1);
+        };
+        return el;
+      };
+
+      grid.insertAdjacentHTML = (_pos: string, html: string) => {
+        insertCount++;
+        const catMatch = html.match(/data-category="([^"]+)"/);
+        const countsMatch = html.match(/data-counts="([^"]+)"/);
+        const langMatch = html.match(/data-lang="([^"]+)"/);
+        bannerNode = {
+          isBanner: true,
+          html,
+          dataset: {
+            category: catMatch?.[1] || '',
+            counts: countsMatch?.[1] || '',
+            lang: langMatch?.[1] || ''
+          },
+          querySelectorAll: (sel: string) => (sel === 'button[data-quick-filter]' ? tabButtons : []),
+          remove: () => {
+            const idx = grid.children.indexOf(bannerNode);
+            if (idx >= 0) grid.children.splice(idx, 1);
+          }
+        };
+        grid.children.push(bannerNode);
+      };
+      grid.querySelector = (sel: string) => (sel === '.model-family-banner' ? bannerNode : null);
+
+      modelHub.setCategory('tiny', true);
+      await modelHub.loadStatuses(false, true);
+      expect(insertCount).toBe(1);
+      const initialBannerRef = bannerNode;
+      expect(grid.children.filter((c: any) => !c.isBanner).length).toBe(3);
+
+      invokeMock.mockClear();
+
+      // Switching quick filter should update tabs & cards synchronously without recreating banner or calling invoke
+      modelHub.setQuickFilter('en');
+      expect(invokeMock).not.toHaveBeenCalled();
+      expect(insertCount).toBe(1);
+      expect(grid.children[0]).toBe(initialBannerRef);
+      expect(tabButtons[0].classList.contains('active')).toBe(false);
+      expect(tabButtons[0].getAttribute('aria-selected')).toBe('false');
+      expect(tabButtons[0].getAttribute('tabindex')).toBe('-1');
+      expect(tabButtons[2].classList.contains('active')).toBe(true);
+      expect(tabButtons[2].getAttribute('aria-selected')).toBe('true');
+      expect(tabButtons[2].getAttribute('tabindex')).toBe('0');
+
+      const cardsAfterEn = grid.children.filter((c: any) => !c.isBanner);
+      expect(cardsAfterEn.length).toBe(1);
+      expect(cardsAfterEn[0].getAttribute('data-model')).toBe('tiny.en');
+    });
+
+    it('uses dark inset contrast on active segment count pill and prevents banner flex shrinking in models.css', () => {
+      const modelsCss = loadSourceFile('styles/views/models.css');
+      expect(modelsCss).toMatch(/\.model-family-banner\s*\{[^}]*flex-shrink:\s*0;/);
+      expect(modelsCss).toMatch(/\.model-segment-btn\.active\s+\.segment-count\s*\{[^}]*background:\s*rgba\(0,\s*0,\s*0,\s*0\.28\);/);
+      expect(modelsCss).toMatch(/@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*?\.model-family-banner[\s\S]*?\.model-segment-btn[\s\S]*?\.segment-count/);
+    });
   });
 });

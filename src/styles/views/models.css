@@ -120,6 +120,7 @@
   -webkit-backdrop-filter: blur(12px);
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
   gap: 12px;
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.2);
   transition: var(--transition-smooth);
@@ -243,7 +244,7 @@
   font-weight: 500;
   color: var(--color-text-muted);
   cursor: pointer;
-  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 0.18s cubic-bezier(0.16, 1, 0.3, 1), color 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1);
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -283,7 +284,7 @@
   box-sizing: border-box;
   background: rgba(255, 255, 255, 0.09);
   color: var(--color-text-dim);
-  transition: all 0.18s ease;
+  transition: background-color 0.18s ease, color 0.18s ease;
 }
 
 .model-segment-btn:hover .segment-count {
@@ -292,8 +293,9 @@
 }
 
 .model-segment-btn.active .segment-count {
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(0, 0, 0, 0.28);
   color: #fff;
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.18);
 }
 
 /* VAD / Special Info Pill */
@@ -520,9 +522,12 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .badge-downloading {
+  .badge-downloading,
+  .model-family-banner {
     animation: none;
   }
+  .model-segment-btn,
+  .segment-count,
   .model-action-btn,
   .model-action-btn svg {
     transition: none !important;
